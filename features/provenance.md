@@ -35,6 +35,22 @@ For a refresh, discover the exact type in the installed managed index, decompile
 read its relevant complete member/ranges, retain the logical DLL identity/hash/version and replace
 only records established by those bytes. Treat a changed hash as different evidence.
 
+The expanded map also reads 175 complete installed types using the existing focus-safe native
+decompiler fallback, `ilspycmd` / `ICSharpCode.Decompiler` version `10.1.0.8386`. Namespaces
+were resolved from the exact installed type index, including the seven issue types owned by
+SandBox. Both owning DLL hashes above were rechecked after those reads and remained identical.
+Native's installed module descriptor still identifies `v1.4.8`.
+[behavior-sources.json](baseline/behavior-sources.json) records each complete source's normalized
+digest and line count, its logical owning assembly hash, version and provider. Two repository
+production files carry their own file hashes separately. No decompiled source files are packaged.
+
+[Expanded authoring receipt](evidence/expanded-sources.json) records the native source binding
+and dataset counts/digests. It is not an app-validator receipt or live result; the earlier app
+receipt covers only its original listed artifact ranges. Full bodies were read for discovery,
+but only [interpreted-cases.json](interpreted-cases.json) claims the curated complete-member
+outcomes. The remaining lexical branches are explicitly structural, and declared effects remain
+definitions until consumer/caller context is interpreted.
+
 Repository declarations are regenerated from `git ls-files` in this checkout only.
 Each inventory record carries its owning repository file SHA-256 and source line. Comments,
 test assemblies, package/output directories and the game installation are not harvested as
@@ -45,6 +61,9 @@ Source line/hash freshness is checked by regenerating in memory and comparing.
 Evidence labels:
 
 - `candidate`: an acceptance question requiring exact installed behavior/source expansion.
+- `definition-inspected`: a leaf's exact declared choice/effect parameters; no consumer or runtime claim.
+- `source-interpreted`: the leaf's specified complete-member result was interpreted; integration remains unverified.
+- `source-structural`: separate source-path navigation, excluded from behavior counts and gameplay evidence.
 - `source-inspected`: the named repository surface was inspected; no runtime claim.
 - `installed-definition` / `installed-registration`: a symbol, parameter or registration in the named game DLL.
 - `declaration-only`: an indexed co-op declaration; no assertion that DI, Harmony or the live command registry activates it.
@@ -56,8 +75,10 @@ Evidence labels:
 The `support` field records restrictions/unknowns independently of evidence status. Definitions
 are not advertised as co-op compatibility. The 212 registrations do not cover all game systems,
 and 165 options from three menu registrars do not cover every menu, dialogue or UI screen.
-Perk role/bonus declarations omit consumer models and troop-use conditions from the readable
-index; inspect those before predicting an effect. StoryMode, custom battle, native multiplayer,
+The expanded [perk sheets](perks.md) retain both effects, masks and 913 distinct located model
+reference locations. They do not assign a located reference to primary/secondary automatically;
+role checks, troop-use conditions, caps, formulas and co-op model replacement still need tracing.
+StoryMode, custom battle, native multiplayer,
 native callbacks/physics and optional DLC modules need their own discovery and runtime evidence.
 The bound tree has no `Missions.Naval` project; installed naval menu declarations remain unknown
 co-op support. Candidate naval actions must not be inferred as enabled.

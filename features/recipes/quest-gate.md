@@ -15,6 +15,10 @@ Sources: [allowlist and normal dialogue gate](../../source/GameInterface/Service
 [journal gate](../../source/GameInterface/Services/UI/Patches/GameUIDisable.cs),
 and [installed issue registrations](../installed.md#normal-issue-availability).
 
+Use [quest leaves](../behaviors/quests.md) to distinguish this normal type-gate recipe from
+the 31 interpreted stolen-goods cases. The [43-type structural index](../source-paths.md)
+does not supply terminal-result oracles and does not enable excluded quests.
+
 Read-only static discovery from the root:
 
 ```powershell

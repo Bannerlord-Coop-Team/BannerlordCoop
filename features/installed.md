@@ -233,6 +233,7 @@ as declarations; enabled module/license/access state still needs observation.
 ## Individual perks
 
 Every row is a separately initialized perk. Retain both role-dependent effects and alternative choice.
+[Perk effect sheets](perks.md) expand primary/secondary effects, troop masks and located consumer references.
 `GetTierCost(n)` is an installed expression, not a copied assertion about the player's current level.
 Bonus numbers below are raw declarations: `AddFactor` is not an already measured percentage result.
 Zero bonuses can enable a capability and must not be treated as absent effects. Applicable models, troop flags,

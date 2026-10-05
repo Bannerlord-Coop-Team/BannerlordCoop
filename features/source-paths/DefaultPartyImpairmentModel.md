@@ -1,0 +1,19 @@
+# DefaultPartyImpairmentModel
+
+Installed type: `TaleWorlds.CampaignSystem.GameComponents.DefaultPartyImpairmentModel`.
+
+Normal support: unverified.
+[Index](../source-paths.md) · [Mapping contract](../granularity.md) · [Source identities](../baseline/behavior-sources.json)
+
+This is structural navigation. Local returns, assignments and calls can belong to nested
+or exclusive branches; resolve the complete caller/guard context before using any as an outcome.
+
+| Path | Parent | Predicate / entry | Local outcome | Assignment targets | Call targets | Source span |
+| --- | --- | --- | --- | --- | --- | --- |
+| DefaultPartyImpairmentModel.GetSiegeExpectedVulnerabilityTime.17.member | movement.010 | Actual arguments and enclosing type state at member entry; full caller graph unresolved | Named member outcome requires interpretation; local returns: return (((MBRandom.RandomFloatNormal &gt; 0f) ? num2 : (1f - num2)) * (float)CampaignTime.HoursInDay + num) % (float)CampaignTime.HoursInDay; | Locally assigned targets: num, num2 | Calls in this member: MathF.Pow, return | TaleWorlds.CampaignSystem.GameComponents.DefaultPartyImpairmentModel@17-22 |
+| DefaultPartyImpairmentModel.GetDisorganizedStateDuration.24.member | movement.010 | Actual arguments and enclosing type state at member entry; full caller graph unresolved | Named member outcome requires interpretation; local returns: return stat; | Locally assigned targets: stat, flag | Calls in this member: ExplainedNumber, party.HasPerk, stat.AddFactor, PerkHelper.AddPerkBonusForParty | TaleWorlds.CampaignSystem.GameComponents.DefaultPartyImpairmentModel@24-34 |
+| DefaultPartyImpairmentModel.GetDisorganizedStateDuration.24.guard-28 | movement.010 | Source predicate is true: !party.IsCurrentlyAtSea &amp;&amp; flag &amp;&amp; party.HasPerk(DefaultPerks.Tactics.SwiftRegroup) | Local true-branch returns: continues; final outcome requires surrounding control flow | True-branch assignment targets: none located | True-branch calls: stat.AddFactor | TaleWorlds.CampaignSystem.GameComponents.DefaultPartyImpairmentModel@24-34 |
+| DefaultPartyImpairmentModel.CanGetDisorganized.36.member | movement.010 | Actual arguments and enclosing type state at member entry; full caller graph unresolved | Named member outcome requires interpretation; local returns: return party.MobileParty.AttachedTo != null;; return true;; return false; | Locally assigned targets: none located | Calls in this member: none located | TaleWorlds.CampaignSystem.GameComponents.DefaultPartyImpairmentModel@36-47 |
+| DefaultPartyImpairmentModel.CanGetDisorganized.36.guard-38 | movement.010 | Source predicate is true: party.IsActive &amp;&amp; party.IsMobile &amp;&amp; party.MobileParty.MemberRoster.TotalManCount &gt;= 10 | Local true-branch returns: return party.MobileParty.AttachedTo != null;; return true; | True-branch assignment targets: none located | True-branch calls: none located | TaleWorlds.CampaignSystem.GameComponents.DefaultPartyImpairmentModel@36-47 |
+| DefaultPartyImpairmentModel.CanGetDisorganized.36.guard-40 | movement.010 | Source predicate is true: party.MobileParty.Army != null &amp;&amp; party.MobileParty != party.MobileParty.Army.LeaderParty | Local true-branch returns: return party.MobileParty.AttachedTo != null; | True-branch assignment targets: none located | True-branch calls: none located | TaleWorlds.CampaignSystem.GameComponents.DefaultPartyImpairmentModel@36-47 |
+| DefaultPartyImpairmentModel.GetVulnerabilityStateDuration.49.member | movement.010 | Actual arguments and enclosing type state at member entry; full caller graph unresolved | Named member outcome requires interpretation; local returns: return MBRandom.RandomFloatNormal + 4f; | Locally assigned targets: none located | Calls in this member: none located | TaleWorlds.CampaignSystem.GameComponents.DefaultPartyImpairmentModel@49-52 |

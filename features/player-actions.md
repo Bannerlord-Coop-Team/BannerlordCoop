@@ -1,6 +1,7 @@
-# Player action coverage
+# Player action groups
 
 Generated from [catalog.csv](catalog.csv) by `python tools/feature_map.py refresh`.
+Use [individual behavior leaves](behaviors/README.md) for separately identified cases and effects.
 Oracles below are acceptance requirements, not recorded passing results. A candidate is a coverage question;
 neither its presence nor a nearby declaration establishes the feature's exact installed behavior or co-op support.
 Source-inspected rows identify repository surfaces only. See [evidence](evidence/authoring.md) for actual exercise.
@@ -142,6 +143,12 @@ Entry: Client character development screen
 | progression.011 | Reset perks | arena master; payment; confirm/cancel | reset removes eligible choices and payment occurs only for the accepted action | unverified / candidate |
 | progression.012 | Trait progression | reward; betrayal; relation consequence | trait XP/state belongs to the correct player and survives reload | unverified / candidate |
 | progression.013 | Display learning limit | attributes; focus; skill change | displayed learning state agrees with the authoritative development state | unverified / candidate |
+| progression.014 | Apply Scout perk effect | scout assigned; scout replaced; no eligible scout | Observe this declared Scout effect only in its actual eligible consumer context; no other role inherits it | unverified / candidate |
+| progression.015 | Apply Engineer perk effect | engineer assigned; engineer replaced; no eligible engineer | Observe this declared Engineer effect only in its actual eligible consumer context; no other role inherits it | unverified / candidate |
+| progression.016 | Apply Quartermaster perk effect | quartermaster assigned; quartermaster replaced; no eligible quartermaster | Observe this declared Quartermaster effect only in its actual eligible consumer context; no other role inherits it | unverified / candidate |
+| progression.017 | Apply Surgeon perk effect | surgeon assigned; surgeon replaced; no eligible surgeon | Observe this declared Surgeon effect only in its actual eligible consumer context; no other role inherits it | unverified / candidate |
+| progression.018 | Apply ArmyCommander perk effect | army commander; army member; army leadership changes | Observe this declared ArmyCommander effect only in its actual eligible consumer context; no other role inherits it | unverified / candidate |
+| progression.019 | Apply PartyMember perk effect | perk holder present; holder absent; holder in another party | Observe this declared PartyMember effect only in its actual eligible consumer context; no other role inherits it | unverified / candidate |
 
 Sources: [features/baseline/installed.json](../features/baseline/installed.json), [source/GameInterface/Services/CharacterDevelopers](../source/GameInterface/Services/CharacterDevelopers), [source/GameInterface/Services/HeroDevelopers](../source/GameInterface/Services/HeroDevelopers)
 

@@ -1,0 +1,1598 @@
+{
+  "implementation": "5f4d63cc0975174ab42cfe1da67fc6d7214065e7",
+  "sources": {
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultCharacterDevelopmentModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultCharacterDevelopmentModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 324,
+      "decompiled_sha256": "adbbf415127194395532da4244d9469fea70c70d04f00128f5138a5eefd786e9",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyTroopUpgradeModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyTroopUpgradeModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 164,
+      "decompiled_sha256": "3cd7f919fc39d983974cdaf8931793902f5e5c311db9a15c200c113efeaca848",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyTradeModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyTradeModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 17,
+      "decompiled_sha256": "ede813c02aeae80647f720d15126c80190bfdc26ade1fdce1db499cdc12ec90f",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultTradeItemPriceFactorModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultTradeItemPriceFactorModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 204,
+      "decompiled_sha256": "6f531f9776bfc5d85f01a72f1ad9ce1e8306cb1d47841ba17e571801b357239f",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyWageModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyWageModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 288,
+      "decompiled_sha256": "c2da6f426624b9da8eb8580e44752303cbfb315f26fcd7c82c41f39bc0264c43",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartySizeLimitModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartySizeLimitModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 486,
+      "decompiled_sha256": "2821d5ccc4d363a575753cd0bbfa70acd38dcae15ce0ef801ad09b44ae490f52",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartySpeedCalculatingModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartySpeedCalculatingModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 450,
+      "decompiled_sha256": "9ff8672029dbf96e33a235234afdca58f866956ad3e3b1d5cb6c9977ab4b1928",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyMoraleModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyMoraleModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 247,
+      "decompiled_sha256": "92c6b61ac758679851412efd30328641513166b2c7bd93115406578719e496d5",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyHealingModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyHealingModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 339,
+      "decompiled_sha256": "d5dc40722ecddb4dd3f46c61fba30a8db744839eac4afb024902509620f73e40",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultInventoryCapacityModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultInventoryCapacityModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 114,
+      "decompiled_sha256": "7171e0abfbe72c63c6f7de0efaee37d31503c22936e8da2bc3d570e5ecacef58",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementFoodModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementFoodModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 103,
+      "decompiled_sha256": "713246594f0e15b64b8e93398d53d6cb6978c0307339e5eca10d116c8bfda514",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementSecurityModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementSecurityModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 319,
+      "decompiled_sha256": "e7ad88e48bd3ea3e5b42c5afadc3e384e6fc267d6cc80fb056473a3d5be53fc4",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementLoyaltyModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementLoyaltyModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 296,
+      "decompiled_sha256": "0231a4cfa26619847e6b2d3d64da7ceca9385f4eb827fba0850d261f6ce33a40",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementMilitiaModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementMilitiaModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 195,
+      "decompiled_sha256": "f78a9b597dc9b84361f19ef77283d506ad5dfbc4d27d182beb526ce8a71d2ee9",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementGarrisonModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementGarrisonModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 161,
+      "decompiled_sha256": "7fabc83521b82be410834bac0f697871ed0051721a0112aa74214d0650e023c7",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSmithingModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSmithingModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 422,
+      "decompiled_sha256": "8fb3e7a2584c75c9c6c199e81ebec43b743f6c71efa56ecece6d37d3c3be39a2",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultTournamentModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultTournamentModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 147,
+      "decompiled_sha256": "d780eaf91502e7bec88ddeb73b96da6f623879d5018568878298706ce5490e1b",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultCombatXpModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultCombatXpModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 122,
+      "decompiled_sha256": "54f1620599d19ec35e1abc88e7e5ecdaeab28163d92de71b92f0f0209192f85d",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultBattleRewardModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultBattleRewardModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 430,
+      "decompiled_sha256": "59846bd58324c691395491bdff3adb3ff73903286ed134355fde5715284a6d0b",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultClanFinanceModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultClanFinanceModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 983,
+      "decompiled_sha256": "5bec9c9dbb004b6afb6b3c2502f7e49e8591447d83b67e618d55244aee637c91",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultBuildingConstructionModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultBuildingConstructionModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 161,
+      "decompiled_sha256": "b34546600f699818865940d0990c23716d15f5134ea24c755f1b7f7acf81b5da",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultMarriageModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultMarriageModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 185,
+      "decompiled_sha256": "6174ba4db956e9ddffba5f3b0e4568cb1aae2c134f42869c1248eb3820e8d69e",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultAgeModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultAgeModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 181,
+      "decompiled_sha256": "c27974cbcea4bee3f6d0b859c40ca8e9535c1ed7ff49fb0abd1ee2a3e0284074",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultAlleyModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultAlleyModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 359,
+      "decompiled_sha256": "d43853f3294fbe4aca0d1564587ab36656d8acc4632d39f2868f0e14d07d9ef3",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultAllianceModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultAllianceModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 761,
+      "decompiled_sha256": "c3fb60bd77854ecd15064f1c16e16b9557a11de3da35ab50e8bd9a8d825edd0b",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultArmyManagementCalculationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultArmyManagementCalculationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 478,
+      "decompiled_sha256": "c4a4071ad2573e46ca28fcce34be13a3fc6ee49a7fd2d01f91571ac5e966a164",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultBanditDensityModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultBanditDensityModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 80,
+      "decompiled_sha256": "29c2d2c25e862b350cca25e3888d40c78f5b6dcd0da4942da064d7ef160f4ea1",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultBannerItemModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultBannerItemModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 56,
+      "decompiled_sha256": "d9e57ac2fcc2f515641b837f5c85778f8122e691e1a860812d2358cdf5abc8c2",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultBarterModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultBarterModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 98,
+      "decompiled_sha256": "2c665678b9b3eb9b76cd0e5af305dd4ffb2d2b69adb084b56efdfe10c9ff5c7e",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultBattleCaptainModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultBattleCaptainModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 25,
+      "decompiled_sha256": "25a057ef7b59287737e4d9edf5bf3ddee393ef6d5286025c06039816448ec650",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultBodyPropertiesModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultBodyPropertiesModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 22,
+      "decompiled_sha256": "b2c1dd20fbc2e25cb1d5c87f85e9cf1d5db9aa8d05552af3c3eb5db00052bdc7",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultBribeCalculationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultBribeCalculationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 105,
+      "decompiled_sha256": "7ef1514881d86ee2d022cfef792c36745650708e2ad12dc8783190535a6851df",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultBuildingEffectModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultBuildingEffectModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 39,
+      "decompiled_sha256": "51ac6db6377782c22a9f0b52085f7b02b75195a80a972944da0f2ca49c5d9b33",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultBuildingModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultBuildingModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 29,
+      "decompiled_sha256": "7a3d09503c6ed6ebbb693185ebe11872e05314f07f873fa7d512728134fc5814",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultBuildingScoreCalculationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultBuildingScoreCalculationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 20,
+      "decompiled_sha256": "6c87b5f35288ca9770107fa25e4220375d6c47e0b7da182a02e5ee53ad17d384",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultCampaignShipDamageModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultCampaignShipDamageModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 23,
+      "decompiled_sha256": "36d772cb577b63f0c3db92e213d22dfff6d9fd29dc48891cd9ddde47a5b39da9",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultCampaignShipParametersModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultCampaignShipParametersModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 88,
+      "decompiled_sha256": "e3594815fd9ef090ec4c9c253a7fad7790700271f78185ef8b53e2caaa5f4a22",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultCampaignTimeModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultCampaignTimeModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 48,
+      "decompiled_sha256": "a16f90ae451f89dffb38a4bb832f329170a0fd92737f9bb8a5b54839ec73f01f",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultCaravanModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultCaravanModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 68,
+      "decompiled_sha256": "7f410b0dea22dbcf84ddc53dc5e570b6ac5e95b74654cf7f4bb4bf43b2b1dc70",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultCharacterStatsModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultCharacterStatsModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 48,
+      "decompiled_sha256": "64cb75d6da6cb6f545a0805b40dcd6e1941efc638780c816f11da05c1ec71cbe",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultClanMemberPartyRoleModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultClanMemberPartyRoleModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 77,
+      "decompiled_sha256": "08eb728becbf0e856c0beafb58bd3bb5972ccb130aebb9b57d440809fc9ecfdd",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultClanPoliticsModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultClanPoliticsModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 283,
+      "decompiled_sha256": "81f5f19fb37999d780b412baf6bca4099f645a0f7a684c94f0f0d6929528caf0",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultClanTierModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultClanTierModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 169,
+      "decompiled_sha256": "1a67fc97181439641783300c475a6e5c918983dd09f626bba4339a88ce40bf3c",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultCombatSimulationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultCombatSimulationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 354,
+      "decompiled_sha256": "cceeebb1945719affdaff9631796770fbc6dbc93ab74c7bf3af53433a434c9d2",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultCompanionHiringPriceCalculationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultCompanionHiringPriceCalculationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 49,
+      "decompiled_sha256": "3d521f292fb1ef1c340445e218578a000c8e4bd1e2333a2b161228609bbe5802",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultCrimeModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultCrimeModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 114,
+      "decompiled_sha256": "7b92e4e09d5707ec8853f1433fc9957ad03176c2636a068a06e6dee019def9d8",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultCutsceneSelectionModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultCutsceneSelectionModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 13,
+      "decompiled_sha256": "bcbf4e8e748f7a78d3e8a55e9b3f7f07c8a942a9e8b042c352762eb260920929",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultDailyTroopXpBonusModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultDailyTroopXpBonusModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 29,
+      "decompiled_sha256": "2bb523183d6d77ab34dc42040bc27f329ba6a0d6c85735e79ae545519cfdca5d",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultDefectionModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultDefectionModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 15,
+      "decompiled_sha256": "988059244b450cafd849ab8c7d88078ee596da29abd002d6a0def6e0e5454775",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultDelayedTeleportationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultDelayedTeleportationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 64,
+      "decompiled_sha256": "072f162bca25170f0e231403e9b785a9a6452a17057108e04e621a99cab2314f",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultDifficultyModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultDifficultyModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 93,
+      "decompiled_sha256": "95c324afcba853b941f605c447f550efca48dd94b59e91a8f9cdea4d30fcf416",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultDiplomacyModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultDiplomacyModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 1292,
+      "decompiled_sha256": "fd373ef3b597cc376664d3296ff2be87756d0731a35a95393bbe335ec174889a",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultDisguiseDetectionModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultDisguiseDetectionModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 32,
+      "decompiled_sha256": "d2215c4102813796269718ea18319c359d4f1e0c381d81aa2597af6f39b50080",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultEmissaryModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultEmissaryModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 17,
+      "decompiled_sha256": "583ae88a9e954f19fadb5bdbd05a21a5b7d610935dba25dfd76d57efd7830096",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultEncounterGameMenuModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultEncounterGameMenuModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 336,
+      "decompiled_sha256": "4ccd7ff38c989b0f708ab4c5c33c7eaa089a75edab507a0378865e23bf4edc70",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultEncounterModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultEncounterModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 535,
+      "decompiled_sha256": "3a25026fb3c78d4c5d81a6b788d0c427085022e3c87ea123b92492476d8c94cd",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultEquipmentSelectionModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultEquipmentSelectionModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 90,
+      "decompiled_sha256": "e8c2bf759b8a3e53344372a2a1dbd2196fc927005272bcb4c5a8b96b93232229",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultExecutionRelationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultExecutionRelationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 78,
+      "decompiled_sha256": "13a47f8ee74cfc9268183dd5677c1b8ffc2e1eaef6fe1523a49faa42bd5532de",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultFleetManagementModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultFleetManagementModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 26,
+      "decompiled_sha256": "d3a2467d87a98769f2aea57aaa72380aa86d86053b3be80d11ca1d9695a809fe",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultGenericXpModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultGenericXpModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 16,
+      "decompiled_sha256": "a43cc29db64e8090c6510d10c31c4b7745efe544b71fab933621af2a77f3906a",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultHeirSelectionCalculationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultHeirSelectionCalculationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 98,
+      "decompiled_sha256": "d88d39f7a45338ef90803077c0894430af8bcf8e6ce35f1bf2f46d86b19406f7",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultHeroAgentLocationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultHeroAgentLocationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 120,
+      "decompiled_sha256": "6b6463094ae1d284918d5b15c0dbb8a94bb1adfe03a2203c9aa4274546deadca",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultHeroCreationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultHeroCreationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 476,
+      "decompiled_sha256": "d17391644e277a230717ccde36167b0219ab2ba4b9ed42531fa239cc8d514018",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultHeroDeathProbabilityCalculationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultHeroDeathProbabilityCalculationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 36,
+      "decompiled_sha256": "3603025c805d16a15b83b880f7814012b8dded21dd1a336c228aa8331cd93708",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultHideoutModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultHideoutModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 31,
+      "decompiled_sha256": "3b80f38ab9030fe4ca2029bf64d148e350dff950f893780920f89fe3cbe31893",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultIncidentModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultIncidentModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 31,
+      "decompiled_sha256": "a834d7d7ef49b7f82c117918626c76ac25168e90f1f8fdc82317e184406342b8",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultInformationRestrictionModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultInformationRestrictionModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 60,
+      "decompiled_sha256": "d7b721a8f02022a4d9322d8133ac8a8173bd01548cd41136052ec8b351b11891",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultIssueModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultIssueModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 146,
+      "decompiled_sha256": "e3414093912288ae5370ca5c22c2b690ee2b09db5ae57f77d94f9f8a0e168235",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultItemDiscardModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultItemDiscardModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 65,
+      "decompiled_sha256": "b48e119f85a91090a60a07298e9818add3e3486707938332ef15efe6e2ed2794",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultKingdomCreationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultKingdomCreationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 97,
+      "decompiled_sha256": "ea628ba99b3ae431277b77b356b61d34283d371a74023a820c44eb4ba57ab33a",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultKingdomDecisionPermissionModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultKingdomDecisionPermissionModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 109,
+      "decompiled_sha256": "94d3c464dffa6d96c2a65b1281ea8ab13d3b396fa09b36dcf89cf7afbcaed856",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultLocationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultLocationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 54,
+      "decompiled_sha256": "717524360f0b8b875dabd868604ffe4d058399f748277469fdc8fec75f156c51",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultMapDistanceModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultMapDistanceModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 196,
+      "decompiled_sha256": "46173ccd5a8f7ff7c9350e23685485aaf7beb231a569106c2573a183fa8e01e6",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultMapTrackModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultMapTrackModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 231,
+      "decompiled_sha256": "6569b1e1cc6321af6884aeacf2c2075e0d33525031cef2a255870fbe22634992",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultMapVisibilityModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultMapVisibilityModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 110,
+      "decompiled_sha256": "4bf968b629db4ec42c7f456f14bb28fbbaed41125e7f9d56976776fee938ad0e",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultMapWeatherModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultMapWeatherModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 680,
+      "decompiled_sha256": "428e5bdbf84d9283b7677a6d42078833307bd5c3daedec336eee602d0576efc2",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultMilitaryPowerModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultMilitaryPowerModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 285,
+      "decompiled_sha256": "03ae05b0c125039b137f8acc02e9d8908557c2f6c1faf1af3ff0510584612f75",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultMinorFactionsModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultMinorFactionsModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 99,
+      "decompiled_sha256": "48f32c319bc98582bcd29b02d31dc98e18cf49d1fbfb59944731f8f96ac8f34f",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultMobilePartyAIModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultMobilePartyAIModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 601,
+      "decompiled_sha256": "6971fe291f71c0e0a016c1f18804b2b8ada42308f9b29fc4578e8c01aa291ac4",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultMobilePartyFoodConsumptionModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultMobilePartyFoodConsumptionModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 97,
+      "decompiled_sha256": "57bafc65c6ba09c75203d6e31ca0d70fbf6576de995ce43497ef1296fe440b9e",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultNotablePowerModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultNotablePowerModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 149,
+      "decompiled_sha256": "45d3aa07054475ae8e85205f5dda71c7f701c98741c6764ff7cb8fb580a95ef1",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultNotableSpawnModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultNotableSpawnModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 35,
+      "decompiled_sha256": "08bf9e90fcb4b0cc2f7a2423606bccfa7543551842addccfb1835fb7d0b51dbb",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyDesertionModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyDesertionModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 123,
+      "decompiled_sha256": "902276ee28ce63df6dec710d82dbb5755a52e410621c43b8021b1621df5e6f87",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyFoodBuyingModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyFoodBuyingModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 59,
+      "decompiled_sha256": "a13bd0e13a3be89360bc75ebfb60a1cd14f5f346f6e5aa8860b56af434545adb",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyImpairmentModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyImpairmentModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 53,
+      "decompiled_sha256": "85ae7113f16ef9b665942903f512675efde086eb49a4e597a732870ed43210a6",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyNavigationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyNavigationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 73,
+      "decompiled_sha256": "8c4261e98b9108225007c9aeeca3d898a411f84840c116c4d89654c0d315d93b",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyShipLimitModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyShipLimitModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 23,
+      "decompiled_sha256": "b8acfe679ed15855abc7b1eef9017edc9a5717ff6416bd527ac77a4d846a66fb",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyTrainingModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyTrainingModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 138,
+      "decompiled_sha256": "2bedd303b1dd6e3164886683b6b1f488428d5b49adaffe022b0c1a13d6670de7",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyTransitionModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyTransitionModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 23,
+      "decompiled_sha256": "4a1db3e49a3c5f383f90841ad67fd3ba1030f272988734e56505e9baac218170",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPersuasionModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPersuasionModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 177,
+      "decompiled_sha256": "bb920d74f6c6f47067cf8c33fb32bfde9932f5a2fa819cda16172ebda4f75605",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPlayerProgressionModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPlayerProgressionModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 13,
+      "decompiled_sha256": "d5685fd9f8eea06e623094787ac0f3720bdc3682c24b91f0028fda6858c28b5c",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPregnancyModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPregnancyModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 47,
+      "decompiled_sha256": "cb06f71ab66bde5c0b7be692faba112128c21e0df7213b502069de980720bb81",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPrisonBreakModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPrisonBreakModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 50,
+      "decompiled_sha256": "085afa30a92c89d2d88184d966dcf6d12bbdc43414ad1bc07956e21be0c785fb",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPrisonerDonationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPrisonerDonationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 40,
+      "decompiled_sha256": "a8980a7314dea1954ae2a9f9523e0a43d6097164f35d29ef9b425cf97c8a10ea",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPrisonerRecruitmentCalculationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPrisonerRecruitmentCalculationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 112,
+      "decompiled_sha256": "6becbb763fb746ed5a8392e8cc0ce958bdd9ab2b150a036084b1e7d72d08f99a",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultRaidModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultRaidModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 69,
+      "decompiled_sha256": "555542704b862b696a6423a4ef5ef3fa244fffd4c677d74841253a51c5911106",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultRansomValueCalculationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultRansomValueCalculationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 56,
+      "decompiled_sha256": "cd7275403f067d55bee8eb5967c66eeae502f1c65af580f06e1bd497b10b62dc",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultRomanceModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultRomanceModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 12,
+      "decompiled_sha256": "ad92dcc0c5b161b3ee533118e36659c4cb3770b3ab9a79b70f2ca187807a5892",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSceneModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSceneModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 110,
+      "decompiled_sha256": "55743b7a860e464d99879b6579ecd3f317ff873ffca73e7d09a84cf8a6348f12",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementAccessModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementAccessModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 564,
+      "decompiled_sha256": "2877e07d4533d906592413bb30316beeb6219003d0422cb5ab5126d70a8e8a8b",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementEconomyModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementEconomyModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 95,
+      "decompiled_sha256": "78665c7785d0c630738d75f56f1dd841ff4c760be9d2572205187503deeb14e0",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementPatrolModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementPatrolModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 60,
+      "decompiled_sha256": "f47b74d520013756dceb87c37c8fb85eda5f87e3397cefcba60415c4c55c5803",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementProsperityModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementProsperityModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 206,
+      "decompiled_sha256": "fd590416aefe92f3b7e26315c5cdb435dbe6d834b7c8f77e90ee42a2ab63007a",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementTaxModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementTaxModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 191,
+      "decompiled_sha256": "8a0e4b81895827070112c62ec8ff78b138fc150f04e3ffb3e2c057b307d5b502",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementValueModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSettlementValueModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 332,
+      "decompiled_sha256": "82259af64f21b29ff5f51c72828d2c0243a40ee08d45bed31e27b5edb25b4222",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultShipCostModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultShipCostModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 29,
+      "decompiled_sha256": "6041780a1ecbc6172de07931b23058bc9979d245a680ed42aaf95f14b6787c28",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultShipStatModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultShipStatModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 12,
+      "decompiled_sha256": "bd7a5da68dbfd24def851c77946e630355ceb7f7ec51b07f4a1f580ee4c5917e",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSiegeAftermathModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSiegeAftermathModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 27,
+      "decompiled_sha256": "ec07c9a42012041f917f6c7220af4a3ab6ecea181991cac0f6adae4a52d40a54",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSiegeEventModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSiegeEventModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 622,
+      "decompiled_sha256": "a9de9aed5a72eedd23f9f693b1aadfe18dfacff37cea99225b84f476e71cd5e3",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSiegeLordsHallFightModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSiegeLordsHallFightModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 70,
+      "decompiled_sha256": "5344b0033c9e079e02124ae15e8580da595f3dd298ea56d7772a00ceb344dc02",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultSiegeStrategyActionModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultSiegeStrategyActionModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 309,
+      "decompiled_sha256": "53fa0c9154fe34c7627353b78b54e4664087a66eee4fa1ce500cbdb78cdc5fb4",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultTargetScoreCalculatingModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultTargetScoreCalculatingModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 392,
+      "decompiled_sha256": "9f6a094e77cbffd78a6629b1258ca160f1f474758d2fb02aa64e57b604da1f61",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultTavernMercenaryTroopsModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultTavernMercenaryTroopsModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 8,
+      "decompiled_sha256": "6f3fb145dac886dd14be8c76efe2c3ecd884bb5f03b23b2c9910e24e4fb06a71",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultTradeAgreementModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultTradeAgreementModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 358,
+      "decompiled_sha256": "78a621e033a55f4bb309b10b245c2758857628682eb76000e9f98a27eb842e79",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultTroopSacrificeModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultTroopSacrificeModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 125,
+      "decompiled_sha256": "6780f4ce9003562017931e8d5dcce9e68d78d1c7501139c849803eb865fc4a3e",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultTroopSupplierProbabilityModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultTroopSupplierProbabilityModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 152,
+      "decompiled_sha256": "76a7f82f22c8664c439f676d3bdb5714a9375332ff0f94e5db28a04aaea9e48d",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultValuationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultValuationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 26,
+      "decompiled_sha256": "a52af42a6fa91f0bfb8b0293136e429711828415250b7cd1fbf427e0339046d7",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultVassalRewardsModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultVassalRewardsModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 51,
+      "decompiled_sha256": "1431ddc791446a679ba600052d089dc32c6f975d0dbf3bcbc1bd755dea3077bf",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultVillageProductionCalculatorModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultVillageProductionCalculatorModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 123,
+      "decompiled_sha256": "52ee9e3457fd5692fec3163cb4bbe23018194db4656a84df0b64d62eb6286d03",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultVillageTradeModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultVillageTradeModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 31,
+      "decompiled_sha256": "f9c6825df67c6174998d8e31f3ac50c951fca9654b773fd46c401bbcdbac902f",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultVoiceOverModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultVoiceOverModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 194,
+      "decompiled_sha256": "bd07ad37433853918f723b9f5d287cfeabe1d1abc8496e79128b73488185759b",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultVolunteerModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultVolunteerModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 129,
+      "decompiled_sha256": "6000ed558eac29d81f78bc662a9169da176c00a36e70056379e2c4f7ae452df7",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultWallHitPointCalculationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultWallHitPointCalculationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 45,
+      "decompiled_sha256": "dd949bc9a5d032f2575c9fd45d5493dfff447855ce98702465c46fa2038c233d",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultWorkshopModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultWorkshopModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 102,
+      "decompiled_sha256": "b75faefc1033cc09125d2b5a58ae1f3a3aa31f35fc229e03faf4eae757d6e54a",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.ArmyNeedsSuppliesIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.ArmyNeedsSuppliesIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 642,
+      "decompiled_sha256": "5cb2dc01543a55f18072a3de5996682d2d777bbc9ae57aff4f395f22013a3617",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.ArtisanCantSellProductsAtAFairPriceIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.ArtisanCantSellProductsAtAFairPriceIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 1015,
+      "decompiled_sha256": "9fee637de425f02341c3213fdc0e1ca8f3ebd958c08733571028dbb3c5116664",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 776,
+      "decompiled_sha256": "b9a1dc03007f47370fbe9487c7b7157f0f7686d9177132d1bdab33a84a7a1a69",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 550,
+      "decompiled_sha256": "8a214ff88afa0ade23b93f10a7a2368eeb4daf42f5d13bbfccbd0fd152ec8ea1",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 933,
+      "decompiled_sha256": "828267c155a3935b1a40990c23d83263c795c12207b5ed30ee4b4d19a2abf864",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.EscortMerchantCaravanIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.EscortMerchantCaravanIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 1426,
+      "decompiled_sha256": "f73218393873872f004beda90f7d26286cc3e919a835588dfea21245058011dd",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 1214,
+      "decompiled_sha256": "f311b9bfab5499e4428a3c92621b2afa59c2dc25ce961db4c496bfabdd2533c9",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 975,
+      "decompiled_sha256": "0f2a89245a0dfbde3de885a82fbf1e5d8a238b7920992872b7df4a7f9673a014",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsWeaponsIssueQuestBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsWeaponsIssueQuestBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 1292,
+      "decompiled_sha256": "8d98916dc27870450ab433cdddf6ae8efd06e138a6924ee8d550aca77cd0b5e8",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.RevenueFarmingIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.RevenueFarmingIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 1402,
+      "decompiled_sha256": "514419b2eeb73a4b7e662d8455613dbac0a13b98aebae0746a0915dad4d3ece7",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 844,
+      "decompiled_sha256": "730e965c67474b8af26bb1be2247e0d60580bd6297c4fd63fb33848f0c06a903",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 821,
+      "decompiled_sha256": "b3ba4ef0c0492bceb95d90e7bf9613b738521c242597179fb69282bcb5b95dc4",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.HeadmanVillageNeedsDraughtAnimalsIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.HeadmanVillageNeedsDraughtAnimalsIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 781,
+      "decompiled_sha256": "2daabcc51a28a2464549e489ab9414e91530039fe66c9a9a1d34d78666f52817",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 653,
+      "decompiled_sha256": "1176840e778d5b5d2ad6809738afe13a973a43c6db49c1d16198d0afc3a9faf1",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 976,
+      "decompiled_sha256": "99c7e13acc782dbf0722f56420d5f82ee5063c7b638b9141bea3880d66d117ad",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.LandLordTheArtOfTheTradeIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.LandLordTheArtOfTheTradeIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 926,
+      "decompiled_sha256": "1d61cc3470069c4890ef699c9d4e0e457f82dc3ec92c5d0af95f078ba19f5acc",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.LandlordNeedsAccessToVillageCommonsIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.LandlordNeedsAccessToVillageCommonsIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 1006,
+      "decompiled_sha256": "27966ed74cfe1fb580d5b52e5faf5a8b1585c26dc1bb542792e4963422bd0742",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.LandLordNeedsManualLaborersIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.LandLordNeedsManualLaborersIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 835,
+      "decompiled_sha256": "7028344e5e082fc6fd12c044f0cfdcaaf801e144763beb0599c16bb05f8648f3",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.LandlordTrainingForRetainersIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.LandlordTrainingForRetainersIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 793,
+      "decompiled_sha256": "2c7d48068e4cd5169104568691e534109fc0d24463be2909623398a662583309",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.LordNeedsGarrisonTroopsIssueQuestBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.LordNeedsGarrisonTroopsIssueQuestBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 762,
+      "decompiled_sha256": "fd0e096ac94797cdd81cfcc8de524834bc23a432f8c4ada7d066dc37c78ef331",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.TheConquestOfSettlementIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.TheConquestOfSettlementIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 636,
+      "decompiled_sha256": "cf1f3d9bb167afa18651beb0f2d7ebbb70e3889c7ab2bc2e6fc281f03026ebcc",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.VillageNeedsCraftingMaterialsIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.VillageNeedsCraftingMaterialsIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 649,
+      "decompiled_sha256": "af2069a5d6d062976c886f0b93f9432db64e91504d02980b45b1a01fe7a56db4",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 996,
+      "decompiled_sha256": "7d69cdc4e571915484de37ddc522ccba10dbbee3f6e03f800c4dd781d6ff3ef5",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.LordNeedsHorsesIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.LordNeedsHorsesIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 943,
+      "decompiled_sha256": "aadf60ba2f69921e9bbd69b67d010a0cec6781b45ae3ae3a4bdcc538b6f1c84d",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.LordsNeedsTutorIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.LordsNeedsTutorIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 981,
+      "decompiled_sha256": "27d7ae8c2d1c32970a9089dfe4d6a956358ab7ac9decccf64a68f2784976c039",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.LordWantsRivalCapturedIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.LordWantsRivalCapturedIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 893,
+      "decompiled_sha256": "1dcf84bc178075cdb8655c9334b4a4008ea5963992b3c4c77b172e8b6228f842",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.MerchantArmyOfPoachersIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.MerchantArmyOfPoachersIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 1182,
+      "decompiled_sha256": "beaf76bf937d7d4c7165e102ce59469ae52b0633d284673d80d648e4125ed1c9",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 852,
+      "decompiled_sha256": "4d9dc4b7e60620c7d1142e1bcfd1677f843fd9a78d22bea6661b0b55dab5ffc8",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.NearbyBanditBaseIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.NearbyBanditBaseIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 708,
+      "decompiled_sha256": "af802feb394dfb9be2fc2f3d497438fbfce9ed05a6439941536e1323bd30c5ee",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 635,
+      "decompiled_sha256": "f6ecff5e2b65dfaea9d74cf1dd28d5f9d00f17f56f532d58acb401c077a14749",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 695,
+      "decompiled_sha256": "cdfc3a90445f55efbeb45cfe3d374eaa6dd08adf2dd93def603d5a2b02cd5fa4",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.VillageNeedsToolsIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.VillageNeedsToolsIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 685,
+      "decompiled_sha256": "bf8aee9274cd4308e82db960e10abf0288877d1babfbab737af95aa474af25d6",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsRecruitsIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsRecruitsIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 539,
+      "decompiled_sha256": "ac0f6a82e07df366b9bd01717484bd6d27b3d990e2b0fd233f9b1dbc71d9ad5b",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsSpecialWeaponsIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsSpecialWeaponsIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 529,
+      "decompiled_sha256": "01ddd6e465f39bd90981d21376a071b5208cdc17430c307440c0ea319edd1982",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.LesserNobleRevoltIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.LesserNobleRevoltIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 1249,
+      "decompiled_sha256": "a8207e64cae40de05087a076621566504de73bb1d3d7d284bff9429176dd9c74",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.BettingFraudIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.BettingFraudIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 932,
+      "decompiled_sha256": "2d1c729ae77ab1bd67a03eeba5c943aa9cb51eadbd23e6c05798f82ec35e6757",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "SandBox.Issues.RivalGangMovingInIssueBehavior": {
+      "type": "SandBox.Issues.RivalGangMovingInIssueBehavior",
+      "assembly": "Modules/SandBox/bin/Win64_Shipping_Client/SandBox.dll",
+      "sha256": "587c6e94c425745c1478f632f3b66226ff8298666cb27e8e6d9a62488df5956a",
+      "version": "Native v1.4.8",
+      "line_count": 1746,
+      "decompiled_sha256": "3a4a29c0bb58a04b22cc483213a3512dedb532228a9bc0f7f81a61e15f8ccd73",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "SandBox.Issues.RuralNotableInnAndOutIssueBehavior": {
+      "type": "SandBox.Issues.RuralNotableInnAndOutIssueBehavior",
+      "assembly": "Modules/SandBox/bin/Win64_Shipping_Client/SandBox.dll",
+      "sha256": "587c6e94c425745c1478f632f3b66226ff8298666cb27e8e6d9a62488df5956a",
+      "version": "Native v1.4.8",
+      "line_count": 897,
+      "decompiled_sha256": "fb184e704eff90f3b67c050af4126651b556d565c1371cfff912dcf1dad9e251",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "SandBox.Issues.FamilyFeudIssueBehavior": {
+      "type": "SandBox.Issues.FamilyFeudIssueBehavior",
+      "assembly": "Modules/SandBox/bin/Win64_Shipping_Client/SandBox.dll",
+      "sha256": "587c6e94c425745c1478f632f3b66226ff8298666cb27e8e6d9a62488df5956a",
+      "version": "Native v1.4.8",
+      "line_count": 2215,
+      "decompiled_sha256": "943fbdbcd93eb265904c667be560e827c0161b5ca37b0bf773950ecfdc82a56f",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "SandBox.Issues.NotableWantsDaughterFoundIssueBehavior": {
+      "type": "SandBox.Issues.NotableWantsDaughterFoundIssueBehavior",
+      "assembly": "Modules/SandBox/bin/Win64_Shipping_Client/SandBox.dll",
+      "sha256": "587c6e94c425745c1478f632f3b66226ff8298666cb27e8e6d9a62488df5956a",
+      "version": "Native v1.4.8",
+      "line_count": 2053,
+      "decompiled_sha256": "8826a9a7716689047c0323acdedfa7174955f7773eac30750a641195caf9401c",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "SandBox.Issues.TheSpyPartyIssueQuestBehavior": {
+      "type": "SandBox.Issues.TheSpyPartyIssueQuestBehavior",
+      "assembly": "Modules/SandBox/bin/Win64_Shipping_Client/SandBox.dll",
+      "sha256": "587c6e94c425745c1478f632f3b66226ff8298666cb27e8e6d9a62488df5956a",
+      "version": "Native v1.4.8",
+      "line_count": 1371,
+      "decompiled_sha256": "cd594a811ca77d2d03c8db72fa8c6a08fe3cbedcbbe4b1a92f5d36895592b2f9",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "SandBox.Issues.ProdigalSonIssueBehavior": {
+      "type": "SandBox.Issues.ProdigalSonIssueBehavior",
+      "assembly": "Modules/SandBox/bin/Win64_Shipping_Client/SandBox.dll",
+      "sha256": "587c6e94c425745c1478f632f3b66226ff8298666cb27e8e6d9a62488df5956a",
+      "version": "Native v1.4.8",
+      "line_count": 1458,
+      "decompiled_sha256": "d3eb0db84522ab8d6df12863f5bb6438efed4405f0944f16cbf70448f3926625",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "SandBox.Issues.SnareTheWealthyIssueBehavior": {
+      "type": "SandBox.Issues.SnareTheWealthyIssueBehavior",
+      "assembly": "Modules/SandBox/bin/Win64_Shipping_Client/SandBox.dll",
+      "sha256": "587c6e94c425745c1478f632f3b66226ff8298666cb27e8e6d9a62488df5956a",
+      "version": "Native v1.4.8",
+      "line_count": 1464,
+      "decompiled_sha256": "19d7584b49130946310f3957b479ba4eab3d9ef9b236a7149cf8bbb75e3fa2c2",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks": {
+      "type": "TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 2336,
+      "decompiled_sha256": "60775585aceb632c17e643d417c762f7096684ec4ed44506a53c2b4fdfea0a23",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.CharacterDevelopment.PerkObject": {
+      "type": "TaleWorlds.CampaignSystem.CharacterDevelopment.PerkObject",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 107,
+      "decompiled_sha256": "016e2b0cbb41608fc73777d312d09570a109bfc546c082ecac8083537fc168f3",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.CampaignBehaviors.EncounterGameMenuBehavior": {
+      "type": "TaleWorlds.CampaignSystem.CampaignBehaviors.EncounterGameMenuBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 3242,
+      "decompiled_sha256": "33d7d9b62a341f7850f627f9872814318333b838b43793dec6b09fb44d445e53",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.CampaignBehaviors.PlayerTownVisitCampaignBehavior": {
+      "type": "TaleWorlds.CampaignSystem.CampaignBehaviors.PlayerTownVisitCampaignBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 1515,
+      "decompiled_sha256": "fe1ee745717f3a51f3dd2155bb4f5efa0017eb94471c2bea033c198833f9a816",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.CampaignBehaviors.VillageHostileActionCampaignBehavior": {
+      "type": "TaleWorlds.CampaignSystem.CampaignBehaviors.VillageHostileActionCampaignBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 775,
+      "decompiled_sha256": "61b10164e937c7283c5b6ed942b3b206b7ed7de1857061e27cb63436e504a4f9",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "SandBox.GameComponents.SandboxAgentApplyDamageModel": {
+      "type": "SandBox.GameComponents.SandboxAgentApplyDamageModel",
+      "assembly": "Modules/SandBox/bin/Win64_Shipping_Client/SandBox.dll",
+      "sha256": "587c6e94c425745c1478f632f3b66226ff8298666cb27e8e6d9a62488df5956a",
+      "version": "Native v1.4.8",
+      "line_count": 1226,
+      "decompiled_sha256": "501454b4ec5bad0871a9a21c727e5c1307c4f185cb6d8b3889134b2e2d6865fe",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "SandBox.GameComponents.SandboxAgentDecideKilledOrUnconsciousModel": {
+      "type": "SandBox.GameComponents.SandboxAgentDecideKilledOrUnconsciousModel",
+      "assembly": "Modules/SandBox/bin/Win64_Shipping_Client/SandBox.dll",
+      "sha256": "587c6e94c425745c1478f632f3b66226ff8298666cb27e8e6d9a62488df5956a",
+      "version": "Native v1.4.8",
+      "line_count": 42,
+      "decompiled_sha256": "520341730408dedcb48a680ba0237aacda05ac8dfbe86984529ba764f153b6d3",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "SandBox.GameComponents.SandboxAgentStatCalculateModel": {
+      "type": "SandBox.GameComponents.SandboxAgentStatCalculateModel",
+      "assembly": "Modules/SandBox/bin/Win64_Shipping_Client/SandBox.dll",
+      "sha256": "587c6e94c425745c1478f632f3b66226ff8298666cb27e8e6d9a62488df5956a",
+      "version": "Native v1.4.8",
+      "line_count": 1670,
+      "decompiled_sha256": "ff1fc247f2203cea074025946941e4998084c8092a02a6416d035a117dc6d3a5",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "coop.trade": {
+      "type": "coop.trade",
+      "assembly": "source/GameInterface/Services/Inventory/Handlers/TradeHandler.cs",
+      "sha256": "3b081ebf53ac0b2cdd79ea4009289d853dcb4bea85f4e883f480ba8ab6ff2fd9",
+      "version": "repository@5f4d63cc0975174ab42cfe1da67fc6d7214065e7",
+      "line_count": 515,
+      "decompiled_sha256": "76c094be0dbf39a25a41b8be025c0caac36624980bbd67bd514d9d2666901552",
+      "provider": "repository"
+    },
+    "coop.development": {
+      "type": "coop.development",
+      "assembly": "source/GameInterface/Services/CharacterDevelopers/Handlers/CharacterDeveloperHandler.cs",
+      "sha256": "445695ecf039f6490d3c279eaa38432532053e8634fd16668a9cdec3e25f9832",
+      "version": "repository@5f4d63cc0975174ab42cfe1da67fc6d7214065e7",
+      "line_count": 188,
+      "decompiled_sha256": "ebec9ed227016bb2cc5e2f30173bb21043b2aaf1f20b8bda637549ce5aebaa54",
+      "provider": "repository"
+    }
+  }
+}
