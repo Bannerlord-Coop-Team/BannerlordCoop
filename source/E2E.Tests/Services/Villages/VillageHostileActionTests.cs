@@ -1164,7 +1164,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.False(party.IsCurrentlyAtSea);
                 Assert.False(mapEvent.IsFinalized);
                 var behavior = new EncounterGameMenuBehavior();
-                var args = new MenuCallbackArgs(null, TextObject.GetEmpty());
+                var args = new MenuCallbackArgs((MenuContext)null, TextObject.GetEmpty());
                 Assert.True(behavior.game_menu_encounter_leave_on_condition(args));
 
                 // Keep the real finalization request pending while native Leave finishes locally.
