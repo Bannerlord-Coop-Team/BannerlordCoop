@@ -12,6 +12,7 @@ using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Issues.Commands;
 
@@ -21,7 +22,7 @@ public static class QuestIsolationFixtureCommands
     private const string CommandPrefix = "coop.debug.issues";
 
     private static CoopCommandResult Succeeded(object value) =>
-        new CoopCommandResult(true, JsonConvert.SerializeObject(value));
+        new CoopCommandResult(true, "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(value));
 
     private static CoopCommandResult Failed(string output) =>
         new CoopCommandResult(false, output, "command_failed");
@@ -61,8 +62,10 @@ public static class QuestIsolationFixtureCommands
                     heroId = IdOf(objectManager, hero),
                     name = hero.Name?.ToString(),
                     settlementId = IdOf(objectManager, hero.CurrentSettlement),
+                    settlementStringId = hero.CurrentSettlement.StringId,
                     settlementName = hero.CurrentSettlement.Name?.ToString(),
                     hideoutId = IdOf(objectManager, hideout),
+                    hideoutStringId = hideout?.StringId,
                 } : null)
                 .Where(candidate => candidate?.heroId != null && candidate.settlementId != null && candidate.hideoutId != null)
                 .ToArray();
@@ -255,6 +258,7 @@ public static class QuestIsolationFixtureCommands
             heroId,
             heroName = hero.Name?.ToString(),
             settlementId = IdOf(objectManager, hero.CurrentSettlement),
+            mainPartySettlementStringId = MobileParty.MainParty?.CurrentSettlement?.StringId,
             issue = issue == null ? null : new
             {
                 type = issue.GetType().Name,

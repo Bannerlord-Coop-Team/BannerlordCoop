@@ -18,6 +18,8 @@ namespace E2E.Tests.Services.Issues;
 
 public class QuestIsolationFixtureCommandsTests : IDisposable
 {
+    private const string StructuredPrefix = "LIVE_TEST_JSON=";
+
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
     private EnvironmentInstance Client => TestEnvironment.Clients.First();
@@ -44,7 +46,8 @@ public class QuestIsolationFixtureCommandsTests : IDisposable
                 var result = State(instance).ProcessCommand(Args(heroId));
 
                 Assert.True(result.Succeeded, result.Output);
-                var state = JObject.Parse(result.Output);
+                Assert.StartsWith(StructuredPrefix, result.Output);
+                var state = JObject.Parse(result.Output.Substring(StructuredPrefix.Length));
                 Assert.Equal(side, (string)state["side"]);
                 Assert.Equal(heroId, (string)state["heroId"]);
                 Assert.Equal(JTokenType.Null, state["issue"].Type);
@@ -67,7 +70,10 @@ public class QuestIsolationFixtureCommandsTests : IDisposable
                 Client.Resolve<IIssueConversationTracker>(),
                 Client.Resolve<IControllerIdProvider>());
 
-            Assert.False(command.ProcessCommand(Args(heroId)).Succeeded);
+            var result = command.ProcessCommand(Args(heroId));
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("has not allowed a tracked conversation", result.Output);
         });
 
         Assert.Empty(Client.InternalMessages.GetMessages<QuestTypeQuestSolutionAcceptTriggered>());
@@ -84,7 +90,10 @@ public class QuestIsolationFixtureCommandsTests : IDisposable
                 Server.Resolve<IObjectManager>(),
                 Server.Resolve<IControllerIdProvider>());
 
-            Assert.False(command.ProcessCommand(Args(heroId)).Succeeded);
+            var result = command.ProcessCommand(Args(heroId));
+
+            Assert.False(result.Succeeded);
+            Assert.Contains("is client-only", result.Output);
         });
 
         Assert.Empty(Server.InternalMessages.GetMessages<IssueConversationOpenedLocally>());
