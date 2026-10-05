@@ -7,11 +7,10 @@ SHA-256 `1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae`, Nati
 The artifact hash/range is in [installed-sources.json](evidence/installed-sources.json).
 Lines refer to this decompiled type. No other quest inherits this branch coverage.
 
-The expanded [quest behavior leaves](behaviors/quests.md) contain 31 interpreted cases for
+The [source-case table](source-cases.csv) contains 31 interpreted cases for
 this issue, including generation versus survival thresholds, admission, alternative eligibility,
 payment, force, designated battle result, settlement departure and load hooks. Each case carries
-its own complete-member span and remaining co-op/runtime work. The [complete type navigation](source-paths/GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.md)
-also locates structural guards and calls, without treating them as interpreted outcomes.
+its own complete-member span and remaining co-op/runtime work.
 
 The observations paraphrase complete inspected vanilla members. Co-op owner routing,
 replacement patches and actual replication require separate evidence. Vanilla local-player
@@ -39,9 +38,8 @@ the alternative-success member above. Debug completion does not exercise every n
 
 Remaining work includes caller/transition ordering, actual companion/troop counts and return,
 owner versus other-client context, interrupted/repeated actions, complete delegate/dialogue
-coverage, persistence/reconnect and indirect lifecycle effects. Structural navigation now
-covers all 43 registered issue types in [the source index](source-paths.md); the other 42 remain
-disabled by the normal source gate and their branches are not interpreted terminal-result
+coverage, persistence/reconnect and indirect lifecycle effects. The other 42 registered issues
+remain disabled by the normal source gate and their branches are not interpreted terminal-result
 oracles. The [gate recipe](recipes/quest-gate.md) covers admission only. Full quest acceptance
 still needs the remaining source interpretation and both real clients' action/state/side-effect
 evidence for every required slice.

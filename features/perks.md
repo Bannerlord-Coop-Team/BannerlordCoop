@@ -1,29 +1,26 @@
-# Perk choices and individual effects
+# Inspecting affected perk behavior
 
-Each effect retains its declared role, raw bonus, increment and troop mask independently.
-The skill threshold comes from the installed definition, not a measured UI eligibility result.
-`{VALUE}` is a game's localization variable; raw bonuses are not automatically formatted percentages.
-Consumer references locate mentions of the perk. A mention is not an established primary/secondary
-apply path or evidence that co-op uses that model. Missing references do not establish an unused perk.
-[Definition data](baseline/perk-effects.json) · [Mapping contract](granularity.md) · [Behavior leaves](behaviors/progression.md)
+Perk selection and each primary/secondary effect are separate acceptance obligations when
+a change affects them, including when both declared roles match. The compact map groups
+player-visible progression and role behavior rather than committing a page for every definition.
 
-| Skill | Choices | Effects |
-| --- | ---: | ---: |
-| [Athletics](perks/Athletics.md) | 21 | 42 |
-| [Bow](perks/Bow.md) | 21 | 42 |
-| [Charm](perks/Charm.md) | 20 | 39 |
-| [Crafting](perks/Crafting.md) | 20 | 22 |
-| [Crossbow](perks/Crossbow.md) | 21 | 42 |
-| [Engineering](perks/Engineering.md) | 21 | 41 |
-| [Leadership](perks/Leadership.md) | 21 | 41 |
-| [Medicine](perks/Medicine.md) | 21 | 41 |
-| [OneHanded](perks/OneHanded.md) | 21 | 42 |
-| [Polearm](perks/Polearm.md) | 21 | 42 |
-| [Riding](perks/Riding.md) | 20 | 39 |
-| [Roguery](perks/Roguery.md) | 21 | 41 |
-| [Scouting](perks/Scouting.md) | 21 | 41 |
-| [Steward](perks/Steward.md) | 21 | 42 |
-| [Tactics](perks/Tactics.md) | 21 | 41 |
-| [Throwing](perks/Throwing.md) | 21 | 42 |
-| [Trade](perks/Trade.md) | 23 | 45 |
-| [TwoHanded](perks/TwoHanded.md) | 18 | 36 |
+```powershell
+python tools/feature_map.py find WrappedHandles --kind vanilla-perk
+python tools/feature_map.py find progression --kind feature
+```
+
+[The installed snapshot](baseline/installed.json) retains 374 choices, their alternative,
+skill threshold expression, declared roles, raw bonuses and increments. These are definitions
+from the named Native v1.4.8 DLL, not observed selection or effect application.
+
+Before writing an effect oracle, inspect the exact installed `DefaultPerks`/`PerkObject`
+definition and complete consumer/caller. Trace which effect argument is used, eligible hero
+role, troop mask, context, cap, formula and any co-op model replacement. A located perk name
+does not automatically identify the primary or secondary apply path. Raw `AddFactor` values
+are not measured percentages; zero bonus does not mean no capability. Do not invent a
+secondary effect when the definition has none.
+
+Retain the relevant spans/build identities and compare holder versus nonholder or ineligible
+role/troop/context through real actions. Observe each required owner/shared consequence;
+persistence of selection alone does not prove an effect. New effects need their own source
+case and runtime evidence under [the evidence contract](granularity.md).

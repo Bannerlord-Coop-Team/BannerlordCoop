@@ -14,28 +14,6 @@ import feature_map
 
 
 class FeatureMapTests(unittest.TestCase):
-    def test_perk_effect_roles_masks_and_single_effect_are_distinct(self):
-        definitions = json.loads((feature_map.FEATURES / "baseline/perk-effects.json").read_text(encoding="utf-8"))["effects"]
-        effects = {(row["id"], row["effect"]): row for row in definitions}
-        primary = effects["OneHandedWrappedHandles", "primary"]
-        secondary = effects["OneHandedWrappedHandles", "secondary"]
-        self.assertEqual((primary["role"], primary["bonus"], primary["increment"], primary["troop_mask"]),
-                         ("Personal", "0.2f", "AddFactor", "TroopUsageFlags.Undefined"))
-        self.assertEqual((secondary["role"], secondary["bonus"], secondary["increment"], secondary["troop_mask"]),
-                         ("Captain", "30f", "Add", "TroopUsageFlags.OneHandedUser"))
-        self.assertEqual(effects["OneHandedDuelist", "primary"]["role"], "Personal")
-        self.assertEqual(effects["OneHandedDuelist", "secondary"]["role"], "Personal")
-        self.assertIn(("EngineeringMasterwork", "primary"), effects)
-        self.assertNotIn(("EngineeringMasterwork", "secondary"), effects)
-        self.assertTrue(any(use["type"].endswith("SandboxAgentStatCalculateModel") for use in secondary["uses"]))
-        roles = {"Scout": "progression.014", "Engineer": "progression.015", "Quartermaster": "progression.016",
-                 "Surgeon": "progression.017", "ArmyCommander": "progression.018", "PartyMember": "progression.019"}
-        leaves = {row["id"]: row for row in feature_map.behavior_rows()}
-        for definition in definitions:
-            if definition["role"] in roles:
-                leaf = leaves["perk." + definition["id"] + "." + definition["effect"]]
-                self.assertEqual(leaf["parent"], roles[definition["role"]])
-
     def test_real_command_contract_and_commented_sync(self):
         rows = feature_map.inventory_rows()
         commands = {row["id"]: row for row in rows if row["kind"] == "command"}
@@ -51,15 +29,10 @@ class FeatureMapTests(unittest.TestCase):
 
     def test_source_and_link_drift_are_rejected_in_isolated_copy(self):
         original = feature_map.ROOT
-        sources = feature_map.source_files()
         with tempfile.TemporaryDirectory(prefix="bannerlord-map-check-") as temporary:
             root = Path(temporary)
             shutil.copytree(original / "features", root / "features")
             shutil.copytree(original / ".agents", root / ".agents")
-            for path in sources:
-                target = root / path.relative_to(original)
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(path, target)
             # Preserve all real linked instructions/paths without copying game/package outputs.
             for path in (original / "features").rglob("*.md"):
                 for target in feature_map.re.findall(r"\]\(([^)]+)\)", path.read_text(encoding="utf-8")):
@@ -74,44 +47,57 @@ class FeatureMapTests(unittest.TestCase):
                         shutil.copy2(source, dest)
                     elif source.is_dir():
                         dest.mkdir(parents=True, exist_ok=True)
-            copied = [root / path.relative_to(original) for path in sources]
-            with patch.object(feature_map, "ROOT", root), patch.object(feature_map, "FEATURES", root / "features"), \
-                    patch.object(feature_map, "INVENTORY", root / "features/inventory.csv"), \
-                    patch.object(feature_map, "source_files", return_value=copied):
+            manifest = json.loads((root / "features/baseline/behavior-sources.json").read_text(encoding="utf-8"))
+            for source in manifest["sources"].values():
+                if source["provider"] == "repository":
+                    target = root / source["assembly"]
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(original / source["assembly"], target)
+            with patch.object(feature_map, "ROOT", root), patch.object(feature_map, "FEATURES", root / "features"):
                 with contextlib.redirect_stdout(io.StringIO()):
                     feature_map.validate()
-                changed = root / "source/GameInterface/Services/Towns/Commands/TownDebugCommand.cs"
+                command = root / "source/GameInterface/Services/Towns/Commands/TownDebugCommand.cs"
+                saved_command = command.read_bytes()
+                with patch.object(feature_map, "source_files", return_value=[command]):
+                    before = [row for row in feature_map.inventory_rows() if row["kind"] == "command"]
+                    command.write_bytes(saved_command + b"\r\n// isolated inventory freshness witness\r\n")
+                    after = [row for row in feature_map.inventory_rows() if row["kind"] == "command"]
+                self.assertTrue(before)
+                self.assertEqual([row["id"] for row in before], [row["id"] for row in after])
+                self.assertNotEqual(before[0]["sha256"], after[0]["sha256"])
+                command.write_bytes(saved_command)
+                changed = root / manifest["sources"]["coop.trade"]["assembly"]
                 saved = changed.read_bytes()
                 changed.write_bytes(saved + b"\r\n// isolated stale-source witness\r\n")
-                with self.assertRaisesRegex(SystemExit, "inventory.csv differs"):
+                with self.assertRaisesRegex(SystemExit, "repository behavior source changed"):
                     feature_map.validate()
                 changed.write_bytes(saved)
-                leaves_path = root / "features/behavior-leaves.csv"
-                saved_leaves = leaves_path.read_bytes()
-                with leaves_path.open(encoding="utf-8", newline="") as stream:
+                cases_path = root / "features/source-cases.csv"
+                saved_cases = cases_path.read_bytes()
+                with cases_path.open(encoding="utf-8", newline="") as stream:
                     reader = csv.DictReader(stream)
                     fields = reader.fieldnames
-                    leaves = list(reader)
+                    cases = list(reader)
 
-                def write_leaves():
-                    with leaves_path.open("w", encoding="utf-8", newline="") as stream:
+                def write_cases():
+                    with cases_path.open("w", encoding="utf-8", newline="") as stream:
                         writer = csv.DictWriter(stream, fieldnames=fields, lineterminator="\n")
                         writer.writeheader()
-                        writer.writerows(leaves)
+                        writer.writerows(cases)
 
-                original_parent = leaves[0]["parent"]
-                leaves[0]["parent"] = "absent.group"
-                write_leaves()
+                original_parent = cases[0]["parent"]
+                cases[0]["parent"] = "absent.group"
+                write_cases()
                 with self.assertRaisesRegex(SystemExit, "unknown parent"):
                     feature_map.validate()
-                leaves[0]["parent"] = original_parent
-                backed = next(row for row in leaves if row["kind"] == "perk-effect")
+                cases[0]["parent"] = original_parent
+                backed = cases[0]
                 original_evidence = backed["evidence"]
                 backed["evidence"] = original_evidence.split("@", 1)[0] + "@1-99999999"
-                write_leaves()
+                write_cases()
                 with self.assertRaisesRegex(SystemExit, "invalid evidence range"):
                     feature_map.validate()
-                leaves_path.write_bytes(saved_leaves)
+                cases_path.write_bytes(saved_cases)
                 sources_path = root / "features/baseline/behavior-sources.json"
                 saved_sources = sources_path.read_bytes()
                 manifest = json.loads(saved_sources)

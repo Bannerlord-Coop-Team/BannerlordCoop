@@ -2,7 +2,7 @@
 
 These are source observations at the implementation commit in [provenance](provenance.md),
 not passing runtime claims. Installed baseline definitions remain separately visible in
-[installed.md](installed.md). The broad [action map](player-actions.md) names remaining acceptance questions.
+[baseline/installed.json](baseline/installed.json). The [action map](player-actions.md) names remaining acceptance questions.
 
 The [release-facing README](../README.md#current-features) separately advertises current
 capabilities, marks armies/sieges as experimental and hideouts/quests/naval support as planned.
@@ -31,8 +31,8 @@ and one source-allowlisted issue does not make quests generally supported.
 | Battles | co-op battle/session/authority/spawn services define additional ownership and lifecycle boundaries | [battle services](../source/Missions/Battles), [map-event services](../source/GameInterface/Services/MapEvents) | real mission actions, casualties, reinforcements, authority transition and campaign return |
 | Naval paths | installed encounter/settlement menus contain naval declarations; no `Missions.Naval` project exists in this bound tree | [installed snapshot](baseline/installed.json), [mission tree](../source/Missions) | exact owning optional module/opt-in/license and real naval runtime; currently unknown |
 
-For each surface, search `inventory.csv` for exact commands, sync expressions and Harmony
-target declarations, then inspect the named source before selecting a real action. The
+For each surface, query `python tools/feature_map.py find governor` for current commands,
+sync expressions and Harmony target declarations, then inspect the named source before selecting a real action. The
 lexical index does not resolve every dynamic target or establish that a patch/command is active.
 The current allowlist could also fail to apply at runtime, an exception explicitly reported
 by its source; the map must preserve contrary runtime evidence rather than override it.

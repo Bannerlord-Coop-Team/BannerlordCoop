@@ -13,11 +13,11 @@ Sources: [allowlist and normal dialogue gate](../../source/GameInterface/Service
 [debug grant catalog](../../source/GameInterface/Services/Issues/Commands/IssueGiveCatalog.cs),
 [debug commands](../../source/GameInterface/Services/Issues/Commands/IssuesDebugCommand.cs),
 [journal gate](../../source/GameInterface/Services/UI/Patches/GameUIDisable.cs),
-and [installed issue registrations](../installed.md#normal-issue-availability).
+and [installed issue registrations](../baseline/installed.json).
 
-Use [quest leaves](../behaviors/quests.md) to distinguish this normal type-gate recipe from
-the 31 interpreted stolen-goods cases. The [43-type structural index](../source-paths.md)
-does not supply terminal-result oracles and does not enable excluded quests.
+Use [the focused branch map](../quest-branches.md) and [source cases](../source-cases.csv)
+to distinguish this normal type-gate recipe from the 31 interpreted stolen-goods cases.
+Other registered issue types remain disabled; registrations do not supply terminal-result oracles.
 
 Read-only static discovery from the root:
 

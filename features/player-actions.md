@@ -1,7 +1,7 @@
-# Player action groups
+# Player-visible behaviors
 
 Generated from [catalog.csv](catalog.csv) by `python tools/feature_map.py refresh`.
-Use [individual behavior leaves](behaviors/README.md) for separately identified cases and effects.
+Material outcome branches are retained in [source-cases.csv](source-cases.csv).
 Oracles below are acceptance requirements, not recorded passing results. A candidate is a coverage question;
 neither its presence nor a nearby declaration establishes the feature's exact installed behavior or co-op support.
 Source-inspected rows identify repository surfaces only. See [evidence](evidence/authoring.md) for actual exercise.
@@ -10,7 +10,7 @@ Source-inspected rows identify repository surfaces only. See [evidence](evidence
 
 Entry: Coop menu / connection workflow
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | sessions.001 | Start authoritative server | server launch; no player hero/party on host | server campaign reaches readiness without consuming a client slot | unverified / source-inspected |
 | sessions.002 | Join a server | server address; Steam selection; explicit join | client obtains its own registered hero and party | unverified / source-inspected |
@@ -31,7 +31,7 @@ Sources: [source/Coop.Core/Client](../source/Coop.Core/Client), [source/Coop.Cor
 
 Entry: Client character creation / character screen
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | character.001 | Create player character | first admission; returning player | new character belongs to exactly one admitted player | unverified / candidate |
 | character.002 | Select culture | available cultures; saved culture | chosen culture survives replication and reload | unverified / candidate |
@@ -50,7 +50,7 @@ Sources: [source/GameInterface/Services/Banners](../source/GameInterface/Service
 
 Entry: Client campaign map
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | movement.001 | Move to map position | short travel; long travel; unreachable destination | authoritative position reaches the selected reachable destination | unverified / candidate |
 | movement.002 | Move to settlement | town; castle; village; hostile settlement | party reaches the correct settlement and entry state | unverified / candidate |
@@ -73,7 +73,7 @@ Sources: [source/GameInterface/Services/MapTracks](../source/GameInterface/Servi
 
 Entry: Client party screen / campaign map
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | party.001 | Recruit troops | town; village; mercenary; volunteer slots | roster increases once and gold/volunteer stock decreases accordingly | unverified / candidate |
 | party.002 | Upgrade troops | eligible; insufficient XP; insufficient gold; mount requirement | chosen upgrade consumes the correct resources and preserves total troop count | unverified / candidate |
@@ -102,7 +102,7 @@ Sources: [source/GameInterface/Services/MobileParties](../source/GameInterface/S
 
 Entry: Hero / companion / family interfaces
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | heroes.001 | Change hero gold | reward; purchase; transfer; loss | hero gold changes once and agrees on both clients | unverified / candidate |
 | heroes.002 | Change hero state | active; wounded; prisoner; dead; disabled | state transitions and campaign membership remain consistent | unverified / candidate |
@@ -128,7 +128,7 @@ Sources: [source/GameInterface/Services/Actions](../source/GameInterface/Service
 
 Entry: Client character development screen
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | progression.001 | Gain skill XP | combat; trade; healing; campaign roles | earned XP reaches the intended hero rather than another player's hero | unverified / candidate |
 | progression.002 | Increase skill level | below threshold; cross threshold; multiple levels | skill value and available perk choices agree after XP is applied | unverified / candidate |
@@ -156,7 +156,7 @@ Sources: [features/baseline/installed.json](../features/baseline/installed.json)
 
 Entry: Client inventory / equipment screen
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | inventory.001 | Equip weapon | empty slot; replacement; two-handed; shield | selected item appears in the correct equipment slot and mission | unverified / candidate |
 | inventory.002 | Equip armor | head; body; arm; leg; cape | armor and resulting character appearance match both clients | unverified / candidate |
@@ -177,7 +177,7 @@ Sources: [source/GameInterface/Services/Equipments](../source/GameInterface/Serv
 
 Entry: Town/village trade screen / barter conversation
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | trade.001 | Buy goods | one item; stack; insufficient gold | buyer gold decreases and market/player item counts balance | unverified / candidate |
 | trade.002 | Sell goods | one item; stack; merchant funds exhausted | seller gold and market stock change by the completed transaction | unverified / candidate |
@@ -198,7 +198,7 @@ Sources: [source/GameInterface/Services/Barters](../source/GameInterface/Service
 
 Entry: Town workshop conversation / clan finance
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | workshops.001 | Purchase workshop | available seller; ownership limit; insufficient gold | payment and workshop owner change occur once | unverified / candidate |
 | workshops.002 | Sell workshop | owned; unowned; ownership changed | sale proceeds reach the intended owner and ownership updates | unverified / candidate |
@@ -213,7 +213,7 @@ Sources: [source/GameInterface/Services/Actions](../source/GameInterface/Service
 
 Entry: Notable conversation / clan parties / campaign map
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | caravans.001 | Create caravan | leader choice; normal/strong escort; fee | one registered caravan is created for the intended owner | unverified / candidate |
 | caravans.002 | Caravan trading | visit market; buy; sell | caravan stock, funds and owner income follow the authoritative transaction | unverified / candidate |
@@ -228,7 +228,7 @@ Sources: [source/GameInterface/Services/Caravans](../source/GameInterface/Servic
 
 Entry: Town smithy / crafting screen
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | crafting.001 | Choose smith | player; companion; unavailable smith | crafting changes and stamina apply to the selected hero | unverified / candidate |
 | crafting.002 | Select weapon template | type; valid pieces; incompatible pieces | selected combination resolves to a valid weapon design | unverified / candidate |
@@ -248,7 +248,7 @@ Sources: [source/GameInterface/Services/CraftingOrders](../source/GameInterface/
 
 Entry: Town/castle menu / settlement management
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | towns.001 | Enter town | friendly; neutral; hostile; siege | menu and encounter state reflect the actual settlement access | unverified / candidate |
 | towns.002 | Enter castle | friendly; permission denied; hostile | correct castle access and interior options are shown | unverified / candidate |
@@ -274,7 +274,7 @@ Sources: [source/GameInterface/Services/Fiefs](../source/GameInterface/Services/
 
 Entry: Village menu / campaign map
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | villages.001 | Enter village | normal; raided; hostile; own village | menu reflects authoritative village state and access | unverified / candidate |
 | villages.002 | Recruit volunteers | available slots; relation restriction; forced recruitment | volunteer stock and owning player roster balance | unverified / candidate |
@@ -295,7 +295,7 @@ Sources: [source/GameInterface/Services/Actions](../source/GameInterface/Service
 
 Entry: Town/castle construction interface
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | buildings.001 | Select construction project | available building; unavailable project | selected queue entry names the intended building | unverified / candidate |
 | buildings.002 | Change construction queue | append; reorder; remove | queue order matches the accepted client action | unverified / candidate |
@@ -311,7 +311,7 @@ Sources: [source/GameInterface/Services/Buildings](../source/GameInterface/Servi
 
 Entry: Town/castle/village scene / conversation
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | locations.001 | Walk town center | spawn; move; interact; leave | client enters the intended town scene with correct actors | unverified / candidate |
 | locations.002 | Enter lord's hall | permission; bribe; disguise; denied | scene access and authoritative consequences match accepted action | unverified / candidate |
@@ -333,7 +333,7 @@ Sources: [source/GameInterface/Services/Characters](../source/GameInterface/Serv
 
 Entry: Town common area / alley interaction
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | alleys.001 | Challenge alley gang | enter area; provoke; combat | alley encounter participants and consequences match the selected area | unverified / candidate |
 | alleys.002 | Take over alley | win fight; cancel; companion assignment | ownership and installed player-alley data agree | unverified / candidate |
@@ -348,7 +348,7 @@ Sources: [source/GameInterface/Services/Alleys](../source/GameInterface/Services
 
 Entry: Party/dungeon screen / captivity / prison break
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | prisoners.001 | Capture hero | battle; surrender; authoritative action | hero prisoner state and captor roster agree | unverified / candidate |
 | prisoners.002 | Release hero prisoner | free; barter; ransom; peace | prisoner leaves the captor once and state/location update | unverified / candidate |
@@ -367,7 +367,7 @@ Sources: [source/GameInterface/Services/Actions](../source/GameInterface/Service
 
 Entry: Clan screen / lord conversation
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | clans.001 | Create clan | new player; initial name/banner | one clan is linked to the intended player hero | unverified / candidate |
 | clans.002 | Inspect clan roster | family; companions; leaders; parties | UI represents authoritative membership and assignments | unverified / candidate |
@@ -387,7 +387,7 @@ Sources: [source/GameInterface/Services/Clans](../source/GameInterface/Services/
 
 Entry: Kingdom screen / diplomacy / decision UI
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | kingdoms.001 | Create kingdom | eligibility; governor conversation; naming | one registered kingdom is created with intended leader and clan | unverified / candidate |
 | kingdoms.002 | Dissolve kingdom | valid conditions; remaining clans/fiefs | membership and stance links reach the correct final state | unverified / candidate |
@@ -416,7 +416,7 @@ Sources: [source/Coop.Core/Server/Services/Kingdoms](../source/Coop.Core/Server/
 
 Entry: Campaign army UI / map
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | armies.001 | Create army | leader eligible; influence; available parties | one registered army owns the intended leader and invited parties | unverified / candidate |
 | armies.002 | Invite party to army | eligible; already attached; other player | accepted party joins the intended army once | unverified / candidate |
@@ -435,7 +435,7 @@ Sources: [source/GameInterface/Services/Armies](../source/GameInterface/Services
 
 Entry: Notable/lord conversation / quest journal
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | quests.001 | Discover issue | eligible giver; normal generation; disabled type | only source-allowlisted issues appear through normal supported admission | unverified / source-inspected |
 | quests.002 | View issue dialogue | issue icon; task entry; alternate task entry | dialogue entry follows the exact allowlist gate | unverified / source-inspected |
@@ -457,7 +457,7 @@ Sources: [features/baseline/installed.json](../features/baseline/installed.json)
 
 Entry: Town arena / co-op tournament lobby
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | tournaments.001 | Generate tournament | town availability; existing tournament | one town tournament becomes available without duplicate creation | unverified / source-inspected |
 | tournaments.002 | Join tournament lobby | first client; second client; repeated join | both clients reference one server session with distinct participants | unverified / source-inspected |
@@ -478,7 +478,7 @@ Sources: [source/E2E.Tests](../source/E2E.Tests), [source/GameInterface/Services
 
 Entry: Campaign encounter / rendered battle mission
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | battles.001 | Attack enemy party | first encounter; two clients; AI ally | correct registered parties enter the same authoritative map event | unverified / candidate |
 | battles.002 | Join allied battle | attacker; defender; reinforcement; late entry | joining party and player appear on the intended battle side | unverified / candidate |
@@ -517,7 +517,7 @@ Sources: [source/GameInterface/Services/MapEvents](../source/GameInterface/Servi
 
 Entry: Siege camp / settlement siege menu / assault mission
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | sieges.001 | Begin siege | town; castle; army leader; lone party | one registered siege event links correct besieger and settlement | unverified / candidate |
 | sieges.002 | Join besieger camp | leader; army member; second player | party joins the correct siege side and observes shared progress | unverified / candidate |
@@ -542,7 +542,7 @@ Sources: [source/GameInterface/Services/BesiegerCamps](../source/GameInterface/S
 
 Entry: Installed naval menu paths / optional mod mission module
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | naval.001 | Embark party | port; shoreline where allowed; ships available | embark path exists for the enabled module set and retains party identity | unknown; no Missions.Naval project in bound tree / candidate |
 | naval.002 | Disembark party | port; landing; invalid location | accepted landing produces one authoritative land party | unknown; no Missions.Naval project in bound tree / candidate |
@@ -560,7 +560,7 @@ Sources: [features/baseline/installed.json](../features/baseline/installed.json)
 
 Entry: Authoritative campaign ticks / observed map state
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | ai.001 | AI strategic objective | attack; defend; recruit; resupply | authoritative goal/behavior is replicated to observing clients | unverified / candidate |
 | ai.002 | AI party think | daily/hourly tick; player nearby | client-disabled behavior does not create a second decision | unverified / candidate |
@@ -580,7 +580,7 @@ Sources: [source/GameInterface/Services/Actions](../source/GameInterface/Service
 
 Entry: Client campaign HUD / encyclopedia / map / notifications
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | presentation.001 | Party map banner | owner; banner edit; kingdom change | visual banner matches authoritative ownership/design | unverified / candidate |
 | presentation.002 | Party map name | hero/clan rename; hidden party | visible name matches the permitted current party state | unverified / candidate |
@@ -604,7 +604,7 @@ Sources: [UIMovies](../UIMovies), [source/GameInterface/Services/Chat](../source
 
 Entry: Client options / co-op options / time controls
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | options.001 | Co-op options menu | open; edit; confirm; cancel | accepted options persist and affect only the intended scope | unverified / candidate |
 | options.002 | Campaign pause | menu pause; player request; policy restrictions | effective time control follows authoritative pause policy | unverified / candidate |
@@ -620,7 +620,7 @@ Sources: [source/GameInterface/Services/Difficulties](../source/GameInterface/Se
 
 Entry: Server save / session sidecar / startup save selection
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | save.001 | Save campaign | manual; automatic; pending authoritative action | completed save is readable and identified after write completion | unverified / candidate |
 | save.002 | Save player registrations | multiple clients; disconnected player | session metadata retains correct platform/hero/party mappings | unverified / candidate |
@@ -640,7 +640,7 @@ Sources: [doc/automated-testing/mcp-deployment.md](../doc/automated-testing/mcp-
 
 Entry: Repository selector / direct bannerlord-coop MCP / evidence
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | tools.001 | Select required verification | known documentation; unknown path; invalid identity | unit selection, fail-closed full-live selection and invalid-input exit are independently asserted | tooling exercised; no gameplay proof / exercised |
 | tools.002 | Read launch preflight | commit headroom; bridge compatibility; ownership | read-only preflight reports prerequisites without launching/deploying | tooling-only / source-inspected |
@@ -659,7 +659,7 @@ Sources: [doc/automated-testing/verification-harness.md](../doc/automated-testin
 
 Entry: Native/SandBox/StoryMode/CustomBattle/Multiplayer entry points
 
-| ID | Action | Independent slices | Required observation | Support / evidence |
+| ID | Action | Outcome variants | Required observation | Support / evidence |
 | --- | --- | --- | --- | --- |
 | vanilla-modes.001 | Sandbox campaign | new game; saved game | entry and behavior registration are established for the exact installed build | unverified / candidate |
 | vanilla-modes.002 | Story campaign | tutorial; story progression; quest phases | StoryMode-owned paths require separate source and runtime evidence | unverified / candidate |
