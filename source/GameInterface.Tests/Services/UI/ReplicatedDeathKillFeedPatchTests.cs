@@ -10,6 +10,7 @@ using Xunit;
 namespace GameInterface.Tests.Services.UI;
 
 /// <summary>Regression coverage for replicated death kill-feed context.</summary>
+[Collection(nameof(BattleSpawnGateCollection))]
 public class ReplicatedDeathKillFeedPatchTests : IDisposable
 {
     public void Dispose()
