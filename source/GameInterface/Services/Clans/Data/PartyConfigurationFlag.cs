@@ -1,3 +1,4 @@
+using Common.Util;
 using System;
 using TaleWorlds.CampaignSystem;
 
@@ -36,5 +37,20 @@ public static class PartyConfigurationFlags
             case PartyConfigurationFlag.CanHaveFleet: hero.CanHaveFleet = value; break;
             default: throw new ArgumentOutOfRangeException(nameof(flag), flag, null);
         }
+    }
+
+    /// <summary>
+    /// Server only: <see cref="Hero.ResetPartyConfiguration"/>, which nulls a field that is not synced,
+    /// done through the synced flags first so that clients get the defaults too.
+    /// </summary>
+    public static void Reset(Hero hero)
+    {
+        // Clients never run the vanilla reset, so publish even inside a replicated action's scope.
+        using (AllowedThread.Suspend())
+        {
+            foreach (PartyConfigurationFlag flag in Enum.GetValues(typeof(PartyConfigurationFlag)))
+                Set(hero, flag, true);
+        }
+        hero.ResetPartyConfiguration();
     }
 }

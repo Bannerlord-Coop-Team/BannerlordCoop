@@ -92,6 +92,11 @@ namespace E2E.Tests.Services.Heroes
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.Father));
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.Mother));
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.Spouse));
+            // v1.5 party commands; a hero with no party configuration reads true for each.
+            TestEnvironment.AssertProperty<Hero, bool>(nameof(Hero.CanJoinArmy), false, defaultValue: true);
+            TestEnvironment.AssertProperty<Hero, bool>(nameof(Hero.CanRaid), false, defaultValue: true);
+            TestEnvironment.AssertProperty<Hero, bool>(nameof(Hero.CanDonateTroopsToGarrison), false, defaultValue: true);
+            TestEnvironment.AssertProperty<Hero, bool>(nameof(Hero.CanHaveFleet), false, defaultValue: true);
         }
 
         [Fact]

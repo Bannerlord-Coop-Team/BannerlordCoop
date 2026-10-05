@@ -7,6 +7,7 @@ using Common.Network.Messages;
 using Common.Util;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Messages;
+using GameInterface.Services.Clans.Data;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
@@ -438,6 +439,8 @@ internal class HeirSelectionHandler : IHandler
         sentSelections.Remove(originalHeroId);
 
         heirSelectionCampaignBehaviorInterface.OnBeforePlayerCharacterChanged(data.OriginalHero, originalParty);
+        // The server never raises OnBeforePlayerCharacterChanged, where v1.5 resets the new player character's party commands.
+        PartyConfigurationFlags.Reset(data.Heir);
 
         Logger.Information($"Transferred controller {registeredPlayer.ControllerId} from hero {originalHeroId} to heir {heirId}");
 
