@@ -37,6 +37,9 @@ Server setup walkthrough: https://www.youtube.com/watch?v=laZM967Eals
 
 ## Current Features
 
+The [granular feature map](features/README.md) lists individual actions, installed game definitions,
+co-op restrictions and verification status. Its inventory is not a gameplay compatibility claim.
+
 - Shared campaign map
 - Player and AI movement synchronization
 - Map encounters

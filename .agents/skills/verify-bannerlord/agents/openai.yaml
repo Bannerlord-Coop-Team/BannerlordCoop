@@ -1,0 +1,4 @@
+interface:
+  display_name: "Verify Bannerlord"
+  short_description: "Inspect Bannerlord features and verify co-op behavior"
+  default_prompt: "Use $verify-bannerlord to select and execute source-bound Bannerlord verification recipes."
