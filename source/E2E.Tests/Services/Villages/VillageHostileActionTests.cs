@@ -59,6 +59,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
@@ -1191,7 +1192,9 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkTroopKilled>());
                 Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkTroopWounded>());
                 Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkTroopScoreHit>());
-            }, MapEventDisabledMethods);
+            }, MapEventDisabledMethods.Append(
+                // The headless test uses the default spawn setting without loading BannerlordConfig.
+                AccessTools.PropertyGetter(typeof(MBGameManager), nameof(MBGameManager.UnitSpawnPrioritization))));
         }
         finally
         {
