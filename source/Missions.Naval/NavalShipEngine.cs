@@ -145,6 +145,10 @@ public class NavalShipEngine : INavalShipEngine
         }
 
         agentsLogic.AssignAndTeleportCrewToShipMachines(fresh);
+
+        // Removing one hull and adding one leaves the planner's agent count unchanged, so its k-d tree keeps the removed
+        // copy and never sees the new hull. Rebuild the planner the way vanilla does after changing ships mid-mission.
+        mission.GetMissionBehavior<NavalTrajectoryPlanningLogic>()?.ForceReinitialize();
         return fresh;
     }
 
