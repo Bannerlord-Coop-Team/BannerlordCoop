@@ -200,13 +200,22 @@ public sealed class ArtisanProductIssueOwnerTests : IDisposable
     public void RegistryResolutionWaitsForEarlierGameThreadRegistration()
     {
         Hero missing = null!;
+        bool? lookupOnGameThread = null;
         objects.Setup(o => o.TryGetObjectWithLogging("relative", out missing)).Returns(false);
-        GameThread.RunSafe(() => SetupHero("relative", relative));
+        GameThread.RunSafe(() =>
+        {
+            SetupHero("relative", relative);
+            var registered = relative;
+            objects.Setup(o => o.TryGetObjectWithLogging("relative", out registered))
+                .Callback(() => lookupOnGameThread = GameThread.Instance.IsGameThread)
+                .Returns(true);
+        });
 
         MessageBroker.Instance.Publish(this, Message());
         Drain();
 
         Assert.Same(issue, relative.Issue);
+        Assert.True(lookupOnGameThread);
     }
 
     [Fact]
