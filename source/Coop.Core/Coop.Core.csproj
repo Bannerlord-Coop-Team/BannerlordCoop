@@ -30,7 +30,7 @@
     <PlatformTarget>x64</PlatformTarget>
     <StartWorkingDirectory>$(SolutionDir)..\mb2\bin\Win64_Shipping_Client</StartWorkingDirectory>
     <StartProgram>$(SolutionDir)..\mb2\bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
-    <StartArguments>/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_</StartArguments>
+    <StartArguments>/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode$(COOP_DEBUG_MODULES)*Coop*_MODULES_</StartArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <OutputPath>bin\Release\</OutputPath>
