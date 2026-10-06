@@ -97,6 +97,15 @@ public interface INavalShipEngine
     /// kind; <paramref name="attacker"/> and <paramref name="hitter"/> are null when they are not known here.
     /// </summary>
     void ApplyShipDamage(MissionObject hull, NetworkApplyShipDamage damage, Agent attacker, MissionObject hitter);
+
+    /// <summary>The hull's current damage state.</summary>
+    BattleShipCondition ReadCondition(MissionObject hull);
+
+    /// <summary>
+    /// [Game thread] Sets an owner's damage state on a copied hull, or carries it onto a replacement hull: HP, fire and
+    /// sails, and sinking through the vanilla path. A copy also takes the sunk state; a simulated hull sinks on its own.
+    /// </summary>
+    void ApplyCondition(MissionObject hull, BattleShipCondition condition);
 }
 
 /// <summary>An agent a hull replacement moves: whether it is the hull's crew and, when it stood aboard, its hull-local deck position.</summary>

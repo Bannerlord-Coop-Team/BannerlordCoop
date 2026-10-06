@@ -18,7 +18,8 @@ namespace Missions.Battles;
 /// Replicates naval hulls over the mission mesh. Own hulls register when they spawn, are announced to peers at
 /// the first deployment commit and stream their frame, helm input and ropes at 20 Hz; other owners' hulls are
 /// spawned as kinematic copies and follow those samples. Ropes ride the samples because each one carries every
-/// station's generation-ordered state, so a later sample repairs a rejected one; leaving sends them once more.
+/// station's generation-ordered state, so a later sample repairs a rejected one; leaving sends them once more. Owners also
+/// send a hull's damage state when it changes, and copies take it on.
 /// </summary>
 public interface IBattleShipReplicator : IDisposable
 {
@@ -69,6 +70,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly Dictionary<Guid, ShipStream> streams = new Dictionary<Guid, ShipStream>();
     private readonly List<BattleShipSpawnData> pendingForeignHulls = new List<BattleShipSpawnData>();
     private readonly List<HullSwap> hullSwaps = new List<HullSwap>();
+    private readonly Dictionary<Guid, NetworkShipCondition> pendingConditions = new Dictionary<Guid, NetworkShipCondition>();
     private bool spawningForeignHull;
     private bool spawnRecordsSent;
     private float sendElapsed;
@@ -111,6 +113,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Subscribe<BattleMissionLeaving>(Handle_MissionLeaving);
         messageBroker.Subscribe<NetworkBattleRopeFinal>(Handle_NetworkBattleRopeFinal);
         messageBroker.Subscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
+        messageBroker.Subscribe<NetworkShipCondition>(Handle_NetworkShipCondition);
     }
 
     public void Dispose()
@@ -123,7 +126,9 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Unsubscribe<BattleMissionLeaving>(Handle_MissionLeaving);
         messageBroker.Unsubscribe<NetworkBattleRopeFinal>(Handle_NetworkBattleRopeFinal);
         messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
+        messageBroker.Unsubscribe<NetworkShipCondition>(Handle_NetworkShipCondition);
         hullSwaps.Clear();
+        pendingConditions.Clear();
     }
 
     // [Game thread] Published synchronously by the spawn postfix. Hulls this client fields go on PlayerTeam; the
@@ -194,6 +199,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         if (!Registry.TryGet(shipId, out var ship)) return "No registered hull has that ship id.";
         if (!ship.IsNpcParty || !IsOwnHull(ship)) return "The hull is not an AI hull this client simulates.";
+        // A sunk copy is disabled and simulates nothing, so it stays as it is under its new owner.
+        if (engine.ReadCondition(ship.Hull)?.SinkingState == BattleShipCondition.Sunk) return "The hull has sunk.";
         if (hullSwaps.Any(swap => swap.ShipId == shipId)) return "The hull is already being replaced.";
 
         hullSwaps.Add(new HullSwap(shipId));
@@ -288,6 +295,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         AdvanceHullSwaps();
         PruneRemovedHulls();
         DrainPendingForeignHulls();
+        DrainPendingConditions();
 
         if (!spawnRecordsSent && deployment.IsCommitted)
         {
@@ -343,7 +351,91 @@ public class BattleShipReplicator : IBattleShipReplicator
             network.SendAll(new NetworkBattleShipSample(ship.ShipId, session.OwnControllerId, stream.Sent, deadline,
                 NetworkBattleShipSample.FromFrame(engine.GetFrame(ship.Hull)), engine.ReadInput(ship.Hull),
                 engine.CaptureRopes(ship.Hull, ShipIdOf), session.HostEpoch));
+            SendConditionIfChanged(ship, stream);
         }
+    }
+
+    // Owners send a hull's damage state when it changes; the first check after the hull was announced sends it once.
+    private void SendConditionIfChanged(NetworkShipInfo ship, ShipStream stream)
+    {
+        var condition = engine.ReadCondition(ship.Hull);
+        if (condition == null || !condition.DiffersFrom(stream.Condition)) return;
+
+        stream.Condition = condition;
+        stream.ConditionRevision++;
+        stream.ConditionEpoch = session.HostEpoch;
+        network.SendAll(new NetworkShipCondition(ship.ShipId, session.OwnControllerId, stream.ConditionRevision, session.HostEpoch,
+            condition));
+    }
+
+    private void Handle_NetworkShipCondition(MessagePayload<NetworkShipCondition> payload)
+    {
+        var condition = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (Mission.Current == null) return;
+            AcceptCondition(condition);
+        }, context: nameof(Handle_NetworkShipCondition));
+    }
+
+    /// <summary>[Game thread] Sets an owner's condition on its copied hull; one for a hull not spawned here yet waits for it.</summary>
+    internal void AcceptCondition(NetworkShipCondition condition)
+    {
+        if (condition == null) return;
+
+        if (!Registry.TryGet(condition.ShipId, out var ship))
+        {
+            if (!pendingConditions.TryGetValue(condition.ShipId, out var pending) || IsNewerCondition(condition, pending))
+                pendingConditions[condition.ShipId] = condition;
+            return;
+        }
+
+        var stream = GetStream(condition.ShipId);
+        var rejection = ValidateCondition(ship, session.OwnControllerId, condition, stream.ConditionRevision, stream.ConditionEpoch);
+        if (rejection == null && ship.IsNpcParty && hostEpochPolicy.IsStale(condition.HostEpoch, session.HostEpoch))
+            rejection = "stale_epoch";
+        if (rejection != null)
+        {
+            stream.Reject("condition_" + rejection);
+            return;
+        }
+
+        engine.ApplyCondition(ship.Hull, condition.Condition);
+        stream.Condition = condition.Condition;
+        stream.ConditionRevision = condition.Revision;
+        if (ship.IsNpcParty) stream.ConditionEpoch = condition.HostEpoch;
+    }
+
+    private static bool IsNewerCondition(NetworkShipCondition condition, NetworkShipCondition than) =>
+        condition.HostEpoch > than.HostEpoch || (condition.HostEpoch == than.HostEpoch && condition.Revision > than.Revision);
+
+    private void DrainPendingConditions()
+    {
+        if (pendingConditions.Count == 0) return;
+
+        foreach (var shipId in pendingConditions.Keys.ToArray())
+        {
+            if (!Registry.TryGet(shipId, out _)) continue;
+
+            var condition = pendingConditions[shipId];
+            pendingConditions.Remove(shipId);
+            AcceptCondition(condition);
+        }
+    }
+
+    /// <summary>Why a condition must be dropped, or null to apply it.</summary>
+    internal static string ValidateCondition(NetworkShipInfo ship, string ownControllerId, NetworkShipCondition condition,
+        long acceptedRevision, int acceptedEpoch)
+    {
+        if (ship.CurrentAuthority == ownControllerId) return "own_hull";
+        if (condition.OwnerControllerId != ship.CurrentAuthority) return "not_authority";
+
+        // A new host numbers an AI hull's conditions on from its own count, so a newer epoch restarts the order.
+        if (ship.IsNpcParty && condition.HostEpoch < acceptedEpoch) return "stale_epoch";
+        bool newEpoch = ship.IsNpcParty && condition.HostEpoch > acceptedEpoch;
+        if (!newEpoch && condition.Revision <= acceptedRevision) return "stale";
+        if (condition.Condition == null || !condition.Condition.IsValid) return "invalid_condition";
+        return null;
     }
 
     // [Game thread] Published by the battle controller before it stops the mesh; samples end here, so peers get the
@@ -635,6 +727,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         ships = Registry.Ships.Select(ship =>
         {
             streams.TryGetValue(ship.ShipId, out var stream);
+            var condition = engine.ReadCondition(ship.Hull);
             return new
             {
                 shipId = ship.ShipId,
@@ -657,6 +750,11 @@ public class BattleShipReplicator : IBattleShipReplicator
                 epoch = IsOwnHull(ship) ? session.HostEpoch : stream?.AcceptedEpoch ?? 0,
                 helmPilot = engine.HasHelmPilot(ship.Hull),
                 swapPhase = hullSwaps.FirstOrDefault(swap => swap.ShipId == ship.ShipId)?.Phase.ToString(),
+                hp = condition?.HitPoints,
+                sailHp = condition?.SailHitPoints,
+                fireHp = condition?.FireHitPoints,
+                sinking = condition?.SinkingState,
+                conditionRevision = stream?.ConditionRevision ?? 0,
             };
         }).ToArray(),
     };
@@ -701,6 +799,10 @@ public class BattleShipReplicator : IBattleShipReplicator
         public long Applied;
         public long Rejects;
         public string LastReject;
+        /// <summary>The owner's last sent, or a copy's last applied, damage state, its revision and its host epoch.</summary>
+        public BattleShipCondition Condition;
+        public long ConditionRevision;
+        public int ConditionEpoch;
 
         public void Reject(string reason)
         {

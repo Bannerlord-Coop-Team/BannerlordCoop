@@ -17,6 +17,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using SinkingState = NavalDLC.Missions.NavalPhysics.NavalPhysics.SinkingState;
 
 namespace Missions.Naval;
 
@@ -157,6 +158,7 @@ public class NavalShipEngine : INavalShipEngine
 
         var origin = ship.ShipOrigin;
         var frame = ship.GlobalFrame;
+        var condition = ReadCondition(ship);
 
         // Quest5's RemoveShipInternal: no rope or bridge may keep pointing at a removed hull.
         ship.BreakAllExistingConnections();
@@ -166,6 +168,9 @@ public class NavalShipEngine : INavalShipEngine
         var fresh = shipsLogic.SpawnShip(origin, in frame, team, formation, spawnAnchored: false, checkForFreeArea: false);
         fresh.SetController(ShipControllerType.AI);
         formation.SetControlledByAI(true);
+
+        // HP lives on the shared origin; fire, partial HP and sinking live on the hull, so a sinking hull keeps sinking.
+        ApplyCondition(fresh, condition);
 
         // Removing one hull and adding one leaves the planner's agent count unchanged, so its k-d tree keeps the removed
         // hull and never sees the new one. Rebuild it the way vanilla does after changing ships mid-mission.
@@ -439,6 +444,77 @@ public class NavalShipEngine : INavalShipEngine
                     return;
             }
         }
+    }
+
+    public BattleShipCondition ReadCondition(MissionObject hull)
+    {
+        var ship = (MissionShip)hull;
+        return new BattleShipCondition(ship.HitPoints, ship.SailHitPoints, ship.FireHitPoints, ship._partialHitPoints?.ToArray(),
+            (int)ship.Physics.NavalSinkingState);
+    }
+
+    public void ApplyCondition(MissionObject hull, BattleShipCondition condition)
+    {
+        var ship = (MissionShip)hull;
+        if (condition == null || !ship.GameEntity.IsValid) return;
+
+        bool isCopy = NavalForeignHulls.Contains(ship);
+        using (NavalShipDamageGate.RoutedApply())
+        {
+            if (ship.ShipOrigin is Ship origin)
+            {
+                origin.HitPoints = condition.HitPoints;
+                origin.SailHitPoints = condition.SailHitPoints;
+            }
+
+            ApplyPartialHitPoints(ship, condition.PartialHitPoints);
+
+            // At 0 sail HP DealDamageToSails sets the sails burning; zero damage changes no HP.
+            if (ship.SailHitPoints <= 0f && ship.ShipSailState == MissionShip.SailState.Intact)
+                ship.DealDamageToSails(null, 0f, 0f, null);
+
+            bool catchesFire = condition.FireHitPoints <= 0f && ship.FireHitPoints > 0f;
+            ship.FireHitPoints = condition.FireHitPoints;
+            if (catchesFire)
+            {
+                ship.PrepareForAbandonment();
+                ship.GameEntity.GetFirstScriptOfTypeRecursive<ShipBurningSystem>()?.StartFire();
+                ship.ShipsLogic.OnShipBurned(ship);
+            }
+
+            ApplySinkingState(ship, (SinkingState)condition.SinkingState, isCopy);
+        }
+
+        // PrepareForAbandonment and SetSinkingState leave the hull an auto-updated controller; a copy keeps none.
+        if (isCopy) ship.SetController(ShipControllerType.None, autoUpdateController: false);
+    }
+
+    private static void ApplyPartialHitPoints(MissionShip ship, float[] partialHitPoints)
+    {
+        var parts = ship._partialHitPoints;
+        float max = ship.MaxPartialHealth;
+        if (partialHitPoints == null || parts == null || max <= 0f) return;
+
+        for (int i = 0; i < parts.Length && i < partialHitPoints.Length; i++)
+        {
+            parts[i] = partialHitPoints[i];
+            ship.Physics.SetTargetDurabilityOfPart(i, partialHitPoints[i] / max);
+        }
+    }
+
+    // SetSinkingState(Sinking) is what DealDamage does at 0 HP. Sunk is what OnTick does once the hull is under water,
+    // which a copy reaches on its own when the owner's samples carry it down; this covers a copy that never does.
+    private static void ApplySinkingState(MissionShip ship, SinkingState target, bool isCopy)
+    {
+        if (target != SinkingState.Floating && ship.Physics.NavalSinkingState == SinkingState.Floating)
+            ship.SetSinkingState(SinkingState.Sinking);
+
+        if (target != SinkingState.Sunk || !isCopy || ship.IsSunk) return;
+
+        ship.SetSinkingState(SinkingState.Sunk);
+        ship.ShipSailState = MissionShip.SailState.Destroyed;
+        if (ship.SailBurningSoundEvent?.IsPlaying() == true) ship.SailBurningSoundEvent.Stop();
+        ship.ShipsLogic.OnShipSunk(ship);
     }
 
     // MissionShip.OnHit's fire branch: a heavy hit leaves a burn mark, and at 0 fire HP the sails and hull burn and the

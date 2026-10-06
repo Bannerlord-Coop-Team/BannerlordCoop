@@ -452,6 +452,168 @@ public class BattleShipReplicatorTests
         Assert.Equal(record.CustomSailPatternId, copy.CustomSailPatternId);
     }
 
+    [Fact]
+    public void Tick_SendsTheOwnHullConditionOnceAndThenOnlyWhenItChanges()
+    {
+        var harness = new Harness(committed: true);
+        var condition = Condition(900f);
+        harness.Engine.Setup(e => e.ReadCondition(harness.OwnHull)).Returns(() => condition);
+
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+        condition = Condition(900.001f);
+        harness.Replicator.Tick(0.1f);
+        condition = Condition(850f);
+        harness.Replicator.Tick(0.1f);
+
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkShipCondition)), Times.Exactly(2));
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkShipCondition
+            && ((NetworkShipCondition)m).Revision == 2 && ((NetworkShipCondition)m).Condition.HitPoints == 850f
+            && ((NetworkShipCondition)m).OwnerControllerId == Own && ((NetworkShipCondition)m).HostEpoch == HostEpoch)), Times.Once);
+    }
+
+    [Fact]
+    public void Tick_BeforeDeploymentCommit_SendsNoCondition()
+    {
+        var harness = new Harness(committed: false);
+        harness.Engine.Setup(e => e.ReadCondition(harness.OwnHull)).Returns(Condition(900f));
+
+        harness.Replicator.Tick(0.1f);
+
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkShipCondition)), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(Peer, Peer, false, 5, 0, 4, 0, null)]
+    [InlineData(Peer, "someone_else", false, 5, 0, 4, 0, "not_authority")]
+    [InlineData(Own, Own, false, 5, 0, 4, 0, "own_hull")]
+    [InlineData(Peer, Peer, false, 4, 0, 4, 0, "stale")]
+    [InlineData(Peer, Peer, false, 3, 9, 4, 1, "stale")]
+    [InlineData(Peer, Peer, true, 9, 2, 1, 3, "stale_epoch")]
+    [InlineData(Peer, Peer, true, 1, 4, 9, 3, null)]
+    [InlineData(Peer, Peer, true, 9, 3, 9, 3, "stale")]
+    public void ValidateCondition_KeepsTheOwnersRevisionOrderAndRestartsItForANewHostEpoch(string authority, string sender,
+        bool isNpcParty, long revision, int epoch, long acceptedRevision, int acceptedEpoch, string expected)
+    {
+        var ship = new NetworkShipInfo(Guid.NewGuid(), authority, "MapEventParty_9", isNpcParty, CreateHull(), null);
+        var condition = new NetworkShipCondition(ship.ShipId, sender, revision, epoch, Condition(500f));
+
+        Assert.Equal(expected, BattleShipReplicator.ValidateCondition(ship, Own, condition, acceptedRevision, acceptedEpoch));
+    }
+
+    [Fact]
+    public void ValidateCondition_RejectsANonFiniteCondition()
+    {
+        var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, null, false, CreateHull(), null);
+        var condition = new NetworkShipCondition(ship.ShipId, Peer, 1, 0, Condition(float.NaN));
+
+        Assert.Equal("invalid_condition", BattleShipReplicator.ValidateCondition(ship, Own, condition, 0, 0));
+    }
+
+    [Fact]
+    public void AcceptCondition_AppliesNewerRevisionsToTheCopyAndDropsOlderOnes()
+    {
+        var harness = new Harness(committed: true);
+        var copy = CreateHull();
+        var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_2", false, copy, null);
+        harness.Registry.TryRegister(ship);
+        var newer = new NetworkShipCondition(ship.ShipId, Peer, 2, 0, Condition(600f));
+        var older = new NetworkShipCondition(ship.ShipId, Peer, 1, 0, Condition(800f));
+
+        harness.Replicator.AcceptCondition(newer);
+        harness.Replicator.AcceptCondition(older);
+
+        harness.Engine.Verify(e => e.ApplyCondition(copy, newer.Condition), Times.Once);
+        harness.Engine.Verify(e => e.ApplyCondition(copy, older.Condition), Times.Never);
+        var inspected = JObject.FromObject(harness.Replicator.Inspect())["ships"]!
+            .Single(entry => (Guid)entry["shipId"]! == ship.ShipId);
+        Assert.Equal(2, (long)inspected["conditionRevision"]!);
+        Assert.Equal("condition_stale", (string)inspected["lastReject"]!);
+    }
+
+    [Fact]
+    public void AcceptCondition_ForAHullNotSpawnedYet_AppliesTheLatestOneOnceItIsRegistered()
+    {
+        var harness = new Harness(committed: true);
+        var shipId = Guid.NewGuid();
+        var latest = new NetworkShipCondition(shipId, Peer, 3, 0, Condition(400f));
+        harness.Replicator.AcceptCondition(latest);
+        harness.Replicator.AcceptCondition(new NetworkShipCondition(shipId, Peer, 2, 0, Condition(700f)));
+        harness.Replicator.Tick(0.1f);
+        harness.Engine.Verify(e => e.ApplyCondition(It.IsAny<MissionObject>(), It.IsAny<BattleShipCondition>()), Times.Never);
+
+        var copy = CreateHull();
+        harness.Registry.TryRegister(new NetworkShipInfo(shipId, Peer, "MapEventParty_2", false, copy, null));
+        harness.LiveHulls.Add(copy);
+        harness.Replicator.Tick(0.1f);
+
+        harness.Engine.Verify(e => e.ApplyCondition(copy, latest.Condition), Times.Once);
+        harness.Engine.Verify(e => e.ApplyCondition(It.IsAny<MissionObject>(), It.IsAny<BattleShipCondition>()), Times.Once);
+    }
+
+    [Fact]
+    public void Inspect_ReportsEachHullsCondition()
+    {
+        var harness = new Harness(committed: true);
+        harness.Engine.Setup(e => e.ReadCondition(harness.OwnHull))
+            .Returns(new BattleShipCondition(420f, 80f, 30f, new float[6], 1));
+        harness.Replicator.Tick(0.1f);
+
+        var ship = JObject.FromObject(harness.Replicator.Inspect())["ships"]![0]!;
+
+        Assert.Equal(420f, (float)ship["hp"]!);
+        Assert.Equal(80f, (float)ship["sailHp"]!);
+        Assert.Equal(1, (int)ship["sinking"]!);
+        Assert.Equal(1, (long)ship["conditionRevision"]!);
+    }
+
+    [Fact]
+    public void ReplaceNpcHull_RefusesASunkHull()
+    {
+        var harness = new Harness(committed: true);
+        var ai = new NetworkShipInfo(Guid.NewGuid(), Own, "MapEventParty_8", true, CreateHull(), null);
+        harness.Registry.TryRegister(ai);
+        harness.Engine.Setup(e => e.ReadCondition(ai.Hull)).Returns(new BattleShipCondition(0f, 0f, 0f, new float[6], BattleShipCondition.Sunk));
+
+        Assert.Equal("The hull has sunk.", harness.Replicator.ReplaceNpcHull(ai.ShipId));
+    }
+
+    [Fact]
+    public void Condition_DiffersOnlyBeyondTheToleranceOrOnSinkingState()
+    {
+        var condition = new BattleShipCondition(500f, 200f, 100f, new[] { 50f, 50f }, 0);
+
+        Assert.True(condition.DiffersFrom(null));
+        Assert.False(condition.DiffersFrom(new BattleShipCondition(500.005f, 200f, 100f, new[] { 50f, 50f }, 0)));
+        Assert.True(condition.DiffersFrom(new BattleShipCondition(500f, 200f, 100f, new[] { 50f, 49f }, 0)));
+        Assert.True(condition.DiffersFrom(new BattleShipCondition(500f, 200f, 100f, new[] { 50f, 50f }, 1)));
+    }
+
+    [Fact]
+    public void NetworkShipCondition_RoundTripsEveryField()
+    {
+        var message = new NetworkShipCondition(Guid.NewGuid(), Peer, 7, 2,
+            new BattleShipCondition(420.5f, 80f, -3f, new[] { 1f, 2f, 3f, 4f, 5f, 6f }, 2));
+
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, message);
+        stream.Position = 0;
+        var copy = Serializer.Deserialize<NetworkShipCondition>(stream);
+
+        Assert.Equal(message.ShipId, copy.ShipId);
+        Assert.Equal(Peer, copy.OwnerControllerId);
+        Assert.Equal(7, copy.Revision);
+        Assert.Equal(2, copy.HostEpoch);
+        Assert.Equal(420.5f, copy.Condition.HitPoints);
+        Assert.Equal(80f, copy.Condition.SailHitPoints);
+        Assert.Equal(-3f, copy.Condition.FireHitPoints);
+        Assert.Equal(message.Condition.PartialHitPoints, copy.Condition.PartialHitPoints);
+        Assert.Equal(2, copy.Condition.SinkingState);
+    }
+
+    private static BattleShipCondition Condition(float hitPoints) =>
+        new BattleShipCondition(hitPoints, 300f, 100f, new[] { 80f, 80f, 80f, 80f, 80f, 80f }, 0);
+
     private static MissionObject CreateHull() => ShipTestHulls.Create();
 
     private sealed class Harness
