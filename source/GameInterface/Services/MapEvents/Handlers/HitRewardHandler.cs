@@ -7,6 +7,7 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
@@ -27,6 +28,7 @@ public class HitRewardHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISendCoalescer coalescer;
+    private readonly HashSet<string> mapEventsMissingTracker = new HashSet<string>();
 
     public HitRewardHandler(
         IMessageBroker messageBroker,
@@ -242,6 +244,15 @@ public class HitRewardHandler : IHandler
             if ((battleObserverMissionLogic?.BattleObserver) == null) return;
 
             TroopUpgradeTracker troopUpgradeTracker = mapEvent.TroopUpgradeTracker;
+            if (troopUpgradeTracker == null)
+            {
+                if (mapEventsMissingTracker.Add(data.MapEventId))
+                    Logger.Warning("Skipping scoreboard upgrades for {MapEventId}: its TroopUpgradeTracker is null on this client " +
+                        "(finalized {IsFinalized}, main party side {Side}, parties {PartyCount})",
+                        data.MapEventId, mapEvent.IsFinalized, PartyBase.MainParty?.Side, mapEvent.InvolvedParties.Count());
+                return;
+            }
+
             if (affectorCharacter.IsHero)
             {
                 Hero heroObject = affectorCharacter.HeroObject;
