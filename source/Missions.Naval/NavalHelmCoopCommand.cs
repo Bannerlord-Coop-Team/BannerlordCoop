@@ -14,7 +14,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 // coop.debug.naval.helm 0 1 1 10
-/// <summary>DEBUG: drives the local player's own hull with keyboard-equivalent helm input for a few seconds.</summary>
+/// <summary>DEBUG: takes the own hull's helm if it is empty and drives the hull with keyboard-equivalent input for a few seconds.</summary>
 public sealed class NavalHelmCoopCommand : ICoopCommand
 {
     internal const int DefaultSeconds = 5;
@@ -31,7 +31,8 @@ public sealed class NavalHelmCoopCommand : ICoopCommand
 
     public string Name => "helm";
 
-    public string Description => "Steers, rows and sets the sail of this client's own hull as the keyboard would, for a few seconds.";
+    public string Description => "Seats the main agent at the own hull's empty helm, then steers, rows and sets the sail as the keyboard " +
+        "would, for a few seconds.";
 
     public CoopCommandSide Side => CoopCommandSide.Client;
 
@@ -49,16 +50,43 @@ public sealed class NavalHelmCoopCommand : ICoopCommand
 
         error = hulls.TryGetOwnHull(out var hull);
         if (error != null) return Failed(error);
+        error = TakeHelm(hull, Agent.Main);
+        if (error != null) return Failed(error);
         if (!hull.IsPlayerControlled || hull.Controller is not PlayerShipController)
-            return Failed("The own hull is not player controlled; take its helm first.");
-        if (Agent.Main == null || hull.ShipControllerMachine?.PilotAgent != Agent.Main)
-            return Failed("The main agent is not at the own hull's helm.");
+            return Failed("The own hull did not turn player controlled with the main agent at its helm.");
 
         var record = KeyboardRecord(request.Rudder, request.Row, request.Sail);
         NavalHelmOverride.Start(hull, record, request.Seconds);
         return new CoopCommandResult(true, string.Format(CultureInfo.InvariantCulture,
             "NAVAL_HELM ship={0} rudder={1} rowerLongitudinal={2} rowerLateral={3} sail={4} seconds={5}",
             hulls.ShipIdOf(hull), record.RudderLateral, record.RowerLongitudinal, record.RowerLateral, record.Sail, request.Seconds));
+    }
+
+    // An empty helm takes the main agent the way vanilla seats a captain at spawn (NavalShipAgents); the controller then
+    // follows the pilot as MissionShip.OnTick's UpdateController would on the next tick.
+    private static string TakeHelm(MissionShip hull, Agent main)
+    {
+        if (main == null || !main.IsActive()) return "There is no living main agent to take the helm.";
+        if (hull.IsSinking) return "The own hull is sinking.";
+
+        var helm = hull.ShipControllerMachine;
+        var point = helm?.PilotStandingPoint;
+        if (point == null) return "The own hull has no helm.";
+        if (helm.PilotAgent != null && helm.PilotAgent != main) return $"The own hull's helm is held by {helm.PilotAgent.Name}.";
+
+        if (helm.PilotAgent == null)
+        {
+            if (point.IsDisabledForPlayers) return "The own hull's helm is disabled for players.";
+
+            if (main.CurrentlyUsedGameObject != null) main.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
+            main.TeleportToPosition(point.GameEntity.GlobalPosition);
+            main.UseGameObject(point);
+            if (helm.PilotAgent != main) return "The main agent could not take the own hull's helm.";
+            helm.OnPilotAssignedDuringSpawn();
+        }
+
+        if (!hull.IsPlayerControlled) hull.UpdateController();
+        return null;
     }
 
     internal readonly struct HelmRequest
