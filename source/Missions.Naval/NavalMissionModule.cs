@@ -46,6 +46,12 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalReswapCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
+        builder.RegisterType<NavalDamageCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<NavalSinkCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
         builder.RegisterType<NavalRopeDebugCommands.RopeListCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();

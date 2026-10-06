@@ -135,6 +135,22 @@ internal static class NavalShipDamageGate
         return false;
     }
 
+#if DEBUG
+    /// <summary>[Game thread] Deals hull damage the way a ship siege hit does, so the gate applies or routes it like one.</summary>
+    internal static void DealLocalHit(MissionShip ship, float damage)
+    {
+        var outer = EnterHit(null, ship.GlobalFrame.origin);
+        try
+        {
+            ship.DealDamage(damage, null, out _, out _, out _, out _);
+        }
+        finally
+        {
+            ExitHit(outer);
+        }
+    }
+#endif
+
     /// <summary>The sail's index in the hull's sails, or -1.</summary>
     internal static int SailIndexOf(MissionShip ship, MissionSail sail)
     {

@@ -41,6 +41,8 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             deploymentCommitted = controller.Deployment.IsCommitted,
             ownReservePresent = mission.GetMissionBehavior<CoopNavalReserveGuard>()?.ReservePresent,
             shipSync = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipReplicator.Inspect(),
+            shipDamage = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipDamageRouter.Inspect(),
+            shipDamageGate = NavalShipDamageGate.Inspect(),
             shipDecks = controller.MissionComponent.AgentMovementHandler.InspectShipDecks(),
             hostEpoch = controller.Session.HostEpoch,
             npcFleet = InspectNpcFleet(controller, mission.GetMissionBehavior<CoopNavalBattleBehavior>()),
