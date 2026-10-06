@@ -7,11 +7,12 @@ namespace Missions.Naval;
 public class CoopNavalBattleBehavior : MissionLogic
 {
     public CoopNavalBattleBehavior(IBattleShipReplicator shipReplicator, IAgentStationUseReplicator stationUseReplicator,
-        INavalNpcFleetSpawner npcFleetSpawner)
+        INavalNpcFleetSpawner npcFleetSpawner, IBattleShipDamageRouter shipDamageRouter)
     {
         ShipReplicator = shipReplicator;
         StationUseReplicator = stationUseReplicator;
         NpcFleetSpawner = npcFleetSpawner;
+        ShipDamageRouter = shipDamageRouter;
         CoopNavalMissionScope.IsActive = true;
     }
 
@@ -20,6 +21,8 @@ public class CoopNavalBattleBehavior : MissionLogic
     public IAgentStationUseReplicator StationUseReplicator { get; }
 
     public INavalNpcFleetSpawner NpcFleetSpawner { get; }
+
+    public IBattleShipDamageRouter ShipDamageRouter { get; }
 
     public override void OnMissionTick(float dt)
     {
@@ -32,6 +35,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     public override void OnEndMissionInternal()
     {
         CoopNavalMissionScope.IsActive = false;
+        ShipDamageRouter.Dispose();
         StationUseReplicator.Dispose();
         ShipReplicator.Dispose();
         NavalRopes.Clear();
@@ -39,6 +43,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         NavalHelmOverride.Clear();
 #endif
         NavalForeignHulls.Clear();
+        NavalShipDamageGate.Clear();
         NavalPlayerDeploymentSlot.Reset();
         base.OnEndMissionInternal();
     }

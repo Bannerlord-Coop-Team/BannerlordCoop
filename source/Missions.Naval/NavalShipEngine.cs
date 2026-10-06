@@ -413,6 +413,51 @@ public class NavalShipEngine : INavalShipEngine
     public object InspectRopes(IEnumerable<MissionObject> hulls, Func<MissionObject, Guid> shipIdOf) =>
         NavalRopes.Inspect(hulls.OfType<MissionShip>(), shipIdOf);
 
+    public void ApplyShipDamage(MissionObject hull, NetworkApplyShipDamage damage, Agent attacker, MissionObject hitter)
+    {
+        var ship = (MissionShip)hull;
+        if (!ship.GameEntity.IsValid || ship.IsDisabled) return;
+
+        var point = ship.GlobalFrame.TransformToParent(damage.LocalPoint);
+        using (NavalShipDamageGate.RoutedApply())
+        {
+            switch (damage.Kind)
+            {
+                case BattleShipDamageKind.Hull:
+                    ship.DealDamage(damage.Damage, hitter as MissionShip, out _, out _, out _, out _);
+                    return;
+                case BattleShipDamageKind.Collision:
+                    ship.DealCollisionDamage(hitter as MissionShip, damage.IsRamDamage, point, damage.Damage);
+                    return;
+                case BattleShipDamageKind.Sails:
+                    var sails = ship.Sails;
+                    var sail = damage.SailIndex >= 0 && damage.SailIndex < sails.Count ? sails[damage.SailIndex] : null;
+                    ship.DealDamageToSails(attacker, damage.Damage, damage.InflictedDamage, sail);
+                    return;
+                case BattleShipDamageKind.Fire:
+                    ApplyFireDamage(ship, attacker, damage.Damage, point);
+                    return;
+            }
+        }
+    }
+
+    // MissionShip.OnHit's fire branch: a heavy hit leaves a burn mark, and at 0 fire HP the sails and hull burn and the
+    // crew abandons ship.
+    private static void ApplyFireDamage(MissionShip ship, Agent attacker, float fireDamage, Vec3 point)
+    {
+        if (ship.FireHitPoints <= 0f) return;
+
+        float dealt = ship.DealFireDamage(fireDamage);
+        var burning = ship.GameEntity.GetFirstScriptOfTypeRecursive<ShipBurningSystem>();
+        if (dealt > 40f) burning?.RegisterBlow(point);
+        if (ship.FireHitPoints > 0f) return;
+
+        ship.DealDamageToSails(attacker, ship.SailHitPoints, ship.SailHitPoints, null);
+        ship.PrepareForAbandonment();
+        burning?.StartFire();
+        ship.ShipsLogic.OnShipBurned(ship);
+    }
+
     // The machine whose pilot point this is; the point entity sits at most a few levels below its machine.
     private static UsableMachine PilotMachineOf(UsableMissionObject point)
     {

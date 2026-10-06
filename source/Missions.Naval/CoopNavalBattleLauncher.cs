@@ -209,7 +209,10 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
             controller.MissionComponent, shipEngine, controller.Deployment);
         var npcFleetSpawner = new NavalNpcFleetSpawner(controller.Session, shipReplicator, controller.MissionComponent.ShipRegistry,
             shipSnapshotBuilder, objectManager, playerManager, enemySide);
-        mission.AddMissionBehavior(new CoopNavalBattleBehavior(shipReplicator, stationUseReplicator, npcFleetSpawner));
+        var shipDamageRouter = new BattleShipDamageRouter(network, messageBroker, controller.Session, controller.MissionComponent,
+            shipEngine);
+        mission.AddMissionBehavior(new CoopNavalBattleBehavior(shipReplicator, stationUseReplicator, npcFleetSpawner,
+            shipDamageRouter));
     }
 
     // Own party only: vanilla GetMapEventPartiesOfPlayerTeams takes the first non-NPC party as the player's,

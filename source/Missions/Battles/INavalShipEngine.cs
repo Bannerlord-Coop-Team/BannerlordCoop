@@ -91,6 +91,12 @@ public interface INavalShipEngine
 
     /// <summary>[Game thread] Rope state per throw station and the joint force counters (diagnostics).</summary>
     object InspectRopes(IEnumerable<MissionObject> hulls, Func<MissionObject, Guid> shipIdOf);
+
+    /// <summary>
+    /// [Game thread] Replays another client's hit on a hull this client simulates through the vanilla damage method of its
+    /// kind; <paramref name="attacker"/> and <paramref name="hitter"/> are null when they are not known here.
+    /// </summary>
+    void ApplyShipDamage(MissionObject hull, NetworkApplyShipDamage damage, Agent attacker, MissionObject hitter);
 }
 
 /// <summary>An agent a hull replacement moves: whether it is the hull's crew and, when it stood aboard, its hull-local deck position.</summary>
