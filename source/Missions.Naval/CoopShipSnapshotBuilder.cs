@@ -71,7 +71,8 @@ public class CoopShipSnapshotBuilder : ICoopShipSnapshotBuilder
         // Field, not the Owner setter: the setter would add the copy to the owner's party ships.
         snapshot._owner = owner;
 
-        // S5: Ship.OnShipDamaged on this copy still grants skill XP and runs DestroyShipAction at 0 HP; gate both.
+        // CoopShipSnapshotPatches keep its mission damage out of the campaign (destroy action, skill XP).
+        CoopShipSnapshots.Add(snapshot);
         return snapshot;
     }
 }

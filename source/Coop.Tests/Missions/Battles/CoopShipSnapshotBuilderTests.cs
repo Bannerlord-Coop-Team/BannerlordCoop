@@ -36,6 +36,18 @@ public class CoopShipSnapshotBuilderTests
         Assert.Equal(100f, snapshot.HitPoints);
     }
 
+    [Fact]
+    public void Build_MarksOnlyTheSnapshotForTheCampaignGates()
+    {
+        var source = CreateOwnedShip(CreateParty(), hitPoints: 600f);
+
+        var snapshot = new CoopShipSnapshotBuilder().Build(source);
+
+        Assert.True(CoopShipSnapshots.Contains(snapshot));
+        Assert.False(CoopShipSnapshots.Contains(source));
+        Assert.False(CoopShipSnapshots.Contains(null));
+    }
+
     private static PartyBase CreateParty()
     {
         var party = (PartyBase)RuntimeHelpers.GetUninitializedObject(typeof(PartyBase));
