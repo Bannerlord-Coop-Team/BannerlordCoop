@@ -51,7 +51,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private float elapsed;
     private bool seatsAnnounced;
     private bool applyingRemote;
-    private long sent, applied, dropped, localPuppetReleases, pinned;
+    private long sent, applied, dropped, localPuppetReleases, pinned, sinkingReleases;
 
     public AgentStationUseReplicator(
         IBattleNetwork network,
@@ -151,10 +151,11 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     // [Game thread] Runs after this frame's hull frame writes. A puppet the owner keeps seated is re-pinned to its station's
     // user frame on the moved hull, as the lab did; if vanilla released it locally it is re-seated once per owner revision.
     /// <summary>
-    /// An applied seat follows a remote owner's announcements. It ends when the puppet dies or when this client adopts
-    /// it (host migration): from then on vanilla seats it, possibly on a replacement hull.
+    /// An applied seat follows a remote owner's announcements. It ends when the puppet dies, when its hull sinks (the owner's
+    /// agent can drown seated without a release) or when this client adopts it (host migration): from then on vanilla seats
+    /// it, possibly on a replacement hull.
     /// </summary>
-    internal static bool KeepsAppliedSeat(bool alive, bool ownedHere) => alive && !ownedHere;
+    internal static bool KeepsAppliedSeat(bool alive, bool ownedHere, bool hullSinking) => alive && !ownedHere && !hullSinking;
 
     private bool IsOwnedHere(Guid agentId) =>
         missionComponent.AgentRegistry.TryGetAgentInfo(agentId, out var info) && info.CurrentAuthority == session.OwnControllerId;
@@ -167,9 +168,13 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         foreach (var entry in appliedSeats)
         {
             var seat = entry.Value;
-            if (!KeepsAppliedSeat(engine.IsAlive(seat.Agent), IsOwnedHere(entry.Key)))
+            bool alive = engine.IsAlive(seat.Agent);
+            bool ownedHere = IsOwnedHere(entry.Key);
+            bool hullSinking = engine.IsSinking(seat.Hull);
+            if (!KeepsAppliedSeat(alive, ownedHere, hullSinking))
             {
                 leftAgents.Add(entry.Key);
+                if (alive && !ownedHere && hullSinking) ReleaseFromSinkingHull(entry.Key, seat);
                 continue;
             }
 
@@ -190,6 +195,13 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         foreach (var agentId in leftAgents)
             appliedSeats.Remove(agentId);
+    }
+
+    private void ReleaseFromSinkingHull(Guid agentId, AppliedSeat seat)
+    {
+        sinkingReleases++;
+        Logger.Information("[NavalSync] Released puppet {AgentId} from a station of a sinking hull", agentId);
+        Apply(seat.Agent, seat.Point, inUse: false);
     }
 
     private void DrainPending()
@@ -232,16 +244,18 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
             return true;
         }
 
+        // A sinking hull seats nobody; a late use from its owner only lets the puppet go.
+        bool inUse = use.InUse && !engine.IsSinking(ship.Hull);
         appliedRevisions[use.AgentId] = use.Revision;
-        Apply(info.Agent, point, use.InUse);
-        RecordAppliedSeat(use.AgentId, info.Agent, use.InUse ? point : null);
+        Apply(info.Agent, point, inUse);
+        RecordAppliedSeat(use.AgentId, info.Agent, ship.Hull, inUse ? point : null);
         return true;
     }
 
-    internal void RecordAppliedSeat(Guid agentId, Agent agent, UsableMissionObject point)
+    internal void RecordAppliedSeat(Guid agentId, Agent agent, MissionObject hull, UsableMissionObject point)
     {
         if (point == null) appliedSeats.Remove(agentId);
-        else appliedSeats[agentId] = new AppliedSeat(agent, point);
+        else appliedSeats[agentId] = new AppliedSeat(agent, hull, point);
     }
 
     // The station owns the puppet's pose from here, so the buffered owner pose is dropped before seating.
@@ -296,6 +310,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         dropped,
         localPuppetReleases,
         pinned,
+        sinkingReleases,
         appliedSeats = appliedSeats.Count,
         pending = pending.Count,
         ownSeated = ownSeated.Count,
@@ -303,13 +318,15 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
     private sealed class AppliedSeat
     {
-        public AppliedSeat(Agent agent, UsableMissionObject point)
+        public AppliedSeat(Agent agent, MissionObject hull, UsableMissionObject point)
         {
             Agent = agent;
+            Hull = hull;
             Point = point;
         }
 
         public Agent Agent { get; }
+        public MissionObject Hull { get; }
         public UsableMissionObject Point { get; }
         // Set once a local release was re-seated; the next owner revision gives the seat a fresh attempt.
         public bool Reseated { get; set; }

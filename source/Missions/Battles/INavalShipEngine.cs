@@ -101,6 +101,9 @@ public interface INavalShipEngine
     /// <summary>The hull's current damage state.</summary>
     BattleShipCondition ReadCondition(MissionObject hull);
 
+    /// <summary>Whether the hull is sinking or has sunk.</summary>
+    bool IsSinking(MissionObject hull);
+
     /// <summary>
     /// [Game thread] Sets an owner's damage state on a copied hull, or carries it onto a replacement hull: HP, fire and
     /// sails, and sinking through the vanilla path. A copy also takes the sunk state; a simulated hull sinks on its own.

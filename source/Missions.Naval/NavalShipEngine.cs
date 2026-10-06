@@ -453,6 +453,8 @@ public class NavalShipEngine : INavalShipEngine
             (int)ship.Physics.NavalSinkingState);
     }
 
+    public bool IsSinking(MissionObject hull) => hull is MissionShip ship && ship.IsSinking;
+
     public void ApplyCondition(MissionObject hull, BattleShipCondition condition)
     {
         var ship = (MissionShip)hull;
