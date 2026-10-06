@@ -15,7 +15,7 @@ namespace GameInterface.Services.UI.Patches
             return gameState switch
             {
                 KingdomState => ModInformation.IsClient,
-                QuestsState => false,
+                QuestsState => ModInformation.IsClient,
                 CharacterDeveloperState => ModInformation.IsClient,
                 PartyState => ModInformation.IsClient,
                 InventoryState => ModInformation.IsClient,
