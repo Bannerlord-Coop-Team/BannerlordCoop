@@ -568,6 +568,38 @@ public class BattleShipReplicatorTests
     }
 
     [Fact]
+    public void Tick_StopsSamplingAnOwnHullAfterItsSunkConditionWentOut()
+    {
+        var harness = new Harness(committed: true);
+        var condition = Condition(900f);
+        harness.Engine.Setup(e => e.ReadCondition(harness.OwnHull)).Returns(() => condition);
+
+        harness.Replicator.Tick(0.1f);
+        condition = new BattleShipCondition(0f, 0f, 0f, new float[6], BattleShipCondition.Sunk);
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkBattleShipSample)), Times.Exactly(2));
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkShipCondition
+            && ((NetworkShipCondition)m).Condition.SinkingState == BattleShipCondition.Sunk)), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(BattleShipCondition.Sunk, true)]
+    public void Inspect_ReportsWhetherEachHullHasSunk(int sinkingState, bool expected)
+    {
+        var harness = new Harness(committed: true);
+        harness.Engine.Setup(e => e.ReadCondition(harness.OwnHull))
+            .Returns(new BattleShipCondition(0f, 0f, 0f, new float[6], sinkingState));
+
+        var ship = JObject.FromObject(harness.Replicator.Inspect())["ships"]![0]!;
+
+        Assert.Equal(expected, (bool)ship["isSunk"]!);
+    }
+
+    [Fact]
     public void ReplaceNpcHull_RefusesASunkHull()
     {
         var harness = new Harness(committed: true);

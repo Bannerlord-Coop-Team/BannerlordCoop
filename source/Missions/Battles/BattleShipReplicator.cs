@@ -347,6 +347,9 @@ public class BattleShipReplicator : IBattleShipReplicator
         foreach (var ship in Registry.Ships.Where(IsOwnHull))
         {
             var stream = GetStream(ship.ShipId);
+            // The sunk condition already went out after the hull's last sample; peers keep that frame.
+            if (stream.Condition?.SinkingState == BattleShipCondition.Sunk) continue;
+
             stream.Sent++;
             network.SendAll(new NetworkBattleShipSample(ship.ShipId, session.OwnControllerId, stream.Sent, deadline,
                 NetworkBattleShipSample.FromFrame(engine.GetFrame(ship.Hull)), engine.ReadInput(ship.Hull),
@@ -754,6 +757,7 @@ public class BattleShipReplicator : IBattleShipReplicator
                 sailHp = condition?.SailHitPoints,
                 fireHp = condition?.FireHitPoints,
                 sinking = condition?.SinkingState,
+                isSunk = condition?.SinkingState == BattleShipCondition.Sunk,
                 conditionRevision = stream?.ConditionRevision ?? 0,
             };
         }).ToArray(),

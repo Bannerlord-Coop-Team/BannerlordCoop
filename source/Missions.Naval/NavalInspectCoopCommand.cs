@@ -73,18 +73,21 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
         return new CoopCommandResult(true, "NAVAL_INSPECT " + JsonConvert.SerializeObject(state));
     }
 
-    // AI hulls with their authority and how many have a pilot at the helm (the AI captain steers through it).
+    // AI hulls with their authority and how many have a pilot at the helm (the AI captain steers through it). A sinking or
+    // sunk hull has no controller and needs no pilot, so the afloat counts leave it out.
     private static object InspectNpcFleet(CoopBattleController controller, CoopNavalBattleBehavior naval)
     {
         var hulls = controller.MissionComponent.ShipRegistry.Ships.Where(ship => ship.IsNpcParty).ToArray();
+        var afloat = hulls.Where(ship => (ship.Hull as MissionShip)?.IsSinking != true).ToArray();
         return new
         {
             spawner = naval?.NpcFleetSpawner.Inspect(),
             isLocalHost = controller.Session.IsLocalHost,
             hulls = hulls.Length,
-            ownedHere = hulls.Count(ship => ship.CurrentAuthority == controller.Session.OwnControllerId),
-            helmPilotsSeated = hulls.Count(ship => (ship.Hull as MissionShip)?.ShipControllerMachine?.PilotAgent != null),
-            aiControllers = hulls.Count(ship => (ship.Hull as MissionShip)?.Controller?.ControllerType == NavalDLC.Missions.ShipControl.ShipControllerType.AI),
+            sinkingOrSunk = hulls.Length - afloat.Length,
+            ownedHere = afloat.Count(ship => ship.CurrentAuthority == controller.Session.OwnControllerId),
+            helmPilotsSeated = afloat.Count(ship => (ship.Hull as MissionShip)?.ShipControllerMachine?.PilotAgent != null),
+            aiControllers = afloat.Count(ship => (ship.Hull as MissionShip)?.Controller?.ControllerType == NavalDLC.Missions.ShipControl.ShipControllerType.AI),
         };
     }
 
