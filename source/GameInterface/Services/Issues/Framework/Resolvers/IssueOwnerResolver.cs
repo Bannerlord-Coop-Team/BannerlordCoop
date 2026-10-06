@@ -4,7 +4,7 @@ using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
-namespace GameInterface.Services.Issues.Framework.Registry;
+namespace GameInterface.Services.Issues.Framework.Resolvers;
 
 internal class IssueOwnerResolver : IIssueOwnerResolver
 {

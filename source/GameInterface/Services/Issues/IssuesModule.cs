@@ -3,7 +3,7 @@ using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Dispatch;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
-using GameInterface.Services.Issues.Framework.Registry;
+using GameInterface.Services.Issues.Framework.Resolvers;
 using System;
 
 namespace GameInterface.Services.Issues;

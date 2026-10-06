@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace GameInterface.Services.Issues.Framework.Registry;
+namespace GameInterface.Services.Issues.Framework.Registries;
 
 internal class QuestTypeRegistry : IQuestTypeRegistry
 {

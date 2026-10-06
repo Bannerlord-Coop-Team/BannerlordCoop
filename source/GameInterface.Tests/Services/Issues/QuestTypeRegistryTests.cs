@@ -1,5 +1,5 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.Issues.Framework.Registry;
+using GameInterface.Services.Issues.Framework.Registries;
 using Moq;
 using System;
 using Xunit;
