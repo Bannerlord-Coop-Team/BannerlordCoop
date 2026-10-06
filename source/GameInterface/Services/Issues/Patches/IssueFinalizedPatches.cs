@@ -19,12 +19,14 @@ internal class IssueManagerQuestCompletedReasonCapture
 
     [HarmonyPatch(nameof(IssueManager.OnQuestCompleted))]
     [HarmonyPrefix]
-    private static void Prefix(QuestBase quest, QuestBase.QuestCompleteDetails detail)
+    internal static void Prefix(QuestBase quest, QuestBase.QuestCompleteDetails detail)
     {
-        if (quest?.QuestGiver == null) return;
-        if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(quest.QuestGiver.Issue)) return;
+        if (quest == null) return;
+        // Inheritance changes the issue owner while preserving the original quest giver.
+        var issue = IssueManager.GetIssueOfQuest(quest);
+        if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(issue)) return;
 
-        PendingReasons[quest.QuestGiver] = detail switch
+        PendingReasons[issue.IssueOwner] = detail switch
         {
             QuestBase.QuestCompleteDetails.Success => IssueFinalizeReason.QuestSuccess,
             QuestBase.QuestCompleteDetails.Cancel => IssueFinalizeReason.QuestCancel,

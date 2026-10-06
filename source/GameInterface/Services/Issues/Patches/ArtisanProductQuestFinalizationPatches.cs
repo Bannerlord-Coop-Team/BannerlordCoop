@@ -38,7 +38,8 @@ internal sealed class ArtisanProductQuestFinalizationPatches
         if (ArtisanProductPlayerChangePatch.ChangedPlayer != null && ModInformation.IsClient) return false;
         if (ModInformation.IsClient) return AllowedThread.IsThisThreadAllowed();
         return ContainerProvider.TryResolve<IArtisanProductAuthority>(out var authority) &&
-            authority.TryEnter(__instance.QuestGiver, out __state, ArtisanProductPlayerChangePatch.ChangedPlayer);
+            authority.TryEnter(IssueManager.GetIssueOfQuest(__instance)?.IssueOwner, out __state,
+                ArtisanProductPlayerChangePatch.ChangedPlayer);
     }
 
     [HarmonyFinalizer]

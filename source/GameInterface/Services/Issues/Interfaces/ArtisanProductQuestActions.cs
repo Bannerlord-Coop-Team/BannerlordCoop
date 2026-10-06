@@ -36,7 +36,7 @@ internal sealed class ArtisanProductQuestActions : IArtisanProductQuestActions
         if (ModInformation.IsClient) return;
         foreach (var quest in Campaign.Current.QuestManager.Quests.OfType<Quest>().ToArray())
         {
-            if (!quest.IsOngoing || !ownership.TryGetOwnerControllerId(quest.QuestGiver, out var owner) ||
+            if (!quest.IsOngoing || !ownership.TryGetOwnerControllerId(IssueManager.GetIssueOfQuest(quest)?.IssueOwner, out var owner) ||
                 owner != controllerId) continue;
             quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.\""));
         }

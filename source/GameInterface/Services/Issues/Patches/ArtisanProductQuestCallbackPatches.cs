@@ -29,7 +29,7 @@ internal sealed class ArtisanProductQuestCallbackPatches
         __state = null;
         if (ModInformation.IsClient) return false;
         return ContainerProvider.TryResolve<IArtisanProductAuthority>(out var authority) &&
-            authority.TryEnter(__instance.QuestGiver, out __state);
+            authority.TryEnter(IssueManager.GetIssueOfQuest(__instance)?.IssueOwner, out __state);
     }
 
     [HarmonyFinalizer]

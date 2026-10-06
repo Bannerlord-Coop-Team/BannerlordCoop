@@ -31,11 +31,13 @@ internal sealed class ArtisanProductQuestActionPatches
     [HarmonyPrefix]
     private static bool RefuseMerchantOffer(Quest __instance) => Request(__instance, ArtisanProductQuestAction.RefuseMerchantOffer);
 
-    private static bool Request(Quest quest, ArtisanProductQuestAction action)
+    internal static bool Request(Quest quest, ArtisanProductQuestAction action)
     {
         if (ModInformation.IsServer) return true;
-        MessageBroker.Instance.Publish(quest, new ArtisanProductQuestActionRequested(
-            quest.QuestGiver, action, quest._deliveredRawGoods));
+        var owner = IssueManager.GetIssueOfQuest(quest)?.IssueOwner;
+        if (owner != null)
+            MessageBroker.Instance.Publish(quest, new ArtisanProductQuestActionRequested(
+                owner, action, quest._deliveredRawGoods));
         return false;
     }
 }

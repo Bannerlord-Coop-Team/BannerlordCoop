@@ -48,7 +48,8 @@ internal sealed class ArtisanProductQuestPresentationPatches
     {
         if (__state || !__instance._counterOfferGiven || !IsLocalOwner(__instance)) return;
         MessageBroker.Instance.Publish(__instance, new ArtisanProductQuestActionRequested(
-            __instance.QuestGiver, ArtisanProductQuestAction.MerchantOfferShown, __instance._deliveredRawGoods));
+            IssueManager.GetIssueOfQuest(__instance)?.IssueOwner, ArtisanProductQuestAction.MerchantOfferShown,
+            __instance._deliveredRawGoods));
     }
 
     [HarmonyPatch("InitializeQuestOnGameLoad")]
@@ -65,7 +66,7 @@ internal sealed class ArtisanProductQuestPresentationPatches
 
     private static bool IsLocalOwner(Quest quest)
         => ModInformation.IsClient && ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership) &&
-            ownership.IsLocalPeerOwner(quest.QuestGiver);
+            ownership.IsLocalPeerOwner(IssueManager.GetIssueOfQuest(quest)?.IssueOwner);
 }
 
 [HarmonyPatch(typeof(ChangePlayerCharacterAction), nameof(ChangePlayerCharacterAction.Apply))]
@@ -80,7 +81,7 @@ internal sealed class ArtisanProductPlayerPresentationPatch
         {
             Campaign.Current.ConversationManager.RemoveRelatedLines(quest);
             Campaign.Current.QuestManager.RemoveAllTrackedObjectsForQuest(quest);
-            if (!quest.IsOngoing || !ownership.IsLocalPeerOwner(quest.QuestGiver)) continue;
+            if (!quest.IsOngoing || !ownership.IsLocalPeerOwner(IssueManager.GetIssueOfQuest(quest)?.IssueOwner)) continue;
             quest.InitializeQuestOnGameLoad();
             quest.AddDialogs();
             quest.AddTrackedObject(quest.QuestGiver);
@@ -120,7 +121,7 @@ internal sealed class ArtisanProductJournalPresentationPatches
         if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership))
             return item.Quest is not Quest &&
                 item.Issue is not ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue;
-        if (item.Quest is Quest) return ownership.IsLocalPeerOwner(item.Quest.QuestGiver);
+        if (item.Quest is Quest) return ownership.IsLocalPeerOwner(IssueManager.GetIssueOfQuest(item.Quest)?.IssueOwner);
         if (item.Issue is ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue)
             return ownership.IsLocalPeerOwner(item.Issue.IssueOwner);
         return IsVisibleHistory(item.QuestLogEntry);
@@ -162,7 +163,7 @@ internal sealed class ArtisanProductNotificationPatches
     {
         if (quest is not Quest) return true;
         if (ModInformation.IsServer || !ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership)) return false;
-        if (ownership.IsLocalPeerOwner(quest.QuestGiver)) return true;
+        if (ownership.IsLocalPeerOwner(IssueManager.GetIssueOfQuest(quest)?.IssueOwner)) return true;
         var history = Campaign.Current.GetCampaignBehavior<JournalLogsCampaignBehavior>()?.GetRelatedLog(quest);
         return ownership.TryGetJournalOwner(history, out _) && ArtisanProductJournalPresentationPatches.IsVisibleHistory(history);
     }
