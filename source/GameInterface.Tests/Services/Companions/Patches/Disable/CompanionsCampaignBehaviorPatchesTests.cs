@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Services.Companions.Patches.Disable;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -157,9 +158,9 @@ public class CompanionsCampaignBehaviorPatchesTests
     public void ShouldSpawnWanderer_NoHeroes_SpawnsWhenLimitPositive()
     {
         Assert.True(CompanionsCampaignBehaviorPatches.ShouldSpawnWanderer(
-            new Hero[0], limit: 1, freeOnly: true));
+            Array.Empty<Hero>(), limit: 1, freeOnly: true));
         Assert.False(CompanionsCampaignBehaviorPatches.ShouldSpawnWanderer(
-            new Hero[0], limit: 0, freeOnly: true));
+            Array.Empty<Hero>(), limit: 0, freeOnly: true));
     }
 
     [Fact]
