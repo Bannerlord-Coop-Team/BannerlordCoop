@@ -71,6 +71,7 @@ namespace Coop.IntegrationTests.Serialization
                 PlayerBattleAiJoinWindowHours = 6,
                 EnsureUnaffiliatedWanderers = false,
                 WandererLimit = 64,
+                SpawnRateWanderers = 2,
                 WandererLimitScalesWithPlayers = true,
                 PlayerKingdomClanTierRequired = 2,
                 SmithingStaminaRecoveryMultiplier = 2.5f,
@@ -93,6 +94,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(6, copy.PlayerBattleAiJoinWindowHours);
             Assert.False(copy.EnsureUnaffiliatedWanderers);
             Assert.Equal(64, copy.WandererLimit);
+            Assert.Equal(2, copy.SpawnRateWanderers);
             Assert.True(copy.WandererLimitScalesWithPlayers);
             Assert.Equal(2, copy.PlayerKingdomClanTierRequired);
             Assert.Equal(2.5f, copy.SmithingStaminaRecoveryMultiplier);
@@ -144,6 +146,7 @@ namespace Coop.IntegrationTests.Serialization
             SpeedLimitWhilePlayersInBattle = false,
             EnsureUnaffiliatedWanderers = false,
             WandererLimit = 0,
+            SpawnRateWanderers = 0,
             WandererLimitScalesWithPlayers = false,
             PlayerKingdomClanTierRequired = 0,
             SmithingStaminaRecoveryOutsideSettlements = false,
@@ -172,6 +175,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.False(copy.SpeedLimitWhilePlayersInBattle);
             Assert.False(copy.EnsureUnaffiliatedWanderers);
             Assert.Equal(0, copy.WandererLimit);
+            Assert.Equal(0, copy.SpawnRateWanderers);
             Assert.False(copy.WandererLimitScalesWithPlayers);
             Assert.Equal(0, copy.PlayerKingdomClanTierRequired);
             Assert.False(copy.SmithingStaminaRecoveryOutsideSettlements);
