@@ -25,6 +25,9 @@ public class NavalShipEngine : INavalShipEngine
 {
     private const int MaxPathDepth = 16;
 
+    // Clear of every hull and the water, where NavalTeamAgents.UnassignAgentAux parks troops it takes off a ship.
+    private const float ParkingHeight = 500f;
+
     private readonly ICoopShipSnapshotBuilder snapshotBuilder;
     private readonly IObjectManager objectManager;
 
@@ -90,66 +93,109 @@ public class NavalShipEngine : INavalShipEngine
         return ship;
     }
 
-    public MissionObject SetNpcHullAuthority(MissionObject hull, bool owned)
+    public void ReleaseNpcHull(MissionObject hull)
     {
         var ship = (MissionShip)hull;
-        if (owned) return ReplaceCopyWithSimulatedHull(ship);
-
         NavalForeignHulls.Add(ship);
         ship.SetController(ShipControllerType.None, autoUpdateController: false);
         if (ship.GameEntity.IsValid) ship.GameEntity.DisableDynamicBodySimulation();
-        return ship;
     }
 
-    // EnableDynamicBody does not undo DisableDynamicBodySimulation (live: the body stayed inactive), and the engine has
-    // no other inverse, so the copy is swapped for a hull spawned the way the host spawned it.
-    private static MissionShip ReplaceCopyWithSimulatedHull(MissionShip copy)
+    // Vanilla only removes a hull nobody it keeps stands on (Quest5 frees crewless hulls, ShipRetreatLogic fades the crew
+    // aboard), so the agents aboard leave a tick before the hull does, parked the way UnassignAgentAux parks troops.
+    public IReadOnlyList<HullSwapAgent> ParkHullAgents(MissionObject hull)
     {
+        var ship = (MissionShip)hull;
+        var mission = Mission.Current;
+        var agentsLogic = mission?.GetMissionBehavior<NavalAgentsLogic>();
+        if (agentsLogic == null || !ship.GameEntity.IsValid) return Array.Empty<HullSwapAgent>();
+
+        var frame = ship.GlobalFrame;
+        var moved = new List<HullSwapAgent>();
+        foreach (var agent in mission.Agents.ToList())
+        {
+            if (!agent.IsActive() || !agent.IsHuman) continue;
+
+            bool isTracked = agentsLogic.IsAgentOnAnyShip(agent, out var onShip) && onShip == ship;
+            bool isCrew = isTracked || (ship.Formation != null && agent.Formation == ship.Formation);
+            bool isAboard = ship.GetIsAgentOnShip(agent) || agent.GetComponent<AgentNavalComponent>()?.SteppedShip == ship
+                || UsesMachineOf(agent, ship);
+            if (!isCrew && !isAboard) continue;
+
+            if (isAboard && agent.CurrentlyUsedGameObject != null)
+                agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
+            if (isTracked) agentsLogic.RemoveAgentFromShip(agent, ship);
+
+            var deckLocal = Vec3.Zero;
+            if (isAboard)
+            {
+                var position = agent.Position;
+                deckLocal = frame.TransformToLocalNonOrthogonal(position);
+                agent.SetIsPhysicsForceClosed(true);
+                agent.TeleportToPosition(new Vec3(position.x, position.y, ParkingHeight));
+            }
+
+            moved.Add(new HullSwapAgent(agent, isCrew, isAboard, deckLocal));
+        }
+
+        return moved;
+    }
+
+    private static bool UsesMachineOf(Agent agent, MissionShip ship) =>
+        agent.CurrentlyUsedGameObject is UsableMissionObject used && used.GameEntity.IsValid && used.GameEntity.Root == ship.GameEntity;
+
+    // EnableDynamicBody does not undo DisableDynamicBodySimulation (live: the body stayed inactive), and the engine has
+    // no other inverse, so the hull is swapped for one spawned the way the host spawned it.
+    public MissionObject ReplaceHull(MissionObject hull)
+    {
+        var ship = (MissionShip)hull;
         var mission = Mission.Current;
         var shipsLogic = ShipsLogic;
-        var agentsLogic = mission?.GetMissionBehavior<NavalAgentsLogic>();
-        var formation = copy.Formation;
-        var team = copy.Team;
-        if (shipsLogic == null || agentsLogic == null || formation == null || team == null || !copy.GameEntity.IsValid)
-            return copy;
+        var formation = ship.Formation;
+        var team = ship.Team;
+        if (shipsLogic == null || formation == null || team == null || !ship.GameEntity.IsValid) return null;
 
-        var origin = copy.ShipOrigin;
-        var frame = copy.GlobalFrame;
-        var crew = mission.Agents.Where(agent => agent.IsActive() && agent.IsHuman && agent.Formation == formation).ToList();
+        var origin = ship.ShipOrigin;
+        var frame = ship.GlobalFrame;
 
-        // Nobody may stay on a machine of the hull that is about to be removed, nor be tracked as its crew.
-        foreach (var agent in mission.Agents)
-        {
-            if (agent.IsActive() && agent.CurrentlyUsedGameObject is UsableMissionObject used
-                && used.GameEntity.IsValid && used.GameEntity.Root == copy.GameEntity)
-                agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
-        }
-
-        foreach (var agent in crew)
-        {
-            if (agentsLogic.IsAgentOnAnyShip(agent, out var onShip) && onShip == copy)
-                agentsLogic.RemoveAgentFromShip(agent, copy);
-        }
-
-        NavalForeignHulls.Remove(copy);
-        shipsLogic.RemoveShip(copy);
+        // Quest5's RemoveShipInternal: no rope or bridge may keep pointing at a removed hull.
+        ship.BreakAllExistingConnections();
+        NavalForeignHulls.Remove(ship);
+        shipsLogic.RemoveShip(ship);
 
         var fresh = shipsLogic.SpawnShip(origin, in frame, team, formation, spawnAnchored: false, checkForFreeArea: false);
         fresh.SetController(ShipControllerType.AI);
         formation.SetControlledByAI(true);
 
-        // The adopted crew become the new hull's crew; vanilla seats the helm and oars and moves them onto its deck.
-        foreach (var agent in crew)
-        {
-            if (agent.IsActive()) agentsLogic.AddAgentToShip(agent, fresh);
-        }
-
-        agentsLogic.AssignAndTeleportCrewToShipMachines(fresh);
-
         // Removing one hull and adding one leaves the planner's agent count unchanged, so its k-d tree keeps the removed
-        // copy and never sees the new hull. Rebuild the planner the way vanilla does after changing ships mid-mission.
+        // hull and never sees the new one. Rebuild it the way vanilla does after changing ships mid-mission.
         mission.GetMissionBehavior<NavalTrajectoryPlanningLogic>()?.ForceReinitialize();
         return fresh;
+    }
+
+    public void BoardHullAgents(MissionObject hull, IReadOnlyList<HullSwapAgent> agents)
+    {
+        var ship = (MissionShip)hull;
+        var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
+        if (agentsLogic == null || agents == null || !ship.GameEntity.IsValid || ship.Team == null) return;
+
+        var frame = ship.GlobalFrame;
+        foreach (var moved in agents)
+        {
+            var agent = moved.Agent;
+            if (!agent.IsActive()) continue;
+
+            if (moved.IsParked)
+            {
+                agent.SetIsPhysicsForceClosed(false);
+                agent.TeleportToPosition(frame.TransformToParent(moved.DeckLocal));
+            }
+
+            if (moved.IsCrew) agentsLogic.AddAgentToShip(agent, ship);
+        }
+
+        // Vanilla seats the helm and oars and moves their crew onto them.
+        agentsLogic.AssignAndTeleportCrewToShipMachines(ship);
     }
 
     public bool HasHelmPilot(MissionObject hull) => ((MissionShip)hull).ShipControllerMachine?.PilotAgent != null;

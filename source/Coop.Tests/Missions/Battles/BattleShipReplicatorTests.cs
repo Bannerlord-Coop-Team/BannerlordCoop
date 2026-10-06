@@ -8,6 +8,7 @@ using Moq;
 using Newtonsoft.Json.Linq;
 using ProtoBuf;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -134,32 +135,124 @@ public class BattleShipReplicatorTests
         var peerShip = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_2", false, peerHull, null);
         harness.Registry.TryRegister(ai);
         harness.Registry.TryRegister(peerShip);
+        harness.LiveHulls.Add(aiHull);
+        harness.LiveHulls.Add(peerHull);
 
         Assert.Equal(1, harness.Replicator.TransferNpcHulls(Own));
         Assert.Equal(0, harness.Replicator.TransferNpcHulls(Own));
+        harness.Replicator.Tick(0.1f);
 
         Assert.Equal(Own, ai.CurrentAuthority);
         Assert.Equal(Peer, peerShip.CurrentAuthority);
-        harness.Engine.Verify(e => e.SetNpcHullAuthority(aiHull, true), Times.Once);
-        harness.Engine.Verify(e => e.SetNpcHullAuthority(peerHull, It.IsAny<bool>()), Times.Never);
+        harness.Engine.Verify(e => e.ParkHullAgents(aiHull), Times.Once);
+        harness.Engine.Verify(e => e.ParkHullAgents(peerHull), Times.Never);
     }
 
     [Fact]
-    public void TransferNpcHulls_ToThisClient_RebindsTheShipToTheReplacementHull()
+    public void TransferNpcHulls_ToThisClient_ChangesNoHullBeforeTheNextMissionTick()
+    {
+        var harness = new Harness(committed: true);
+        var copy = CreateHull();
+        harness.Registry.TryRegister(new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, copy, null));
+
+        harness.Replicator.TransferNpcHulls(Own);
+
+        harness.Engine.Verify(e => e.ParkHullAgents(It.IsAny<MissionObject>()), Times.Never);
+        harness.Engine.Verify(e => e.ReplaceHull(It.IsAny<MissionObject>()), Times.Never);
+        harness.Engine.Verify(e => e.BoardHullAgents(It.IsAny<MissionObject>(), It.IsAny<IReadOnlyList<HullSwapAgent>>()), Times.Never);
+    }
+
+    [Fact]
+    public void Tick_AfterTakeover_ParksThenReplacesThenBoardsOneStepPerTick()
     {
         var harness = new Harness(committed: true);
         var copy = CreateHull();
         var fresh = CreateHull();
         var ai = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, copy, null);
         harness.Registry.TryRegister(ai);
-        harness.Engine.Setup(e => e.SetNpcHullAuthority(copy, true)).Returns(fresh);
-
+        harness.LiveHulls.Add(copy);
+        var parked = new[] { new HullSwapAgent(null, isCrew: true, isParked: true, Vec3.Zero) };
+        harness.Engine.Setup(e => e.ParkHullAgents(copy)).Returns(parked);
+        harness.Engine.Setup(e => e.ReplaceHull(copy)).Returns(fresh).Callback(() =>
+        {
+            harness.LiveHulls.Remove(copy);
+            harness.LiveHulls.Add(fresh);
+        });
         harness.Replicator.TransferNpcHulls(Own);
 
+        harness.Replicator.Tick(0.1f);
+        harness.Engine.Verify(e => e.ParkHullAgents(copy), Times.Once);
+        harness.Engine.Verify(e => e.ReplaceHull(It.IsAny<MissionObject>()), Times.Never);
+
+        harness.Replicator.Tick(0.1f);
+        harness.Engine.Verify(e => e.ReplaceHull(copy), Times.Once);
+        harness.Engine.Verify(e => e.BoardHullAgents(It.IsAny<MissionObject>(), It.IsAny<IReadOnlyList<HullSwapAgent>>()), Times.Never);
         Assert.True(harness.Registry.TryGet(ai.ShipId, out var ship));
         Assert.Same(fresh, ship.Hull);
-        Assert.Equal(Own, ship.CurrentAuthority);
         Assert.False(harness.Registry.TryGetByHull(copy, out _));
+
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+        harness.Engine.Verify(e => e.BoardHullAgents(fresh, parked), Times.Once);
+        harness.Engine.Verify(e => e.ParkHullAgents(It.IsAny<MissionObject>()), Times.Once);
+        harness.Engine.Verify(e => e.ReplaceHull(It.IsAny<MissionObject>()), Times.Once);
+        Assert.Equal(Own, ship.CurrentAuthority);
+    }
+
+    [Fact]
+    public void Tick_WhenTheHullCannotBeReplaced_BoardsTheParkedAgentsBackOntoIt()
+    {
+        var harness = new Harness(committed: true);
+        var copy = CreateHull();
+        var ai = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, copy, null);
+        harness.Registry.TryRegister(ai);
+        harness.LiveHulls.Add(copy);
+        var parked = new[] { new HullSwapAgent(null, isCrew: true, isParked: true, Vec3.Zero) };
+        harness.Engine.Setup(e => e.ParkHullAgents(copy)).Returns(parked);
+        harness.Replicator.TransferNpcHulls(Own);
+
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+
+        harness.Engine.Verify(e => e.BoardHullAgents(copy, parked), Times.Once);
+        Assert.Same(copy, ai.Hull);
+    }
+
+    [Fact]
+    public void TransferNpcHulls_AwayMidSwap_BoardsTheParkedAgentsAndStopsTheSwap()
+    {
+        var harness = new Harness(committed: true);
+        var copy = CreateHull();
+        harness.Registry.TryRegister(new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, copy, null));
+        harness.LiveHulls.Add(copy);
+        var parked = new[] { new HullSwapAgent(null, isCrew: true, isParked: true, Vec3.Zero) };
+        harness.Engine.Setup(e => e.ParkHullAgents(copy)).Returns(parked);
+        harness.Replicator.TransferNpcHulls(Own);
+        harness.Replicator.Tick(0.1f);
+
+        harness.Replicator.TransferNpcHulls(Peer);
+        harness.Replicator.Tick(0.1f);
+
+        harness.Engine.Verify(e => e.BoardHullAgents(copy, parked), Times.Once);
+        harness.Engine.Verify(e => e.ReleaseNpcHull(copy), Times.Once);
+        harness.Engine.Verify(e => e.ReplaceHull(It.IsAny<MissionObject>()), Times.Never);
+    }
+
+    [Fact]
+    public void ReplaceNpcHull_QueuesOnlyAnAiHullThisClientSimulatesOnce()
+    {
+        var harness = new Harness(committed: true);
+        var foreignAi = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, CreateHull(), null);
+        var ownAi = new NetworkShipInfo(Guid.NewGuid(), Own, "MapEventParty_8", true, CreateHull(), null);
+        harness.Registry.TryRegister(foreignAi);
+        harness.Registry.TryRegister(ownAi);
+
+        Assert.NotNull(harness.Replicator.ReplaceNpcHull(Guid.NewGuid()));
+        Assert.NotNull(harness.Replicator.ReplaceNpcHull(harness.OwnShipId));
+        Assert.NotNull(harness.Replicator.ReplaceNpcHull(foreignAi.ShipId));
+        Assert.Null(harness.Replicator.ReplaceNpcHull(ownAi.ShipId));
+        Assert.NotNull(harness.Replicator.ReplaceNpcHull(ownAi.ShipId));
     }
 
     [Fact]
@@ -173,7 +266,7 @@ public class BattleShipReplicatorTests
         harness.Replicator.TransferNpcHulls(Peer);
 
         Assert.Equal(Peer, ai.CurrentAuthority);
-        harness.Engine.Verify(e => e.SetNpcHullAuthority(aiHull, false), Times.Once);
+        harness.Engine.Verify(e => e.ReleaseNpcHull(aiHull), Times.Once);
     }
 
     [Fact]
@@ -183,11 +276,14 @@ public class BattleShipReplicatorTests
         var aiHull = CreateHull();
         var ai = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, aiHull, null);
         harness.Registry.TryRegister(ai);
+        harness.LiveHulls.Add(aiHull);
 
         harness.Replicator.TransferNpcHulls("successor");
+        harness.Replicator.Tick(0.1f);
 
         Assert.Equal("successor", ai.CurrentAuthority);
-        harness.Engine.Verify(e => e.SetNpcHullAuthority(It.IsAny<MissionObject>(), It.IsAny<bool>()), Times.Never);
+        harness.Engine.Verify(e => e.ReleaseNpcHull(It.IsAny<MissionObject>()), Times.Never);
+        harness.Engine.Verify(e => e.ParkHullAgents(It.IsAny<MissionObject>()), Times.Never);
     }
 
     [Fact]
@@ -365,6 +461,7 @@ public class BattleShipReplicatorTests
         public MessageBroker Broker { get; } = new MessageBroker();
         public NetworkShipRegistry Registry { get; } = new NetworkShipRegistry();
         public MissionObject OwnHull { get; } = CreateHull();
+        public List<MissionObject> LiveHulls { get; } = new List<MissionObject>();
         public Guid OwnShipId { get; } = Guid.NewGuid();
         public BattleShipReplicator Replicator { get; }
 
@@ -387,7 +484,8 @@ public class BattleShipReplicatorTests
             deployment.SetupGet(d => d.IsCommitted).Returns(committed);
 
             var engine = Engine;
-            engine.SetupGet(e => e.Hulls).Returns(new[] { hull });
+            LiveHulls.Add(hull);
+            engine.SetupGet(e => e.Hulls).Returns(() => LiveHulls);
             engine.Setup(e => e.GetFrame(It.IsAny<MissionObject>())).Returns(MatrixFrame.Identity);
             engine.Setup(e => e.Describe(It.IsAny<MissionObject>(), It.IsAny<NetworkShipInfo>())).Returns((MissionObject _, NetworkShipInfo info) =>
                 new BattleShipSpawnData(info.ShipId, info.CurrentAuthority, info.MapEventPartyId, false, BattleSideEnum.Defender,

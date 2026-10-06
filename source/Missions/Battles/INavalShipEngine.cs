@@ -59,13 +59,26 @@ public interface INavalShipEngine
     /// <summary>[Game thread] Re-targets a seated puppet at its station's user frame on the current hull frame.</summary>
     void PinToStation(Agent agent, UsableMissionObject point);
 
+    /// <summary>[Game thread] Hands an AI (NPC) hull's simulation away from this client: it becomes a kinematic copy following its owner's samples.</summary>
+    void ReleaseNpcHull(MissionObject hull);
+
     /// <summary>
-    /// [Game thread] Hands an AI (NPC) hull's simulation to this client or away from it. Released, the hull becomes a
-    /// kinematic copy following its owner's samples. Taken over, a copy is replaced by a fresh simulated hull of the same
-    /// ship at the same frame under the AI controller, crewed by its formation's agents, because a copy's body cannot
-    /// be re-activated. Returns the hull that now stands for the ship.
+    /// [Mission tick] First step of replacing a hull: stops every agent aboard using its machines and parks it off
+    /// every hull, and stops tracking the hull's crew, so nobody stands on or is tracked by the hull when it goes.
     /// </summary>
-    MissionObject SetNpcHullAuthority(MissionObject hull, bool owned);
+    IReadOnlyList<HullSwapAgent> ParkHullAgents(MissionObject hull);
+
+    /// <summary>
+    /// [Mission tick] Second step: removes the hull and spawns a fresh simulated hull of the same ship at the same frame
+    /// under the AI controller, because a copy's body cannot be re-activated. Null when the hull cannot be replaced.
+    /// </summary>
+    MissionObject ReplaceHull(MissionObject hull);
+
+    /// <summary>
+    /// [Mission tick] Last step: moves the parked agents back to their deck positions on <paramref name="hull"/>, makes
+    /// the crew its crew again and seats the helm and oars.
+    /// </summary>
+    void BoardHullAgents(MissionObject hull, IReadOnlyList<HullSwapAgent> agents);
 
     /// <summary>Whether an agent is seated at the hull's helm (diagnostics).</summary>
     bool HasHelmPilot(MissionObject hull);
@@ -78,4 +91,21 @@ public interface INavalShipEngine
 
     /// <summary>[Game thread] Rope state per throw station and the joint force counters (diagnostics).</summary>
     object InspectRopes(IEnumerable<MissionObject> hulls, Func<MissionObject, Guid> shipIdOf);
+}
+
+/// <summary>An agent a hull replacement moves: whether it is the hull's crew and, when it stood aboard, its hull-local deck position.</summary>
+public sealed class HullSwapAgent
+{
+    public HullSwapAgent(Agent agent, bool isCrew, bool isParked, Vec3 deckLocal)
+    {
+        Agent = agent;
+        IsCrew = isCrew;
+        IsParked = isParked;
+        DeckLocal = deckLocal;
+    }
+
+    public Agent Agent { get; }
+    public bool IsCrew { get; }
+    public bool IsParked { get; }
+    public Vec3 DeckLocal { get; }
 }

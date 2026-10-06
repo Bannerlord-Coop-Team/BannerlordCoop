@@ -37,6 +37,12 @@ public interface IBattleShipReplicator : IDisposable
     /// </summary>
     Guid RegisterNpcHull(MissionObject hull, Formation formation, string mapEventPartyId);
 
+    /// <summary>
+    /// [Game thread] Queues replacing an AI hull this client simulates with a fresh simulated hull of the same ship, one
+    /// step per mission tick, keeping its ship id. Why it cannot, or null.
+    /// </summary>
+    string ReplaceNpcHull(Guid shipId);
+
     /// <summary>[Game thread] Rope state per throw station of every registered hull (diagnostics).</summary>
     object InspectRopes();
 }
@@ -62,6 +68,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
     private readonly Dictionary<Guid, ShipStream> streams = new Dictionary<Guid, ShipStream>();
     private readonly List<BattleShipSpawnData> pendingForeignHulls = new List<BattleShipSpawnData>();
+    private readonly List<HullSwap> hullSwaps = new List<HullSwap>();
     private bool spawningForeignHull;
     private bool spawnRecordsSent;
     private float sendElapsed;
@@ -116,10 +123,11 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Unsubscribe<BattleMissionLeaving>(Handle_MissionLeaving);
         messageBroker.Unsubscribe<NetworkBattleRopeFinal>(Handle_NetworkBattleRopeFinal);
         messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
+        hullSwaps.Clear();
     }
 
     // [Game thread] Published synchronously by the spawn postfix. Hulls this client fields go on PlayerTeam; the
-    // copies this replicator spawns raise the same event and are registered by their spawn path instead.
+    // copies and replacement hulls this replicator spawns raise the same event and are registered by their spawn path instead.
     private void Handle_ShipSpawned(MessagePayload<ShipSpawnedInBattle> payload)
     {
         var hull = payload.What.Hull;
@@ -167,12 +175,10 @@ public class BattleShipReplicator : IBattleShipReplicator
             bool wasOwn = IsOwnHull(ship);
             ship.CurrentAuthority = newHost;
             bool isOwn = IsOwnHull(ship);
-            if (wasOwn != isOwn)
-            {
-                var hull = engine.SetNpcHullAuthority(ship.Hull, isOwn);
-                if (hull != null && !ReferenceEquals(hull, ship.Hull) && !Registry.TryRebindHull(ship.ShipId, hull))
-                    Logger.Error("[NavalSync] Could not rebind AI hull {ShipId} to its replacement", ship.ShipId);
-            }
+            if (isOwn && !wasOwn)
+                ReplaceNpcHull(ship.ShipId);
+            else if (wasOwn && !isOwn)
+                ReleaseNpcHull(ship);
 
             // The old owner's interpolation target must not keep writing frames to a hull this client now simulates.
             var stream = GetStream(ship.ShipId);
@@ -184,9 +190,102 @@ public class BattleShipReplicator : IBattleShipReplicator
         return transferred;
     }
 
+    public string ReplaceNpcHull(Guid shipId)
+    {
+        if (!Registry.TryGet(shipId, out var ship)) return "No registered hull has that ship id.";
+        if (!ship.IsNpcParty || !IsOwnHull(ship)) return "The hull is not an AI hull this client simulates.";
+        if (hullSwaps.Any(swap => swap.ShipId == shipId)) return "The hull is already being replaced.";
+
+        hullSwaps.Add(new HullSwap(shipId));
+        return null;
+    }
+
+    // A hull handed away mid-swap gets its parked agents back before it turns into a copy.
+    private void ReleaseNpcHull(NetworkShipInfo ship)
+    {
+        var swap = hullSwaps.FirstOrDefault(pending => pending.ShipId == ship.ShipId);
+        if (swap != null)
+        {
+            hullSwaps.Remove(swap);
+            if (swap.Agents != null) engine.BoardHullAgents(ship.Hull, swap.Agents);
+        }
+
+        engine.ReleaseNpcHull(ship.Hull);
+    }
+
+    // [Mission tick] One step per hull per tick: vanilla removes no hull its kept agents stand on, and crews a mid-mission
+    // hull the tick after spawning it (Quest5 CallReinforcement, then InitializeReinforcement).
+    private void AdvanceHullSwaps()
+    {
+        foreach (var swap in hullSwaps.ToArray())
+        {
+            if (!Registry.TryGet(swap.ShipId, out var ship))
+            {
+                hullSwaps.Remove(swap);
+                Logger.Error("[NavalSync] Hull swap {ShipId}: the ship went away mid-swap", swap.ShipId);
+                continue;
+            }
+
+            try
+            {
+                AdvanceHullSwap(swap, ship);
+            }
+            catch (Exception exception)
+            {
+                hullSwaps.Remove(swap);
+                Logger.Error(exception, "[NavalSync] Hull swap {ShipId} failed in phase {Phase}", swap.ShipId, swap.Phase);
+            }
+        }
+    }
+
+    private void AdvanceHullSwap(HullSwap swap, NetworkShipInfo ship)
+    {
+        switch (swap.Phase)
+        {
+            case HullSwapPhase.ParkAgents:
+                swap.Agents = engine.ParkHullAgents(ship.Hull);
+                swap.Phase = HullSwapPhase.ReplaceHull;
+                Logger.Information("[NavalSync] Hull swap {ShipId}: parked {Count} agent(s) off the hull", ship.ShipId, swap.Agents.Count);
+                return;
+
+            case HullSwapPhase.ReplaceHull:
+                MissionObject fresh;
+                spawningForeignHull = true;
+                try
+                {
+                    fresh = engine.ReplaceHull(ship.Hull);
+                }
+                finally
+                {
+                    spawningForeignHull = false;
+                }
+
+                if (fresh == null)
+                {
+                    hullSwaps.Remove(swap);
+                    engine.BoardHullAgents(ship.Hull, swap.Agents);
+                    Logger.Error("[NavalSync] Hull swap {ShipId}: the hull could not be replaced; its agents went back aboard", ship.ShipId);
+                    return;
+                }
+
+                if (!Registry.TryRebindHull(ship.ShipId, fresh))
+                    Logger.Error("[NavalSync] Could not rebind AI hull {ShipId} to its replacement", ship.ShipId);
+                swap.Phase = HullSwapPhase.BoardAgents;
+                Logger.Information("[NavalSync] Hull swap {ShipId}: replaced the hull with a simulated one", ship.ShipId);
+                return;
+
+            case HullSwapPhase.BoardAgents:
+                hullSwaps.Remove(swap);
+                engine.BoardHullAgents(ship.Hull, swap.Agents);
+                Logger.Information("[NavalSync] Hull swap {ShipId}: boarded {Count} agent(s) onto the new hull", ship.ShipId, swap.Agents.Count);
+                return;
+        }
+    }
+
     public void Tick(float dt)
     {
         elapsed += Math.Max(0f, dt);
+        AdvanceHullSwaps();
         PruneRemovedHulls();
         DrainPendingForeignHulls();
 
@@ -557,6 +656,7 @@ public class BattleShipReplicator : IBattleShipReplicator
                 streaming = stream?.Target != null,
                 epoch = IsOwnHull(ship) ? session.HostEpoch : stream?.AcceptedEpoch ?? 0,
                 helmPilot = engine.HasHelmPilot(ship.Hull),
+                swapPhase = hullSwaps.FirstOrDefault(swap => swap.ShipId == ship.ShipId)?.Phase.ToString(),
             };
         }).ToArray(),
     };
@@ -568,6 +668,25 @@ public class BattleShipReplicator : IBattleShipReplicator
         finalRopesRejected,
         stations = engine.InspectRopes(Registry.Ships.Select(ship => ship.Hull).ToArray(), ShipIdOf),
     };
+
+    private enum HullSwapPhase
+    {
+        ParkAgents,
+        ReplaceHull,
+        BoardAgents,
+    }
+
+    private sealed class HullSwap
+    {
+        public HullSwap(Guid shipId)
+        {
+            ShipId = shipId;
+        }
+
+        public Guid ShipId { get; }
+        public HullSwapPhase Phase { get; set; }
+        public IReadOnlyList<HullSwapAgent> Agents { get; set; }
+    }
 
     private sealed class ShipStream
     {
