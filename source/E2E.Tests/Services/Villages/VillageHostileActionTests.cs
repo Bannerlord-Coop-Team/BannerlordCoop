@@ -1246,12 +1246,17 @@ public class VillageHostileActionTests : MapEventTestBase
 
     private static void InstallSimulationModels(EnvironmentInstance instance, SimulationRoundProbe model)
     {
-        Campaign.Current._gameModels = instance.GameInstance.Game.AddGameModelsManager<GameModels>(new List<GameModel>
+        // Existing models take precedence over these fallbacks.
+        var models = new List<GameModel>
         {
-            model,
             new DefaultTroopSupplierProbabilityModel(),
             new DefaultCharacterStatsModel(),
-        });
+        };
+        models.AddRange(Campaign.Current.Models.GetGameModels());
+        models.Add(model);
+        var gameModels = new GameModels(models);
+        instance.GameInstance.Game._gameModelManagers[typeof(GameModels)] = gameModels;
+        Campaign.Current._gameModels = gameModels;
     }
 
     private sealed class SimulationRoundProbe : DefaultCombatSimulationModel
