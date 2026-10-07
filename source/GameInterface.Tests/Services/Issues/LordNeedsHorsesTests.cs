@@ -243,7 +243,7 @@ public class LordNeedsHorsesTests : IDisposable
     public void SavedQuestLoad_RetainsJournalProgressWithOrWithoutSavedLogReference(bool hasSavedReference)
     {
         var quest = ObjectHelper.SkipConstructor<Quest>();
-        var log = new JournalLog(new CampaignTime(12345), TextObject.Empty, TextObject.Empty, 3, 7, LogType.Discreate);
+        var log = new JournalLog(new CampaignTime(12345), TextObject.GetEmpty(), TextObject.GetEmpty(), 3, 7, LogType.Discreate);
         AccessTools.Field(typeof(QuestBase), "_journalEntries").SetValue(quest, new MBList<JournalLog> { log });
         AccessTools.Field(typeof(Quest), "_numMountsToBeDelivered").SetValue(quest, 7);
         AccessTools.Field(typeof(Quest), "_questJournalEntry").SetValue(quest, hasSavedReference ? log : null);
