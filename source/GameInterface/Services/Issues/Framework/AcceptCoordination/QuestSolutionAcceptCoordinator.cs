@@ -181,7 +181,6 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             // No quest object here, its dialogs would answer this player's conversations too
             issue._issueDifficultyMultiplier = data.DifficultyMultiplier;
             issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
-            issue.IsTriedToSolveBefore = true;
             issue.IssueDueTime = CampaignTime.Never;
 
             descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);

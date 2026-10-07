@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.TroopRosters.Data;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.Issues.Framework.Interface;
@@ -16,4 +17,6 @@ public interface IAlternativeSolutionTroopValidator
 
     // Gives the sent troops back to the local main party, used when the accept is turned down
     void ReturnToMainParty(IssueBase issue);
+
+    void ReturnTroopsToParty(MobileParty party, TroopRosterElementData[] troops);
 }

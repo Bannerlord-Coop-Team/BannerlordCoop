@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
@@ -33,6 +34,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
     private readonly IAlternativeSolutionTroopValidator troopValidator;
+    private readonly IControllerIdProvider controllerIdProvider;
 
     public AlternativeSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -41,7 +43,8 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         IIssueResolver issueResolver,
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager,
-        IAlternativeSolutionTroopValidator troopValidator)
+        IAlternativeSolutionTroopValidator troopValidator,
+        IControllerIdProvider controllerIdProvider)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -50,6 +53,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         this.ownership = ownership;
         this.playerManager = playerManager;
         this.troopValidator = troopValidator;
+        this.controllerIdProvider = controllerIdProvider;
 
         messageBroker.Subscribe<AlternativeSolutionAcceptRequested>(Handle_AlternativeSolutionAcceptRequested);
         messageBroker.Subscribe<RequestAlternativeSolutionAccept>(Handle_RequestAlternativeSolutionAccept);
@@ -108,7 +112,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var playerHero))
         {
-            Reject(peer, data);
+            Reject(peer, data, playerHero);
             return;
         }
 
@@ -116,7 +120,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             descriptor.AlternativeSolutionAcceptStrategy == null ||
             !issue.IsOngoingWithoutQuest)
         {
-            Reject(peer, data);
+            Reject(peer, data, playerHero);
             return;
         }
 
@@ -131,7 +135,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
         if (!troopsAreValid || !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
         {
-            Reject(peer, data);
+            Reject(peer, data, playerHero);
             return;
         }
 
@@ -152,7 +156,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         {
             Logger.Error(e, "Starting the alternative solution of {issue} failed", data.IssueId);
             ownership.Remove(data.IssueOwnerId);
-            Reject(peer, data);
+            Reject(peer, data, playerHero);
             return;
         }
 
@@ -161,11 +165,17 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             data.IssueId,
             troopValidator.ToData(issue.AlternativeSolutionSentTroops),
             CaptureState(issue),
-            descriptor.AlternativeSolutionAcceptStrategy.Capture(issue)));
+            descriptor.AlternativeSolutionAcceptStrategy.Capture(issue),
+            player.ControllerId));
     }
 
-    private void Reject(NetPeer peer, RequestAlternativeSolutionAccept data)
+    private void Reject(NetPeer peer, RequestAlternativeSolutionAccept data, Hero playerHero)
     {
+        if (playerHero?.PartyBelongedTo != null)
+        {
+            troopValidator.ReturnTroopsToParty(playerHero.PartyBelongedTo, data.SentTroops);
+        }
+
         network.Send(peer, new NetworkAlternativeSolutionAcceptRejected(data.IssueOwnerId, data.IssueId));
     }
 
@@ -182,6 +192,13 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor))
             {
+                return;
+            }
+
+            if (data.ControllerId != controllerIdProvider.ControllerId)
+            {
+                issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                ApplyState(issue, data.State);
                 return;
             }
 

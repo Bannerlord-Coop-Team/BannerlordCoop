@@ -22,17 +22,22 @@ public readonly struct NetworkAlternativeSolutionAccepted : IServerToClientComma
     [ProtoMember(5)]
     public readonly byte[] Captured;
 
+    [ProtoMember(6)]
+    public readonly string ControllerId;
+
     public NetworkAlternativeSolutionAccepted(
         string issueOwnerId,
         string issueId,
         TroopRosterElementData[] sentTroops,
         AlternativeSolutionVanillaState state,
-        byte[] captured)
+        byte[] captured,
+        string controllerId)
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
         SentTroops = sentTroops;
         State = state;
         Captured = captured;
+        ControllerId = controllerId;
     }
 }

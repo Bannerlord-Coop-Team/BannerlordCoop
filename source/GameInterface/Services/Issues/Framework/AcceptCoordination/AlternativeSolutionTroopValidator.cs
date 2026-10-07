@@ -34,7 +34,27 @@ internal class AlternativeSolutionTroopValidator : IAlternativeSolutionTroopVali
 
     public void ReturnToMainParty(IssueBase issue)
     {
-        MobileParty.MainParty.MemberRoster.Add(issue.AlternativeSolutionSentTroops);
+        var memberRoster = MobileParty.MainParty.MemberRoster;
+
+        foreach (var element in issue.AlternativeSolutionSentTroops.GetTroopRoster())
+        {
+            if (element.Character.IsHero && !memberRoster.Contains(element.Character))
+            {
+                memberRoster.AddToCounts(element.Character, 1);
+            }
+        }
+
         issue.AlternativeSolutionSentTroops.Clear();
+    }
+
+    public void ReturnTroopsToParty(MobileParty party, TroopRosterElementData[] troops)
+    {
+        foreach (var element in rosterData.FromData(troops).GetTroopRoster())
+        {
+            if (!element.Character.IsHero)
+            {
+                party.MemberRoster.Add(element);
+            }
+        }
     }
 }
