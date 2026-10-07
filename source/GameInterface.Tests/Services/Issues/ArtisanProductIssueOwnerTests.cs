@@ -13,12 +13,16 @@ using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Encyclopedia.Pages;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit;
@@ -89,6 +93,7 @@ public sealed class ArtisanProductIssueOwnerTests : IDisposable
         handler = new ArtisanProductIssueOwnerHandler(MessageBroker.Instance, network.Object, objects.Object,
             generations, ownership, conversations);
         harmony.CreateClassProcessor(typeof(ArtisanProductIssueOwnerPatches)).Patch();
+        harmony.CreateClassProcessor(typeof(ArtisanProductQuestSettlementPatches)).Patch();
     }
 
     [Theory]
@@ -236,6 +241,94 @@ public sealed class ArtisanProductIssueOwnerTests : IDisposable
         {
             MessageBroker.Instance.Unsubscribe(capture);
         }
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void NativeFailureConsequencesFollowTheIssueSettlementAndPreserveTheGiver(int transfers)
+    {
+        var merchant = ObjectHelper.SkipConstructor<Hero>();
+        merchant.Occupation = Occupation.Merchant;
+        var town = ObjectHelper.SkipConstructor<Settlement>();
+        town.Town = ObjectHelper.SkipConstructor<Town>();
+        town.Town.Prosperity = 100;
+        town._notablesCache = new MBList<Hero> { merchant };
+        original._stayingInSettlement = town;
+        original.AddPower(100);
+
+        if (transfers > 0)
+        {
+            relative._stayingInSettlement = town;
+            MessageBroker.Instance.Publish(this, Message());
+            Drain();
+            original._stayingInSettlement = null;
+        }
+        if (transfers > 1)
+        {
+            var heir = ObjectHelper.SkipConstructor<Hero>();
+            SetupHero("heir", heir);
+            heir._stayingInSettlement = town;
+            MessageBroker.Instance.Publish(this, new NetworkArtisanProductIssueOwnerChanged("relative", 41, "heir", 1, "player-a"));
+            Drain();
+            relative._stayingInSettlement = null;
+        }
+
+        ModInformation.IsServer = true;
+        quest.OnFailed();
+
+        Assert.Equal(90, town.Town.Prosperity);
+        Assert.Equal(5, merchant.Power);
+        Assert.Equal(90, original.Power);
+        Assert.Same(original, quest.QuestGiver);
+        Assert.True(ownership.TryGetOwnerControllerId(issue.IssueOwner, out var owner));
+        Assert.Equal("player-a", owner);
+    }
+
+    [Fact]
+    public void QuestConstructionBeforeIssueAttachmentKeepsTheOriginalSettlementOwner()
+    {
+        issue.IssueQuest = null;
+
+        Assert.Same(original, ArtisanProductQuestSettlementPatches.GetSettlementOwner(quest));
+    }
+
+    [Fact]
+    public void EveryInstalledQuestSettlementReadHasAPatchTarget()
+    {
+        var giver = AccessTools.PropertyGetter(typeof(QuestBase), nameof(QuestBase.QuestGiver));
+        var settlement = AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.CurrentSettlement));
+        var readers = typeof(Quest).GetMethods(BindingFlags.Public | BindingFlags.NonPublic |
+            BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly).Where(method =>
+        {
+            var code = PatchProcessor.GetOriginalInstructions(method).ToList();
+            return code.Zip(code.Skip(1), (first, second) => first.Calls(giver) && second.Calls(settlement)).Any(match => match);
+        });
+
+        Assert.Equal(readers.Select(method => method.Name).OrderBy(name => name),
+            ArtisanProductQuestSettlementPatches.TargetMethods().Select(method => method.Name).OrderBy(name => name));
+    }
+
+    [Theory]
+    [InlineData("get_PlayerStartsQuestLogText", 1)]
+    [InlineData("GetCounterOfferDialogFlow", 1)]
+    [InlineData("QuestFailedWithRefusal", 1)]
+    [InlineData("RefuseCounterOfferConsequences", 2)]
+    [InlineData("OnClanChangedKingdom", 1)]
+    [InlineData("OnFailed", 2)]
+    [InlineData("OnCompleteWithSuccess", 2)]
+    public void InstalledQuestMethodsPreserveGiverReadsExceptForSettlementAccess(string methodName, int count)
+    {
+        var original = PatchProcessor.GetOriginalInstructions(AccessTools.Method(typeof(Quest), methodName)).ToList();
+        var giver = AccessTools.PropertyGetter(typeof(QuestBase), nameof(QuestBase.QuestGiver));
+        var originalGiverCount = original.Count(instruction => instruction.Calls(giver));
+        var patched = ArtisanProductQuestSettlementPatches.Transpiler(original.Select(instruction => new CodeInstruction(instruction))).ToList();
+        var currentOwner = AccessTools.Method(typeof(ArtisanProductQuestSettlementPatches), nameof(ArtisanProductQuestSettlementPatches.GetSettlementOwner));
+
+        Assert.Equal(count, patched.Count(instruction => instruction.Calls(currentOwner)));
+        Assert.Equal(originalGiverCount - count, patched.Count(instruction => instruction.Calls(giver)));
+        Assert.Equal(original.Count, patched.Count);
     }
 
     [Theory]
