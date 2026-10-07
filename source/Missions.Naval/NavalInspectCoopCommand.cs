@@ -93,12 +93,14 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
     }
 
     // Registered human agents with the hull whose formation they serve on, so a puppet's hull is visible.
+    // A sunk hull serves no crew, matching its owner, where vanilla takes swimming AI crew off its formation.
     private static object[] InspectAgents(Mission mission, ICoopMissionComponent missionComponent, CoopNavalBattleBehavior naval) => mission.Agents
         .Where(agent => agent.IsHuman && agent.IsActive())
         .Select(agent =>
         {
             missionComponent.AgentRegistry.TryGetAgentInfo(agent, out var info);
             missionComponent.ShipRegistry.TryGetByFormation(agent.Formation, out var ship);
+            if ((ship?.Hull as MissionShip)?.IsSunk == true) ship = null;
             Guid deckShip = Guid.Empty;
             Vec3 deckLocal = Vec3.Zero;
             bool onDeck = naval != null && naval.ShipReplicator.TryGetDeckPose(agent, agent.Position, out deckShip, out deckLocal);
