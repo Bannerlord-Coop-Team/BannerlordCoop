@@ -881,6 +881,23 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         var partyAId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var partyBId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var targetId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        // A member roster clamps xp to the troop's upgrade cost, so give the troop an upgrade.
+        foreach (var instance in new[] { Server }.Concat(TestEnvironment.Clients))
+        {
+            instance.Call(() =>
+            {
+                var troop = instance.GetRegisteredObject<CharacterObject>(troopId);
+                var target = instance.GetRegisteredObject<CharacterObject>(targetId);
+                using (new AllowedThread())
+                {
+                    target.Level = 26;
+                    troop.Level = 20;
+                    troop.UpgradeTargets = new[] { target };
+                }
+            });
+        }
+        int depositedXp = 0;
         Server.Call(() =>
         {
             var players = Server.Resolve<IPlayerManager>();
@@ -890,8 +907,11 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
             using (new AllowedThread())
                 hero.ChangeState(prisoner ? Hero.CharacterStates.Prisoner : Hero.CharacterStates.Active);
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyAId, out var partyA));
+            depositedXp = 3 * troop.GetUpgradeXpCost(partyA.Party, 0);
+            Assert.True(depositedXp > 0);
             var mine = new TroopRoster();
-            mine.AddToCounts(troop, 4, false, 1, 400);
+            mine.AddToCounts(troop, 4, false, 1, depositedXp);
             var other = new TroopRoster();
             other.AddToCounts(troop, 2, false, 0, 50);
             var registry = Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>();
@@ -907,6 +927,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         for (int attempt = 0; attempt < 2; attempt++)
             Client.Call(() => Client.Resolve<INetwork>().SendAll(
                 new RequestAwaitingAlternativeSolutionTroopsDrain(new TroopRosterData(Array.Empty<TroopRosterElementData>()))));
+        TestEnvironment.FlushCoalescer();
 
         foreach (var instance in new[] { Server, Client, otherClient })
         {
@@ -920,7 +941,8 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
                 if (!prisoner)
                 {
                     Assert.Equal(1, mine.MemberRoster.TotalWoundedRegulars);
-                    Assert.Equal(400, mine.MemberRoster.GetElementXp(troop));
+                    // Observers receive roster counts without xp.
+                    Assert.Equal(instance == otherClient ? 0 : depositedXp, mine.MemberRoster.GetElementXp(troop));
                 }
             });
         }
