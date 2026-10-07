@@ -91,6 +91,15 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         return playerHullsOutOfAction || enemyHullsOutOfAction;
     }
 
+#if DEBUG
+    /// <summary>[Game thread, battle host] Latches one side as depleted, so the next end check concludes the battle.</summary>
+    internal void ForceOutcome(bool playerVictory)
+    {
+        if (playerVictory) _isEnemySideDepleted = true;
+        else _isPlayerSideDepleted = true;
+    }
+#endif
+
     /// <summary>[Game thread] End state for coop.debug.naval.inspect.</summary>
     internal object Inspect()
     {
