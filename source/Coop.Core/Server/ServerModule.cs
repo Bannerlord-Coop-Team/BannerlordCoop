@@ -12,6 +12,7 @@ using Coop.Core.Common;
 using Coop.Core.Common.Configuration;
 #if DEBUG
 using Coop.Core.Common.Commands;
+using Coop.Core.Server.Services.Save.Commands;
 #endif
 using Coop.Core.Common.Session;
 using Coop.Core.Server.Connections;
@@ -52,6 +53,11 @@ public class ServerModule : CommonModule
         builder.RegisterType<JoinDebugCommands.JoinStateCoopCommand>().As<ICoopCommand>().InstancePerDependency();
         builder.RegisterType<JoinDebugCommands.StageInactivePartyCoopCommand>().As<ICoopCommand>().InstancePerDependency();
         builder.RegisterType<JoinDebugCommands.RestoreInactivePartyCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+        // Scoped so the armed observation and its subscription live as long as the server session.
+        builder.RegisterType<CoopSessionWriteObserver>().As<ICoopSessionWriteObserver>().InstancePerLifetimeScope();
+        builder.RegisterType<SessionWriteDebugCommands.SessionArmCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+        builder.RegisterType<SessionWriteDebugCommands.SessionResultCoopCommand>().As<ICoopCommand>().InstancePerDependency();
+        builder.RegisterType<SessionWriteDebugCommands.SessionReleaseCoopCommand>().As<ICoopCommand>().InstancePerDependency();
 #endif
 
         // The mission/P2P stack is composed into the server container too (it is also in ClientModule) so the
