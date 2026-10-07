@@ -161,7 +161,6 @@
     "playerKingdomClanTierRequired": 4,
 
     // Allows players to join another player's clan or propose a player marriage.
-    // Currently only available to testers & supporters.
     // Disabling this does not dissolve existing coop clans.
     "coopClansEnabled": true,
 
