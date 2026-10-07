@@ -139,8 +139,12 @@ public class AlternativeSolutionCompletionOwnerResolutionTests : IDisposable
             Assert.Equal(serverMainHeroGoldBefore, Hero.MainHero.Gold);
             Assert.Equal(serverMainHeroCharacterBefore, Hero.MainHero.CharacterObject);
 
-            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var deposited));
-            Assert.True(deposited.TotalManCount >= 1);
+            // An available true owner gets the troops back immediately instead of a pending deposit.
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionHeroId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(trueOwnerPartyId, out var trueOwnerParty));
+            Assert.Equal(1, trueOwnerParty.MemberRoster.GetTroopCount(companion.CharacterObject));
+            Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
+            Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
     }
 }
