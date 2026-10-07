@@ -167,7 +167,7 @@ internal class CompanionsCampaignBehaviorPatches
         int perTownLimit = (int)Math.Ceiling(limit / Town.AllTowns.Count);
         int spawnRateWanderers = SpawnRateWanderers;
 
-        for (int i = 0; i< spawnRateWanderers && shouldSpawn(); i++)
+        for (int i = 0; i < spawnRateWanderers && shouldSpawn(); i++)
         {
             Town targetTown = Town.AllTowns.GetRandomElementWithPredicate(delegate (Town x)
             {

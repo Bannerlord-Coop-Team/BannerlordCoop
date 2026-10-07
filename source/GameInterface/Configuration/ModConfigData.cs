@@ -93,6 +93,7 @@ public sealed class ModOptionsData
     public bool? EnsureUnaffiliatedWanderers { get; set; }
 
     public int? WandererLimit { get; set; }
+
     public int? SpawnRateWanderers { get; set; }
 
     public bool? WandererLimitScalesWithPlayers { get; set; }

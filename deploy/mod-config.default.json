@@ -151,7 +151,7 @@
     // e.g. With 3 players: 1 at tier 0 adds 0, 1 at tier 2 adds 5, 1 at tier 5 adds 10. This results in 32 + 0 + 5 + 10 = 47.
     "wandererLimitScalesWithPlayers": false,
 
-    // Toggle the rate of spawning new wanderers.
+    // Set the rate of spawning new wanderers.
     // Vanilla/default is 1 wanderer per in-game day.
     // Setting this value lower than 1 means no more wanderer spawns.
     "spawnRateWanderers": 1,
