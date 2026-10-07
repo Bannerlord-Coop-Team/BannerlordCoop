@@ -185,7 +185,7 @@ public class LordNeedsHorsesTests : IDisposable
         var pending = new TroopRoster();
         pending.AddToCounts(troop, 2, false, 0, 140);
         var issue = ObjectHelper.SkipConstructor<Issue>();
-        AccessTools.Property(typeof(IssueBase), nameof(IssueBase.AlternativeSolutionSentTroops)).SetValue(issue, pending);
+        AccessTools.Field(typeof(IssueBase), nameof(IssueBase.AlternativeSolutionSentTroops)).SetValue(issue, pending);
         var screen = ObjectHelper.SkipConstructor<PartyScreenLogic>();
         var data = new PartyScreenLogicInitializationData
         {
@@ -234,7 +234,7 @@ public class LordNeedsHorsesTests : IDisposable
         Assert.DoesNotContain(instructions, x => x.Calls(AccessTools.DeclaredMethod(typeof(Quest), "GetNumQuestMountsInInventory")));
         Assert.Single(instructions.Where(x => x.Calls(AccessTools.Method(typeof(LordNeedsHorsesLoadPatch), "SavedMountCount"))));
         Assert.Contains(instructions, x => x.opcode == OpCodes.Ldc_I4_M1);
-        Assert.Contains(instructions, x => x.Calls(AccessTools.DeclaredMethod(typeof(Quest), "SetDialogs")));
+        Assert.Contains(instructions, x => x.Calls(AccessTools.DeclaredMethod(typeof(QuestBase), "SetDialogs")));
     }
 
     [Theory]
