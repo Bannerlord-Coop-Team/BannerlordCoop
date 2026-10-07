@@ -86,6 +86,7 @@ internal class BattleHostHandler : IHandler
         public readonly List<PendingReturn> PendingReturns = new List<PendingReturn>();
         public HostEndpoint HostEndpoint;
         public BattleState ResolvedState;
+        public bool Concluded;
     }
 
     private sealed class HostEndpoint
@@ -158,6 +159,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Subscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
         messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Subscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
+        messageBroker.Subscribe<BattleStateChangeProcessed>(Handle_BattleStateChangeProcessed);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -173,6 +175,7 @@ internal class BattleHostHandler : IHandler
         messageBroker.Unsubscribe<NetworkBattleSupplyProgress>(Handle_NetworkBattleSupplyProgress);
         messageBroker.Unsubscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Unsubscribe<BattleResolvedStateRecorded>(Handle_BattleResolvedStateRecorded);
+        messageBroker.Unsubscribe<BattleStateChangeProcessed>(Handle_BattleStateChangeProcessed);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
     }
 
@@ -358,6 +361,20 @@ internal class BattleHostHandler : IHandler
         GetOrCreateRuntimeState(result.MapEventId).ResolvedState = result.BattleState;
         if (hostRegistry.TryGet(result.MapEventId, out var assignment))
             BroadcastResolvedState(result.MapEventId, assignment, result.BattleState);
+    }
+
+    // [Server, game thread] The map event committed the battle's result, so its host no longer owns anything to hand on.
+    private void Handle_BattleStateChangeProcessed(MessagePayload<BattleStateChangeProcessed> payload)
+    {
+        if (ModInformation.IsClient)
+            return;
+
+        var processed = payload.What;
+        if (!processed.Applied || !BattleResultCommitter.IsSupportedResultState(processed.BattleState))
+            return;
+
+        if (battleRuntimeStates.TryGetValue(processed.MapEventId, out var runtimeState))
+            runtimeState.Concluded = true;
     }
 
     /// <summary>[Server] Send the requester every reserve it owns, one message per side. With
@@ -777,6 +794,14 @@ internal class BattleHostHandler : IHandler
 
             if (assignment.HostControllerId == controllerId)
             {
+                // A promotion after the commit would hand the ended mission's AI and hulls to a peer for nothing.
+                if (IsConcluded(mapEventId))
+                {
+                    Logger.Information("[BattleHost] Host {Host} left concluded battle {MapEventId}; keeping the assignment at epoch {Epoch} without promoting",
+                        controllerId, mapEventId, assignment.Epoch);
+                    return;
+                }
+
                 if (successors.Count == 0)
                 {
                     // The recorded host left and no mission-ready successor exists — but the instance is NOT
@@ -933,6 +958,10 @@ internal class BattleHostHandler : IHandler
         }
         return false;
     }
+
+    // [Server, game thread] The map event applied this battle's result while the instance was still occupied.
+    private bool IsConcluded(string mapEventId) =>
+        battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) && runtimeState.Concluded;
 
     // Append the requester to the successor line unless it is already the host or already queued. Returns the
     // new immutable assignment via <paramref name="updated"/>, or false when nothing changed.

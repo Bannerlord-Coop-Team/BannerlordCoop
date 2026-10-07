@@ -1,7 +1,10 @@
+using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions;
@@ -32,6 +35,48 @@ public class HostMigrationTests : MissionTestEnvironment
         AssertHost(Server, mapEventId, "ctrl-B", "ctrl-C");
         foreach (var client in Clients)
             AssertHost(client, mapEventId, "ctrl-B", "ctrl-C");
+    }
+
+    [Fact]
+    public void HostDepartsAfterTheResultIsCommitted_KeepsTheAssignmentWithoutPromoting()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
+        var clients = Clients.ToArray();
+        EnterBattle(clients[0], mapEventId);
+        EnterBattle(clients[1], mapEventId);
+        EnterBattle(clients[2], mapEventId);
+        CommitBattleState(mapEventId, BattleState.DefenderVictory, applied: true);
+
+        DepartBattle("ctrl-A", mapEventId);
+
+        AssertHost(Server, mapEventId, "ctrl-A", "ctrl-B", "ctrl-C");
+        foreach (var client in Clients)
+        {
+            AssertHost(client, mapEventId, "ctrl-A", "ctrl-B", "ctrl-C");
+            AssertIsLocalHost(client, mapEventId, client == clients[0]);
+        }
+    }
+
+    [Fact]
+    public void HostDepartsAfterAnUnappliedConclusion_StillPromotes()
+    {
+        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B");
+        var clients = Clients.ToArray();
+        EnterBattle(clients[0], mapEventId);
+        EnterBattle(clients[1], mapEventId);
+        CommitBattleState(mapEventId, BattleState.DefenderVictory, applied: false);
+
+        DepartBattle("ctrl-A", mapEventId);
+
+        AssertHost(Server, mapEventId, "ctrl-B");
+        foreach (var client in Clients)
+            AssertHost(client, mapEventId, "ctrl-B");
+    }
+
+    private void CommitBattleState(string mapEventId, BattleState battleState, bool applied)
+    {
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this,
+            new BattleStateChangeProcessed(mapEventId, battleState, applied)));
     }
 
     [Fact]

@@ -124,6 +124,7 @@ public class CoopBattleController : CoopMissionController
         var casualties = new CasualtyAttributionMap();
 
         var deployment = new BattleDeploymentCoordinator(network, messageBroker, session);
+        var resultCommitter = new BattleResultCommitter(network, relayNetwork, session);
 
         lifecycle = new BattleInstanceLifecycle(
             network,
@@ -162,7 +163,7 @@ public class CoopBattleController : CoopMissionController
             puppetMountStateRepairer,
             battleDamageDataMapper);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
-        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder);
+        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder, resultCommitter);
         puppetSpawner = new PuppetSpawner(
             messageBroker,
             objectManager,
@@ -191,7 +192,7 @@ public class CoopBattleController : CoopMissionController
         HostEpochPolicy = hostEpochPolicy;
         Session = session;
         Deployment = deployment;
-        ResultCommitter = new BattleResultCommitter(network, relayNetwork, session);
+        ResultCommitter = resultCommitter;
         SiegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
         messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
         messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);

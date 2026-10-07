@@ -66,6 +66,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly IBattleTeamResolver teamResolver;
     private readonly IObjectManager objectManager;
     private readonly IHostEpochPolicy hostEpochPolicy;
+    private readonly IBattleResultCommitter resultCommitter;
 
     private readonly Dictionary<Guid, ShipStream> streams = new Dictionary<Guid, ShipStream>();
     private readonly List<BattleShipSpawnData> pendingForeignHulls = new List<BattleShipSpawnData>();
@@ -93,7 +94,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         INavalShipEngine engine,
         IBattleTeamResolver teamResolver,
         IObjectManager objectManager,
-        IHostEpochPolicy hostEpochPolicy)
+        IHostEpochPolicy hostEpochPolicy,
+        IBattleResultCommitter resultCommitter)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -104,6 +106,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         this.teamResolver = teamResolver;
         this.objectManager = objectManager;
         this.hostEpochPolicy = hostEpochPolicy;
+        this.resultCommitter = resultCommitter;
 
         missionComponent.AgentMovementHandler.ConfigureShipDecks(CaptureDeck, ResolveDeckFrame);
         messageBroker.Subscribe<ShipSpawnedInBattle>(Handle_ShipSpawned);
@@ -164,6 +167,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         var migrated = payload.What;
         if (migrated.MapEventId != session.InstanceId) return;
+        if (!BattleAuthorityMigrator.AppliesHostMigration(resultCommitter)) return;
 
         GameThread.RunSafe(() => TransferNpcHulls(migrated.NewHostControllerId ?? session.OwnControllerId),
             context: nameof(Handle_BattleHostMigrated));

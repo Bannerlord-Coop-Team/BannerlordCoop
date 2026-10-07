@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using Missions;
 using Missions.Agents.Handlers;
@@ -284,6 +285,23 @@ public class BattleShipReplicatorTests
         Assert.Equal("successor", ai.CurrentAuthority);
         harness.Engine.Verify(e => e.ReleaseNpcHull(It.IsAny<MissionObject>()), Times.Never);
         harness.Engine.Verify(e => e.ParkHullAgents(It.IsAny<MissionObject>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(false, Own)]
+    [InlineData(true, Peer)]
+    public void HostMigrated_ToThisClient_MovesTheAiHullsOnlyWhileTheResultIsOpen(bool resultHeld, string expectedAuthority)
+    {
+        var harness = new Harness(committed: true, resultHeld: resultHeld);
+        var aiHull = CreateHull();
+        var ai = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, aiHull, null);
+        harness.Registry.TryRegister(ai);
+        harness.LiveHulls.Add(aiHull);
+
+        harness.Broker.Publish(this, new BattleHostMigrated(Instance, Peer, Own));
+        GameThread.Run(() => { }, blocking: true);
+
+        Assert.Equal(expectedAuthority, ai.CurrentAuthority);
     }
 
     [Fact]
@@ -659,7 +677,7 @@ public class BattleShipReplicatorTests
         public Guid OwnShipId { get; } = Guid.NewGuid();
         public BattleShipReplicator Replicator { get; }
 
-        public Harness(bool committed)
+        public Harness(bool committed, bool resultHeld = false)
         {
             var hull = OwnHull;
             Registry.TryRegister(new NetworkShipInfo(OwnShipId, Own, "MapEventParty_1", false, hull, null));
@@ -686,8 +704,13 @@ public class BattleShipReplicatorTests
                     0, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null,
                     100f, 50f, 1, ""));
 
+            var resultCommitter = new Mock<IBattleResultCommitter>();
+            var resolvedState = BattleState.DefenderVictory;
+            resultCommitter.Setup(c => c.TryGetResolvedState(out resolvedState)).Returns(resultHeld);
+
             Replicator = new BattleShipReplicator(Network.Object, Broker, session.Object, deployment.Object,
-                component.Object, engine.Object, Mock.Of<IBattleTeamResolver>(), Mock.Of<IObjectManager>(), new HostEpochPolicy());
+                component.Object, engine.Object, Mock.Of<IBattleTeamResolver>(), Mock.Of<IObjectManager>(), new HostEpochPolicy(),
+                resultCommitter.Object);
         }
     }
 }
