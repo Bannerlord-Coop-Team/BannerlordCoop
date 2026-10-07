@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Clans.Data;

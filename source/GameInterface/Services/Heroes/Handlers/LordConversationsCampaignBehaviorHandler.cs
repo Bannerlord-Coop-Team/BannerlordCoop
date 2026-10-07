@@ -106,6 +106,9 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<PartyBase>(data.MainPartyId, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
+            // The answer arrives after the player chose it; meanwhile another party may hold the lord, or he
+            // may have died. A prisoner the player just looted is held by no party and can still be taken.
+            if (!conversationHero.IsAlive || conversationHero.PartyBelongedToAsPrisoner != null) return;
 
             TakePrisonerAction.Apply(mainParty, conversationHero);
         },

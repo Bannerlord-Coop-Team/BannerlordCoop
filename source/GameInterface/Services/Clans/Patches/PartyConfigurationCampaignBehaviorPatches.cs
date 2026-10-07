@@ -1,4 +1,4 @@
-using GameInterface.Services.Clans.Data;
+﻿using GameInterface.Services.Clans.Data;
 using GameInterface.Services.Clans.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -36,7 +36,7 @@ internal class PartyConfigurationCampaignBehaviorPatches
     [HarmonyPrefix]
     private static bool OnHeroChangedClanPrefix(Hero hero, Clan clan)
     {
-        if (clan != null && (clan == Clan.PlayerClan || clan.IsPlayerClan()))
+        if (clan.IsPlayerClan())
             PartyConfigurationFlags.Reset(hero);
         return false;
     }

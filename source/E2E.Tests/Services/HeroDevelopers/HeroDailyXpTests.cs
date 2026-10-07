@@ -1,4 +1,4 @@
-using E2E.Tests.Util;
+﻿using E2E.Tests.Util;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;

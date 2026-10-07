@@ -138,9 +138,9 @@ internal class DefaultMobilePartyAIModelPatches
             PersistedDisablePlayerAttackTimes.Remove(attackerParty);
     }
 
-    // v1.5.4 stops an AI party from attacking next to a main party stronger than itself. The server's main party
-    // is never a player's, so that check reads any player party instead. The method's later IsMainParty read is
-    // older and stays.
+    // v1.5 stops an AI party from starting any attack while a main party stronger than itself is near it. The
+    // co-op server has no main party on the map, so that check reads any active player party instead; an offline
+    // player's party is parked (inactive) and cannot step in. The method's later IsMainParty read is older and stays.
     [HarmonyPatch(nameof(DefaultMobilePartyAIModel.GetBestInitiativeBehavior))]
     [HarmonyTranspiler]
     internal static IEnumerable<CodeInstruction> StrongerPlayerNearbyTranspiler(IEnumerable<CodeInstruction> instructions)
@@ -148,7 +148,7 @@ internal class DefaultMobilePartyAIModelPatches
         var codes = instructions.ToList();
         var isMainParty = AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.IsMainParty));
         var strength = AccessTools.PropertyGetter(typeof(PartyBase), nameof(PartyBase.EstimatedStrength));
-        var helper = AccessTools.Method(typeof(DefaultMobilePartyAIModelPatches), nameof(IsMainOrPlayerParty));
+        var helper = AccessTools.Method(typeof(DefaultMobilePartyAIModelPatches), nameof(IsActivePlayerParty));
         for (int i = 0; i < codes.Count; i++)
         {
             if (!codes[i].Calls(isMainParty) || !codes.Skip(i + 1).Take(6).Any(code => code.Calls(strength))) continue;
@@ -159,7 +159,7 @@ internal class DefaultMobilePartyAIModelPatches
         return codes;
     }
 
-    internal static bool IsMainOrPlayerParty(MobileParty party) => party.IsMainParty || party.IsPlayerParty();
+    internal static bool IsActivePlayerParty(MobileParty party) => party.IsActive && party.IsPlayerParty();
 
     [HarmonyPatch(nameof(DefaultMobilePartyAIModel.ShouldConsiderAttacking))]
     [HarmonyPostfix]

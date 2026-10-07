@@ -188,7 +188,8 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
                 AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(native, mission.Shell);
                 try
                 {
-                    // v1.5 runs this hook right after AfterStart, before the co-op session has elected a host.
+                    // v1.5 runs this hook at the end of mission loading, after AfterStart, before the co-op
+                    // session has elected a host.
                     mission.Shell.AfterMissionLoadingFinished();
                     Assert.Equal(0, initialSpawnCompletedCount);
                 }

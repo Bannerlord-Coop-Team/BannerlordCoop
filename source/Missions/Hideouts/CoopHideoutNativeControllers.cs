@@ -184,7 +184,8 @@ internal sealed class CoopHideoutAmbushController : HideoutAmbushMissionControll
     public int GetNumberOfPlayerControllableTroops() => coop.Attacker.GetNumberOfPlayerControllableTroops();
     public override void OnCreated() => Mission.DoesMissionRequireCivilianEquipment = false;
     public override void AfterStart() { }
-    // v1.5 finishes deployment here, during mission loading and before the session has a host.
+    // v1.5 calls Mission.OnInitialSpawnCompleted here, which finishes deployment during mission loading,
+    // before the session has a host.
     // CoopHideoutMissionLogic.OnMissionTick stays the single deployment finisher, after the session is ready.
     public override void OnAfterMissionLoadingFinished() { }
     public override void OnMissionTick(float dt) { }

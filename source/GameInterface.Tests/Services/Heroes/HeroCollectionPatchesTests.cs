@@ -1,4 +1,4 @@
-using GameInterface.Services.Heroes.Patches;
+﻿using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,12 +9,15 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Heroes;
 
+/// <summary>
+/// Hero collection writes that happen only on the server must go through the sync intercepts.
+/// </summary>
 public class HeroCollectionPatchesTests
 {
     [Fact]
     public void GarrisonAutoRecruitment_PublishesTheVolunteerItTakes()
     {
-        var method = AccessTools.Method(typeof(GarrisonRecruitmentCampaignBehavior), "TickAutoRecruitmentGarrisonChange");
+        var method = AccessTools.Method(typeof(GarrisonRecruitmentCampaignBehavior), nameof(GarrisonRecruitmentCampaignBehavior.TickAutoRecruitmentGarrisonChange));
         var targets = (IEnumerable<MethodBase>)AccessTools.Method(typeof(HeroCollectionPatches), "TargetMethods").Invoke(null, null);
         Assert.Contains(method, targets);
 
