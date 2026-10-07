@@ -33,7 +33,8 @@ A second comparison of v1.4.8 and v1.5.4 behavior after the port found more gaps
 | `453e8a842` Follow more v1.5 campaign changes | Heroes, executions, barters, governors |
 | `b02090451` Keep the hideout ambush deployment with co-op | Missions |
 | `8f4be3d91` Keep AI from attacking next to stronger players | AI |
-| `96bcc4718` Sync volunteers taken by garrison auto-recruitment | Recruitment (also on `development`, not a v1.5 change) |
+| `96bcc4718` Sync volunteers taken by garrison auto-recruitment | Recruitment (not a v1.5 change; the bug is also on `development`, PR #3816) |
+| `68b137a70` Fix review findings in the v1.5 follow-ups | AI, captures, tests |
 
 Each commit body lists its changes.
 
@@ -134,8 +135,9 @@ Each commit body lists its changes.
 - Party morale changes are floats.
 - Safe passage no longer hides the bribed parties from the AI for 32 hours; they decide again at once.
   Co-op's lord and bandit barter handlers do the same.
-- v1.5.4 stops an AI party from starting a fight next to a main party stronger than itself. Co-op
-  applies that check to every player party (`DefaultMobilePartyAIModelPatches.cs`).
+- v1.5 stops an AI party from starting any attack while a main party stronger than itself is near
+  it. Co-op applies that check to every active player party; an offline player's party is parked
+  and does not count (`DefaultMobilePartyAIModelPatches.cs`).
 
 ### New v1.5 campaign behaviors
 
@@ -143,7 +145,7 @@ These change synced state, so they run on the server only (`DisableV15CampaignBe
 `HeroDailyXpCampaignBehavior` (player heroes get no daily xp, as vanilla gives none to the player),
 `EmptyClanPartiesCampaignBehavior` (clients report no empty clan parties, since that list belongs to
 the server's player clan), `PartyConfigurationCampaignBehavior` (its resets reach clients through
-the clan screen patches above) and `BattleWreckageCampaignBehavior`.
+`PartyConfigurationCampaignBehaviorPatches.cs`, above) and `BattleWreckageCampaignBehavior`.
 
 ### Missions
 
@@ -169,7 +171,7 @@ the clan screen patches above) and `BattleWreckageCampaignBehavior`.
 
 - Village force actions always take the encounter path; v1.5's no-resist path is not supported yet.
 - Blood feuds and empty clan parties are keyed on the local main hero and player clan. They run on
-  the server only and are not multiplayer-aware yet.
+  the server only and are not multiplayer-aware yet (blood feuds: #3819).
 - Naval (War Sails) content stays unsupported, including the set sail and disembark leave paths.
 - A failed courtship can be retried after a season in v1.5. The co-op server refuses that retry, and a
   client loses its courtship attempt history when it reconnects.
@@ -177,19 +179,28 @@ the clan screen patches above) and `BattleWreckageCampaignBehavior`.
   players: when a player's clan changes kingdom, lords no longer at war with it keep chasing the
   player until their next AI decision, and an AI party that agreed not to attack a player can still
   pick the settlement that player last attacked.
+- v1.5 lowers a calculating player's relation with a town notable at their first meeting. Co-op
+  clears a player's meeting records when an heir takes over (`CoopSessionMigrationRules.cs`), so a
+  calculating heir takes that penalty again with notables the family had already met; vanilla's heir
+  keeps the met state and does not.
 - v1.5 kills a player marked to die in battle when the battle ends. That listener checks the server's
   main hero, so a co-op player probably dies at the next daily tick instead; not checked in game.
 
 ## Porting the dedicated server
 
 The dedicated server is built from this repository's module plus its own host program, so the
-co-op logic it runs is already ported. Its host program is the remaining work. Check first wherever
-it:
+co-op logic it runs is already ported. The host program's port is on the `bannerlord-1.5.x` branch
+of `Bannerlord-Coop-Team/BannerlordCoop.DedicatedServer`, which tracks its status in
+`docs/bannerlord-1.5.x-port.md`; it compiles against v1.5.4 and has not booted yet. When porting
+host code, check first wherever it:
 
 - creates or loads a campaign: `new Campaign(CampaignGameMode.Campaign, new AdvancedStartOptionsData())`;
 - lists or loads saves: `SaveLoadVM.LoadSavesAsync`, then `RefreshSaves`;
 - runs without a map event visual creator, or relies on map trackers (`Campaign.MapTrackerManager`);
 - creates kingdoms: `KingdomManager.CreateKingdom` without the separate formal name argument;
+- loads saves on a host whose `MBSaveLoad.CurrentVersion` is empty: `IsUpdatingGameVersion` is then
+  false for every save, so the v1.5 save migrations never run and a pre-v1.5 save fails to load (one
+  of the dedicated server's two port blockers, fixed on its branch);
 - compares game versions with clients (v1.5.4), or lists the modules it loads. `ModuleValidator`
   refuses DLC modules (`ValidateNoDlc`, which catches the modules `deploy/Server Instructions.md` tells
   hosts to turn off) and leaves modules whose id starts with `DedicatedServer.` out of the module
@@ -206,10 +217,12 @@ clients.
 - The whole solution builds against v1.5.4. Every Harmony patch class binds, except
   `MobilePartyAIRobustnessPatches`, whose class-level `[HarmonyPatch]` is commented out on
   `development` too.
-- The bodies of all 2,336 game methods patched in GameInterface were diffed from v1.4.8 to v1.5.3 and
-  from v1.5.3 to v1.5.4, and the changes reviewed.
-- Unit tests (4,095) and E2E tests (2,708, 5 of them skipped as on `development`) pass in Release. On Windows, run E2E in 16 shards
+- The bodies of all 2,336 game methods GameInterface patched at the port (`0d8dd2280`) were diffed
+  from v1.4.8 to v1.5.3 and from v1.5.3 to v1.5.4, and the changes reviewed. The patch targets added
+  since were written against v1.5.4.
+- Unit tests (4,103 passed, 14 skipped) and E2E tests (2,712, 5 of them skipped as on `development`)
+  pass in Release. On Windows, run E2E in 16 shards
   (`sh ../.github/scripts/run-e2e-shard.sh <n> 16` from `source`): with 8, a shard's test filter can
   exceed the command-line length limit.
-- Not done yet: a live session with a server and two clients, the dedicated server, and CI, whose
-  build image still carries v1.4.8 game assemblies.
+- Not done yet: a live session with a server and two clients, a dedicated server boot on v1.5.4, and
+  CI, whose build image still carries v1.4.8 game assemblies.
