@@ -142,6 +142,24 @@ public class BattleCompletionTrackerTests
     }
 
     [Fact]
+    public void HostLeavesMidEnd_PeerReportAtTheOldEpochWaitsForThePromotedHost()
+    {
+        var tracker = new BattleCompletionTracker();
+
+        Assert.False(tracker.TryRecordResult(
+            "battle", "host", BattleState.AttackerVictory, 1, new[] { "host", "peer" }, "host", 1, out _));
+        tracker.MemberDeparted("battle", "host");
+        tracker.HostAssigned("battle", "peer", 2);
+
+        // The peer's report of the old host's snapshot is stamped with epoch 1.
+        Assert.False(tracker.TryRecordResult(
+            "battle", "peer", BattleState.AttackerVictory, 1, new[] { "peer" }, "peer", 2, out _));
+        Assert.True(tracker.TryRecordResult(
+            "battle", "peer", BattleState.AttackerVictory, 2, new[] { "peer" }, "peer", 2, out var state));
+        Assert.Equal(BattleState.AttackerVictory, state);
+    }
+
+    [Fact]
     public void ReportsBeforeHostElection_RequireCurrentEpochHostReport()
     {
         var tracker = new BattleCompletionTracker();

@@ -32,8 +32,9 @@ namespace Missions.Naval;
 /// <summary>
 /// Coop replacement for <c>NavalMissions.OpenNavalBattleMission</c>. Keeps the vanilla naval behavior list but
 /// fields only the local player's own party: coop troop suppliers, detached snapshots of own-party ships from
-/// <see cref="ICoopShipSnapshotBuilder"/>, own-party captains, no <c>NavalBattleEndLogic</c> (campaign ship capture) and no
-/// <c>ShipRetreatLogic</c> (naval retreat is disabled). Other players' and AI hulls are not spawned here.
+/// <see cref="ICoopShipSnapshotBuilder"/>, own-party captains, <see cref="CoopNavalBattleEndLogic"/> instead of
+/// <c>NavalBattleEndLogic</c> and no <c>ShipRetreatLogic</c> (naval retreat is disabled). Other players' and AI hulls are
+/// not spawned here.
 /// </summary>
 public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
 {
@@ -213,6 +214,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
             shipEngine);
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(shipReplicator, stationUseReplicator, npcFleetSpawner,
             shipDamageRouter));
+        mission.AddMissionBehavior(new CoopNavalBattleEndLogic(controller.Session, controller.Deployment, controller.ResultCommitter));
     }
 
     // Own party only: vanilla GetMapEventPartiesOfPlayerTeams takes the first non-NPC party as the player's,
