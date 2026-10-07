@@ -33,3 +33,4 @@ using System.Runtime.InteropServices;
 [assembly: InternalsVisibleTo("Coop.IntegrationTests")]
 [assembly: InternalsVisibleTo("E2E.Tests")]
 [assembly: InternalsVisibleTo("GameInterface.Tests")]
+[assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
