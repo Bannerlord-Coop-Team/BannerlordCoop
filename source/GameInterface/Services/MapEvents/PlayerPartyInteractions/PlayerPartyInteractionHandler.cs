@@ -1042,10 +1042,23 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         using (new AllowedThread())
         {
+            var tracker = mapEvent.TroopUpgradeTracker;
             EncounterManager.RestartPlayerEncounter(attacker, defender);
+            RestoreTroopUpgradeTracker(mapEvent, tracker);
         }
 
         AssignLocalHostileEncounter(attacker, defender, mapEvent, localSide);
+    }
+
+    /// <summary>
+    /// [Client, under AllowedThread] Restarting finishes a joined encounter, and vanilla LeaveBattle then drops the main
+    /// party's tracker that the server keeps, so a later hero hit would find none. The party is re-attached right after.
+    /// </summary>
+    internal static void RestoreTroopUpgradeTracker(MapEvent mapEvent, TroopUpgradeTracker tracker)
+    {
+        if (tracker == null || mapEvent.IsFinalized || mapEvent.TroopUpgradeTracker != null) return;
+
+        mapEvent.TroopUpgradeTracker = tracker;
     }
 
     private static BattleSideEnum GetLocalHostileEncounterSide(PartyBase attacker, PartyBase defender)

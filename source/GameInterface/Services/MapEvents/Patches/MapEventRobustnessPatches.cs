@@ -82,23 +82,6 @@ internal class MapEventRobustnessPatches
         PopulateTrackerFromMapEvent(__instance, value);
     }
 
-#if DEBUG
-    private static bool loggedClientTrackerNulled;
-
-    // Temporary diagnostic: names the caller that nulls the player's tracker on a client (HitRewardHandler skips then).
-    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.TroopUpgradeTracker), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static void PrefixTroopUpgradeTrackerNulledOnClient(MapEvent __instance, TroopUpgradeTracker value)
-    {
-        if (!ModInformation.IsClient || value != null || loggedClientTrackerNulled) return;
-        if (__instance != MapEvent.PlayerMapEvent || MapEventInitializationBarrier.GetTracker(__instance) == null) return;
-
-        loggedClientTrackerNulled = true;
-        Logger.Warning("Client is nulling the TroopUpgradeTracker of its player MapEvent {MapEventId}:\n{StackTrace}",
-            __instance.StringId, Environment.StackTrace);
-    }
-#endif
-
     private static void PopulateTrackerFromMapEvent(MapEvent mapEvent, TroopUpgradeTracker tracker)
     {
         if (mapEvent._sides is null) return;
