@@ -552,7 +552,10 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
             using (new AllowedThread())
             {
                 Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, controllerId);
+                // A prisoner player cannot take troops back directly, so the cancel keeps them in the held-troops registry.
+                owner.ChangeState(Hero.CharacterStates.Prisoner);
                 owner.Issue.CompleteIssueWithCancel();
+                owner.ChangeState(Hero.CharacterStates.Active);
             }
 
             Assert.Null(owner.Issue);
