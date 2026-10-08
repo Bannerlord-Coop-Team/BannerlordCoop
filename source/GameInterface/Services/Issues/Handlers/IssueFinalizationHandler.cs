@@ -1,9 +1,10 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -11,6 +12,7 @@ using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
@@ -27,6 +29,7 @@ internal class IssueFinalizationHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IIssueOwnershipRegistry ownershipRegistry;
     private readonly IIssueGenerationRegistry generationRegistry;
+    private readonly IGangLeaderWeaponsAcceptance weaponsAcceptance;
 
     public IssueFinalizationHandler(
         IMessageBroker messageBroker,
@@ -34,7 +37,8 @@ internal class IssueFinalizationHandler : IHandler
         INetwork network,
         IPlayerManager playerManager,
         IIssueOwnershipRegistry ownershipRegistry,
-        IIssueGenerationRegistry generationRegistry)
+        IIssueGenerationRegistry generationRegistry,
+        IGangLeaderWeaponsAcceptance weaponsAcceptance)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -42,6 +46,7 @@ internal class IssueFinalizationHandler : IHandler
         this.playerManager = playerManager;
         this.ownershipRegistry = ownershipRegistry;
         this.generationRegistry = generationRegistry;
+        this.weaponsAcceptance = weaponsAcceptance;
 
         messageBroker.Subscribe<IssueFinalizedTriggered>(Handle_IssueFinalizedTriggered);
         messageBroker.Subscribe<QuestTerminalOutcomeTriggered>(Handle_QuestTerminalOutcomeTriggered);
@@ -267,7 +272,8 @@ internal class IssueFinalizationHandler : IHandler
             return false;
         }
 
-        if (reason == IssueFinalizeReason.RejectedAccept || reason == IssueFinalizeReason.AlternativeSolutionSuccess)
+        if (reason == IssueFinalizeReason.RejectedAccept || reason == IssueFinalizeReason.AlternativeSolutionSuccess ||
+            reason == IssueFinalizeReason.AlternativeSolutionFail)
         {
             Logger.Error("Rejecting {Message} claiming {Reason} for owner {Owner} - this reason can only originate server-side",
                 nameof(RequestIssueRemoved), reason, ownerId);
@@ -415,10 +421,21 @@ internal class IssueFinalizationHandler : IHandler
         var ownerId = payload.What.OwnerId;
         var reason = payload.What.Reason;
         var proof = payload.What.Proof;
+        var questId = payload.What.QuestId;
+        var generation = payload.What.Generation;
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(ownerId, out var owner)) return;
+            QuestBase detachedQuest = null;
+            if (questId != null)
+            {
+                if (!generationRegistry.TryGetGeneration(owner, out var current) || current != generation) return;
+                detachedQuest = Campaign.Current.QuestManager.Quests.FirstOrDefault(q =>
+                    q.QuestGiver == owner && q.StringId == questId && q.IsOngoing);
+                if (detachedQuest == null) return;
+            }
 
+            weaponsAcceptance.CancelAlternativeSelection(owner);
             Hero truePlayerHero = null;
             MobileParty ownerParty = null;
             if (ownershipRegistry.TryGetOwnerControllerId(owner, out var recordedOwnerControllerId) &&
@@ -433,7 +450,8 @@ internal class IssueFinalizationHandler : IHandler
             {
                 using (new MainHeroSubstitutionScope(truePlayerHero ?? owner, ownerParty))
                 {
-                    IssueFinalizationSupport.FinalizeMirror(owner, reason, suppressReplicationPatches: true, skipConsequenceReapplication: true);
+                    IssueFinalizationSupport.FinalizeMirror(owner, reason, suppressReplicationPatches: true, skipConsequenceReapplication: true, detachedQuest: detachedQuest);
+                    if (detachedQuest != null) ownershipRegistry.Clear(owner);
                 }
             }
             finally

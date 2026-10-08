@@ -1,4 +1,4 @@
-using Common.Util;
+﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Issues.Generic;
@@ -115,8 +115,10 @@ public class IssueFinalizationSecurityTests : IDisposable
         return new OwnedIssue(controllerId, generation);
     }
 
-    [Fact]
-    public void RequestIssueRemoved_ClaimingAlternativeSolutionSuccess_RejectedAsServerOnlyReason()
+    [Theory]
+    [InlineData(IssueFinalizeReason.AlternativeSolutionSuccess)]
+    [InlineData(IssueFinalizeReason.AlternativeSolutionFail)]
+    public void RequestIssueRemoved_ClaimingAlternativeOutcome_RejectedAsServerOnlyReason(IssueFinalizeReason reason)
     {
         var fixture = SetupVillageOwner();
         var owned = SetupOwnedIssue(fixture);
@@ -127,7 +129,7 @@ public class IssueFinalizationSecurityTests : IDisposable
             Assert.True(Client.ObjectManager.TryGetId(owner, out var ownerId));
 
             var network = Client.Resolve<Common.Network.INetwork>();
-            network.SendAll(new RequestIssueRemoved(ownerId, IssueFinalizeReason.AlternativeSolutionSuccess, owned.Generation));
+            network.SendAll(new RequestIssueRemoved(ownerId, reason, owned.Generation));
         });
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());

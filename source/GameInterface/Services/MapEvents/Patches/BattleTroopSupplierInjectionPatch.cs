@@ -1,9 +1,12 @@
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
+using SandBox.Missions.MissionLogics;
 using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -17,11 +20,19 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// changes. Only active in a coop battle (see <see cref="BattleSpawnGate"/>); ordinary battles keep their
 /// native suppliers.
 /// </summary>
-[HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), MethodType.Constructor,
-    new Type[] { typeof(IMissionTroopSupplier[]), typeof(BattleSideEnum), typeof(Mission.BattleSizeType) })]
+[HarmonyPatch]
 internal class BattleTroopSupplierInjectionPatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<BattleTroopSupplierInjectionPatch>();
+
+    [HarmonyTargetMethods]
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Constructor(typeof(DefaultBattleMissionAgentSpawnLogic),
+            new[] { typeof(IMissionTroopSupplier[]), typeof(BattleSideEnum), typeof(Mission.BattleSizeType) });
+        yield return AccessTools.Constructor(typeof(WhileEnteringSettlementBattleMissionController),
+            new[] { typeof(IMissionTroopSupplier[]), typeof(int), typeof(int) });
+    }
 
     [HarmonyPrefix]
     private static void Prefix(IMissionTroopSupplier[] suppliers)

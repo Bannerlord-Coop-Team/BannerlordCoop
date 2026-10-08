@@ -14,7 +14,7 @@ internal enum ConversationRestartDecision
 
 internal interface IConversationRestartContextTracker
 {
-    string Capture(PlayerEncounter encounter);
+    string Capture(PlayerEncounter encounter, string requestId = null);
     ConversationRestartDecision Consume(string requestId, PlayerEncounter currentEncounter, PartyBase defender, PartyBase attacker);
     void Remove(string requestId);
 }
@@ -60,9 +60,9 @@ internal class ConversationRestartContextTracker : IConversationRestartContextTr
         }
     }
 
-    public string Capture(PlayerEncounter encounter)
+    public string Capture(PlayerEncounter encounter, string requestId = null)
     {
-        var requestId = Guid.NewGuid().ToString("N");
+        requestId ??= Guid.NewGuid().ToString("N");
 
         lock (sync)
         {

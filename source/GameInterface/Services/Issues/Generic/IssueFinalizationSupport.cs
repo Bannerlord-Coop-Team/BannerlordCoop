@@ -1,4 +1,4 @@
-using Common.Util;
+﻿using Common.Util;
 using GameInterface.Services.Issues.Messages;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -19,15 +19,15 @@ public sealed class IssueFinalizeAuthorityGuard : IDisposable
 
 internal static class IssueFinalizationSupport
 {
-    public static void FinalizeMirror(Hero owner, IssueFinalizeReason reason, bool suppressReplicationPatches = true, bool skipConsequenceReapplication = false)
+    public static void FinalizeMirror(Hero owner, IssueFinalizeReason reason, bool suppressReplicationPatches = true, bool skipConsequenceReapplication = false, QuestBase detachedQuest = null)
     {
-        if (owner?.Issue == null) return;
+        if (owner?.Issue == null && detachedQuest == null) return;
 
         IDisposable replicationScope = suppressReplicationPatches ? new AllowedThread() : null;
         using (new IssueFinalizeAuthorityGuard())
         using (replicationScope)
         {
-            var quest = owner.Issue.IssueQuest;
+            var quest = detachedQuest ?? owner.Issue.IssueQuest;
             if (quest != null && quest.IsOngoing)
             {
                 ApplyOngoingQuestFinalize(owner, quest, reason, skipConsequenceReapplication);

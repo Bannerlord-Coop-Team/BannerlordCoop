@@ -62,6 +62,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.Barter;
 using TaleWorlds.Core;
 using TaleWorlds.Core.ImageIdentifiers;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 using GameInterface.Services.Clans.Data;
 using TaleWorlds.ObjectSystem;
@@ -1387,8 +1388,9 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     {
         if (proposal == PlayerPartyInteractionProposal.Mercenary)
         {
+            var goldIcon = new TextObject("{GOLD_ICON}").ToString();
             expectedText =
-                $"RandomPlayer offers to serve as a mercenary. The kingdom will pay {mercenaryAwardMultiplier} gold per influence point earned, whenever the contract is honored. Do you accept?";
+                $"RandomPlayer offers to serve as a mercenary. The kingdom will pay {mercenaryAwardMultiplier}{goldIcon} gold per influence point earned, whenever the contract is honored. Do you accept?";
         }
 
         PlayerPartyInteractionDialogState.Apply(new NetworkPlayerPartyInteractionState(

@@ -1,5 +1,8 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using System.Linq;
+using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.SaveSystem;
 
 namespace GameInterface.Services.Issues.Patches;
@@ -12,6 +15,15 @@ internal sealed class IssueOwnershipSaveData
     [SaveableField(2)]
     internal string OwnerControllerId;
 
+    [SaveableField(3)]
+    internal MobileParty WeaponsGuardsParty;
+
+    [SaveableField(4)]
+    internal bool WeaponsBattlePending;
+
+    [SaveableField(5)]
+    internal string WeaponsQuestId;
+
     private IssueOwnershipSaveData()
     {
     }
@@ -20,6 +32,24 @@ internal sealed class IssueOwnershipSaveData
     {
         IssueGiverHero = issueGiverHero;
         OwnerControllerId = ownerControllerId;
+        var quest = issueGiverHero.Issue?.IssueQuest as GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssueQuest
+            ?? Campaign.Current.QuestManager.Quests.OfType<GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssueQuest>()
+                .FirstOrDefault(q => q.QuestGiver == issueGiverHero && q.IsOngoing);
+        if (quest != null)
+        {
+            WeaponsGuardsParty = quest._guardsParty;
+            WeaponsBattlePending = quest._checkForBattleResult;
+            WeaponsQuestId = quest.StringId;
+        }
+    }
+
+    internal void RestoreQuestReferences()
+    {
+        var quest = Campaign.Current.QuestManager.Quests.OfType<GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssueQuest>()
+            .FirstOrDefault(q => q.QuestGiver == IssueGiverHero && q.IsOngoing && q.StringId == WeaponsQuestId);
+        if (quest == null) return;
+        quest._guardsParty = WeaponsGuardsParty;
+        quest._checkForBattleResult = WeaponsBattlePending;
     }
 }
 
