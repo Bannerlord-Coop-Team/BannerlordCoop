@@ -2,7 +2,7 @@
 
 This is a compact map of player-visible behavior in BannerlordCoop, bound to the installed
 Native v1.4.8 snapshot and repository source in [provenance](provenance.md).
-It lists **385 behaviors in 31 areas**, with **63 interpreted source cases** where concrete
+It lists **386 behaviors in 31 areas**, with **63 interpreted source cases** where concrete
 outcomes or boundaries have been inspected. These are coverage requirements and source
 observations, not a gameplay compatibility claim.
 
@@ -33,7 +33,7 @@ and execution. All 63 source cases remain unrun. Four game recipes are draft.
 | quests | 13 | tournaments | 12 |
 | battles | 29 | sieges | 16 |
 | naval | 9 | ai | 11 |
-| presentation | 15 | options | 7 |
+| presentation | 15 | options | 8 |
 | save | 11 | tools | 10 |
 | vanilla-modes | 6 | | |
 

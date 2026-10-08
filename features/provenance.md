@@ -3,8 +3,13 @@
 Discovery date: 2026-10-05. Repository: `Bannerlord-Coop-Team/BannerlordCoop`.
 Bound implementation commit: `5f4d63cc0975174ab42cfe1da67fc6d7214065e7`.
 Implementation tree: `9fc0c1eb1986a7c6d86549dadccd324280610431`.
-An isolated worktree excluded the main test checkout's unrelated edits. The map changes no
-implementation, game build/deployment, save or gameplay runtime.
+An isolated worktree excluded the main test checkout's unrelated edits. The map authoring changes
+no implementation, game build/deployment, save or gameplay runtime.
+
+The branch later merged `origin/development` through `cde8bb5922b9fc1a685cb361bf4fb90e86e2d41b`.
+The compact map now reflects that base's wanderer spawn-rate configuration, fixed tavern NPC
+definition and mission-tick recovery. The eight complete source identities below remain pinned
+to the original source-interpreted revision; no new source case is claimed from those merges.
 
 Installed Native reports `v1.4.8`. Complete-type decompilation and bounded complete-member
 reads supplied the source interpretations and definitions. Truncated responses were reread;

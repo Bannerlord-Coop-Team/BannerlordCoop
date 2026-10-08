@@ -315,7 +315,7 @@ Entry: Town/castle/village scene / conversation
 | --- | --- | --- | --- | --- |
 | locations.001 | Walk town center | spawn; move; interact; leave | client enters the intended town scene with correct actors | unverified / candidate |
 | locations.002 | Enter lord's hall | permission; bribe; disguise; denied | scene access and authoritative consequences match accepted action | unverified / candidate |
-| locations.003 | Enter tavern | town menu; scene transition; return | correct tavern NPCs and player identities appear | unverified / candidate |
+| locations.003 | Enter tavern | town menu; scene transition; configured fixed NPC; return | correct configured tavern NPCs and player identities appear | unverified / candidate |
 | locations.004 | Enter prison | permission; ransom; prison break context | correct prisoner characters are presented in the intended prison | unverified / candidate |
 | locations.005 | Walk village | normal village; hostility; scene return | village scene and campaign return agree | unverified / candidate |
 | locations.006 | Talk to notable | issue giver; recruitment; caravan | conversation uses the selected registered hero | unverified / candidate |
@@ -327,7 +327,7 @@ Entry: Town/castle/village scene / conversation
 | locations.012 | Barber appearance change | available actor; payment; cancel | accepted appearance changes reach both clients | unverified / candidate |
 | locations.013 | Board game interaction | start; move; win/loss; leave | game state and reward agree where the current co-op path exists | unverified / candidate |
 
-Sources: [source/GameInterface/Services/Characters](../source/GameInterface/Services/Characters), [source/GameInterface/Services/Locations](../source/GameInterface/Services/Locations), [source/GameInterface/Services/Missions](../source/GameInterface/Services/Missions)
+Sources: [deploy/ModuleData/coop_fixed_town_npcs.xml](../deploy/ModuleData/coop_fixed_town_npcs.xml), [source/GameInterface/Services/Characters](../source/GameInterface/Services/Characters), [source/GameInterface/Services/Companions](../source/GameInterface/Services/Companions), [source/GameInterface/Services/Locations](../source/GameInterface/Services/Locations), [source/GameInterface/Services/Missions](../source/GameInterface/Services/Missions)
 
 ## alleys
 
@@ -509,9 +509,9 @@ Entry: Campaign encounter / rendered battle mission
 | battles.027 | Battle loot | winner; participant contribution; abandoned loot | accepted loot reaches intended player inventories | unverified / candidate |
 | battles.028 | Battle prisoners | hero capture; troop capture; escaped hero | prisoner identities and rosters agree | unverified / candidate |
 | battles.029 | Post-battle relations/rewards | renown; influence; skill XP; quest progress | each reward/side effect targets its actual eligible owner | unverified / candidate |
-| battles.030 | Mission exit | normal; retreat; crash; completed battle | client returns to the correct campaign state with no retained live mission | unverified / candidate |
+| battles.030 | Mission exit | normal; retreat; tick exception; crash; completed battle | client returns to the correct campaign state with no retained live mission, and a tick exception does not leave the mission loop waiting forever | unverified / candidate |
 
-Sources: [source/GameInterface/Services/MapEvents](../source/GameInterface/Services/MapEvents), [source/GameInterface/Services/Missions](../source/GameInterface/Services/Missions), [source/Missions/Battles](../source/Missions/Battles)
+Sources: [source/GameInterface/Services/GameState/Patches/OnTickRobustnessPatches.cs](../source/GameInterface/Services/GameState/Patches/OnTickRobustnessPatches.cs), [source/GameInterface/Services/MapEvents](../source/GameInterface/Services/MapEvents), [source/GameInterface/Services/Missions](../source/GameInterface/Services/Missions), [source/Missions/Battles](../source/Missions/Battles)
 
 ## sieges
 
@@ -613,8 +613,9 @@ Entry: Client options / co-op options / time controls
 | options.005 | Difficulty settings | damage; recruitment; combat; campaign parameters | current effective option matches persisted configuration | unverified / candidate |
 | options.006 | Audio/graphics/input options | apply; cancel; restart-dependent | local preference affects intended rendering/input without gameplay state divergence | unverified / candidate |
 | options.007 | Hotkey interaction | map; inventory; character; mission | input reaches the visible intended context | unverified / candidate |
+| options.008 | Wanderer spawn rate | disabled; default; multiple per tick; population limit; player-occupied town | eligible towns receive the configured number of new unaffiliated wanderers without exceeding shared limits | unverified / candidate |
 
-Sources: [source/GameInterface/Services/Difficulties](../source/GameInterface/Services/Difficulties), [source/GameInterface/Services/Time](../source/GameInterface/Services/Time), [source/GameInterface/Services/UI/CoopOptions](../source/GameInterface/Services/UI/CoopOptions)
+Sources: [deploy/mod-config.default.json](../deploy/mod-config.default.json), [source/GameInterface/Configuration](../source/GameInterface/Configuration), [source/GameInterface/Services/Companions](../source/GameInterface/Services/Companions), [source/GameInterface/Services/Difficulties](../source/GameInterface/Services/Difficulties), [source/GameInterface/Services/Time](../source/GameInterface/Services/Time), [source/GameInterface/Services/UI/CoopOptions](../source/GameInterface/Services/UI/CoopOptions)
 
 ## save
 

@@ -7,7 +7,7 @@ specified oracle. Do not create feature entries for every syntax branch or numer
 
 | Record | Purpose | What it establishes |
 | --- | --- | --- |
-| [catalog.csv](catalog.csv) | 385 behaviors in 31 areas, input surface, variants and required observation | a coverage question or named source surface, with its own support/status |
+| [catalog.csv](catalog.csv) | 386 behaviors in 31 areas, input surface, variants and required observation | a coverage question or named source surface, with its own support/status |
 | [source-cases.csv](source-cases.csv) | 63 interpreted outcomes or boundary tables with parent behavior and complete-member spans | the stated member-level source result only; runtime is separately recorded |
 | [baseline/installed.json](baseline/installed.json) | installed registrar, menu and perk definitions with owning DLL hash | definition/registration discovery, not compatibility |
 | [baseline/behavior-sources.json](baseline/behavior-sources.json) | the eight complete source identities cited by the interpreted cases | source binding and span bounds, not a runtime result |

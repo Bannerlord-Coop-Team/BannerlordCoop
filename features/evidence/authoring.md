@@ -80,6 +80,14 @@ The earlier passing selector exercise is retained with its exact original source
 No harness rebuild, CI, game build/deployment, launch, save or owner/lane change was performed
 for this reduction. All 63 source cases retain `runtime: unrun`.
 
+## Base merge refresh
+
+Date: 2026-10-07. The feature-map branch merged `origin/development` through
+`cde8bb5922b9fc1a685cb361bf4fb90e86e2d41b` and resolved the README roadmap conflict while
+retaining the compact map. The catalog now includes the merged wanderer spawn-rate option and
+binds the fixed tavern NPC and mission-tick recovery changes to existing behavior rows.
+No source case was promoted or run; all 63 interpreted cases remain `runtime: unrun`.
+
 ## Review corrections
 
 Corrections to the review of documentation head `4b51faa483b59e1b4cbc133c3600bbcf83a2265b`

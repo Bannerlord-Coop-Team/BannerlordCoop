@@ -35,7 +35,7 @@ Dedicated-server operators can block Steam64 identities with a [server-side ban 
 
 Server setup walkthrough: https://www.youtube.com/watch?v=laZM967Eals
 
-## Current Features
+## Roadmap
 
 The [compact behavior map](features/README.md) lists player-visible behaviors, installed game definitions,
 co-op restrictions and verification status. Its entries are not a gameplay compatibility claim.
@@ -72,6 +72,8 @@ co-op restrictions and verification status. Its entries are not a gameplay compa
 - Quests
 
 Planned items and release priorities may change as development continues.
+
+Current roadmap: https://bannerlordcoop.com/#roadmap
 
 ## Multiplayer Battles
 
