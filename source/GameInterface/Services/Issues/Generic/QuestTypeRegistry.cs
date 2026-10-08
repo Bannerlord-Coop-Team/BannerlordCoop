@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -12,6 +12,12 @@ public static class QuestTypeRegistry
     {
         if (descriptor?.IssueType == null) return;
         ByIssueType[descriptor.IssueType] = descriptor;
+    }
+
+    internal static void Unregister(QuestTypeDescriptor descriptor)
+    {
+        if (descriptor != null && Get(descriptor.IssueType) == descriptor)
+            ByIssueType.Remove(descriptor.IssueType);
     }
 
     public static QuestTypeDescriptor Get(Type issueType) =>
