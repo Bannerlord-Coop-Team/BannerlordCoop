@@ -323,8 +323,8 @@ internal class LordNeedsHorsesEligibilityPatch
     {
         if (__instance is not Issue issue || !issue.IsOngoingWithoutQuest || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return;
         if (ContainerProvider.TryResolve<ILordNeedsHorsesQuest>(out var service) && !service.HasConflictingQuest(issue)) return;
-        // Vanilla ranks the duplicate refusal right after the at-war one, so it replaces every lower-ranked refusal.
-        if (!__result && issueGiver.MapFaction.IsAtWarWith(Hero.MainHero.MapFaction)) return;
+        // Vanilla ranks the stay-alive cancel and then the at-war refusal above the duplicate one, which outranks the rest.
+        if (!__result && (!issue.IssueStayAliveConditions() || issueGiver.MapFaction.IsAtWarWith(Hero.MainHero.MapFaction))) return;
         __result = false;
         explanation = new TextObject("{=HvY7wjHt}I don't think you can help me. I think you may have other, similar commitments that could interfere.");
     }
