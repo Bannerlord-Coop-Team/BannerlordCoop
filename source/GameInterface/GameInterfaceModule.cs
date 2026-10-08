@@ -148,6 +148,8 @@ public class GameInterfaceModule : Module
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
         builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<IssueGenerationRegistry>().As<IIssueGenerationRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<Services.Issues.ScoutEnemyGarrisonsQuestState>().As<Services.Issues.IScoutEnemyGarrisonsQuestState>().InstancePerLifetimeScope();
+        builder.RegisterType<Services.Issues.ScoutEnemyGarrisonsService>().As<Services.Issues.IScoutEnemyGarrisonsService>().InstancePerDependency();
         builder.RegisterType<AwaitingAlternativeSolutionTroopsRegistry>().As<IAwaitingAlternativeSolutionTroopsRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().InstancePerLifetimeScope();
