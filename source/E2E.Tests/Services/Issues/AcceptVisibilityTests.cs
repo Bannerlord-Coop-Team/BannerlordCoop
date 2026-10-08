@@ -7,6 +7,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Visibility;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -243,6 +244,36 @@ public class AcceptVisibilityTests : IDisposable
         Server.SimulateMessage(this, new PlayerCampaignEntered(Owner.NetPeer));
 
         Owner.Call(() => Assert.False(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(ownerIssue)));
+    }
+
+    [Fact]
+    public void SendTroops_TheSnapshotReplacesAnOwnerTheClientRememberedFromBefore()
+    {
+        var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        AddIssue(Other, notableId);
+        ServerKnowsTheOwner(notableId);
+        Other.Call(() => Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, "stale-player")));
+
+        Server.SimulateMessage(this, new PlayerCampaignEntered(Other.NetPeer));
+
+        Other.Call(() =>
+        {
+            Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out var ownerControllerId));
+            Assert.Equal(OwnerControllerId, ownerControllerId);
+        });
+    }
+
+    [Fact]
+    public void SendTroops_AnEmptySnapshotClearsWhatTheClientRememberedFromBefore()
+    {
+        var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        AddIssue(Other, notableId);
+        Other.Call(() => Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, "stale-player")));
+
+        Server.SimulateMessage(this, new PlayerCampaignEntered(Other.NetPeer));
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueOwnershipSnapshot>());
+        Other.Call(() => Assert.False(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out _)));
     }
 
     [Fact]

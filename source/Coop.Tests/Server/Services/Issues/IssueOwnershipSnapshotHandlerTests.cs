@@ -64,7 +64,7 @@ public class IssueOwnershipSnapshotHandlerTests
     }
 
     [Fact]
-    public void PlayerCampaignEntered_OnServer_SendsNothingWhenNoIssueIsOwned()
+    public void PlayerCampaignEntered_OnServer_SendsAnEmptySnapshotWhenNoIssueIsOwned()
     {
         WithRole(true, () =>
         {
@@ -77,7 +77,8 @@ public class IssueOwnershipSnapshotHandlerTests
 
             messageBroker.Publish(this, new PlayerCampaignEntered(enteringPeer));
 
-            Assert.False(network.SentNetworkMessages.ContainsKey(enteringPeer.Id));
+            var snapshot = Assert.Single(network.GetPeerMessagesFromType<NetworkIssueOwnershipSnapshot>(enteringPeer));
+            Assert.Empty(snapshot.Owners);
         });
     }
 

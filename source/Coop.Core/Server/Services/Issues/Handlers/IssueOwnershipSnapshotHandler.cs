@@ -41,12 +41,6 @@ internal class IssueOwnershipSnapshotHandler : IHandler
             return;
         }
 
-        var owners = ownership.GetAll();
-        if (owners.Length == 0)
-        {
-            return;
-        }
-
-        network.Send(payload.What.playerId, new NetworkIssueOwnershipSnapshot(owners));
+        network.Send(payload.What.playerId, new NetworkIssueOwnershipSnapshot(ownership.GetAll()));
     }
 }
