@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.ObjectManager;
@@ -30,6 +30,7 @@ public static class AlternativeSolutionStartRunner
         using (new AlternativeSolutionStartAuthorityGuard())
         using (ResolveOwnerScope(truePlayer))
         {
+            CheckBountyHuntersPreconditions(owner.Issue);
             if (!owner.Issue.AlternativeSolutionCondition(out _))
                 throw new InvalidOperationException($"StartOnServer: AlternativeSolutionCondition rejected the accept for owner {owner.StringId}");
 
@@ -43,6 +44,7 @@ public static class AlternativeSolutionStartRunner
         using (new AlternativeSolutionStartAuthorityGuard())
         using (ResolveOwnerScope(truePlayer))
         {
+            CheckBountyHuntersPreconditions(owner.Issue);
             if (!owner.Issue.AlternativeSolutionCondition(out _))
                 throw new InvalidOperationException($"StartOnServerFromClaim: AlternativeSolutionCondition rejected the accept for owner {owner.StringId}");
             if (!DoTroopsSatisfyAlternativeSolution(owner.Issue, validatedRoster, out _))
@@ -61,6 +63,13 @@ public static class AlternativeSolutionStartRunner
             owner.Issue.StartIssueWithAlternativeSolution();
             return AlternativeSolutionVanillaStateSync.Capture(owner.Issue);
         }
+    }
+
+    private static void CheckBountyHuntersPreconditions(IssueBase issue)
+    {
+        if (issue is CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssue
+            && !issue.CheckPreconditions(issue.IssueOwner, out _))
+            throw new InvalidOperationException("The player no longer meets the bounty hunters issue requirements");
     }
 
     private static bool DoTroopsSatisfyAlternativeSolution(IssueBase issue, TroopRoster troopRoster, out TextObject explanation)
@@ -82,7 +91,7 @@ public static class AlternativeSolutionStartRunner
         foreach (var element in validatedRoster.GetTroopRoster())
         {
             party.MemberRoster.AddToCounts(
-                element.Character, -element.Number, false, -element.WoundedNumber, 0, true, -1);
+                element.Character, -element.Number, false, -element.WoundedNumber, -element.Xp, true, -1);
         }
     }
 

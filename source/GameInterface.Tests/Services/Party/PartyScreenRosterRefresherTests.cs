@@ -120,7 +120,9 @@ public class PartyScreenRosterRefresherTests
         authoritative.AddToCounts(character, 5, false, 1);
         visible.AddToCounts(character, -2);
         var refresher = new PartyScreenRosterRefresher(
-            new FixedBaselineProvider(logic._initialData.RightMemberRoster));
+            new FixedBaselineProvider(logic._initialData.RightMemberRoster),
+            new global::GameInterface.Services.Issues.Generic.AlternativeSolutionTroopSelection(
+                () => Moq.Mock.Of<IPartyScreenRosterRefresher>()));
 
         var applied = refresher.TryApply(logic, authoritative, character, Heal, () => { });
 
@@ -272,7 +274,9 @@ public class PartyScreenRosterRefresherTests
     }
 
     private static PartyScreenRosterRefresher CreateRefresher()
-        => new PartyScreenRosterRefresher(new PartyScreenRosterBaselineProvider());
+        => new PartyScreenRosterRefresher(new PartyScreenRosterBaselineProvider(),
+            new global::GameInterface.Services.Issues.Generic.AlternativeSolutionTroopSelection(
+                () => Moq.Mock.Of<IPartyScreenRosterRefresher>()));
 
     private static void Heal(TroopRoster roster, CharacterObject troop)
     {

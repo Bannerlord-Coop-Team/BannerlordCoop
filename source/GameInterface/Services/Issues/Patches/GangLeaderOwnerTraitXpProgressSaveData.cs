@@ -1,5 +1,5 @@
-using Common.Logging;
-using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
+﻿using Common.Logging;
+using GameInterface.Services.Issues.Generic;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -79,7 +79,7 @@ internal class GangLeaderOwnerTraitXpProgressPersistencePatches
 
     private static void SyncDataInternal(IDataStore dataStore)
     {
-        var progressRegistry = GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress;
+        if (!ContainerProvider.TryResolve<PendingRegistry<PropertyOwner<PropertyObject>>>(out var progressRegistry)) return;
 
         List<GangLeaderOwnerTraitXpProgressSaveData> saveData = null;
         if (dataStore.IsSaving)
