@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -134,6 +134,10 @@ internal class IssueConversationHandler : IHandler
 
     private bool IsRequesterPresentWithIssueGiver(string controllerId, Hero issueGiver)
     {
+        if (issueGiver.Issue is TaleWorlds.CampaignSystem.Issues.LordWantsRivalCapturedIssueBehavior.LordWantsRivalCapturedIssue &&
+            ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests))
+            return quests.IsPresentWithGiver(controllerId, issueGiver);
+
         if (issueGiver.CurrentSettlement == null) return false;
         if (!playerManager.TryGetPlayer(controllerId, out var player) || player.MobilePartyId == null) return false;
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return false;

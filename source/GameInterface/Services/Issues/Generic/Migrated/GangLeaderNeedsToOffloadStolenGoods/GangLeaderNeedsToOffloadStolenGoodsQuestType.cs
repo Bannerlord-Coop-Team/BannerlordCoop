@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -341,13 +341,13 @@ internal static class GangLeaderNeedsToOffloadStolenGoodsQuestType
             progress = new PropertyOwner<PropertyObject>();
         }
         var traitLevelBefore = owner.GetTraitLevel(trait);
-        if (progress.GetPropertyValue(trait) == 0)
+        if (!progress.HasProperty(trait))
         {
             progress.SetPropertyValue(trait, Campaign.Current.Models.CharacterDevelopmentModel.GetTraitXpRequiredForTraitLevel(trait, traitLevelBefore));
         }
         Campaign.Current.Models.CharacterDevelopmentModel.GetTraitLevelForTraitXp(
             owner, trait, xpValue + progress.GetPropertyValue(trait), out var traitLevel, out var traitXp);
-        progress.SetPropertyValue(trait, traitXp);
+        progress._attributes[trait] = traitXp;
         OwnerTraitXpProgress.Set(owner, progress);
         if (traitLevel != traitLevelBefore)
         {
