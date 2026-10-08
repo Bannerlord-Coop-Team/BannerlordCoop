@@ -59,4 +59,31 @@ public class IssueOwnershipRegistryTests
         Assert.False(registry.TryGetOwner("hero", "issue_1", out _));
         Assert.True(registry.TrySetOwner("hero", "issue_1", "player-B"));
     }
+
+    [Fact]
+    public void GetAll_ReturnsEveryEntryAndDropsRemovedOnes()
+    {
+        var registry = new IssueOwnershipRegistry();
+        registry.TrySetOwner("hero_1", "issue_1", "player-A");
+        registry.TrySetOwner("hero_2", "issue_2", "player-B");
+
+        var all = registry.GetAll();
+
+        Assert.Equal(2, all.Length);
+        Assert.Contains(all, owner => owner.IssueOwnerId == "hero_1" && owner.IssueId == "issue_1" && owner.ControllerId == "player-A");
+        Assert.Contains(all, owner => owner.IssueOwnerId == "hero_2" && owner.IssueId == "issue_2" && owner.ControllerId == "player-B");
+
+        registry.Remove("hero_1");
+
+        var remaining = Assert.Single(registry.GetAll());
+        Assert.Equal("hero_2", remaining.IssueOwnerId);
+    }
+
+    [Fact]
+    public void GetAll_IsEmptyWhenNobodyClaimedAnIssue()
+    {
+        var registry = new IssueOwnershipRegistry();
+
+        Assert.Empty(registry.GetAll());
+    }
 }

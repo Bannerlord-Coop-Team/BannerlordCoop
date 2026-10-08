@@ -1,4 +1,6 @@
-﻿namespace GameInterface.Services.Issues.Framework.Interface;
+﻿using GameInterface.Services.Issues.Framework.Registries;
+
+namespace GameInterface.Services.Issues.Framework.Interface;
 
 public interface IIssueOwnershipRegistry
 {
@@ -8,4 +10,6 @@ public interface IIssueOwnershipRegistry
     bool TryGetOwner(string issueOwnerId, string issueId, out string controllerId);
 
     void Remove(string issueOwnerId);
+
+    IssueOwnershipData[] GetAll();
 }

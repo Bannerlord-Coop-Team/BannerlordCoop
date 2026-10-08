@@ -172,6 +172,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
                 return;
             }
 
+            ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, data.ControllerId);
+
             // The accepting player already ran the accept locally
             if (data.ControllerId == controllerIdProvider.ControllerId)
             {

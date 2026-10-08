@@ -15,9 +15,9 @@ namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsToOffloadStolenGoo
 /// </summary>
 internal class GangLeaderNeedsToOffloadStolenGoodsQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
 {
-    private static readonly FieldInfo AmountField = AccessTools.Field(typeof(Quest), "_stolenTradeGoodAmount");
-    private static readonly FieldInfo PriceField = AccessTools.Field(typeof(Quest), "_stolenTradeGoodPrice");
-    private static readonly FieldInfo CounterOfferGoldField = AccessTools.Field(typeof(Quest), "_counterOfferGold");
+    private static readonly FieldInfo AmountField = AccessTools.Field(typeof(Quest), nameof(Quest._stolenTradeGoodAmount));
+    private static readonly FieldInfo PriceField = AccessTools.Field(typeof(Quest), nameof(Quest._stolenTradeGoodPrice));
+    private static readonly FieldInfo CounterOfferGoldField = AccessTools.Field(typeof(Quest), nameof(Quest._counterOfferGold));
     private static readonly FieldInfo RewardGoldField = AccessTools.Field(typeof(QuestBase), nameof(QuestBase.RewardGold));
 
     public byte[] Capture(IssueBase issue)

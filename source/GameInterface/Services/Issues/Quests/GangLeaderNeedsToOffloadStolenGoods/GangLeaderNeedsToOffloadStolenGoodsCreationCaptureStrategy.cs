@@ -15,8 +15,7 @@ namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsToOffloadStolenGoo
 
 internal class GangLeaderNeedsToOffloadStolenGoodsCreationCaptureStrategy : ICreationCaptureStrategy
 {
-    private static readonly FieldInfo StolenTradeGoodField = AccessTools.Field(typeof(Issue), "_randomForStolenTradeGood");
-    private static readonly PropertyInfo CounterOfferHeroProperty = AccessTools.Property(typeof(Issue), nameof(Issue.CounterOfferHero));
+    private static readonly FieldInfo StolenTradeGoodField = AccessTools.Field(typeof(Issue), nameof(Issue._randomForStolenTradeGood));
 
     private readonly IObjectManager objectManager;
 
@@ -56,7 +55,7 @@ internal class GangLeaderNeedsToOffloadStolenGoodsCreationCaptureStrategy : ICre
             return;
         }
 
-        CounterOfferHeroProperty.SetValue(issue, counterOfferHero);
+        ((Issue)issue).CounterOfferHero = counterOfferHero;
     }
 
     public bool TryBuildDebugCapture(Hero issueOwner, out byte[] captured)

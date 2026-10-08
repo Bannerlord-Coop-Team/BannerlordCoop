@@ -1,10 +1,12 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Visibility;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -22,6 +24,7 @@ public class AcceptVisibilityTests : IDisposable
     private const int SentTroops = 10;
 
     private readonly List<(IssueBase.IssueUpdateDetails Details, Hero? Solver)> otherUpdates = new();
+    private readonly List<QuestBase.QuestCompleteDetails> otherQuestCompletions = new();
 
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
@@ -70,6 +73,31 @@ public class AcceptVisibilityTests : IDisposable
             CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(
                 this,
                 (IssueBase issue, IssueBase.IssueUpdateDetails details, Hero solver) => otherUpdates.Add((details, solver)));
+        });
+    }
+
+    private void ListenForQuestCompletionsOnTheOtherClient()
+    {
+        Other.Call(() =>
+        {
+            CampaignEvents.OnQuestCompletedEvent.AddNonSerializedListener(
+                this,
+                (QuestBase quest, QuestBase.QuestCompleteDetails details) => otherQuestCompletions.Add(details));
+        });
+    }
+
+    private void LoadQuestSolutionFromSave(IssueBase issue, string notableId)
+    {
+        Other.Call(() =>
+        {
+            Assert.True(Other.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+
+            using (new AllowedThread())
+            {
+                issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+                issue.IssueQuest = new UnstartedQuest("quest_unstarted", notable);
+                issue.IsTriedToSolveBefore = true;
+            }
         });
     }
 
@@ -160,6 +188,124 @@ public class AcceptVisibilityTests : IDisposable
 
         Owner.Call(() => Assert.False(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(ownerIssue)));
         Other.Call(() => Assert.True(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(otherIssue)));
+    }
+
+    private static void LoadTroopsMissionFromSave(EnvironmentInstance instance, IssueBase issue, string troopId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+
+            using (new AllowedThread())
+            {
+                issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                issue.AlternativeSolutionSentTroops.AddToCounts(troop, SentTroops);
+            }
+        });
+    }
+
+    private void ServerKnowsTheOwner(string notableId)
+    {
+        Server.Call(() => Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, OwnerControllerId)));
+    }
+
+    [Fact]
+    public void SendTroops_AClientThatJoinsLaterDoesNotCountTheMissionAsItsOwn()
+    {
+        var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var otherIssue = AddIssue(Other, notableId);
+        ServerKnowsTheOwner(notableId);
+        LoadTroopsMissionFromSave(Other, otherIssue, troopId);
+
+        Server.SimulateMessage(this, new PlayerCampaignEntered(Other.NetPeer));
+
+        Other.Call(() =>
+        {
+            Assert.True(otherIssue.AlternativeSolutionSentTroops.TotalManCount > 0);
+            Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out var ownerControllerId));
+            Assert.Equal(OwnerControllerId, ownerControllerId);
+            Assert.True(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(otherIssue));
+        });
+    }
+
+    [Fact]
+    public void SendTroops_AnOwnerWhoRejoinsGetsItsMissionBackInTheQuestScreen()
+    {
+        var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var ownerIssue = AddIssue(Owner, notableId);
+        ServerKnowsTheOwner(notableId);
+        LoadTroopsMissionFromSave(Owner, ownerIssue, troopId);
+
+        Owner.Call(() => Assert.True(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(ownerIssue)));
+
+        Server.SimulateMessage(this, new PlayerCampaignEntered(Owner.NetPeer));
+
+        Owner.Call(() => Assert.False(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(ownerIssue)));
+    }
+
+    [Fact]
+    public void SendTroops_AClientForgetsTheOwnerWhenTheIssueEnds()
+    {
+        var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        AddIssue(Other, notableId);
+        var accepted = TroopsAccepted(notableId, companionId, troopId);
+
+        Other.SimulateMessage(this, accepted);
+
+        Other.Call(() =>
+        {
+            Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out var ownerControllerId));
+            Assert.Equal(OwnerControllerId, ownerControllerId);
+        });
+
+        Other.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, IssueOutcome.AlternativeSolution));
+
+        Other.Call(() => Assert.False(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out _)));
+    }
+
+    [Theory]
+    [InlineData(IssueOutcome.QuestSuccess)]
+    [InlineData(IssueOutcome.QuestCancel)]
+    public void QuestSolution_AClientThatJoinedLaterEndsTheIssueWithoutDrivingTheQuestFromTheSave(IssueOutcome outcome)
+    {
+        var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var otherIssue = AddIssue(Other, notableId);
+        ListenForIssueUpdatesOnTheOtherClient();
+        ListenForQuestCompletionsOnTheOtherClient();
+        LoadQuestSolutionFromSave(otherIssue, notableId);
+
+        Other.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
+
+        Other.Call(() =>
+        {
+            Assert.True(Other.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            Assert.Null(notable.Issue);
+            Assert.Null(otherIssue.IssueQuest);
+            Assert.False(otherIssue.IsTriedToSolveBefore);
+        });
+
+        Assert.Empty(otherQuestCompletions);
+        var update = Assert.Single(otherUpdates);
+        Assert.Null(update.Solver);
+    }
+
+    [Fact]
+    public void QuestSolution_EveryClientRemembersWhoAccepted()
+    {
+        var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        AddIssue(Other, notableId);
+
+        Other.SimulateMessage(this, new NetworkQuestSolutionAccepted(notableId, IssueId, OwnerControllerId, 1f, Array.Empty<byte>()));
+
+        Other.Call(() =>
+        {
+            Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out var ownerControllerId));
+            Assert.Equal(OwnerControllerId, ownerControllerId);
+        });
     }
 
     [Fact]

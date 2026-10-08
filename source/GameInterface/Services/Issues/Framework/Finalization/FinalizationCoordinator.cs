@@ -199,6 +199,8 @@ internal class FinalizationCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
+            ownership.Remove(data.IssueOwnerId);
+
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
             {
                 return;
@@ -259,25 +261,25 @@ internal class FinalizationCoordinator : IHandler
 
         var quest = issue.IssueQuest;
 
-        if (quest != null)
+        if (quest == null)
         {
-            TryCompleteQuest(quest, outcome);
+            Logger.Error("{issue} has no quest to end with {outcome}", issue.StringId, outcome);
             return;
         }
 
-        // The server lost the quest object, the issue itself still has to end.
-        TryCompleteIssue(issue, outcome);
-
-        // Vanilla's timeout is announced by its own patch, the other endings are not.
-        if (outcome != IssueOutcome.QuestTimeOut)
-        {
-            messageBroker.Publish(issue, new IssueOutcomeObserved(issue, outcome));
-        }
+        TryCompleteQuest(quest, outcome);
     }
 
     private static void Replay(IssueBase issue, IssueOutcome outcome)
     {
         var quest = issue.IssueQuest;
+
+        if (quest != null && !Campaign.Current.QuestManager.Quests.Contains(quest))
+        {
+            issue.IssueQuest = null;
+            issue.IsTriedToSolveBefore = false;
+            quest = null;
+        }
 
         if (quest != null && quest.IsOngoing && TryCompleteQuest(quest, outcome))
         {

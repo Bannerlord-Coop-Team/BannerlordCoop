@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace GameInterface.Services.Issues.Framework.Registries;
 
@@ -43,6 +44,16 @@ internal class IssueOwnershipRegistry : IIssueOwnershipRegistry
         lock (owners)
         {
             owners.Remove(issueOwnerId);
+        }
+    }
+
+    public IssueOwnershipData[] GetAll()
+    {
+        lock (owners)
+        {
+            return owners
+                .Select(owner => new IssueOwnershipData(owner.Key, owner.Value.IssueId, owner.Value.ControllerId))
+                .ToArray();
         }
     }
 }

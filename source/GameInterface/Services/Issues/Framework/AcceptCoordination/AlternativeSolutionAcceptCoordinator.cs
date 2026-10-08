@@ -195,6 +195,8 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
                 return;
             }
 
+            ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, data.ControllerId);
+
             if (data.ControllerId != controllerIdProvider.ControllerId)
             {
                 issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
