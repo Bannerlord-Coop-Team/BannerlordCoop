@@ -1,14 +1,18 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Patches;
 
@@ -79,7 +83,7 @@ internal class IssueExpiryFinalizeAuthorityPatch
         __state?.Dispose();
     }
 
-    private static IssueFinalizeAuthorityGuard OpenGuardIfAuthoritative()
+    internal static IssueFinalizeAuthorityGuard OpenGuardIfAuthoritative()
     {
         return CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer
             ? new IssueFinalizeAuthorityGuard()
@@ -87,11 +91,82 @@ internal class IssueExpiryFinalizeAuthorityPatch
     }
 }
 
+[HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut))]
+internal class QuestTimeoutFinalizeAuthorityPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(QuestBase __instance, out IssueFinalizeAuthorityGuard __state)
+    {
+        __state = IssueExpiryFinalizeAuthorityPatch.OpenGuardIfAuthoritative();
+        return __instance is not VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest || __state != null;
+    }
+
+    [HarmonyFinalizer]
+    private static void Finalizer(IssueFinalizeAuthorityGuard __state)
+    {
+        __state?.Dispose();
+    }
+}
+
+[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithAiLord))]
+internal class IssueAiLordCompletionFinalizeAuthorityPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(out IssueFinalizeAuthorityGuard __state)
+    {
+        __state = IssueExpiryFinalizeAuthorityPatch.OpenGuardIfAuthoritative();
+    }
+
+    [HarmonyFinalizer]
+    private static void Finalizer(IssueFinalizeAuthorityGuard __state)
+    {
+        __state?.Dispose();
+    }
+}
+
+[HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut))]
+internal class QuestTimeoutOwnerSubstitutionPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(QuestBase __instance, out MainHeroSubstitutionScope __state)
+    {
+        __state = null;
+        if (!CallOriginalPolicy.IsOriginalAllowed() && !ModInformation.IsServer) return;
+        if (__instance.QuestGiver == null) return;
+        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry) ||
+            !ownershipRegistry.TryGetOwnerControllerId(__instance.QuestGiver, out var controllerId)) return;
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+            !playerManager.TryGetPlayer(controllerId, out var player)) return;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+            !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var ownerHero)) return;
+
+        objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var ownerParty);
+        __state = new MainHeroSubstitutionScope(ownerHero, ownerParty);
+    }
+
+    [HarmonyFinalizer]
+    private static void Finalizer(MainHeroSubstitutionScope __state)
+    {
+        __state?.Dispose();
+    }
+}
+
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
 internal class IssueFinalizedPatches
 {
+    [HarmonyPrefix]
+    private static void Prefix(IssueBase __instance, out (QuestBase Quest, byte Proof) __state)
+    {
+        var reason = IssueFinalizeReason.IssueOnly;
+        if (__instance.IssueOwner != null)
+        {
+            IssueManagerQuestCompletedReasonCapture.PendingReasons.TryGetValue(__instance.IssueOwner, out reason);
+        }
+        __state = (__instance.IssueQuest, IssueFinalizationSupport.CaptureProof(__instance, reason));
+    }
+
     [HarmonyPostfix]
-    private static void Postfix(IssueBase __instance)
+    private static void Postfix(IssueBase __instance, (QuestBase Quest, byte Proof) __state)
     {
         var owner = __instance.IssueOwner;
         var reason = IssueFinalizeReason.IssueOnly;
@@ -102,9 +177,12 @@ internal class IssueFinalizedPatches
         }
 
         var wasGenuinelyFinalized = !DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance) || IssueFinalizeAuthorityGuard.IsActive;
+        ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry);
+        string controllerId = null;
+        ownershipRegistry?.TryGetOwnerControllerId(owner, out controllerId);
         if (wasGenuinelyFinalized)
         {
-            if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) ownershipRegistry.Clear(owner);
+            ownershipRegistry?.Clear(owner);
 
             if (owner != null &&
                 ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
@@ -117,7 +195,14 @@ internal class IssueFinalizedPatches
 
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
         if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return;
+        if (ModInformation.IsServer && !wasGenuinelyFinalized) return;
 
-        MessageBroker.Instance.Publish(__instance, new IssueFinalizedTriggered(owner, reason));
+        TextObject terminalLog = null;
+        if (__state.Quest is VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest quest &&
+            quest.JournalEntries.Count > 0)
+        {
+            terminalLog = quest.JournalEntries[quest.JournalEntries.Count - 1].LogText;
+        }
+        MessageBroker.Instance.Publish(__instance, new IssueFinalizedTriggered(owner, reason, __instance, controllerId, terminalLog, __state.Proof));
     }
 }

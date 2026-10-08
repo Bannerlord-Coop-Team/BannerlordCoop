@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -231,6 +231,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
 
+            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
             try
             {
@@ -249,8 +250,6 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     nameof(NetworkQuestTypeQuestAccepted), data.OwnerId);
                 return;
             }
-
-            ownershipRegistry.SetOwner(owner, data.OwnerControllerId);
         });
     }
 
