@@ -151,12 +151,16 @@
     // e.g. With 3 players: 1 at tier 0 adds 0, 1 at tier 2 adds 5, 1 at tier 5 adds 10. This results in 32 + 0 + 5 + 10 = 47.
     "wandererLimitScalesWithPlayers": false,
 
+    // Set the rate of spawning new wanderers.
+    // Vanilla/default is 1 wanderer per in-game day.
+    // Setting this value lower than 1 means no more wanderer spawns.
+    "spawnRateWanderers": 1,
+
     // Set a custom clan tier required to form a player kingdom.
     // Vanilla/default allows players to start kingdoms from clan tier 4 onwards.
     "playerKingdomClanTierRequired": 4,
 
     // Allows players to join another player's clan or propose a player marriage.
-    // Currently only available to testers & supporters.
     // Disabling this does not dissolve existing coop clans.
     "coopClansEnabled": true,
 
