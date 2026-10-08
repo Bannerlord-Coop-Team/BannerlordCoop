@@ -15,6 +15,8 @@ public class ShipSyncTests : SyncTestBase
     string shipId;
     string shipHullId;
     string shipOwnerId;
+    string upgradePieceId;
+    string figureheadId;
 
     public ShipSyncTests(ITestOutputHelper output) : base(output)
     {
@@ -22,9 +24,116 @@ public class ShipSyncTests : SyncTestBase
 
         TestEnvironment.CreateRegisteredObject<ShipSlot>();
         shipHullId = TestEnvironment.CreateRegisteredObject<ShipHull>();
-        TestEnvironment.CreateRegisteredObject<ShipUpgradePiece>();
-        TestEnvironment.CreateRegisteredObject<Figurehead>();
+        upgradePieceId = TestEnvironment.CreateRegisteredObject<ShipUpgradePiece>();
+        figureheadId = TestEnvironment.CreateRegisteredObject<Figurehead>();
         shipOwnerId = TestEnvironment.CreateRegisteredObject<PartyBase>();
+    }
+
+    [Fact]
+    public void Server_SetPieceAtSlot_SyncsPiecesAndEmptySlots()
+    {
+        SetShipHullLimits();
+
+        AssertClientPieces(("slot1", null), ("slot2", null));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.True(Server.ObjectManager.TryGetObject(upgradePieceId, out ShipUpgradePiece piece));
+            ship.SetPieceAtSlot("slot1", piece);
+        });
+
+        AssertClientPieces(("slot1", upgradePieceId), ("slot2", null));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(shipId, out Ship ship));
+            ship.SetPieceAtSlot("slot1", null);
+        });
+
+        AssertClientPieces(("slot1", null), ("slot2", null));
+    }
+
+    [Fact]
+    public void Server_SetPieceAtSlot_InvalidatesClientVersion()
+    {
+        SetShipHullLimits();
+        WarmClientVersions();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.True(Server.ObjectManager.TryGetObject(upgradePieceId, out ShipUpgradePiece piece));
+            ship.SetPieceAtSlot("slot1", piece);
+        });
+
+        AssertClientVersionsDirty();
+    }
+
+    [Fact]
+    public void Server_ChangeFigurehead_InvalidatesClientVersion()
+    {
+        WarmClientVersions();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.True(Server.ObjectManager.TryGetObject(figureheadId, out Figurehead figurehead));
+            ship.ShipHull.CanEquipFigurehead = true;
+            ship.ChangeFigurehead(figurehead);
+        });
+
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.True(client.ObjectManager.TryGetObject(figureheadId, out Figurehead figurehead));
+            Assert.Same(figurehead, ship.Figurehead);
+        }
+
+        AssertClientVersionsDirty();
+    }
+
+    private void AssertClientPieces(params (string SlotTag, string? PieceId)[] expected)
+    {
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.Equal(expected.Select(slot => slot.SlotTag), ship._shipPieces.Keys);
+
+            foreach (var (slotTag, pieceId) in expected)
+            {
+                if (pieceId == null)
+                {
+                    Assert.Null(ship._shipPieces[slotTag]);
+                    continue;
+                }
+
+                Assert.True(client.ObjectManager.TryGetObject(pieceId, out ShipUpgradePiece piece));
+                Assert.Same(piece, ship._shipPieces[slotTag]);
+            }
+        }
+    }
+
+    private void WarmClientVersions()
+    {
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject(shipId, out Ship ship));
+                _ = ship.VersionNo;
+                Assert.False(ship._isVersionDirty);
+            });
+        }
+    }
+
+    private void AssertClientVersionsDirty()
+    {
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.True(ship._isVersionDirty);
+        }
     }
 
     [Fact]

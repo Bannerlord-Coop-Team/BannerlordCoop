@@ -8,7 +8,6 @@ internal class ShipSync : IAutoSync
     public ShipSync(AutoSyncRegistry AutoSyncRegistry)
     {
         //// Fields
-        AutoSyncRegistry.AddField(AccessTools.Field(typeof(Ship), nameof(Ship._shipPieces)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Ship), nameof(Ship.ShipHull)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Ship), nameof(Ship._name)));
         AutoSyncRegistry.AddField(AccessTools.Field(typeof(Ship), nameof(Ship._unlockedUpgradePieces)));

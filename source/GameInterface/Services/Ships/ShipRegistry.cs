@@ -1,5 +1,6 @@
 ﻿using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -7,6 +8,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Ships;
 
@@ -48,6 +50,9 @@ internal class ShipRegistry : AutoRegistryBase<Ship>
 
     public override void OnClientCreated(Ship obj, string id)
     {
+        // Initialise the dictionary by creating it and dirtying the version number
+        ReflectionUtils.SetPrivateField(typeof(Ship), nameof(Ship._shipPieces), obj, new Dictionary<string, ShipUpgradePiece>());
+        obj.UpdateVersionNo();
     }
 
     public override void OnClientDestroyed(Ship obj, string id)
