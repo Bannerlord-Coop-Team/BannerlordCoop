@@ -237,6 +237,20 @@ public class LordNeedsHorsesTests : IDisposable
         Assert.Contains(instructions, x => x.Calls(AccessTools.DeclaredMethod(typeof(QuestBase), "SetDialogs")));
     }
 
+    [Fact]
+    public void ServerHandIn_CountsEveryStackOfTheRequestedMount()
+    {
+        var horse = new ItemObject("lord_needs_horses_test_horse");
+        var other = new ItemObject("lord_needs_horses_test_camel");
+        var roster = new ItemRoster();
+        roster.AddToCounts(new EquipmentElement(horse, null), 3);
+        roster.AddToCounts(new EquipmentElement(horse, new ItemModifier()), 2);
+        roster.AddToCounts(new EquipmentElement(other, null), 4);
+
+        Assert.Equal(3, roster.GetItemNumber(horse));
+        Assert.Equal(5, LordNeedsHorsesQuestType.CountMounts(roster, horse));
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

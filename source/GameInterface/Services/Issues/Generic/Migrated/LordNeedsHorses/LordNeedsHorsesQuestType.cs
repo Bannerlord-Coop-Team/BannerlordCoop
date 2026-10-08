@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using System;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Interfaces;
@@ -8,6 +9,8 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.LordNeedsHorses;
 
@@ -58,9 +61,13 @@ internal static class LordNeedsHorsesQuestType
             })
             .WithAlternativeAccept(acceptance)
             .WithQuestSuccessValidation((issue, party) => party != null && issue.IssueQuest is Quest quest &&
-                party.ItemRoster.GetItemNumber(quest._mountObjectToBeDelivered) >= quest._numMountsToBeDelivered)
+                CountMounts(party.ItemRoster, quest._mountObjectToBeDelivered) >= quest._numMountsToBeDelivered)
             .WithQuestFailValidation(issue => issue.IssueQuest is Quest { IsOngoing: true })
             .WithQuestFailConsequence(quest => quest.OnQuestDeclined())
             .Build());
     }
+
+    // Matches the quest's own GetNumQuestMountsInInventory: every stack counts, while GetItemNumber reads only the first.
+    internal static int CountMounts(ItemRoster roster, ItemObject mount) =>
+        roster.Where(element => element.EquipmentElement.Item == mount).Sum(element => element.Amount);
 }
