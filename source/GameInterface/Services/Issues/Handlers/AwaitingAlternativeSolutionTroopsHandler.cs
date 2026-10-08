@@ -4,18 +4,22 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.Issues.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
 using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.UI.Messages;
 using LiteNetLib;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.Issues.Handlers;
@@ -63,6 +67,8 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
 
         messageBroker.Subscribe<AwaitingAlternativeSolutionTroopsDrainedLocally>(Handle_AwaitingAlternativeSolutionTroopsDrainedLocally);
         messageBroker.Subscribe<RequestAwaitingAlternativeSolutionTroopsDrain>(Handle_RequestAwaitingAlternativeSolutionTroopsDrain);
+        messageBroker.Subscribe<NetworkAwaitingAlternativeSolutionTroopsDrainResult>(Handle_DrainResult);
+        messageBroker.Subscribe<SwitchedPlayer>(Handle_SwitchedPlayer);
     }
 
     public void Dispose()
@@ -74,6 +80,8 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
 
         messageBroker.Unsubscribe<AwaitingAlternativeSolutionTroopsDrainedLocally>(Handle_AwaitingAlternativeSolutionTroopsDrainedLocally);
         messageBroker.Unsubscribe<RequestAwaitingAlternativeSolutionTroopsDrain>(Handle_RequestAwaitingAlternativeSolutionTroopsDrain);
+        messageBroker.Unsubscribe<NetworkAwaitingAlternativeSolutionTroopsDrainResult>(Handle_DrainResult);
+        messageBroker.Unsubscribe<SwitchedPlayer>(Handle_SwitchedPlayer);
     }
 
     private void Handle_AwaitingAlternativeSolutionTroopsDepositedLocally(MessagePayload<AwaitingAlternativeSolutionTroopsDepositedLocally> payload)
@@ -88,83 +96,91 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
     private void Handle_RequestAwaitingAlternativeSolutionTroopsDeposit(MessagePayload<RequestAwaitingAlternativeSolutionTroopsDeposit> payload)
     {
         if (ModInformation.IsClient) return;
-
-        var requester = payload.Who as NetPeer;
-        if (requester == null || !playerManager.TryGetPlayer(requester, out var player))
+        GameThread.RunSafe(() =>
         {
-            Logger.Error("Rejecting {Message} from an unregistered/unknown requester", nameof(RequestAwaitingAlternativeSolutionTroopsDeposit));
-            if (requester != null) network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDepositRejected(payload.What.OwnerId));
-            return;
-        }
+            var requester = payload.Who as NetPeer;
+            if (requester == null || !playerManager.TryGetPlayer(requester, out var player))
+            {
+                Logger.Error("Rejecting {Message} from an unregistered/unknown requester", nameof(RequestAwaitingAlternativeSolutionTroopsDeposit));
+                if (requester != null) network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDepositRejected(payload.What.OwnerId));
+                return;
+            }
 
-        if (!objectManager.TryGetObjectWithLogging<Hero>(payload.What.OwnerId, out var owner))
-        {
-            Logger.Error("Rejecting {Message} for an unknown owner {OwnerId}", nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), payload.What.OwnerId);
-            network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDepositRejected(payload.What.OwnerId));
-            return;
-        }
+            if (!objectManager.TryGetObjectWithLogging<Hero>(payload.What.OwnerId, out var owner))
+            {
+                Logger.Error("Rejecting {Message} for an unknown owner {OwnerId}", nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), payload.What.OwnerId);
+                network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDepositRejected(payload.What.OwnerId));
+                return;
+            }
 
-        if (!ownershipRegistry.TryGetOwnerControllerId(owner, out var recordedOwner) || recordedOwner != player.ControllerId)
-        {
-            Logger.Error("Rejecting {Message} from {Requester}, who is not the recorded owner of {Owner}",
-                nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), player.ControllerId, payload.What.OwnerId);
-            network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDepositRejected(payload.What.OwnerId));
-            return;
-        }
+            if (!ownershipRegistry.TryGetOwnerControllerId(owner, out var recordedOwner) || recordedOwner != player.ControllerId)
+            {
+                Logger.Error("Rejecting {Message} from {Requester}, who is not the recorded owner of {Owner}",
+                    nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), player.ControllerId, payload.What.OwnerId);
+                network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDepositRejected(payload.What.OwnerId));
+                return;
+            }
 
-        if (owner.Issue is not { IsSolvingWithAlternative: true } issue)
-        {
-            Logger.Error("Rejecting {Message} for {Owner}, whose issue is not solving with an alternative solution",
-                nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), payload.What.OwnerId);
-            network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDepositRejected(payload.What.OwnerId));
-            return;
-        }
+            if (owner.Issue is not { IsSolvingWithAlternative: true } issue)
+            {
+                Logger.Error("Rejecting {Message} for {Owner}, whose issue is not solving with an alternative solution",
+                    nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), payload.What.OwnerId);
+                network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDepositRejected(payload.What.OwnerId));
+                return;
+            }
 
-        if (!generationRegistry.TryGetGeneration(owner, out var currentGeneration))
-        {
-            Logger.Error("Rejecting {Message} for {Owner} - no tracked issue generation",
-                nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), payload.What.OwnerId);
-            network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDepositRejected(payload.What.OwnerId));
-            return;
-        }
+            if (!generationRegistry.TryGetGeneration(owner, out var currentGeneration))
+            {
+                Logger.Error("Rejecting {Message} for {Owner} - no tracked issue generation",
+                    nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), payload.What.OwnerId);
+                network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDepositRejected(payload.What.OwnerId));
+                return;
+            }
 
-        if (depositedGenerationByOwnerId.TryGetValue(payload.What.OwnerId, out var lastDepositedGeneration)
-            && lastDepositedGeneration == currentGeneration)
-        {
-            return;
-        }
+            if (depositedGenerationByOwnerId.TryGetValue(payload.What.OwnerId, out var lastDepositedGeneration)
+                && lastDepositedGeneration == currentGeneration)
+            {
+                return;
+            }
 
-        var claimedRoster = UnpackToRoster(payload.What.Troops);
-        var validatedRoster = troopValidator.Validate(claimedRoster, issue.AlternativeSolutionSentTroops, preserveTroopXp: true);
-        depositedGenerationByOwnerId[payload.What.OwnerId] = currentGeneration;
-        troopsRegistry.Deposit(player.ControllerId, validatedRoster);
+            var claimedRoster = UnpackToRoster(payload.What.Troops);
+            var validatedRoster = troopValidator.Validate(claimedRoster, issue.AlternativeSolutionSentTroops, preserveTroopXp: true);
+            depositedGenerationByOwnerId[payload.What.OwnerId] = currentGeneration;
+            troopsRegistry.Deposit(player.ControllerId, validatedRoster);
 
-        var confirmedPacked = troopRosterInterface.PackTroopRosterData(validatedRoster);
-        network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(payload.What.OwnerId, confirmedPacked));
+            var confirmedPacked = troopRosterInterface.PackTroopRosterData(validatedRoster);
+            network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(payload.What.OwnerId, confirmedPacked));
+        });
     }
 
     private void Handle_NetworkAwaitingAlternativeSolutionTroopsDepositRejected(MessagePayload<NetworkAwaitingAlternativeSolutionTroopsDepositRejected> payload)
     {
         if (ModInformation.IsServer) return;
-        if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
 
-        var localControllerId = controllerIdProvider.ControllerId;
-        if (string.IsNullOrEmpty(localControllerId)) return;
+            var localControllerId = controllerIdProvider.ControllerId;
+            if (string.IsNullOrEmpty(localControllerId)) return;
 
-        Logger.Error("Server rejected {Message} for owner {OwnerId} - rolling back the local speculative deposit",
-            nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), payload.What.OwnerId);
-        troopsRegistry.Clear(localControllerId);
+            Logger.Error("Server rejected {Message} for owner {OwnerId} - rolling back the local speculative deposit",
+                nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), payload.What.OwnerId);
+            troopsRegistry.Clear(localControllerId);
+        });
     }
 
     private void Handle_NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(MessagePayload<NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed> payload)
     {
         if (ModInformation.IsServer) return;
-        if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
 
-        var localControllerId = controllerIdProvider.ControllerId;
-        if (string.IsNullOrEmpty(localControllerId)) return;
+            var localControllerId = controllerIdProvider.ControllerId;
+            if (string.IsNullOrEmpty(localControllerId)) return;
 
-        troopsRegistry.Deposit(localControllerId, UnpackToRoster(payload.What.Troops));
+            troopsRegistry.Deposit(localControllerId, UnpackToRoster(payload.What.Troops));
+        });
     }
 
     private void Handle_AwaitingAlternativeSolutionTroopsDrainedLocally(MessagePayload<AwaitingAlternativeSolutionTroopsDrainedLocally> payload)
@@ -178,15 +194,47 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
     private void Handle_RequestAwaitingAlternativeSolutionTroopsDrain(MessagePayload<RequestAwaitingAlternativeSolutionTroopsDrain> payload)
     {
         if (ModInformation.IsClient) return;
-
-        if (payload.Who is not NetPeer requester || !playerManager.TryGetPlayer(requester, out var player))
+        var requester = payload.Who as NetPeer;
+        GameThread.RunSafe(() =>
         {
-            Logger.Error("Rejecting {Message} from an unregistered/unknown requester", nameof(RequestAwaitingAlternativeSolutionTroopsDrain));
-            return;
-        }
+            if (requester == null || !playerManager.TryGetPlayer(requester, out var player)) return;
+            try
+            {
+                if (!troopsRegistry.TryGet(player.ControllerId, out var pending) ||
+                    !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) ||
+                    !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return;
 
-        troopsRegistry.Withdraw(player.ControllerId, UnpackToRoster(payload.What.Troops));
+                using (new MainHeroSubstitutionScope(hero, party))
+                {
+                    if (!Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return;
+                    Campaign.Current.IssueManager.MakeAlternativeTroopsReturn(pending);
+                    troopsRegistry.Clear(player.ControllerId);
+                }
+            }
+            finally
+            {
+                var remaining = troopsRegistry.TryGet(player.ControllerId, out var pending)
+                    ? troopRosterInterface.PackTroopRosterData(pending) : new TroopRosterData(System.Array.Empty<TroopRosterElementData>());
+                network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDrainResult(player.ControllerId, remaining));
+            }
+        });
     }
+
+    private void Handle_DrainResult(MessagePayload<NetworkAwaitingAlternativeSolutionTroopsDrainResult> payload)
+    {
+        if (ModInformation.IsServer) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controller) ||
+                controller.ControllerId != payload.What.OwnerControllerId) return;
+            troopsRegistry.Clear(controller.ControllerId);
+            troopsRegistry.Restore(controller.ControllerId, UnpackToRoster(payload.What.RemainingTroops));
+            IssueManagerAlternativeSolutionTroopsPatches.CompleteReturnInquiry();
+        });
+    }
+
+    private void Handle_SwitchedPlayer(MessagePayload<SwitchedPlayer> payload) =>
+        IssueManagerAlternativeSolutionTroopsPatches.CompleteReturnInquiry();
 
     private TroopRoster UnpackToRoster(TroopRosterData troops)
     {
