@@ -436,7 +436,7 @@ public class PuppetSpawner : IPuppetSpawner
             Logger.Warning("[BattleSync] Puppet {AgentId} spawned with a fallback {Side} party; {Party} unresolved", data.AgentId, data.Side, data.MapEventPartyId);
         }
 
-        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(data.TroopSeed));
+        var origin = new CoopAgentOrigin(character, party, -1, null, new UniqueTroopDescriptor(data.TroopSeed), data.MapEventPartyId);
 
         var missionEquipment = ResolveMissionEquipment(data.MissionEquipmentData);
 
@@ -808,6 +808,11 @@ public class PuppetSpawner : IPuppetSpawner
                         DiscardPendingFormations(data.AgentId);
                         return true;
                     }
+                    if (!disconnected && IsPlayerPartyRecord(data, controllerId))
+                    {
+                        DiscardPendingFormations(data.AgentId);
+                        return true;
+                    }
                     var authority = GetPendingAuthority(data.AgentId, data.AuthorityRevision);
                     string riderController = authority?.ControllerId ?? data.OwnerControllerId;
                     if (riderController != controllerId)
@@ -835,7 +840,7 @@ public class PuppetSpawner : IPuppetSpawner
         });
     }
 
-    // [Game thread] Withdraw only the current holder's own party; disconnected troops remain adopted.
+    // [Game thread] A withdrawn player's party stays withdrawn even after its agents changed holder.
     private bool IsWithdrawnPlayerParty(BattleAgentSpawnData data)
     {
         string controllerId;
@@ -844,6 +849,9 @@ public class PuppetSpawner : IPuppetSpawner
         bool wasHost;
         lock (withdrawnControllerLock)
         {
+            foreach (var withdrawn in withdrawnControllers)
+                if (!disconnectedControllers.Contains(withdrawn) && IsPlayerPartyRecord(data, withdrawn))
+                    return true;
             if (!withdrawnControllers.Contains(controllerId)) return false;
             if (disconnectedControllers.Contains(controllerId)) return false;
             wasHost = withdrawnHostControllers.Contains(controllerId);

@@ -6,7 +6,6 @@ using E2E.Tests.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.BugReporting;
 using GameInterface.Services.BugReporting.Messages;
-using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Unstuck;
@@ -46,16 +45,18 @@ public class UnstuckCommandTests : MapEventTestBase
     public UnstuckCommandTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
-    public void Unstuck_OnServer_IsRejected()
+    public void Unstuck_OnServerWithoutAPlayer_AsksForThePlayer()
     {
         string output = null;
         Server.Call(() =>
         {
-            output = ExecuteUnstuck();
+            output = ExecuteUnstuck(Server);
         });
 
-        Assert.Equal("Command can only be run on a client.", output);
+        Assert.Equal("On the server coop.unstuck needs the player to unstick. " +
+            "Usage: coop.unstuck <controller id or \"hero name\">. coop.debug.players.list shows the current ids.", output);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkRequestPlayerUnstuck>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>());
     }
 
     [Fact]
@@ -66,7 +67,7 @@ public class UnstuckCommandTests : MapEventTestBase
         string output = null;
         Client.Call(() =>
         {
-            output = ExecuteUnstuck();
+            output = ExecuteUnstuck(Client);
         });
 
         Assert.Contains("Unstuck request sent", output);
@@ -541,10 +542,10 @@ public class UnstuckCommandTests : MapEventTestBase
         });
     }
 
-    private static string ExecuteUnstuck()
+    private static string ExecuteUnstuck(EnvironmentInstance instance)
     {
-        var command = new UnstuckCommand.UnstuckCoopCommand();
-        return command.ProcessCommand(new CoopCommandArgsFactory().FromValues(Array.Empty<string>())).Output;
+        return instance.Resolve<ICoopCommandRegistry>()
+            .ProcessCommand("coop.unstuck", new CoopCommandArgsFactory().FromValues(Array.Empty<string>())).Output;
     }
 
 }

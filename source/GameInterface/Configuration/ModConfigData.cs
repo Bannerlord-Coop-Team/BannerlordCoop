@@ -94,6 +94,8 @@ public sealed class ModOptionsData
 
     public int? WandererLimit { get; set; }
 
+    public int? SpawnRateWanderers { get; set; }
+
     public bool? WandererLimitScalesWithPlayers { get; set; }
 
     public int? PlayerKingdomClanTierRequired { get; set; }

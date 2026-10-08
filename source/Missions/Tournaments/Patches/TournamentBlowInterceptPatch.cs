@@ -1,5 +1,6 @@
 using HarmonyLib;
 using Missions.Tournaments.Spectators;
+using SandBox.GameComponents;
 using SandBox.Tournaments.MissionLogics;
 using System.Linq;
 using TaleWorlds.MountAndBlade;
@@ -17,6 +18,15 @@ internal static class TournamentCombatPatchInstaller
         if (Harmony.GetPatchInfo(target)?.Prefixes.Any(patch => patch.PatchMethod == prefix) == true) return;
 
         harmony.Patch(target, prefix: new HarmonyMethod(prefix));
+
+        var difficulty = AccessTools.Method(
+            typeof(SandboxMissionDifficultyModel),
+            nameof(SandboxMissionDifficultyModel.GetDamageMultiplierOfCombatDifficulty));
+        var difficultyPostfix = AccessTools.Method(
+            typeof(TournamentRemotePlayerDifficultyPatch),
+            nameof(TournamentRemotePlayerDifficultyPatch.Postfix));
+        if (difficulty != null)
+            harmony.Patch(difficulty, postfix: new HarmonyMethod(difficultyPostfix));
 
         var reward = AccessTools.Method(typeof(TournamentFightMissionController), "EnemyHitReward");
         var rewardPrefix = AccessTools.Method(typeof(TournamentRewardSuppressionPatch), nameof(TournamentRewardSuppressionPatch.Prefix));
@@ -88,6 +98,19 @@ internal static class TournamentBlowInterceptPatch
         CoopTournamentController controller = Mission.Current?.GetMissionBehavior<CoopTournamentController>();
         if (controller == null) return true;
         return controller.InterceptBlow(__instance, blow, collisionData);
+    }
+}
+
+/// <summary>
+/// Lets the difficulty model give a remote tournament player the Player Received Damage multiplier.
+/// </summary>
+internal static class TournamentRemotePlayerDifficultyPatch
+{
+    public static void Postfix(Agent victimAgent, ref float __result)
+    {
+        CoopTournamentController controller = Mission.Current?.GetMissionBehavior<CoopTournamentController>();
+        if (controller == null) return;
+        controller.ApplyRemotePlayerDifficulty(victimAgent, ref __result);
     }
 }
 

@@ -51,6 +51,7 @@ namespace GameInterface.Tests.Bootstrap
             if (MBObjectManager.Instance != null) return;
 
             MBObjectManager.Init();
+            RegisterType<Monster>();
             RegisterType<ItemObject>();
             RegisterType<Settlement>();
             RegisterType<Hero>();

@@ -1,21 +1,26 @@
-﻿using GameInterface.Registry;
-using System.Threading;
+﻿using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Monsters;
 
-/// <summary>
-/// Registry for <see cref="Monster"/> type
-/// </summary>
-internal class MonsterRegistry : RegistryBase<Monster>
+internal class MonsterRegistry : AutoRegistryBase<Monster>
 {
-    private const string MonsterIdPrefix = "CoopMonster";
-    private static int InstanceCounter = 0;
+    // MonsterLifetimePatches owns constructor synchronization.
+    public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public MonsterRegistry(IRegistryCollection collection) : base(collection) { }
+    public MonsterRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
+    {
+    }
 
-    public override void RegisterAll()
+    public override void RegisterAllObjects()
     {
         foreach (Monster monster in MBObjectManager.Instance.GetObjectTypeList<Monster>())
         {
@@ -23,8 +28,8 @@ internal class MonsterRegistry : RegistryBase<Monster>
         }
     }
 
-    protected override string GetNewId(Monster obj)
-    {
-        return $"{MonsterIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
-    }
+    public override void OnClientCreated(Monster obj, string id) { }
+    public override void OnClientDestroyed(Monster obj, string id) { }
+    public override void OnServerCreated(Monster obj, string id) { }
+    public override void OnServerDestroyed(Monster obj, string id) { }
 }

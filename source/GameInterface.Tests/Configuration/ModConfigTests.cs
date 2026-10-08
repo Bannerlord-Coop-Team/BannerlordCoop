@@ -297,6 +297,7 @@ public class ModConfigTests : IDisposable
         Assert.True(options.SpeedLimitWhilePlayersInBattle);
         Assert.True(options.EnsureUnaffiliatedWanderers);
         Assert.Equal(32, options.WandererLimit);
+        Assert.Equal(1, options.SpawnRateWanderers);
         Assert.False(options.WandererLimitScalesWithPlayers);
         Assert.Equal(4, options.PlayerKingdomClanTierRequired);
         Assert.True(options.SmithingStaminaRecoveryOutsideSettlements);
