@@ -1,13 +1,15 @@
-using System;
+﻿using System;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Localization;
+using System.Linq;
 
 namespace GameInterface.Services.Issues.Generic;
 
@@ -30,6 +32,9 @@ public static class AlternativeSolutionStartRunner
         using (new AlternativeSolutionStartAuthorityGuard())
         using (ResolveOwnerScope(truePlayer))
         {
+            if (owner.Issue is ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue &&
+                !owner.Issue.CheckPreconditions(owner, out _))
+                throw new InvalidOperationException("Artisan alternative acceptance preconditions changed");
             if (!owner.Issue.AlternativeSolutionCondition(out _))
                 throw new InvalidOperationException($"StartOnServer: AlternativeSolutionCondition rejected the accept for owner {owner.StringId}");
 
@@ -43,12 +48,32 @@ public static class AlternativeSolutionStartRunner
         using (new AlternativeSolutionStartAuthorityGuard())
         using (ResolveOwnerScope(truePlayer))
         {
+            if (owner.Issue is ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue &&
+                !owner.Issue.CheckPreconditions(owner, out _))
+                throw new InvalidOperationException("Artisan alternative acceptance preconditions changed");
             if (!owner.Issue.AlternativeSolutionCondition(out _))
                 throw new InvalidOperationException($"StartOnServerFromClaim: AlternativeSolutionCondition rejected the accept for owner {owner.StringId}");
             if (!DoTroopsSatisfyAlternativeSolution(owner.Issue, validatedRoster, out _))
                 throw new InvalidOperationException($"StartOnServerFromClaim: the validated roster does not satisfy the alternative solution requirement for owner {owner.StringId}");
 
-            RemoveFromTrueOwnerParty(validatedRoster);
+            if (owner.Issue is ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue)
+            {
+                var companions = validatedRoster.GetTroopRoster().Where(element => element.Character.IsHero).ToArray();
+                if (companions.Length != 1 || companions[0].Number != 1)
+                    throw new InvalidOperationException("Artisan alternative requires one companion");
+                var companion = companions[0].Character.HeroObject;
+                if (companion == Hero.MainHero || companion.PartyBelongedTo != MobileParty.MainParty ||
+                    !companion.CanHaveCampaignIssues() || companion.IsWounded || companion.IsPregnant)
+                    throw new InvalidOperationException("Artisan alternative companion is no longer eligible");
+
+                var wages = GetArtisanAlternativeWages(owner.Issue, validatedRoster, companion);
+                if (wages < 0 || Hero.MainHero.Gold < wages)
+                    throw new InvalidOperationException("Artisan alternative wages are no longer affordable");
+                GiveGoldAction.ApplyBetweenCharacters(null, Hero.MainHero, -wages);
+            }
+
+            RemoveFromTrueOwnerParty(validatedRoster,
+                owner.Issue is ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue);
 
             owner.Issue.AlternativeSolutionSentTroops.Clear();
             foreach (var element in validatedRoster.GetTroopRoster())
@@ -63,6 +88,13 @@ public static class AlternativeSolutionStartRunner
         }
     }
 
+    internal static int GetArtisanAlternativeWages(IssueBase issue, TroopRoster selection, Hero companion)
+    {
+        // The server has not assigned the selected companion to the issue yet.
+        var days = (int)Campaign.Current.Models.IssueModel.GetDurationOfResolutionForHero(companion, issue).ToDays;
+        return selection.GetTroopRoster().Sum(element => checked(element.Character.TroopWage * element.Number * days));
+    }
+
     private static bool DoTroopsSatisfyAlternativeSolution(IssueBase issue, TroopRoster troopRoster, out TextObject explanation)
     {
         var neededMenCount = issue.GetTotalAlternativeSolutionNeededMenCount();
@@ -74,16 +106,34 @@ public static class AlternativeSolutionStartRunner
         return issue.DoTroopsSatisfyAlternativeSolution(troopRoster, out explanation);
     }
 
-    private static void RemoveFromTrueOwnerParty(TroopRoster validatedRoster)
+    private static void RemoveFromTrueOwnerParty(TroopRoster validatedRoster, bool transferTroopXp)
     {
         var party = Campaign.Current?.MainParty;
         if (party == null) return;
 
         foreach (var element in validatedRoster.GetTroopRoster())
         {
+            var xpToTransfer = 0;
+            if (transferTroopXp)
+            {
+                var available = party.MemberRoster.GetElementCopyAtIndex(party.MemberRoster.FindIndexOfTroop(element.Character));
+                xpToTransfer = available.Xp;
+                if (!element.Character.IsHero)
+                {
+                    var upgradeXp = element.Character.UpgradeTargets.Select(target =>
+                        Campaign.Current.Models.PartyTroopUpgradeModel.GetXpCostForUpgrade(party.Party, element.Character, target))
+                        .DefaultIfEmpty(0).Max();
+                    // Vanilla keeps XP with the remaining troops up to their upgrade capacity.
+                    var remainingCapacity = (long)(available.Number - element.Number) * upgradeXp;
+                    xpToTransfer = (int)Math.Max(0L, available.Xp - remainingCapacity);
+                }
+                validatedRoster.SetElementXp(validatedRoster.FindIndexOfTroop(element.Character), xpToTransfer);
+            }
             party.MemberRoster.AddToCounts(
-                element.Character, -element.Number, false, -element.WoundedNumber, 0, true, -1);
+                element.Character, -element.Number, false, -element.WoundedNumber, -xpToTransfer, true, -1);
         }
+        // SetElementXp leaves the cached roster enumeration unchanged until the version advances.
+        if (transferTroopXp) validatedRoster.UpdateVersion();
     }
 
     private static MainHeroSubstitutionScope ResolveOwnerScope(Player truePlayer)
@@ -93,7 +143,8 @@ public static class AlternativeSolutionStartRunner
         if (!objectManager.TryGetObjectWithLogging<Hero>(truePlayer.HeroId, out var trueOwnerHero))
             throw new InvalidOperationException($"ResolveOwnerScope: could not resolve true owner Hero {truePlayer.HeroId}");
 
-        objectManager.TryGetObjectWithLogging<MobileParty>(truePlayer.MobilePartyId, out var trueOwnerParty);
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(truePlayer.MobilePartyId, out var trueOwnerParty))
+            throw new InvalidOperationException($"ResolveOwnerScope: could not resolve true owner party {truePlayer.MobilePartyId}");
 
         return new MainHeroSubstitutionScope(trueOwnerHero, trueOwnerParty);
     }

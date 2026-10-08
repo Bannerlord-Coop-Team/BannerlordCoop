@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
@@ -20,16 +20,8 @@ public readonly struct AwaitingAlternativeSolutionTroopsDepositedLocally : IEven
     }
 }
 
-public readonly struct AwaitingAlternativeSolutionTroopsDrainedLocally : IEvent
+public readonly struct AlternativeSolutionTroopsReturnRequested : IEvent
 {
-    public readonly string OwnerControllerId;
-    public readonly TroopRoster Troops;
-
-    public AwaitingAlternativeSolutionTroopsDrainedLocally(string ownerControllerId, TroopRoster troops)
-    {
-        OwnerControllerId = ownerControllerId;
-        Troops = troops;
-    }
 }
 
 [ProtoContract(SkipConstructor = true)]
@@ -50,13 +42,6 @@ public readonly struct RequestAwaitingAlternativeSolutionTroopsDeposit : IComman
 [ProtoContract(SkipConstructor = true)]
 public readonly struct RequestAwaitingAlternativeSolutionTroopsDrain : ICommand
 {
-    [ProtoMember(1)]
-    public readonly TroopRosterData Troops;
-
-    public RequestAwaitingAlternativeSolutionTroopsDrain(TroopRosterData troops)
-    {
-        Troops = troops;
-    }
 }
 
 [ProtoContract(SkipConstructor = true)]
@@ -78,10 +63,13 @@ public readonly struct NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed 
     public readonly string OwnerId;
     [ProtoMember(2)]
     public readonly TroopRosterData Troops;
+    [ProtoMember(3)]
+    public readonly bool ReturnResponse;
 
-    public NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(string ownerId, TroopRosterData troops)
+    public NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(string ownerId, TroopRosterData troops, bool returnResponse = false)
     {
         OwnerId = ownerId;
         Troops = troops;
+        ReturnResponse = returnResponse;
     }
 }

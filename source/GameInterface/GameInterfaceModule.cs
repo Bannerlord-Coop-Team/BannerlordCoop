@@ -113,6 +113,15 @@ public class GameInterfaceModule : Module
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<Services.Crime.CrimeRatingService>().As<Services.Crime.ICrimeRatingService>().InstancePerDependency();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().InstancePerLifetimeScope();
+        builder.RegisterType<ArtisanProductIssueCreation>().As<IArtisanProductIssueCreation>().InstancePerDependency();
+        builder.RegisterType<ArtisanProductQuestActions>().As<IArtisanProductQuestActions>().InstancePerDependency();
+        builder.RegisterType<ArtisanProductLordActions>().As<IArtisanProductLordActions>().InstancePerDependency();
+        builder.RegisterType<ArtisanProductQuestAcceptance>().As<IArtisanProductQuestAcceptance>().InstancePerDependency();
+        builder.RegisterType<ArtisanProductAlternativeSelection>().As<IArtisanProductAlternativeSelection>().InstancePerDependency();
+        builder.RegisterType<ArtisanProductJournal>().As<IArtisanProductJournal>().InstancePerDependency();
+        builder.RegisterType<ArtisanProductAuthority>().As<IArtisanProductAuthority>().InstancePerDependency();
+        builder.RegisterType<ArtisanProductTraits>().As<IArtisanProductTraits>().InstancePerDependency();
+        builder.RegisterType<ArtisanProductGenerationContext>().As<IArtisanProductGenerationContext>().SingleInstance();
         builder.RegisterType<HideoutPreparation>().As<IHideoutPreparation>().InstancePerDependency();
         builder.RegisterType<BugReportService>().As<IBugReportService>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<BugReportOverlay>().As<IBugReportOverlay>().InstancePerLifetimeScope();

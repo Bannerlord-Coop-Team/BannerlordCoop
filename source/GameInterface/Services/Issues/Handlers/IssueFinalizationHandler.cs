@@ -1,9 +1,10 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -428,6 +429,7 @@ internal class IssueFinalizationHandler : IHandler
                 if (player.MobilePartyId != null) objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out ownerParty);
             }
 
+            var removedIssue = owner.Issue;
             SetProofContext(reason, proof);
             try
             {
@@ -440,6 +442,9 @@ internal class IssueFinalizationHandler : IHandler
             {
                 SetProofContext(reason, 0);
             }
+            if (removedIssue is ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssue &&
+                owner.Issue != removedIssue)
+                ArtisanProductQuestAcceptance.ResumeAcceptanceDialog(owner, accepted: false);
         });
     }
 }
