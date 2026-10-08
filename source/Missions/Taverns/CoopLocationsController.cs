@@ -31,7 +31,7 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Taverns;
 
-public class CoopLocationsController : CoopMissionController, ILocationMissionBehavior
+public class CoopLocationsController : CoopMissionController, ILocationMissionLifetime
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CoopLocationsController>();
     private readonly INetwork relayNetwork;
@@ -75,46 +75,54 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             coopMissionComponent,
             Missions.Agents.Handlers.MovementCadenceProfile.Location)
     {
-        this.relayNetwork = relayNetwork;
-        this.controllerIdProvider = controllerIdProvider;
-        this.hostRegistry = hostRegistry;
-        this.missionWeaponDataMapper = missionWeaponDataMapper;
-        this.conversationAgentGuard = conversationAgentGuard;
-        this.partyPuppetRegistrar = partyPuppetRegistrar;
-        //this.boardGameManager = boardGameManager;
+        try
+        {
+            this.relayNetwork = relayNetwork;
+            this.controllerIdProvider = controllerIdProvider;
+            this.hostRegistry = hostRegistry;
+            this.missionWeaponDataMapper = missionWeaponDataMapper;
+            this.conversationAgentGuard = conversationAgentGuard;
+            this.partyPuppetRegistrar = partyPuppetRegistrar;
+            //this.boardGameManager = boardGameManager;
 
-        // Composition-root style (mirrors CoopBattleController): the per-mission session and NPC
-        // binding map are SHARED state, so the components are constructed here around single
-        // instances instead of DI-resolving them (transient injection would give each its own).
-        session = new LocationSession(controllerIdProvider, hostRegistry);
-        coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
-            () => session.IsLocalHost);
-        var bindingMap = new LocationAgentBindingMap();
-        partyAgentMap = new LocationPartyAgentMap();
+            // Composition-root style (mirrors CoopBattleController): the per-mission session and NPC
+            // binding map are SHARED state, so the components are constructed here around single
+            // instances instead of DI-resolving them (transient injection would give each its own).
+            session = new LocationSession(controllerIdProvider, hostRegistry);
+            coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
+                () => session.IsLocalHost);
+            var bindingMap = new LocationAgentBindingMap();
+            partyAgentMap = new LocationPartyAgentMap();
 
-        npcReplicator = new LocationOwnedAgentReplicator(
-            network, messageBroker, objectManager, coopMissionComponent, session, bindingMap, rosterBinder, spawnBatchCodec);
-        authorityMigrator = new LocationAuthorityMigrator(
-            messageBroker, coopMissionComponent, session, bindingMap, partyAgentMap, missionContext,
-            npcHoldRegistry, conversationAgentGuard);
-        npcPuppetSpawner = new LocationPuppetSpawner(
-            messageBroker, objectManager, coopMissionComponent, session, conversationAgentGuard,
-            bindingMap, partyAgentMap, rosterBinder, agentBudget, spawnBatchCodec, authorityMigrator, withdrawalState);
-        populationDirector = new LocationPopulationDirector(messageBroker, session, bindingMap, npcPuppetSpawner);
+            npcReplicator = new LocationOwnedAgentReplicator(
+                network, messageBroker, objectManager, coopMissionComponent, session, bindingMap, rosterBinder, spawnBatchCodec);
+            authorityMigrator = new LocationAuthorityMigrator(
+                messageBroker, coopMissionComponent, session, bindingMap, partyAgentMap, missionContext,
+                npcHoldRegistry, conversationAgentGuard);
+            npcPuppetSpawner = new LocationPuppetSpawner(
+                messageBroker, objectManager, coopMissionComponent, session, conversationAgentGuard,
+                bindingMap, partyAgentMap, rosterBinder, agentBudget, spawnBatchCodec, authorityMigrator, withdrawalState);
+            populationDirector = new LocationPopulationDirector(messageBroker, session, bindingMap, npcPuppetSpawner);
 
-        messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
+            messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
+        }
+        catch
+        {
+            try { Abandon(); }
+            catch (Exception error) { Logger.Error(error, "Failed mission construction cleanup"); }
+            throw;
+        }
     }
 
-    public override void Dispose()
+    protected override void DisposeMission()
     {
-        messageBroker.Unsubscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
-
-        npcReplicator.Dispose();
-        npcPuppetSpawner.Dispose();
-        populationDirector.Dispose();
-        authorityMigrator.Dispose();
-
-        base.Dispose();
+        Cleanup(
+            () => messageBroker.Unsubscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation),
+            () => npcReplicator?.Dispose(),
+            () => npcPuppetSpawner?.Dispose(),
+            () => populationDirector?.Dispose(),
+            () => authorityMigrator?.Dispose(),
+            base.DisposeMission);
     }
 
     public override void OnMissionTick(float dt)

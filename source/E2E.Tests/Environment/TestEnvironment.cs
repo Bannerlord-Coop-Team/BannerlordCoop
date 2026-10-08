@@ -65,12 +65,12 @@ public class TestEnvironment
         var builder = new ContainerBuilder();
 
         builder.RegisterModule<ClientModule>();
-        builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().InstancePerLifetimeScope();
+        builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().SingleInstance();
 
         // Override the real LiteNetP2PClient mesh with the in-process mock so battle (spawn / control) mesh
         // traffic routes between client instances. Inert for campaign tests, which never resolve IBattleNetwork.
         builder.RegisterInstance(meshOrchestrator).AsSelf().SingleInstance();
-        builder.RegisterType<MockBattleNetwork>().AsSelf().As<IBattleNetwork>().InstancePerLifetimeScope();
+        builder.RegisterType<MockBattleNetwork>().AsSelf().As<IBattleNetwork>().SingleInstance();
 
         builder.RegisterType<ClientInstance>().AsSelf();
 
@@ -91,7 +91,7 @@ public class TestEnvironment
         var builder = new ContainerBuilder();
 
         builder.RegisterModule<ServerModule>();
-        builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
+        builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().SingleInstance();
         builder.RegisterType<ServerInstance>().AsSelf();
 
         AddSharedDependencies(builder);
@@ -130,10 +130,10 @@ public class TestEnvironment
         builder.RegisterInstance(new FixedBattleSizeProvider(1000))
             .As<IBattleSizeProvider>();
 
-        builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
-        builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
+        builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().SingleInstance();
+        builder.RegisterType<TestPolicy>().As<ISyncPolicy>().SingleInstance();
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
-        //builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
+        //builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().SingleInstance().AutoActivate();
 
         return builder;
     }

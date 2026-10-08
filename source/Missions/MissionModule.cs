@@ -26,6 +26,7 @@ using Missions.Services.Network;
 using Missions.Taverns;
 using Missions.Tournaments;
 using Missions.Tournaments.Spectators;
+using System;
 using System.Collections.Generic;
 
 namespace Missions;
@@ -53,11 +54,14 @@ public class MissionModule : Module
         builder.RegisterType<SiegeInteractionDebugBehavior>().AsSelf()
             .As<ISiegeInteractionDebugBehavior>().InstancePerDependency();
         builder.RegisterType<AgentHitSoundFixtureHandler>().As<IAgentHitSoundFixtureHandler>()
-            .InstancePerLifetimeScope().AutoActivate();
+            .SingleInstance().AutoActivate();
 #endif
         builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
         builder.RegisterType<SiegeGateHitApplier>().As<ISiegeGateHitApplier>().InstancePerDependency();
         base.Load(builder);
+
+        // The container is one co-op session; child scopes own only transient mission graphs.
+        builder.RegisterType<MissionLifetimeFactory>().As<IMissionLifetimeFactory>().SingleInstance();
 
         foreach (HarmonyPatchCategoryRegistration registration in CreatePatchCategoryRegistrations())
             builder.RegisterInstance(registration);
@@ -69,7 +73,7 @@ public class MissionModule : Module
             .As<ICoopCommand>()
             .InstancePerDependency();
 
-        builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().InstancePerLifetimeScope();
+        builder.RegisterType<LiteNetP2PClient>().As<IBattleNetwork>().SingleInstance();
         builder.RegisterType<MovementPacketCompressor>()
             .As<IMovementPacketCompressor>()
             .InstancePerDependency();
@@ -102,16 +106,14 @@ public class MissionModule : Module
             .InstancePerDependency();
         builder.RegisterType<CompressedMovementPacketHandler>()
             .AsSelf()
-            .InstancePerLifetimeScope()
+            .SingleInstance()
             .AutoActivate();
-        builder.RegisterType<NoopSteamMissionBridge>().As<ISteamMissionBridge>().InstancePerLifetimeScope();
+        builder.RegisterType<NoopSteamMissionBridge>().As<ISteamMissionBridge>().SingleInstance();
         builder.RegisterType<MissionMapTimeView>()
             .AsSelf()
-            .As<ILocationMissionBehavior>()
             .InstancePerDependency();
         builder.RegisterType<PlayerNameplateMissionView>()
             .AsSelf()
-            .As<ILocationMissionBehavior>()
             .InstancePerDependency();
         builder.RegisterType<PlayerNameplateControllerResolver>()
             .As<IPlayerNameplateControllerResolver>()
@@ -129,7 +131,7 @@ public class MissionModule : Module
         builder.RegisterType<MissionContext>()
             .AsSelf()
             .As<IMissionContext>()
-            .InstancePerLifetimeScope()
+            .SingleInstance()
             .AutoActivate();
 
         // Everything a mission composes is transient (InstancePerDependency): each mission resolves a
@@ -146,16 +148,37 @@ public class MissionModule : Module
         // mission gets a fresh controller that is disposed with that mission — InstancePerLifetimeScope
         // would hand a disposed instance to the next mission.
         builder.RegisterType<CoopLocationsController>()
-            .AsSelf()
-            .As<ILocationMissionBehavior>()
-            .InstancePerDependency();
+            .Keyed<CoopLocationsController>(MissionLifetimeFactory.MissionTag)
+            .InstancePerMatchingLifetimeScope(MissionLifetimeFactory.MissionTag)
+            .ExternallyOwned();
+        builder.Register((context, parameters) => context.Resolve<IMissionLifetimeFactory>().Create<CoopLocationsController>(parameters))
+            .AsSelf().InstancePerDependency().ExternallyOwned();
+        builder.Register(context =>
+        {
+            var controller = context.Resolve<CoopLocationsController>();
+            try
+            {
+                return new ILocationMissionBehavior[]
+                {
+                    controller.ResolveMissionBehavior<MissionMapTimeView>(),
+                    controller.ResolveMissionBehavior<PlayerNameplateMissionView>(),
+                    controller
+                };
+            }
+            catch
+            {
+                try { controller.Abandon(); }
+                catch (Exception error) { LogManager.GetLogger<MissionModule>().Error(error, "Failed location composition cleanup"); }
+                throw;
+            }
+        }).As<IEnumerable<ILocationMissionBehavior>>().InstancePerDependency();
 
         // Location NPC spawn-batch codec (stateless). The per-mission session/binding map/components
         // are constructed by CoopLocationsController itself (composition-root style, mirroring
         // CoopBattleController) so they share one session instance.
         builder.RegisterType<LocationAgentSpawnBatchCodec>()
             .As<ILocationAgentSpawnBatchCodec>()
-            .InstancePerLifetimeScope();
+            .SingleInstance();
         builder.RegisterType<LocationPartyPuppetRegistrar>()
             .As<ILocationPartyPuppetRegistrar>()
             .InstancePerDependency();
@@ -177,8 +200,11 @@ public class MissionModule : Module
         // each mission gets a fresh controller that is disposed with that mission. Attached to the mission by
         // CoopBattleBehaviorAttacher (below), never resolved by type from outside the Missions assembly.
         builder.RegisterType<CoopBattleController>()
-            .AsSelf()
-            .InstancePerDependency();
+            .Keyed<CoopBattleController>(MissionLifetimeFactory.MissionTag)
+            .InstancePerMatchingLifetimeScope(MissionLifetimeFactory.MissionTag)
+            .ExternallyOwned();
+        builder.Register((context, parameters) => context.Resolve<IMissionLifetimeFactory>().Create<CoopBattleController>(parameters))
+            .AsSelf().InstancePerDependency().ExternallyOwned();
 
         // Attaches the coop battle behaviors to a freshly opened battle mission. Resolved from the container
         // by BattleMissionEntryPatch (the native OpenBattleMission path) and injected into the coop launcher;
@@ -186,7 +212,7 @@ public class MissionModule : Module
         // Stateless, so a single per-scope instance is fine.
         builder.RegisterType<CoopBattleBehaviorAttacher>()
             .As<ICoopBattleBehaviorAttacher>()
-            .InstancePerLifetimeScope();
+            .SingleInstance();
         builder.RegisterType<BattleSizeProvider>()
             .As<IBattleSizeProvider>()
             .InstancePerDependency();
@@ -197,36 +223,39 @@ public class MissionModule : Module
         // SandBox mission behaviors. Stateless, so a single per-scope instance is fine.
         builder.RegisterType<CoopFieldBattleLauncher>()
             .As<ICoopFieldBattleLauncher>()
-            .InstancePerLifetimeScope();
+            .SingleInstance();
 
         builder.RegisterType<CoopHideoutMissionLauncher>()
             .As<ICoopHideoutMissionLauncher>()
-            .InstancePerLifetimeScope();
+            .SingleInstance();
 
         // Builds the coop walls-assault siege mission (mirrors SandBoxMissions.OpenSiegeMissionWithDeployment
         // with the same coop swaps). Resolved by the GameInterface battle flow as ICoopSiegeBattleLauncher.
         builder.RegisterType<CoopSiegeBattleLauncher>()
             .As<ICoopSiegeBattleLauncher>()
-            .InstancePerLifetimeScope();
+            .SingleInstance();
 
         builder.RegisterType<CoopTournamentController>()
-            .AsSelf()
-            .InstancePerDependency();
+            .Keyed<CoopTournamentController>(MissionLifetimeFactory.MissionTag)
+            .InstancePerMatchingLifetimeScope(MissionLifetimeFactory.MissionTag)
+            .ExternallyOwned();
+        builder.Register((context, parameters) => context.Resolve<IMissionLifetimeFactory>().Create<CoopTournamentController>(parameters))
+            .AsSelf().InstancePerDependency().ExternallyOwned();
 
         builder.RegisterType<TournamentSpectatorAgentManagerFactory>()
             .As<ITournamentSpectatorAgentManagerFactory>()
-            .InstancePerLifetimeScope();
+            .SingleInstance();
 
         builder.RegisterType<CoopTournamentLauncher>()
             .As<ICoopTournamentLauncher>()
-            .InstancePerLifetimeScope();
+            .SingleInstance();
 
         // Battle host election: elects on the server, stores the broadcast on clients, AutoActivated so it
         // subscribes up front on both. The assignment store itself (IBattleHostRegistry) is registered by
         // GameInterfaceModule — its handlers gate finalizes/conclusions on it too.
         builder.RegisterType<BattleHostHandler>()
             .AsSelf()
-            .InstancePerLifetimeScope()
+            .SingleInstance()
             .AutoActivate();
 
         // Location NPC host election: elects on the server, stores the broadcast on clients, AutoActivated
@@ -235,17 +264,17 @@ public class MissionModule : Module
         // departures for instance ids its own registry does not hold.
         builder.RegisterType<LocationHostHandler>()
             .AsSelf()
-            .InstancePerLifetimeScope()
+            .SingleInstance()
             .AutoActivate();
 
         // [Server] Applies owner-reported battle casualties to the authoritative map-event roster.
         builder.RegisterType<BattleCasualtyHandler>()
             .AsSelf()
-            .InstancePerLifetimeScope()
+            .SingleInstance()
             .AutoActivate();
         builder.RegisterType<BattleDebugRouteHandler>()
             .AsSelf()
-            .InstancePerLifetimeScope()
+            .SingleInstance()
             .AutoActivate();
         // Slots spawned agents into their team formation so vanilla's formation markers/order-targeting see
         // them. Injected into the battle spawn sub-services (stateless, so transient lifetime is moot).
@@ -257,9 +286,9 @@ public class MissionModule : Module
             .As<IAgentNativeMountState>()
             .InstancePerDependency();
 
-        builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<NetworkAgentRegistry>().As<INetworkAgentRegistry>().SingleInstance();
         //builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>().InstancePerDependency();
-        builder.RegisterType<NetworkWorldItemRegistry>().As<INetworkWorldItemRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<NetworkWorldItemRegistry>().As<INetworkWorldItemRegistry>().SingleInstance();
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();
         builder.RegisterType<AgentEquipmentApplier>().As<IAgentEquipmentApplier>().InstancePerDependency();
         builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerDependency();
