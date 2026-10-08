@@ -2,7 +2,8 @@
 
 This page records what changed between Bannerlord v1.4.8 and v1.5.4 and how co-op follows it on the
 `bannerlord-1.5.x` branch. `development` stays on v1.4.8. Use it to review the port, and as a
-checklist when porting other code that runs against the game, such as the dedicated server.
+checklist when porting other code that runs against the game, such as the dedicated server. The
+epic #3836 tracks the v1.5 work that remains.
 
 ## Branch and commits
 
@@ -173,6 +174,10 @@ the server's player clan), `PartyConfigurationCampaignBehavior` (its resets reac
 - Blood feuds and empty clan parties are keyed on the local main hero and player clan. They run on
   the server only and are not multiplayer-aware yet (blood feuds: #3819).
 - Naval (War Sails) content stays unsupported, including the set sail and disembark leave paths.
+- v1.5 leaves a `BattleWreckage` after a field battle with a winner and at least 15 casualties: a
+  battle site on land, a wreckage at sea (sea wrecks come only from naval battles). Its behavior runs
+  on the server only and nothing syncs the wrecks to clients, so players cannot see, investigate or
+  loot them; not checked in game (#3837, #3838).
 - A failed courtship can be retried after a season in v1.5. The co-op server refuses that retry, and a
   client loses its courtship attempt history when it reconnects.
 - Two v1.5 AI reactions check the server's main party and player clan, so they never fire for co-op
