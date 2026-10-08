@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Migrated.LordNeedsHorses;
 using GameInterface.Services.Issues.Interfaces;
@@ -318,14 +319,35 @@ internal class LordNeedsHorsesDuplicateGatePatch
 internal class LordNeedsHorsesEligibilityPatch
 {
     [HarmonyPostfix]
-    private static void Postfix(IssueBase __instance, ref bool __result, ref TextObject explanation)
+    private static void Postfix(IssueBase __instance, Hero issueGiver, ref bool __result, ref TextObject explanation)
     {
-        if (!__result || __instance is not Issue issue || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return;
-        if (!ContainerProvider.TryResolve<ILordNeedsHorsesQuest>(out var service) || service.HasConflictingQuest(issue))
-        {
-            __result = false;
-            explanation = new TextObject("{=HvY7wjHt}I don't think you can help me. I think you may have other, similar commitments that could interfere.");
-        }
+        if (__instance is not Issue issue || !issue.IsOngoingWithoutQuest || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return;
+        if (ContainerProvider.TryResolve<ILordNeedsHorsesQuest>(out var service) && !service.HasConflictingQuest(issue)) return;
+        // Vanilla ranks the duplicate refusal right after the at-war one, so it replaces every lower-ranked refusal.
+        if (!__result && issueGiver.MapFaction.IsAtWarWith(Hero.MainHero.MapFaction)) return;
+        __result = false;
+        explanation = new TextObject("{=HvY7wjHt}I don't think you can help me. I think you may have other, similar commitments that could interfere.");
+    }
+}
+
+[HarmonyPatch(typeof(LordNeedsHorsesIssueBehavior), nameof(LordNeedsHorsesIssueBehavior.ConditionsHold))]
+internal class LordNeedsHorsesPlayerClanGiverPatch
+{
+    // Vanilla excludes only Clan.PlayerClan, which is no co-op player's clan on the server.
+    [HarmonyPostfix]
+    private static void Postfix(Hero issueGiver, ref bool __result)
+    {
+        if (__result && issueGiver.Clan.IsPlayerClan()) __result = false;
+    }
+}
+
+[HarmonyPatch(typeof(Issue), nameof(Issue.IssueStayAliveConditions))]
+internal class LordNeedsHorsesPlayerClanStayAlivePatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(Issue __instance, ref bool __result)
+    {
+        if (__result && __instance.IssueOwner.Clan.IsPlayerClan()) __result = false;
     }
 }
 
