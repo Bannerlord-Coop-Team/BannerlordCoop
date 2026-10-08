@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
@@ -95,13 +95,17 @@ public readonly struct NetworkQuestTypeAlternativeAccepted : IServerToClientComm
     [ProtoMember(5)]
     public readonly TroopRosterData SentTroops;
 
-    public NetworkQuestTypeAlternativeAccepted(string ownerId, string ownerControllerId, AlternativeSolutionVanillaState state, byte[] fieldsBytes, TroopRosterData sentTroops)
+    [ProtoMember(6)]
+    public readonly int Generation;
+
+    public NetworkQuestTypeAlternativeAccepted(string ownerId, string ownerControllerId, AlternativeSolutionVanillaState state, byte[] fieldsBytes, TroopRosterData sentTroops, int generation = 0)
     {
         OwnerId = ownerId;
         OwnerControllerId = ownerControllerId;
         State = state;
         FieldsBytes = fieldsBytes;
         SentTroops = sentTroops;
+        Generation = generation;
     }
 }
 
@@ -113,9 +117,13 @@ public readonly struct NetworkQuestTypeAcceptRejected : IServerToClientCommand
     [ProtoMember(2)]
     public readonly bool IsAlternative;
 
-    public NetworkQuestTypeAcceptRejected(string ownerId, bool isAlternative)
+    [ProtoMember(3)]
+    public readonly int Generation;
+
+    public NetworkQuestTypeAcceptRejected(string ownerId, bool isAlternative, int generation = 0)
     {
         OwnerId = ownerId;
         IsAlternative = isAlternative;
+        Generation = generation;
     }
 }

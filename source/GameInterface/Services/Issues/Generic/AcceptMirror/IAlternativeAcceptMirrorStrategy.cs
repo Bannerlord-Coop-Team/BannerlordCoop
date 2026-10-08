@@ -1,4 +1,4 @@
-using HarmonyLib;
+﻿using HarmonyLib;
 using ProtoBuf;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -62,7 +62,7 @@ internal static class AlternativeSolutionVanillaStateSync
         issue._totalTroopXpAmount,
         issue._companionRewardSkill?.StringId);
 
-    public static void Apply(IssueBase issue, AlternativeSolutionVanillaState state)
+    public static void Apply(IssueBase issue, AlternativeSolutionVanillaState state, JournalLog startLog = null)
     {
         issue.AlternativeSolutionReturnTimeForTroops = state.ReturnTime;
         issue.IssueDueTime = state.ReturnTime;
@@ -77,7 +77,7 @@ internal static class AlternativeSolutionVanillaStateSync
             issue._companionRewardSkill = skill;
         }
 
-        issue.AddLog(new JournalLog(
+        issue.AddLog(startLog ?? new JournalLog(
             CampaignTime.Now,
             (TextObject)StartLogProperty.GetValue(issue),
             new TextObject("{=VFO7rMzK}Return Days"),

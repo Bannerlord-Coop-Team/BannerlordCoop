@@ -818,7 +818,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         });
     }
 
-    private static class InquiryCaptureHandler
+    internal static class InquiryCaptureHandler
     {
         private static readonly Type InformationManagerType =
             Type.GetType("TaleWorlds.Library.InformationManager, TaleWorlds.Library");

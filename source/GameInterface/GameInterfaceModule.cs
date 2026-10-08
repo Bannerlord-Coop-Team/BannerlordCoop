@@ -147,6 +147,8 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().InstancePerLifetimeScope();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
         builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<Services.Issues.SmugglersQuestAuthority>().As<Services.Issues.ISmugglersQuestAuthority>().InstancePerDependency();
+        builder.RegisterType<Services.Issues.SmugglersQuestOwners>().As<Services.Issues.ISmugglersQuestOwners>().InstancePerLifetimeScope();
         builder.RegisterType<IssueGenerationRegistry>().As<IIssueGenerationRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<AwaitingAlternativeSolutionTroopsRegistry>().As<IAwaitingAlternativeSolutionTroopsRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
