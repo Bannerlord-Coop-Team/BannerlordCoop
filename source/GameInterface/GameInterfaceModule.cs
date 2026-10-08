@@ -23,6 +23,8 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Hideouts;
+using GameInterface.Services.Issues;
+using GameInterface.Services.Issues.Data;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Kingdoms;
@@ -147,6 +149,10 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().InstancePerLifetimeScope();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
         builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<ExtortionQuestContext>().As<IExtortionQuestContext>().InstancePerDependency();
+        builder.RegisterType<ExtortionQuestWorld>().As<IExtortionQuestWorld>().InstancePerDependency();
+        builder.RegisterType<ExtortionQuestJournal>().As<IExtortionQuestJournal>().InstancePerLifetimeScope();
+        builder.RegisterType<ExtortionAlternativeSelection>().InstancePerLifetimeScope();
         builder.RegisterType<IssueGenerationRegistry>().As<IIssueGenerationRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<AwaitingAlternativeSolutionTroopsRegistry>().As<IAwaitingAlternativeSolutionTroopsRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
@@ -209,6 +215,24 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ClientClanStrengthRefresher>().As<IClientClanStrengthRefresher>().InstancePerDependency();
         builder.RegisterType<MainPartyBattleRewardsCache>().As<IMainPartyBattleRewardsCache>().InstancePerLifetimeScope();
         builder.RegisterType<HideoutResultEncounter>().As<IHideoutResultEncounter>().InstancePerDependency();
+        builder.RegisterType<ExtortionQuestAcceptance>().As<IExtortionQuestAcceptance>().InstancePerDependency();
+        builder.RegisterType<ExtortionQuestRewards>().As<IExtortionQuestRewards>().InstancePerLifetimeScope();
+        builder.Register(context =>
+        {
+            var acceptance = context.Resolve<IExtortionQuestAcceptance>();
+            var rewards = context.Resolve<IExtortionQuestRewards>();
+            var descriptor = QuestDescriptorBuilder.For<
+                TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssue,
+                TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest>("Extortion by Deserters")
+                .WithQuestSolutionAccept<ExtortionQuestAcceptFields>(acceptance)
+                .WithAlternativeAccept<ExtortionAlternativeAcceptFields>(acceptance)
+                .WithQuestSuccessValidation(rewards.Validate)
+                .WithQuestSuccessProofCapture(rewards.CaptureChoice)
+                .WithQuestSuccessConsequence(rewards.Apply)
+                .Build();
+            QuestTypeRegistry.Register(descriptor);
+            return descriptor;
+        }).InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
         builder.RegisterType<MapEventInitializationBarrierBinding>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<RetreatedMapEventPartyTracker>().As<IRetreatedMapEventPartyTracker>().InstancePerLifetimeScope();

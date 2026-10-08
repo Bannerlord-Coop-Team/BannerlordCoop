@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.SaveSystem;
 
@@ -12,14 +12,18 @@ internal sealed class IssueOwnershipSaveData
     [SaveableField(2)]
     internal string OwnerControllerId;
 
+    [SaveableField(3)]
+    internal string IssueId;
+
     private IssueOwnershipSaveData()
     {
     }
 
-    internal IssueOwnershipSaveData(Hero issueGiverHero, string ownerControllerId)
+    internal IssueOwnershipSaveData(Hero issueGiverHero, string ownerControllerId, string issueId = null)
     {
         IssueGiverHero = issueGiverHero;
         OwnerControllerId = ownerControllerId;
+        IssueId = issueId;
     }
 }
 
