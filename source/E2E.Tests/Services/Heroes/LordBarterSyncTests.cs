@@ -1256,6 +1256,89 @@ public class LordBarterSyncTests : MapEventTestBase
         });
     }
 
+    public enum DefectionPriceChange
+    {
+        WarDeclared,
+        ClanChangedKingdom,
+    }
+
+    /// <summary>
+    /// The pinned price only holds for the war state and kingdom it was priced from, and the voided
+    /// authorization is dropped so a reopened barter gets a fresh price.
+    /// </summary>
+    [Theory]
+    [InlineData(DefectionPriceChange.WarDeclared)]
+    [InlineData(DefectionPriceChange.ClanChangedKingdom)]
+    public void JoinKingdomBarter_PriceInputsChangeAfterAuthorization_IsRejected(DefectionPriceChange change)
+    {
+        var client = Clients.First();
+        var fixture = CreateDefectionFixture(client);
+        var otherKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(fixture.PlayerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.TargetHeroId, out var targetHero));
+            TakePrisonerAction.Apply(playerParty.Party, targetHero);
+        });
+
+        var harmony = AcceptEveryDefectionOffer();
+        try
+        {
+            var result = SendDefectionBarter(
+                client,
+                fixture,
+                PeaceConversationContext.PlayerPartyPrisoner,
+                fixture.PlayerPartyId,
+                betweenAuthorizationAndRequest: () => Server.Call(() =>
+                {
+                    Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.TargetHeroId, out var targetHero));
+                    Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(fixture.DestinationKingdomId, out var destination));
+                    Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(otherKingdomId, out var otherKingdom));
+                    if (change == DefectionPriceChange.WarDeclared)
+                    {
+                        VillageHostileFactionStanceHelper.ApplyWarStance(destination, targetHero.Clan.Kingdom);
+                        Assert.True(destination.IsAtWarWith(targetHero.Clan.Kingdom));
+                    }
+                    else
+                    {
+                        using (new AllowedThread())
+                            targetHero.Clan._kingdom = otherKingdom;
+                    }
+                }));
+
+            Assert.False(result.Accepted);
+            Assert.Contains("situation changed", result.Reason);
+
+            Server.NetworkSentMessages.Clear();
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestLordBarter(
+                fixture.TargetHeroId,
+                PeaceConversationContext.PlayerPartyPrisoner,
+                fixture.PlayerPartyId,
+                LordBarterKind.JoinKingdomAsClan,
+                Array.Empty<PeaceBarterTerm>(),
+                result.RequestId)));
+            TestEnvironment.FlushCoalescer();
+
+            var retry = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordBarterResult>());
+            Assert.False(retry.Accepted);
+            Assert.Contains("no longer authorized", retry.Reason);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.TargetHeroId, out var targetHero));
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(fixture.DestinationKingdomId, out var destination));
+                Assert.NotSame(destination, targetHero.Clan.Kingdom);
+                Assert.True(targetHero.IsPrisoner);
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+
+        Server.PumpGameThread();
+    }
+
     /// <summary>
     /// Vanilla starts the prisoner barter with no OtherParty, and the party screen talk sets no location,
     /// so no older branch matches it (#3072). The captor branch goes first, so it also wins while the

@@ -194,6 +194,15 @@ internal sealed partial class LordBarterHandler : IHandler
                 return;
             }
 
+            // The price counts the clan's fiefs only at peace, so a war or kingdom change since authorization voids it.
+            if ((LordBarterKind)request.Kind == LordBarterKind.JoinKingdomAsClan &&
+                !authorization.IsPricedFor(targetHero.Clan.Kingdom, targetKingdom))
+            {
+                authorizations.Remove(peer);
+                Reject(peer, request, playerHero.Gold, "The lord's situation changed since the barter opened. Reopen the barter to see the new price.");
+                return;
+            }
+
             using var playerContext = new BarterPlayerContext(playerHero, playerParty.MobileParty);
             if (!TryBuildBarter(
                     playerHero,
@@ -469,6 +478,8 @@ internal sealed partial class LordBarterHandler : IHandler
             authorization.Kind,
             authorization.TargetKingdomId,
             joinKingdomValue,
+            targetHero.Clan?.Kingdom,
+            targetKingdom != null && targetKingdom.IsAtWarWith(targetHero.Clan.Kingdom),
             DateTime.UtcNow.Add(AuthorizationLifetime));
         completedResults.Remove(peer);
 
@@ -987,6 +998,8 @@ internal sealed partial class LordBarterHandler : IHandler
         private int Kind { get; }
         public string TargetKingdomId { get; }
         public int JoinKingdomValue { get; }
+        private Kingdom PricedOriginKingdom { get; }
+        private bool PricedAtWar { get; }
         public DateTime ExpiresAtUtc { get; }
 
         public LordBarterAuthorization(
@@ -997,6 +1010,8 @@ internal sealed partial class LordBarterHandler : IHandler
             int kind,
             string targetKingdomId,
             int joinKingdomValue,
+            Kingdom pricedOriginKingdom,
+            bool pricedAtWar,
             DateTime expiresAtUtc)
         {
             RequestId = requestId;
@@ -1006,7 +1021,15 @@ internal sealed partial class LordBarterHandler : IHandler
             Kind = kind;
             TargetKingdomId = targetKingdomId;
             JoinKingdomValue = joinKingdomValue;
+            PricedOriginKingdom = pricedOriginKingdom;
+            PricedAtWar = pricedAtWar;
             ExpiresAtUtc = expiresAtUtc;
+        }
+
+        public bool IsPricedFor(Kingdom originKingdom, Kingdom targetKingdom)
+        {
+            return originKingdom == PricedOriginKingdom &&
+                   targetKingdom.IsAtWarWith(originKingdom) == PricedAtWar;
         }
 
         public bool Matches(NetworkRequestLordBarter request)
