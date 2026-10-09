@@ -235,6 +235,27 @@ public class CoopConnectMenuVMTests
     }
 
     [Fact]
+    public void SteamLobbyRefresh_CompletionUpdatesRowsWhoseLobbyChanged()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+
+        SelectSteamLobbiesTab(viewModel);
+        browser.Progress(CreateLobby(1, "Host 1"), CreateLobby(2, "Host 2"));
+        var unchangedRow = viewModel.SteamLobbies[1];
+
+        browser.Complete(
+            CreateLobby(1, "Host 1", connectedPlayers: 3, passwordRequired: true),
+            CreateLobby(2, "Host 2"));
+
+        Assert.Equal(3, viewModel.SteamLobbies[0].ConnectedPlayers);
+        Assert.True(viewModel.SteamLobbies[0].PasswordRequired);
+        Assert.Same(unchangedRow, viewModel.SteamLobbies[1]);
+        Assert.Equal("Hosted Steam Servers (2 servers; 3 players)", viewModel.SteamLobbiesHeaderText);
+    }
+
+    [Fact]
     public void SteamLobbyRefresh_ErrorDiscardsPartialResults()
     {
         var browser = new TestSteamLobbyBrowser();

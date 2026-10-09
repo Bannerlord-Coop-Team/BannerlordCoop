@@ -479,7 +479,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         ApplySteamLobbyHostFilter(resetPage: false);
     }
 
-    // Reuses rows already shown so a partial update doesn't rebuild the page the player is looking at.
+    // Reuses unchanged rows so a partial update doesn't rebuild the page the player is looking at.
     private void SetDiscoveredLobbies(IReadOnlyList<SteamLobbySummary> lobbies)
     {
         var shownLobbies = new Dictionary<ulong, SteamLobbyListItemVM>();
@@ -493,7 +493,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
         {
             if (lobby.LobbyId == 0) continue;
 
-            discoveredSteamLobbies.Add(shownLobbies.TryGetValue(lobby.LobbyId, out var shown)
+            discoveredSteamLobbies.Add(shownLobbies.TryGetValue(lobby.LobbyId, out var shown) && shown.Shows(lobby)
                 ? shown
                 : new SteamLobbyListItemVM(
                     lobby.LobbyId,

@@ -68,7 +68,14 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
     {
         if (!ReferenceEquals(activeRequest, request) || request.OnProgress == null || lobbyIds == null) return;
 
-        request.OnProgress(BuildSummaries(lobbyIds));
+        try
+        {
+            request.OnProgress(BuildSummaries(lobbyIds));
+        }
+        catch (Exception)
+        {
+            // Skip only this partial update, otherwise the throw fails the whole search in OnLobbyMatchList.
+        }
     }
 
     private void CompletePublicRequest(LobbyRequest request, IReadOnlyList<ulong> lobbyIds, bool success)

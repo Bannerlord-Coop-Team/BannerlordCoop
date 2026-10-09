@@ -1,5 +1,6 @@
 ﻿using Common.Network.Session;
 using Coop.Steam;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Xunit;
@@ -79,6 +80,29 @@ public class SteamLobbyBrowserTests
         api.CompletePendingList();
 
         Assert.Equal(new ulong[] { 42, 43 }, results.Select(lobby => lobby.LobbyId));
+    }
+
+    [Fact]
+    public void RequestLobbies_FailedProgressReportDoesNotFailTheSearch()
+    {
+        api.CompleteOperationsImmediately = false;
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000042 });
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        string error = "not completed";
+        browser.RequestLobbies(
+            (lobbies, completionError) =>
+            {
+                results = lobbies;
+                error = completionError;
+            },
+            _ => throw new InvalidOperationException("scripted progress failure"));
+
+        api.ListPageCallback(new ulong[] { 42 });
+        api.CompletePendingList();
+
+        Assert.Equal(42UL, Assert.Single(results).LobbyId);
+        Assert.Null(error);
     }
 
     [Fact]
