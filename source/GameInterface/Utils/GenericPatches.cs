@@ -215,10 +215,9 @@ namespace GameInterface.Utils
             where TRemoveMessage : GenericEvent<TInstance, TItem>
         {
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
-            // MBList inherits Add/Remove, so the call site operand is reflected from List and wont equal one reflected from MBList
-            var addMethod = typeof(List<TItem>).GetMethod("Add");
+            var addMethod = typeof(MBList<TItem>).GetMethod("Add");
             var addIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(MBListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
-            var removeMethod = typeof(List<TItem>).GetMethod("Remove");
+            var removeMethod = typeof(MBList<TItem>).GetMethod("Remove");
             var removeIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(MBListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
 
             GenericPatchHelpers.CollectionAddInterceptCache.TryAdd(fieldInfo, addIntercept);

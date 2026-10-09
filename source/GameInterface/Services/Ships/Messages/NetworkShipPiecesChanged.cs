@@ -15,13 +15,22 @@ internal readonly struct NetworkShipPiecesChanged : ICommand
     [ProtoMember(3)]
     public readonly uint[] PieceHandles;
 
+    [ProtoMember(4)]
+    public readonly uint[] UnlockedPieceHandles;
+
+    [ProtoMember(5)]
+    public readonly bool HasUnlockedPieces;
+
     public NetworkShipPiecesChanged(
         uint shipHandle,
         string[] slotTags,
-        uint[] pieceHandles)
+        uint[] pieceHandles,
+        uint[] unlockedPieceHandles)
     {
         ShipHandle = shipHandle;
         SlotTags = slotTags;
         PieceHandles = pieceHandles;
+        UnlockedPieceHandles = unlockedPieceHandles;
+        HasUnlockedPieces = unlockedPieceHandles != null;
     }
 }

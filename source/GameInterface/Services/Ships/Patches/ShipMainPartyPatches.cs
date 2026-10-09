@@ -1,6 +1,5 @@
 ﻿using GameInterface.Services.PartyBases.Extensions;
 using HarmonyLib;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -19,13 +18,11 @@ internal class ShipMainPartyPatches
         {
             __instance._unlockedUpgradePieces = new MBList<ShipUpgradePiece>(__instance._shipPieces.Count);
 
-            using Dictionary<string, ShipUpgradePiece>.Enumerator enumerator = __instance._shipPieces.GetEnumerator();
-            while (enumerator.MoveNext())
+            foreach (var pair in __instance._shipPieces)
             {
-                KeyValuePair<string, ShipUpgradePiece> pieceAtTagSlot = enumerator.Current;
-                if (pieceAtTagSlot.Value != null)
+                if (pair.Value != null)
                 {
-                    __instance._unlockedUpgradePieces.Add(pieceAtTagSlot.Value);
+                    __instance._unlockedUpgradePieces.Add(pair.Value);
                 }
             }
             return false;

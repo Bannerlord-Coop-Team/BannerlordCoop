@@ -6,6 +6,7 @@ using GameInterface.Services.Ships.Messages;
 using System;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Ships.Handlers;
 
@@ -53,7 +54,17 @@ internal class ShipPiecesHandler : IHandler
             i++;
         }
 
-        network.SendAll(new NetworkShipPiecesChanged(shipHandle, slotTags, pieceHandles));
+        uint[] unlockedPieceHandles = null;
+        if (ship._unlockedUpgradePieces != null)
+        {
+            unlockedPieceHandles = new uint[ship._unlockedUpgradePieces.Count];
+            for (var j = 0; j < unlockedPieceHandles.Length; j++)
+            {
+                if (!objectManager.TryGetHandleWithLogging(ship._unlockedUpgradePieces[j], out unlockedPieceHandles[j])) return;
+            }
+        }
+
+        network.SendAll(new NetworkShipPiecesChanged(shipHandle, slotTags, pieceHandles, unlockedPieceHandles));
     }
 
     private void Handle_NetworkShipPiecesChanged(MessagePayload<NetworkShipPiecesChanged> obj)
@@ -75,12 +86,25 @@ internal class ShipPiecesHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging(pieceHandles[i], out pieces[i])) return;
             }
 
+            MBList<ShipUpgradePiece> unlockedPieces = null;
+            if (data.HasUnlockedPieces)
+            {
+                var unlockedPieceHandles = data.UnlockedPieceHandles ?? Array.Empty<uint>();
+                unlockedPieces = new MBList<ShipUpgradePiece>(unlockedPieceHandles.Length);
+                foreach (var handle in unlockedPieceHandles)
+                {
+                    if (!objectManager.TryGetObjectWithLogging(handle, out ShipUpgradePiece piece)) return;
+                    unlockedPieces.Add(piece);
+                }
+            }
+
             // Rebuilt in the server's order because VersionNo hashes the slots in enumeration order
             ship._shipPieces.Clear();
             for (var i = 0; i < slotTags.Length; i++)
             {
                 ship._shipPieces.Add(slotTags[i], pieces[i]);
             }
+            ship._unlockedUpgradePieces = unlockedPieces;
 
             ship.Owner?.MobileParty?.SetNavalVisualAsDirty();
             ship.UpdateVersionNo();

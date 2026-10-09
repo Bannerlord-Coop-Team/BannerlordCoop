@@ -100,7 +100,7 @@ public class ShipSyncTests : SyncTestBase
     public void Server_PlayerOwnedShip_SyncsUnlockedPieces()
     {
         SetShipHullLimits();
-        var playerPartyId = CreatePlayerParty();
+        var playerPartyId = CreateServerPlayerParty();
         var secondPieceId = TestEnvironment.CreateRegisteredObject<ShipUpgradePiece>();
 
         Server.Call(() =>
@@ -207,7 +207,6 @@ public class ShipSyncTests : SyncTestBase
 
         TestEnvironment.AssertReferenceField<Ship, ShipHull>(nameof(Ship.ShipHull), referenceStringId: shipHullId, defaultValue: ship.ShipHull);
         AssertShipNameField();
-        TestEnvironment.AssertCollectionReferenceField<Ship, ShipUpgradePiece>(nameof(Ship._unlockedUpgradePieces));
     }
 
     [Fact]
@@ -264,24 +263,19 @@ public class ShipSyncTests : SyncTestBase
         ship.ShipHull.MaxSailHitPoints = 100;
     }
 
-    private string CreatePlayerParty()
+    // Only the server knows the party is a player, so clients can only get the unlocked list from the server
+    private string CreateServerPlayerParty()
     {
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
-        Player player = null;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject(partyId, out MobileParty party));
             Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
             Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero.Clan, out var clanId));
             Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero.CharacterObject, out var characterId));
-            player = new Player("ship-player", heroId, partyId, clanId, characterId);
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("ship-player", heroId, partyId, clanId, characterId)));
         });
-
-        foreach (var instance in Clients.Prepend(Server))
-        {
-            instance.Call(() => Assert.True(instance.Resolve<IPlayerManager>().AddPlayer(player)));
-        }
 
         return partyId;
     }
