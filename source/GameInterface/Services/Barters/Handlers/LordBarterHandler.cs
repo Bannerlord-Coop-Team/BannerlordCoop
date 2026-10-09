@@ -74,6 +74,7 @@ internal sealed partial class LordBarterHandler : IHandler
         this.siegeEventInterface = siegeEventInterface;
         this.sendCoalescer = sendCoalescer;
         messageBroker.Subscribe<NetworkAuthorizeLordBarter>(HandleAuthorization);
+        messageBroker.Subscribe<NetworkLordBarterAuthorized>(HandleAuthorized);
         messageBroker.Subscribe<NetworkCancelLordBarterAuthorization>(HandleAuthorizationCanceled);
         messageBroker.Subscribe<NetworkRequestLordBarter>(HandleRequest);
         messageBroker.Subscribe<NetworkLordBarterResult>(HandleResult);
@@ -83,6 +84,7 @@ internal sealed partial class LordBarterHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkAuthorizeLordBarter>(HandleAuthorization);
+        messageBroker.Unsubscribe<NetworkLordBarterAuthorized>(HandleAuthorized);
         messageBroker.Unsubscribe<NetworkCancelLordBarterAuthorization>(HandleAuthorizationCanceled);
         messageBroker.Unsubscribe<NetworkRequestLordBarter>(HandleRequest);
         messageBroker.Unsubscribe<NetworkLordBarterResult>(HandleResult);
@@ -109,6 +111,13 @@ internal sealed partial class LordBarterHandler : IHandler
         if (ModInformation.IsClient || !(payload.Who is NetPeer peer)) return;
         var request = payload.What;
         GameThread.RunSafe(() => ProcessAuthorization(peer, request), context: nameof(NetworkAuthorizeLordBarter));
+    }
+
+    private void HandleAuthorized(MessagePayload<NetworkLordBarterAuthorized> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var authorized = payload.What;
+        GameThread.RunSafe(() => LordBarterPatch.ApplyServerValuation(authorized), context: nameof(NetworkLordBarterAuthorized));
     }
 
     private void HandleAuthorizationCanceled(MessagePayload<NetworkCancelLordBarterAuthorization> payload)
@@ -201,6 +210,13 @@ internal sealed partial class LordBarterHandler : IHandler
             }
 
             var kind = (LordBarterKind)request.Kind;
+            if (kind == LordBarterKind.JoinKingdomAsClan)
+            {
+                LordBarterValuationPatch.Pin(
+                    barter.GetOfferedBarterables().OfType<JoinKingdomAsClanBarterable>().FirstOrDefault(),
+                    authorization.JoinKingdomValue);
+            }
+
             var isSafePassage = kind == LordBarterKind.SafePassage;
             var previousTargetKingdom = kind == LordBarterKind.JoinKingdomAsClan
                 ? targetHero.Clan.Kingdom
@@ -413,7 +429,7 @@ internal sealed partial class LordBarterHandler : IHandler
                 peer,
                 request,
                 out var playerHero,
-                out _,
+                out var playerParty,
                 out var targetHero,
                 out _,
                 out _) ||
@@ -441,6 +457,10 @@ internal sealed partial class LordBarterHandler : IHandler
             return;
         }
 
+        var joinKingdomValue = kind == LordBarterKind.JoinKingdomAsClan
+            ? PriceDefection(playerHero, playerParty, targetHero, targetKingdom)
+            : 0;
+
         authorizations[peer] = new LordBarterAuthorization(
             authorization.RequestId,
             authorization.TargetHeroId,
@@ -448,8 +468,21 @@ internal sealed partial class LordBarterHandler : IHandler
             authorization.ContextId,
             authorization.Kind,
             authorization.TargetKingdomId,
+            joinKingdomValue,
             DateTime.UtcNow.Add(AuthorizationLifetime));
         completedResults.Remove(peer);
+
+        if (kind == LordBarterKind.JoinKingdomAsClan)
+            network.Send(peer, new NetworkLordBarterAuthorized(authorization.RequestId, joinKingdomValue));
+    }
+
+    // Priced once and held for the authorization's lifetime, like vanilla's barter screen with time paused,
+    // otherwise campaign time moving between authorization and offer shifts the price the client balanced to.
+    private static int PriceDefection(Hero playerHero, PartyBase playerParty, Hero targetHero, Kingdom targetKingdom)
+    {
+        using var playerContext = new BarterPlayerContext(playerHero, playerParty.MobileParty);
+        return new JoinKingdomAsClanBarterable(targetHero, targetKingdom, isDefecting: true)
+            .GetValueForFaction(targetHero.Clan);
     }
 
     /// <summary>
@@ -953,6 +986,7 @@ internal sealed partial class LordBarterHandler : IHandler
         private string ContextId { get; }
         private int Kind { get; }
         public string TargetKingdomId { get; }
+        public int JoinKingdomValue { get; }
         public DateTime ExpiresAtUtc { get; }
 
         public LordBarterAuthorization(
@@ -962,6 +996,7 @@ internal sealed partial class LordBarterHandler : IHandler
             string contextId,
             int kind,
             string targetKingdomId,
+            int joinKingdomValue,
             DateTime expiresAtUtc)
         {
             RequestId = requestId;
@@ -970,6 +1005,7 @@ internal sealed partial class LordBarterHandler : IHandler
             ContextId = contextId;
             Kind = kind;
             TargetKingdomId = targetKingdomId;
+            JoinKingdomValue = joinKingdomValue;
             ExpiresAtUtc = expiresAtUtc;
         }
 
