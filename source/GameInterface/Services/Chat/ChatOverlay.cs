@@ -778,4 +778,5 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         if (currentlyHeld) return true;
         return buttonPressed && pointerOverChat;
     }
+
 }
