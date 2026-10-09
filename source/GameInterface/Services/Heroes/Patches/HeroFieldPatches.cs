@@ -182,7 +182,7 @@ namespace GameInterface.Services.Heroes.Patches
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName.Value, instance));
+            MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName?.Value, instance));
 
             instance._firstName = newName;
         }
@@ -219,7 +219,7 @@ namespace GameInterface.Services.Heroes.Patches
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new NameChanged(newName.Value, instance));
+            MessageBroker.Instance.Publish(instance, new NameChanged(newName?.Value, instance));
 
             instance._name = newName;
         }
