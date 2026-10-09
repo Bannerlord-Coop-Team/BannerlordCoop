@@ -77,8 +77,6 @@ public class CoopCommandSideRegressionTests
         yield return new object[] { "HeroDebugCommand", "HeroSetBannerItemCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "HeroDebugCommand", "HeroSetIssueCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "HeroDebugCommand", "HeroRefreshVolunteersCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "IssuesDebugCommand", "IssuesGiveCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "IssuesDebugCommand", "IssuesCompleteCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "TacticalUnitSymbolsDebugCommand", "UiTacticalSymbolsCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "PlayerCaptivityCommands", "PlayerCaptivityRandomCapturePlayerCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "PlayerCaptivityCommands", "PlayerCaptivityCapturePlayerCoopCommand", CoopCommandSide.Server };

@@ -95,8 +95,6 @@ public class GameInterface : IGameInterface
         harmony.PatchCategory(assembly, HARMONY_STATIC_FIXES_CATEGORY);
         harmony.PatchAllUncategorized(assembly);
 
-        Services.Issues.Generic.QuestTypeBootstrap.EnsureAllMigratedTypesRegistered();
-
         foreach (HarmonyPatchCategoryRegistration patchCategory in patchCategories)
         {
             patchCategory.Apply(harmony);
