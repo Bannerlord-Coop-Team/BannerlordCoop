@@ -1,6 +1,9 @@
 ﻿using E2E.Tests.Util;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -93,6 +96,67 @@ public class ShipSyncTests : SyncTestBase
         AssertClientVersionsDirty();
     }
 
+    [Fact]
+    public void Server_PlayerOwnedShip_SyncsUnlockedPieces()
+    {
+        SetShipHullLimits();
+        var playerPartyId = CreatePlayerParty();
+        var secondPieceId = TestEnvironment.CreateRegisteredObject<ShipUpgradePiece>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.True(Server.ObjectManager.TryGetObject(upgradePieceId, out ShipUpgradePiece piece));
+            Assert.True(Server.ObjectManager.TryGetObject(playerPartyId, out MobileParty playerParty));
+            ship.SetPieceAtSlot("slot1", piece);
+            ChangeShipOwnerAction.ApplyByTransferring(playerParty.Party, ship);
+        });
+
+        AssertUnlockedPieces(upgradePieceId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.True(Server.ObjectManager.TryGetObject(secondPieceId, out ShipUpgradePiece piece));
+            ship.EquipUpgradePiece("slot2", piece);
+        });
+
+        AssertUnlockedPieces(upgradePieceId, secondPieceId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.True(Server.ObjectManager.TryGetObject(shipOwnerId, out PartyBase owner));
+            ChangeShipOwnerAction.ApplyByTransferring(owner, ship);
+        });
+
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            Assert.True(instance.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.Null(ship._unlockedUpgradePieces);
+        }
+    }
+
+    [Fact]
+    public void Server_DestroyShipAction_UnregistersShip()
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.True(Server.ObjectManager.TryGetObject(shipOwnerId, out PartyBase owner));
+            ship.Owner = owner;
+            DestroyShipAction.Apply(ship);
+        });
+
+        Assert.False(Server.ObjectManager.TryGetObject<Ship>(shipId, out _));
+
+        foreach (var client in Clients)
+        {
+            client.PumpGameThread();
+            Assert.False(client.ObjectManager.TryGetObject<Ship>(shipId, out _));
+        }
+    }
+
     private void AssertClientPieces(params (string SlotTag, string? PieceId)[] expected)
     {
         foreach (var client in Clients)
@@ -150,7 +214,6 @@ public class ShipSyncTests : SyncTestBase
     public void Server_Ship_Properties()
     {
         SetShipHullLimits();
-        SetShipOwnerPartyAsMainParty();
 
         TestEnvironment.AssertReferenceProperty<Ship, Figurehead>(nameof(Ship.Figurehead));
         TestEnvironment.AssertProperty<Ship, bool>(nameof(Ship.IsInvulnerable), false);
@@ -184,16 +247,6 @@ public class ShipSyncTests : SyncTestBase
         }
     }
 
-    private void SetShipOwnerPartyAsMainParty()
-    {
-        Server.Call(() => SetShipOwnerPartyAsMainParty(Server));
-
-        foreach (var client in Clients)
-        {
-            client.Call(() => SetShipOwnerPartyAsMainParty(client));
-        }
-    }
-
     private void SetShipHullLimits()
     {
         Server.Call(() => SetShipHullLimits(Server));
@@ -211,11 +264,41 @@ public class ShipSyncTests : SyncTestBase
         ship.ShipHull.MaxSailHitPoints = 100;
     }
 
-    private void SetShipOwnerPartyAsMainParty(EnvironmentInstance instance)
+    private string CreatePlayerParty()
     {
-        Assert.True(instance.ObjectManager.TryGetObject(shipOwnerId, out PartyBase owner));
-        owner.MobileParty.Party = owner;
-        Campaign.Current.MainParty = owner.MobileParty;
-        Assert.Same(owner, PartyBase.MainParty);
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Player player = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(partyId, out MobileParty party));
+            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero, out var heroId));
+            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero.Clan, out var clanId));
+            Assert.True(Server.ObjectManager.TryGetId(party.LeaderHero.CharacterObject, out var characterId));
+            player = new Player("ship-player", heroId, partyId, clanId, characterId);
+        });
+
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() => Assert.True(instance.Resolve<IPlayerManager>().AddPlayer(player)));
+        }
+
+        return partyId;
+    }
+
+    private void AssertUnlockedPieces(params string[] pieceIds)
+    {
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            Assert.True(instance.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.NotNull(ship._unlockedUpgradePieces);
+
+            var expected = pieceIds.Select(pieceId =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject(pieceId, out ShipUpgradePiece piece));
+                return piece;
+            });
+            Assert.Equal(expected, ship._unlockedUpgradePieces);
+        }
     }
 }
