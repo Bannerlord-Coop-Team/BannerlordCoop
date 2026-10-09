@@ -202,6 +202,57 @@ public class CoopConnectMenuVMTests
     }
 
     [Fact]
+    public void SteamLobbyRefresh_ShowsPartialResultsAndKeepsPageWhileSearching()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+
+        SelectSteamLobbiesTab(viewModel);
+        var partial = Enumerable.Range(1, 5)
+            .Select(index => CreateLobby((ulong)index, $"Host {index}"))
+            .ToArray();
+        browser.Progress(partial);
+
+        Assert.Equal(new[] { "Host 1", "Host 2", "Host 3", "Host 4" }, VisibleHosts(viewModel));
+        Assert.Equal("Searching for hosted Steam lobbies...", viewModel.SteamLobbyStatusText);
+        Assert.True(viewModel.IsRefreshSteamLobbiesDisabled);
+        Assert.False(viewModel.IsNextSteamLobbyPageDisabled);
+        var firstRow = viewModel.SteamLobbies[0];
+
+        viewModel.ActionNextSteamLobbyPage();
+        Assert.Equal(new[] { "Host 5" }, VisibleHosts(viewModel));
+
+        browser.Complete(partial.Concat(new[] { CreateLobby(6, "Host 6") }).ToArray());
+
+        Assert.Equal(new[] { "Host 5", "Host 6" }, VisibleHosts(viewModel));
+        Assert.Equal("Page 2 of 2", viewModel.SteamLobbyPageText);
+        Assert.Equal(string.Empty, viewModel.SteamLobbyStatusText);
+        Assert.False(viewModel.IsRefreshSteamLobbiesDisabled);
+
+        viewModel.ActionPreviousSteamLobbyPage();
+        Assert.Same(firstRow, viewModel.SteamLobbies[0]);
+    }
+
+    [Fact]
+    public void SteamLobbyRefresh_ErrorDiscardsPartialResults()
+    {
+        var browser = new TestSteamLobbyBrowser();
+        using var messageBroker = new MessageBroker();
+        using var viewModel = new CoopConnectMenuVM(browser, messageBroker);
+
+        SelectSteamLobbiesTab(viewModel);
+        browser.Progress(CreateLobby(1, "Host 1"));
+        browser.Fail("Could not retrieve Steam lobbies");
+
+        Assert.Empty(viewModel.SteamLobbies);
+        Assert.Equal("Could not retrieve Steam lobbies", viewModel.SteamLobbyStatusText);
+
+        viewModel.SteamLobbyHostSearchText = "Host";
+        Assert.Empty(viewModel.SteamLobbies);
+    }
+
+    [Fact]
     public void SearchSteamLobbies_FiltersDisplayedHostNamesCaseInsensitively()
     {
         var browser = new TestSteamLobbyBrowser();
@@ -436,19 +487,35 @@ public class CoopConnectMenuVMTests
     private sealed class TestSteamLobbyBrowser : ISteamLobbyBrowser
     {
         private Action<IReadOnlyList<SteamLobbySummary>, string>? onCompleted;
+        private Action<IReadOnlyList<SteamLobbySummary>>? onProgress;
 
         public int RequestCount { get; private set; }
 
-        public void RequestLobbies(Action<IReadOnlyList<SteamLobbySummary>, string> callback)
+        public void RequestLobbies(
+            Action<IReadOnlyList<SteamLobbySummary>, string> callback,
+            Action<IReadOnlyList<SteamLobbySummary>>? progress = null)
         {
             RequestCount++;
             onCompleted = callback;
+            onProgress = progress;
+        }
+
+        public void Progress(params SteamLobbySummary[] lobbies)
+        {
+            Assert.NotNull(onProgress);
+            onProgress!(lobbies);
         }
 
         public void Complete(params SteamLobbySummary[] lobbies)
         {
             Assert.NotNull(onCompleted);
             onCompleted!(lobbies, string.Empty);
+        }
+
+        public void Fail(string error)
+        {
+            Assert.NotNull(onCompleted);
+            onCompleted!(Array.Empty<SteamLobbySummary>(), error);
         }
     }
 }

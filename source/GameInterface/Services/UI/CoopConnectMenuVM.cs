@@ -42,6 +42,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     private const string DefaultServerAddress = "localhost";
     private const int DefaultConnectionPort = 4200;
+    private const string SearchingStatusText = "Searching for hosted Steam lobbies...";
 
     public event Action SteamLobbiesTabActivated;
 
@@ -158,7 +159,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             OnPropertyChanged(nameof(SteamLobbyPasswordFilter));
             OnPropertyChanged(nameof(PasswordFilterButtonText));
 
-            if (!disposed && !IsRefreshingSteamLobbies)
+            if (!disposed)
             {
                 ApplySteamLobbyHostFilter(resetPage: true);
             }
@@ -176,7 +177,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             minimumSteamLobbyPlayers = value;
             OnPropertyChanged(nameof(MinimumSteamLobbyPlayers));
 
-            if (!disposed && !IsRefreshingSteamLobbies)
+            if (!disposed)
             {
                 ApplySteamLobbyHostFilter(resetPage: true);
             }
@@ -194,7 +195,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             steamLobbyHostSearchText = value;
             OnPropertyChanged(nameof(SteamLobbyHostSearchText));
 
-            if (!disposed && !IsRefreshingSteamLobbies)
+            if (!disposed)
             {
                 ApplySteamLobbyHostFilter(resetPage: true);
             }
@@ -233,9 +234,6 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             isRefreshingSteamLobbies = value;
             OnPropertyChanged(nameof(IsRefreshingSteamLobbies));
             OnPropertyChanged(nameof(IsRefreshSteamLobbiesDisabled));
-            OnPropertyChanged(nameof(IsSearchSteamLobbiesDisabled));
-            OnPropertyChanged(nameof(IsPreviousSteamLobbyPageDisabled));
-            OnPropertyChanged(nameof(IsNextSteamLobbyPageDisabled));
         }
     }
 
@@ -243,17 +241,13 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
     public bool IsRefreshSteamLobbiesDisabled => steamLobbyBrowser == null || IsRefreshingSteamLobbies;
 
     [DataSourceProperty]
-    public bool IsSearchSteamLobbiesDisabled => IsRefreshingSteamLobbies;
-
-    [DataSourceProperty]
     public bool IsSteamLobbyPaginationVisible => SteamLobbyPageCount > 1;
 
     [DataSourceProperty]
-    public bool IsPreviousSteamLobbyPageDisabled => IsRefreshingSteamLobbies || steamLobbyPageIndex == 0;
+    public bool IsPreviousSteamLobbyPageDisabled => steamLobbyPageIndex == 0;
 
     [DataSourceProperty]
-    public bool IsNextSteamLobbyPageDisabled => IsRefreshingSteamLobbies ||
-        steamLobbyPageIndex >= SteamLobbyPageCount - 1;
+    public bool IsNextSteamLobbyPageDisabled => steamLobbyPageIndex >= SteamLobbyPageCount - 1;
 
     [DataSourceProperty]
     public string SteamLobbyStatusText
@@ -301,7 +295,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     public void ActionCycleSteamLobbyPasswordFilter()
     {
-        if (disposed || IsRefreshingSteamLobbies) return;
+        if (disposed) return;
 
         SteamLobbyPasswordFilter = SteamLobbyPasswordFilter switch
         {
@@ -325,12 +319,13 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
         int generation = ++lobbyRequestGeneration;
         IsRefreshingSteamLobbies = true;
-        SteamLobbyStatusText = "Searching for hosted Steam lobbies...";
+        SteamLobbyStatusText = SearchingStatusText;
 
         try
         {
             steamLobbyBrowser.RequestLobbies(
-                (lobbies, error) => CompleteLobbyRefresh(generation, lobbies, error));
+                (lobbies, error) => CompleteLobbyRefresh(generation, lobbies, error),
+                lobbies => ShowPartialLobbyRefresh(generation, lobbies));
         }
         catch (Exception ex)
         {
@@ -341,7 +336,7 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
     public void ActionSearchSteamLobbies()
     {
-        if (disposed || IsRefreshingSteamLobbies) return;
+        if (disposed) return;
 
         ApplySteamLobbyHostFilter(resetPage: true);
     }
@@ -466,29 +461,50 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
 
         if (!string.IsNullOrWhiteSpace(error))
         {
+            discoveredSteamLobbies.Clear();
             ClearSteamLobbyDisplay();
             SteamLobbyStatusText = error;
             return;
         }
 
-        lobbies ??= Array.Empty<SteamLobbySummary>();
+        SetDiscoveredLobbies(lobbies);
+        ApplySteamLobbyHostFilter(resetPage: false);
+    }
 
-        foreach (var lobby in lobbies)
+    private void ShowPartialLobbyRefresh(int generation, IReadOnlyList<SteamLobbySummary> lobbies)
+    {
+        if (disposed || generation != lobbyRequestGeneration) return;
+
+        SetDiscoveredLobbies(lobbies);
+        ApplySteamLobbyHostFilter(resetPage: false);
+    }
+
+    // Reuses rows already shown so a partial update doesn't rebuild the page the player is looking at.
+    private void SetDiscoveredLobbies(IReadOnlyList<SteamLobbySummary> lobbies)
+    {
+        var shownLobbies = new Dictionary<ulong, SteamLobbyListItemVM>();
+        foreach (var lobby in discoveredSteamLobbies)
+        {
+            shownLobbies[lobby.LobbyId] = lobby;
+        }
+
+        discoveredSteamLobbies.Clear();
+        foreach (var lobby in lobbies ?? Array.Empty<SteamLobbySummary>())
         {
             if (lobby.LobbyId == 0) continue;
 
-            discoveredSteamLobbies.Add(new SteamLobbyListItemVM(
-                lobby.LobbyId,
-                lobby.OwnerName,
-                lobby.ConnectedPlayers,
-                lobby.ProtocolVersion,
-                lobby.ModVersion,
-                lobby.PasswordRequired,
-                lobby.IsCompatible,
-                RequestSteamLobbyJoin));
+            discoveredSteamLobbies.Add(shownLobbies.TryGetValue(lobby.LobbyId, out var shown)
+                ? shown
+                : new SteamLobbyListItemVM(
+                    lobby.LobbyId,
+                    lobby.OwnerName,
+                    lobby.ConnectedPlayers,
+                    lobby.ProtocolVersion,
+                    lobby.ModVersion,
+                    lobby.PasswordRequired,
+                    lobby.IsCompatible,
+                    RequestSteamLobbyJoin));
         }
-
-        ApplySteamLobbyHostFilter(resetPage: true);
     }
 
     private void ApplySteamLobbyHostFilter(bool resetPage)
@@ -513,17 +529,26 @@ public class CoopConnectMenuVM : ViewModel, IDisposable
             steamLobbyPageIndex = Math.Min(steamLobbyPageIndex, Math.Max(0, SteamLobbyPageCount - 1));
         }
 
-        SteamLobbies.Clear();
-        foreach (var lobby in filteredLobbies
+        var pageLobbies = filteredLobbies
             .Skip(steamLobbyPageIndex * SteamLobbyPageSize)
-            .Take(SteamLobbyPageSize))
+            .Take(SteamLobbyPageSize)
+            .ToList();
+        if (!pageLobbies.SequenceEqual(SteamLobbies))
         {
-            SteamLobbies.Add(lobby);
+            SteamLobbies.Clear();
+            foreach (var lobby in pageLobbies)
+            {
+                SteamLobbies.Add(lobby);
+            }
         }
 
         NotifySteamLobbyDisplayChanged();
 
-        if (filteredSteamLobbyCount > 0)
+        if (IsRefreshingSteamLobbies)
+        {
+            SteamLobbyStatusText = SearchingStatusText;
+        }
+        else if (filteredSteamLobbyCount > 0)
         {
             SteamLobbyStatusText = string.Empty;
         }

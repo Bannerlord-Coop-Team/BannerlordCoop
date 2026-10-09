@@ -134,7 +134,6 @@
                         </BrushWidget>
                         <Standard.Button WidthSizePolicy="Fixed" SuggestedWidth="150" HeightSizePolicy="Fixed" SuggestedHeight="58"
                                          VerticalAlignment="Center" MarginLeft="12"
-                                         IsDisabled="@IsSearchSteamLobbiesDisabled"
                                          Command.Click="ActionSearchSteamLobbies" Parameter.Text="@SearchButtonText"/>
                       </Children>
                     </ListPanel>
@@ -161,7 +160,6 @@
                                          HeightSizePolicy="Fixed"
                                          SuggestedHeight="65"
                                          VerticalAlignment="Center"
-                                         IsDisabled="@IsSearchSteamLobbiesDisabled"
                                          Command.Click="ActionCycleSteamLobbyPasswordFilter"
                                          Parameter.Text="@PasswordFilterButtonText"/>
 

@@ -19,7 +19,9 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
         this.lobbyApi = lobbyApi;
     }
 
-    public void RequestLobbies(Action<IReadOnlyList<SteamLobbySummary>, string> onCompleted)
+    public void RequestLobbies(
+        Action<IReadOnlyList<SteamLobbySummary>, string> onCompleted,
+        Action<IReadOnlyList<SteamLobbySummary>> onProgress = null)
     {
         if (requestInFlight)
         {
@@ -28,7 +30,7 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
         }
 
         requestInFlight = true;
-        var request = new LobbyRequest(onCompleted);
+        var request = new LobbyRequest(onCompleted, onProgress);
         activeRequest = request;
 
         try
@@ -52,12 +54,21 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
 
         try
         {
-            lobbyApi.RequestLobbyList((lobbyIds, success) => CompletePublicRequest(request, lobbyIds, success));
+            lobbyApi.RequestLobbyList(
+                (lobbyIds, success) => CompletePublicRequest(request, lobbyIds, success),
+                lobbyIds => ReportPublicProgress(request, lobbyIds));
         }
         catch (Exception)
         {
             FinishRequest(request, Array.Empty<SteamLobbySummary>(), "Could not retrieve Steam lobbies");
         }
+    }
+
+    private void ReportPublicProgress(LobbyRequest request, IReadOnlyList<ulong> lobbyIds)
+    {
+        if (!ReferenceEquals(activeRequest, request) || request.OnProgress == null || lobbyIds == null) return;
+
+        request.OnProgress(BuildSummaries(lobbyIds));
     }
 
     private void CompletePublicRequest(LobbyRequest request, IReadOnlyList<ulong> lobbyIds, bool success)
@@ -238,15 +249,19 @@ public class SteamLobbyBrowser : ISteamLobbyBrowser
     private sealed class LobbyRequest
     {
         public readonly Action<IReadOnlyList<SteamLobbySummary>, string> OnCompleted;
+        public readonly Action<IReadOnlyList<SteamLobbySummary>> OnProgress;
         public readonly List<ulong> PublicLobbyIds = new List<ulong>();
         public readonly List<ulong> FriendLobbyIds = new List<ulong>();
         public readonly HashSet<ulong> SeenFriendLobbyIds = new HashSet<ulong>();
         public readonly HashSet<ulong> PendingFriendLobbyIds = new HashSet<ulong>();
         public readonly HashSet<ulong> LoadedFriendLobbyIds = new HashSet<ulong>();
 
-        public LobbyRequest(Action<IReadOnlyList<SteamLobbySummary>, string> onCompleted)
+        public LobbyRequest(
+            Action<IReadOnlyList<SteamLobbySummary>, string> onCompleted,
+            Action<IReadOnlyList<SteamLobbySummary>> onProgress)
         {
             OnCompleted = onCompleted;
+            OnProgress = onProgress;
         }
     }
 
