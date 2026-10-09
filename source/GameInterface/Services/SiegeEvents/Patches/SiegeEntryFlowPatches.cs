@@ -303,13 +303,13 @@ internal class SiegeEntryFlowPatches
         return false;
     }
 
-    // Try-to-get-away accept: the camp write sits between the troop/item sacrifice and the debrief menu,
-    // all of which must keep running locally, so the native body cannot be suppressed. Route the camp
-    // removal and clear it locally up front under AllowedThread (applied without forwarding or the
-    // client-write error log); the native guarded write then sees null and skips itself. The approval
-    // must not touch the menus — the native flow continues into the debrief on its own.
+    // Try-to-get-away accept: route the camp removal and clear it locally up front under AllowedThread
+    // (applied without forwarding or the client-write error log). The approval must not touch the menus,
+    // the accept flow continues into the debrief on its own. Runs first because
+    // EncounterGameMenuBehaviorPatches replaces the body with a false-returning prefix, which would skip this one.
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_encounter_leave_your_soldiers_behind_accept_on_consequence))]
     [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
     private static bool LeaveSoldiersBehindAcceptPrefix()
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
