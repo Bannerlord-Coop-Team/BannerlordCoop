@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Issues.Framework.Interface;
+using System;
 
 namespace GameInterface.Services.Issues.Framework.Registries;
 
@@ -26,7 +27,7 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
         messageBroker.Unsubscribe<NetworkIssueOwnershipSnapshot>(Handle_NetworkIssueOwnershipSnapshot);
     }
 
-    private void Handle_NetworkIssueOwnershipSnapshot(MessagePayload<NetworkIssueOwnershipSnapshot> payload)
+    internal void Handle_NetworkIssueOwnershipSnapshot(MessagePayload<NetworkIssueOwnershipSnapshot> payload)
     {
         if (ModInformation.IsServer)
         {
@@ -38,7 +39,7 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
             ownership.Remove(remembered.IssueOwnerId);
         }
 
-        foreach (var owner in payload.What.Owners)
+        foreach (var owner in payload.What.Owners ?? Array.Empty<IssueOwnershipData>())
         {
             ownership.TrySetOwner(owner.IssueOwnerId, owner.IssueId, owner.ControllerId);
         }
