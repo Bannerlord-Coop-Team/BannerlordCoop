@@ -2,6 +2,7 @@
 using Autofac.Core;
 using Autofac.Core.Registration;
 using Autofac.Core.Resolving.Pipeline;
+using Common;
 using Common.Commands;
 using Common.Logging;
 using Common.PacketHandlers;
@@ -58,8 +59,10 @@ using GameInterface.Surrogates;
 using GameInterface.Utils.Commands;
 using HarmonyLib;
 using Serilog;
+using System.IO;
 using System.Linq;
 using System.Threading;
+using Assembly = System.Reflection.Assembly;
 
 namespace GameInterface;
 
@@ -69,6 +72,8 @@ public class GameInterfaceModule : Module
     public const string HarmonyId = "Bannerlord.Coop";
 
     private static readonly Harmony harmony = new Harmony(HarmonyId);
+
+    private static readonly ILogger Logger = LogManager.GetLogger<GameInterfaceModule>();
 
     protected override void Load(ContainerBuilder builder)
     {
@@ -196,8 +201,28 @@ public class GameInterfaceModule : Module
         builder.RegisterModule<RegistryModule>();
         builder.RegisterModule<AutoSyncModule>();
 
+        // Coop.Naval binds to NavalDLC types, so its module is loaded only while NavalDLC is active.
+        if (ModInformation.IsNavalDlcActive && TryLoadCoopNavalAssembly(out var coopNavalAssembly))
+            builder.RegisterAssemblyModules(coopNavalAssembly);
 
         base.Load(builder);
+    }
+
+    // Test hosts don't ship Coop.Naval.dll, so skip it instead of failing the whole container build
+    private static bool TryLoadCoopNavalAssembly(out Assembly assembly)
+    {
+        var directory = Path.GetDirectoryName(typeof(GameInterfaceModule).Assembly.Location);
+        var path = Path.Combine(directory, "Coop.Naval.dll");
+
+        if (!File.Exists(path))
+        {
+            Logger.Error("NavalDLC is active but {Path} was not found, naval campaign services are disabled", path);
+            assembly = null;
+            return false;
+        }
+
+        assembly = Assembly.LoadFrom(path);
+        return true;
     }
 
     // Log injector

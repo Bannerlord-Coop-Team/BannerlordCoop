@@ -6,6 +6,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
@@ -65,9 +66,12 @@ public readonly struct GameSaveDataPacket : IPacket
     public readonly HeroMeetingData HeroMeetingData;
 
     [ProtoMember(11)]
-    public readonly AttachmentIdMap AttachmentIdMap;
+    public readonly NavalPlayerData NavalPlayerData;
 
     [ProtoMember(12)]
+    public readonly AttachmentIdMap AttachmentIdMap;
+
+    [ProtoMember(13)]
     public readonly ServerOptions ServerOptions;
 
     public GameSaveDataPacket(
@@ -81,6 +85,7 @@ public readonly struct GameSaveDataPacket : IPacket
         TradePlayerData tradePlayerData,
         InventoryPlayerData inventoryPlayerData,
         HeroMeetingData heroMeetingData,
+        NavalPlayerData navalPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions)
     {
@@ -94,6 +99,7 @@ public readonly struct GameSaveDataPacket : IPacket
         TradePlayerData = tradePlayerData;
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
+        NavalPlayerData = navalPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
     }

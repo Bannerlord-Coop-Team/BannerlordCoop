@@ -1,10 +1,9 @@
 ﻿using HarmonyLib;
 using NavalDLC.CampaignBehaviors;
 
-namespace Missions.Naval;
+namespace Coop.Naval.Patches;
 
 [HarmonyPatch(typeof(NavalInitializationCampaignBehavior))]
-[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class NavalIntroductionPopupPatch
 {
     // Set the 6 focus points locally on joining client, which then get sent to the server as part of the packaged hero

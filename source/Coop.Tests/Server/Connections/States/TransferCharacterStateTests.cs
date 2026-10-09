@@ -9,6 +9,7 @@ using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
@@ -82,6 +83,9 @@ namespace Coop.Tests.Server.Connections.States
             {
                 ["lord_6_1"] = 1351,
             };
+            var navalPlayerData = new NavalPlayerData(new(), new());
+            navalPlayerData.PlayerUnlockedFigureHeads["Hero_Player"] = new() { "figurehead_1" };
+            navalPlayerData.PlayerLastFigureheadLootTimes["Hero_Player"] = 2702;
             var session = new CoopSession(
                 string.Empty,
                 Array.Empty<Player>(),
@@ -92,7 +96,8 @@ namespace Coop.Tests.Server.Connections.States
                 null!,
                 null!,
                 null!,
-                heroMeetingData);
+                heroMeetingData,
+                navalPlayerData);
             serverComponent.Container.Resolve<Mock<ICoopSessionProvider>>()
                 .SetupGet(provider => provider.CoopSession)
                 .Returns(session);
@@ -108,6 +113,8 @@ namespace Coop.Tests.Server.Connections.States
             Assert.Equal(0, packet.ChunkIndex);
             Assert.Equal(1, packet.ChunkCount);
             Assert.Equal(1351, packet.HeroMeetingData.PlayerLastMeetingTimes["Hero_Player"]["lord_6_1"]);
+            Assert.Equal(new[] { "figurehead_1" }, packet.NavalPlayerData.PlayerUnlockedFigureHeads["Hero_Player"]);
+            Assert.Equal(2702, packet.NavalPlayerData.PlayerLastFigureheadLootTimes["Hero_Player"]);
             serverComponent.Container.Resolve<Mock<ITimeControlInterface>>()
                 .Verify(m => m.ServerSetTimeControl(It.IsAny<TimeControlEnum>()), Times.Never);
 

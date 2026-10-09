@@ -6,6 +6,7 @@ using Coop.Core.Client.States;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.UI.Interfaces;
@@ -51,6 +52,7 @@ namespace Coop.Tests.Client.States
                 new TradePlayerData(new(), new(), new(), new()),
                 new InventoryPlayerData(new(), new()),
                 new HeroMeetingData(new()),
+                new NavalPlayerData(new(), new()),
                 new AttachmentIdMap(new()),
                 new ServerOptions(new()));
 

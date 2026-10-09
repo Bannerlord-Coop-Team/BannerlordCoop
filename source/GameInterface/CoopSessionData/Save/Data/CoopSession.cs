@@ -4,6 +4,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
@@ -28,6 +29,7 @@ public interface ICoopSession
     TradePlayerData TradePlayerData { get; }
     InventoryPlayerData InventoryPlayerData { get; }
     HeroMeetingData HeroMeetingData { get; }
+    NavalPlayerData NavalPlayerData { get; }
 }
 
 /// <inheritdoc cref="ICoopSession"/>
@@ -47,7 +49,8 @@ public class CoopSession : ICoopSession
         new InteractionsPlayerData(new(), new(), new(), new(), new(), new(), new(), new(), new(), new(), new()),
         new TradePlayerData(new(), new(), new(), new()),
         new InventoryPlayerData(new(), new()),
-        new HeroMeetingData(new()));
+        new HeroMeetingData(new()),
+        new NavalPlayerData(new(), new()));
 
     [ProtoMember(1)]
     public string UniqueGameId { get; }
@@ -69,6 +72,8 @@ public class CoopSession : ICoopSession
     public InventoryPlayerData InventoryPlayerData { get; }
     [ProtoMember(10)]
     public HeroMeetingData HeroMeetingData { get; }
+    [ProtoMember(11)]
+    public NavalPlayerData NavalPlayerData { get; }
 
     public CoopSession(
         string uniqueGameId,
@@ -80,7 +85,8 @@ public class CoopSession : ICoopSession
         InteractionsPlayerData interactionsPlayerData,
         TradePlayerData tradePlayerData,
         InventoryPlayerData inventoryPlayerData,
-        HeroMeetingData heroMeetingData)
+        HeroMeetingData heroMeetingData,
+        NavalPlayerData navalPlayerData)
     {
         UniqueGameId = uniqueGameId;
         Players = players;
@@ -92,5 +98,6 @@ public class CoopSession : ICoopSession
         TradePlayerData = tradePlayerData;
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
+        NavalPlayerData = navalPlayerData;
     }
 }

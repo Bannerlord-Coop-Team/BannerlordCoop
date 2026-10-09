@@ -4,6 +4,7 @@ using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.Caravans;
 using GameInterface.Services.Inventory;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.Heroes;
 using System.Collections.Generic;
 using GameInterface.Services.Inventory.TradeSkills;
@@ -70,7 +71,8 @@ namespace Coop.Tests.Server.Services.Save
                 interactionsPlayerData,
                 tradePlayerData,
                 new InventoryPlayerData(new(), new()),
-                new HeroMeetingData(new()));
+                new HeroMeetingData(new()),
+                new NavalPlayerData(new(), new()));
 
             string saveFile = sessionData.UniqueGameId;
 
@@ -125,6 +127,10 @@ namespace Coop.Tests.Server.Services.Save
                 },
             };
 
+            var navalPlayerData = new NavalPlayerData(new(), new());
+            navalPlayerData.PlayerUnlockedFigureHeads["MyHero1"] = new() { "figurehead_1", "figurehead_2" };
+            navalPlayerData.PlayerLastFigureheadLootTimes["MyHero1"] = 2702;
+
             ICoopSession sessionData = new CoopSession(
                 "SaveManagerTest",
                 players,
@@ -135,7 +141,8 @@ namespace Coop.Tests.Server.Services.Save
                 interactionsPlayerData,
                 tradePlayerData,
                 new InventoryPlayerData(new(), new()),
-                new HeroMeetingData(meetingTimes));
+                new HeroMeetingData(meetingTimes),
+                navalPlayerData);
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId;
 
@@ -167,6 +174,8 @@ namespace Coop.Tests.Server.Services.Save
                 Assert.Equal(sessionData.TradePlayerData.PlayerSettlementBribePaid[playerHeroId], savedSession.TradePlayerData.PlayerSettlementBribePaid[playerHeroId]);
             }
             Assert.Equal(1351, savedSession.HeroMeetingData.PlayerLastMeetingTimes["MyHero1"]["lord_6_1"]);
+            Assert.Equal(new[] { "figurehead_1", "figurehead_2" }, savedSession.NavalPlayerData.PlayerUnlockedFigureHeads["MyHero1"]);
+            Assert.Equal(2702, savedSession.NavalPlayerData.PlayerLastFigureheadLootTimes["MyHero1"]);
         }
 
         [Fact]

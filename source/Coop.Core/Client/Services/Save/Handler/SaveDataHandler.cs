@@ -8,6 +8,7 @@ using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.NavalDLC.Messages;
 using GameInterface.Services.ObjectManager.Messages;
 using GameInterface.Services.Smithing.Messages;
 using GameInterface.Services.Save.Interfaces;
@@ -65,6 +66,7 @@ internal class SaveDataHandler : IHandler
         messageBroker.Publish(this, new InitializeClientTradeData(saveDataMessage.TradePlayerData));
         messageBroker.Publish(this, new InitializeClientInventoryData(saveDataMessage.InventoryPlayerData));
         messageBroker.Publish(this, new InitializeClientHeroMeetingData(saveDataMessage.HeroMeetingData));
+        messageBroker.Publish(this, new InitializeClientNavalData(saveDataMessage.NavalPlayerData));
         messageBroker.Publish(this, new InitializeClientAttachmentIdMap(saveDataMessage.AttachmentIdMap));
         // Add any other CoopSession data initialisations for clients here
     }

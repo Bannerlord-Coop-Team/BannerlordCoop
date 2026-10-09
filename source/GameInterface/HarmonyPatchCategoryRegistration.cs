@@ -17,8 +17,18 @@ public sealed class HarmonyPatchCategoryRegistration
         Category = category;
     }
 
+    /// <summary>Applies every patch in the assembly without a category, like GameInterface's own patches.</summary>
+    public static HarmonyPatchCategoryRegistration Uncategorized(Assembly assembly) =>
+        new HarmonyPatchCategoryRegistration(assembly, null);
+
     public void Apply(Harmony harmony)
     {
+        if (Category == null)
+        {
+            harmony.PatchAllUncategorized(Assembly);
+            return;
+        }
+
         harmony.PatchCategory(Assembly, Category);
     }
 }

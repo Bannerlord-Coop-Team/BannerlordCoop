@@ -8,6 +8,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
@@ -42,8 +43,10 @@ public record NetworkGameSaveDataReceived : IEvent
     [ProtoMember(10)]
     public HeroMeetingData HeroMeetingData { get; }
     [ProtoMember(11)]
-    public AttachmentIdMap AttachmentIdMap { get; }
+    public NavalPlayerData NavalPlayerData { get; }
     [ProtoMember(12)]
+    public AttachmentIdMap AttachmentIdMap { get; }
+    [ProtoMember(13)]
     public ServerOptions ServerOptions { get; }
 
     public NetworkGameSaveDataReceived(
@@ -57,6 +60,7 @@ public record NetworkGameSaveDataReceived : IEvent
         TradePlayerData tradePlayerData,
         InventoryPlayerData inventoryPlayerData,
         HeroMeetingData heroMeetingData,
+        NavalPlayerData navalPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions)
     {
@@ -70,6 +74,7 @@ public record NetworkGameSaveDataReceived : IEvent
         TradePlayerData = tradePlayerData;
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
+        NavalPlayerData = navalPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
     }

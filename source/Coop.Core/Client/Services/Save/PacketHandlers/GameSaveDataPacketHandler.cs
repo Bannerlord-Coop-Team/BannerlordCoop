@@ -10,6 +10,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
@@ -113,6 +114,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             completedTransfer.TradePlayerData,
             completedTransfer.InventoryPlayerData,
             completedTransfer.HeroMeetingData,
+            completedTransfer.NavalPlayerData,
             completedTransfer.AttachmentIdMap,
             completedTransfer.ServerOptions));
     }
@@ -136,6 +138,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             TradePlayerData = firstChunk.TradePlayerData;
             InventoryPlayerData = firstChunk.InventoryPlayerData;
             HeroMeetingData = firstChunk.HeroMeetingData;
+            NavalPlayerData = firstChunk.NavalPlayerData;
             AttachmentIdMap = firstChunk.AttachmentIdMap;
             ServerOptions = firstChunk.ServerOptions;
         }
@@ -152,6 +155,7 @@ internal class GameSaveDataPacketHandler : IPacketHandler
         public TradePlayerData TradePlayerData { get; }
         public InventoryPlayerData InventoryPlayerData { get; }
         public HeroMeetingData HeroMeetingData { get; }
+        public NavalPlayerData NavalPlayerData { get; }
         public AttachmentIdMap AttachmentIdMap { get; }
         public ServerOptions ServerOptions { get; }
 
