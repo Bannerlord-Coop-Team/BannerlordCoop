@@ -72,7 +72,7 @@ public sealed class ChatService : IChatService, IDisposable
         messageBroker.Subscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
     }
 
-    public bool IsTyping => viewModel.IsOpen;
+    public bool IsTyping => overlay.IsInputFocused;
 
     public void Initialize()
     {
