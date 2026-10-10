@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.Inventory.Interfaces;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ItemRosters.Messages;
@@ -20,14 +21,17 @@ namespace GameInterface.Services.ItemRosters.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly IPartyScreenRosterRefresher partyScreenRosterRefresher;
+        private readonly IInventoryLogicInterface inventory;
 
         public ClearItemRosterHandler(
             IMessageBroker messageBroker,
             IObjectManager objectManager,
-            IPartyScreenRosterRefresher partyScreenRosterRefresher) {
+            IPartyScreenRosterRefresher partyScreenRosterRefresher,
+            IInventoryLogicInterface inventory) {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.partyScreenRosterRefresher = partyScreenRosterRefresher;
+            this.inventory = inventory;
 
             messageBroker.Subscribe<ClearItemRoster>(Handle);
         }
@@ -42,7 +46,8 @@ namespace GameInterface.Services.ItemRosters.Handlers
                 {
                     if (!objectManager.TryGetObjectWithLogging<ItemRoster>(data.ItemRosterId, out var itemRoster)) return;
 
-                    if (!partyScreenRosterRefresher.TryApply(itemRoster, ItemRosterPatch.ClearOverride))
+                    if (!inventory.TryClearInventory(itemRoster) &&
+                        !partyScreenRosterRefresher.TryApply(itemRoster, ItemRosterPatch.ClearOverride))
                     {
                         ItemRosterPatch.ClearOverride(itemRoster);
                     }
