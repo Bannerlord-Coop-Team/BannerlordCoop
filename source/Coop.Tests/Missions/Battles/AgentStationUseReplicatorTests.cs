@@ -123,14 +123,14 @@ public class AgentStationUseReplicatorTests
     }
 
     private static AgentStationUseReplicator CreateReplicator(INavalShipEngine engine,
-        INetworkAgentRegistry? registry = null, INetworkShipRegistry? ships = null)
+        INetworkAgentRegistry? registry = null, INetworkShipRegistry? ships = null, MessageBroker? broker = null)
     {
         var component = new Mock<ICoopMissionComponent>();
         component.SetupGet(c => c.AgentMovementHandler).Returns(Mock.Of<IAgentMovementHandler>());
         component.SetupGet(c => c.AgentActionHandler).Returns(Mock.Of<IAgentActionHandler>());
         component.SetupGet(c => c.AgentRegistry).Returns(registry ?? Mock.Of<INetworkAgentRegistry>());
         component.SetupGet(c => c.ShipRegistry).Returns(ships ?? Mock.Of<INetworkShipRegistry>());
-        return new AgentStationUseReplicator(Mock.Of<IBattleNetwork>(), new MessageBroker(), Mock.Of<IBattleSession>(),
+        return new AgentStationUseReplicator(Mock.Of<IBattleNetwork>(), broker ?? new MessageBroker(), Mock.Of<IBattleSession>(),
             component.Object, engine, Mock.Of<IBattleDeploymentCoordinator>());
     }
 
@@ -177,6 +177,40 @@ public class AgentStationUseReplicatorTests
 
         engine.Verify(e => e.ApplyStationUse(agent, point, true), Times.Exactly(2));
         engine.Verify(e => e.ApplyStationUse(agent, point, false), Times.Once);
+    }
+
+    [Fact]
+    public void Tick_ForgetsAnOwnSeatOnceTheAgentsAuthorityMovesAway()
+    {
+        var agentId = Guid.NewGuid();
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+        var info = new CoopAgentInfo("local", "local", "battle", agent, agentId, 1);
+        bool locallyControlled = true;
+        var registry = new Mock<INetworkAgentRegistry>();
+        registry.Setup(r => r.TryGetAgentInfo(agent, out info)).Returns(true);
+        registry.Setup(r => r.IsLocallyControlled(agent)).Returns(() => locallyControlled);
+        registry.Setup(r => r.IsLocallyControlled(agentId)).Returns(() => locallyControlled);
+        var hull = ShipTestHulls.Create();
+        var ship = new NetworkShipInfo(Guid.NewGuid(), "local", "party", isNpcParty: false, hull, null!);
+        var ships = new Mock<INetworkShipRegistry>();
+        ships.Setup(s => s.TryGetByHull(hull, out ship)).Returns(true);
+        var point = CreatePoint();
+        var engine = new Mock<INavalShipEngine>();
+        var stationHull = (MissionObject)hull;
+        string stationKey = "oar";
+        int pointIndex = 0;
+        engine.Setup(e => e.TryDescribeStation(point, out stationHull, out stationKey, out pointIndex)).Returns(true);
+        var broker = new MessageBroker();
+        using var replicator = CreateReplicator(engine.Object, registry.Object, ships.Object, broker);
+
+        broker.Publish(this, new AgentStationUseChanged(agent, point, inUse: true));
+        replicator.Tick(0.1f);
+        bool seatedWhileOwned = replicator.IsOwnSeat(agentId);
+        locallyControlled = false;
+        replicator.Tick(0.1f);
+
+        Assert.True(seatedWhileOwned);
+        Assert.False(replicator.IsOwnSeat(agentId));
     }
 
     private static NetworkAgentStationUse Use(Guid agentId, Guid shipId, bool inUse, long revision, string sender) =>

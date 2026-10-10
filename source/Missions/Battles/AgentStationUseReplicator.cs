@@ -137,6 +137,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     public void Tick(float dt)
     {
         elapsed += Math.Max(0f, dt);
+        PruneOwnSeats();
         if (!seatsAnnounced && deployment.IsCommitted)
         {
             seatsAnnounced = true;
@@ -147,6 +148,16 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         DrainPending();
         RefreshAppliedSeats();
+    }
+
+    // An agent whose authority moved away sends no release, so its seat is no longer this client's to announce or withhold.
+    private void PruneOwnSeats()
+    {
+        if (ownSeated.Count == 0) return;
+
+        var agents = missionComponent.AgentRegistry;
+        foreach (var agentId in ownSeated.Keys.Where(agentId => !agents.IsLocallyControlled(agentId)).ToList())
+            ownSeated.Remove(agentId);
     }
 
     /// <summary>
