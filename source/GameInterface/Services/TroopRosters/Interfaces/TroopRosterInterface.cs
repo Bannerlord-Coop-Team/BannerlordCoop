@@ -11,8 +11,10 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.TroopRosters.Interfaces;
 
@@ -357,10 +359,24 @@ internal class TroopRosterInterface : ITroopRosterInterface
             MessageBroker.Instance.Publish(this, new VolunteerTypesArrayUpdated(hero, null, index));
 
             mobileParty.MemberRoster.AddToCounts(characterObject, 1, false, 0, 0, true, -1);
-            CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
+            ApplyRecruitmentSideEffects(mobileParty, characterObject);
         }
 
         GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, cost, false);
+    }
+
+    private static void ApplyRecruitmentSideEffects(MobileParty mobileParty, CharacterObject troop)
+    {
+        var leaderHero = mobileParty.LeaderHero;
+        if (leaderHero.GetPerkValue(DefaultPerks.Leadership.FamousCommander))
+        {
+            mobileParty.MemberRoster.AddXpToTroop(troop, (int)DefaultPerks.Leadership.FamousCommander.SecondaryBonus);
+        }
+        SkillLevelingManager.OnTroopRecruited(leaderHero, 1, troop.Tier);
+        if (troop.Occupation == Occupation.Bandit)
+        {
+            SkillLevelingManager.OnBanditsRecruited(mobileParty, troop, 1);
+        }
     }
 
     public TroopRosterOrderData PackTroopRosterOrderData(TroopRoster roster)

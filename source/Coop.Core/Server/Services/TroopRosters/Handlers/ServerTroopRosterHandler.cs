@@ -38,16 +38,9 @@ internal class ServerTroopRosterHandler : IHandler
     {
         var data = payload.What;
 
-        GameThread.Run(() =>
+        GameThread.RunSafe(() =>
         {
-            try
-            {
-                troopRosterInterface.HandleOnRecruitmentDone(data.MobilePartyId, data.TroopsInCart);
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Failed to apply {Message}", nameof(ClientRequestRecruitment));
-            }
+            troopRosterInterface.HandleOnRecruitmentDone(data.MobilePartyId, data.TroopsInCart);
         });
     }
 }
