@@ -15,7 +15,6 @@ public sealed class NetworkBattleShipSample : IEvent
     [ProtoMember(1)] public readonly Guid ShipId;
     [ProtoMember(2)] public readonly string OwnerControllerId;
     [ProtoMember(3)] public readonly long Sequence;
-    [ProtoMember(4)] public readonly long DeadlineUtcTicks;
     [ProtoMember(5)] public readonly float[] Frame;
     /// <summary>The hull's helm input, replayed on copies for oar and sail presentation.</summary>
     [ProtoMember(6)] public readonly BattleShipInput Input;
@@ -24,7 +23,7 @@ public sealed class NetworkBattleShipSample : IEvent
     /// <summary>The sender's battle host epoch; AI-hull samples from a superseded host generation are dropped.</summary>
     [ProtoMember(8)] public readonly int HostEpoch;
 
-    public NetworkBattleShipSample(Guid shipId, string ownerControllerId, long sequence, long deadlineUtcTicks, float[] frame,
+    public NetworkBattleShipSample(Guid shipId, string ownerControllerId, long sequence, float[] frame,
         BattleShipInput input = default, BattleRopeState[] ropes = null, int hostEpoch = 0)
     {
         Ropes = ropes;
@@ -32,7 +31,6 @@ public sealed class NetworkBattleShipSample : IEvent
         ShipId = shipId;
         OwnerControllerId = ownerControllerId;
         Sequence = sequence;
-        DeadlineUtcTicks = deadlineUtcTicks;
         Frame = frame;
         Input = input;
     }

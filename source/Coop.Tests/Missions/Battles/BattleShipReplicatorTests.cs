@@ -52,22 +52,46 @@ public class BattleShipReplicatorTests
     }
 
     [Theory]
-    [InlineData(Peer, Peer, 5, 0, 500, null)]
-    [InlineData(Peer, "someone_else", 5, 0, 500, "not_authority")]
-    [InlineData(Peer, Peer, 5, 5, 500, "stale")]
-    [InlineData(Peer, Peer, 5, 0, -1, "expired")]
-    [InlineData(Peer, Peer, 5, 0, 5000, "expired")]
-    [InlineData(Own, Own, 5, 0, 500, "own_hull")]
-    public void ValidateSample_AcceptsOnlyFreshSamplesFromTheHullAuthority(
-        string authority, string sender, long sequence, long accepted, int deadlineOffsetMs, string expected)
+    [InlineData(Peer, Peer, 5, 0, null)]
+    [InlineData(Peer, "someone_else", 5, 0, "not_authority")]
+    [InlineData(Peer, Peer, 5, 5, "stale")]
+    [InlineData(Own, Own, 5, 0, "own_hull")]
+    public void ValidateSample_AcceptsOnlyNewerSamplesFromTheHullAuthority(
+        string authority, string sender, long sequence, long accepted, string expected)
     {
         var ship = new NetworkShipInfo(Guid.NewGuid(), authority, null, false, CreateHull(), null);
-        long now = DateTime.UtcNow.Ticks;
-        var sample = new NetworkBattleShipSample(ship.ShipId, sender, sequence,
-            now + TimeSpan.FromMilliseconds(deadlineOffsetMs).Ticks, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity));
+        var sample = new NetworkBattleShipSample(ship.ShipId, sender, sequence, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity));
 
-        Assert.Equal(expected, BattleShipReplicator.ValidateSample(ship, Own, sample, accepted, 0, now));
+        Assert.Equal(expected, BattleShipReplicator.ValidateSample(ship, Own, sample, accepted, 0));
     }
+
+    [Fact]
+    public void AcceptSample_ExpiresTheTargetOnlyAfterItsLifetimeOnThisClientsClock()
+    {
+        var harness = new Harness(committed: false);
+        var copy = CreateHull();
+        var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_2", false, copy, null);
+        harness.Registry.TryRegister(ship);
+        harness.LiveHulls.Add(copy);
+        var frame = NetworkBattleShipSample.FromFrame(MatrixFrame.Identity);
+
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 1, frame));
+        harness.Replicator.Tick(0.8f);
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 2, frame));
+        harness.Replicator.Tick(0.8f);
+        bool streamingWhileFresh = (bool)Inspected(harness, ship.ShipId)["streaming"]!;
+        harness.Replicator.Tick(0.3f);
+
+        var inspected = Inspected(harness, ship.ShipId);
+        Assert.True(streamingWhileFresh);
+        Assert.False((bool)inspected["streaming"]!);
+        Assert.Equal("expired", (string)inspected["lastReject"]!);
+        Assert.Equal(2, (long)inspected["applied"]!);
+        harness.Engine.Verify(e => e.ApplyForeignFrame(copy, It.IsAny<MatrixFrame>()), Times.Exactly(2));
+    }
+
+    private static JToken Inspected(Harness harness, Guid shipId) =>
+        JObject.FromObject(harness.Replicator.Inspect())["ships"]!.Single(entry => (Guid)entry["shipId"]! == shipId);
 
     [Theory]
     [InlineData(2, 10, 3, 4, "stale_epoch")]
@@ -78,25 +102,23 @@ public class BattleShipReplicatorTests
         int sampleEpoch, long sequence, int acceptedEpoch, long acceptedSequence, string expected)
     {
         var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, CreateHull(), null);
-        long now = DateTime.UtcNow.Ticks;
-        var sample = new NetworkBattleShipSample(ship.ShipId, Peer, sequence, now + TimeSpan.FromMilliseconds(500).Ticks,
+        var sample = new NetworkBattleShipSample(ship.ShipId, Peer, sequence,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), default, null, sampleEpoch);
 
-        Assert.Equal(expected, BattleShipReplicator.ValidateSample(ship, Own, sample, acceptedSequence, acceptedEpoch, now));
+        Assert.Equal(expected, BattleShipReplicator.ValidateSample(ship, Own, sample, acceptedSequence, acceptedEpoch));
     }
 
     [Fact]
     public void ValidateSample_PlayerHull_IgnoresTheHostEpoch()
     {
         var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_2", false, CreateHull(), null);
-        long now = DateTime.UtcNow.Ticks;
-        var older = new NetworkBattleShipSample(ship.ShipId, Peer, 11, now + TimeSpan.FromMilliseconds(500).Ticks,
+        var older = new NetworkBattleShipSample(ship.ShipId, Peer, 11,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), default, null, 1);
-        var newerButStale = new NetworkBattleShipSample(ship.ShipId, Peer, 5, now + TimeSpan.FromMilliseconds(500).Ticks,
+        var newerButStale = new NetworkBattleShipSample(ship.ShipId, Peer, 5,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), default, null, 9);
 
-        Assert.Null(BattleShipReplicator.ValidateSample(ship, Own, older, 10, 5, now));
-        Assert.Equal("stale", BattleShipReplicator.ValidateSample(ship, Own, newerButStale, 10, 5, now));
+        Assert.Null(BattleShipReplicator.ValidateSample(ship, Own, older, 10, 5));
+        Assert.Equal("stale", BattleShipReplicator.ValidateSample(ship, Own, newerButStale, 10, 5));
     }
 
     [Fact]
@@ -308,23 +330,21 @@ public class BattleShipReplicatorTests
     public void ValidateSample_RejectsANonFiniteRudder()
     {
         var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, null, false, CreateHull(), null);
-        long now = DateTime.UtcNow.Ticks;
-        var sample = new NetworkBattleShipSample(ship.ShipId, Peer, 1, now + TimeSpan.FromMilliseconds(500).Ticks,
+        var sample = new NetworkBattleShipSample(ship.ShipId, Peer, 1,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), new BattleShipInput(0, 1, 0, float.NaN, 2));
 
-        Assert.Equal("invalid_input", BattleShipReplicator.ValidateSample(ship, Own, sample, 0, 0, now));
+        Assert.Equal("invalid_input", BattleShipReplicator.ValidateSample(ship, Own, sample, 0, 0));
     }
 
     [Fact]
     public void ValidateSample_RejectsAnInvalidRopeSet()
     {
         var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, null, false, CreateHull(), null);
-        long now = DateTime.UtcNow.Ticks;
         var ropes = new[] { BattleRopeStateTests.Rope(1, BattleRopeState.RopesPulling), BattleRopeStateTests.Rope(2, BattleRopeState.Removed) };
-        var sample = new NetworkBattleShipSample(ship.ShipId, Peer, 1, now + TimeSpan.FromMilliseconds(500).Ticks,
+        var sample = new NetworkBattleShipSample(ship.ShipId, Peer, 1,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), default, ropes);
 
-        Assert.Equal("invalid_ropes", BattleShipReplicator.ValidateSample(ship, Own, sample, 0, 0, now));
+        Assert.Equal("invalid_ropes", BattleShipReplicator.ValidateSample(ship, Own, sample, 0, 0));
     }
 
     [Fact]
@@ -429,7 +449,7 @@ public class BattleShipReplicatorTests
     public void Sample_RoundTripsTheHelmInput()
     {
         var input = new BattleShipInput(1, 2, 0, -0.5f, 2);
-        var sample = new NetworkBattleShipSample(Guid.NewGuid(), Peer, 7, 1234,
+        var sample = new NetworkBattleShipSample(Guid.NewGuid(), Peer, 7,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), input);
 
         using var stream = new MemoryStream();

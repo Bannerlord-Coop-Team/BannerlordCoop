@@ -61,7 +61,8 @@ public class BattleShipReplicator : IBattleShipReplicator
 
     internal const float SendIntervalSeconds = 0.05f;
     internal const float InterpolationSeconds = 0.05f;
-    internal static readonly long SampleLifetimeTicks = TimeSpan.FromSeconds(1).Ticks;
+    // Measured on this client's mission clock from receipt, since peers' wall clocks are not in step.
+    internal const float SampleLifetimeSeconds = 1f;
 
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
@@ -351,7 +352,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (sendElapsed < SendIntervalSeconds) return;
         sendElapsed = 0;
 
-        long deadline = DateTime.UtcNow.Ticks + SampleLifetimeTicks;
         foreach (var ship in Registry.Ships.Where(IsOwnHull))
         {
             var stream = GetStream(ship.ShipId);
@@ -359,7 +359,7 @@ public class BattleShipReplicator : IBattleShipReplicator
             if (stream.Condition?.SinkingState == BattleShipCondition.Sunk) continue;
 
             stream.Sent++;
-            network.SendAll(new NetworkBattleShipSample(ship.ShipId, session.OwnControllerId, stream.Sent, deadline,
+            network.SendAll(new NetworkBattleShipSample(ship.ShipId, session.OwnControllerId, stream.Sent,
                 NetworkBattleShipSample.FromFrame(engine.GetFrame(ship.Hull)), engine.ReadInput(ship.Hull),
                 engine.CaptureRopes(ship.Hull, ShipIdOf), session.HostEpoch));
             SendConditionIfChanged(ship, stream);
@@ -545,12 +545,17 @@ public class BattleShipReplicator : IBattleShipReplicator
     private void Handle_NetworkBattleShipSample(MessagePayload<NetworkBattleShipSample> payload)
     {
         var sample = payload.What;
-        GameThread.RunSafe(() => AcceptSample(sample), context: nameof(Handle_NetworkBattleShipSample));
+        GameThread.RunSafe(() =>
+        {
+            if (Mission.Current == null) return;
+            AcceptSample(sample);
+        }, context: nameof(Handle_NetworkBattleShipSample));
     }
 
-    private void AcceptSample(NetworkBattleShipSample sample)
+    /// <summary>[Game thread] Takes an owner's sample as the copied hull's next interpolation target.</summary>
+    internal void AcceptSample(NetworkBattleShipSample sample)
     {
-        if (Mission.Current == null || sample == null) return;
+        if (sample == null) return;
 
         var stream = GetStream(sample.ShipId);
         if (!Registry.TryGet(sample.ShipId, out var ship))
@@ -559,7 +564,7 @@ public class BattleShipReplicator : IBattleShipReplicator
             return;
         }
 
-        var rejection = ValidateSample(ship, session.OwnControllerId, sample, stream.Accepted, stream.AcceptedEpoch, DateTime.UtcNow.Ticks);
+        var rejection = ValidateSample(ship, session.OwnControllerId, sample, stream.Accepted, stream.AcceptedEpoch);
         // BR-102: an AI hull follows the host, so a superseded hosting generation is dropped like siege state.
         if (rejection == null && ship.IsNpcParty && hostEpochPolicy.IsStale(sample.HostEpoch, session.HostEpoch))
             rejection = "stale_epoch";
@@ -575,13 +580,14 @@ public class BattleShipReplicator : IBattleShipReplicator
         engine.ApplyRopes(ship.Hull, sample.Ropes, HullOf, final: false);
         stream.Start = stream.HasWritten ? stream.Written : engine.GetFrame(ship.Hull);
         stream.Target = sample;
+        stream.TargetReceivedAt = elapsed;
         stream.Accepted = sample.Sequence;
         stream.Elapsed = 0;
     }
 
     /// <summary>Why a sample must be dropped, or null to accept it.</summary>
     internal static string ValidateSample(NetworkShipInfo ship, string ownControllerId, NetworkBattleShipSample sample,
-        long acceptedSequence, int acceptedEpoch, long nowUtcTicks)
+        long acceptedSequence, int acceptedEpoch)
     {
         if (ship.CurrentAuthority == ownControllerId) return "own_hull";
         if (sample.OwnerControllerId != ship.CurrentAuthority) return "not_authority";
@@ -590,7 +596,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (ship.IsNpcParty && sample.HostEpoch < acceptedEpoch) return "stale_epoch";
         bool newEpoch = ship.IsNpcParty && sample.HostEpoch > acceptedEpoch;
         if (!newEpoch && sample.Sequence <= acceptedSequence) return "stale";
-        if (sample.DeadlineUtcTicks <= nowUtcTicks || sample.DeadlineUtcTicks > nowUtcTicks + SampleLifetimeTicks) return "expired";
         if (!sample.HasValidFrame) return "invalid_frame";
         if (!sample.Input.IsValid) return "invalid_input";
         if (!BattleRopeState.AreValid(sample.Ropes)) return "invalid_ropes";
@@ -601,14 +606,13 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         if (float.IsNaN(dt) || float.IsInfinity(dt) || dt <= 0) return;
 
-        long now = DateTime.UtcNow.Ticks;
         foreach (var entry in streams)
         {
             var stream = entry.Value;
             var target = stream.Target;
             if (target == null || !Registry.TryGet(entry.Key, out var ship) || IsOwnHull(ship)) continue;
 
-            if (target.DeadlineUtcTicks <= now)
+            if (elapsed - stream.TargetReceivedAt > SampleLifetimeSeconds)
             {
                 stream.Target = null;
                 stream.Reject("expired");
@@ -799,6 +803,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     private sealed class ShipStream
     {
         public NetworkBattleShipSample Target;
+        /// <summary>This client's mission clock when <see cref="Target"/> arrived.</summary>
+        public float TargetReceivedAt;
         public MatrixFrame Start;
         public MatrixFrame Written;
         public bool HasWritten;

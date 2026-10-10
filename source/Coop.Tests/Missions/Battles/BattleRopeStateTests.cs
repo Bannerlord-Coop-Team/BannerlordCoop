@@ -20,7 +20,7 @@ public class BattleRopeStateTests
         };
         ropes[1].CurveTarget = new[] { 1f, 2f, 3f };
         ropes[1].CurveAngle = 35f;
-        var sample = new NetworkBattleShipSample(Guid.NewGuid(), "peer", 9, 1234,
+        var sample = new NetworkBattleShipSample(Guid.NewGuid(), "peer", 9,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), new BattleShipInput(0, 1, 0, 0.25f, 2), ropes);
 
         var copy = RoundTrip(sample);
@@ -48,7 +48,7 @@ public class BattleRopeStateTests
     [Fact]
     public void Sample_WithoutRopes_RoundTripsAsNull()
     {
-        var sample = new NetworkBattleShipSample(Guid.NewGuid(), "peer", 1, 1234, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity));
+        var sample = new NetworkBattleShipSample(Guid.NewGuid(), "peer", 1, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity));
 
         Assert.Null(RoundTrip(sample).Ropes);
         Assert.True(BattleRopeState.AreValid(null));
