@@ -401,7 +401,7 @@ public class PuppetSpawner : IPuppetSpawner
         int slotsNeeded = agentBudget.SlotsForEquipment(data.SpawnEquipment);
         if (slotsNeeded > slotsAvailable) return false; // at capacity — buffer
 
-        var team = teamResolver.ResolveReplicatedTeam(data.Side, isOwnAgent);
+        var team = teamResolver.ResolveReplicatedTeam(data.Side, session.IsOwn(data.OwnerControllerId));
         if (team == null) return false;                                 // teams not created yet — buffer
 
         // Crew of a hull waits for that hull and joins its local formation, which is the hull's ship assignment.
