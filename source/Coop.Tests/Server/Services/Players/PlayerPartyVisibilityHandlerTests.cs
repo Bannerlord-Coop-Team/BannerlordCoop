@@ -10,6 +10,7 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
@@ -407,6 +408,47 @@ public class PlayerPartyVisibilityHandlerTests : IDisposable
 
         playerManager.Verify(manager => manager.ClearPeer(peer), Times.Once);
         Assert.Single(broker.GetMessagesFromType<PlayerConnectionStateChanged>());
+    }
+
+    [Fact]
+    public void HeadlessDisconnectAndReconnect_BroadcastsDestroyThenOneClientOnlyCreate()
+    {
+        var managerType = Type.GetType("SandBox.View.Map.Managers.MobilePartyVisualManager, SandBox.View", true)!;
+        Assert.Null(AccessTools.Property(managerType, "Current").GetValue(null));
+        var player = CreatePlayer();
+        var party = CreateParty();
+        var hero = CreateActiveHero();
+        var peer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        var (players, connections, objects) =
+            CreateReleaseMocks(player, party, peer, isConnected: true, isSynchronized: true);
+        objects.Setup(manager => manager.TryGetObjectWithLogging(player.MobilePartyId, out party)).Returns(true);
+        objects.Setup(manager => manager.TryGetObjectWithLogging(player.HeroId, out hero)).Returns(true);
+        uint partyHandle = 42;
+        objects.Setup(manager => manager.TryGetHandleWithLogging(party, out partyHandle)).Returns(true);
+        var network = new Mock<INetwork>();
+        var broker = new TestMessageBroker();
+        using var handler = new PlayerPartyVisibilityHandler(
+            broker, players.Object, connections.Object, objects.Object, network.Object,
+            Mock.Of<ISiegeEventInterface>());
+
+        broker.Publish(this, new PlayerDisconnected(peer, default));
+        GameThread.Run(() => { }, blocking: true);
+        Assert.False(party.IsActive);
+        network.Verify(value => value.SendAll(It.Is<NetworkDestroyPartyVisual>(
+            message => message.MobilePartyHandle == 42)), Times.Once);
+
+        broker.Publish(this, new PlayerCampaignSynchronized(peer));
+        GameThread.Run(() => { }, blocking: true);
+        broker.Publish(this, new PlayerCampaignSynchronized(peer));
+        GameThread.Run(() => { }, blocking: true);
+
+        Assert.True(party.IsActive);
+        network.Verify(value => value.SendAll(It.Is<NetworkCreatePartyVisual>(
+            message => message.MobilePartyHandle == 42 && message.PartyVisualId == null &&
+                message.PartyVisualHandle == 0)), Times.Once);
+        objects.Verify(value => value.AddNewObject(It.IsAny<object>(), out It.Ref<string>.IsAny), Times.Never);
+        objects.Verify(value => value.Remove(It.IsAny<object>()), Times.Never);
+        network.VerifyNoOtherCalls();
     }
 
     private static (Mock<IPlayerManager>, Mock<IConnectionCollection>, Mock<IObjectManager>)
