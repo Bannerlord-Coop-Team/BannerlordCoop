@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Commands;
 using Common.Messaging;
 using Common.Util;
 using GameInterface;
@@ -35,6 +36,12 @@ public class CoopNavalModule : Module
             }
 
             builder.RegisterType(type).As(interfaceToRegister).InstancePerLifetimeScope();
+        }
+
+        // Load coop commands within Coop.Naval
+        foreach (var type in GetConcreteTypes<ICoopCommand>())
+        {
+            builder.RegisterType(type).As<ICoopCommand>().InstancePerDependency();
         }
     }
 

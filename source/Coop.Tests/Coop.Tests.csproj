@@ -78,6 +78,7 @@
     <Reference Include="TaleWorlds.DotNet"><HintPath>../../mb2/bin/Win64_Shipping_Client/TaleWorlds.DotNet.dll</HintPath></Reference>
     <Publicize Include="Missions.Naval" />
     <Publicize Include="Coop.Naval" />
+    <Publicize Include="NavalDLC" />
     <Reference Include="TaleWorlds.ScreenSystem"><HintPath>../../mb2/bin/Win64_Shipping_Client/TaleWorlds.ScreenSystem.dll</HintPath></Reference>
     <Publicize Include="TaleWorlds.ScreenSystem" />
     <Publicize Include="TaleWorlds.MountAndBlade.View" />
