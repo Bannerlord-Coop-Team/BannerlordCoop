@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Registry;
 using GameInterface.Services.GameState.Interfaces;
@@ -82,9 +83,10 @@ public class InitialServerState : ServerStateBase
 #if DEBUG
         loadingInterface.ShowLoadingScreen();
         // The MP dev save predates NavalDLC, so a NavalDLC server starts a new campaign instead.
-        if (global::Common.ModInformation.IsNavalDlcActive)
+        if (ModInformation.IsNavalDlcActive)
             gameStateInterface.StartNewGame();
-        else gameStateInterface.LoadGame("MP");
+        else
+            gameStateInterface.LoadGame("MP");
 #endif
     }
 

@@ -415,6 +415,7 @@ internal class BattleHostHandler : IHandler
             SendOwnedReserves(mapEventId, mapEvent, requester, requesterId, includeEmptySides: true);
         });
     }
+
     /// <summary>[Server] A client asks for the reserves it currently owns: at battle ENTRY (feed its own
     /// parties while it loads), or after taking over a departed owner's troops (a host adopting a leaver, or
     /// a promoted successor) — the reply carries the full owned set at the current ledger pointers so adopted

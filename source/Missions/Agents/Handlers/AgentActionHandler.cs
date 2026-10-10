@@ -82,11 +82,11 @@ public class AgentActionHandler : IAgentActionHandler
     private readonly IRemoteAgentActionProcessor remoteActionProcessor;
     private readonly IGuardReactionHandler guardReactionHandler;
 
-    // Outbound observation and sequence share one record because both belong to the local agent's action stream.
     private Func<CoopAgentInfo, bool> isStationOwned;
 
     public void ConfigureStationOwnedAgents(Func<CoopAgentInfo, bool> isStationOwned) => this.isStationOwned = isStationOwned;
 
+    // Outbound observation and sequence share one record because both belong to the local agent's action stream.
     private readonly Dictionary<Guid, LocalAgentActionState> _localAgentStates =
         new Dictionary<Guid, LocalAgentActionState>();
 

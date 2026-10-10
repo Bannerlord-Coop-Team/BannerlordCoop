@@ -23,7 +23,7 @@ public interface IAgentStationUseReplicator : IDisposable
     string DescribeStation(Agent agent);
 
     /// <summary>Whether this client seated the agent and withholds its movement and actions (diagnostics).</summary>
-    bool IsOwnSeat(System.Guid agentId);
+    bool IsOwnSeat(Guid agentId);
 
     object Inspect();
 }
@@ -149,8 +149,6 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         RefreshAppliedSeats();
     }
 
-    // [Game thread] Runs after this frame's hull frame writes. A puppet the owner keeps seated is re-pinned to its station's
-    // user frame on the moved hull; if vanilla released it locally it is re-seated once per owner revision.
     /// <summary>
     /// An applied seat follows a remote owner's announcements. It ends when the puppet dies, when its hull sinks (the owner's
     /// agent can drown seated without a release) or when this client adopts it (host migration): from then on vanilla seats
@@ -161,6 +159,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private bool IsOwnedHere(Guid agentId) =>
         missionComponent.AgentRegistry.TryGetAgentInfo(agentId, out var info) && info.CurrentAuthority == session.OwnControllerId;
 
+    // [Game thread] Runs after this frame's hull frame writes. A puppet the owner keeps seated is re-pinned to its station's
+    // user frame on the moved hull; if vanilla released it locally it is re-seated once per owner revision.
     internal void RefreshAppliedSeats()
     {
         if (appliedSeats.Count == 0) return;

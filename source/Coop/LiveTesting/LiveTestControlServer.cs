@@ -1189,7 +1189,7 @@ namespace Coop.LiveTesting
             return true;
         }
 
-        internal static string ReadArgument(string[] arguments, string name)
+        private static string ReadArgument(string[] arguments, string name)
         {
             int index = Array.FindIndex(arguments, argument =>
                 argument.Equals(name, StringComparison.OrdinalIgnoreCase));

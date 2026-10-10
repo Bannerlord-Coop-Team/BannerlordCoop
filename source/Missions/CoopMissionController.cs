@@ -156,8 +156,22 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         try
         {
-            DisposeMissionHandlers();
+            // Detach the per-mission agent handlers FIRST, before mission state and native agents are freed. Both
+            // detach deterministically here instead of leaking their packet-handler registration until the GC
+            // finalizer runs.
+            coopMissionComponent.AgentMovementHandler.Dispose();
+            coopMissionComponent.AgentActionHandler.Dispose();
+            coopMissionComponent.AgentVoiceHandler.Dispose();
+
+            coopMissionComponent.MissileHandler.Dispose();
+            coopMissionComponent.WeaponDropHandler.Dispose();
+            coopMissionComponent.WeaponPickupHandler.Dispose();
+            coopMissionComponent.ShieldDamageHandler.Dispose();
+            coopMissionComponent.CombatHitPresentationHandler.Dispose();
+            coopMissionComponent.AgentDeathHandler.Dispose();
+
             OnLeaving();
+
             base.OnEndMission();
         }
         finally
@@ -174,22 +188,5 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
                 coopMissionComponent.AgentRegistry.Clear();
             }
         }
-    }
-
-    protected void DisposeMissionHandlers()
-    {
-        // Detach the per-mission agent handlers FIRST, before mission state and native agents are freed. Both
-        // detach deterministically here instead of leaking their packet-handler registration until the GC
-        // finalizer runs.
-        coopMissionComponent.AgentMovementHandler.Dispose();
-        coopMissionComponent.AgentActionHandler.Dispose();
-        coopMissionComponent.AgentVoiceHandler.Dispose();
-
-        coopMissionComponent.MissileHandler.Dispose();
-        coopMissionComponent.WeaponDropHandler.Dispose();
-        coopMissionComponent.WeaponPickupHandler.Dispose();
-        coopMissionComponent.ShieldDamageHandler.Dispose();
-        coopMissionComponent.CombatHitPresentationHandler.Dispose();
-        coopMissionComponent.AgentDeathHandler.Dispose();
     }
 }
