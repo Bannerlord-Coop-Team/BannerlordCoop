@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Chat;
+using GameInterface.Services.Chat;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 using Xunit;
@@ -40,25 +40,47 @@ public class ChatOverlayTests
         Assert.True(inputRestrictions.MouseVisibility);
     }
 
+    [Fact]
+    public void OpenPanelTypingRestrictions_ClaimKeyboardWithoutMouse()
+    {
+        var inputRestrictions = new InputRestrictions(900);
+
+        ChatOverlay.SetOpenPanelTypingRestrictions(inputRestrictions);
+
+        Assert.Equal(InputUsageMask.Keyboardkeys, inputRestrictions.InputUsageMask);
+        Assert.False(inputRestrictions.MouseVisibility);
+    }
+
+    [Fact]
+    public void OpenPanelTypingWithMouseRestrictions_ClaimAllWithCursor()
+    {
+        var inputRestrictions = new InputRestrictions(900);
+
+        ChatOverlay.SetOpenPanelTypingWithMouseRestrictions(inputRestrictions);
+
+        Assert.Equal(InputUsageMask.All, inputRestrictions.InputUsageMask);
+        Assert.True(inputRestrictions.MouseVisibility);
+    }
+
     [Theory]
-    [InlineData(true, false, false, false, true)]
-    [InlineData(false, true, false, false, true)]
-    [InlineData(false, false, true, false, true)]
-    [InlineData(false, false, false, false, true)]
-    [InlineData(false, false, false, true, false)]
-    [InlineData(false, true, false, true, true)]
-    public void OpenPanelCursor_HidesOnlyDuringMapLook(
-        bool inputFocused,
+    [InlineData(false, true, true, true, true)]
+    [InlineData(false, true, true, false, false)]
+    [InlineData(false, true, false, true, false)]
+    [InlineData(true, true, false, false, true)]
+    [InlineData(true, false, false, false, false)]
+    [InlineData(true, true, true, false, true)]
+    public void ChatPointerCapture_StartsOnPressOverPanelOnly(
+        bool currentlyHeld,
+        bool buttonDown,
+        bool buttonPressed,
         bool pointerOverChat,
-        bool mouseCaptureActive,
-        bool mapLookActive,
         bool expected)
     {
-        Assert.Equal(expected, ChatOverlay.ShouldShowOpenPanelCursor(
-            inputFocused,
-            pointerOverChat,
-            mouseCaptureActive,
-            mapLookActive));
+        Assert.Equal(expected, ChatOverlay.ShouldKeepChatPointerCapture(
+            currentlyHeld,
+            buttonDown,
+            buttonPressed,
+            pointerOverChat));
     }
 
     [Fact]
@@ -152,17 +174,32 @@ public class ChatOverlayTests
     [InlineData(false, false, true, false, false)]
     [InlineData(true, true, true, false, false)]
     [InlineData(true, false, false, false, false)]
-    public void ChatOpen_OnlyOnUnobstructedGameplay(
-        bool isGameplayScreen,
+    public void ChatOpen_WhenOpenableScreenAndFocusAllows(
+        bool isOpenableScreen,
         bool isConversationActive,
         bool isGameplayLayerFocused,
         bool isChatLayerFocused,
         bool expected)
     {
         Assert.Equal(expected, ChatOverlay.ShouldAllowChatOpen(
-            isGameplayScreen,
+            isOpenableScreen,
             isConversationActive,
             isGameplayLayerFocused,
             isChatLayerFocused));
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
+    public void SettlementMapMenu_OnlyWhenMapMenuAndInSettlement(
+        bool atMenu,
+        bool hasCurrentSettlement,
+        bool expected)
+    {
+        Assert.Equal(expected, ChatOverlay.IsSettlementMapMenu(
+            atMenu,
+            hasCurrentSettlement));
     }
 }
