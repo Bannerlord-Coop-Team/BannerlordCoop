@@ -194,7 +194,7 @@ public class BattleShipReplicatorTests
         var ai = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, copy, null);
         harness.Registry.TryRegister(ai);
         harness.LiveHulls.Add(copy);
-        var parked = new[] { new HullSwapAgent(null, isCrew: true, isParked: true, Vec3.Zero) };
+        var parked = new[] { new HullSwapAgent(null, isCrew: true, isParked: true, Vec3.Zero, Vec3.Zero) };
         harness.Engine.Setup(e => e.ParkHullAgents(copy)).Returns(parked);
         harness.Engine.Setup(e => e.ReplaceHull(copy)).Returns(fresh).Callback(() =>
         {
@@ -230,7 +230,7 @@ public class BattleShipReplicatorTests
         var ai = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, copy, null);
         harness.Registry.TryRegister(ai);
         harness.LiveHulls.Add(copy);
-        var parked = new[] { new HullSwapAgent(null, isCrew: true, isParked: true, Vec3.Zero) };
+        var parked = new[] { new HullSwapAgent(null, isCrew: true, isParked: true, Vec3.Zero, Vec3.Zero) };
         harness.Engine.Setup(e => e.ParkHullAgents(copy)).Returns(parked);
         harness.Replicator.TransferNpcHulls(Own);
 
@@ -243,13 +243,76 @@ public class BattleShipReplicatorTests
     }
 
     [Fact]
+    public void Tick_DuringShipDeployment_WaitsBeforeParkingTheAgents()
+    {
+        var harness = new Harness(committed: true);
+        var copy = CreateHull();
+        harness.Registry.TryRegister(new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, copy, null));
+        harness.LiveHulls.Add(copy);
+        bool deploying = true;
+        harness.Engine.SetupGet(e => e.IsDeploymentMode).Returns(() => deploying);
+        harness.Replicator.TransferNpcHulls(Own);
+
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+        harness.Engine.Verify(e => e.ParkHullAgents(It.IsAny<MissionObject>()), Times.Never);
+
+        deploying = false;
+        harness.Replicator.Tick(0.1f);
+        harness.Engine.Verify(e => e.ParkHullAgents(copy), Times.Once);
+        harness.Engine.Verify(e => e.ReplaceHull(It.IsAny<MissionObject>()), Times.Never);
+    }
+
+    [Fact]
+    public void Tick_WhenReplacingTheHullThrows_HandsTheParkedAgentsBack()
+    {
+        var harness = new Harness(committed: true);
+        var copy = CreateHull();
+        harness.Registry.TryRegister(new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, copy, null));
+        harness.LiveHulls.Add(copy);
+        var parked = new[] { new HullSwapAgent(null, isCrew: true, isParked: true, Vec3.Zero, Vec3.Zero) };
+        harness.Engine.Setup(e => e.ParkHullAgents(copy)).Returns(parked);
+        harness.Engine.Setup(e => e.ReplaceHull(copy)).Throws(new InvalidOperationException("spawn failed"));
+        harness.Replicator.TransferNpcHulls(Own);
+
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+
+        harness.Engine.Verify(e => e.BoardHullAgents(copy, parked), Times.Once);
+        harness.Engine.Verify(e => e.ReplaceHull(copy), Times.Once);
+    }
+
+    [Fact]
+    public void Tick_WhenTheShipGoesAwayMidSwap_HandsTheParkedAgentsBackWithoutAHull()
+    {
+        var harness = new Harness(committed: true);
+        var copy = CreateHull();
+        harness.Registry.TryRegister(new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, copy, null));
+        harness.LiveHulls.Add(copy);
+        var parked = new[] { new HullSwapAgent(null, isCrew: true, isParked: true, Vec3.Zero, Vec3.Zero) };
+        harness.Engine.Setup(e => e.ParkHullAgents(copy)).Returns(parked);
+        harness.Replicator.TransferNpcHulls(Own);
+
+        // The first tick parks the agents, then drops the hull that left the mission from the registry.
+        harness.LiveHulls.Remove(copy);
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+
+        harness.Engine.Verify(e => e.ParkHullAgents(copy), Times.Once);
+        harness.Engine.Verify(e => e.BoardHullAgents(null, parked), Times.Once);
+        harness.Engine.Verify(e => e.ReplaceHull(It.IsAny<MissionObject>()), Times.Never);
+    }
+
+    [Fact]
     public void TransferNpcHulls_AwayMidSwap_BoardsTheParkedAgentsAndStopsTheSwap()
     {
         var harness = new Harness(committed: true);
         var copy = CreateHull();
         harness.Registry.TryRegister(new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, copy, null));
         harness.LiveHulls.Add(copy);
-        var parked = new[] { new HullSwapAgent(null, isCrew: true, isParked: true, Vec3.Zero) };
+        var parked = new[] { new HullSwapAgent(null, isCrew: true, isParked: true, Vec3.Zero, Vec3.Zero) };
         harness.Engine.Setup(e => e.ParkHullAgents(copy)).Returns(parked);
         harness.Replicator.TransferNpcHulls(Own);
         harness.Replicator.Tick(0.1f);

@@ -15,6 +15,12 @@ public interface INavalShipEngine
     /// <summary>The live hulls of the current mission.</summary>
     IReadOnlyList<MissionObject> Hulls { get; }
 
+    /// <summary>
+    /// Whether NavalShipsLogic is still in deployment, where a removed hull is pooled and spawning its ship again returns
+    /// that same hull, so a hull cannot be replaced yet.
+    /// </summary>
+    bool IsDeploymentMode { get; }
+
     /// <summary>The hull's campaign ship description, side, formation and frame under the given identity.</summary>
     BattleShipSpawnData Describe(MissionObject hull, NetworkShipInfo identity);
 
@@ -76,7 +82,7 @@ public interface INavalShipEngine
 
     /// <summary>
     /// [Mission tick] Last step: moves the parked agents back to their deck positions on <paramref name="hull"/>, makes
-    /// the crew its crew again and seats the helm and oars.
+    /// the crew its crew again and seats the helm and oars. With a null or removed hull, the parked agents go back where they stood.
     /// </summary>
     void BoardHullAgents(MissionObject hull, IReadOnlyList<HullSwapAgent> agents);
 
@@ -114,16 +120,19 @@ public interface INavalShipEngine
 /// <summary>An agent a hull replacement moves: whether it is the hull's crew and, when it stood aboard, its hull-local deck position.</summary>
 public sealed class HullSwapAgent
 {
-    public HullSwapAgent(Agent agent, bool isCrew, bool isParked, Vec3 deckLocal)
+    public HullSwapAgent(Agent agent, bool isCrew, bool isParked, Vec3 deckLocal, Vec3 parkedFrom)
     {
         Agent = agent;
         IsCrew = isCrew;
         IsParked = isParked;
         DeckLocal = deckLocal;
+        ParkedFrom = parkedFrom;
     }
 
     public Agent Agent { get; }
     public bool IsCrew { get; }
     public bool IsParked { get; }
     public Vec3 DeckLocal { get; }
+    /// <summary>The agent's world position before it was parked.</summary>
+    public Vec3 ParkedFrom { get; }
 }

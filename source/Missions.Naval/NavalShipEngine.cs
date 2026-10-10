@@ -43,6 +43,8 @@ public class NavalShipEngine : INavalShipEngine
     public IReadOnlyList<MissionObject> Hulls =>
         ShipsLogic?.AllShips.Cast<MissionObject>().ToList() ?? new List<MissionObject>();
 
+    public bool IsDeploymentMode => ShipsLogic?.IsDeploymentMode == true;
+
     public BattleShipSpawnData Describe(MissionObject hull, NetworkShipInfo identity)
     {
         var ship = (MissionShip)hull;
@@ -127,16 +129,16 @@ public class NavalShipEngine : INavalShipEngine
                 agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
             if (isTracked) agentsLogic.RemoveAgentFromShip(agent, ship);
 
+            var position = agent.Position;
             var deckLocal = Vec3.Zero;
             if (isAboard)
             {
-                var position = agent.Position;
                 deckLocal = frame.TransformToLocalNonOrthogonal(position);
                 agent.SetIsPhysicsForceClosed(true);
                 agent.TeleportToPosition(new Vec3(position.x, position.y, ParkingHeight));
             }
 
-            moved.Add(new HullSwapAgent(agent, isCrew, isAboard, deckLocal));
+            moved.Add(new HullSwapAgent(agent, isCrew, isAboard, deckLocal, position));
         }
 
         return moved;
@@ -180,9 +182,14 @@ public class NavalShipEngine : INavalShipEngine
 
     public void BoardHullAgents(MissionObject hull, IReadOnlyList<HullSwapAgent> agents)
     {
-        var ship = (MissionShip)hull;
+        var ship = hull as MissionShip;
         var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
-        if (agentsLogic == null || agents == null || !ship.GameEntity.IsValid || ship.Team == null) return;
+        if (agents == null) return;
+        if (agentsLogic == null || ship == null || ship.IsRemoved || !ship.GameEntity.IsValid || ship.Team == null)
+        {
+            UnparkWhereTheyStood(agents);
+            return;
+        }
 
         var frame = ship.GlobalFrame;
         foreach (var moved in agents)
@@ -201,6 +208,19 @@ public class NavalShipEngine : INavalShipEngine
 
         // Vanilla seats the helm and oars and moves their crew onto them.
         agentsLogic.AssignAndTeleportCrewToShipMachines(ship);
+    }
+
+    // With no hull left to board, the parked agents go back where they stood rather than hang frozen at the parking height.
+    private static void UnparkWhereTheyStood(IReadOnlyList<HullSwapAgent> agents)
+    {
+        foreach (var moved in agents)
+        {
+            var agent = moved.Agent;
+            if (!moved.IsParked || !agent.IsActive()) continue;
+
+            agent.SetIsPhysicsForceClosed(false);
+            agent.TeleportToPosition(moved.ParkedFrom);
+        }
     }
 
     public bool HasHelmPilot(MissionObject hull) => ((MissionShip)hull).ShipControllerMachine?.PilotAgent != null;

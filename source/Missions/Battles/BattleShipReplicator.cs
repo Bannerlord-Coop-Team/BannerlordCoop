@@ -238,6 +238,7 @@ public class BattleShipReplicator : IBattleShipReplicator
             if (!Registry.TryGet(swap.ShipId, out var ship))
             {
                 hullSwaps.Remove(swap);
+                if (swap.Agents != null) engine.BoardHullAgents(null, swap.Agents);
                 Logger.Error("[NavalSync] Hull swap {ShipId}: the ship went away mid-swap", swap.ShipId);
                 continue;
             }
@@ -250,7 +251,21 @@ public class BattleShipReplicator : IBattleShipReplicator
             {
                 hullSwaps.Remove(swap);
                 Logger.Error(exception, "[NavalSync] Hull swap {ShipId} failed in phase {Phase}", swap.ShipId, swap.Phase);
+                // Boarding is the step that threw in the last phase, so only an earlier failure hands the parked agents back.
+                if (swap.Phase == HullSwapPhase.ReplaceHull && swap.Agents != null) ReturnParkedAgents(swap, ship);
             }
+        }
+    }
+
+    private void ReturnParkedAgents(HullSwap swap, NetworkShipInfo ship)
+    {
+        try
+        {
+            engine.BoardHullAgents(ship.Hull, swap.Agents);
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "[NavalSync] Hull swap {ShipId}: could not hand the parked agents back", swap.ShipId);
         }
     }
 
@@ -259,6 +274,9 @@ public class BattleShipReplicator : IBattleShipReplicator
         switch (swap.Phase)
         {
             case HullSwapPhase.ParkAgents:
+                // A hull removed during deployment is pooled and spawning its ship again returns that same kinematic copy.
+                if (engine.IsDeploymentMode) return;
+
                 swap.Agents = engine.ParkHullAgents(ship.Hull);
                 swap.Phase = HullSwapPhase.ReplaceHull;
                 Logger.Information("[NavalSync] Hull swap {ShipId}: parked {Count} agent(s) off the hull", ship.ShipId, swap.Agents.Count);
