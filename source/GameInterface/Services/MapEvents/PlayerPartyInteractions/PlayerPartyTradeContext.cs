@@ -29,6 +29,9 @@ internal static class PlayerPartyTradeContext
     public static bool SuppressNativeCloseMessages { get; private set; }
 
     private static BarterVM activeBarterVM;
+#if DEBUG
+    internal static BarterVM ActiveBarterVM => activeBarterVM;
+#endif
     private static ButtonWidget resetButton;
     private static bool isApplyingServerOffer;
     private static readonly FieldInfo PrisonerCharacterField =
@@ -184,6 +187,8 @@ internal static class PlayerPartyTradeContext
     public static void PublishOfferChanged(BarterVM barterVM)
     {
         if (!IsActive) return;
+        // Each item's initial amount invokes SendOffer while the barter lists are still being built.
+        if (barterVM?.InitializationIsOver != true) return;
         if (isApplyingServerOffer || !CanModifyOffer()) return;
 
         ResetAcceptance();
