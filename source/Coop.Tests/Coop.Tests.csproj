@@ -68,6 +68,7 @@
   </ItemGroup>
   <ItemGroup Condition=" '$(Configuration)' == 'Debug' ">
     <ProjectReference Include="..\Missions.Naval\Missions.Naval.csproj" />
+    <ProjectReference Include="..\Coop.Naval\Coop.Naval.csproj" />
     <Reference Include="NavalDLC">
       <HintPath>..\..\mb2\Modules\NavalDLC\bin\Win64_Shipping_Client\NavalDLC.dll</HintPath>
     </Reference>
@@ -76,6 +77,7 @@
     <Reference Include="NavalDLC.ViewModelCollection"><HintPath>..\..\mb2\Modules\NavalDLC\bin\Win64_Shipping_Client\NavalDLC.ViewModelCollection.dll</HintPath></Reference>
     <Reference Include="TaleWorlds.DotNet"><HintPath>../../mb2/bin/Win64_Shipping_Client/TaleWorlds.DotNet.dll</HintPath></Reference>
     <Publicize Include="Missions.Naval" />
+    <Publicize Include="Coop.Naval" />
     <Reference Include="TaleWorlds.ScreenSystem"><HintPath>../../mb2/bin/Win64_Shipping_Client/TaleWorlds.ScreenSystem.dll</HintPath></Reference>
     <Publicize Include="TaleWorlds.ScreenSystem" />
     <Publicize Include="TaleWorlds.MountAndBlade.View" />

@@ -10,6 +10,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
@@ -83,6 +84,9 @@ namespace Coop.Tests.Server.Connections.States
             {
                 ["lord_6_1"] = 1351,
             };
+            var navalPlayerData = new NavalPlayerData(new(), new());
+            navalPlayerData.PlayerUnlockedFigureHeads["Hero_Player"] = new() { "figurehead_1" };
+            navalPlayerData.PlayerLastFigureheadLootTimes["Hero_Player"] = 2702;
             var session = new CoopSession(
                 string.Empty,
                 Array.Empty<Player>(),
@@ -94,7 +98,8 @@ namespace Coop.Tests.Server.Connections.States
                 null!,
                 null!,
                 heroMeetingData,
-                null!);
+                null!,
+                navalPlayerData);
 
             session.ClanFinance["Hero_Player"] = new ClanFinanceSettings("Clan_Coop", "Hero_Leader", 600);
             serverComponent.Container.Resolve<Mock<ICoopSessionProvider>>()
@@ -115,6 +120,8 @@ namespace Coop.Tests.Server.Connections.States
             Assert.Equal(600, packet.ClanFinance["Hero_Player"].DailyPayment);
             session.ClanFinance.Clear();
             Assert.Single(packet.ClanFinance);
+            Assert.Equal(new[] { "figurehead_1" }, packet.NavalPlayerData.PlayerUnlockedFigureHeads["Hero_Player"]);
+            Assert.Equal(2702, packet.NavalPlayerData.PlayerLastFigureheadLootTimes["Hero_Player"]);
             serverComponent.Container.Resolve<Mock<ITimeControlInterface>>()
                 .Verify(m => m.ServerSetTimeControl(It.IsAny<TimeControlEnum>()), Times.Never);
 

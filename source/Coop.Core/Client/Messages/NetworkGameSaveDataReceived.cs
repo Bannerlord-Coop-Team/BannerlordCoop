@@ -10,6 +10,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Workshops;
@@ -51,6 +52,8 @@ public record NetworkGameSaveDataReceived : IEvent
     public ServerOptions ServerOptions { get; }
     [ProtoMember(14)]
     public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
+    [ProtoMember(15)]
+    public NavalPlayerData NavalPlayerData { get; }
 
     public NetworkGameSaveDataReceived(
         byte[] gameSaveData,
@@ -64,6 +67,7 @@ public record NetworkGameSaveDataReceived : IEvent
         InventoryPlayerData inventoryPlayerData,
         HeroMeetingData heroMeetingData,
         AgingPlayerData agingPlayerData,
+        NavalPlayerData navalPlayerData,
         AttachmentIdMap attachmentIdMap,
         ServerOptions serverOptions,
         Dictionary<string, ClanFinanceSettings> clanFinance = null)
@@ -79,6 +83,7 @@ public record NetworkGameSaveDataReceived : IEvent
         InventoryPlayerData = inventoryPlayerData;
         HeroMeetingData = heroMeetingData;
         AgingPlayerData = agingPlayerData;
+        NavalPlayerData = navalPlayerData;
         AttachmentIdMap = attachmentIdMap;
         ServerOptions = serverOptions;
         ClanFinance = clanFinance;

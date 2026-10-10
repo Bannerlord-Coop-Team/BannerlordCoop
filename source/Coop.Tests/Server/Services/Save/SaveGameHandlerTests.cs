@@ -360,6 +360,7 @@ public class SaveGameHandlerTests
             empty.TradePlayerData,
             empty.InventoryPlayerData,
             empty.HeroMeetingData,
-            empty.AgingPlayerData);
+            empty.AgingPlayerData,
+            empty.NavalPlayerData);
     }
 }
