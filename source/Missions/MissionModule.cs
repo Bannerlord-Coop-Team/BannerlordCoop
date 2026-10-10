@@ -27,6 +27,7 @@ using Missions.Services.Network;
 using Missions.Taverns;
 using Missions.Tournaments;
 using Missions.Tournaments.Spectators;
+using Serilog;
 using System.Collections.Generic;
 using System.IO;
 using Assembly = System.Reflection.Assembly;
@@ -49,6 +50,10 @@ public class MissionModule : Module
     internal const string WeaponPickupPatchCategory = "CoopWeaponPickupPatches";
     internal const string PilotSeatPatchCategory = "CoopPilotSeatPatches";
     internal const string HideoutPatchCategory = "CoopHideoutPatches";
+    private const string NavalMissionsAssemblyFile = "Missions.Naval.dll";
+
+    private static readonly ILogger Logger = LogManager.GetLogger<MissionModule>();
+    private static bool navalMissionsAssemblyMissingLogged;
 
     protected override void Load(ContainerBuilder builder)
     {
@@ -302,14 +307,28 @@ public class MissionModule : Module
         builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerDependency();
 
         // Missions.Naval binds to NavalDLC types, so its module is loaded only while NavalDLC is active.
-        if (ModInformation.IsNavalDlcActive)
-            builder.RegisterAssemblyModules(LoadNavalMissionsAssembly());
+        if (ModInformation.IsNavalDlcActive && TryLoadNavalMissionsAssembly(out var navalAssembly))
+            builder.RegisterAssemblyModules(navalAssembly);
     }
 
-    private static Assembly LoadNavalMissionsAssembly()
+    // A build made without War Sails installed leaves Missions.Naval.dll out, so naval battles stay unavailable.
+    private static bool TryLoadNavalMissionsAssembly(out Assembly assembly)
     {
-        var directory = Path.GetDirectoryName(typeof(MissionModule).Assembly.Location);
-        return Assembly.LoadFrom(Path.Combine(directory, "Missions.Naval.dll"));
+        var path = Path.Combine(Path.GetDirectoryName(typeof(MissionModule).Assembly.Location), NavalMissionsAssemblyFile);
+        if (File.Exists(path))
+        {
+            assembly = Assembly.LoadFrom(path);
+            return true;
+        }
+
+        assembly = null;
+        if (!navalMissionsAssemblyMissingLogged)
+        {
+            navalMissionsAssemblyMissingLogged = true;
+            Logger.Warning("{File} is missing at {Path}; naval battles are unavailable", NavalMissionsAssemblyFile, path);
+        }
+
+        return false;
     }
 
     internal static IEnumerable<HarmonyPatchCategoryRegistration> CreatePatchCategoryRegistrations()

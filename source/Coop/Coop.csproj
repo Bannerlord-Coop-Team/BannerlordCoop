@@ -243,8 +243,8 @@
       <Project>{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}</Project>
       <Name>Missions</Name>
     </ProjectReference>
-    <!-- Naval battle services; loaded by MissionModule only while NavalDLC is active. -->
-    <ProjectReference Include="..\Missions.Naval\Missions.Naval.csproj">
+    <!-- Naval battle services; loaded by MissionModule only while NavalDLC is active. Built only where War Sails is installed. -->
+    <ProjectReference Include="..\Missions.Naval\Missions.Naval.csproj" Condition="Exists('..\..\mb2\Modules\NavalDLC\bin\Win64_Shipping_Client\NavalDLC.dll')">
       <Project>{D0EA26DD-7462-4D93-9895-C5E243954F95}</Project>
       <Name>Missions.Naval</Name>
     </ProjectReference>
