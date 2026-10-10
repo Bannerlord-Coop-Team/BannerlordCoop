@@ -25,7 +25,10 @@ public sealed class MirrorAgent
     public int DeathAction { get; set; } = -1;
     public Vec3 Position { get; set; }
     public int TeleportToPositionCalls { get; set; }
+    public int SetTargetPositionCalls { get; set; }
     public int SetTargetPositionAndDirectionCalls { get; set; }
+    public int ClearTargetFrameCalls { get; set; }
+    public AgentMovementLockedState MovementLockedState { get; set; }
     public Vec2 LastTargetPosition { get; set; }
     public Vec3 LastTargetDirection { get; set; }
     public Vec3 RealGlobalVelocity { get; set; }
@@ -35,6 +38,7 @@ public sealed class MirrorAgent
     public bool LastMaximumSpeedLimitIsMultiplier { get; set; }
     public EquipmentIndex PrimaryWieldedItemIndex { get; set; } = EquipmentIndex.None;
     public EquipmentIndex OffhandWieldedItemIndex { get; set; } = EquipmentIndex.None;
+    public MissionEquipment Equipment { get; set; } = new MissionEquipment();
     public BasicCharacterObject Character { get; set; }
     public Equipment SpawnEquipment { get; set; }
     public BodyProperties BodyProperties { get; set; }
@@ -62,6 +66,8 @@ public sealed class MirrorAgent
     public int SetMovementDirectionCalls { get; set; }
     public Vec2 InputVector { get; set; }
     public int SetMovementInputCalls { get; set; }
+    public int AddAccelerationCalls { get; set; }
+    public Vec3 LastAcceleration { get; set; }
     public Agent.MovementControlFlag MovementFlags { get; set; }
     public int SetMovementFlagsCalls { get; set; }
     public int NativeStateWriteSequence { get; set; }

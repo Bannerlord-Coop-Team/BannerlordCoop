@@ -11,10 +11,10 @@ namespace Coop.Core.Client.Services.MobileParties.Messages;
 internal class NetworkSettlementEncounterRejected : ICommand
 {
     [ProtoMember(1)]
-    public string PartyId;
+    public uint PartyId;
 
     [ProtoMember(2)]
-    public string SettlementId;
+    public uint SettlementId;
 
     public NetworkSettlementEncounterRejected(NetworkRequestStartSettlementEncounter payload)
     {

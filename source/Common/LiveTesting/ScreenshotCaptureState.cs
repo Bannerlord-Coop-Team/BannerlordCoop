@@ -89,8 +89,7 @@ public sealed class ScreenshotCaptureState
         bool eligibleForStability = observation.Exists &&
             observation.HeaderValid &&
             observation.LengthMatchesHeader &&
-            observation.Length > 0 &&
-            observation.IsFreshFor(CaptureRequestedUtc);
+            observation.Length > 0;
         bool stable = eligibleForStability &&
             HasObservation &&
             LastObservationEngineFrame != observationEngineFrame &&

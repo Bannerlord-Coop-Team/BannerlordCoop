@@ -1,10 +1,10 @@
-// Clear mutates the existing dictionary instance in place - deliberately distinct from the
+﻿// Clear mutates the existing dictionary instance in place - deliberately distinct from the
 // whole-dictionary replacement above, which swaps the member to a new instance
 SubscribeTracked((MessagePayload<Local_{{ MemberDeclaringTypeName }}_{{ MemberName }}_DictionaryClear> payload) =>
 {
     var data = payload.What;
 
-    if (!objectManager.TryGetIdWithLogging(data.Instance, out var instanceId))
+    if (!objectManager.TryGetHandleWithLogging(data.Instance, out var instanceId))
         return;
 
     // Preserve mutation order: pending upserts must arrive before this clear.

@@ -3,6 +3,7 @@ using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface;
+using GameInterface.Services.Hideouts;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Logging;
@@ -11,11 +12,16 @@ using GameInterface.Services.Players;
 using Moq;
 using SandBox.GameComponents;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
 using Xunit.Abstractions;
 
@@ -28,10 +34,12 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(BattleSideEnum.Attacker, false)]
-    [InlineData(BattleSideEnum.Defender, true)]
+    [InlineData(BattleSideEnum.Attacker, false, false, false)]
+    [InlineData(BattleSideEnum.Defender, true, false, false)]
+    [InlineData(BattleSideEnum.Attacker, false, true, true)]
+    [InlineData(BattleSideEnum.Attacker, true, true, false)]
     public void AttackMissionStart_NonInitiatingClientInitializesJoinedPlayerEncounter(
-        BattleSideEnum localSide, bool startWithStaleBattle)
+        BattleSideEnum localSide, bool startWithStaleBattle, bool isHideout, bool isDirectAssault)
     {
         var staleMapEvent = startWithStaleBattle ? CreateServerMapEvent() : null;
         var mapEvent = CreateServerMapEvent();
@@ -41,17 +49,26 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
         var client = Clients.Last();
         var missionInitializerResolver = new RecordingMissionInitializerResolver();
         var battleLauncher = new Mock<ICoopFieldBattleLauncher>();
+        var hideoutLauncher = new Mock<ICoopHideoutMissionLauncher>();
         MissionInitializerRecord openedInitializer = default;
         battleLauncher.Setup(l => l.OpenCoopFieldBattle(It.IsAny<MissionInitializerRecord>()))
             .Callback<MissionInitializerRecord>(initializer => openedInitializer = initializer)
             .Returns((Mission)null!);
+        hideoutLauncher.Setup(l => l.OpenCoopHideoutMission(It.IsAny<MissionInitializerRecord>(), isDirectAssault))
+            .Callback<MissionInitializerRecord, bool>((initializer, _) => openedInitializer = initializer)
+            .Returns((Mission)null!);
 
         using var launcherScope = client.Container.BeginLifetimeScope(builder =>
-            builder.RegisterInstance(battleLauncher.Object).As<ICoopFieldBattleLauncher>());
+        {
+            builder.RegisterInstance(battleLauncher.Object).As<ICoopFieldBattleLauncher>();
+            builder.RegisterInstance(hideoutLauncher.Object).As<ICoopHideoutMissionLauncher>();
+        });
 
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var clientBattle));
+            if (isHideout)
+                clientBattle._mapEventType = MapEvent.BattleTypes.Hideout;
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(nonInitiatingPartyId, out var localParty));
             var previousMainParty = Campaign.Current.MainParty;
             Campaign.Current.MainParty = localParty;
@@ -91,7 +108,8 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                     PatchEncounterDir = new Vec2(1f, 0f),
                 };
                 messageBroker.Publish(this, new NetworkStartAttackMission(
-                    mapEvent.MapEventId, missionInitializer, mapEvent.AttackerPartyId));
+                    mapEvent.MapEventId, missionInitializer, mapEvent.AttackerPartyId,
+                    isHideout, isDirectAssault));
 
                 Assert.Equal(0, missionInitializerResolver.CallCount);
                 GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));
@@ -121,7 +139,11 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                     Assert.NotSame(staleEncounter, PlayerEncounter.Current);
                 Assert.NotNull(new SandboxBattleInitializationModel().GetAllAvailableTroopTypes());
                 battleLauncher.Verify(
-                    l => l.OpenCoopFieldBattle(It.IsAny<MissionInitializerRecord>()), Times.Once);
+                    l => l.OpenCoopFieldBattle(It.IsAny<MissionInitializerRecord>()),
+                    isHideout ? Times.Never() : Times.Once());
+                hideoutLauncher.Verify(
+                    l => l.OpenCoopHideoutMission(It.IsAny<MissionInitializerRecord>(), isDirectAssault),
+                    isHideout ? Times.Once() : Times.Never());
                 Assert.False(BattleSpawnGate.IsCoopBattleActive);
             }
             finally
@@ -129,6 +151,100 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 BattleSpawnGate.EndBattle();
                 Campaign.Current.MainParty = previousMainParty;
                 Campaign.Current.PlayerEncounter = null;
+                ContainerProvider.SetContainer(client.Container);
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(BattleSideEnum.Defender, false)]
+    [InlineData(BattleSideEnum.Attacker, false)]
+    [InlineData(BattleSideEnum.Defender, true)]
+    public void SiegeMissionStart_InitializesEncounterBeforeOpeningMission(
+        BattleSideEnum localSide, bool hasCurrentEncounter)
+    {
+        var mapEvent = CreateServerMapEvent();
+        var partyId = JoinNewServerPartyToSide(mapEvent.MapEventId, localSide);
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var client = Clients.Last();
+        var launcher = new Mock<ICoopSiegeBattleLauncher>();
+        bool opened = false;
+
+        using var launcherScope = client.Container.BeginLifetimeScope(builder =>
+            builder.RegisterInstance(launcher.Object).As<ICoopSiegeBattleLauncher>());
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEvent.MapEventId, out var battle));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            var campaign = Campaign.Current;
+            var previousMainParty = campaign.MainParty;
+            var previousEncounter = campaign.PlayerEncounter;
+            var previousLocationModel = campaign.Models.LocationModel;
+            var previousDifficultyModel = campaign.Models.DifficultyModel;
+            var previousWeatherModel = campaign.Models.MapWeatherModel;
+            var previousScene = campaign._mapSceneWrapper;
+
+            try
+            {
+                campaign.MainParty = party;
+                campaign.PlayerEncounter = null;
+                campaign._mapSceneWrapper = Mock.Of<IMapScene>();
+                campaign.Models.LocationModel = Mock.Of<LocationModel>();
+                campaign.Models.DifficultyModel = Mock.Of<DifficultyModel>();
+                campaign.Models.MapWeatherModel = Mock.Of<MapWeatherModel>();
+                battle._mapEventType = MapEvent.BattleTypes.Siege;
+                battle.MapEventSettlement = settlement;
+                settlement.LocationComplex = new LocationComplex();
+                settlement.LocationComplex._locations.Add("center", new Location(
+                    "center", new TextObject("castle"), new TextObject("gate"), 0, false, false,
+                    "CanAlways", "CanAlways", "CanAlways", "CanAlways",
+                    new[] { "empire_castle_f", "empire_castle_f", "empire_castle_f", "empire_castle_f" },
+                    settlement.LocationComplex));
+
+                if (hasCurrentEncounter)
+                    BattleMissionStartHandler.InitializePlayerEncounter(battle);
+                var existingEncounter = PlayerEncounter.Current;
+
+                launcher.Setup(l => l.OpenCoopSiegeBattle(It.IsAny<MissionInitializerRecord>(),
+                        It.IsAny<float[]>(), It.IsAny<List<MissionSiegeWeapon>>(),
+                        It.IsAny<List<MissionSiegeWeapon>>(), false))
+                    .Returns(() =>
+                    {
+                        Assert.Same(battle, PlayerEncounter.Battle);
+                        Assert.Equal(localSide == BattleSideEnum.Attacker, PlayerEncounter.PlayerIsAttacker);
+                        Assert.Same(settlement, PlayerEncounter.Current.EncounterSettlementAux);
+                        Assert.True(PlayerEncounter.Current.IsJoinedBattle);
+                        if (hasCurrentEncounter) Assert.Same(existingEncounter, PlayerEncounter.Current);
+                        opened = true;
+                        return null!;
+                    });
+
+                using var messageBroker = new MessageBroker();
+                using var handler = new BattleMissionStartHandler(messageBroker, client.ObjectManager,
+                    client.Resolve<IPlayerManager>(), client.Resolve<INetwork>(),
+                    client.Resolve<IMapEventLogger>(), new RecordingMissionInitializerResolver(), null!);
+                ContainerProvider.SetContainer(launcherScope);
+                messageBroker.Publish(this, new NetworkStartSiegeMission(mapEvent.MapEventId, 0,
+                    new[] { 1f, 1f }, Array.Empty<SiegeEngineState>(), Array.Empty<SiegeEngineState>(),
+                    mapEvent.AttackerPartyId, settlementId));
+                GameThread.Instance.Update(TimeSpan.FromMilliseconds(16));
+
+                Assert.True(opened);
+                Assert.Same(battle, PlayerEncounter.Battle);
+                Assert.Equal(localSide == BattleSideEnum.Attacker, PlayerEncounter.PlayerIsAttacker);
+                Assert.False(BattleSpawnGate.IsCoopBattleActive);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+                campaign.MainParty = previousMainParty;
+                campaign.PlayerEncounter = previousEncounter;
+                campaign.Models.LocationModel = previousLocationModel;
+                campaign.Models.DifficultyModel = previousDifficultyModel;
+                campaign.Models.MapWeatherModel = previousWeatherModel;
+                campaign._mapSceneWrapper = previousScene;
                 ContainerProvider.SetContainer(client.Container);
             }
         });

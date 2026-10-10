@@ -13,9 +13,9 @@ namespace AutoSync;
 public readonly struct Network_{{ MemberDeclaringTypeName}}_{{ MemberName }}_ClearQueue : ICommand
 {
     [ProtoMember(1)]
-    public readonly string InstanceId;
+    public readonly uint InstanceId;
 
-    public Network_{{ MemberDeclaringTypeName}}_{{ MemberName }}_ClearQueue(string instanceId)
+    public Network_{{ MemberDeclaringTypeName}}_{{ MemberName }}_ClearQueue(uint instanceId)
     {
         InstanceId = instanceId;
     }

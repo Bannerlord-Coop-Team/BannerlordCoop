@@ -9,6 +9,8 @@ using System.Collections.Generic;
 using System.Linq;
 using GameInterface.Configuration;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Hideouts;
+using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -72,13 +74,18 @@ public interface IBattleTroopReserveBuilder : IGameAbstraction
     /// <summary>Forget a controller's withdrawn parties: drop them from the ledger and the built-set so that,
     /// if it rejoins, its party is re-flattened fresh (supplied pointer reset) and re-spawns.</summary>
     void ForgetController(MapEvent mapEvent, string controllerId);
+    void ForgetParty(MapEvent mapEvent, MapEventParty party);
 
     /// <summary>Forget EVERY reserve of a battle (its whole ledger entry + flatten cache). Called when a battle
     /// ENDS — concluded (victory) or fully ABANDONED (host left with no successors) — so the server stops
     /// holding the battle's reserves and a later battle on the SAME map event re-flattens all parties fresh
     /// (otherwise the AI/enemy parties the host had been fielding keep their advanced supplied pointers and
     /// never re-spawn on a restart).</summary>
-    void ForgetMapEvent(MapEvent mapEvent);
+    void ForgetMapEvent(MapEvent mapEvent, bool preserveHealth = false);
+
+    /// <summary>Keep surviving and unspawned troop health for this party's next reserve.</summary>
+    void RecordHealth(MapEvent mapEvent, MapEventParty party, IReadOnlyDictionary<int, float> survivors, int suppliedCount,
+        IReadOnlyDictionary<int, float> routedSurvivors = null);
 }
 
 /// <inheritdoc cref="IBattleTroopReserveBuilder"/>
@@ -89,20 +96,26 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     private readonly IBattleTroopLedger ledger;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
+    private readonly IHideoutTroopSelection hideoutSelection;
 
     // Parties already flattened into the ledger (by object-manager id). Per-PARTY, not per-map-event, so a
     // party that joins AFTER the battle started (a mid-battle joiner) gets flattened on demand the next time
     // reserves are built — otherwise it would never be in the ledger and that player would own nothing.
+    private readonly Dictionary<string, Dictionary<PartyBase, Dictionary<int, float>>> routedHealth = new();
     private readonly HashSet<string> builtParties = new HashSet<string>();
     private readonly Dictionary<string, Dictionary<int, int>> ambushSupplyOrders =
         new Dictionary<string, Dictionary<int, int>>();
+    private readonly Dictionary<string, Dictionary<string, string>> hideoutPartyReserves = new();
+    private readonly Dictionary<string, Dictionary<PartyBase, Dictionary<string, Queue<float>>>> retainedHealth = new();
     private readonly object gate = new object();
 
-    public BattleTroopReserveBuilder(IBattleTroopLedger ledger, IObjectManager objectManager, IPlayerManager playerManager)
+    public BattleTroopReserveBuilder(IBattleTroopLedger ledger, IObjectManager objectManager, IPlayerManager playerManager,
+        IHideoutTroopSelection hideoutSelection = null)
     {
         this.ledger = ledger;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
+        this.hideoutSelection = hideoutSelection;
     }
 
     public void PrepareMissionReserves(MapEvent mapEvent, MobileParty initiatingParty)
@@ -112,11 +125,16 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         FlattenedTroopRoster defenderPriority = null;
         if (mapEvent.IsSiegeAmbush)
             defenderPriority = BuildSiegeAmbushPriorityRoster(mapEvent, initiatingParty);
+        else if (mapEvent.IsHideoutBattle)
+            defenderPriority = MapEventHelper.GetPriorityListForHideoutMission(
+                mapEvent.DefenderSide.Parties.Where(party => party.Party.MobileParty != null)
+                    .Select(party => party.Party.MobileParty).ToList(), out _);
 
         mapEvent.AttackerSide.MakeReadyForMission(null);
         mapEvent.DefenderSide.MakeReadyForMission(defenderPriority);
 
-        if (!mapEvent.IsSiegeAmbush || !objectManager.TryGetId(mapEvent, out var mapEventId))
+        if ((!mapEvent.IsSiegeAmbush && !mapEvent.IsHideoutBattle) ||
+            !objectManager.TryGetId(mapEvent, out var mapEventId))
             return;
 
         lock (gate)
@@ -213,42 +231,112 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
     public void ForgetController(MapEvent mapEvent, string controllerId)
     {
         if (mapEvent == null || string.IsNullOrEmpty(controllerId)) return;
+        // A hideout attempt cannot replenish its spent escort reserve by retreating and rejoining.
+        if (mapEvent.IsHideoutBattle) return;
         if (!objectManager.TryGetId(mapEvent, out var mapEventId)) return;
 
+        foreach (var party in EnumerateParties(mapEvent))
+            if (IsPartyRegisteredToController(party, controllerId))
+                ForgetParty(mapEvent, party);
+    }
+
+    public void ForgetParty(MapEvent mapEvent, MapEventParty party)
+    {
+        if (mapEvent == null || mapEvent.IsHideoutBattle || party == null
+            || !objectManager.TryGetId(mapEvent, out var mapEventId)
+            || !objectManager.TryGetId(party, out var partyId)) return;
         lock (gate)
         {
-            foreach (var party in EnumerateParties(mapEvent))
-            {
-                if (!objectManager.TryGetId(party, out var partyId)) continue;
-                if (!IsPartyRegisteredToController(party, controllerId)) continue;
-
-                ledger.RemoveParty(mapEventId, partyId);
-                builtParties.Remove(partyId);
-                Logger.Information("[TroopSupply] Forgot party {PartyId} of retreating {Controller} (re-flattens fresh on rejoin)",
-                    partyId, controllerId);
-            }
+            ledger.RemoveParty(mapEventId, partyId);
+            builtParties.Remove(partyId);
         }
     }
 
-    public void ForgetMapEvent(MapEvent mapEvent)
+    public void ForgetMapEvent(MapEvent mapEvent, bool preserveHealth = false)
     {
         if (mapEvent == null) return;
+        // A vanished mission host does not end the hideout attempt or restore spent escort slots.
+        if (mapEvent.IsHideoutBattle && !mapEvent.IsFinalized && mapEvent.BattleState == BattleState.None)
+            return;
         if (!objectManager.TryGetId(mapEvent, out var mapEventId)) return;
 
         lock (gate)
         {
+            if (!preserveHealth) retainedHealth.Remove(mapEventId);
+            routedHealth.Remove(mapEventId);
             int forgotten = 0;
-            foreach (var party in EnumerateParties(mapEvent))
-                if (objectManager.TryGetId(party, out var partyId) && builtParties.Remove(partyId))
+            foreach (var partyId in ledger.GetParties(mapEventId))
+                if (builtParties.Remove(partyId))
                     forgotten++;
 
             // Drop the whole battle's reserves in one shot — covers every party (including any no longer
             // enumerable) and leaves no empty per-battle entry behind, so a restart re-flattens fresh.
             ledger.Remove(mapEventId);
             ambushSupplyOrders.Remove(mapEventId);
+            if (hideoutPartyReserves.TryGetValue(mapEventId, out var hideoutParties))
+                foreach (var partyId in hideoutParties.Values)
+                    builtParties.Remove(partyId);
+            hideoutPartyReserves.Remove(mapEventId);
             Logger.Information("[TroopSupply] Forgot ALL reserves of battle {MapEventId} ({Count} flatten-cache entries cleared)",
                 mapEventId, forgotten);
         }
+    }
+
+    public void RecordHealth(MapEvent mapEvent, MapEventParty party, IReadOnlyDictionary<int, float> survivors, int suppliedCount,
+        IReadOnlyDictionary<int, float> routedSurvivors = null)
+    {
+        if (mapEvent == null || party?.Party == null || mapEvent.IsFinalized ||
+            !objectManager.TryGetId(mapEvent, out var mapEventId) ||
+            !objectManager.TryGetId(party, out var partyId)) return;
+
+        lock (gate)
+        {
+            if (!ledger.TryGetReserve(mapEventId, partyId, out var entries, out var supplied)) return;
+            supplied = Math.Min(entries.Count, Math.Max(supplied, suppliedCount));
+            if (!routedHealth.TryGetValue(mapEventId, out var routedParties))
+                routedHealth[mapEventId] = routedParties = new Dictionary<PartyBase, Dictionary<int, float>>();
+            if (!routedParties.TryGetValue(party.Party, out var routed))
+                routedParties[party.Party] = routed = new Dictionary<int, float>();
+            if (routedSurvivors != null)
+                foreach (var survivor in routedSurvivors) routed[survivor.Key] = survivor.Value;
+            var healthByCharacter = new Dictionary<string, Queue<float>>();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+                float? health = survivors != null && survivors.TryGetValue(entry.Seed, out var survivorHealth)
+                    ? survivorHealth
+                    : routed.TryGetValue(entry.Seed, out var routedValue) ? routedValue
+                    : i >= supplied ? entry.Health : null;
+                if (!health.HasValue || !(health.Value > 0f) || float.IsInfinity(health.Value)) continue;
+                if (!healthByCharacter.TryGetValue(entry.CharacterId, out var values))
+                    healthByCharacter[entry.CharacterId] = values = new Queue<float>();
+                values.Enqueue(health.Value);
+            }
+            if (!retainedHealth.TryGetValue(mapEventId, out var parties))
+                retainedHealth[mapEventId] = parties = new Dictionary<PartyBase, Dictionary<string, Queue<float>>>();
+            // MapEventParty wrappers and descriptor seeds can change when a party rejoins.
+            parties[party.Party] = healthByCharacter;
+        }
+    }
+
+    private void RestoreHealth(string mapEventId, PartyBase party, List<TroopReserveEntry> entries)
+    {
+        if (!retainedHealth.TryGetValue(mapEventId, out var parties) ||
+            !parties.TryGetValue(party, out var healthByCharacter)) return;
+        for (int i = 0; i < entries.Count; i++)
+        {
+            var entry = entries[i];
+            if (!healthByCharacter.TryGetValue(entry.CharacterId, out var values) || values.Count == 0) continue;
+            entries[i] = new TroopReserveEntry(entry.Seed, entry.CharacterId, entry.FormationClass,
+                entry.SupplyOrder, values.Dequeue());
+        }
+        parties.Remove(party);
+        if (routedHealth.TryGetValue(mapEventId, out var routedParties))
+        {
+            routedParties.Remove(party);
+            if (routedParties.Count == 0) routedHealth.Remove(mapEventId);
+        }
+        if (parties.Count == 0) retainedHealth.Remove(mapEventId);
     }
 
     private static int CountEntries(List<PartyReserve> parties)
@@ -277,19 +365,53 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
                 if (builtParties.Contains(partyId))
                     continue; // already flattened
 
+                if (mapEvent.IsHideoutBattle && party.Party?.Side == BattleSideEnum.Attacker)
+                {
+                    if (hideoutSelection?.HasSelection(mapEvent.MapEventSettlement, party.Party.MobileParty) != true)
+                        continue;
+                    if (RestoreHideoutReserve(mapEventId, party, partyId))
+                        continue;
+                }
+
                 bool hadRoster = party._roster != null;
                 var supplyOrders = party.Party?.Side == BattleSideEnum.Defender
                     ? defenderSupplyOrders
                     : null;
                 var entries = FlattenParty(party, supplyOrders, ref nextAmbushSupplyOrder);
+                if (mapEvent.IsHideoutBattle && party.Party?.Side == BattleSideEnum.Attacker)
+                    hideoutSelection.FilterReserve(mapEvent, party, entries);
                 if (supplyOrders == null)
                     PlacePlayerHeroFirstInReserve(party, entries);
+                RestoreHealth(mapEventId, party.Party, entries);
                 ledger.SetReserve(mapEventId, partyId, entries);
                 builtParties.Add(partyId);
                 Logger.Information("[TroopSupply] Built reserve: party {PartyId} side {Side} -> {Count} troops (roster was {Roster})",
                     partyId, party.Party?.Side, entries.Count, hadRoster ? "present" : "null");
             }
         }
+    }
+
+    private bool RestoreHideoutReserve(string mapEventId, MapEventParty party, string partyId)
+    {
+        if (!objectManager.TryGetId(party.Party.MobileParty, out var mobilePartyId)) return false;
+        if (!hideoutPartyReserves.TryGetValue(mapEventId, out var parties))
+        {
+            parties = new Dictionary<string, string>();
+            hideoutPartyReserves.Add(mapEventId, parties);
+        }
+
+        var hadPrevious = parties.TryGetValue(mobilePartyId, out var previousPartyId);
+        parties[mobilePartyId] = partyId;
+        if (!hadPrevious || !ledger.TryGetReserve(mapEventId, previousPartyId, out var entries, out var supplied))
+            return false;
+
+        // Leaving and rejoining creates a new MapEventParty, but keeps this attempt's spent descriptors.
+        ledger.SetReserve(mapEventId, partyId, entries);
+        ledger.ReportSupplied(mapEventId, partyId, supplied);
+        ledger.RemoveParty(mapEventId, previousPartyId);
+        builtParties.Remove(previousPartyId);
+        builtParties.Add(partyId);
+        return true;
     }
 
     // Hand out the server's current flattened descriptors so every client spawns the same agent identities.

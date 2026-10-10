@@ -8,7 +8,6 @@ using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Patches;
-using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Tests.Bootstrap;
@@ -36,6 +35,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
 {
     static NearbyPartyReinforcerTests()
     {
+        RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
         GameBootStrap.Initialize();
     }
 
@@ -345,7 +345,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
     }
 
     [Fact]
-    public void AttachedArmyCleanup_PublishesEveryRecursivelyRemovedParty()
+    public void AttachedArmyCleanup_RemovesLeaderAndAttachedParty()
     {
         var removedPlayer = CreateMobileParty();
         var nearbyArmyLeader = CreateMobileParty();
@@ -370,15 +370,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         nearbyArmyLeader._isCurrentlyUsedByAQuest = true;
         side._nearbyPartiesAddedToPlayerMapEvent.Add(nearbyArmyLeader);
         MarkAsPlayerParty(removedPlayer);
-        var publishedRemovals = new List<(object Source, MapEventPartyRemoved Message)>();
-        var messageBroker = new Mock<IMessageBroker>();
-        messageBroker
-            .Setup(broker => broker.Publish(
-                It.IsAny<object>(),
-                It.IsAny<MapEventPartyRemoved>()))
-            .Callback<object, MapEventPartyRemoved>((source, message) =>
-                publishedRemovals.Add((source, message)));
-        var reinforcer = new NearbyPartyReinforcer(messageBroker.Object);
+        var reinforcer = CreateReinforcer();
 
         reinforcer.RemoveReinforcementsIfNoPlayers(mapEvent, removedPlayer);
 
@@ -386,18 +378,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         Assert.Null(attachedArmyParty.MapEventSide);
         Assert.DoesNotContain(leaderMapEventParty, side.Parties);
         Assert.DoesNotContain(attachedMapEventParty, side.Parties);
-        Assert.Collection(
-            publishedRemovals,
-            removal =>
-            {
-                Assert.Same(side, removal.Source);
-                Assert.Same(leaderMapEventParty, removal.Message.MapEventParty);
-            },
-            removal =>
-            {
-                Assert.Same(side, removal.Source);
-                Assert.Same(attachedMapEventParty, removal.Message.MapEventParty);
-            });
+        Assert.Empty(side._nearbyPartiesAddedToPlayerMapEvent);
     }
 
     [Fact]
@@ -409,20 +390,8 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         using var messageBroker = new MessageBroker();
         using var handler = new NearbyPartyReinforcementHandler(messageBroker, reinforcer);
 
-        bool ownsGameThreadMark = GameThread.Instance.GameThreadId == 0;
-        if (ownsGameThreadMark)
-            GameThread.Instance.MarkGameThread();
-
-        try
-        {
-            using (new AllowedThread())
-                messageBroker.Publish(mapEvent, new PartyRemovedFromMapEvent(removedParty));
-        }
-        finally
-        {
-            if (ownsGameThreadMark)
-                GameThread.Instance.RestoreGameThread(0);
-        }
+        using (new AllowedThread())
+            messageBroker.Publish(mapEvent, new PartyRemovedFromMapEvent(removedParty));
 
         Assert.True(reinforcer.WaitForCleanup());
         Assert.Equal(1, reinforcer.CleanupCount);
@@ -436,23 +405,11 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
         using var messageBroker = new MessageBroker();
         using var handler = new NearbyPartyReinforcementHandler(messageBroker, reinforcer);
 
-        bool ownsGameThreadMark = GameThread.Instance.GameThreadId == 0;
-        if (ownsGameThreadMark)
-            GameThread.Instance.MarkGameThread();
-
-        try
+        using (new AllowedThread())
         {
-            using (new AllowedThread())
-            {
-                InteractionPatches.OpenAiJoinWindowAndPublish(
-                    mapEvent,
-                    () => messageBroker.Publish(mapEvent, new PlayerJoinedBattle()));
-            }
-        }
-        finally
-        {
-            if (ownsGameThreadMark)
-                GameThread.Instance.RestoreGameThread(0);
+            InteractionPatches.OpenAiJoinWindowAndPublish(
+                mapEvent,
+                () => messageBroker.Publish(mapEvent, new PlayerJoinedBattle()));
         }
 
         Assert.True(reinforcer.WaitForImmediateScan());
@@ -460,7 +417,7 @@ public sealed class NearbyPartyReinforcerTests : IDisposable
     }
 
     private static NearbyPartyReinforcer CreateReinforcer()
-        => new NearbyPartyReinforcer(Mock.Of<IMessageBroker>());
+        => new NearbyPartyReinforcer();
 
     private MapEvent CreatePlayerBattle(MobileParty playerParty, MobileParty enemyParty)
     {

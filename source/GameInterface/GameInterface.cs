@@ -2,6 +2,7 @@
 using GameInterface.Utils;
 using HarmonyLib;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 
 namespace GameInterface;
@@ -23,7 +24,14 @@ public class GameInterface : IGameInterface
 
     public const string HARMONY_GAME_STARTED_CATEGORY = "GameStartedPatches";
 
+    private const string PatchingFailedEarlierMessage =
+        "Patching failed earlier in this session. Restart Bannerlord before joining or hosting again.";
+
     private static bool gameStartedPatchesApplied;
+
+    // Patches outlive the container, so a later attempt would otherwise take the reconnect path over a partial install.
+    private static readonly ConcurrentDictionary<string, Exception> failedPatchAttempts =
+        new ConcurrentDictionary<string, Exception>();
 
     private readonly Harmony harmony;
     private readonly IAutoSyncPatchCollector patchCollector;
@@ -48,6 +56,11 @@ public class GameInterface : IGameInterface
 
     public void PatchAll()
     {
+        if (failedPatchAttempts.TryGetValue(harmony.Id, out Exception earlierFailure))
+        {
+            throw new InvalidOperationException(PatchingFailedEarlierMessage, earlierFailure);
+        }
+
         if (Harmony.HasAnyPatches(harmony.Id))
         {
             // Reconnect skips the install below, so handlers torn down on disconnect must be rebound here.
@@ -55,6 +68,24 @@ public class GameInterface : IGameInterface
             return;
         }
 
+        try
+        {
+            PatchAllCore();
+        }
+        catch (Exception e)
+        {
+            // UnpatchAll is disabled, so whatever was applied before the failure stays for the whole process.
+            if (Harmony.HasAnyPatches(harmony.Id))
+            {
+                failedPatchAttempts.TryAdd(harmony.Id, e);
+            }
+
+            throw;
+        }
+    }
+
+    private void PatchAllCore()
+    {
         var assembly = typeof(GameInterface).Assembly;
 
         // Must run before any other detour below, or a fragile no-op method's detour can corrupt its inline
@@ -63,8 +94,6 @@ public class GameInterface : IGameInterface
 
         harmony.PatchCategory(assembly, HARMONY_STATIC_FIXES_CATEGORY);
         harmony.PatchAllUncategorized(assembly);
-
-        Services.Issues.Generic.QuestTypeBootstrap.EnsureAllMigratedTypesRegistered();
 
         foreach (HarmonyPatchCategoryRegistration patchCategory in patchCategories)
         {

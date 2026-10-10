@@ -4,9 +4,9 @@ namespace GameInterface.Services.ItemRosters.Messages
 {
     public class ClearItemRoster : ICommand
     {
-        public string ItemRosterId { get; }
+        public uint ItemRosterId { get; }
 
-        public ClearItemRoster(string itemRosterId)
+        public ClearItemRoster(uint itemRosterId)
         {
             ItemRosterId = itemRosterId;
         }

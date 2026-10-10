@@ -18,8 +18,12 @@ public class AttachmentIdMap
     [ProtoMember(1)]
     public Dictionary<string, string> DerivedToServerId { get; }
 
-    public AttachmentIdMap(Dictionary<string, string> derivedToServerId)
+    [ProtoMember(2)]
+    public Dictionary<string, uint> ServerIdToHandle { get; }
+
+    public AttachmentIdMap(Dictionary<string, string> derivedToServerId, Dictionary<string, uint> serverIdToHandle)
     {
         DerivedToServerId = derivedToServerId;
+        ServerIdToHandle = serverIdToHandle;
     }
 }

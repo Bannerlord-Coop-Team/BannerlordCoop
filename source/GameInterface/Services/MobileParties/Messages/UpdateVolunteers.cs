@@ -8,9 +8,9 @@ namespace GameInterface.Services.MobileParties.Messages;
 internal readonly struct UpdateVolunteers : ICommand
 {
     [ProtoMember(1)]
-    public readonly Dictionary<string, string[]> UpdatedVolunteerTypeIds;
+    public readonly Dictionary<uint, uint[]> UpdatedVolunteerTypeIds;
 
-    public UpdateVolunteers(Dictionary<string, string[]> updatedVolunteerTypeIds)
+    public UpdateVolunteers(Dictionary<uint, uint[]> updatedVolunteerTypeIds)
     {
         UpdatedVolunteerTypeIds = updatedVolunteerTypeIds;
     }

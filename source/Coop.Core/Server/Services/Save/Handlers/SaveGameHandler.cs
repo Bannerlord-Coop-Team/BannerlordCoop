@@ -11,6 +11,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Save.Messages;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -88,6 +89,22 @@ internal class SaveGameHandler : IHandler
     private void Handle_GameSaved(MessagePayload<GameSaved> obj)
     {
         var saveName = obj.What.SaveName;
+        try
+        {
+            WriteCoopSession(saveName);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Failed to write the co-op session for save {SaveName}", saveName);
+            messageBroker.Publish(this, new CoopSessionWritten(saveName, false));
+            return;
+        }
+
+        messageBroker.Publish(this, new CoopSessionWritten(saveName, true));
+    }
+
+    private void WriteCoopSession(string saveName)
+    {
         var current = coopSessionProvider.CoopSession;
         var empty = CoopSession.Empty;
 
@@ -101,7 +118,9 @@ internal class SaveGameHandler : IHandler
             current?.InteractionsPlayerData ?? empty.InteractionsPlayerData,
             current?.TradePlayerData ?? empty.TradePlayerData,
             current?.InventoryPlayerData ?? empty.InventoryPlayerData,
-            current?.HeroMeetingData ?? empty.HeroMeetingData);
+            current?.HeroMeetingData ?? empty.HeroMeetingData,
+            current?.AgingPlayerData ?? empty.AgingPlayerData,
+            current?.ClanFinance ?? empty.ClanFinance);
 
         coopSessionProvider.CoopSession = session;
 
@@ -124,7 +143,9 @@ internal class SaveGameHandler : IHandler
             loaded?.InteractionsPlayerData ?? empty.InteractionsPlayerData,
             loaded?.TradePlayerData ?? empty.TradePlayerData,
             loaded?.InventoryPlayerData ?? empty.InventoryPlayerData,
-            loaded?.HeroMeetingData ?? empty.HeroMeetingData);
+            loaded?.HeroMeetingData ?? empty.HeroMeetingData,
+            loaded?.AgingPlayerData ?? empty.AgingPlayerData,
+            loaded?.ClanFinance ?? empty.ClanFinance);
 
         coopSessionProvider.CoopSession = savedSession;
     }

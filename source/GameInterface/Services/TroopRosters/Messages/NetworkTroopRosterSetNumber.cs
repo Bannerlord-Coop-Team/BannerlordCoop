@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace GameInterface.Services.TroopRosters.Messages;
@@ -13,13 +13,13 @@ namespace GameInterface.Services.TroopRosters.Messages;
 internal readonly struct NetworkTroopRosterSetNumber : ICommand
 {
     [ProtoMember(1)]
-    public readonly string RosterId;
+    public readonly uint RosterId;
     [ProtoMember(2)]
-    public readonly string CharacterId;
+    public readonly uint CharacterId;
     [ProtoMember(3)]
     public readonly int Number;
 
-    public NetworkTroopRosterSetNumber(string rosterId, string characterId, int number)
+    public NetworkTroopRosterSetNumber(uint rosterId, uint characterId, int number)
     {
         RosterId = rosterId;
         CharacterId = characterId;

@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Commands;
 using GameInterface.Services.Party.Commands;
+using HarmonyLib;
 using System;
+using TaleWorlds.CampaignSystem.Party;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Party;
@@ -31,5 +33,19 @@ public class PartyCommandsTests : IDisposable
 
         Assert.False(result.Succeeded);
         Assert.Equal("Command can only be run on a client.", result.Output);
+    }
+
+    [Fact]
+    public void MoveOffset_IssuesBehaviorAndNavigationMovement()
+    {
+        var method = AccessTools.Method(
+            typeof(PartyCommands.MoveOffsetCoopCommand),
+            nameof(PartyCommands.MoveOffsetCoopCommand.ProcessCommand));
+        var instructions = PatchProcessor.GetOriginalInstructions(method);
+
+        Assert.Contains(instructions, instruction => instruction.Calls(
+            AccessTools.Method(typeof(MobileParty), "SetNavigationModePoint")));
+        Assert.Contains(instructions, instruction => instruction.Calls(
+            AccessTools.Method(typeof(MobileParty), nameof(MobileParty.SetMoveGoToPoint))));
     }
 }

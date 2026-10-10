@@ -27,13 +27,13 @@ public readonly struct ModOptions
     [ProtoMember(3)]
     public readonly bool ClientsCanUseCheats { get; } = false;
     [ProtoMember(4)]
-    public readonly bool GoldFoodInfluenceChangeInSettlements { get; } = true;
+    public readonly bool GoldFoodInfluenceChangeInSettlements { get; } = false;
     [ProtoMember(5)]
-    public readonly GoldFoodChangeMode GoldFoodInfluenceChangeInBattles { get; } = GoldFoodChangeMode.OneDayMax;
+    public readonly GoldFoodChangeMode GoldFoodInfluenceChangeInBattles { get; } = GoldFoodChangeMode.Disabled;
     [ProtoMember(6)]
     public readonly bool GoldFoodInfluenceChangeForDisconnectedPlayers { get; } = false;
     [ProtoMember(7)]
-    public readonly int PlayerBattleAiJoinWindowHours { get; } = 24;
+    public readonly int PlayerBattleAiJoinWindowHours { get; } = 6;
     [ProtoMember(8)]
     public readonly bool SpeedLimitWhilePlayersInBattle { get; } = true;
     [ProtoMember(9)]
@@ -53,27 +53,52 @@ public readonly struct ModOptions
     [ProtoMember(16)]
     public readonly LordDefectionRetryMode LordDefectionRetries { get; } = LordDefectionRetryMode.Vanilla;
     [ProtoMember(17)]  
-    public readonly bool EnableHeroExecutions { get; } = true;
+    public readonly bool EnableHeroExecutions { get; } = false;
     [ProtoMember(18)]
     public readonly bool EnablePlayerClanMemberExecutions { get; } = false;
     [ProtoMember(19)]
-    public readonly bool ShowPlayerNameplates { get; } = true;
+    public readonly bool EnablePlayerExecutions { get; } = false;
     [ProtoMember(20)]
+    public readonly bool ShowPlayerNameplates { get; } = true;
+    [ProtoMember(21)]
     public readonly bool PlayerWoundedBattleEntry { get; } = true;
+    [ProtoMember(22)]
+    public bool VoiceEnabled { get; } = true;
+    [ProtoMember(23)]
+    public bool EnsureUnaffiliatedWanderers { get; } = true;
+
+    [ProtoMember(24)]
+    public readonly bool CoopClansEnabled { get; } = true;
+
+    [ProtoMember(25)]
+    public readonly bool BlockAiWarDeclarationsOnOfflinePlayers { get; } = false;
+    [ProtoMember(26)]
+    public readonly int SpawnRateWanderers { get; } = 1;
+
+    public ModOptions(ModOptions previous, bool voiceEnabled)
+    {
+        this = previous;
+        VoiceEnabled = voiceEnabled;
+    }
 
     public ModOptions(ModOptionsData modOptionsData)
     {
+        VoiceEnabled = modOptionsData.VoiceEnabled ?? VoiceEnabled;
         FastForwardEnabled = modOptionsData.FastForwardEnabled ?? FastForwardEnabled;
         AutoPauseEnabled = modOptionsData.AutoPauseEnabled ?? AutoPauseEnabled;
         ClientsCanUseCheats = modOptionsData.ClientsCanUseCheats ?? ClientsCanUseCheats;
         GoldFoodInfluenceChangeInSettlements = modOptionsData.GoldFoodInfluenceChangeInSettlements ?? GoldFoodInfluenceChangeInSettlements;
         GoldFoodInfluenceChangeInBattles = modOptionsData.GoldFoodInfluenceChangeInBattles ?? GoldFoodInfluenceChangeInBattles;
         GoldFoodInfluenceChangeForDisconnectedPlayers = modOptionsData.GoldFoodInfluenceChangeForDisconnectedPlayers ?? GoldFoodInfluenceChangeForDisconnectedPlayers;
+        BlockAiWarDeclarationsOnOfflinePlayers = modOptionsData.BlockAiWarDeclarationsOnOfflinePlayers ?? BlockAiWarDeclarationsOnOfflinePlayers;
         PlayerBattleAiJoinWindowHours = modOptionsData.PlayerBattleAiJoinWindowHours ?? PlayerBattleAiJoinWindowHours;
         SpeedLimitWhilePlayersInBattle = modOptionsData.SpeedLimitWhilePlayersInBattle ?? SpeedLimitWhilePlayersInBattle;
+        EnsureUnaffiliatedWanderers = modOptionsData.EnsureUnaffiliatedWanderers ?? EnsureUnaffiliatedWanderers;
         WandererLimit = modOptionsData.WandererLimit ?? WandererLimit;
+        SpawnRateWanderers = modOptionsData.SpawnRateWanderers ?? SpawnRateWanderers;
         WandererLimitScalesWithPlayers = modOptionsData.WandererLimitScalesWithPlayers ?? WandererLimitScalesWithPlayers;
         PlayerKingdomClanTierRequired = modOptionsData.PlayerKingdomClanTierRequired ?? PlayerKingdomClanTierRequired;
+        CoopClansEnabled = modOptionsData.CoopClansEnabled ?? CoopClansEnabled;
         SmithingStaminaRecoveryOutsideSettlements = modOptionsData.SmithingStaminaRecoveryOutsideSettlements ?? SmithingStaminaRecoveryOutsideSettlements;
         SmithingStaminaRecoveryMultiplier = modOptionsData.SmithingStaminaRecoveryMultiplier ?? SmithingStaminaRecoveryMultiplier;
         MaximumLootersMultiplier = modOptionsData.MaximumLootersMultiplier ?? MaximumLootersMultiplier;
@@ -81,6 +106,7 @@ public readonly struct ModOptions
         LordDefectionRetries = modOptionsData.LordDefectionRetries ?? LordDefectionRetries;
         EnableHeroExecutions = modOptionsData.EnableHeroExecutions ?? EnableHeroExecutions;
         EnablePlayerClanMemberExecutions = modOptionsData.EnablePlayerClanMemberExecutions ?? EnablePlayerClanMemberExecutions;
+        EnablePlayerExecutions = modOptionsData.EnablePlayerExecutions ?? EnablePlayerExecutions;
         ShowPlayerNameplates = modOptionsData.ShowPlayerNameplates ?? ShowPlayerNameplates;
         PlayerWoundedBattleEntry = modOptionsData.PlayerWoundedBattleEntry ?? PlayerWoundedBattleEntry;
     }

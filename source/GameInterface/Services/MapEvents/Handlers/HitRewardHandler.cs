@@ -44,6 +44,9 @@ public class HitRewardHandler : IHandler
         messageBroker.Subscribe<TrackTroopForUpgrades>(Handle_TrackTroopForUpgrades);
         messageBroker.Subscribe<NetworkTrackTroopForUpgrades>(Handle_NetworkTrackTroopForUpgrades);
 
+        messageBroker.Subscribe<BattleSurgeryReward>(Handle_BattleSurgeryReward);
+        messageBroker.Subscribe<NetworkBattleSurgeryReward>(Handle_NetworkBattleSurgeryReward);
+
         messageBroker.Subscribe<BattleHitReward>(Handle_BattleHitReward);
         messageBroker.Subscribe<NetworkBattleHitReward>(Handle_NetworkBattleHitReward);
 
@@ -57,6 +60,9 @@ public class HitRewardHandler : IHandler
     {
         messageBroker.Unsubscribe<TrackTroopForUpgrades>(Handle_TrackTroopForUpgrades);
         messageBroker.Unsubscribe<NetworkTrackTroopForUpgrades>(Handle_NetworkTrackTroopForUpgrades);
+
+        messageBroker.Unsubscribe<BattleSurgeryReward>(Handle_BattleSurgeryReward);
+        messageBroker.Unsubscribe<NetworkBattleSurgeryReward>(Handle_NetworkBattleSurgeryReward);
 
         messageBroker.Unsubscribe<BattleHitReward>(Handle_BattleHitReward);
         messageBroker.Unsubscribe<NetworkBattleHitReward>(Handle_NetworkBattleHitReward);
@@ -87,6 +93,31 @@ public class HitRewardHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<CharacterObject>(data.CharacterId, out var character)) return;
 
             mapEventParty.Party.MapEvent?.TroopUpgradeTracker.AddTrackedTroop(mapEventParty.Party, character);
+        });
+    }
+
+    private void Handle_BattleSurgeryReward(MessagePayload<BattleSurgeryReward> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var data = payload.What;
+        if (!objectManager.TryGetIdWithLogging(data.Party, out var partyId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.MapEvent, out var mapEventId)) return;
+        network.SendAll(new NetworkBattleSurgeryReward(partyId, mapEventId, data.SurgerySuccess, data.TroopTier));
+    }
+
+    private void Handle_NetworkBattleSurgeryReward(MessagePayload<NetworkBattleSurgeryReward> payload)
+    {
+        if (ModInformation.IsClient) return;
+        var data = payload.What;
+        if (data.TroopTier < 0 || data.TroopTier > 10) return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.PartyId, out var party)) return;
+            if (!objectManager.TryGetObjectWithLogging<MapEvent>(data.MapEventId, out var mapEvent)) return;
+            if (mapEvent.IsFinalized || party.MapEvent != mapEvent) return;
+
+            SkillLevelingManager.OnSurgeryApplied(party, data.SurgerySuccess, data.TroopTier);
         });
     }
 

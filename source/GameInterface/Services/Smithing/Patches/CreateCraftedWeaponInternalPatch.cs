@@ -6,11 +6,14 @@ using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CraftingSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
+using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -19,6 +22,7 @@ namespace GameInterface.Services.Smithing.Patches;
 [HarmonyPatch(typeof(CraftingCampaignBehavior))]
 internal class CreateCraftedWeaponInternalPatch
 {
+    private const string ClientVisualPrefix = "ClientVisual_";
     private static readonly ILogger Logger = LogManager.GetLogger<CraftingCampaignBehavior>();
 
     [HarmonyPatch(nameof(CraftingCampaignBehavior.CreateCraftedWeaponInternal))]
@@ -28,11 +32,9 @@ internal class CreateCraftedWeaponInternalPatch
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        // Locally create string id. Without a string id, the result popup will not render new weapons.
-        // This isn't sent to the server, won't matter after the item is crafted and won't persist across save games.
-        // If the server uses this string id, two clients crafting at the same time can cause mismatched ids/crafted item counts.
-        // Probable old cause of issue reported that gave crafted items to other players when two clients crafted at the same time.
-        string nextCraftedItemId = $"ClientVisual_{__instance.GetNextCraftedItemId()}";
+        // The unique client request id also gives the temporary item the string id needed to render the result.
+        string clientRequestId = Guid.NewGuid().ToString("N");
+        string nextCraftedItemId = $"{ClientVisualPrefix}{clientRequestId}";
         ItemObject craftedItemObject;
         using (new AllowedThread())
         {
@@ -49,9 +51,6 @@ internal class CreateCraftedWeaponInternalPatch
         // Need to return the ItemObject for client's CraftingVM
         __result = craftedItemObject;
 
-        // Patched separately for sending to server
-        __instance.AddResearchPoints(weaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmithingItem(craftedItemObject, crafterHero, isFreeMode));
-
         // Publish message with data. Local ClientVisual not sent.
         // Actual item created on server and all clients in CraftingCampaignBehaviorCraftingHandler.
         var message = new CreatedCraftedWeaponInternal(
@@ -64,22 +63,101 @@ internal class CreateCraftedWeaponInternalPatch
             Hero.MainHero,
             craftingLogic,
             activeCraftingOrder,
-            Settlement.CurrentSettlement);
+            Settlement.CurrentSettlement,
+            clientRequestId);
         MessageBroker.Instance.Publish(__instance, message);
 
         // Skip original to override original client saving
         return false;
     }
 
+    [HarmonyPatch(typeof(WeaponDesignVM), nameof(WeaponDesignVM.CreateCraftingResultPopup))]
+    [HarmonyPrefix]
+    public static bool CreateCraftingResultPopupPrefix(ref WeaponDesignVM __instance)
+    {
+        if (!IsPendingCraftedItem(__instance.CraftedItemObject)) return true;
+
+        __instance.IsInFinalCraftingStage = false;
+        return false;
+    }
+
+    [HarmonyPatch(typeof(CraftingVM), nameof(CraftingVM.ExecuteMainAction))]
+    [HarmonyPrefix]
+    public static bool ExecuteMainActionPrefix(CraftingVM __instance)
+    {
+        return !IsPendingCraftedItem(__instance.WeaponDesign?.CraftedItemObject);
+    }
+
+    [HarmonyPatch(typeof(WeaponDesignVM), nameof(WeaponDesignVM.ExecuteOpenOrderPopup))]
+    [HarmonyPrefix]
+    public static bool ExecuteOpenOrderPopupPrefix(WeaponDesignVM __instance)
+    {
+        return CanChangeCraftingSelection(__instance);
+    }
+
+    [HarmonyPatch(typeof(WeaponDesignVM), nameof(WeaponDesignVM.ExecuteOpenOrdersTab))]
+    [HarmonyPrefix]
+    public static bool ExecuteOpenOrdersTabPrefix(WeaponDesignVM __instance)
+    {
+        return CanChangeCraftingSelection(__instance);
+    }
+
+    [HarmonyPatch(typeof(WeaponDesignVM), nameof(WeaponDesignVM.ExecuteOpenFreeBuildTab))]
+    [HarmonyPrefix]
+    public static bool ExecuteOpenFreeBuildTabPrefix(WeaponDesignVM __instance)
+    {
+        return CanChangeCraftingSelection(__instance);
+    }
+
+    [HarmonyPatch(typeof(WeaponDesignVM), nameof(WeaponDesignVM.OnFinalize))]
+    [HarmonyPrefix]
+    public static void WeaponDesignVMOnFinalizePrefix(WeaponDesignVM __instance)
+    {
+        ClearPendingCraftedItem(__instance);
+    }
+
+    private static bool IsPendingCraftedItem(ItemObject craftedItem)
+        => craftedItem?.StringId?.StartsWith(ClientVisualPrefix, StringComparison.Ordinal) == true;
+
+    private static bool IsPendingCraftedItem(ItemObject craftedItem, string clientRequestId)
+        => IsPendingCraftedItem(craftedItem) &&
+           string.Equals(craftedItem.StringId, $"{ClientVisualPrefix}{clientRequestId}", StringComparison.Ordinal);
+
+    internal static bool CanChangeCraftingSelection(WeaponDesignVM weaponDesignVM)
+        => weaponDesignVM == null ||
+           (!weaponDesignVM.IsInFinalCraftingStage && !IsPendingCraftedItem(weaponDesignVM.CraftedItemObject));
+
+    public static bool ClearPendingCraftedItem(WeaponDesignVM weaponDesignVM)
+    {
+        if (weaponDesignVM == null || !IsPendingCraftedItem(weaponDesignVM.CraftedItemObject)) return false;
+
+        string clientRequestId = weaponDesignVM.CraftedItemObject.StringId.Substring(ClientVisualPrefix.Length);
+        return ClearPendingCraftedItem(weaponDesignVM, clientRequestId);
+    }
+
+    public static bool ClearPendingCraftedItem(WeaponDesignVM weaponDesignVM, string clientRequestId)
+    {
+        if (weaponDesignVM == null || !IsPendingCraftedItem(weaponDesignVM.CraftedItemObject, clientRequestId)) return false;
+
+        var pendingCraftedItem = weaponDesignVM.CraftedItemObject;
+        MBObjectManager.Instance.UnregisterObject(pendingCraftedItem);
+
+        if (GameStateManager.Current.ActiveState is CraftingState craftingState &&
+            ReferenceEquals(craftingState.CraftingLogic._craftedItemObject, pendingCraftedItem))
+        {
+            craftingState.CraftingLogic._craftedItemObject = null;
+        }
+
+        weaponDesignVM.CraftedItemObject = null;
+        weaponDesignVM.IsInFinalCraftingStage = false;
+        return true;
+    }
+
     [HarmonyPatch(nameof(CraftingCampaignBehavior.CreateCraftedWeaponInCraftingOrderMode))]
     [HarmonyPrefix]
     public static bool CreateCraftedWeaponInCraftingOrderModePrefix(CraftingCampaignBehavior __instance, ref ItemObject __result, Hero crafterHero, CraftingOrder craftingOrder, WeaponDesign weaponDesign)
     {
-        ItemObject itemObject = __instance.CreateCraftedWeaponInternal(false, crafterHero, weaponDesign, null);
-        float xpAmount = craftingOrder.GetOrderExperience(itemObject, __instance._currentItemModifier) + (float)Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInCraftingOrderMode(itemObject);
-
-        var message = new AddSkillXpFromCrafting(crafterHero, xpAmount);
-        MessageBroker.Instance.Publish(__instance, message);
+        ItemObject itemObject = __instance.CreateCraftedWeaponInternal(false, crafterHero, weaponDesign, __instance._currentItemModifier);
 
         __result = itemObject;
         return false;
@@ -90,12 +168,6 @@ internal class CreateCraftedWeaponInternalPatch
     public static bool CreateCraftedWeaponInFreeBuildModePrefix(CraftingCampaignBehavior __instance, ref ItemObject __result, Hero hero, WeaponDesign weaponDesign, ItemModifier weaponModifier = null)
     {
         ItemObject itemObject = __instance.CreateCraftedWeaponInternal(true, hero, weaponDesign, weaponModifier);
-        int skillXpForSmithingInFreeBuildMode = Campaign.Current.Models.SmithingModel.GetSkillXpForSmithingInFreeBuildMode(itemObject);
-
-        var message = new AddSkillXpFromCrafting(hero, (float)skillXpForSmithingInFreeBuildMode);
-        MessageBroker.Instance.Publish(__instance, message);
-        
-        __instance.AddItemToHistory(itemObject);
 
         __result = itemObject;
         return false;

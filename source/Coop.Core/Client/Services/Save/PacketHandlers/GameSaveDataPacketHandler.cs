@@ -6,6 +6,8 @@ using Coop.Core.Common.Network.Packets;
 using GameInterface.Services.Alleys;
 using GameInterface.Services.CampaignService.Data;
 using GameInterface.Services.Caravans;
+using GameInterface.Services.Clans;
+using System.Collections.Generic;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Inventory;
 using GameInterface.Services.Inventory.TradeSkills;
@@ -113,8 +115,10 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             completedTransfer.TradePlayerData,
             completedTransfer.InventoryPlayerData,
             completedTransfer.HeroMeetingData,
+            completedTransfer.AgingPlayerData,
             completedTransfer.AttachmentIdMap,
-            completedTransfer.ServerOptions));
+            completedTransfer.ServerOptions,
+            completedTransfer.ClanFinance));
     }
 
     private sealed class PendingTransfer
@@ -136,8 +140,10 @@ internal class GameSaveDataPacketHandler : IPacketHandler
             TradePlayerData = firstChunk.TradePlayerData;
             InventoryPlayerData = firstChunk.InventoryPlayerData;
             HeroMeetingData = firstChunk.HeroMeetingData;
+            AgingPlayerData = firstChunk.AgingPlayerData;
             AttachmentIdMap = firstChunk.AttachmentIdMap;
             ServerOptions = firstChunk.ServerOptions;
+            ClanFinance = firstChunk.ClanFinance;
         }
 
         public int TransferId { get; }
@@ -152,8 +158,10 @@ internal class GameSaveDataPacketHandler : IPacketHandler
         public TradePlayerData TradePlayerData { get; }
         public InventoryPlayerData InventoryPlayerData { get; }
         public HeroMeetingData HeroMeetingData { get; }
+        public AgingPlayerData AgingPlayerData { get; }
         public AttachmentIdMap AttachmentIdMap { get; }
         public ServerOptions ServerOptions { get; }
+        public Dictionary<string, ClanFinanceSettings> ClanFinance { get; }
 
         public bool TryAdd(GameSaveDataChunkPacket chunk)
         {

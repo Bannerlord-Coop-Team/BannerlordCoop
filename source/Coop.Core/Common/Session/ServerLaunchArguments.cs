@@ -1,4 +1,6 @@
 ﻿using Common.Network;
+using Coop.Core.Common.Configuration;
+using GameInterface.Services.UI;
 using Common.Network.Session;
 using System;
 using System.Collections.Generic;
@@ -18,6 +20,29 @@ public static class ServerLaunchArguments
     public const string OwnerArgument = "/coopowner";
     public const string PasswordArgument = "/cooppassword";
     public const string VisibilityArgument = "/coopvisibility";
+
+    /// <summary>Reads real argv tokens; a bare flag retains the normal client/server defaults.</summary>
+    public static bool TryParseAutoConnect(IReadOnlyList<string> args, out bool requested, out NetworkConfig configuration)
+    {
+        requested = false;
+        configuration = null;
+        int flag = -1;
+        for (int i = 0; i < args.Count; i++)
+        {
+            if (!IsToken(args[i], "/autoconnect")) continue;
+            requested = true;
+            if (flag >= 0) return false;
+            flag = i;
+        }
+        if (flag < 0 || flag + 1 == args.Count) return true;
+        string endpoint = args[flag + 1];
+        if (endpoint.StartsWith("/", StringComparison.Ordinal) || endpoint.StartsWith("-", StringComparison.Ordinal) ||
+            endpoint.StartsWith("_MODULES_", StringComparison.OrdinalIgnoreCase)) return true;
+        if (!CoopConnectMenuVM.TryParseServerAddress(endpoint, out var host, out int port) ||
+            Uri.CheckHostName(host) == UriHostNameType.Unknown) return false;
+        configuration = new NetworkConfig { Address = host, Port = port };
+        return true;
+    }
 
     /// <summary>
     /// Builds a fresh server command line with mode, active modules, save, owner PID, and optional

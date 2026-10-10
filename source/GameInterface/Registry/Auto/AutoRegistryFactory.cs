@@ -137,6 +137,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         finally
         {
             joinIdRemap = null;
+            ObjectManager.ClearJoinHandleMap();
         }
     }
 

@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace Coop.Core.Server.Services.MobileParties;
 
@@ -72,7 +71,7 @@ internal sealed class PlayerPartyTroopXpBaselineProvider : IPlayerPartyTroopXpBa
     private bool TryCapture(TroopRoster roster, out TroopRosterXpBaseline baseline)
     {
         baseline = default;
-        if (!objectManager.TryGetId(roster, out var rosterId)) return false;
+        if (!objectManager.TryGetHandle(roster, out var rosterId)) return false;
 
         var entries = new List<TroopXpBaselineEntry>();
         for (int index = 0; index < roster.Count; index++)
@@ -80,15 +79,15 @@ internal sealed class PlayerPartyTroopXpBaselineProvider : IPlayerPartyTroopXpBa
             TroopRosterElement element = roster.GetElementCopyAtIndex(index);
             CharacterObject character = element.Character;
             if (character == null || character.IsHero) continue;
-            if (!objectManager.TryGetId(character, out var characterId)) return false;
+            if (!objectManager.TryGetHandle(character, out var characterId)) return false;
 
             entries.Add(new TroopXpBaselineEntry(
-                Compact(characterId, typeof(CharacterObject)),
+                characterId,
                 element.Xp));
         }
 
         baseline = new TroopRosterXpBaseline(
-            Compact(rosterId, typeof(TroopRoster)),
+            rosterId,
             entries.ToArray());
         return true;
     }

@@ -28,19 +28,22 @@ internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
     private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
     private readonly ITimeControlInterface timeControlInterface;
     private readonly IPlayerPartyTroopXpBaselineProvider troopXpBaselineProvider;
+    private readonly IPartyBehaviorWireMapper partyBehaviorWireMapper;
 
     public JoinCampaignBaselineSender(
         INetwork network,
         IMapTimeTrackerInterface mapTimeTrackerInterface,
         IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot,
         ITimeControlInterface timeControlInterface,
-        IPlayerPartyTroopXpBaselineProvider troopXpBaselineProvider)
+        IPlayerPartyTroopXpBaselineProvider troopXpBaselineProvider,
+        IPartyBehaviorWireMapper partyBehaviorWireMapper)
     {
         this.network = network;
         this.mapTimeTrackerInterface = mapTimeTrackerInterface;
         this.mobilePartyBehaviorSnapshot = mobilePartyBehaviorSnapshot;
         this.timeControlInterface = timeControlInterface;
         this.troopXpBaselineProvider = troopXpBaselineProvider;
+        this.partyBehaviorWireMapper = partyBehaviorWireMapper;
     }
 
     public void Send(NetPeer peer)
@@ -64,7 +67,7 @@ internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
 
         var liveParties = new HashSet<MobileParty>(activeParties);
         var liveSettlements = new HashSet<Settlement>(settlements);
-        var partyStates = new MobilePartyJoinState[activeParties.Count];
+        var partyStates = new NetworkMobilePartyJoinState[activeParties.Count];
         TroopRosterXpBaseline[] troopXpBaselines = Array.Empty<TroopRosterXpBaseline>();
         bool isComplete = true;
         for (int i = 0; i < activeParties.Count; i++)
@@ -87,8 +90,13 @@ internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
 
             PartyBehaviorUpdateData behavior = state.Behavior;
             behavior.ForcePosition = true;
-            state.Behavior = behavior;
-            partyStates[i] = state;
+            if (!partyBehaviorWireMapper.TryToNetwork(behavior, out var networkBehavior))
+            {
+                Logger.Warning("Could not map a join baseline for party {Party} to network handles", party?.StringId);
+                isComplete = false;
+                break;
+            }
+            partyStates[i] = new NetworkMobilePartyJoinState(state, networkBehavior);
         }
 
         if (isComplete && !troopXpBaselineProvider.TryCapture(peer, out troopXpBaselines))
@@ -99,7 +107,7 @@ internal sealed class JoinCampaignBaselineSender : IJoinCampaignBaselineSender
 
         if (isComplete == false)
         {
-            partyStates = Array.Empty<MobilePartyJoinState>();
+            partyStates = Array.Empty<NetworkMobilePartyJoinState>();
             troopXpBaselines = Array.Empty<TroopRosterXpBaseline>();
         }
 

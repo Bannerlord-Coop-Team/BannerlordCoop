@@ -28,6 +28,67 @@ internal class MobilePartyDebugCommand
 
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyDebugCommand>();
 
+    public sealed class SetDisorganizedCoopCommand : ICoopCommand
+    {
+        private readonly IObjectManager objectManager;
+
+        public SetDisorganizedCoopCommand(IObjectManager objectManager) => this.objectManager = objectManager;
+
+        public string Prefix => "coop.debug.mobileparty";
+        public string Name => "set_disorganized";
+        public string Description => "Calls the authoritative disorganization action for a registered party.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("partyId", "The registered party id."),
+            new ExpectedArgs("value", "True or false."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+            if (args.Count != 2 || !bool.TryParse(args[1], out var value))
+                return Failed("Expected a registered party id and true or false.");
+            if (!objectManager.TryGetObject<MobileParty>(args[0], out var party))
+                return Failed($"Party with id {args[0]} not found.");
+
+            party.SetDisorganized(value);
+            return Succeeded($"PartyId={args[0]} IsDisorganized={party.IsDisorganized}");
+        }
+    }
+
+    public sealed class DisorganizationCacheCoopCommand : ICoopCommand
+    {
+        private readonly IObjectManager objectManager;
+
+        public DisorganizationCacheCoopCommand(IObjectManager objectManager) => this.objectManager = objectManager;
+
+        public string Prefix => "coop.debug.mobileparty";
+        public string Name => "disorganization_cache";
+        public string Description => "Inspects party speed cache versions, optionally evaluating the local speed cache.";
+        public CoopCommandSide Side => CoopCommandSide.Both;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("partyId", "The registered party id."),
+            new ExpectedArgs("evaluate", "True to evaluate the local speed cache; false only observes."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (args.Count != 2 || !bool.TryParse(args[1], out var evaluate))
+                return Failed("Expected a registered party id and true or false.");
+            if (!objectManager.TryGetObject<MobileParty>(args[0], out var party))
+                return Failed($"Party with id {args[0]} not found.");
+
+            int beforeVersion = party.VersionNo;
+            int beforeDerivedVersion = party.GetVersionNoForBaseSpeedCalculation();
+            int beforeCacheVersion = party._partyPureSpeedLastCheckVersion;
+            if (evaluate) party.CalculateSpeedForPartyUnified();
+            return Succeeded(FormattableString.Invariant(
+                $"PartyId={args[0]} StringId={party.StringId} IsDisorganized={party.IsDisorganized} ExpiryDays={party._disorganizedUntilTime.ToDays:R} Evaluate={evaluate} BeforeVersion={beforeVersion} BeforeDerivedVersion={beforeDerivedVersion} BeforeCacheVersion={beforeCacheVersion} Version={party.VersionNo} DerivedVersion={party.GetVersionNoForBaseSpeedCalculation()} CacheVersion={party._partyPureSpeedLastCheckVersion} BaseSpeed={party.LastCalculatedBaseSpeed:R} Speed={party._lastCalculatedSpeed:R}"));
+        }
+    }
+
     public sealed class InfoCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.mobileparty";

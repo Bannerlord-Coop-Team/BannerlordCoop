@@ -55,7 +55,7 @@ namespace E2E.Tests.Services.PartyVisuals
             var server = TestEnvironment.Server;
             var client = TestEnvironment.Clients.First();
             NetworkDestroyPartyVisual? destroyed = null;
-            string? expectedVisualId = null;
+            uint expectedMobilePartyHandle = 0;
             client.Resolve<IMessageBroker>().Subscribe<NetworkDestroyPartyVisual>(payload => destroyed = payload.What);
 
             server.Call(() =>
@@ -63,8 +63,8 @@ namespace E2E.Tests.Services.PartyVisuals
                 var mobileParty = new MobileParty();
                 var partyBase = new PartyBase(mobileParty);
                 mobileParty.StringId = "mountain_bandits_24";
-                expectedVisualId = $"MobilePartyVisual_{mobileParty.StringId}";
                 Assert.True(server.ObjectManager.TryGetId(mobileParty, out string mobilePartyId));
+                Assert.True(server.ObjectManager.TryGetHandle(mobileParty, out expectedMobilePartyHandle));
                 Assert.True(server.ObjectManager.Remove(mobileParty));
 
                 var mobilePartyVisual = new MobilePartyVisual(partyBase);
@@ -77,7 +77,7 @@ namespace E2E.Tests.Services.PartyVisuals
             });
 
             Assert.NotNull(destroyed);
-            Assert.Equal(expectedVisualId, destroyed.PartyVisualId);
+            Assert.Equal(expectedMobilePartyHandle, destroyed.MobilePartyHandle);
         }
 
         [Fact]

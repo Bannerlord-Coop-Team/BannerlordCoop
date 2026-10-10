@@ -90,6 +90,9 @@
     <Reference Include="TaleWorlds.MountAndBlade">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.View">
+      <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.View.dll</HintPath>
+    </Reference>
 	  <Reference Include="TaleWorlds.ModuleManager">
 		  <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ModuleManager.dll</HintPath>
 	  </Reference>

@@ -1188,7 +1188,9 @@ internal class DefaultNotificationsHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.VictimHero, out var victimHeroId)) return;
-            if (!objectManager.TryGetIdWithLogging(obj.What.Killer, out var killerId)) return;
+
+            string killerId = null;
+            if (obj.What.Killer != null && !objectManager.TryGetIdWithLogging(obj.What.Killer, out killerId)) return;
 
             network.SendAll(new NetworkNotifyHeroKilled(victimHeroId, killerId, obj.What.Detail, obj.What.ShowNotification));
         });
@@ -1200,7 +1202,9 @@ internal class DefaultNotificationsHandler : IHandler
         {
             if (!TryGetNotificationsBehavior(out var notificationsBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.VictimHeroId, out var victimHero)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.KillerId, out var killer)) return;
+
+            Hero killer = null;
+            if (obj.What.KillerId != null && !objectManager.TryGetObjectWithLogging<Hero>(obj.What.KillerId, out killer)) return;
 
             notificationsBehavior.OnHeroKilled(victimHero, killer, obj.What.Detail, obj.What.ShowNotification);
         });

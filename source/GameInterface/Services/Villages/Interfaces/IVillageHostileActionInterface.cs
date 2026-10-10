@@ -1,3 +1,4 @@
+using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Villages.Data;
 using TaleWorlds.CampaignSystem;
@@ -20,4 +21,17 @@ public interface IVillageHostileActionInterface : IGameAbstraction
     bool TryGetForceActionCooldown(Settlement settlement, out CampaignTime cooldownUntil);
     VillageHostileActionCooldownData[] GetActiveCooldowns();
     void ApplyCooldowns(VillageHostileActionCooldownData[] cooldowns);
+    ForceTransferPoolData AuthorizeForceTransfer(
+        VillageHostileAction action,
+        string partyId,
+        string settlementId,
+        ItemRosterElementData[] suppliesItems,
+        string troopId,
+        int troopCount);
+    bool TryConsumeForceTransfer(string requestId, string partyId, out ForceTransferPoolData pool);
+    bool TryPeekForceTransfer(string requestId, string partyId, out ForceTransferPoolData pool);
+    bool HasPendingForceTransferForParty(string partyId);
+    void GrantForceTransferPool(MobileParty attacker, ForceTransferPoolData pool);
+    bool IsForceTransferPoolValid(ForceTransferPoolData pool);
+    void OpenForceTransferLootScreen(ForceTransferPoolData pool);
 }

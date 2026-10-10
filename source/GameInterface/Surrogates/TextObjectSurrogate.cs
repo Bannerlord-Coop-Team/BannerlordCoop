@@ -19,19 +19,21 @@ internal struct TextObjectSurrogate
     [ProtoMember(3)]
     public Dictionary<string, int> IntAttributes { get; set; }
 
+    [ProtoMember(4)]
+    public Dictionary<string, string> StringAttributes { get; set; }
+
     public TextObjectSurrogate(TextObject textObject)
     {
         Text = textObject?.Value;
         TextObjectAttributes = new();
         IntAttributes = new();
+        StringAttributes = new();
 
         if (textObject?.Attributes == null)
             return;
 
         foreach (var attribute in textObject.Attributes)
         {
-            var type = attribute.Value.GetType();
-
             if (attribute.Value is TextObject textVariable)
             {
                 TextObjectAttributes[attribute.Key] = new TextObjectSurrogate(textVariable);
@@ -39,6 +41,10 @@ internal struct TextObjectSurrogate
             else if (attribute.Value is int integerVariable)
             {
                 IntAttributes[attribute.Key] = integerVariable;
+            }
+            else if (attribute.Value is string stringVariable)
+            {
+                StringAttributes[attribute.Key] = stringVariable;
             }
         }
     }
@@ -51,7 +57,9 @@ internal struct TextObjectSurrogate
     public static implicit operator TextObject(TextObjectSurrogate surrogate)
     {
         // Keep null attributes instead of initializing an empty dictionary
-        if (surrogate.TextObjectAttributes == null && surrogate.IntAttributes == null)
+        if (surrogate.TextObjectAttributes == null 
+            && surrogate.IntAttributes == null
+            && surrogate.StringAttributes == null)
             return new TextObject(surrogate.Text);
 
         var attributes = new Dictionary<string, object>();
@@ -68,6 +76,13 @@ internal struct TextObjectSurrogate
             foreach (var integerAttribute in surrogate.IntAttributes)
             {
                 attributes[integerAttribute.Key] = integerAttribute.Value;
+            }
+        }
+        if (surrogate.StringAttributes != null)
+        {
+            foreach (var stringAttribute in surrogate.StringAttributes)
+            {
+                attributes[stringAttribute.Key] = stringAttribute.Value;
             }
         }
 

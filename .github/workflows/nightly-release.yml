@@ -226,6 +226,7 @@ jobs:
             -p:SourceRevisionId="$GITHUB_SHA" \
             -p:IncludeSourceRevisionInInformationalVersion=true \
             -p:ModName= \
+            -p:DefineConstants=TRACE%3BTESTER \
             -p:NuGetAudit=false \
             --consoleLoggerParameters:ErrorsOnly
 
@@ -293,7 +294,7 @@ jobs:
             test -s "$binary/$required"
           done
           cp 'deploy/Server Instructions.md' deploy/mod-config.default.json "$module/"
-          cp -R deploy/ModuleData "$module/"
+          cp -R deploy/ModuleData deploy/ThirdPartyNotices deploy/GUI "$module/"
           cp -R UIMovies/. "$module/GUI/Prefabs/"
 
           coop_version=$(sed -n 's/.*<CoopVersion>\([^<]*\)<\/CoopVersion>.*/\1/p' source/Directory.Build.props)
@@ -594,10 +595,24 @@ jobs:
           if ($env:GITHUB_EVENT_NAME -ne 'schedule') { return }
           if ($env:RELEASE_DATE -notmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') { throw 'Release date is invalid' }
           $env:RCLONE_CONFIG_PATRON_ENDPOINT = "https://$env:R2_ACCOUNT_ID.r2.cloudflarestorage.com"
+          $metadataJson = & (Join-Path $PWD 'rclone.exe') lsjson "patron:$env:R2_NIGHTLY_BUCKET" --recursive --files-only --include '/nightly/client.json' --max-depth 2 --no-modtime --no-mimetype --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($metadataJson -join "`n"))) { throw 'Published nightly manifest lookup failed' }
+          if (-not ($metadataJson -join "`n").TrimStart().StartsWith('[')) { throw 'Published nightly manifest lookup failed' }
+          $entries = ($metadataJson -join "`n") | ConvertFrom-Json
+          if ($null -eq $entries -or $entries.Count -eq 0) {
+            Write-Host 'No published nightly manifest exists yet.'
+            return
+          }
+          $entries = @($entries)
+          if ($entries.Count -ne 1 -or $entries[0].Path -ne 'nightly/client.json') { throw 'Published nightly manifest lookup failed' }
+          $metadata = $entries[0]
+          if ($metadata.IsDir -or $metadata.Size -le 0 -or $metadata.Size -gt 4096) { throw 'Published nightly manifest size is invalid' }
           $manifest = Join-Path $env:RUNNER_TEMP 'published-client.json'
           & (Join-Path $PWD 'rclone.exe') copyto "patron:$env:R2_NIGHTLY_BUCKET/nightly/client.json" $manifest --s3-no-check-bucket --retries 3 --low-level-retries 10 --quiet
-          if ($LASTEXITCODE -ne 0) { return }
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $manifest -PathType Leaf)) { throw 'Published nightly manifest download failed' }
+          if ((Get-Item -LiteralPath $manifest).Length -ne $metadata.Size) { throw 'Published nightly manifest size is invalid' }
           $published = Get-Content -LiteralPath $manifest -Raw -Encoding utf8 | ConvertFrom-Json
+          if ([string]$published.releaseDate -notmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') { throw 'Published nightly manifest release date is invalid' }
           if ([string]$published.releaseDate -eq $env:RELEASE_DATE) {
             Write-Host "Scheduled nightly will not overwrite the published $($env:RELEASE_DATE) client."
             'overwrite=false' | Add-Content $env:GITHUB_OUTPUT

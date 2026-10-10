@@ -32,9 +32,10 @@ internal class HideoutLifetimeHandler : IHandler
     private void Handle_HideoutCreated(MessagePayload<HideoutCreated> payload)
     {
         var hideout = payload.What.Hideout;
-        objectManager.AddExisting(hideout.StringId, hideout);
+        if (!objectManager.AddExisting(hideout.StringId, hideout)) return;
+        if (!objectManager.TryGetHandleWithLogging(hideout, out var handle)) return;
 
-        var message = new NetworkCreateHideout(hideout.StringId);
+        var message = new NetworkCreateHideout(hideout.StringId, handle);
         network.SendAll(message);
     }
 
@@ -45,7 +46,7 @@ internal class HideoutLifetimeHandler : IHandler
             using (new AllowedThread())
             {
                 var newHideout = ObjectHelper.SkipConstructor<Hideout>();
-                objectManager.AddExisting(payload.What.HideoutId, newHideout);
+                objectManager.AddExisting(payload.What.HideoutId, newHideout, payload.What.Handle);
             }
         });
     }

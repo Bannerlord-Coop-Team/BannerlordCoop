@@ -308,6 +308,8 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
         {
             harmony.UnpatchAll(harmony.Id);
         }
+
+        Server.PumpGameThread();
     }
 
     private static bool SuppressMarriageBarterableApply() => false;
@@ -497,10 +499,15 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
                 initialCounterpartyGold + offeredGold,
                 assertMainHero: true);
         }
+
+        Server.PumpGameThread();
     }
 
-    [Fact]
-    public void ArrangedMarriageBarter_ClanRelatives_AppliesPaymentAndExactSpouses()
+    [Theory]
+    [InlineData(Romance.RomanceLevelEnum.Untested)]
+    [InlineData(Romance.RomanceLevelEnum.FailedInPracticalities)]
+    public void ArrangedMarriageBarter_ClanRelatives_AuthorizesFromCurrentRomanceStateAndAppliesPayment(
+        Romance.RomanceLevelEnum initialLevel)
     {
         const int initialPlayerGold = 1_000_000;
         const int initialCounterpartyGold = 75;
@@ -554,7 +561,7 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
             Romance.SetRomanticState(
                 playerRelative,
                 counterpartyRelative,
-                Romance.RomanceLevelEnum.MatchMadeByFamily);
+                initialLevel);
             Assert.False(BarterManager.Instance.LastBarterIsAccepted);
         });
         Server.NetworkSentMessages.Clear();
@@ -567,6 +574,25 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
             counterparty.PartyId,
             playerRelativeId,
             counterpartyRelativeId)));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(playerRelativeId, out var playerRelative));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(counterpartyRelativeId, out var counterpartyRelative));
+            Assert.Equal(Romance.RomanceLevelEnum.MatchMadeByFamily,
+                Romance.GetRomanticLevel(playerRelative, counterpartyRelative));
+        });
+        TestEnvironment.FlushCoalescer();
+        foreach (var environmentClient in Clients)
+        {
+            environmentClient.Call(() =>
+            {
+                Assert.True(environmentClient.ObjectManager.TryGetObject<Hero>(playerRelativeId, out var playerRelative));
+                Assert.True(environmentClient.ObjectManager.TryGetObject<Hero>(counterpartyRelativeId, out var counterpartyRelative));
+                Assert.Equal(Romance.RomanceLevelEnum.MatchMadeByFamily,
+                    Romance.GetRomanticLevel(playerRelative, counterpartyRelative));
+            });
+        }
 
         Server.Call(() => ConversationPartyHold.EndEngagement(
             Server.Resolve<ConversationPartyTracker>(),
@@ -608,6 +634,8 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
                 initialPlayerGold - offeredGold,
                 initialCounterpartyGold + offeredGold);
         }
+
+        Server.PumpGameThread();
     }
 
     [Fact]

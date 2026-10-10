@@ -26,7 +26,7 @@ public class CoopCommandSideRegressionTests
 
     [Theory]
     [InlineData(false, "HeroDeveloperCommands", "HeroDeveloperAddAttributePointsCoopCommand", "This command is only available on the server")]
-    [InlineData(true, "UnstuckCommand", "UnstuckCoopCommand", "This command is only available on the client")]
+    [InlineData(true, "MapEventDebugCommands", "StartAttackMissionCoopCommand", "This command is only available on the client")]
     public void Registry_RejectsWrongSideForRealCommands(
         bool isServer,
         string outerTypeName,
@@ -77,8 +77,6 @@ public class CoopCommandSideRegressionTests
         yield return new object[] { "HeroDebugCommand", "HeroSetBannerItemCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "HeroDebugCommand", "HeroSetIssueCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "HeroDebugCommand", "HeroRefreshVolunteersCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "IssuesDebugCommand", "IssuesGiveCoopCommand", CoopCommandSide.Server };
-        yield return new object[] { "IssuesDebugCommand", "IssuesCompleteCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "TacticalUnitSymbolsDebugCommand", "UiTacticalSymbolsCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "PlayerCaptivityCommands", "PlayerCaptivityRandomCapturePlayerCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "PlayerCaptivityCommands", "PlayerCaptivityCapturePlayerCoopCommand", CoopCommandSide.Server };
@@ -101,6 +99,7 @@ public class CoopCommandSideRegressionTests
         yield return new object[] { "MapEventDebugCommands", "LateJoinModeExitMissionsCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "MapEventDebugCommands", "LateJoinModeCleanupCoopCommand", CoopCommandSide.Server };
 #endif
+        yield return new object[] { "MapEventDebugCommands", "LateJoinModeFixtureStateCoopCommand", CoopCommandSide.Server };
         yield return new object[] { "MapEventDebugCommands", "StartAttackMissionCoopCommand", CoopCommandSide.Client };
         yield return new object[] { "CampaignOptionsCommands", "CampaignOptionsIsIronmanModeCoopCommand", CoopCommandSide.Both };
     }

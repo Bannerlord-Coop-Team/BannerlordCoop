@@ -17,7 +17,7 @@ using System.Threading;
 namespace Coop.Core.Common.Network;
 
 /// <inheritdoc cref="INetwork"/>
-public abstract class CoopNetworkBase : INetwork, INetEventListener
+public abstract class CoopNetworkBase : INetwork, IBufferedNetwork, INetEventListener
 {
     public INetworkConfig Config { get; }
     public abstract int Priority { get; }
@@ -243,6 +243,8 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
             peer => peer.ConnectionState == ConnectionState.Connected,
             SendReliableMessagePayload);
     }
+
+    public void DiscardPendingMessages(NetPeer peer) => reliableMessageBatcher.Remove(peer);
 
     private void RecordAggregateSent(AggregateMessagePacket packet, int framingOverhead)
     {

@@ -5,10 +5,14 @@ using Common.Network;
 using Common.Network.Session;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Client;
+using Coop.Core.Client.Services.Discord;
 using Coop.Core.Server;
+using Coop.Core.Server.Services.Shutdown;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Tests.Mocks;
 using GameInterface;
+using GameInterface.Services.Missions;
+using GameInterface.Services.Voice;
 using Missions;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,9 +34,17 @@ namespace Coop.Tests.Autofac
 
             var client = container.Resolve<INetwork>();
             Assert.NotNull(client);
+            Assert.NotNull(container.Resolve<IVoiceClient>());
+            Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopOptionsKeybinding>());
+            Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopKeybindingPopupFactory>());
+            Assert.NotNull(container.Resolve<IVoiceWindowFocus>());
+            Assert.Equal("Not started", container.Resolve<IVoiceAudio>().Status);
 
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
+
+            // Only ServerModule registers the restart command, so a client console doesn't know it.
+            Assert.False(container.Resolve<ICoopCommandRegistry>().Contains("coop.server.shutdown"));
 
             ICoopCommand[] registeredCommands = container.Resolve<IEnumerable<ICoopCommand>>().ToArray();
             Assert.Contains(registeredCommands, command =>
@@ -44,7 +56,20 @@ namespace Coop.Tests.Autofac
                 .Where(command => command.GetType().Assembly == typeof(MissionModule).Assembly)
                 .ToArray();
 #if DEBUG
-            Assert.Equal(30, missionCommands.Length);
+            Assert.False(container.IsRegistered<IMissionMembershipRegistry>());
+            ICoopCommandRegistry catalog = container.Resolve<ICoopCommandRegistry>();
+            Assert.True(catalog.Contains("coop.debug.battle.hit_sound_fixture_route"));
+            Assert.True(catalog.Contains("coop.debug.battle.hit_sound_fixture_state"));
+            Assert.True(catalog.Contains("coop.debug.battle.hit_sound_trace"));
+            Assert.Same(container.Resolve<IVoiceClient>(), container.Resolve<IVoiceSyntheticTest>());
+            Assert.Equal(CoopCommandSide.Client, Assert.Single(registeredCommands,
+                command => $"{command.Prefix}.{command.Name}" == "coop.debug.voice.synthetic").Side);
+            Assert.Equal(45, missionCommands.Length);
+            Assert.Contains(missionCommands, command => command.Name == "peer_state");
+            Assert.Contains(missionCommands, command => command.Name == "controller_agents");
+            Assert.Contains(missionCommands, command => command.Name == "drive_owned_agents");
+            Assert.Contains(missionCommands, command => command.Name == "cancel_owned_agent_drive");
+            Assert.Contains(missionCommands, command => command.Name == "owned_agent_drive_state");
             Assert.Equal(
                 new[] { "arm_inactive_party_deficit", "disconnect", "join_state" },
                 registeredCommands
@@ -69,14 +94,24 @@ namespace Coop.Tests.Autofac
 
             var server = container.Resolve<INetwork>();
             Assert.NotNull(server);
+            Assert.False(container.IsRegistered<IVoiceClient>());
+            Assert.False(container.IsRegistered<IDiscordPresenceClient>());
+            Assert.False(container.IsRegistered<IVoiceAudio>());
 
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);
 
+            // The restart command is an operator command, so Release servers have it too.
+            Assert.True(container.Resolve<ICoopCommandRegistry>().Contains("coop.server.shutdown"));
+            Assert.Same(container.Resolve<IServerAdmissionGate>(), container.Resolve<IServerAdmissionGate>());
+            Assert.Equal(ServerShutdownPhase.Idle, container.Resolve<IServerShutdownCoordinator>().Phase);
+
 #if DEBUG
+            Assert.False(container.IsRegistered<IVoiceSyntheticTest>());
             ICoopCommand[] registeredCommands = container.Resolve<IEnumerable<ICoopCommand>>().ToArray();
+            Assert.DoesNotContain(registeredCommands, command => $"{command.Prefix}.{command.Name}" == "coop.debug.voice.synthetic");
             Assert.Equal(
-                new[] { "join_state", "restore_inactive_party", "stage_inactive_party" },
+                new[] { "join_state", "player_party_readiness", "restore_inactive_party", "stage_inactive_party" },
                 registeredCommands
                     .Where(command => command.Prefix == "coop.debug.connection")
                     .Select(command => command.Name)

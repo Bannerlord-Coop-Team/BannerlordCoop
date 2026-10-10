@@ -467,4 +467,95 @@
       <EquipmentSet id="npc_companion_equipment_template_vlandia" />
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_f992e349"
+    name="{=!}Charles"
+    voice="earnest"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.battania"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_battania_2_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_battania" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Generosity" value="-1" />
+      <Trait id="Honor" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Cape" id="Item.battania_cloak" />
+        <equipment slot="Body" id="Item.sackcloth_tunic" />
+      </EquipmentRoster>
+      <EquipmentSet id="npc_companion_equipment_template_battania" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_8886871f"
+    name="{=!}Batuhan Erkmen"
+    voice="earnest"
+    age="23"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="false"
+    culture="Culture.battania"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_battania_9_skills">
+    <face>
+      <face_key_template value="BodyProperty.fighter_battania" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Generosity" value="-1" />
+      <Trait id="Mercy" value="-1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.nordic_leather_cap" />
+        <equipment slot="Cape" id="Item.scarf" />
+        <equipment slot="Body" id="Item.steppe_armor" />
+        <equipment slot="Gloves" id="Item.armwraps" />
+        <equipment slot="Leg" id="Item.battania_fur_boots" />
+      </EquipmentRoster>
+      <EquipmentSet id="npc_companion_equipment_template_battania" />
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_wanderer_a634d3aa"
+    name="{=!}Katie"
+    voice="softspoken"
+    age="27"
+    default_group="Infantry"
+    is_template="true"
+    is_hero="false"
+    is_female="true"
+    culture="Culture.battania"
+    occupation="Wanderer"
+    skill_template="SkillSet.spc_wanderer_battania_0_skills">
+    <face>
+      <face_key_template value="BodyProperty.townswoman_battania" />
+    </face>
+    <Traits>
+      <Trait id="Calculating" value="1" />
+      <Trait id="Honor" value="1" />
+      <Trait id="Valor" value="1" />
+    </Traits>
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Cape" id="Item.scarf" />
+        <equipment slot="Body" id="Item.footmans_tunic" />
+        <equipment slot="Gloves" id="Item.leather_gloves" />
+        <equipment slot="Leg" id="Item.eastern_leather_boots" />
+      </EquipmentRoster>
+      <EquipmentSet id="npc_companion_equipment_template_battania" />
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>

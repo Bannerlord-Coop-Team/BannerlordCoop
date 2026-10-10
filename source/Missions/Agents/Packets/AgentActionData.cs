@@ -395,6 +395,8 @@ namespace Missions.Agents.Packets
             float? action0Speed,
             float? action1Speed)
         {
+            Equipment = AgentEquipmentData.TryCapture(agent, out var equipment)
+                ? equipment : (AgentEquipmentData?)null;
             ActionIndexCache cache0 = agent.GetCurrentAction(0);
             ActionIndexCache cache1 = agent.GetCurrentAction(1);
             bool isPlayerControlled =
@@ -475,6 +477,14 @@ namespace Missions.Agents.Packets
             // Apply held input before action transitions so an explicit guard direction remains the final native command.
             ApplyDefendMovementFlags(agent, movementFlags);
 
+            ApplyActionChannels(agent, visualActionAccessor, suppressMountedGuardActionTransition);
+        }
+
+        internal void ApplyActionChannels(
+            Agent agent,
+            IAgentVisualActionAccessor visualActionAccessor,
+            bool suppressMountedGuardActionTransition = false)
+        {
             // Install action transitions, but let an unchanged native action advance on its local timeline.
             ApplyActionChannel(
                 agent,
@@ -564,7 +574,7 @@ namespace Missions.Agents.Packets
             agent.SetActionChannel(
                 channel,
                 action,
-                ignorePriority: forceGuardDirectionTransition,
+                ignorePriority: forceGuardDirectionTransition || action == ActionIndexCache.act_none,
                 additionalFlags: actionFlags,
                 actionSpeed: resolvedActionSpeed,
                 startProgress: actionProgress);
@@ -614,6 +624,14 @@ namespace Missions.Agents.Packets
             int actionIndex,
             out ActionIndexCache action)
         {
+            // A released action has no animation name, but must clear the replicated use pose.
+            if (actionIndex == ActionIndexCache.act_none.Index)
+            {
+                action = ActionIndexCache.act_none;
+                // Retained guard cleanup releases its own action; other guard presentations decay locally.
+                return !IsGuardPresentationAction(agent.GetCurrentActionType(channel));
+            }
+
             string actionName = GetActionNameWithCode(actionIndex);
             if (actionName != null)
             {
@@ -749,6 +767,34 @@ namespace Missions.Agents.Packets
         public float? Action0Speed { get; }
         [ProtoMember(14)]
         public float? Action1Speed { get; }
+        [ProtoMember(15)]
+        public AgentEquipmentData? Equipment { get; private set; }
+        [ProtoMember(16)]
+        public long EquipmentRevision { get; private set; }
+
+        [ProtoMember(17)]
+        public long AuthorityRevision { get; private set; }
+
+        [ProtoMember(18)]
+        public AgentPilotSeatData? PilotSeat { get; private set; }
+
+        internal AgentActionData WithPilotSeat(AgentPilotSeatData? pilotSeat)
+        {
+            var snapshot = (AgentActionData)MemberwiseClone();
+            snapshot.PilotSeat = pilotSeat;
+            return snapshot;
+        }
+
+        internal AgentActionData WithEquipment(long revision, AgentEquipmentData? equipment,
+            long? authorityRevision = null)
+        {
+            var snapshot = (AgentActionData)MemberwiseClone();
+            snapshot.EquipmentRevision = revision;
+            if (authorityRevision.HasValue) snapshot.AuthorityRevision = authorityRevision.Value;
+            snapshot.Equipment = equipment;
+            return snapshot;
+        }
+
         [ProtoIgnore]
         public bool CrouchMode
         {

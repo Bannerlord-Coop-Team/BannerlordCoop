@@ -43,7 +43,7 @@ public sealed class AgentDataNavalDeckWireTests
         var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
 
         var restored = Assert.IsType<MovementPacket>(serializer.Deserialize(serializer.Serialize(
-            new MovementPacket(new[] { Guid.NewGuid() }, new[] { data }, new[] { firstHull, secondHull }))));
+            new MovementPacket(new[] { Guid.NewGuid() }, new[] { data }, deckShips: new[] { firstHull, secondHull }))));
 
         Assert.Equal(new[] { firstHull, secondHull }, restored.DeckShips);
         AgentData agent = Assert.Single(restored.Agents);

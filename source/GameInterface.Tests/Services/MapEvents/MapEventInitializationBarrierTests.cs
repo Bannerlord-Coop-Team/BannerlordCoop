@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
@@ -20,6 +21,25 @@ namespace GameInterface.Tests.Services.MapEvents;
 
 public class MapEventInitializationBarrierTests
 {
+    [Fact]
+    public void CommittedView_ExcludesMissingPendingAndDisposedEvents()
+    {
+        var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+        var party = ObjectHelper.SkipConstructor<PartyBase>();
+        using var barrier = CreateBarrier(mapEvent, party);
+
+        Assert.False(barrier.IsCommitted(null));
+        Assert.False(barrier.IsCommitted(mapEvent));
+        barrier.Register(mapEvent);
+        Assert.True(barrier.IsPending(mapEvent));
+        Assert.False(barrier.IsCommitted(mapEvent));
+        barrier.Register(mapEvent, committed: true);
+        Assert.False(barrier.IsPending(mapEvent));
+        Assert.True(barrier.IsCommitted(mapEvent));
+        barrier.Dispose();
+        Assert.False(barrier.IsCommitted(mapEvent));
+    }
+
     [Fact]
     public void Binding_IsIsolatedByScopeAndRemovedOnDisposal()
     {
@@ -141,7 +161,8 @@ public class MapEventInitializationBarrierTests
             new Mock<IMessageBroker>().Object,
             new Mock<INetwork>().Object,
             objectManager.Object,
-            new StubSiegeEventGraphSynchronizer());
+            new StubSiegeEventGraphSynchronizer(),
+            new SendCoalescer());
     }
 
     private sealed class StubSiegeEventGraphSynchronizer : ISiegeEventGraphSynchronizer

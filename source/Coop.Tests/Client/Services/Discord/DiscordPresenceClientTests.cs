@@ -18,6 +18,40 @@ public class DiscordPresenceClientTests : IAsyncLifetime
         client = new DiscordPresenceClient(connection);
     }
 
+    [Fact]
+    public async Task MainMenuBeforeConnection_InitializesWithoutPlayerOrSessionDetails()
+    {
+        client.SetMainMenu();
+        await Drain();
+
+        AssertMainMenu();
+        Assert.Equal(1, connection.InitializeCalls);
+    }
+
+    [Fact]
+    public async Task MainMenuAfterCampaign_ReplacesPlayerCountAndSurvivesReadyWithStaleActivity()
+    {
+        client.SetPresence("In a co-op campaign", "3 players", startedAt);
+        await Drain();
+        var capturedPresence = connection.CurrentPresence;
+
+        client.SetMainMenu();
+        await Drain();
+        connection.CompleteReady(capturedPresence);
+        await Drain();
+
+        AssertMainMenu();
+        Assert.Equal(1, connection.InitializeCalls);
+    }
+
+    private void AssertMainMenu()
+    {
+        Assert.Equal("Main Menu", connection.CurrentPresence!.State);
+        Assert.Null(connection.CurrentPresence.Details);
+        Assert.Null(connection.CurrentPresence.Party);
+        Assert.Equal(DiscordPresenceClient.ArtworkKey, connection.CurrentPresence.Assets.LargeImageKey);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

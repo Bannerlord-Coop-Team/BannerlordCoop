@@ -1,0 +1,7 @@
+# Start Codex at the repository root, or use tools/mcp/start-codex.cmd.
+# Project trust is a user decision; this file does not grant trust.
+[mcp_servers.bannerlord-coop]
+command = "powershell.exe"
+args = ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "tools/mcp/launch.ps1"]
+startup_timeout_sec = 30
+tool_timeout_sec = 360

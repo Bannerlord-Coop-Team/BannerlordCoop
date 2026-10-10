@@ -1,9 +1,10 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Banners.Messages;
+using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using SandBox.GauntletUI.Map;
 using SandBox.View.Map;
@@ -55,6 +56,7 @@ namespace GameInterface.Services.Banners.Handlers
             }
 
             network.SendAll(new NetworkUpdatePlayerBanner(clan.Banner.Serialize(), clanId, clan.Color, clan.Color2));
+            messageBroker.Publish(this, new ClanManagementChanged(clan, ClanManagementRefresh.Identity));
         }
 
         /// <summary>
@@ -105,6 +107,7 @@ namespace GameInterface.Services.Banners.Handlers
             if (ModInformation.IsServer)
             {
                 network.SendAll(new NetworkUpdatePlayerBanner(payload.BannerCode, payload.ClanId, payload.Color, payload.Color2));
+                messageBroker.Publish(this, new ClanManagementChanged(clan, ClanManagementRefresh.Identity));
             }
         }
 

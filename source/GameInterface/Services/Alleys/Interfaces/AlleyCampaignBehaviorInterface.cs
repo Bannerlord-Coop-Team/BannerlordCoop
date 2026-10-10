@@ -20,6 +20,8 @@ namespace GameInterface.Services.Alleys.Interfaces;
 /// </summary>
 public interface IAlleyCampaignBehaviorInterface : IGameAbstraction
 {
+    Dictionary<string, AlleyManagementData> ClientAlleyData { get; set; }
+
     void AddOrUpdatePlayerAlleyData(Alley alley, Hero overseer, TroopRoster garrison, CampaignTime lastRecruitTime);
     void RemovePlayerAlleyData(Alley alley);
     bool TryGetCurrentSettlementAlley(out Alley alley);
@@ -51,6 +53,9 @@ public class AlleyCampaignBehaviorInterface : IAlleyCampaignBehaviorInterface
     private static readonly ILogger Logger = LogManager.GetLogger<AlleyCampaignBehaviorInterface>();
 
     private static AlleyCampaignBehavior Behavior => Campaign.Current?.GetCampaignBehavior<AlleyCampaignBehavior>();
+
+    // Coop clan views read this data without adding entries to the local player's managed alleys.
+    public Dictionary<string, AlleyManagementData> ClientAlleyData { get; set; } = new();
 
     public void AddOrUpdatePlayerAlleyData(Alley alley, Hero overseer, TroopRoster garrison, CampaignTime lastRecruitTime)
     {

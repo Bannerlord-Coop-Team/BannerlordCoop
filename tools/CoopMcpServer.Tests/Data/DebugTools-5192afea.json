@@ -1,0 +1,2531 @@
+[
+  {
+    "name": "capture_screenshot",
+    "title": null,
+    "description": "Wait 1..120 seconds for advancing engine/render observations, request one screenshot, await stable bridge BMP evidence, and return completed PNG image content plus artifact metadata. Bounded to 64MiB BMP, 16M pixels, 8MiB PNG. Does not prove the intended screen visually; inspect the returned image. Failure preserves captureId/path and bridge diagnostics; never blindly retry uncertain capture. Legacy screenshot/status remain asynchronous.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run_id",
+        "instance",
+        "timeout_seconds"
+      ]
+    },
+    "outputSchema": null,
+    "annotations": null,
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "execute_command",
+    "title": null,
+    "description": "Execute a catalog command on the target game thread. arguments is a string array, not a shell or console line. Preserve argument boundaries; do not add quoting. Run authoritative mutations on server, read-only inspections on clients. Inspect ok/error and output; outcomeUncertain=true means it may still execute, never blindly retry.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "run_id",
+        "instance",
+        "name",
+        "arguments"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "process": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "pid": {
+              "type": "integer"
+            },
+            "role": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platformId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "runToken": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "processStartedUtc": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "result": true,
+        "error": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "code": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcomeUncertain": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "annotations": null,
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "get_run",
+    "title": null,
+    "description": "Refresh owned instances: process alive is distinct from endpoint readiness, campaign readiness and mission readiness. Includes endpoint status and diagnostic errors.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "artifactDirectory": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "instances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "identity": {
+                "type": "object",
+                "properties": {
+                  "pid": {
+                    "type": "integer"
+                  },
+                  "startedUtc": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "role": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "platformId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "runToken": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "pid",
+                  "startedUtc",
+                  "role",
+                  "platformId",
+                  "runToken"
+                ]
+              },
+              "processAlive": {
+                "type": "boolean"
+              },
+              "status": true,
+              "error": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "message": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "outcomeUncertain": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "processTreeAlive": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "cleanupComplete": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "identity",
+              "processAlive",
+              "status",
+              "error",
+              "processTreeAlive",
+              "cleanupComplete"
+            ]
+          }
+        },
+        "preflight": {
+          "type": "object",
+          "properties": {
+            "allowed": {
+              "type": "boolean"
+            },
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "newProcesses": {
+              "type": "integer"
+            },
+            "estimatedBytesPerProcess": {
+              "type": "integer"
+            },
+            "reserveBytes": {
+              "type": "integer"
+            },
+            "estimatedRequiredBytes": {
+              "type": "integer"
+            },
+            "commit": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "committedBytes": {
+                  "type": "integer"
+                },
+                "limitBytes": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "committedBytes",
+                "limitBytes"
+              ]
+            },
+            "bridge": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "mvid": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "protocol": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "capabilities": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "path",
+                "mvid",
+                "protocol",
+                "capabilities"
+              ]
+            }
+          },
+          "required": [
+            "allowed",
+            "code",
+            "message",
+            "newProcesses",
+            "estimatedBytesPerProcess",
+            "reserveBytes",
+            "estimatedRequiredBytes",
+            "commit",
+            "bridge"
+          ]
+        },
+        "clientAttempts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "requestedSave": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "bytes": {
+              "type": "integer"
+            },
+            "lastWriteUtc": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "sessionSidecarPresent": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name",
+            "bytes",
+            "lastWriteUtc",
+            "sessionSidecarPresent"
+          ]
+        },
+        "clientLaunchErrors": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "outcomeUncertain": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "profile",
+        "artifactDirectory",
+        "state",
+        "error",
+        "instances",
+        "preflight",
+        "clientAttempts",
+        "requestedSave",
+        "clientLaunchErrors"
+      ]
+    },
+    "annotations": {
+      "title": null,
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": null,
+      "readOnlyHint": true
+    },
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "join_client",
+    "title": null,
+    "description": "Attempt one deferred client join after server readyForCampaignTests and client readyToJoin. This schedules joining, not completion. Then wait for client readyForCampaignTests. Do not retry uncertain outcomes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "instance"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "process": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "pid": {
+              "type": "integer"
+            },
+            "role": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platformId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "runToken": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "processStartedUtc": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "result": true,
+        "error": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "code": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcomeUncertain": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "annotations": null,
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "list_commands",
+    "title": null,
+    "description": "List ALL registered co-op framework commands plus legacy coop.debug.* commands for this instance. Wait for commandRegistryReady for the full session registry. Arbitrary vanilla console commands are not exposed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "instance"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "process": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "pid": {
+              "type": "integer"
+            },
+            "role": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platformId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "runToken": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "processStartedUtc": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "result": true,
+        "error": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "code": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcomeUncertain": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "annotations": {
+      "title": null,
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": null,
+      "readOnlyHint": true
+    },
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "list_saves",
+    "title": null,
+    "description": "List local graphical Bannerlord save basenames for a configured profile, from the redirected Windows Documents save folder. Metadata only, 64 per page and 512 catalog entries maximum. Pass nextOffset until unchanged. Use an exact name as start_run save_name; no save parsing/copy/delete/write, no hotload. Missing co-op .json sidecar is reported, not created.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string"
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0
+        }
+      },
+      "required": [
+        "profile"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "directory": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "saves": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "bytes": {
+                "type": "integer"
+              },
+              "lastWriteUtc": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "sessionSidecarPresent": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "bytes",
+              "lastWriteUtc",
+              "sessionSidecarPresent"
+            ]
+          }
+        },
+        "nextOffset": {
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "directory",
+        "saves",
+        "nextOffset",
+        "truncated",
+        "note"
+      ]
+    },
+    "annotations": {
+      "title": null,
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": null,
+      "readOnlyHint": true
+    },
+    "execution": null,
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "options_menu",
+    "title": null,
+    "description": "Client-only co-op options navigation: open from campaign map, select tab id, inspect, or close WITHOUT applying. Omit tab on open to select the first available tab. Only controls its own topmost options screen; never clicks arbitrary UI or edits settings. Inspect ok/error; do not retry uncertain mutations. Use screenshot and screenshot_status to view the rendered menu.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "tab": {
+          "type": "string",
+          "default": null
+        }
+      },
+      "required": [
+        "run_id",
+        "instance",
+        "action"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "process": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "pid": {
+              "type": "integer"
+            },
+            "role": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platformId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "runToken": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "processStartedUtc": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "result": true,
+        "error": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "code": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcomeUncertain": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "annotations": null,
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "preflight_run",
+    "title": null,
+    "description": "Read-only system commit headroom and deployed DEBUG bridge metadata check for a server plus client_count new clients. No launch, deployment, allocation, or configuration changes. Budgets are configurable estimates, not guarantees.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string"
+        },
+        "client_count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "profile",
+        "client_count"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "allowed": {
+          "type": "boolean"
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "newProcesses": {
+          "type": "integer"
+        },
+        "estimatedBytesPerProcess": {
+          "type": "integer"
+        },
+        "reserveBytes": {
+          "type": "integer"
+        },
+        "estimatedRequiredBytes": {
+          "type": "integer"
+        },
+        "commit": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "committedBytes": {
+              "type": "integer"
+            },
+            "limitBytes": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "committedBytes",
+            "limitBytes"
+          ]
+        },
+        "bridge": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "mvid": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "protocol": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "capabilities": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "path",
+            "mvid",
+            "protocol",
+            "capabilities"
+          ]
+        }
+      },
+      "required": [
+        "allowed",
+        "code",
+        "message",
+        "newProcesses",
+        "estimatedBytesPerProcess",
+        "reserveBytes",
+        "estimatedRequiredBytes",
+        "commit",
+        "bridge"
+      ]
+    },
+    "annotations": {
+      "title": null,
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": null,
+      "readOnlyHint": true
+    },
+    "execution": null,
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "read_logs",
+    "title": null,
+    "description": "Read 4..65536 UTF-8 bytes from the endpoint-reported log (or archived log after stop). Omit cursor for beginning. Pass returned cursor for incremental reads. reset=true means replacement/truncation/compaction changed the observed content; output restarts at beginning. Cursors are opaque and instance-specific.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "cursor": {
+          "type": "string",
+          "default": null
+        },
+        "max_bytes": {
+          "type": "integer",
+          "default": 16384
+        }
+      },
+      "required": [
+        "run_id",
+        "instance"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cursor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reset": {
+          "type": "boolean"
+        },
+        "hasMore": {
+          "type": "boolean"
+        },
+        "length": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "text",
+        "cursor",
+        "reset",
+        "hasMore",
+        "length"
+      ]
+    },
+    "annotations": {
+      "title": null,
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": null,
+      "readOnlyHint": true
+    },
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "screenshot",
+    "title": null,
+    "description": "Request BMP screenshot in the run artifact directory. This is asynchronous; poll screenshot_status with returned captureId until complete. No automatic retry.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "instance"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "process": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "pid": {
+              "type": "integer"
+            },
+            "role": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platformId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "runToken": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "processStartedUtc": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "result": true,
+        "error": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "code": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcomeUncertain": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "annotations": null,
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "screenshot_status",
+    "title": null,
+    "description": "Check an existing screenshot captureId; complete=true means the bridge observed a stable BMP file. Returns a local artifact path, not image bytes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "capture_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id",
+        "instance",
+        "capture_id"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "process": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "pid": {
+              "type": "integer"
+            },
+            "role": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platformId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "runToken": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "processStartedUtc": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "result": true,
+        "error": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "code": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcomeUncertain": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "annotations": {
+      "title": null,
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": null,
+      "readOnlyHint": true
+    },
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "start_client",
+    "title": null,
+    "description": "Add one deferred client to an existing owned run using a configured client_index (1..16). Prefer start_run with client_count=0, wait for server, then add clients as needed. Slot is reserved once: repeated calls report existing_running/existing_exited/launch_failed/outcome_unknown, never relaunch. Preflight rejection has no launch side effect. Launching is not joining; wait readyToJoin, join_client, then wait readyForCampaignTests.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "client_index": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run_id",
+        "client_index"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "run": {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string"
+            },
+            "profile": {
+              "type": "string"
+            },
+            "artifactDirectory": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "instances": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "identity": {
+                    "type": "object",
+                    "properties": {
+                      "pid": {
+                        "type": "integer"
+                      },
+                      "startedUtc": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "role": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "platformId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "runToken": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "pid",
+                      "startedUtc",
+                      "role",
+                      "platformId",
+                      "runToken"
+                    ]
+                  },
+                  "processAlive": {
+                    "type": "boolean"
+                  },
+                  "status": true,
+                  "error": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "code": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "message": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "outcomeUncertain": {
+                        "type": "boolean"
+                      }
+                    }
+                  },
+                  "processTreeAlive": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "cleanupComplete": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name",
+                  "identity",
+                  "processAlive",
+                  "status",
+                  "error",
+                  "processTreeAlive",
+                  "cleanupComplete"
+                ]
+              }
+            },
+            "preflight": {
+              "type": "object",
+              "properties": {
+                "allowed": {
+                  "type": "boolean"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                },
+                "newProcesses": {
+                  "type": "integer"
+                },
+                "estimatedBytesPerProcess": {
+                  "type": "integer"
+                },
+                "reserveBytes": {
+                  "type": "integer"
+                },
+                "estimatedRequiredBytes": {
+                  "type": "integer"
+                },
+                "commit": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "committedBytes": {
+                      "type": "integer"
+                    },
+                    "limitBytes": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "committedBytes",
+                    "limitBytes"
+                  ]
+                },
+                "bridge": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "mvid": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "protocol": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "capabilities": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "mvid",
+                    "protocol",
+                    "capabilities"
+                  ]
+                }
+              },
+              "required": [
+                "allowed",
+                "code",
+                "message",
+                "newProcesses",
+                "estimatedBytesPerProcess",
+                "reserveBytes",
+                "estimatedRequiredBytes",
+                "commit",
+                "bridge"
+              ]
+            },
+            "clientAttempts": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "requestedSave": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "bytes": {
+                  "type": "integer"
+                },
+                "lastWriteUtc": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "sessionSidecarPresent": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "bytes",
+                "lastWriteUtc",
+                "sessionSidecarPresent"
+              ]
+            },
+            "clientLaunchErrors": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "message": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "outcomeUncertain": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "runId",
+            "profile",
+            "artifactDirectory",
+            "state",
+            "error",
+            "instances",
+            "preflight",
+            "clientAttempts",
+            "requestedSave",
+            "clientLaunchErrors"
+          ]
+        },
+        "error": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "code": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcomeUncertain": {
+              "type": "boolean"
+            }
+          }
+        },
+        "preflight": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "allowed": {
+              "type": "boolean"
+            },
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "newProcesses": {
+              "type": "integer"
+            },
+            "estimatedBytesPerProcess": {
+              "type": "integer"
+            },
+            "reserveBytes": {
+              "type": "integer"
+            },
+            "estimatedRequiredBytes": {
+              "type": "integer"
+            },
+            "commit": {
+              "$ref": "#/properties/run/properties/preflight/properties/commit"
+            },
+            "bridge": {
+              "$ref": "#/properties/run/properties/preflight/properties/bridge"
+            }
+          },
+          "required": [
+            "allowed",
+            "code",
+            "message",
+            "newProcesses",
+            "estimatedBytesPerProcess",
+            "reserveBytes",
+            "estimatedRequiredBytes",
+            "commit",
+            "bridge"
+          ]
+        }
+      },
+      "required": [
+        "outcome",
+        "instance",
+        "run",
+        "error",
+        "preflight"
+      ]
+    },
+    "annotations": null,
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "start_run",
+    "title": null,
+    "description": "Launch a configured in-game server and 0..16 deferred clients. Returns booting, NOT connected or ready. Next wait for server readyForCampaignTests, each client readyToJoin, join_client each, then wait each client readyForCampaignTests. Only one active run per MCP session. Optional save_name must be an exact list_saves basename; server uses /coopsave without default fallback. Omit to retain normal startup. MCP never modifies save bytes; normal game autosaves are not disabled.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string"
+        },
+        "client_count": {
+          "type": "integer"
+        },
+        "save_name": {
+          "type": "string",
+          "default": null
+        }
+      },
+      "required": [
+        "profile",
+        "client_count"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "artifactDirectory": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "instances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "identity": {
+                "type": "object",
+                "properties": {
+                  "pid": {
+                    "type": "integer"
+                  },
+                  "startedUtc": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "role": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "platformId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "runToken": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "pid",
+                  "startedUtc",
+                  "role",
+                  "platformId",
+                  "runToken"
+                ]
+              },
+              "processAlive": {
+                "type": "boolean"
+              },
+              "status": true,
+              "error": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "message": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "outcomeUncertain": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "processTreeAlive": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "cleanupComplete": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "identity",
+              "processAlive",
+              "status",
+              "error",
+              "processTreeAlive",
+              "cleanupComplete"
+            ]
+          }
+        },
+        "preflight": {
+          "type": "object",
+          "properties": {
+            "allowed": {
+              "type": "boolean"
+            },
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "newProcesses": {
+              "type": "integer"
+            },
+            "estimatedBytesPerProcess": {
+              "type": "integer"
+            },
+            "reserveBytes": {
+              "type": "integer"
+            },
+            "estimatedRequiredBytes": {
+              "type": "integer"
+            },
+            "commit": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "committedBytes": {
+                  "type": "integer"
+                },
+                "limitBytes": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "committedBytes",
+                "limitBytes"
+              ]
+            },
+            "bridge": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "mvid": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "protocol": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "capabilities": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "path",
+                "mvid",
+                "protocol",
+                "capabilities"
+              ]
+            }
+          },
+          "required": [
+            "allowed",
+            "code",
+            "message",
+            "newProcesses",
+            "estimatedBytesPerProcess",
+            "reserveBytes",
+            "estimatedRequiredBytes",
+            "commit",
+            "bridge"
+          ]
+        },
+        "clientAttempts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "requestedSave": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "bytes": {
+              "type": "integer"
+            },
+            "lastWriteUtc": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "sessionSidecarPresent": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name",
+            "bytes",
+            "lastWriteUtc",
+            "sessionSidecarPresent"
+          ]
+        },
+        "clientLaunchErrors": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "outcomeUncertain": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "profile",
+        "artifactDirectory",
+        "state",
+        "error",
+        "instances",
+        "preflight",
+        "clientAttempts",
+        "requestedSave",
+        "clientLaunchErrors"
+      ]
+    },
+    "annotations": null,
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "stop_run",
+    "title": null,
+    "description": "Shutdown only owned processes, then force-stop those still alive after bounded grace. Archive endpoint-reported logs and retain all run artifacts. Idempotent; cleanup failures remain inspectable and can be retried.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_id"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "runId": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "artifactDirectory": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "instances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "identity": {
+                "type": "object",
+                "properties": {
+                  "pid": {
+                    "type": "integer"
+                  },
+                  "startedUtc": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "role": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "platformId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "runToken": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "pid",
+                  "startedUtc",
+                  "role",
+                  "platformId",
+                  "runToken"
+                ]
+              },
+              "processAlive": {
+                "type": "boolean"
+              },
+              "status": true,
+              "error": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "code": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "message": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "outcomeUncertain": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "processTreeAlive": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "cleanupComplete": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name",
+              "identity",
+              "processAlive",
+              "status",
+              "error",
+              "processTreeAlive",
+              "cleanupComplete"
+            ]
+          }
+        },
+        "preflight": {
+          "type": "object",
+          "properties": {
+            "allowed": {
+              "type": "boolean"
+            },
+            "code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "newProcesses": {
+              "type": "integer"
+            },
+            "estimatedBytesPerProcess": {
+              "type": "integer"
+            },
+            "reserveBytes": {
+              "type": "integer"
+            },
+            "estimatedRequiredBytes": {
+              "type": "integer"
+            },
+            "commit": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "committedBytes": {
+                  "type": "integer"
+                },
+                "limitBytes": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "committedBytes",
+                "limitBytes"
+              ]
+            },
+            "bridge": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "mvid": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "protocol": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "capabilities": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "path",
+                "mvid",
+                "protocol",
+                "capabilities"
+              ]
+            }
+          },
+          "required": [
+            "allowed",
+            "code",
+            "message",
+            "newProcesses",
+            "estimatedBytesPerProcess",
+            "reserveBytes",
+            "estimatedRequiredBytes",
+            "commit",
+            "bridge"
+          ]
+        },
+        "clientAttempts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "requestedSave": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "bytes": {
+              "type": "integer"
+            },
+            "lastWriteUtc": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "sessionSidecarPresent": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "name",
+            "bytes",
+            "lastWriteUtc",
+            "sessionSidecarPresent"
+          ]
+        },
+        "clientLaunchErrors": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "outcomeUncertain": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "runId",
+        "profile",
+        "artifactDirectory",
+        "state",
+        "error",
+        "instances",
+        "preflight",
+        "clientAttempts",
+        "requestedSave",
+        "clientLaunchErrors"
+      ]
+    },
+    "annotations": null,
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "ui_action",
+    "title": null,
+    "description": "DEBUG client UI action on a ui_inspect snapshot/element reference. Allowed: click (native button), toggle (value 0/1), text (replace ordinary non-password text), slider (native numeric value), scroll_vertical/scroll_horizontal (value fraction 0..1). Dropdowns: click opener, inspect again, click visible item. Targets must be visible/enabled/uncovered. All references consumed after dispatch, inspect again and wait for animations. This changes real UI/settings; Apply is a separate button. No gameplay keys/OS input/arbitrary code. Never retry outcomeUncertain mutations.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "snapshot": {
+          "type": "string"
+        },
+        "element": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string",
+          "default": null
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "run_id",
+        "instance",
+        "snapshot",
+        "element",
+        "action"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "process": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "pid": {
+              "type": "integer"
+            },
+            "role": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platformId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "runToken": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "processStartedUtc": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "result": true,
+        "error": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "code": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcomeUncertain": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "annotations": null,
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "ui_inspect",
+    "title": null,
+    "description": "DEBUG client Gauntlet widget tree. Omit snapshot for fresh references (expire after 30s). Pages contain up to 128 elements: repeat with snapshot and nextOffset until nextOffset == total. Discover by widget id/type/text and parent index (eN); password fields are redacted. No automatic waits. A new snapshot or any action invalidates previous references. Use screenshot for visual verification. Truncated trees are inspection-only.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "snapshot": {
+          "type": "string",
+          "default": null
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0
+        }
+      },
+      "required": [
+        "run_id",
+        "instance"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "process": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "pid": {
+              "type": "integer"
+            },
+            "role": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "platformId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "runToken": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "processStartedUtc": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "result": true,
+        "error": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "code": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "message": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "outcomeUncertain": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "annotations": {
+      "title": null,
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": null,
+      "readOnlyHint": true
+    },
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  },
+  {
+    "name": "wait_for_state",
+    "title": null,
+    "description": "Bounded wait, 1..300 seconds, for one instance state: controlReady, readyToJoin, commandRegistryReady, readyForCampaignTests, readyForMissionTests, exited. Returns reached=false and diagnostics on timeout or early exit. No mutation retries.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "instance": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run_id",
+        "instance",
+        "state",
+        "timeout_seconds"
+      ]
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "result": true
+      },
+      "required": [
+        "result"
+      ]
+    },
+    "annotations": {
+      "title": null,
+      "destructiveHint": null,
+      "idempotentHint": null,
+      "openWorldHint": null,
+      "readOnlyHint": true
+    },
+    "execution": {
+      "taskSupport": "optional"
+    },
+    "icons": null,
+    "_meta": null
+  }
+]

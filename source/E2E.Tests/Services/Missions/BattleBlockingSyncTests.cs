@@ -9,6 +9,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
+using HarmonyLib;
 using Missions;
 using Missions.Agents.Handlers;
 using Missions.Agents.Messages;
@@ -30,6 +31,102 @@ namespace E2E.Tests.Services.Missions;
 public class BattleBlockingSyncTests : MissionTestEnvironment
 {
     public BattleBlockingSyncTests(ITestOutputHelper output) : base(output) { }
+
+    [Theory]
+    [InlineData(0, AgentControllerType.Player, false)]
+    [InlineData(1, AgentControllerType.Player, false)]
+    [InlineData(0, AgentControllerType.AI, false)]
+    [InlineData(1, AgentControllerType.AI, false)]
+    [InlineData(0, AgentControllerType.Player, true)]
+    [InlineData(1, AgentControllerType.Player, true)]
+    [InlineData(0, AgentControllerType.AI, true)]
+    [InlineData(1, AgentControllerType.AI, true)]
+    public void PollActions_RangedSiegeOtherActions_SendEntryTransitionsAndClear(
+        int channel, AgentControllerType controllerType, bool mangonel)
+    {
+        RunScenario("owner", context =>
+        {
+            var harmony = new Harmony($"{nameof(PollActions_RangedSiegeOtherActions_SendEntryTransitionsAndClear)}.{Guid.NewGuid()}");
+            var target = AccessTools.Method(typeof(AgentActionData), "GetActionNameWithCode");
+            harmony.Patch(target, postfix: new HarmonyMethod(
+                typeof(BattleBlockingSyncTests), nameof(ReadRangedSiegeActionName)));
+            try
+            {
+                var agentId = Guid.NewGuid();
+                Agent agent = SpawnRegisteredAgent(
+                    context, "owner", agentId, controllerType, out MirrorAgent mirror);
+                context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+                Assert.Empty(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+
+                long sequence = 0;
+                var useActions = mangonel
+                    ? new[] { 3730, 3731, 3732, 3733, 3730, -1 }
+                    : new[] { 3715, 3716, 3717, 3718, 3713, -1 };
+                foreach (int action in useActions)
+                {
+                    if (channel == 0)
+                    {
+                        mirror.Action0Index = action;
+                        mirror.Action0CodeType = Agent.ActionCodeType.Other;
+                    }
+                    else
+                    {
+                        mirror.Action1Index = action;
+                        mirror.Action1CodeType = Agent.ActionCodeType.Other;
+                    }
+                    // The use object can already be detached when the animation clears.
+                    Assert.Null(agent.CurrentlyUsedGameObject);
+                    Assert.Equal(Agent.ActionCodeType.Other, agent.GetCurrentActionType(channel));
+                    context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+
+                    AgentActionPacket packet = Assert.Single(
+                        context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+                    Assert.Equal(agentId, Assert.Single(packet.AgentIds));
+                    Assert.Equal(++sequence, Assert.Single(packet.Sequences));
+                    AgentActionData data = Assert.Single(packet.Actions);
+                    Assert.Equal(action, channel == 0 ? data.Action0Index : data.Action1Index);
+                    Assert.Equal(-1, channel == 0 ? data.Action1Index : data.Action0Index);
+
+                    context.Network.NetworkSentPackets.Packets.Clear();
+                    context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+                    Assert.Empty(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+                }
+
+                foreach (var type in new[] { Agent.ActionCodeType.Other, Agent.ActionCodeType.Idle })
+                {
+                    mirror.Action0Index = type == Agent.ActionCodeType.Other ? 1001 : 1002;
+                    mirror.Action1Index = type == Agent.ActionCodeType.Other ? 1002 : 1001;
+                    mirror.Action0CodeType = type;
+                    mirror.Action1CodeType = type;
+                    context.Component.AgentActionHandler.PollActionsAfterNativeTick();
+                    Assert.Empty(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+                }
+            }
+            finally
+            {
+                harmony.Unpatch(target, HarmonyPatchType.All, harmony.Id);
+            }
+        });
+    }
+
+    private static void ReadRangedSiegeActionName(int actionCode, ref string __result)
+    {
+        __result = actionCode switch
+        {
+            3715 => "act_usage_ballista_ammo_pick_up_start_defender",
+            3716 => "act_usage_ballista_ammo_pick_up_end_defender",
+            3717 => "act_usage_ballista_ammo_place_start_defender",
+            3718 => "act_usage_ballista_ammo_place_end_defender",
+            3713 => "act_usage_ballista_idle_defender",
+            3730 => "act_usage_mangonel_big_idle",
+            3731 => "act_usage_mangonel_big_shoot",
+            3732 => "act_usage_mangonel_big_reload",
+            3733 => "act_usage_mangonel_reload_2_idle",
+            1001 => "act_walk_forward",
+            1002 => "act_idle",
+            _ => __result,
+        };
+    }
 
     [Fact]
     public void PollActions_PlayerGuardInput_SendsActionPacket()
@@ -179,7 +276,12 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 Assert.Single(packet.Actions).GuardMode);
 
             context.Component.AgentActionHandler.CatchUpJoiner("joiner");
-            Assert.Empty(context.Network.DirectPacketSends);
+            var catchUp = Assert.IsType<AgentActionPacket>(Assert.Single(context.Network.DirectPacketSends).Packet);
+            Assert.All(catchUp.Actions, action =>
+            {
+                Assert.Equal(Agent.GuardMode.None, action.GuardMode);
+                Assert.NotNull(action.Equipment);
+            });
         });
     }
 
@@ -999,6 +1101,81 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
+    public void PollActions_HostMigration_StampsFormerHostsOwnAgentWithEpochZero()
+    {
+        const string mapEventId = "mapEvent1";
+        using var fixture = new MissionEngineFixture();
+        EnvironmentInstance formerHost = Clients.First();
+        EnvironmentInstance successor = Clients.Last();
+        SetControllerId(formerHost, "A");
+        SetControllerId(successor, "B");
+        var formerHostAgentId = Guid.NewGuid();
+        var successorAgentId = Guid.NewGuid();
+        BlockingSyncContext formerHostContext = null;
+        BlockingSyncContext successorContext = null;
+        MirrorAgent formerHostMirror = null;
+        MirrorAgent successorMirror = null;
+
+        formerHost.Call(() => RunInBattle(mapEventId, () =>
+        {
+            formerHostContext = new BlockingSyncContext(fixture, formerHost);
+            AssignBattleHost(formerHostContext, mapEventId, "A", new[] { "B" }, epoch: 1);
+            SpawnRegisteredAgent(
+                formerHostContext, "A", formerHostAgentId, AgentControllerType.Player,
+                out formerHostMirror);
+            formerHostContext.Component.AgentActionHandler.PollActions();
+            formerHostMirror.GuardMode = Agent.GuardMode.Right;
+            formerHostMirror.MovementFlags = Agent.MovementControlFlag.DefendRight;
+            formerHostContext.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket packet = Assert.Single(
+                formerHostContext.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            Assert.Equal("A", packet.ControllerId);
+            Assert.Equal(1, packet.BattleHostEpoch);
+            Assert.Equal(formerHostAgentId, Assert.Single(packet.AgentIds));
+            Assert.Equal(1L, Assert.Single(packet.Sequences));
+            formerHostContext.Network.NetworkSentPackets.Packets.Clear();
+        }));
+
+        successor.Call(() => RunInBattle(mapEventId, () =>
+        {
+            successorContext = new BlockingSyncContext(fixture, successor);
+            AssignBattleHost(successorContext, mapEventId, "A", new[] { "B" }, epoch: 1);
+            SpawnRegisteredAgent(
+                successorContext, "B", successorAgentId, AgentControllerType.Player,
+                out successorMirror);
+            successorContext.Component.AgentActionHandler.PollActions();
+
+            AssignBattleHost(successorContext, mapEventId, "B", new[] { "A" }, epoch: 2);
+            successorMirror.GuardMode = Agent.GuardMode.Left;
+            successorMirror.MovementFlags = Agent.MovementControlFlag.DefendLeft;
+            successorContext.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket packet = Assert.Single(
+                successorContext.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            Assert.Equal("B", packet.ControllerId);
+            Assert.Equal(2, packet.BattleHostEpoch);
+            Assert.Equal(successorAgentId, Assert.Single(packet.AgentIds));
+        }));
+
+        formerHost.Call(() => RunInBattle(mapEventId, () =>
+        {
+            AssignBattleHost(formerHostContext, mapEventId, "B", new[] { "A" }, epoch: 2);
+            formerHostMirror.GuardMode = Agent.GuardMode.Left;
+            formerHostMirror.MovementFlags = Agent.MovementControlFlag.DefendLeft;
+            formerHostContext.Component.AgentActionHandler.PollActions();
+
+            AgentActionPacket packet = Assert.Single(
+                formerHostContext.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
+            Assert.Equal("A", packet.ControllerId);
+            Assert.Equal(0, packet.BattleHostEpoch);
+            Assert.Equal(formerHostAgentId, Assert.Single(packet.AgentIds));
+            Assert.Equal(2L, Assert.Single(packet.Sequences));
+            Assert.True(formerHostContext.Registry.IsLocallyControlled(formerHostAgentId));
+        }));
+    }
+
+    [Fact]
     public void CatchUpJoiner_HeldGuard_SendsCurrentStateToJoiningPeer()
     {
         RunScenario("owner", context =>
@@ -1479,8 +1656,10 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         });
     }
 
-    [Fact]
-    public void SuccessorAction_BeforeHostAssignment_WaitsForMigration()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SuccessorAction_BeforeHostAssignment_WaitsForMigration(bool assignmentOnGameThread)
     {
         const string mapEventId = "mapEvent1";
         RunBattleScenario("observer", mapEventId, context =>
@@ -1507,7 +1686,16 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
                 Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
 
                 context.Broker.Publish(this, new MissionPeerDisconnected("A", mapEventId));
-                AssignBattleHost(context, mapEventId, "B", Array.Empty<string>(), epoch: 2);
+                context.Instance.SimulateMessage(this,
+                    new NetworkBattleHostAssigned(mapEventId, "B", Array.Empty<string>(), 2),
+                    markGameThread: assignmentOnGameThread);
+                if (!assignmentOnGameThread)
+                {
+                    Assert.True(context.Hosts.TryGet(mapEventId, out var beforePump));
+                    Assert.Equal("A", beforePump.HostControllerId);
+                    Assert.True(context.Instance.PendingGameThreadActionCount > 0);
+                }
+                context.Instance.PumpGameThread();
                 DrainGameThread();
                 context.Component.AgentActionHandler.ApplyRemoteGuardStates();
 
@@ -1652,7 +1840,7 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Agent ownerB = SpawnAgent(context, AgentControllerType.Player, out MirrorAgent ownerBMirror);
             ownerBMirror.GuardMode = Agent.GuardMode.Right;
 
-            ApplyOwnerAction(context.Component, "owner-b", 1L, agentId, ownerB);
+            ApplyOwnerAction(context.Component, "owner-b", 1L, agentId, ownerB, authorityRevision: 1);
             context.Component.AgentActionHandler.ApplyRemoteGuardStates();
             Assert.Equal(Agent.GuardMode.Right, puppetMirror.GuardMode);
             Assert.Equal(2, puppetMirror.SetWeaponGuardCalls);
@@ -2472,6 +2660,102 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         return agent;
     }
 
+    [Fact]
+    public void EquipmentReference_NewHostEpochRequiresFreshBaseline()
+    {
+        const string mapEventId = "mapEvent1";
+        RunBattleScenario("observer", mapEventId, context =>
+        {
+            context.Broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+            AssignBattleHost(context, mapEventId, "A", Array.Empty<string>(), epoch: 1);
+            DrainGameThread();
+            Guid id = Guid.NewGuid();
+            SpawnRegisteredAgent(context, "A", id, AgentControllerType.None, out MirrorAgent puppet);
+            Agent owner = SpawnAgent(context, AgentControllerType.AI, out MirrorAgent ownerMirror);
+            ownerMirror.Action0Index = 1001;
+            var first = new AgentActionData(owner);
+            context.Component.AgentActionHandler.HandlePacket(null, new AgentActionPacket("A",
+                new[] { id }, new[] { first.WithEquipment(1, first.Equipment) }, new[] { 1L }, 1));
+            DrainGameThread();
+            Assert.Equal(1001, puppet.Action0Index);
+
+            AssignBattleHost(context, mapEventId, "A", Array.Empty<string>(), epoch: 2);
+            DrainGameThread();
+            ownerMirror.Action0Index = 1002;
+            var next = new AgentActionData(owner);
+            context.Component.AgentActionHandler.HandlePacket(null, new AgentActionPacket("A",
+                new[] { id }, new[] { next.WithEquipment(1, null) }, new[] { 2L }, 2));
+            DrainGameThread();
+            context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            Assert.Equal(1001, puppet.Action0Index);
+
+            context.Component.AgentActionHandler.HandlePacket(null, new AgentActionPacket("A",
+                new[] { id }, new[] { next.WithEquipment(1, next.Equipment) }, new[] { 3L }, 2));
+            DrainGameThread();
+            Assert.Equal(1002, puppet.Action0Index);
+        });
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void EquipmentReference_FormerHostUsesOrdinaryBaseline(
+        bool regainAuthority, bool referenceBeforeBaseline)
+    {
+        const string mapEventId = "mapEvent1";
+        RunBattleScenario("observer", mapEventId, context =>
+        {
+            context.Broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
+            context.Broker.Publish(this, new NetworkMissionPeerEntered("B", mapEventId));
+            AssignBattleHost(context, mapEventId, "A", new[] { "B" }, epoch: 1);
+            DrainGameThread();
+            Guid id = Guid.NewGuid();
+            SpawnRegisteredAgent(context, "A", id, AgentControllerType.None, out MirrorAgent puppet);
+            Agent owner = SpawnAgent(context, AgentControllerType.AI, out MirrorAgent ownerMirror);
+
+            void SendAction(int actionIndex, long sequence, long revision, int epoch, bool full)
+            {
+                ownerMirror.Action0Index = actionIndex;
+                var data = new AgentActionData(owner);
+                context.Component.AgentActionHandler.HandlePacket(null, new AgentActionPacket("A",
+                    new[] { id }, new[] { data.WithEquipment(revision, full ? data.Equipment : null,
+                        epoch == 0 && regainAuthority ? 2 : 0) },
+                    new[] { sequence }, epoch));
+                DrainGameThread();
+                context.Component.AgentActionHandler.ApplyRemoteGuardStates();
+            }
+
+            SendAction(1001, sequence: 1, revision: 1, epoch: 1, full: true);
+            Assert.Equal(1001, puppet.Action0Index);
+            AssignBattleHost(context, mapEventId, "B", Array.Empty<string>(), epoch: 2);
+            DrainGameThread();
+            if (regainAuthority)
+            {
+                Assert.True(context.Registry.TryTransferAuthority("B", id));
+                Assert.True(context.Registry.TryTransferAuthority("A", id));
+            }
+
+            if (referenceBeforeBaseline)
+            {
+                SendAction(1002, sequence: 3, revision: 2, epoch: 0, full: false);
+                Assert.Equal(1001, puppet.Action0Index);
+            }
+            SendAction(1002, sequence: 2, revision: 2, epoch: 0, full: true);
+            Assert.Equal(1002, puppet.Action0Index);
+            SendAction(1003, sequence: 4, revision: 2, epoch: 0, full: false);
+            Assert.Equal(1003, puppet.Action0Index);
+
+            SendAction(1004, sequence: 5, revision: 99, epoch: 1, full: true);
+            Assert.Equal(1003, puppet.Action0Index);
+            SendAction(1004, sequence: 6, revision: 99, epoch: 1, full: false);
+            Assert.Equal(1003, puppet.Action0Index);
+            SendAction(1005, sequence: 7, revision: 2, epoch: 0, full: false);
+            Assert.Equal(1005, puppet.Action0Index);
+        });
+    }
+
     private static Agent SpawnRegisteredAgent(
         BlockingSyncContext context,
         string controllerId,
@@ -2533,13 +2817,15 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         long sequence,
         Guid agentId,
         Agent owner,
-        int battleHostEpoch = 0)
+        int battleHostEpoch = 0,
+        long authorityRevision = 0)
     {
+        var data = new AgentActionData(owner);
         component.AgentActionHandler.HandlePacket(null,
             new AgentActionPacket(
                 controllerId,
                 new[] { agentId },
-                new[] { new AgentActionData(owner) },
+                new[] { data.WithEquipment(0, data.Equipment, authorityRevision) },
                 new[] { sequence },
                 battleHostEpoch));
     }

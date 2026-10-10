@@ -7,6 +7,7 @@ using GameInterface.Services.Locations;
 using LiteNetLib;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
+using Missions.Battles;
 #if DEBUG
 using Missions.Diagnostics;
 #endif
@@ -20,6 +21,7 @@ namespace Missions.Agents.Handlers;
 
 public interface IAgentActionHandler : IPacketHandler, IDisposable
 {
+    void BindPilotSeats(string battleId, ISiegeMachineStateReplicator machineState);
     /// <summary>
     /// [Game thread] Detect discrete action and defend-input changes on the locally authoritative main player.
     /// </summary>
@@ -94,6 +96,12 @@ public class AgentActionHandler : IAgentActionHandler
     private struct LocalAgentActionState
     {
         public bool HasObservation;
+        public AgentEquipmentData? Equipment;
+        public AgentEquipmentData? RevisionEquipment;
+        public long EquipmentRevision;
+        public long BroadcastEquipmentRevision;
+        public int EquipmentHostEpoch;
+        public long EquipmentAuthorityRevision;
         public int Action0;
         public int Action1;
         public float Action0Speed;
@@ -117,6 +125,7 @@ public class AgentActionHandler : IAgentActionHandler
         public Agent.MovementControlFlag InputBoundaryDefendFlags;
         public Agent.GuardMode InputBoundaryGuardMode;
         public long Sequence;
+        public AgentPilotSeatData? PilotSeat;
     }
 
     public AgentActionHandler(
@@ -137,10 +146,13 @@ public class AgentActionHandler : IAgentActionHandler
         this.guardReactionHandler = guardReactionHandler;
 
         this.packetManager.RegisterPacketHandler(this);
-        this.messageBroker.Subscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
+        this.messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
     }
 
     public PacketType PacketType => PacketType.AgentAction;
+
+    public void BindPilotSeats(string battleId, ISiegeMachineStateReplicator machineState) =>
+        remoteActionProcessor.BindPilotSeats(battleId, machineState);
 
     public void PollActions()
     {
@@ -243,6 +255,19 @@ public class AgentActionHandler : IAgentActionHandler
         int action1 = agent.GetCurrentAction(1).Index;
         _localAgentStates.TryGetValue(info.AgentId, out var state);
         bool hadState = state.HasObservation;
+        AgentPilotSeatData? pilotSeat = remoteActionProcessor.CapturePilotSeat(info, state.PilotSeat);
+        bool pilotSeatChanged = !Nullable.Equals(state.PilotSeat, pilotSeat);
+        AgentEquipmentData? equipment = AgentEquipmentData.TryCapture(agent, out var capturedEquipment)
+            ? capturedEquipment : (AgentEquipmentData?)null;
+        bool equipmentChanged = hadState
+            ? !Nullable.Equals(state.Equipment, equipment)
+            : equipment.HasValue
+                && (equipment.Value.MainHandIndex != (int)EquipmentIndex.None
+                    || equipment.Value.OffHandIndex != (int)EquipmentIndex.None);
+        equipmentChanged |= equipment.HasValue && state.EquipmentRevision > 0
+            && (state.EquipmentHostEpoch != remoteActionProcessor.GetOutgoingBattleHostEpoch()
+                || state.EquipmentAuthorityRevision != info.AuthorityRevision
+                || state.BroadcastEquipmentRevision != state.EquipmentRevision);
         bool isPlayerControlled =
             agent.Controller == AgentControllerType.Player;
         bool retainInputBoundary =
@@ -342,8 +367,8 @@ public class AgentActionHandler : IAgentActionHandler
             agent.GetCurrentActionType(0);
         Agent.ActionCodeType action1Type =
             agent.GetCurrentActionType(1);
-        bool action0Discrete = IsDiscreteAction(action0Type);
-        bool action1Discrete = IsDiscreteAction(action1Type);
+        bool action0Discrete = IsDiscreteAction(action0Type, action0);
+        bool action1Discrete = IsDiscreteAction(action1Type, action1);
 
         // Native command actions are untyped, so recognize the main agent's order gesture by action name.
         if (agent == Mission.Current.MainAgent)
@@ -395,7 +420,9 @@ public class AgentActionHandler : IAgentActionHandler
             && !action0SpeedChanged && !action1SpeedChanged
             && !defendChanged && !guardChanged
             && !guardedMountStateChanged
-            && !guardedControllerRoleChanged)
+            && !guardedControllerRoleChanged
+            && !equipmentChanged
+            && !pilotSeatChanged)
         {
             if (hadState)
             {
@@ -466,8 +493,12 @@ public class AgentActionHandler : IAgentActionHandler
             || guardChanged
             || guardedMountStateChanged
             || guardedControllerRoleChanged
-            || discreteActionChanged;
+            || discreteActionChanged
+            || equipmentChanged
+            || pilotSeatChanged;
         state.HasObservation = true;
+        state.PilotSeat = pilotSeat;
+        state.Equipment = equipment;
         state.Action0 = action0;
         state.Action1 = action1;
         UpdateActionSpeedObservation(
@@ -522,6 +553,7 @@ public class AgentActionHandler : IAgentActionHandler
             guardReactionChannel,
             publishAction0Speed ? action0Speed : (float?)null,
             publishAction1Speed ? action1Speed : (float?)null);
+        actionData = PrepareEquipmentSnapshot(info, actionData.WithPilotSeat(pilotSeat), catchUp: false);
 #if DEBUG
         MissionActionDiagnostics.RecordOutboundAction();
 #endif
@@ -549,6 +581,7 @@ public class AgentActionHandler : IAgentActionHandler
                 _localAgentStates.TryGetValue(
                     info.AgentId,
                     out LocalAgentActionState state);
+                AgentPilotSeatData? pilotSeat = remoteActionProcessor.CapturePilotSeat(info, state.PilotSeat);
                 bool useInputBoundary =
                     agent.Controller == AgentControllerType.Player
                     && state.HasInputBoundaryObservation;
@@ -583,12 +616,15 @@ public class AgentActionHandler : IAgentActionHandler
                         || agent.GetCurrentAction(1) != ActionIndexCache.act_none);
                 if (defendFlags == Agent.MovementControlFlag.None
                     && !AgentActionData.IsGuardMode(guardMode)
-                    && !locationAmbient)
+                    && !locationAmbient
+                    && !pilotSeat.HasValue
+                    && !AgentEquipmentData.TryCapture(agent, out _))
                     continue;
 
                 (ids ??= new List<Guid>()).Add(info.AgentId);
                 (actions ??= new List<AgentActionData>()).Add(
-                    new AgentActionData(agent, defendFlags, guardMode));
+                    PrepareEquipmentSnapshot(info,
+                        new AgentActionData(agent, defendFlags, guardMode).WithPilotSeat(pilotSeat), catchUp: true));
                 (sequences ??= new List<long>()).Add(NextActionSequence(info.AgentId));
             }
 
@@ -600,6 +636,33 @@ public class AgentActionHandler : IAgentActionHandler
                 sequences,
                 packet => client.Send(controllerId, packet));
         });
+    }
+
+    private AgentActionData PrepareEquipmentSnapshot(
+        CoopAgentInfo info, AgentActionData action, bool catchUp)
+    {
+        // Host epochs scope host actions; ordinary senders use the retained agent authority revision.
+        long authorityRevision = remoteActionProcessor.GetOutgoingBattleHostEpoch() == 0
+            ? info.AuthorityRevision : 0;
+        if (!action.Equipment.HasValue) return action.WithEquipment(0, null, authorityRevision);
+        _localAgentStates.TryGetValue(info.AgentId, out LocalAgentActionState state);
+        int epoch = remoteActionProcessor.GetOutgoingBattleHostEpoch();
+        if (state.EquipmentRevision == 0
+            || !Nullable.Equals(state.RevisionEquipment, action.Equipment)
+            || state.EquipmentHostEpoch != epoch
+            || state.EquipmentAuthorityRevision != info.AuthorityRevision)
+        {
+            state.EquipmentRevision++;
+            state.RevisionEquipment = action.Equipment;
+            state.EquipmentHostEpoch = epoch;
+            state.EquipmentAuthorityRevision = info.AuthorityRevision;
+        }
+        bool includeEquipment = catchUp || state.BroadcastEquipmentRevision != state.EquipmentRevision;
+        // A baseline sent to one joiner has not been published to the existing peers.
+        if (!catchUp) state.BroadcastEquipmentRevision = state.EquipmentRevision;
+        _localAgentStates[info.AgentId] = state;
+        return action.WithEquipment(state.EquipmentRevision, includeEquipment ? action.Equipment : null,
+            authorityRevision);
     }
 
     private void SendActionPackets(
@@ -683,11 +746,11 @@ public class AgentActionHandler : IAgentActionHandler
     }
 
     private void Handle_BattleHostAssigned(
-        MessagePayload<NetworkBattleHostAssigned> payload)
+        MessagePayload<BattleHostAssignmentApplied> payload)
     {
         if (_disposed) return;
 
-        remoteActionProcessor.HandleBattleHostAssigned(payload.What);
+        remoteActionProcessor.HandleBattleHostAssigned(payload.What.Assignment);
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)
@@ -797,11 +860,15 @@ public class AgentActionHandler : IAgentActionHandler
         hasPublishedSpeed = true;
     }
 
-    // Discrete actions worth replicating explicitly. Pure locomotion (Idle / the generic Other bucket that
-    // walk/run fall into) is reproduced on the puppet from the continuous movement packet, so it is NOT sent.
-    private static bool IsDiscreteAction(Agent.ActionCodeType type)
+    // Ranged siege use is also Other; recognize its actions without publishing ordinary locomotion.
+    private static bool IsDiscreteAction(Agent.ActionCodeType type, int actionIndex = -1)
     {
-        return type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle;
+        if (type != Agent.ActionCodeType.Other && type != Agent.ActionCodeType.Idle) return true;
+        if (actionIndex < 0) return false;
+
+        string actionName = AgentActionData.GetActionNameWithCode(actionIndex);
+        return actionName?.StartsWith("act_usage_ballista_", StringComparison.Ordinal) == true
+            || actionName?.StartsWith("act_usage_mangonel_", StringComparison.Ordinal) == true;
     }
 
     private static bool IsMountedGuardLocomotionChurn(
@@ -1014,7 +1081,7 @@ public class AgentActionHandler : IAgentActionHandler
         if (_disposed) return;
         _disposed = true;
 
-        messageBroker.Unsubscribe<NetworkBattleHostAssigned>(Handle_BattleHostAssigned);
+        messageBroker.Unsubscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
         packetManager.RemovePacketHandler(this);
         remoteActionProcessor.Dispose();
         guardReactionHandler.Dispose();

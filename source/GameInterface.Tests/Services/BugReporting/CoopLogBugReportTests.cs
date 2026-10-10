@@ -311,7 +311,6 @@ public class CoopLogBugReportTests : IDisposable
             pendingArchiveRetention: TimeSpan.FromMilliseconds(20),
             cleanupInterval: TimeSpan.FromMilliseconds(20));
         var path = builder.Create(CreateEmptyArchiveContents());
-        File.SetLastWriteTimeUtc(path, DateTime.UtcNow.AddMinutes(-1));
 
         Assert.True(SpinWait.SpinUntil(() => !File.Exists(path), TimeSpan.FromSeconds(2)));
     }

@@ -1,19 +1,18 @@
 ﻿using Common;
 using GameInterface.Configuration;
 using GameInterface.Extentions;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using System;
-using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
-using TaleWorlds.LinQuick;
 
 namespace GameInterface.Services.Companions.Patches.Disable;
 
@@ -47,7 +46,13 @@ internal class CompanionsCampaignBehaviorPatches
         // Use fixed wanderer limit
         if (!ModConfigProvider.ModOptions.WandererLimitScalesWithPlayers)
         {
-            __result = ModConfigProvider.ModOptions.WandererLimit;
+            var ensuredUnaffiliatedWanderersBonusLimit = 0;
+            if (ModConfigProvider.ModOptions.EnsureUnaffiliatedWanderers)
+            {
+                ensuredUnaffiliatedWanderersBonusLimit = CalculateAffiliatedWanderers();
+            }
+
+            __result = ModConfigProvider.ModOptions.WandererLimit + ensuredUnaffiliatedWanderersBonusLimit;
             return false;
         }
 
@@ -135,6 +140,14 @@ internal class CompanionsCampaignBehaviorPatches
         return false;
     }
 
+    private static int SpawnRateWanderers
+    {
+        get
+        {
+            return ModConfigProvider.ModOptions.SpawnRateWanderers;
+        }
+    }
+
     /// <summary>
     /// Replace vanilla implementation to not use Hero.MainHero which is null on the headless server.
     /// </summary>
@@ -142,13 +155,25 @@ internal class CompanionsCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool TrySpawnNewCompanionPrefix(CompanionsCampaignBehavior __instance)
     {
-        if ((float)__instance._aliveCompanionTemplates.Count < __instance._desiredTotalCompanionCount)
+        var options = ModConfigProvider.ModOptions;
+        bool freeOnly = options.EnsureUnaffiliatedWanderers;
+
+        float limit = options.WandererLimitScalesWithPlayers
+            ? __instance._desiredTotalCompanionCount
+            : options.WandererLimit;
+
+        bool shouldSpawn() => ShouldSpawnWanderer(Hero.AllAliveHeroes, limit, freeOnly);
+
+        int perTownLimit = (int)Math.Ceiling(limit / Town.AllTowns.Count);
+        int spawnRateWanderers = SpawnRateWanderers;
+
+        for (int i = 0; i < spawnRateWanderers && shouldSpawn(); i++)
         {
             Town targetTown = Town.AllTowns.GetRandomElementWithPredicate(delegate (Town x)
             {
                 // Instead of checking if Hero.MainHero is in the settlement, check if any players are in the settlement
                 bool playerInSettlement = false;
-                foreach(var playerHero in Campaign.Current.CampaignObjectManager.GetPlayerHeroes())
+                foreach (var playerHero in Campaign.Current.CampaignObjectManager.GetPlayerHeroes())
                 {
                     if (playerHero.CurrentSettlement == x.Settlement)
                     {
@@ -159,7 +184,7 @@ internal class CompanionsCampaignBehaviorPatches
 
                 if (!playerInSettlement && x.Settlement.SiegeEvent == null)
                 {
-                    return x.Settlement.HeroesWithoutParty.AllQ(y => !y.IsWanderer || y.CompanionOf != null);
+                    return x.Settlement.HeroesWithoutParty.Count(y => y.IsWanderer && y.CompanionOf == null) < perTownLimit;
                 }
                 return false;
             });
@@ -169,9 +194,26 @@ internal class CompanionsCampaignBehaviorPatches
             {
                 __instance.CreateCompanionAndAddToSettlement(targetSettlement);
             }
+            else
+            {
+                break;
+            }
         }
 
         return false;
+    }
+
+    internal static bool ShouldSpawnWanderer(IEnumerable<Hero> aliveHeroes, float limit, bool freeOnly)
+    {
+        int count = 0;
+        foreach (var hero in aliveHeroes)
+        {
+            if (!hero.IsWanderer) continue;
+            if (freeOnly && hero.CompanionOf != null) continue;
+            count++;
+        }
+
+        return count < limit;
     }
 
     [HarmonyPatch(nameof(CompanionsCampaignBehavior.GetCompanionTemplateToSpawn))]
@@ -228,5 +270,18 @@ internal class CompanionsCampaignBehaviorPatches
                 makeHeroFugitive(hero);
             }
         }
+    }
+
+    private static int CalculateAffiliatedWanderers()
+    {
+        var affiliatedWanderers = 0;
+        foreach (var hero in Hero.AllAliveHeroes)
+        {
+            if (hero.IsWanderer && hero.CompanionOf != null && hero.CompanionOf.IsPlayerClan())
+            {
+                affiliatedWanderers++;
+            }
+        }
+        return affiliatedWanderers;
     }
 }

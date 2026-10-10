@@ -10,9 +10,9 @@ namespace GameInterface.Services.MobileParties.Messages;
 /// </summary>
 internal sealed class VolunteerSnapshotPayload : ICoalescedPayload
 {
-    private readonly Dictionary<string, string[]> snapshots;
+    private readonly Dictionary<uint, uint[]> snapshots;
 
-    public VolunteerSnapshotPayload(IReadOnlyDictionary<string, string[]> snapshots)
+    public VolunteerSnapshotPayload(IReadOnlyDictionary<uint, uint[]> snapshots)
     {
         if (snapshots == null) throw new ArgumentNullException(nameof(snapshots));
 
@@ -40,9 +40,9 @@ internal sealed class VolunteerSnapshotPayload : ICoalescedPayload
 
     public IMessage ToMessage() => new UpdateVolunteers(Clone(snapshots));
 
-    private static Dictionary<string, string[]> Clone(IReadOnlyDictionary<string, string[]> source)
+    private static Dictionary<uint, uint[]> Clone(IReadOnlyDictionary<uint, uint[]> source)
     {
-        var clone = new Dictionary<string, string[]>(source.Count);
+        var clone = new Dictionary<uint, uint[]>(source.Count);
         foreach (var pair in source)
         {
             clone[pair.Key] = Clone(pair.Value);
@@ -50,11 +50,11 @@ internal sealed class VolunteerSnapshotPayload : ICoalescedPayload
         return clone;
     }
 
-    private static string[] Clone(string[] source)
+    private static uint[] Clone(uint[] source)
     {
-        if (source == null) return Array.Empty<string>();
+        if (source == null) return Array.Empty<uint>();
 
-        var clone = new string[source.Length];
+        var clone = new uint[source.Length];
         Array.Copy(source, clone, source.Length);
         return clone;
     }

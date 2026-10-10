@@ -8,7 +8,7 @@ internal sealed class CoopOptionsOverlay
 {
     private readonly ScreenBase owner;
     private CoopOptionsVM dataSource;
-    private GauntletLayer gauntletLayer;
+    private CoopOptionsGauntletLayer gauntletLayer;
 
     private CoopOptionsOverlay(ScreenBase owner)
     {
@@ -26,7 +26,7 @@ internal sealed class CoopOptionsOverlay
         if (!ContainerProvider.TryResolve<ICoopOptionsVMFactory>(out var factory))
             throw new InvalidOperationException("Coop options view-model factory is unavailable.");
         dataSource = factory.Create(Close);
-        gauntletLayer = new GauntletLayer("CoopOptionsUI", 100)
+        gauntletLayer = new CoopOptionsGauntletLayer(owner, dataSource)
         {
             IsFocusLayer = true
         };
@@ -38,6 +38,7 @@ internal sealed class CoopOptionsOverlay
 
     private void Close()
     {
+        gauntletLayer.CloseKeybinding();
         gauntletLayer.IsFocusLayer = false;
         ScreenManager.TryLoseFocus(gauntletLayer);
         owner.RemoveLayer(gauntletLayer);

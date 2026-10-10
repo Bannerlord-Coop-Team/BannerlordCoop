@@ -29,7 +29,7 @@ namespace Coop.IntegrationTests.Serialization
     {
         /// <summary>Every option set to the value protobuf treats as absent — the direction that only
         /// survives because the receiver starts zeroed. <c>GoldFoodChangeMode.Disabled</c> is enum 0,
-        /// so it is omitted too and must not arrive as the <c>OneDayMax</c> default.</summary>
+        /// so it is omitted too.</summary>
         [Fact]
         public void NetworkLoadModConfig_RoundTrips_OptionsTurnedOff()
         {
@@ -65,38 +65,73 @@ namespace Coop.IntegrationTests.Serialization
             var options = new ModOptions(new ModOptionsData
             {
                 ClientsCanUseCheats = true,
+                GoldFoodInfluenceChangeInSettlements = true,
                 GoldFoodInfluenceChangeInBattles = GoldFoodChangeMode.Enabled,
                 GoldFoodInfluenceChangeForDisconnectedPlayers = true,
                 PlayerBattleAiJoinWindowHours = 6,
+                EnsureUnaffiliatedWanderers = false,
                 WandererLimit = 64,
+                SpawnRateWanderers = 2,
                 WandererLimitScalesWithPlayers = true,
                 PlayerKingdomClanTierRequired = 2,
                 SmithingStaminaRecoveryMultiplier = 2.5f,
                 MaximumLootersMultiplier = 0.25f,
                 LooterPartySizeMultiplier = 0.33f,
+                EnableHeroExecutions = true,
+                EnablePlayerClanMemberExecutions = true,
+                EnablePlayerExecutions = true,
                 ShowPlayerNameplates = true,
                 PlayerWoundedBattleEntry = false,
+                BlockAiWarDeclarationsOnOfflinePlayers = true,
             });
 
             var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
 
             Assert.True(copy.ClientsCanUseCheats);
+            Assert.True(copy.GoldFoodInfluenceChangeInSettlements);
             Assert.Equal(GoldFoodChangeMode.Enabled, copy.GoldFoodInfluenceChangeInBattles);
             Assert.True(copy.GoldFoodInfluenceChangeForDisconnectedPlayers);
             Assert.Equal(6, copy.PlayerBattleAiJoinWindowHours);
+            Assert.False(copy.EnsureUnaffiliatedWanderers);
             Assert.Equal(64, copy.WandererLimit);
+            Assert.Equal(2, copy.SpawnRateWanderers);
             Assert.True(copy.WandererLimitScalesWithPlayers);
             Assert.Equal(2, copy.PlayerKingdomClanTierRequired);
             Assert.Equal(2.5f, copy.SmithingStaminaRecoveryMultiplier);
             Assert.Equal(0.25f, copy.MaximumLootersMultiplier);
             Assert.Equal(0.33f, copy.LooterPartySizeMultiplier);
+            Assert.True(copy.EnableHeroExecutions);
+            Assert.True(copy.EnablePlayerClanMemberExecutions);
+            Assert.True(copy.EnablePlayerExecutions);
             Assert.False(copy.PlayerWoundedBattleEntry);
+            Assert.True(copy.BlockAiWarDeclarationsOnOfflinePlayers);
 
             // Keys the operator left absent still resolve to the documented defaults, not to zero.
             Assert.True(copy.FastForwardEnabled);
             Assert.True(copy.AutoPauseEnabled);
             Assert.True(copy.SpeedLimitWhilePlayersInBattle);
             Assert.True(copy.ShowPlayerNameplates);
+            Assert.True(copy.CoopClansEnabled);
+        }
+
+        [Theory]
+        [InlineData(false, false)]
+        [InlineData(false, true)]
+        [InlineData(true, false)]
+        [InlineData(true, true)]
+        public void NetworkLoadModConfig_RoundTrips_VoiceAndWoundedEntryIndependently(
+            bool voiceEnabled, bool playerWoundedBattleEntry)
+        {
+            var options = new ModOptions(new ModOptionsData
+            {
+                VoiceEnabled = voiceEnabled,
+                PlayerWoundedBattleEntry = playerWoundedBattleEntry,
+            });
+
+            var copy = RoundTrip(new NetworkLoadModConfig(options)).ModOptions;
+
+            Assert.Equal(voiceEnabled, copy.VoiceEnabled);
+            Assert.Equal(playerWoundedBattleEntry, copy.PlayerWoundedBattleEntry);
         }
 
         private static ModOptions AllOptionsOff() => new(new ModOptionsData
@@ -109,15 +144,23 @@ namespace Coop.IntegrationTests.Serialization
             GoldFoodInfluenceChangeForDisconnectedPlayers = false,
             PlayerBattleAiJoinWindowHours = 0,
             SpeedLimitWhilePlayersInBattle = false,
+            EnsureUnaffiliatedWanderers = false,
             WandererLimit = 0,
+            SpawnRateWanderers = 0,
             WandererLimitScalesWithPlayers = false,
             PlayerKingdomClanTierRequired = 0,
             SmithingStaminaRecoveryOutsideSettlements = false,
             SmithingStaminaRecoveryMultiplier = 0f,
             MaximumLootersMultiplier = 0f,
             LooterPartySizeMultiplier = 0f,
+            EnableHeroExecutions = true,
+            EnablePlayerClanMemberExecutions = false,
+            EnablePlayerExecutions = false,
             ShowPlayerNameplates = false,
             PlayerWoundedBattleEntry = false,
+            CoopClansEnabled = false,
+            VoiceEnabled = false,
+            BlockAiWarDeclarationsOnOfflinePlayers = false,
         });
 
         private static void AssertAllOptionsOff(ModOptions copy)
@@ -130,15 +173,23 @@ namespace Coop.IntegrationTests.Serialization
             Assert.False(copy.GoldFoodInfluenceChangeForDisconnectedPlayers);
             Assert.Equal(0, copy.PlayerBattleAiJoinWindowHours);
             Assert.False(copy.SpeedLimitWhilePlayersInBattle);
+            Assert.False(copy.EnsureUnaffiliatedWanderers);
             Assert.Equal(0, copy.WandererLimit);
+            Assert.Equal(0, copy.SpawnRateWanderers);
             Assert.False(copy.WandererLimitScalesWithPlayers);
             Assert.Equal(0, copy.PlayerKingdomClanTierRequired);
             Assert.False(copy.SmithingStaminaRecoveryOutsideSettlements);
             Assert.Equal(0f, copy.SmithingStaminaRecoveryMultiplier);
             Assert.Equal(0f, copy.MaximumLootersMultiplier);
             Assert.Equal(0f, copy.LooterPartySizeMultiplier);
+            Assert.True(copy.EnableHeroExecutions);
+            Assert.False(copy.EnablePlayerClanMemberExecutions);
+            Assert.False(copy.EnablePlayerExecutions);
             Assert.False(copy.ShowPlayerNameplates);
             Assert.False(copy.PlayerWoundedBattleEntry);
+            Assert.False(copy.CoopClansEnabled);
+            Assert.False(copy.VoiceEnabled);
+            Assert.False(copy.BlockAiWarDeclarationsOnOfflinePlayers);
         }
 
         private static T RoundTrip<T>(T original)

@@ -7,7 +7,9 @@ using Missions.Messages;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Roster;
 
 namespace Missions.Battles;
 
@@ -74,8 +76,11 @@ internal class BattleCasualtyHandler : IHandler
             {
                 foreach (var element in roster)
                 {
-                    // Skip already killed or wounded troops
-                    if (element.IsKilled || element.IsWounded) continue;
+                    // Hero.IsWounded can update before this message arrives. The flattened state is the
+                    // authoritative record of whether this battle casualty was already applied.
+                    if (element.State == RosterTroopState.Killed ||
+                        element.State == RosterTroopState.Wounded ||
+                        element.State == RosterTroopState.WoundedInThisBattle) continue;
                     if (element.Troop != troop) continue;
 
                     if (msg.Wounded)
@@ -83,6 +88,8 @@ internal class BattleCasualtyHandler : IHandler
                         try
                         {
                             mapEventParty.OnTroopWounded(element.Descriptor);
+                            if (mapEventParty.Party.MapEventSide != null)
+                                mapEventParty.Party.MapEventSide.TroopCasualties++;
                         }
                         catch (IndexOutOfRangeException e)
                         {
@@ -97,6 +104,8 @@ internal class BattleCasualtyHandler : IHandler
                         try
                         {
                             mapEventParty.OnTroopKilled(element.Descriptor);
+                            if (mapEventParty.Party.MapEventSide != null)
+                                mapEventParty.Party.MapEventSide.TroopCasualties++;
                         }
                         catch (IndexOutOfRangeException e)
                         {
@@ -104,6 +113,11 @@ internal class BattleCasualtyHandler : IHandler
                                 msg.TroopCharacterId, msg.MapEventPartyId);
                             return;
                         }
+
+                        // The server has no PartyAgentOrigin to mark hero deaths
+                        if (troop.IsHero)
+                            KillCharacterAction.ApplyByBattle(troop.HeroObject, null, false);
+
                         messageBroker.Publish(this, new OnTroopKilledAttempted(mapEventParty, element.Descriptor.UniqueSeed));
                     }
                     return;

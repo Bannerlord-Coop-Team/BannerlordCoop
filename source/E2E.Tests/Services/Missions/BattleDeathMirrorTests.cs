@@ -7,6 +7,7 @@ using Missions;
 using Missions.Agents;
 using Missions.Battles;
 using Missions.Messages;
+using Moq;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using Xunit;
@@ -19,8 +20,10 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
 {
     public BattleDeathMirrorTests(ITestOutputHelper output) : base(output) { }
 
-    [Fact]
-    public void OwnedDeath_ReplicatesAffectorAndDeathAction_WhilePreservingKilledState()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OwnedDeath_ReplicatesAffectorAndDeathAction_WhenLocalDeathGuardClears(bool rejectUntilNextTick)
     {
         using var fixture = new MissionEngineFixture();
         var owner = Clients.First();
@@ -37,6 +40,7 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
         peer.Call(() =>
         {
             var mock = CreateConnectedMission(fixture, peer, missionInstanceId);
+            mock.Shell.DisableDying = rejectUntilNextTick;
             peerController = peer.Resolve<CoopBattleController>();
             var registry = peer.Resolve<INetworkAgentRegistry>();
             BasicCharacterObject character = Game.Current.PlayerTroop;
@@ -81,6 +85,17 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
         Assert.Equal(BoneBodyPartType.Head, message.VictimBodyPart);
 
         Assert.True(AgentMirror.TryGet(peerVictim, out var victimMirror));
+        if (rejectUntilNextTick)
+        {
+            Assert.True(victimMirror.IsActive);
+            Assert.Equal(100f, victimMirror.Health);
+            peer.Call(() =>
+            {
+                Assert.True(peer.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(victimId, out _));
+                victimMirror.Mission.DisableDying = false;
+                peerController.OnMissionTick(0f);
+            });
+        }
         Assert.False(victimMirror.IsActive);
         Assert.True(victimMirror.WasKilled);
         Assert.Equal(321, victimMirror.DeathAction);
@@ -181,6 +196,125 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
         Assert.Equal(3587, victimMirror.DeathAction);
 
         GC.KeepAlive(peerController);
+    }
+
+    [Theory]
+    [InlineData(true, Agent.MortalityState.Mortal, MissionMode.Battle, false, 100f)]
+    [InlineData(false, Agent.MortalityState.Immortal, MissionMode.Battle, false, 100f)]
+    [InlineData(false, Agent.MortalityState.Mortal, MissionMode.Conversation, false, 100f)]
+    [InlineData(false, Agent.MortalityState.Mortal, MissionMode.CutScene, false, 100f)]
+    [InlineData(true, Agent.MortalityState.Mortal, MissionMode.Battle, true, 100f)]
+    [InlineData(false, Agent.MortalityState.Immortal, MissionMode.Battle, true, 100f)]
+    [InlineData(false, Agent.MortalityState.Mortal, MissionMode.Conversation, true, 100f)]
+    [InlineData(false, Agent.MortalityState.Mortal, MissionMode.CutScene, true, 100f)]
+    [InlineData(true, Agent.MortalityState.Mortal, MissionMode.Battle, false, 1f)]
+    [InlineData(true, Agent.MortalityState.Mortal, MissionMode.Battle, true, 1f)]
+    public void RejectedDeath_RetainsPuppetAndAttributionUntilRetrySucceeds(
+        bool disableDying, Agent.MortalityState mortality, MissionMode mode, bool wounded, float health)
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var broker = peer.Resolve<IMessageBroker>();
+            var casualties = new CasualtyAttributionMap();
+            var mountRepairer = new Mock<IPuppetMountStateRepairer>();
+            using var applier = new PuppetDeathApplier(
+                broker, peer.Resolve<ICoopMissionComponent>(), casualties, mountRepairer.Object);
+            var victimId = Guid.NewGuid();
+            var victim = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Assert.True(AgentMirror.TryGet(victim, out var mirror));
+            Assert.True(registry.TryRegisterAgent("owner", victimId, victim));
+            casualties.Record(victimId, "party", 7, "troop");
+            mirror.Health = health;
+            mock.Shell.DisableDying = disableDying;
+            mock.Shell._missionMode = mode;
+            victim.SetMortalityState(mortality);
+            var death = new NetworkBattleAgentDied(
+                victimId, wounded, Guid.Empty, 100, BoneBodyPartType.Head, 456);
+
+            int registeredBlows = 0;
+            mock.RegisteredBlow = (_, _) => registeredBlows++;
+            broker.Publish(this, death);
+            applier.DrainPendingDeaths();
+            applier.DrainPendingDeaths();
+            applier.DrainPendingDeaths();
+
+            Assert.Equal(0, registeredBlows);
+            Assert.True(mirror.IsActive);
+            Assert.Equal(health, mirror.Health);
+            Assert.True(registry.TryGetAgentInfo(victimId, out var info));
+            Assert.Same(victim, info.Agent);
+            Assert.Equal("party", casualties.GetOrDefault(victimId).MapEventPartyId);
+            mountRepairer.Verify(x => x.RepairAfterRiderDeath(It.IsAny<Agent>()), Times.Never);
+
+            mock.Shell.DisableDying = false;
+            mock.Shell._missionMode = MissionMode.Battle;
+            victim.SetMortalityState(Agent.MortalityState.Mortal);
+            applier.DrainPendingDeaths();
+
+            Assert.False(mirror.IsActive);
+            Assert.Equal(!wounded, mirror.WasKilled);
+            Assert.Equal(456, mirror.DeathAction);
+            Assert.False(registry.TryGetAgentInfo(victimId, out _));
+            Assert.Null(casualties.GetOrDefault(victimId).MapEventPartyId);
+
+            Assert.Equal(1, registeredBlows);
+            broker.Publish(this, death);
+            applier.DrainPendingDeaths();
+            applier.DrainPendingDeaths();
+            Assert.Equal(1, registeredBlows);
+            mountRepairer.Verify(x => x.RepairAfterRiderDeath(It.IsAny<Agent>()), Times.Once);
+        });
+    }
+
+    [Theory]
+    [InlineData(false, 0f, false)]
+    [InlineData(true, 0f, false)]
+    [InlineData(false, 0f, true)]
+    [InlineData(true, 0f, true)]
+    [InlineData(false, 0.5f, true)]
+    [InlineData(true, 0.5f, true)]
+    [InlineData(false, 0.999f, true)]
+    [InlineData(true, 0.999f, true)]
+    public void ActiveBelowOneHealthPuppet_ReceivesTerminalBlowBeforeDeregistration(
+        bool wounded, float health, bool guardsEnabled)
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+
+        peer.Call(() =>
+        {
+            var mock = fixture.CreateMission(peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var broker = peer.Resolve<IMessageBroker>();
+            using var applier = new PuppetDeathApplier(
+                broker, peer.Resolve<ICoopMissionComponent>(), new CasualtyAttributionMap(),
+                peer.Resolve<IPuppetMountStateRepairer>());
+            var victimId = Guid.NewGuid();
+            var victim = mock.SpawnAgent(
+                new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+            Assert.True(AgentMirror.TryGet(victim, out var mirror));
+            mirror.Health = health;
+            mock.Shell.DisableDying = guardsEnabled;
+            mock.Shell._missionMode = guardsEnabled ? MissionMode.Conversation : MissionMode.Battle;
+            victim.SetMortalityState(guardsEnabled ? Agent.MortalityState.Immortal : Agent.MortalityState.Mortal);
+            Assert.True(registry.TryRegisterAgent("owner", victimId, victim));
+
+            broker.Publish(this, new NetworkBattleAgentDied(
+                victimId, wounded, Guid.Empty, 0, BoneBodyPartType.Head, 456));
+
+            Assert.False(mirror.IsActive);
+            Assert.Equal(!wounded, mirror.WasKilled);
+            Assert.Equal(456, mirror.DeathAction);
+            Assert.False(registry.TryGetAgentInfo(victimId, out _));
+        });
     }
 
     [Fact]

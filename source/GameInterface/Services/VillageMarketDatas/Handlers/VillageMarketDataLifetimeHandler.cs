@@ -40,14 +40,15 @@ internal class VillageMarketDataLifetimeHandler : IHandler
             return;
         }
 
-        network.SendAll(new NetworkCreateVillageMarketData(id));
+        if (!objectManager.TryGetHandleWithLogging(payload.What.Data, out var handle)) return;
+        network.SendAll(new NetworkCreateVillageMarketData(id, handle));
     }
 
     private void HandleCreateCommand(MessagePayload<NetworkCreateVillageMarketData> payload)
     {
         var newVillageMarketData = ObjectHelper.SkipConstructor<VillageMarketData>();
 
-        if (!objectManager.AddExisting(payload.What.MarketDataId, newVillageMarketData))
+        if (!objectManager.AddExisting(payload.What.MarketDataId, newVillageMarketData, payload.What.Handle))
         {
             Logger.Error("Failed to create {ObjectName} on {EventHandler}", nameof(VillageMarketData), nameof(NetworkCreateVillageMarketData));
             return;

@@ -23,6 +23,11 @@ public class GameThread : IUpdateable
     {
         internal readonly Queue<QueuedAction> queue = new Queue<QueuedAction>();
         internal readonly object gate = new object();
+        internal long removedTaskCount;
+        internal long nextDrainBudgetId;
+        internal long activeDrainTicks;
+        internal long activeBlockingTimeoutTicks;
+        internal readonly Dictionary<long, (long DrainTicks, long TimeoutTicks)> drainBudgets = new();
         internal bool isClosed;
         internal int rejectedAfterCloseCount;
         private Action waitPump;
@@ -76,8 +81,11 @@ public class GameThread : IUpdateable
         private QueuedActionCompletionState completionState;
         private Exception failure;
         private string cancellationReason;
+        private Action act;
+        private bool waiterDetached;
 
-        internal Action Act { get; }
+        /// <summary>The queued work, or null once it started, completed or expired.</summary>
+        internal Action Act { get { lock (completionGate) return act; } }
         internal EventWaitHandle Wait { get; }
         internal string Label { get; }
         internal CancellationToken Cancellation { get; }
@@ -88,10 +96,46 @@ public class GameThread : IUpdateable
             string label,
             CancellationToken cancellation)
         {
-            Act = act;
+            this.act = act;
             Wait = wait;
             Label = label;
             Cancellation = cancellation;
+        }
+
+        /// <summary>Claims the action for the game thread. False when its waiter expired it or it already completed.</summary>
+        internal bool TryBeginRun(out Action action)
+        {
+            lock (completionGate)
+            {
+                action = null;
+                if (completionState != QueuedActionCompletionState.Pending) return false;
+                completionState = QueuedActionCompletionState.Running;
+                action = act;
+                act = null;
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Called by the waiting caller after a timeout or cancellation. True when the action had not
+        /// started: it is marked expired, its closure is released and no pump will run it.
+        /// </summary>
+        internal bool TryExpire(string reason)
+        {
+            lock (completionGate)
+            {
+                if (completionState != QueuedActionCompletionState.Pending) return false;
+                completionState = QueuedActionCompletionState.Expired;
+                cancellationReason = reason;
+                act = null;
+                return true;
+            }
+        }
+
+        /// <summary>Stops later completions from signaling <see cref="Wait"/> so its owner can dispose it.</summary>
+        internal void DetachWaiter()
+        {
+            lock (completionGate) waiterDetached = true;
         }
 
         internal void CompleteExecuted() => Complete(QueuedActionCompletionState.Executed, null, null);
@@ -137,13 +181,15 @@ public class GameThread : IUpdateable
         {
             lock (completionGate)
             {
-                if (completionState != QueuedActionCompletionState.Pending)
+                if (completionState != QueuedActionCompletionState.Pending &&
+                    completionState != QueuedActionCompletionState.Running)
                     return;
 
                 failure = completedFailure;
                 cancellationReason = completedCancellationReason;
                 completionState = state;
-                Wait?.Set();
+                act = null;
+                if (!waiterDetached) Wait?.Set();
             }
         }
     }
@@ -151,9 +197,11 @@ public class GameThread : IUpdateable
     private enum QueuedActionCompletionState
     {
         Pending,
+        Running,
         Executed,
         Canceled,
         Failed,
+        Expired,
     }
 
     private readonly QueueContext m_DefaultQueue = new QueueContext();
@@ -228,6 +276,14 @@ public class GameThread : IUpdateable
             throw new ArgumentException("Wrong thread!");
         }
 
+        QueueContext current = CurrentQueue;
+        long budget = Interlocked.Read(ref current.activeDrainTicks);
+        if (budget > 0)
+        {
+            DrainLimitedFrame(current, budget);
+            return;
+        }
+
         List<QueuedAction> toBeRun = new List<QueuedAction>();
 
         int backlog;
@@ -238,6 +294,7 @@ public class GameThread : IUpdateable
             while (queueContext.queue.Count > 0)
             {
                 toBeRun.Add(queueContext.queue.Dequeue());
+                queueContext.removedTaskCount++;
             }
         }
 
@@ -262,27 +319,18 @@ public class GameThread : IUpdateable
         for (int index = 0; index < toBeRun.Count; index++)
         {
             QueuedAction task = toBeRun[index];
-            if (task.Cancellation.IsCancellationRequested)
-            {
-                task.CompleteCanceled("The game-thread session ended before the queued action ran.");
-                continue;
-            }
-
             long actionStart = Stopwatch.GetTimestamp();
+            bool ran;
             try
             {
-                using (ActivateCancellation(task.Cancellation))
-                {
-                    task.Act?.Invoke();
-                }
-                task.CompleteExecuted();
+                ran = RunQueuedTask(task);
             }
-            catch (Exception e)
+            catch
             {
-                task.CompleteFailed(e);
                 CancelUnrunBatch(toBeRun, index + 1);
                 throw;
             }
+            if (!ran) continue;
             long actionTicks = Stopwatch.GetTimestamp() - actionStart;
 
             string label = task.Label ?? "(unlabeled)";
@@ -307,6 +355,142 @@ public class GameThread : IUpdateable
         if (m_ReportTimer.Elapsed >= ReportInterval)
         {
             ReportAndReset();
+        }
+    }
+
+    /// <summary>Limits queued join work per frame while preserving the runtime's FIFO queue.</summary>
+    public IDisposable LimitFrameDrain(TimeSpan maximumDrainTime, TimeSpan? blockingTimeout = null)
+    {
+        if (maximumDrainTime <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(maximumDrainTime));
+        TimeSpan timeout = blockingTimeout ?? BlockingTimeout;
+        if (timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(blockingTimeout));
+        QueueContext queue = CurrentQueue;
+        lock (queue.gate)
+        {
+            if (queue.isClosed) throw new OperationCanceledException("The game-thread queue is closed.");
+            long id = ++queue.nextDrainBudgetId;
+            queue.drainBudgets.Add(id, (Math.Max(1L,
+                (long)(maximumDrainTime.TotalSeconds * Stopwatch.Frequency)), timeout.Ticks));
+            RefreshDrainLimits(queue);
+            return new FrameDrainBudgetScope(queue, id);
+        }
+    }
+
+    /// <summary>Number of active drain limits in this runtime.</summary>
+    public int FrameDrainLimitCount
+    {
+        get
+        {
+            QueueContext queue = CurrentQueue;
+            lock (queue.gate) return queue.drainBudgets.Count;
+        }
+    }
+
+    /// <summary>Timeout applied to newly queued blocking work in this runtime.</summary>
+    public TimeSpan EffectiveBlockingTimeout
+    {
+        get
+        {
+            long ticks = Interlocked.Read(ref CurrentQueue.activeBlockingTimeoutTicks);
+            return ticks > 0 ? TimeSpan.FromTicks(ticks) : BlockingTimeout;
+        }
+    }
+
+    private void DrainLimitedFrame(QueueContext queue, long budgetTicks)
+    {
+        int backlog;
+        long frameEnd;
+        lock (queue.gate)
+        {
+            backlog = queue.queue.Count;
+            frameEnd = queue.removedTaskCount + backlog;
+        }
+
+        long started = Stopwatch.GetTimestamp();
+        int actionsRun = 0;
+        while (actionsRun < backlog)
+        {
+            QueuedAction task;
+            lock (queue.gate)
+            {
+                // Nested pumps and queue discards consume this frame's original work too.
+                if (queue.queue.Count == 0 || queue.removedTaskCount >= frameEnd) break;
+                task = queue.queue.Dequeue();
+                queue.removedTaskCount++;
+            }
+            long actionStart = Stopwatch.GetTimestamp();
+            bool ran;
+            try
+            {
+                ran = RunQueuedTask(task);
+            }
+            catch
+            {
+                var abandoned = new List<QueuedAction>();
+                lock (queue.gate)
+                {
+                    while (queue.queue.Count > 0 && queue.removedTaskCount < frameEnd)
+                    {
+                        abandoned.Add(queue.queue.Dequeue());
+                        queue.removedTaskCount++;
+                    }
+                }
+                CancelUnrunBatch(abandoned, 0);
+                throw;
+            }
+            if (Instrument && ran)
+            {
+                string label = task.Label ?? "(unlabeled)";
+                m_PerLabel.TryGetValue(label, out var aggregate);
+                m_PerLabel[label] = (aggregate.Ticks + Stopwatch.GetTimestamp() - actionStart, aggregate.Count + 1);
+            }
+            actionsRun++;
+            if (Stopwatch.GetTimestamp() - started >= budgetTicks) break;
+        }
+
+        if (!Instrument) return;
+        long elapsed = Stopwatch.GetTimestamp() - started;
+        m_WindowFrames++;
+        m_WindowActions += actionsRun;
+        m_WindowTicks += elapsed;
+        if (elapsed > m_WorstFrameTicks)
+        {
+            m_WorstFrameTicks = elapsed;
+            m_WorstFrameActions = actionsRun;
+        }
+        m_WorstBacklog = Math.Max(m_WorstBacklog, backlog);
+        if (m_ReportTimer.Elapsed >= ReportInterval) ReportAndReset();
+    }
+
+    private static void RefreshDrainLimits(QueueContext queue)
+    {
+        Interlocked.Exchange(ref queue.activeDrainTicks,
+            queue.drainBudgets.Count == 0 ? 0 : queue.drainBudgets.Values.Min(value => value.DrainTicks));
+        Interlocked.Exchange(ref queue.activeBlockingTimeoutTicks,
+            queue.drainBudgets.Count == 0 ? 0 : queue.drainBudgets.Values.Max(value => value.TimeoutTicks));
+    }
+
+    /// <summary>Releases the limit on its owning queue even after the ambient runtime changes.</summary>
+    private sealed class FrameDrainBudgetScope : IDisposable
+    {
+        private QueueContext queue;
+        private readonly long id;
+
+        public FrameDrainBudgetScope(QueueContext queue, long id)
+        {
+            this.queue = queue;
+            this.id = id;
+        }
+
+        public void Dispose()
+        {
+            QueueContext owner = Interlocked.Exchange(ref queue, null);
+            if (owner == null) return;
+            lock (owner.gate)
+            {
+                owner.drainBudgets.Remove(id);
+                RefreshDrainLimits(owner);
+            }
         }
     }
 
@@ -366,7 +550,8 @@ public class GameThread : IUpdateable
     /// <param name="label">Optional name used to attribute drain time in the instrumentation summary.
     /// Defaults to the calling file and method, so call sites do not need to pass anything.</param>
     /// <exception cref="TimeoutException">
-    /// Thrown for blocking calls when the action was not processed within <see cref="BlockingTimeout"/>.
+    /// Thrown for blocking calls when the action did not start within the blocking timeout, in which case it
+    /// never runs, or when it started but did not finish within one more wait.
     /// </exception>
     public static void Run(Action action, bool blocking = false, string label = null,
         [CallerFilePath] string callerFile = null,
@@ -433,27 +618,84 @@ public class GameThread : IUpdateable
 
             if (ewh == null) return;
 
-            int waitResult = !cancellation.CanBeCanceled
-                ? (ewh.WaitOne(BlockingTimeout) ? 0 : WaitHandle.WaitTimeout)
-                : WaitHandle.WaitAny(
-                    new[] { ewh, cancellation.WaitHandle },
-                    BlockingTimeout);
-            if (waitResult == WaitHandle.WaitTimeout)
+            try
             {
-                throw new TimeoutException(
-                    $"A blocking {nameof(Run)} action was not processed by the game loop " +
-                    $"within {BlockingTimeout.TotalSeconds:0} seconds. The game loop thread is not pumping " +
-                    $"{nameof(GameThread)}.{nameof(Update)} (initialized: {Instance.IsInitialized}).");
+                WaitForBlockingCompletion(queuedAction, cancellation);
             }
-            if (waitResult == 1)
+            finally
             {
-                throw new OperationCanceledException(
-                    $"The game-thread session ended before the blocking {nameof(Run)} action completed.");
+                // Completions after this point never touch the handle, so disposing it here is safe.
+                queuedAction.DetachWaiter();
+                ewh.Dispose();
             }
-
-            queuedAction.ThrowIfNotExecuted();
         }
     }
+
+    /// <summary>
+    /// Waits for a queued blocking action. When the wait ends before the game thread claims the action,
+    /// the action expires and never runs. When it is already running, a timeout waits once more.
+    /// </summary>
+    internal static void WaitForBlockingCompletion(QueuedAction queuedAction, CancellationToken cancellation)
+    {
+        EventWaitHandle ewh = queuedAction.Wait;
+        TimeSpan waitTimeout = Instance.EffectiveBlockingTimeout;
+        int waitResult = WaitForSignal(ewh, cancellation, waitTimeout);
+        if (waitResult == 0)
+        {
+            queuedAction.ThrowIfNotExecuted();
+            return;
+        }
+
+        bool timedOut = waitResult == WaitHandle.WaitTimeout;
+        string reason = timedOut
+            ? $"A blocking {nameof(Run)} action was not processed by the game loop " +
+              $"within {waitTimeout.TotalSeconds:0} seconds. The game loop thread is not pumping " +
+              $"{nameof(GameThread)}.{nameof(Update)} (initialized: {Instance.IsInitialized}). It did not start and will not run."
+            : $"The game-thread session ended before the blocking {nameof(Run)} action started. It will not run.";
+        if (queuedAction.TryExpire(reason))
+        {
+            if (timedOut) throw new TimeoutException(reason);
+            throw new OperationCanceledException(reason);
+        }
+
+        // The game thread claimed the action first: it either finished at this instant or is running now.
+        if (!ewh.WaitOne(0))
+        {
+            string label = queuedAction.Label;
+
+            // A session teardown may be waiting for this thread, so cancellation never waits for a running action.
+            if (!timedOut)
+                throw new OperationCanceledException(
+                    $"The game-thread session ended while blocking action {label} was running. It will finish on the game thread.");
+
+            TimeSpan runningWait = RunningWaitLimit(waitTimeout);
+            Logger.Warning(
+                "Blocking game-thread action {Label} started just before its {Timeout}s timeout; waiting up to {Limit}s for it to finish",
+                label, waitTimeout.TotalSeconds, runningWait.TotalSeconds);
+            waitResult = WaitForSignal(ewh, cancellation, runningWait);
+            if (waitResult == WaitHandle.WaitTimeout)
+                throw new TimeoutException(
+                    $"Blocking game-thread action {label} started but did not finish within a further " +
+                    $"{runningWait.TotalSeconds:0} seconds. It will finish on the game thread.");
+            if (waitResult == 1)
+                throw new OperationCanceledException(
+                    $"The game-thread session ended while blocking action {label} was running. It will finish on the game thread.");
+        }
+
+        queuedAction.ThrowIfNotExecuted();
+    }
+
+    /// <summary>
+    /// Second wait for an action that started at the timeout. Capped at <see cref="BlockingTimeout"/> because a
+    /// join catch-up raises the first timeout to minutes.
+    /// </summary>
+    internal static TimeSpan RunningWaitLimit(TimeSpan waitTimeout) =>
+        waitTimeout < BlockingTimeout ? waitTimeout : BlockingTimeout;
+
+    private static int WaitForSignal(EventWaitHandle ewh, CancellationToken cancellation, TimeSpan timeout) =>
+        !cancellation.CanBeCanceled
+            ? (ewh.WaitOne(timeout) ? 0 : WaitHandle.WaitTimeout)
+            : WaitHandle.WaitAny(new[] { ewh, cancellation.WaitHandle }, timeout);
 
     /// <summary>
     /// Runs a given action on the game thread, logging any exception the action throws instead of
@@ -475,6 +717,41 @@ public class GameThread : IUpdateable
     {
         string label = context ?? BuildLabel(callerFile, callerMember);
         Run(WrapSafe(action, context), blocking, label);
+    }
+
+    /// <summary>
+    /// Runs mandatory cleanup like a blocking <see cref="RunSafe"/>, then <paramref name="then"/> on the calling
+    /// thread. An expired call never runs, so after a timeout both are queued as separate items in the caller's
+    /// session instead and the timeout is logged, not thrown. A claim runs the cleanup once when the first copy
+    /// already started. Session cancellation still throws at once and queues nothing.
+    /// </summary>
+    public static void RunCleanupSafe(Action cleanup, Action then = null, string context = null,
+        [CallerFilePath] string callerFile = null,
+        [CallerMemberName] string callerMember = null)
+    {
+        string label = context ?? BuildLabel(callerFile, callerMember);
+        int claimed = 0;
+        Action cleanupOnce = WrapSafe(() =>
+        {
+            if (Interlocked.Exchange(ref claimed, 1) == 0)
+                cleanup();
+        }, context);
+
+        try
+        {
+            Run(cleanupOnce, blocking: true, label: label);
+        }
+        catch (TimeoutException e)
+        {
+            // Separate items keep a failing cleanup from skipping the continuation, as on the blocking path.
+            Run(cleanupOnce, label: label);
+            if (then != null)
+                Run(WrapSafe(then, context), label: label);
+            Logger.Warning(e, "Blocking game-thread cleanup {Label} timed out; it is queued on the game thread with its continuation instead", label);
+            return;
+        }
+
+        then?.Invoke();
     }
 
     /// <summary>
@@ -653,6 +930,7 @@ public class GameThread : IUpdateable
                 queueContext.WaitPump = null;
             }
             discarded = new List<QueuedAction>(queueContext.queue);
+            queueContext.removedTaskCount += queueContext.queue.Count;
             queueContext.queue.Clear();
         }
 
@@ -698,21 +976,25 @@ public class GameThread : IUpdateable
         return new QueueScope(queueContext);
     }
 
-    private static void RunQueuedTask(QueuedAction task)
+    /// <summary>Runs one dequeued item; false when it was canceled or its waiter expired it.</summary>
+    private static bool RunQueuedTask(QueuedAction task)
     {
+        if (task.Cancellation.IsCancellationRequested)
+        {
+            task.CompleteCanceled("The game-thread session ended before the queued action ran.");
+            return false;
+        }
+
+        if (!task.TryBeginRun(out Action action)) return false;
+
         try
         {
-            if (task.Cancellation.IsCancellationRequested)
-            {
-                task.CompleteCanceled("The game-thread session ended before the queued action ran.");
-                return;
-            }
-
             using (ActivateCancellation(task.Cancellation))
             {
-                task.Act?.Invoke();
+                action?.Invoke();
             }
             task.CompleteExecuted();
+            return true;
         }
         catch (Exception e)
         {

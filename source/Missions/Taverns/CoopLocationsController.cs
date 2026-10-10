@@ -49,6 +49,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     //private readonly BoardGameManager boardGameManager;
 
     private string instanceId;
+    public string VoiceInstanceId => instanceId;
     public CoopLocationsController(
         IBattleNetwork network,
         INetwork relayNetwork,
@@ -632,7 +633,10 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             if (Mission.Current == null) return null;
 
             // The owner sends the live mount state because companions can spawn mounted in village centers.
-            bool isVillage = Settlement.CurrentSettlement?.IsVillage == true;
+            var settlement = Settlement.CurrentSettlement;
+            bool useBattleEquipment = ShouldUseBattleEquipment(
+                settlement?.IsVillage == true,
+                settlement?.SettlementComponent is RetirementSettlementComponent);
 
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
@@ -640,7 +644,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
             agentBuildData.Team(Mission.Current.PlayerAllyTeam);
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(ShouldDisableHorses(hasMount));
-            agentBuildData.Equipment(isVillage ? character.FirstBattleEquipment : character.FirstCivilianEquipment);
+            agentBuildData.Equipment(useBattleEquipment
+                ? character.FirstBattleEquipment
+                : character.FirstCivilianEquipment);
             MissionEquipment missionEquipment = ResolveMissionEquipment(missionEquipmentData);
             if (missionEquipment != null)
                 agentBuildData.MissionEquipment(missionEquipment);
@@ -724,6 +730,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
     }
 
     internal static bool ShouldDisableHorses(bool hasMount) => !hasMount;
+
+    internal static bool ShouldUseBattleEquipment(bool isVillage, bool isRetirementLocation)
+        => isVillage || isRetirementLocation;
 
     // Cheap, non-throwing pre-filter for the common "unresolved remote hero" case, so the normal
     // path does not rely on a thrown exception (which trips first-chance break in the debugger).

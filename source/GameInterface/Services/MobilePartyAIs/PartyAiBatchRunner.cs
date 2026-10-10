@@ -2,6 +2,7 @@
 using GameInterface.Services.MobilePartyAIs.Patches;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
@@ -16,17 +17,20 @@ internal interface IPartyAiBatchRunner
 
 /// <summary>
 /// Ticks server party AI in bounded batches without letting one invalid party stop later parties.
+/// A party whose AI keeps throwing is skipped for some of its own visits, then retried.
 /// </summary>
 internal sealed class PartyAiBatchRunner : IPartyAiBatchRunner, IDisposable
 {
     private const int UpdatesPerTick = 100;
     private const int TickDelayMilliseconds = 100;
+    private const int FailuresBeforeQuarantine = 3;
+    private const int QuarantineVisits = 10;
 
     private static readonly ILogger Logger = LogManager.GetLogger<PartyAiBatchRunner>();
 
     private readonly MobileParty[] batch = new MobileParty[UpdatesPerTick];
-    private readonly ConditionalWeakTable<MobileParty, object> loggedFailures =
-        new ConditionalWeakTable<MobileParty, object>();
+    private readonly ConditionalWeakTable<MobileParty, FailureState> failures =
+        new ConditionalWeakTable<MobileParty, FailureState>();
     private readonly Action<MobilePartyAi, float> tickOverride;
     private Task delay = Task.CompletedTask;
     private int currentStartIndex;
@@ -88,10 +92,18 @@ internal sealed class PartyAiBatchRunner : IPartyAiBatchRunner, IDisposable
                 continue;
             }
 
+            // Counts the party's own visits, so the skip lasts longer on saves with more parties
+            failures.TryGetValue(party, out FailureState state);
+            if (state != null && state.SkipVisits > 0)
+            {
+                state.SkipVisits--;
+                continue;
+            }
+
             MobilePartyAi ai = party.Ai;
             if (ai == null)
             {
-                LogFailureOnce(party, null, "Party AI is unavailable");
+                LogUnavailableOnce(party, state ?? GetState(party));
                 continue;
             }
 
@@ -104,32 +116,108 @@ internal sealed class PartyAiBatchRunner : IPartyAiBatchRunner, IDisposable
             }
             catch (Exception ex)
             {
-                LogFailureOnce(party, ex, "Party AI tick threw");
+                RecordFailure(party, state ?? GetState(party), ex);
+                continue;
             }
+
+            if (state != null && state.EpisodeFailures > 0)
+                RecordRecovery(party, state);
         }
     }
 
-    private void LogFailureOnce(MobileParty party, Exception exception, string reason)
-    {
-        if (loggedFailures.TryGetValue(party, out _)) return;
-        loggedFailures.Add(party, new object());
+    private FailureState GetState(MobileParty party) =>
+        failures.GetValue(party, _ => new FailureState());
 
-        if (exception == null)
-        {
-            Logger.Error(
-                "Skipping mobile-party AI tick for {PartyId}: {Reason}",
-                party.StringId,
-                reason);
-        }
-        else
+    private void LogUnavailableOnce(MobileParty party, FailureState state)
+    {
+        if (state.UnavailableLogged) return;
+        state.UnavailableLogged = true;
+
+        Logger.Error(
+            "Skipping mobile-party AI tick for {PartyId}: {Reason}",
+            party.StringId,
+            "Party AI is unavailable");
+    }
+
+    private void RecordFailure(MobileParty party, FailureState state, Exception exception)
+    {
+        // A new exception type gets its own Error so its stack is not hidden behind the first one
+        if (state.LoggedExceptionTypes.Add(exception.GetType()))
         {
             Logger.Error(
                 exception,
                 "Skipping mobile-party AI tick for {PartyId}: {Reason}",
                 party.StringId,
-                reason);
+                "Party AI tick threw");
+        }
+
+        if (state.EpisodeFailures < int.MaxValue) state.EpisodeFailures++;
+        if (state.EpisodeFailures < FailuresBeforeQuarantine) return;
+
+        // A failed retry quarantines again at once
+        state.SkipVisits = QuarantineVisits;
+        if (state.EpisodeQuarantines == 0 && state.QuarantinedEpisodes < int.MaxValue) state.QuarantinedEpisodes++;
+        if (state.EpisodeQuarantines < int.MaxValue) state.EpisodeQuarantines++;
+
+        // Powers of two keep a flapping or long broken party from filling the log
+        bool warn = state.EpisodeQuarantines == 1
+            ? IsPowerOfTwo(state.QuarantinedEpisodes)
+            : IsPowerOfTwo(state.EpisodeQuarantines);
+        if (!warn) return;
+
+        state.EpisodeWarned = true;
+        Logger.Warning(
+            "Skipping mobile-party AI for {PartyId} for its next {Visits} visits after {Failures} failures, last error {Error}",
+            party.StringId,
+            QuarantineVisits,
+            state.EpisodeFailures,
+            Describe(exception));
+    }
+
+    private void RecordRecovery(MobileParty party, FailureState state)
+    {
+        if (state.EpisodeWarned)
+        {
+            Logger.Information(
+                "Mobile-party AI for {PartyId} recovered after {Failures} failures",
+                party.StringId,
+                state.EpisodeFailures);
+        }
+
+        state.EpisodeFailures = 0;
+        state.EpisodeQuarantines = 0;
+        state.EpisodeWarned = false;
+    }
+
+    private static bool IsPowerOfTwo(int value) => value > 0 && (value & (value - 1)) == 0;
+
+    // Message is virtual and can throw, which must not escape into the batch
+    private static string Describe(Exception exception)
+    {
+        string type = exception.GetType().FullName;
+        try
+        {
+            return type + ": " + exception.Message;
+        }
+        catch (Exception)
+        {
+            return type;
         }
     }
 
     public void Dispose() => PartiesThinkPatch.Unbind(this);
+
+    /// <summary>
+    /// Failure bookkeeping for one party, created only once it fails or has no AI.
+    /// </summary>
+    private sealed class FailureState
+    {
+        public HashSet<Type> LoggedExceptionTypes { get; } = new HashSet<Type>();
+        public bool UnavailableLogged { get; set; }
+        public int EpisodeFailures { get; set; }
+        public int EpisodeQuarantines { get; set; }
+        public int QuarantinedEpisodes { get; set; }
+        public bool EpisodeWarned { get; set; }
+        public int SkipVisits { get; set; }
+    }
 }

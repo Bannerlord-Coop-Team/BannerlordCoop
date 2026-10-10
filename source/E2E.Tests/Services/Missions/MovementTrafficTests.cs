@@ -28,13 +28,51 @@ using AgentData = Missions.Agents.Packets.AgentData;
 namespace E2E.Tests.Services.Missions;
 
 /// <summary>Regression coverage for movement traffic and delivery selection.</summary>
-public class MovementTrafficTests : MissionTestEnvironment
+public partial class MovementTrafficTests : MissionTestEnvironment
 {
     private readonly ITestOutputHelper output;
 
     public MovementTrafficTests(ITestOutputHelper output) : base(output)
     {
         this.output = output;
+    }
+
+    [Fact]
+    public void PollMovement_StampsRidersAndStandaloneMountsWithIncreasingCaptureSequence()
+    {
+        using var fixture = new MissionEngineFixture();
+        var peer = Clients.First();
+        SetControllerId(peer, "peer");
+        peer.Call(() =>
+        {
+            var mock = CreateMovementMission(fixture, peer);
+            var registry = peer.Resolve<INetworkAgentRegistry>();
+            var handler = peer.Resolve<ICoopMissionComponent>().AgentMovementHandler;
+            var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
+            Agent rider = SpawnRider(mock);
+            Agent horse = mock.SpawnMount();
+            Agent riddenHorse = mock.SpawnMount(rider);
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 1, rider, 3));
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 3, riddenHorse, 7));
+            Assert.True(registry.TryRegisterAgent("peer", Guid.NewGuid(), 2, horse));
+            Assert.True(AgentMirror.TryGet(rider, out var riderMirror));
+            Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
+
+            handler.PollMovement(0f);
+            var firstPacket = Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>());
+            long first = firstPacket.SampleSequence;
+            Assert.Equal(7, Assert.Single(firstPacket.Agents).MountData.MountAuthorityRevision);
+            Assert.Equal(3, Assert.Single(firstPacket.AuthorityRevisions));
+            Assert.True(first > 0);
+            Assert.Equal(first, Assert.Single(network.NetworkSentPackets.GetPackets<MountMovementPacket>()).SampleSequence);
+            network.NetworkSentPackets.Packets.Clear();
+            riderMirror.Position = new Vec3(1f, 0f, 0f);
+            horseMirror.Position = new Vec3(1f, 0f, 0f);
+            handler.PollMovement(0.026f);
+            long second = Assert.Single(network.NetworkSentPackets.GetPackets<MovementPacket>()).SampleSequence;
+            Assert.True(second > first);
+            Assert.Equal(second, Assert.Single(network.NetworkSentPackets.GetPackets<MountMovementPacket>()).SampleSequence);
+        });
     }
 
     [Fact]
@@ -833,17 +871,12 @@ public class MovementTrafficTests : MissionTestEnvironment
             var pending = Assert.IsAssignableFrom<IDictionary>(recipientState.GetType()
                 .GetField("MovementPendingSince", BindingFlags.Instance | BindingFlags.Public)
                 ?.GetValue(recipientState));
-            var equipment = Assert.IsAssignableFrom<IDictionary>(typeof(AgentMovementHandler)
-                .GetField("lastEquipment", BindingFlags.Instance | BindingFlags.NonPublic)
-                ?.GetValue(handler));
             Assert.Single(pending.Keys);
-            Assert.Single(equipment.Keys);
 
             mirror.IsActive = false;
             handler.PollMovement(0.025f);
 
             Assert.Empty(pending.Keys);
-            Assert.Empty(equipment.Keys);
         });
     }
 
@@ -1245,7 +1278,7 @@ public class MovementTrafficTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void PollMovement_SeedsSpawnEquipmentAndOnlySendsChanges()
+    public void PollMovement_DoesNotPublishIndependentEquipmentChanges()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -1273,15 +1306,12 @@ public class MovementTrafficTests : MissionTestEnvironment
 
             mirror.PrimaryWieldedItemIndex = EquipmentIndex.Weapon2;
             component.AgentMovementHandler.PollMovement(0.025f);
-            var changed = Assert.Single(
-                network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>());
-            Assert.Equal("peer", changed.IdentityScopeId);
-            Assert.Equal(new ushort[] { 1 }, changed.AgentIds);
+            Assert.Empty(network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>());
         });
     }
 
     [Fact]
-    public void PollMovement_SendsInitialEquipmentForLegacyGuidAgents()
+    public void PollMovement_DoesNotPublishIndependentLegacyEquipment()
     {
         using var fixture = new MissionEngineFixture();
         var peer = Clients.First();
@@ -1298,9 +1328,7 @@ public class MovementTrafficTests : MissionTestEnvironment
 
             component.AgentMovementHandler.PollMovement(0f);
 
-            var initial = Assert.Single(
-                network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>());
-            Assert.Equal(new[] { agentId }, initial.AgentGuids);
+            Assert.Empty(network.NetworkSentPackets.GetPackets<AgentEquipmentPacket>());
             var movement = Assert.Single(
                 network.NetworkSentPackets.GetPackets<MovementPacket>());
             Assert.Equal(new[] { agentId }, movement.AgentGuids);
@@ -1330,7 +1358,9 @@ public class MovementTrafficTests : MissionTestEnvironment
             var movement = new MovementPacket(
                 "76561198000000042",
                 new ushort[] { 1, 2, 3 },
-                agents);
+                agents,
+                senderControllerId: "76561198000000042",
+                authorityRevisions: new long[] { 1, 2, 3 });
 
             byte[] original = serializer.Serialize(movement);
             byte[] wire = compressor.Serialize(movement);
@@ -1345,6 +1375,8 @@ public class MovementTrafficTests : MissionTestEnvironment
 
             var roundTripped = Assert.IsType<MovementPacket>(restored);
             Assert.Equal(movement.IdentityScopeId, roundTripped.IdentityScopeId);
+            Assert.Equal(movement.SenderControllerId, roundTripped.SenderControllerId);
+            Assert.Equal(movement.AuthorityRevisions, roundTripped.AuthorityRevisions);
             Assert.Equal(movement.AgentIds, roundTripped.AgentIds);
             Assert.Equal(movement.Agents.Length, roundTripped.Agents.Length);
             for (int i = 0; i < agents.Length; i++)
@@ -1403,12 +1435,20 @@ public class MovementTrafficTests : MissionTestEnvironment
 
             var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
             var compressor = new MovementPacketCompressor(serializer);
+            const string senderControllerId = "76561198000000042";
+            var authorityRevisions = new long[] { 1, 2, 3 };
+            peer.Resolve<IMessageBroker>().Publish(
+                this, new NetworkMissionPeerEntered(senderControllerId, "movement-test"));
             var restoredRiders = Assert.IsType<MovementPacket>(
-                AssertFitsAndDispatchesThroughRelay(serializer, compressor, packetManager, peer.NetPeer,
-                    new MovementPacket("76561198000000042", ids, riders)));
+                AssertFitsAndDispatchesThroughRelay(serializer, compressor, packetManager, Server.NetPeer,
+                    new MovementPacket(senderControllerId, ids, riders, senderControllerId, authorityRevisions)));
             var restoredMounts = Assert.IsType<MountMovementPacket>(
-                AssertFitsAndDispatchesThroughRelay(serializer, compressor, packetManager, peer.NetPeer,
-                    new MountMovementPacket("76561198000000042", ids, mounts)));
+                AssertFitsAndDispatchesThroughRelay(serializer, compressor, packetManager, Server.NetPeer,
+                    new MountMovementPacket(senderControllerId, ids, mounts, senderControllerId, authorityRevisions)));
+            Assert.Equal(senderControllerId, restoredRiders.SenderControllerId);
+            Assert.Equal(senderControllerId, restoredMounts.SenderControllerId);
+            Assert.Equal(authorityRevisions, restoredRiders.AuthorityRevisions);
+            Assert.Equal(authorityRevisions, restoredMounts.AuthorityRevisions);
 
             for (int i = 0; i < ids.Length; i++)
             {

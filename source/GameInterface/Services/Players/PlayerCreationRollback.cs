@@ -95,10 +95,8 @@ internal class PlayerCreationRollback : IPlayerCreationRollback
 
         foreach (var registration in registrations)
         {
-            if (!objectManager.TryGetId(registration, out var id)) continue;
-
-            coalescer?.DropInstance(
-                global::GameInterface.Services.ObjectManager.ObjectManager.Compact(id, registration.GetType()));
+            if (objectManager.TryGetHandle(registration, out var handle))
+                coalescer?.DropInstance(handle);
         }
     }
 

@@ -1,22 +1,21 @@
 ﻿using Common;
-using Common.Extensions;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using Common.Util;
-using GameInterface.Registry.Auto;
-using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
+using LiteNetLib;
 using Serilog;
 using System;
 using System.Linq;
-using System.Reflection;
-using TaleWorlds.Core;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
@@ -29,6 +28,7 @@ public class KingdomHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<KingdomHandler>();
     private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly IKingdomDecisionVoteManager decisionVoteManager;
@@ -38,6 +38,7 @@ public class KingdomHandler : IHandler
 
     public KingdomHandler(
         IMessageBroker messageBroker,
+        INetwork network,
         IObjectManager objectManager,
         IPlayerManager playerManager,
         IKingdomDecisionVoteManager decisionVoteManager,
@@ -46,6 +47,7 @@ public class KingdomHandler : IHandler
         IKingdomCreator kingdomCreator)
     {
         this.messageBroker = messageBroker;
+        this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.decisionVoteManager = decisionVoteManager;
@@ -64,6 +66,8 @@ public class KingdomHandler : IHandler
         messageBroker.Subscribe<NetworkDestroyKingdom>(HandleNetworkDestroyKingdom);
         messageBroker.Subscribe<NetworkRulingClanChanged>(HandleNetworkRulingClanChanged);
         messageBroker.Subscribe<ChangeKingdomName>(HandleChangeKingdomName);
+        messageBroker.Subscribe<GiftSettlementOwnership>(HandleGiftSettlementOwnership);
+        messageBroker.Subscribe<NetworkGiftSettlementOwnership>(HandleNetworkGiftSettlementOwnership);
     }
 
     private void HandleCreateKingdom(MessagePayload<CreateKingdom> obj)
@@ -106,9 +110,16 @@ public class KingdomHandler : IHandler
                 return;
             }
 
-            if (!objectManager.TryGetObjectWithLogging<Clan>(player.ClanId, out var clan))
+            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero))
             {
-                FailCreateKingdomRequest(payload, $"clan {player.ClanId} was not found");
+                FailCreateKingdomRequest(payload, $"hero {player.HeroId} was not found");
+                return;
+            }
+
+            var clan = hero.Clan;
+            if (clan == null)
+            {
+                FailCreateKingdomRequest(payload, $"hero {player.HeroId} has no clan");
                 return;
             }
 
@@ -155,9 +166,15 @@ public class KingdomHandler : IHandler
             RejectKingdomNameChange(payload, $"player not found for controller {payload.ControllerId}");
             return;
         }
-        if (string.IsNullOrWhiteSpace(player.ClanId) || !objectManager.TryGetObject(player.ClanId, out Clan clan))
+        if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero))
         {
-            RejectKingdomNameChange(payload, $"clan {player.ClanId} was not found.");
+            RejectKingdomNameChange(payload, $"hero {player.HeroId} was not found.");
+            return;
+        }
+        var clan = hero.Clan;
+        if (clan == null)
+        {
+            RejectKingdomNameChange(payload, $"hero {player.HeroId} has no clan.");
             return;
         }
         if (string.IsNullOrWhiteSpace(payload.KingdomId) || !objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom))
@@ -567,6 +584,63 @@ public class KingdomHandler : IHandler
             ChangeRulingClanAction.Apply(kingdom, clan);
         });
     }
+
+    private void HandleGiftSettlementOwnership(MessagePayload<GiftSettlementOwnership> obj)
+    {
+        var payload = obj.What;
+        if (!objectManager.TryGetId(payload.SettlementToGive, out string settlementId))
+        {
+            Logger.Warning("Settlement not found in GiftSettlementOwnershipHandler with SettlementId: {id}", payload.SettlementToGive.Id);
+            return;
+        }
+
+        if (!objectManager.TryGetId(payload.ReceiverClan, out string clanId))
+        {
+            Logger.Warning("Clan not found in GiftSettlementOwnershipHandler with ClanId: {id}", payload.ReceiverClan.Id);
+            return;
+        }
+
+        network.SendAll(new NetworkGiftSettlementOwnership(settlementId, clanId));
+    }
+
+    private void HandleNetworkGiftSettlementOwnership(MessagePayload<NetworkGiftSettlementOwnership> obj)
+    {
+        if (obj.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var player))
+        {
+            Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: sender has no registered player",
+                obj.What.SettlementId);
+            return;
+        }
+        var payload = obj.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(payload.SettlementId, out var settlement)) return;
+            if (!objectManager.TryGetObjectWithLogging<Clan>(payload.ReceiverClanId, out var receiverClan)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var playerHero)) return;
+            var playerClan = playerHero.Clan;
+            if (playerClan == null) return;
+            if (playerClan != playerClan.Kingdom?.RulingClan || playerHero != playerClan.Leader)
+            {
+                Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: sender's clan {SenderClan} is not the ruling clan of their kingdom",
+                    obj.What.SettlementId, playerClan.StringId);
+                return;
+            }
+            if(receiverClan.IsUnderMercenaryService || receiverClan.Kingdom != playerClan.Kingdom || receiverClan == playerClan)
+            {
+                Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: receiver's clan {ReceiverClan} invalid (Mecenary: {Mecenary}, Kingdom: {Kingdom})",
+                    obj.What.SettlementId, payload.ReceiverClanId, receiverClan.IsUnderMercenaryService, receiverClan.Kingdom.StringId);
+                return;
+            }
+            if (!settlement.IsFortification || settlement.Town.IsOwnerUnassigned || settlement.OwnerClan != playerClan)
+            { 
+                Logger.Warning("Ignoring GiftSettlementOwnership {Instance}: settlement {Settlement} is not a fortification, currently unassigned, or is not owned by the sender's clan {SenderClan}",
+                       obj.What.SettlementId, settlement.Id, playerClan.StringId);
+                return;
+            }
+            Campaign.Current.KingdomManager.GiftSettlementOwnership(settlement, receiverClan);
+        });
+    }
+
     public void Dispose()
     {
         messageBroker.Unsubscribe<AddDecision>(HandleAddDecision);
@@ -581,5 +655,7 @@ public class KingdomHandler : IHandler
         messageBroker.Unsubscribe<NetworkDestroyKingdom>(HandleNetworkDestroyKingdom);
         messageBroker.Unsubscribe<NetworkRulingClanChanged>(HandleNetworkRulingClanChanged);
         messageBroker.Unsubscribe<ChangeKingdomName>(HandleChangeKingdomName);
+        messageBroker.Unsubscribe<GiftSettlementOwnership>(HandleGiftSettlementOwnership);
+        messageBroker.Unsubscribe<NetworkGiftSettlementOwnership>(HandleNetworkGiftSettlementOwnership);
     }
 }

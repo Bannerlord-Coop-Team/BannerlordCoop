@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Extentions;
 using GameInterface.Services.Clans.Extensions;
+using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -47,7 +48,7 @@ internal class PartyRolesCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnGovernorChangedPrefix(PartyRolesCampaignBehavior __instance, Town fortification, Hero oldGovernor, Hero newGovernor)
     {
-        if (newGovernor == null || newGovernor.Clan == null || !newGovernor.Clan.IsPlayerClan()) return false;
+        if (newGovernor == null || newGovernor.IsPlayerHero() || newGovernor.Clan == null || !newGovernor.Clan.IsPlayerClan()) return false;
 
         __instance.RemoveAllPartyRolesOfHeroIfExist(newGovernor);
 

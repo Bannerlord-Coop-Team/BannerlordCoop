@@ -1,11 +1,15 @@
 ﻿using System;
 using System.Linq;
+using Common.Messaging;
+using E2E.Tests.Environment.Extensions;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using Missions;
 using Missions.Agents;
 using Missions.Agents.Handlers;
+using LiteNetLib;
 using Missions.Agents.Packets;
+using Missions.Messages;
 using Missions.Services.Network;
 using Newtonsoft.Json.Linq;
 using TaleWorlds.Core;
@@ -35,11 +39,14 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
         public MatrixFrame Hull = new MatrixFrame(Mat3.Identity, new Vec3(10f, 20f, 0f));
         // Owner world directions are localised against the local hull at receive time.
         public MatrixFrame ReceiveHull;
+        public NetPeer Sender = null!;
+        private long sampleSequence;
 
         public void Receive(AgentData data, Guid[]? deckShips = null)
         {
             ReceiveHull = Hull;
-            Handler.HandlePacket(null, new MovementPacket(new[] { Id }, new[] { data }, deckShips ?? new[] { HullId }));
+            Handler.HandlePacket(Sender, new MovementPacket(new[] { Id }, new[] { data },
+                sampleSequence: ++sampleSequence, deckShips: deckShips ?? new[] { HullId }));
         }
 
         public void Tick() => Handler.Interpolator.Tick(1f / 60f);
@@ -89,8 +96,11 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
             {
                 Mission = CreateMovementMission(fixture, peer),
                 Handler = peer.Resolve<ICoopMissionComponent>().AgentMovementHandler,
-                Id = Guid.NewGuid()
+                Id = Guid.NewGuid(),
+                Sender = NetPeerExtensions.CreatePeer()
             };
+            peer.Resolve<IMessageBroker>().Publish(this, new NetworkMissionPeerEntered("owner", "movement-test"));
+            peer.Resolve<IMissionContext>().MapPeer("owner", receiver.Sender);
             receiver.Puppet = receiver.Mission.SpawnAgent(
                 new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
             Assert.True(AgentMirror.TryGet(receiver.Puppet, out receiver.Mirror));

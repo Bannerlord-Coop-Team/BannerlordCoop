@@ -24,6 +24,11 @@ public class Poller
     private TimeSpan pollingInterval;
 
     /// <summary>
+    /// Serializes Start, Stop and StopAndWait so they never see a half-swapped source and task
+    /// </summary>
+    private readonly object lifecycleLock = new object();
+
+    /// <summary>
     /// A cancellation token source to stop the polling
     /// </summary>
     private CancellationTokenSource cts;
@@ -57,20 +62,57 @@ public class Poller
     }
 
     /// <summary>
-    /// Starts the polling task in the background
+    /// Starts the polling task in the background. Restarting cancels the current source and queues the replacement
+    /// behind the running task, because both loops would otherwise call the polling function at the same time.
     /// </summary>
     public void Start()
     {
-        if (pollingTask != null)
+        lock (lifecycleLock)
         {
-            Stop();
-        }
+            var previousTask = pollingTask;
+            cts?.Cancel();
 
-        cts = new CancellationTokenSource();
-        pollingTask = Task.Run(PollAsync);
+            var source = new CancellationTokenSource();
+            cts = source;
+            pollingTask = Task.Run(() => RunAsync(previousTask, source));
+        }
     }
 
-    private async Task PollAsync()
+    private async Task RunAsync(Task previousTask, CancellationTokenSource source)
+    {
+        if (previousTask != null)
+        {
+            try
+            {
+                // Wait out the loop this one replaces, otherwise both poll the same state side by side.
+                await previousTask;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Replaced polling loop ended with an exception");
+            }
+        }
+
+        try
+        {
+            await PollAsync(source.Token);
+        }
+        finally
+        {
+            lock (lifecycleLock)
+            {
+                // Only clear the field when a restart hasn't already put a newer source there.
+                if (ReferenceEquals(cts, source))
+                {
+                    cts = null;
+                }
+
+                source.Dispose();
+            }
+        }
+    }
+
+    private async Task PollAsync(CancellationToken token)
     {
         // Setup initial start time
         var startTime = DateTime.Now;
@@ -79,7 +121,7 @@ public class Poller
         string lastError = null;
         long repeatCount = 0;
 
-        while (cts.IsCancellationRequested == false)
+        while (token.IsCancellationRequested == false)
         {
             // Calculate the delta time span
             var delta = DateTime.Now - startTime;
@@ -115,7 +157,7 @@ public class Poller
             // Wait for the specified interval to elapse before continuing the loop
             try
             {
-                await Task.Delay(pollingInterval, cts.Token);
+                await Task.Delay(pollingInterval, token);
             }
             catch (OperationCanceledException)
             {
@@ -132,7 +174,7 @@ public class Poller
     public void Stop()
     {
         // Cancel the cancellation token
-        cts?.Cancel();
+        CancelAndCaptureTask();
     }
 
     /// <summary>
@@ -147,14 +189,13 @@ public class Poller
     /// </returns>
     public bool StopAndWait(TimeSpan timeout)
     {
-        cts?.Cancel();
+        var task = CancelAndCaptureTask();
 
         if (IsPollingThread)
         {
             return false;
         }
 
-        var task = pollingTask;
         if (task == null)
         {
             return true;
@@ -168,6 +209,18 @@ public class Poller
         {
             // The loop faulted; it is no longer running, which is all the caller needs.
             return true;
+        }
+    }
+
+    /// <summary>
+    /// Cancels the current source and hands back the tracked task, so the caller waits outside the lifecycle lock.
+    /// </summary>
+    private Task CancelAndCaptureTask()
+    {
+        lock (lifecycleLock)
+        {
+            cts?.Cancel();
+            return pollingTask;
         }
     }
 }

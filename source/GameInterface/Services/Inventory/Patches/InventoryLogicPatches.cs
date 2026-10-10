@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
+using GameInterface.Services.Villages;
 using HarmonyLib;
 using Serilog;
 using System.Collections.Generic;
@@ -51,6 +52,7 @@ internal class InventoryLogicPatches
         }
 
         // Send rosters and equipment slots to server to manage
+        ForceTransferScreenTracker.TryClaimForceTransferId(__instance._rosters[0], out var forceTransferId);
         var message = new TradeAttempted(
             __instance._rosters[0],
             __instance._rosters[1],
@@ -65,7 +67,8 @@ internal class InventoryLogicPatches
             __instance.CurrentMobileParty,
             __instance.CurrentSettlementComponent,
             __instance.GetBoughtItems(),
-            __instance.GetSoldItems()
+            __instance.GetSoldItems(),
+            forceTransferId
         );
 
         MessageBroker.Instance.Publish(__instance, message);

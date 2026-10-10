@@ -13,7 +13,7 @@ namespace GameInterface.Tests.Services.UI;
 public class NetworkOptionsTests
 {
     [Fact]
-    public void CoopOptionsVM_NetworkBandwidthDefaultsToFiveMiBPerSecond()
+    public void CoopOptionsVM_NetworkBandwidthDefaultsToTenMiBPerSecond()
     {
         string filePath = CreateTempFilePath();
 
@@ -27,8 +27,8 @@ public class NetworkOptionsTests
             var section = Assert.IsType<NetworkSection>(Assert.Single(tab.Sections));
 
             Assert.Equal(NetworkOptionsTabProvider.TabName, tab.Name);
-            Assert.Equal(5f, section.MovementUploadMiBPerSecond);
-            Assert.Equal(5f, section.MovementDownloadMiBPerSecond);
+            Assert.Equal(10f, section.MovementUploadMiBPerSecond);
+            Assert.Equal(10f, section.MovementDownloadMiBPerSecond);
         }
         finally
         {

@@ -37,7 +37,7 @@ Network-receive handlers run on the single `Poller` thread, but the object an id
 
 ### Project Structure
 
-The main solution is `source/Coop.sln`. Game-facing code lives in `source/Coop`, shared networking/serialization in `source/Common`, sync/domain logic in `source/Coop.Core`, and Bannerlord API adapters in `source/GameInterface`. Tests sit beside the code in `source/*.Tests`, `source/Coop.IntegrationTests`, `source/E2E.Tests`, and `source/MissionTests`. Deploy templates and launch scripts are in `deploy`, UI prefabs in `UIMovies`, docs in `doc`, and workshop/media assets in `Workshop` and `Images`.
+The main solution is `source/Coop.sln`. Game-facing code lives in `source/Coop`, shared networking/serialization in `source/Common`, sync/domain logic in `source/Coop.Core`, and Bannerlord API adapters in `source/GameInterface`. Tests sit beside the code in `source/*.Tests`, `source/Coop.IntegrationTests`, and `source/E2E.Tests`. Deploy templates are in `deploy`, UI prefabs in `UIMovies`, docs in `doc`, and workshop/media assets in `Workshop` and `Images`.
 
 ### Build & Test Commands
 
@@ -45,11 +45,11 @@ Run from the repo root on Windows; the repo expects `mb2` to be a junction to th
 
 - `nuget restore source\Coop.sln` — restores legacy `packages.config` dependencies.
 - `dotnet build source\Coop.Core\Coop.Core.csproj -c Release` — the SDK-style core projects.
-- `dotnet build source\ServerConsole\ServerConsole.csproj -c Debug` — the .NET 10 server console.
+- `dotnet build source\ServerConsole\ServerConsole.csproj -c Debug` — the old IntroServer test launcher, not the co-op server.
 - `dotnet test source\Coop.sln -c Release` — xUnit tests where game runtime deps permit.
-- `MSBuild.exe source\Coop\Coop.csproj /p:Configuration=Debug /p:Platform=AnyCPU` — builds and deploys the mod via `deploy.ps1`.
+- `MSBuild.exe source\Coop\Coop.csproj /p:Configuration=Debug /p:Platform=AnyCPU` — builds the mod and deploys it into `mb2\Modules\Coop` through `Deploy.targets`.
 
-For compile-only checks, clear the post-build event: `/p:PostBuildEvent=`.
+`DeployToGame` in `Deploy.targets` runs after every successful build of a project that imports it (`Coop.csproj`, `MissionTestMod.csproj`), including a full `Coop.sln` build, whenever `mb2\Modules` exists. Clearing `PostBuildEvent` doesn't stop it. For compile-only checks, pass an empty global `-p:ModName=`, which turns off `DeployToGame`.
 
 ### Licensing & Authorized Agent Use
 
@@ -95,6 +95,14 @@ Git and builds over the `/mnt/c` mount are slow: a multi-commit `merge`/`fetch`/
 A freshly-created worktree has **no `mb2` junction** (only the main checkout does), so MSBuild/dotnet there fail with thousands of "game type not found" errors. Create a real Windows junction: `powershell.exe New-Item -ItemType Junction -Path <wt>\mb2 -Target '<game dir>'`; a WSL `ln -s` won't resolve for the Windows build, and a Docker run clobbers the junction so recreate it afterward.
 
 If a local Release restore fails with Scriban's `NU1902` advisory promoted to an error, build-time flags can't undo it — it is baked into `obj/project.assets.json`. Delete the SDK projects' `obj/` and re-restore with `-p:NuGetAudit=false`. CI doesn't hit this.
+
+If `dotnet test` fails with `An Application Control policy has blocked this file. (0x800711C7)` (Win32 error 4551), an App Control policy such as Windows 11 Smart App Control is refusing the freshly built, unsigned test assemblies. `Unblock-File` doesn't help, because locally built files carry no download mark. Changing Smart App Control is the machine owner's call: turning it off lowers protection, and on some Windows builds it can only be turned back on by resetting Windows ([Microsoft's FAQ](https://support.microsoft.com/windows/security/threat-malware-protection/smart-app-control-frequently-asked-questions)). An agent should report the error, not change security settings. CI doesn't hit this.
+
+### Local MCP Tools (Pi and Codex)
+
+`runmefirst.cmd` includes the standalone MCP setup after game-path setup succeeds. See [repo-local MCP setup](doc/automated-testing/mcp-setup.md) for existing-developer refresh, local profiles and client prerequisites. Start Pi/Codex at the repo root, or use `tools/mcp/start-pi.cmd` / `start-codex.cmd` from a subdirectory; these wrappers select their own checkout, not an ancestor.
+
+Use the `bannerlord-coop` MCP tools directly for authorized live tests, not shell/file IPC loops. Pi can initialize its uncached direct tools with `mcp({ connect: "bannerlord-coop" })`, which does not launch games. Setup and initialization do not authorize a deployment or live run. Always call `stop_run` and confirm cleanup before exiting/reloading/reconnecting the client; idle keep-alive is not a substitute for cleanup.
 
 ### Runtime Logs (check these first when debugging)
 
@@ -184,7 +192,7 @@ Keep a drafted comment to its one load-bearing point. Don't fold in secondary me
 
 ## Worktree & Working-Directory Workflow
 
-Running the server + client end-to-end needs the changes in the main working directory — the checkout wired to the `mb2` junction and `deploy.ps1`. A linked git worktree can't drive a live run, so changes made in a separate worktree usually have to be moved into the main checkout before they can be tested.
+Running the server + client end-to-end needs the changes in the main working directory — the checkout wired to the `mb2` junction and `Deploy.targets`. A linked git worktree can't drive a live run, so changes made in a separate worktree usually have to be moved into the main checkout before they can be tested.
 
 When asked to move worktree changes into the working directory, **don't blindly layer them on top of what's already there.** Check the working directory first, and **stop and ask for direction before moving if either is true** so the next step can be chosen (stash, commit, discard, switch branch, merge, …):
 

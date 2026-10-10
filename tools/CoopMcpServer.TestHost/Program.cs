@@ -1,0 +1,26 @@
+﻿using CoopMcpServer;
+using CoopMcpServer.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+if (args.Length == 4 && args[0] == "build-tree")
+{
+    await new BuildTreeFixture().RunAsync(args[1], int.Parse(args[2]), int.Parse(args[3]));
+    return;
+}
+
+// Harmless protocol fixtures: no OS game launcher, game dependencies, or registration access.
+var builder = Host.CreateApplicationBuilder();
+builder.Logging.ClearProviders();
+IRunOrchestrator runs = args.Length == 3 && args[1] == "launch-schema"
+    ? new LaunchSchemaFixture(args[0], args[2]).CreateOrchestrator()
+    : new ScreenshotRunFixture(args[0]) { FailureMethod = args.Length == 2 ? args[1] : null };
+builder.Services.AddSingleton(runs);
+builder.Services.AddTransient<IScreenshotImageEncoder, ScreenshotImageEncoder>();
+builder.Services.AddTransient<IScreenshotCapture, ScreenshotCapture>();
+builder.Services.AddTransient<IDebugTools, DebugTools>();
+builder.Services.AddTransient<IModDeploymentService, DeploymentSchemaFixture>();
+builder.Services.AddMcpServer().WithStdioServerTransport().WithTools<DebugTools>().WithTools<DeploymentTools>();
+using var host = builder.Build();
+await host.RunAsync();

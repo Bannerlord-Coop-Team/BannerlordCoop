@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MapEventParties.Messages;
 using Helpers;
 using System.Threading;
@@ -28,6 +29,9 @@ public class CoopAgentOrigin : IAgentOriginBase
     // One-shot removal latch (native PartyGroupAgentOrigin's _isRemoved): 0 = standing, 1 = already counted.
     private int _removedLatch;
     private Banner _banner;
+    private bool healthFinalized;
+
+    public float? InitialHealth { get; }
     private readonly bool _hasThrownWeapon, _hasSpear, _hasShield, _hasHeavyArmor;
 
     public BasicCharacterObject Troop => _troop;
@@ -45,12 +49,13 @@ public class CoopAgentOrigin : IAgentOriginBase
     bool IAgentOriginBase.HasShield => _hasShield;
     bool IAgentOriginBase.HasSpear => _hasSpear;
 
-    public CoopAgentOrigin(CharacterObject troop, PartyBase party, int rank, Banner banner, UniqueTroopDescriptor descriptor, string mapEventPartyId = null, CoopTroopSupplier supplier = null)
+    public CoopAgentOrigin(CharacterObject troop, PartyBase party, int rank, Banner banner, UniqueTroopDescriptor descriptor, string mapEventPartyId = null, CoopTroopSupplier supplier = null, float? initialHealth = null)
     {
         _troop = troop;
         _party = party;
         _descriptor = descriptor;
         _supplier = supplier;
+        InitialHealth = initialHealth;
         Rank = rank == -1 ? MBRandom.RandomInt(10000) : rank;
         _banner = banner;
         MapEventPartyId = mapEventPartyId;
@@ -143,16 +148,29 @@ public class CoopAgentOrigin : IAgentOriginBase
 
     public void OnAgentRemoved(float agentHealth)
     {
-        // Unlike the casualty hooks above, final agent health has no other path back to Hero.HitPoints. Vanilla
-        // performs this transfer in the origin hook, which also covers injured survivors removed during teardown.
-        if (!_troop.IsHero) return;
+        if (healthFinalized || !_troop.IsHero) return;
+        if (!_troop.HeroObject.IsHealthControlledByThisInstance()) return;
+        ReportHeroHealth(agentHealth);
+    }
+
+    public void OnMissionEnded(float agentHealth, bool ownsHealth)
+    {
+        if (healthFinalized) return;
+        healthFinalized = true;
+        if (ownsHealth && _troop.IsHero) ReportHeroHealth(agentHealth);
+    }
+
+    private void ReportHeroHealth(float agentHealth)
+    {
+        if (float.IsNaN(agentHealth) || float.IsInfinity(agentHealth)) return;
 
         var hero = _troop.HeroObject;
         if (hero.HeroState == Hero.CharacterStates.Dead) return;
 
-        if (!hero.IsHealthControlledByThisInstance()) return;
+        var hitPoints = MathF.Max(1, MathF.Round(agentHealth));
+        if (hero.HitPoints == hitPoints) return;
 
-        hero.HitPoints = MathF.Max(1, MathF.Round(agentHealth));
+        MessageBroker.Instance.Publish(this, new HeroHitPointsChangeRequested(hero, hitPoints));
     }
 
     // Unlike the casualty hooks above, score hits have NO other path to the map event party in a coop battle

@@ -12,6 +12,8 @@ public enum JoinSyncSignal
     FinalBaselineApplied,
     WorldReady,
     CatchUpApplied,
+    ReplayBatchComplete,
+    ReplayBatchApplied,
 }
 
 /// <summary>Coordinates the ordered replay and baseline barriers for a joining client.</summary>
@@ -23,5 +25,12 @@ public readonly struct NetworkJoinSync : IMessage
     [ProtoMember(1)]
     public readonly JoinSyncSignal Signal;
 
-    public NetworkJoinSync(JoinSyncSignal signal) => Signal = signal;
+    [ProtoMember(2)]
+    public readonly int ReplayBatchId;
+
+    public NetworkJoinSync(JoinSyncSignal signal, int replayBatchId = 0)
+    {
+        Signal = signal;
+        ReplayBatchId = replayBatchId;
+    }
 }

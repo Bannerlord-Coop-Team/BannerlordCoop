@@ -4,7 +4,7 @@ set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 docker_image=${E2E_IMAGE:-garrettluskey/bannerlordcoop:latest}
-shard_count=${E2E_SHARDS:-8}
+shard_count=${E2E_SHARDS:-4}
 run_id="bannerlordcoop-e2e-$(date +%s)-$$"
 seed_container="${run_id}-seed"
 local_image="${run_id}:workspace"

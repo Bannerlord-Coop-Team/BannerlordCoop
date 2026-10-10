@@ -80,7 +80,8 @@ namespace Missions.Agents.Packets
             int? mountAction0TurnDirection = null,
             int? mountAction0TurnActionIndex = null,
             float? mountAction0TurnProgress = null,
-            bool? mountAction0IsSyntheticTurn = null)
+            bool? mountAction0IsSyntheticTurn = null,
+            long? mountAuthorityRevision = null)
         {
             DeckShipIndex = 0;
             DeckLocal = Vec3.Zero;
@@ -108,7 +109,8 @@ namespace Missions.Agents.Packets
                     mountAction0TurnDirection: mountAction0TurnDirection,
                     mountAction0TurnActionIndex: mountAction0TurnActionIndex,
                     mountAction0TurnProgress: mountAction0TurnProgress,
-                    mountAction0IsSyntheticTurn: mountAction0IsSyntheticTurn);
+                    mountAction0IsSyntheticTurn: mountAction0IsSyntheticTurn,
+                    mountAuthorityRevision: mountAuthorityRevision);
             }
             else
             {

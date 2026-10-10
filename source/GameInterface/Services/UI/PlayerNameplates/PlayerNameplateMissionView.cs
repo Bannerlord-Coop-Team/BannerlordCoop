@@ -9,6 +9,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab;
 using GameInterface.Services.UI.Messages;
+using GameInterface.Services.Voice;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -33,6 +34,7 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
     private readonly IPlayerNameplateEligibility eligibility;
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
+    private readonly IVoiceClient voice;
 
     private PlayerNameplatesVM dataSource;
     private GauntletLayer gauntletLayer;
@@ -46,6 +48,7 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
     public IReadOnlyList<PlayerNameplateTargetVM> Targets =>
         dataSource?.Targets?.ToArray() ?? Array.Empty<PlayerNameplateTargetVM>();
 
+    // Shares the existing mission targets with the audible voice indicator.
     public PlayerNameplateMissionView(
         IMessageBroker messageBroker,
         ICoopOptionsStore optionsStore,
@@ -53,7 +56,8 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
         IPlayerNameplateControllerResolver controllerResolver,
         IPlayerNameplateEligibility eligibility,
         IPlayerManager playerManager,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        IVoiceClient voice)
     {
         this.messageBroker = messageBroker;
         this.optionsStore = optionsStore;
@@ -62,6 +66,7 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
         this.eligibility = eligibility;
         this.playerManager = playerManager;
         this.objectManager = objectManager;
+        this.voice = voice;
     }
 
     public override void OnMissionScreenInitialize()
@@ -80,6 +85,7 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
             optionsStore.LoadOrDefault()));
     }
 
+    // Refreshes nameplate positions and marks only the remote players currently audible to this client.
     public override void OnMissionScreenTick(float dt)
     {
         base.OnMissionScreenTick(dt);
@@ -99,10 +105,13 @@ public sealed class PlayerNameplateMissionView : MissionView, ILocationMissionBe
         var camera = MissionScreen.CombatCamera;
         if (camera == null) return;
 
+        var audible = voice.AudibleSpeakers;
         foreach (var target in dataSource.Targets)
         {
             target.UpdatePosition(camera);
-            if (TryGetControllerId(target.Agent, out var controllerId))
+            bool resolved = TryGetControllerId(target.Agent, out var controllerId);
+            target.SetSpeaking(resolved && audible.Contains(controllerId));
+            if (resolved)
             {
                 target.SetNameColor(colorService.GetColorString(controllerId));
                 if (TryGetPlayerHeroName(controllerId, out var playerHeroName))

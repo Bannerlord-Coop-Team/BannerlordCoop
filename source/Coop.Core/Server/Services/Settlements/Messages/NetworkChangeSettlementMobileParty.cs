@@ -10,13 +10,13 @@ namespace Coop.Core.Server.Services.Settlements.Messages;
 public record NetworkChangeSettlementMobileParty : IEvent
 {
     [ProtoMember(1)]
-    public string SettlementId { get; }
+    public uint SettlementId { get; }
     [ProtoMember(2)]
-    public string MobilePartyId { get; }
+    public uint MobilePartyId { get; }
     [ProtoMember(3)]
     public bool AddMobileParty { get; }
 
-    public NetworkChangeSettlementMobileParty(string settlementId, string mobilePartyId, bool addMobileParty)
+    public NetworkChangeSettlementMobileParty(uint settlementId, uint mobilePartyId, bool addMobileParty)
     {
         SettlementId = settlementId;
         MobilePartyId = mobilePartyId;

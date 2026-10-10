@@ -9,6 +9,7 @@ namespace Coop.Core.Client.Services.Discord;
 public interface IDiscordPresenceClient : IDisposable
 {
     void SetPresence(string details, string state, DateTime startedAtUtc);
+    void SetMainMenu();
     void ClearPresence();
 }
 
@@ -59,6 +60,8 @@ public sealed class DiscordPresenceClient : IDiscordPresenceClient
             ApplyLatestPresence();
         });
     }
+
+    public void SetMainMenu() => SetPresence(null, "Main Menu", DateTime.UtcNow);
 
     public void ClearPresence() => Enqueue(() =>
     {

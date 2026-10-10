@@ -31,42 +31,13 @@ For the best performance and stability, we strongly recommend hosting campaigns 
 
 Steam hosting does not require traditional port forwarding in most cases. Manual network hosting options are also available.
 
+Dedicated-server operators can block Steam64 identities with a [server-side ban list](doc/SteamBans.md).
+
 Server setup walkthrough: https://www.youtube.com/watch?v=laZM967Eals
 
-## Current Features
+## Roadmap
 
-- Shared campaign map
-- Player and AI movement synchronization
-- Map encounters
-- Party and troop management
-- Character skills and progression
-- Clan and kingdom management
-- Settlement management
-- Recruitment and trading
-- Caravans and villager parties
-- Smithing
-- Player captivity
-- Field battles
-- Village raids
-- PvE and PvP combat
-- Simulated battles
-- Players visible inside locations such as taverns and village scenes
-- Dedicated server support
-- Steam integration
-
-### Experimental Features
-
-- Sieges and sally-outs
-- Armies
-
-### Planned Features
-
-- Additional campaign systems and stability improvements
-- Hideouts
-- War Sails DLC support
-- Quests
-
-Planned items and release priorities may change as development continues.
+https://bannerlordcoop.com/#roadmap
 
 ## Multiplayer Battles
 
@@ -78,7 +49,7 @@ Players who retreat or disconnect are handled by the campaign and battle synchro
 
 For the most reliable experience:
 
-- Use the supported Bannerlord game version (currently **v1.4.7**)
+- Use the supported Bannerlord game version (currently **v1.4.8**)
 - Disable all other mods
 - Do not enable the War Sails DLC
 - Ensure every player is using the same mod version
@@ -103,7 +74,7 @@ Bannerlord Coop is developed by a volunteer team and will always be available fo
 
 Support helps cover development tools, hosting infrastructure, dedicated servers, distribution costs, and other project expenses. Choose whichever platform works best for you:
 
-- [**Patreon**](https://www.patreon.com/c/bannerlordcoop/membership) — Become a monthly supporter
+- [**Patreon**](https://www.patreon.com/16338430/join) — Become a monthly supporter
 - [**Buy Me a Coffee**](https://buymeacoffee.com/bannerlordcoop) — Send a one-time contribution
 - [**PayPal**](https://www.paypal.com/donate/?hosted_button_id=KHBSK4FXQ9GKS) — Donate directly
 - [**Afdian**](https://ifdian.net/a/BannerlordCoop) — Support us from China
@@ -114,6 +85,8 @@ Support helps cover development tools, hosting infrastructure, dedicated servers
 ## Contributing
 
 Get started [here!](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/wiki/Getting-Started-as-a-Contributor) Also join our [Discord](https://discord.gg/VXqGyT8) for direct questions and collaboration.
+
+Debug builds of the in-game server always try to load a campaign save named `MP` when the server starts: a plain `/server` launch loads nothing else, and a `/coopsave <name>` launch attempts `MP` before the named save. A missing `MP` save is skipped with `Failed to load save with name MP` in the server log, so create a game and save it as `MP` before hosting from a Debug build; the [Environment Setup Guide](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/wiki/Environment-Setup-Guide) wiki page covers this under Windows Setup (create a new game and save it as MP). Release builds skip `MP` and load only the save picked in the host screen or passed with `/coopsave`.
 
 By submitting a contribution to BannerlordCoop, you agree that your contribution
 may be used, modified, distributed, sublicensed, and relicensed by the

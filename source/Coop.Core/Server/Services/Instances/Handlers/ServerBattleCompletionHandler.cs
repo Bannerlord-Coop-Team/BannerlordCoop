@@ -333,27 +333,18 @@ public class ServerBattleCompletionHandler : IHandler
         RunSerialized(() =>
         {
             if (!missionManager.CompleteInstanceConclusion(result.MapEventId, result.Applied))
+            {
+                // The claim is gone. Only a claim that timed out is recovered here; anything else is a
+                // stale result and stays ignored.
+                if (missionManager.TryTakeExpiredConclusion(result.MapEventId))
+                    RecoverStalledConclusion(result.MapEventId, DateTime.UtcNow);
+
                 return;
+            }
 
             if (!result.Applied)
             {
-                if (!objectManager.TryGetObject<MapEvent>(result.MapEventId, out var mapEvent) ||
-                    mapEvent.IsFinalized ||
-                    mapEvent.BattleState == BattleState.AttackerVictory ||
-                    mapEvent.BattleState == BattleState.DefenderVictory)
-                {
-                    conclusionRetries.Remove(result.MapEventId);
-                    lock (pendingJoinersGate)
-                        pendingJoiners.Remove(result.MapEventId);
-                    completionTracker.Clear(result.MapEventId);
-                    Logger.Warning("Battle conclusion for {Instance} was not applied because the map event is no longer active",
-                        result.MapEventId);
-                    return;
-                }
-
-                conclusionRetries[result.MapEventId] = DateTime.UtcNow + ConclusionRetryDelay;
-                Logger.Warning("Battle conclusion for {Instance} was not applied; reopening it for retry",
-                    result.MapEventId);
+                RecoverStalledConclusion(result.MapEventId, DateTime.UtcNow + ConclusionRetryDelay);
                 return;
             }
 
@@ -395,6 +386,9 @@ public class ServerBattleCompletionHandler : IHandler
             foreach (var instanceId in changedInstances)
                 TryConcludeReportedBattle(instanceId);
 
+            foreach (var instanceId in missionManager.TakeExpiredConclusions())
+                RecoverStalledConclusion(instanceId, now);
+
             var dueRetries = conclusionRetries
                 .Where(entry => now >= entry.Value)
                 .Select(entry => entry.Key)
@@ -405,6 +399,26 @@ public class ServerBattleCompletionHandler : IHandler
                 TryConcludeReportedBattle(instanceId);
             }
         });
+    }
+
+    private void RecoverStalledConclusion(string mapEventId, DateTime retryDueUtc)
+    {
+        if (!objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent) ||
+            mapEvent.IsFinalized ||
+            mapEvent.BattleState == BattleState.AttackerVictory ||
+            mapEvent.BattleState == BattleState.DefenderVictory)
+        {
+            conclusionRetries.Remove(mapEventId);
+            lock (pendingJoinersGate)
+                pendingJoiners.Remove(mapEventId);
+            completionTracker.Clear(mapEventId);
+            Logger.Warning("Battle conclusion for {Instance} was not applied because the map event is no longer active",
+                mapEventId);
+            return;
+        }
+
+        conclusionRetries[mapEventId] = retryDueUtc;
+        Logger.Warning("Battle conclusion for {Instance} was not applied; reopening it for retry", mapEventId);
     }
 
     private void RemovePendingJoiner(string instanceId, string controllerId, Guid reservationId)

@@ -1,5 +1,6 @@
-using Common;
+﻿using Common;
 using Common.Logging;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.ObjectManager;
@@ -7,6 +8,7 @@ using GameInterface.Services.TroopRosters.Data;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -34,25 +36,38 @@ internal readonly struct PlayerPartyInteractionOutcome
     public readonly TroopRosterElementData[] ResponderOfferedTroops;
     public readonly bool InitiatorOfferedPeace;
     public readonly bool ResponderOfferedPeace;
+    public readonly PlayerPartyInteractionProposal Proposal;
+    public readonly bool IsHostile;
+    public readonly string ActorPartyId;
+    public readonly Kingdom TargetKingdom;
+    public readonly int MercenaryAwardMultiplier;
 
-    public PlayerPartyInteractionOutcome(PlayerPartyInteractionSession session, PlayerPartyInteractionOutcomeType outcomeType)
+    public PlayerPartyInteractionOutcome(
+        PlayerPartyInteractionSession session,
+        PlayerPartyInteractionOutcomeType outcomeType,
+        string actorPartyId)
     {
         SessionId = session.SessionId;
         InitiatorPartyId = session.InitiatorPartyId;
         ResponderPartyId = session.ResponderPartyId;
         OutcomeType = outcomeType;
-        InitiatorOfferedItems = session.InitiatorOfferedItems ?? new ItemRosterElementData[0];
-        ResponderOfferedItems = session.ResponderOfferedItems ?? new ItemRosterElementData[0];
+        InitiatorOfferedItems = session.InitiatorOfferedItems ?? Array.Empty<ItemRosterElementData>();
+        ResponderOfferedItems = session.ResponderOfferedItems ?? Array.Empty<ItemRosterElementData>();
         InitiatorOfferedGold = session.InitiatorOfferedGold;
         ResponderOfferedGold = session.ResponderOfferedGold;
-        InitiatorOfferedFiefs = session.InitiatorOfferedFiefs ?? new string[0];
-        ResponderOfferedFiefs = session.ResponderOfferedFiefs ?? new string[0];
-        InitiatorOfferedPrisoners = session.InitiatorOfferedPrisoners ?? new TroopRosterElementData[0];
-        ResponderOfferedPrisoners = session.ResponderOfferedPrisoners ?? new TroopRosterElementData[0];
-        InitiatorOfferedTroops = session.InitiatorOfferedTroops ?? new TroopRosterElementData[0];
-        ResponderOfferedTroops = session.ResponderOfferedTroops ?? new TroopRosterElementData[0];
+        InitiatorOfferedFiefs = session.InitiatorOfferedFiefs ?? Array.Empty<string>();
+        ResponderOfferedFiefs = session.ResponderOfferedFiefs ?? Array.Empty<string>();
+        InitiatorOfferedPrisoners = session.InitiatorOfferedPrisoners ?? Array.Empty<TroopRosterElementData>();
+        ResponderOfferedPrisoners = session.ResponderOfferedPrisoners ?? Array.Empty<TroopRosterElementData>();
+        InitiatorOfferedTroops = session.InitiatorOfferedTroops ?? Array.Empty<TroopRosterElementData>();
+        ResponderOfferedTroops = session.ResponderOfferedTroops ?? Array.Empty<TroopRosterElementData>();
         InitiatorOfferedPeace = session.InitiatorOfferedPeace;
         ResponderOfferedPeace = session.ResponderOfferedPeace;
+        Proposal = session.Proposal;
+        IsHostile = session.IsHostile;
+        ActorPartyId = actorPartyId;
+        TargetKingdom = session.TargetKingdom;
+        MercenaryAwardMultiplier = session.MercenaryAwardMultiplier;
     }
 }
 
@@ -62,47 +77,141 @@ internal class PlayerPartyInteractionOutcomeHandler
 
     private readonly IObjectManager objectManager;
     private readonly IKingdomMembershipState kingdomMembershipState;
+    private readonly IClanJoinRules clanJoinRules;
+    private readonly IClanLeaveRules clanLeaveRules;
+    private readonly IPlayerMarriageRules playerMarriageRules;
 
     public PlayerPartyInteractionOutcomeHandler(
         IObjectManager objectManager,
-        IKingdomMembershipState kingdomMembershipState)
+        IKingdomMembershipState kingdomMembershipState,
+        IClanJoinRules clanJoinRules,
+        IClanLeaveRules clanLeaveRules,
+        IPlayerMarriageRules playerMarriageRules)
     {
         this.objectManager = objectManager;
         this.kingdomMembershipState = kingdomMembershipState;
+        this.clanJoinRules = clanJoinRules;
+        this.clanLeaveRules = clanLeaveRules;
+        this.playerMarriageRules = playerMarriageRules;
     }
 
-    public void Handle(PlayerPartyInteractionOutcome outcome)
+    public bool Handle(PlayerPartyInteractionOutcome outcome)
     {
         switch (outcome.OutcomeType)
         {
             case PlayerPartyInteractionOutcomeType.TradeAccepted:
-                HandleTradeAccepted(outcome);
-                break;
+                return HandleTradeAccepted(outcome);
             case PlayerPartyInteractionOutcomeType.ClanJoinAccepted:
-                HandleClanJoinAccepted(outcome);
-                break;
+                return HandleClanJoinAccepted(outcome);
             case PlayerPartyInteractionOutcomeType.VassalAccepted:
-                HandleVassalAccepted(outcome);
-                break;
-            case PlayerPartyInteractionOutcomeType.ClanJoinDeclined:
-            case PlayerPartyInteractionOutcomeType.TradeDeclined:
-            case PlayerPartyInteractionOutcomeType.VassalDeclined:
-            case PlayerPartyInteractionOutcomeType.Left:
-            case PlayerPartyInteractionOutcomeType.Rejected:
-            case PlayerPartyInteractionOutcomeType.Disconnected:
-            case PlayerPartyInteractionOutcomeType.HostileDemandAccepted:
-            case PlayerPartyInteractionOutcomeType.HostileDemandYielded:
-                // All the above lead to ending the interaction, however we may intend to have them lead to different
-                // logic in the future.
-                break;
+                return HandleVassalAccepted(outcome);
+            case PlayerPartyInteractionOutcomeType.MercenaryAccepted:
+                return HandleMercenaryAccepted(outcome);
+            case PlayerPartyInteractionOutcomeType.ClanLeft:
+            case PlayerPartyInteractionOutcomeType.ClanMemberRemoved:
+                return HandleClanDeparture(outcome);
+            case PlayerPartyInteractionOutcomeType.MarriageAccepted:
+                return HandleMarriageAccepted(outcome);
+            default:
+                return true;
         }
     }
 
-    private void HandleVassalAccepted(PlayerPartyInteractionOutcome outcome)
+    private bool HandleClanDeparture(PlayerPartyInteractionOutcome outcome)
     {
         try
         {
-            RunOnGameThread(() => ApplyVassalage(outcome), "Apply player-party vassalage");
+            bool result = false;
+            RunOnGameThread(() => result = ApplyClanDeparture(outcome), "Apply player-party clan departure");
+            return result;
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e,
+                "Failed to apply player-party clan departure. SessionId={SessionId}, InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
+                outcome.SessionId,
+                outcome.InitiatorPartyId,
+                outcome.ResponderPartyId);
+            return false;
+        }
+    }
+
+    private bool ApplyClanDeparture(PlayerPartyInteractionOutcome outcome)
+    {
+        if (!TryGetSessionParties(outcome, outcome.ActorPartyId, out var actorParty, out var otherParty)) return false;
+
+        var actor = actorParty.LeaderHero;
+        var other = otherParty.LeaderHero;
+        bool isRemoval = outcome.OutcomeType == PlayerPartyInteractionOutcomeType.ClanMemberRemoved;
+        var member = isRemoval ? other : actor;
+        var allowed = actor?.Clan != null && actor.Clan == other?.Clan &&
+            (isRemoval ? clanLeaveRules.CanRemove(actor, member) : clanLeaveRules.CanLeave(member));
+
+        return allowed && clanLeaveRules.TryApply(member, isRemoval);
+    }
+
+    private bool HandleMarriageAccepted(PlayerPartyInteractionOutcome outcome)
+    {
+        try
+        {
+            bool result = false;
+            RunOnGameThread(() => result = ApplyMarriage(outcome), "Apply player-party marriage");
+            return result;
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e,
+                "Failed to apply player-party marriage. SessionId={SessionId}, InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
+                outcome.SessionId,
+                outcome.InitiatorPartyId,
+                outcome.ResponderPartyId);
+            return false;
+        }
+    }
+
+    private bool ApplyMarriage(PlayerPartyInteractionOutcome outcome)
+    {
+        if (outcome.IsHostile ||
+            !objectManager.TryGetObjectWithLogging(outcome.InitiatorPartyId, out PartyBase initiatorParty) ||
+            !objectManager.TryGetObjectWithLogging(outcome.ResponderPartyId, out PartyBase responderParty)) return false;
+
+        if (outcome.Proposal != PlayerPartyInteractionProposal.PatrilinealMarriage &&
+            outcome.Proposal != PlayerPartyInteractionProposal.MatrilinealMarriage) return false;
+
+        return playerMarriageRules.TryApply(
+            initiatorParty.LeaderHero,
+            responderParty.LeaderHero,
+            outcome.Proposal == PlayerPartyInteractionProposal.MatrilinealMarriage);
+    }
+
+    private bool TryGetSessionParties(
+        PlayerPartyInteractionOutcome outcome,
+        string actorPartyId,
+        out PartyBase actorParty,
+        out PartyBase otherParty)
+    {
+        actorParty = null;
+        otherParty = null;
+
+        string otherPartyId;
+        if (actorPartyId == outcome.InitiatorPartyId)
+            otherPartyId = outcome.ResponderPartyId;
+        else if (actorPartyId == outcome.ResponderPartyId)
+            otherPartyId = outcome.InitiatorPartyId;
+        else
+            return false;
+
+        return objectManager.TryGetObjectWithLogging(actorPartyId, out actorParty) &&
+            objectManager.TryGetObjectWithLogging(otherPartyId, out otherParty);
+    }
+
+    private bool HandleVassalAccepted(PlayerPartyInteractionOutcome outcome)
+    {
+        try
+        {
+            bool result = false;
+            RunOnGameThread(() => result = ApplyVassalage(outcome), "Apply player-party vassalage");
+            return result;
         }
         catch (Exception e)
         {
@@ -111,51 +220,94 @@ internal class PlayerPartyInteractionOutcomeHandler
                 outcome.SessionId,
                 outcome.InitiatorPartyId,
                 outcome.ResponderPartyId);
+            return false;
         }
     }
 
-    private void ApplyVassalage(PlayerPartyInteractionOutcome outcome)
+    private bool ApplyVassalage(PlayerPartyInteractionOutcome outcome)
     {
         if (!objectManager.TryGetObject(outcome.InitiatorPartyId, out PartyBase initiatorParty))
         {
             Logger.Warning("Unable to apply player-party vassalage: initiator party not found. PartyId={PartyId}", outcome.InitiatorPartyId);
-            return;
+            return false;
         }
 
         if (!objectManager.TryGetObject(outcome.ResponderPartyId, out PartyBase responderParty))
         {
             Logger.Warning("Unable to apply player-party vassalage: responder party not found. PartyId={PartyId}", outcome.ResponderPartyId);
-            return;
+            return false;
         }
 
         var initiatorClan = initiatorParty.LeaderHero?.Clan ?? initiatorParty.MobileParty?.ActualClan;
         var responderHero = responderParty.LeaderHero;
         var targetKingdom = responderHero?.Clan?.Kingdom;
+        var previousKingdom = initiatorClan?.Kingdom;
         if (initiatorClan == null ||
-            initiatorClan.Kingdom != null ||
-            initiatorClan.Tier < 2 ||
+            initiatorClan.Tier < Campaign.Current.Models.ClanTierModel.VassalEligibleTier ||
             responderHero?.IsKingdomLeader != true ||
-            targetKingdom?.RulingClan != responderHero.Clan)
+            targetKingdom?.RulingClan != responderHero.Clan ||
+            (initiatorClan.Kingdom != null && !initiatorClan.IsUnderMercenaryService) ||
+            targetKingdom != outcome.TargetKingdom)
         {
             Logger.Warning(
                 "Unable to apply player-party vassalage: eligibility changed before acceptance. InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
                 outcome.InitiatorPartyId,
                 outcome.ResponderPartyId);
-            return;
+            return false;
+        }
+        if (initiatorClan.Kingdom == targetKingdom)
+        {
+            if (!initiatorClan.IsUnderMercenaryService)
+            {
+                Logger.Warning("Rejected vassal service request because clan {ClanId} already belongs to kingdom {KingdomId}", initiatorClan, targetKingdom);
+                return false;
+            }
+
+            EndMercenaryServiceAction.EndByBecomingVassal(initiatorClan);
+        }
+        else
+        {
+            if (initiatorClan.Kingdom != null)
+            {
+                if (!initiatorClan.IsUnderMercenaryService)
+                {
+                    Logger.Warning("Rejected vassal service request because clan {ClanId} already belongs to another kingdom", initiatorClan);
+                    return false;
+                }
+
+                EndMercenaryServiceAction.EndByLeavingKingdom(initiatorClan);
+            }
+
+            ChangeKingdomAction.ApplyByJoinToKingdom(initiatorClan, targetKingdom);
+        }
+
+        if (initiatorClan.Kingdom != targetKingdom || initiatorClan.IsUnderMercenaryService)
+        {
+            Logger.Error("Vassal service did not place clan {ClanId} in kingdom {KingdomId}", initiatorClan, targetKingdom);
+            return false;
         }
 
         kingdomMembershipState.MoveClanToKingdom(
-            null,
+            previousKingdom,
             targetKingdom,
             initiatorClan,
-            publishCollectionChanges: true);
+            publishCollectionChanges: true,
+            republishExistingCollections: true);
+        if (!targetKingdom.Clans.Contains(initiatorClan))
+        {
+            Logger.Error("Vassal service did not add clan {ClanId} to kingdom {KingdomId} collections", initiatorClan, targetKingdom);
+            return false;
+        }
+        return true;
     }
 
-    private void HandleClanJoinAccepted(PlayerPartyInteractionOutcome outcome)
+    private bool HandleClanJoinAccepted(PlayerPartyInteractionOutcome outcome)
     {
         try
         {
-            RunOnGameThread(() => ApplyClanJoin(outcome), "Apply player-party clan join");
+            bool result = false;
+            RunOnGameThread(() => result = ApplyClanJoin(outcome), "Apply player-party clan join");
+            return result;
         }
         catch (Exception e)
         {
@@ -164,14 +316,17 @@ internal class PlayerPartyInteractionOutcomeHandler
                 outcome.SessionId,
                 outcome.InitiatorPartyId,
                 outcome.ResponderPartyId);
+            return false;
         }
     }
 
-    private void HandleTradeAccepted(PlayerPartyInteractionOutcome outcome)
+    private bool HandleTradeAccepted(PlayerPartyInteractionOutcome outcome)
     {
         try
         {
-            RunOnGameThread(() => ApplyAcceptedTrade(outcome), "Apply player-party trade");
+            bool result = false;
+            RunOnGameThread(() => result = ApplyAcceptedTrade(outcome), "Apply player-party trade");
+            return result;
         }
         catch (Exception e)
         {
@@ -180,21 +335,22 @@ internal class PlayerPartyInteractionOutcomeHandler
                 outcome.SessionId,
                 outcome.InitiatorPartyId,
                 outcome.ResponderPartyId);
+            return false;
         }
     }
 
-    private void ApplyClanJoin(PlayerPartyInteractionOutcome outcome)
+    private bool ApplyClanJoin(PlayerPartyInteractionOutcome outcome)
     {
         if (!objectManager.TryGetObject(outcome.InitiatorPartyId, out PartyBase initiatorParty))
         {
             Logger.Warning("Unable to apply player-party clan join: initiator party not found. PartyId={PartyId}", outcome.InitiatorPartyId);
-            return;
+            return false;
         }
 
         if (!objectManager.TryGetObject(outcome.ResponderPartyId, out PartyBase responderParty))
         {
             Logger.Warning("Unable to apply player-party clan join: responder party not found. PartyId={PartyId}", outcome.ResponderPartyId);
-            return;
+            return false;
         }
 
         var initiatorHero = initiatorParty.LeaderHero;
@@ -205,26 +361,99 @@ internal class PlayerPartyInteractionOutcomeHandler
                 "Unable to apply player-party clan join: missing initiator hero or responder clan. InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
                 outcome.InitiatorPartyId,
                 outcome.ResponderPartyId);
-            return;
+            return false;
         }
 
-        initiatorHero.Clan = responderClan;
-        if (initiatorParty.MobileParty != null)
-            initiatorParty.MobileParty.ActualClan = responderClan;
+        clanJoinRules.Apply(initiatorHero, responderClan);
+        return true;
     }
 
-    private void ApplyAcceptedTrade(PlayerPartyInteractionOutcome outcome)
+    private bool HandleMercenaryAccepted(PlayerPartyInteractionOutcome outcome)
+    {
+        try
+        {
+            bool result = false;
+            RunOnGameThread(() => result = ApplyMercenaryJoin(outcome), "Apply player-party Mercenary join");
+            return result;
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e,
+                "Failed to apply player-party mercenary join. SessionId={SessionId}, InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
+                outcome.SessionId,
+                outcome.InitiatorPartyId,
+                outcome.ResponderPartyId);
+            return false;
+        }
+    }
+
+    private bool ApplyMercenaryJoin(PlayerPartyInteractionOutcome outcome)
+    {
+        if (!objectManager.TryGetObject(outcome.InitiatorPartyId, out PartyBase initiatorParty))
+        {
+            Logger.Warning("Unable to apply player-party mercenary: initiator party not found. PartyId={PartyId}", outcome.InitiatorPartyId);
+            return false;
+        }
+
+        if (!objectManager.TryGetObject(outcome.ResponderPartyId, out PartyBase responderParty))
+        {
+            Logger.Warning("Unable to apply player-party mercenary: responder party not found. PartyId={PartyId}", outcome.ResponderPartyId);
+            return false;
+        }
+
+        var initiatorClan = initiatorParty.LeaderHero?.Clan ?? initiatorParty.MobileParty?.ActualClan;
+        var responderHero = responderParty.LeaderHero;
+        var targetKingdom = responderHero?.Clan?.Kingdom;
+        List<IFaction> playerwars = new List<IFaction>();
+        List<IFaction> warsOfFactionToJoin = new List<IFaction>();
+        float strengthThresholdForNonMutualWarsToBeIgnoredToJoinKingdom = Campaign.Current.Models.DiplomacyModel.GetStrengthThresholdForNonMutualWarsToBeIgnoredToJoinKingdom(targetKingdom);
+        foreach (var kingdom in Kingdom.All)
+        {
+            if (initiatorClan.MapFaction.IsAtWarWith(kingdom) && kingdom.CurrentTotalStrength > strengthThresholdForNonMutualWarsToBeIgnoredToJoinKingdom)
+            {
+                playerwars.Add(kingdom);
+            }
+            if (targetKingdom.IsAtWarWith(kingdom))
+            {
+                warsOfFactionToJoin.Add(kingdom);
+            }
+        }
+
+        if (initiatorClan == null
+            || initiatorParty.LeaderHero != initiatorClan.Leader
+            || targetKingdom == null
+            || initiatorClan.Tier < Campaign.Current.Models.ClanTierModel.MercenaryEligibleTier
+            || (initiatorClan.IsUnderMercenaryService && initiatorClan.Kingdom == targetKingdom)
+            || !initiatorClan.Settlements.IsEmpty<Settlement>()
+            || initiatorParty.LeaderHero.GetRelation(responderHero) < (float)Campaign.Current.Models.DiplomacyModel.MinimumRelationWithConversationCharacterToJoinKingdom
+            || (initiatorClan.MapFaction.IsKingdomFaction && !initiatorClan.IsUnderMercenaryService)
+            || initiatorClan.IsAtWarWith(targetKingdom)
+            || warsOfFactionToJoin.Intersect(playerwars).Count<IFaction>() != playerwars.Count
+            || targetKingdom != outcome.TargetKingdom)
+        {
+            Logger.Warning(
+                "Unable to apply player-party mercenary: eligibility changed before acceptance. InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
+            outcome.InitiatorPartyId,
+            outcome.ResponderPartyId);
+            return false;
+        }
+        int awardMultiplier = outcome.MercenaryAwardMultiplier;
+        ChangeKingdomAction.ApplyByJoinFactionAsMercenary(initiatorClan, targetKingdom, default, awardMultiplier, true);
+        GainKingdomInfluenceAction.ApplyForJoiningFaction(initiatorClan.Leader, 5f);
+        return true;
+    }
+    private bool ApplyAcceptedTrade(PlayerPartyInteractionOutcome outcome)
     {
         if (!objectManager.TryGetObject(outcome.InitiatorPartyId, out PartyBase initiatorParty))
         {
             Logger.Warning("Unable to apply player-party trade: initiator party not found. PartyId={PartyId}", outcome.InitiatorPartyId);
-            return;
+            return false;
         }
 
         if (!objectManager.TryGetObject(outcome.ResponderPartyId, out PartyBase responderParty))
         {
             Logger.Warning("Unable to apply player-party trade: responder party not found. PartyId={PartyId}", outcome.ResponderPartyId);
-            return;
+            return false;
         }
 
         var initiatorOffer = BuildAcceptedOffer(
@@ -246,7 +475,10 @@ internal class PlayerPartyInteractionOutcomeHandler
         ApplyOffer(responderParty, initiatorParty, responderOffer);
 
         if (outcome.InitiatorOfferedPeace && outcome.ResponderOfferedPeace)
+        {
             ApplyPeace(initiatorParty, responderParty);
+        }
+        return true;
     }
 
     private static void ApplyPeace(PartyBase initiatorParty, PartyBase responderParty)
@@ -459,9 +691,9 @@ internal class PlayerPartyInteractionOutcomeHandler
         return result;
     }
 
-    private Dictionary<string, TroopRequest> BuildTroopRequests(TroopRosterElementData[] offeredTroops)
+    private Dictionary<uint, TroopRequest> BuildTroopRequests(TroopRosterElementData[] offeredTroops)
     {
-        var result = new Dictionary<string, TroopRequest>();
+        var result = new Dictionary<uint, TroopRequest>();
         if (offeredTroops == null) return result;
 
         foreach (var offeredTroop in offeredTroops)

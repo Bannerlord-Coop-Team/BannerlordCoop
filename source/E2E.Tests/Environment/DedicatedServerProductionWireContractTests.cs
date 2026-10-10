@@ -1,19 +1,8 @@
-﻿using Common.Messaging;
-using Common.PacketHandlers;
+﻿using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Common.Network;
 using Coop.Core.Common.Network.Packets;
 using Coop.Core.Server.Connections.Messages;
-using GameInterface.Services.Alleys;
-using GameInterface.Services.CampaignService.Data;
-using GameInterface.Services.Caravans;
-using GameInterface.Services.Heroes;
-using GameInterface.Services.Inventory;
-using GameInterface.Services.Inventory.TradeSkills;
-using GameInterface.Services.MobileParties;
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Smithing;
-using GameInterface.Services.Workshops;
 using LiteNetLib;
 using ProtoBuf;
 
@@ -37,6 +26,7 @@ public sealed class DedicatedServerProductionWireContractTests
             5,
             new byte[] { 1, 2, 3 },
             "campaign-a",
+            null!,
             null!,
             null!,
             null!,

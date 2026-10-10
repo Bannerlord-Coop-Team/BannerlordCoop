@@ -154,10 +154,26 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
 
     public override void OnEndMissionInternal()
     {
-        DisposeMissionHandlers();
-        OnLeaving();
-        base.OnEndMission();
-        Dispose();
+        try
+        {
+            DisposeMissionHandlers();
+            OnLeaving();
+            base.OnEndMission();
+        }
+        finally
+        {
+            // Detach and clear on every exit path, because the registry outlives the mission and a throw in a
+            // step above would otherwise keep wrappers around destroyed native agents reachable from the
+            // campaign map. Detach first: the services that register agents are torn down in Dispose.
+            try
+            {
+                Dispose();
+            }
+            finally
+            {
+                coopMissionComponent.AgentRegistry.Clear();
+            }
+        }
     }
 
     protected void DisposeMissionHandlers()

@@ -37,7 +37,7 @@ internal sealed class MapEventContributionBarrier : IMapEventContributionBarrier
     {
         if (mapEvent == null || coalescer == null) return;
 
-        var flushedIds = new HashSet<string>();
+        var flushedIds = new HashSet<uint>();
         FlushSide(mapEvent.AttackerSide, flushedIds);
         FlushSide(mapEvent.DefenderSide, flushedIds);
     }
@@ -45,20 +45,20 @@ internal sealed class MapEventContributionBarrier : IMapEventContributionBarrier
     public void Flush(MapEventParty mapEventParty)
     {
         if (mapEventParty == null || coalescer == null) return;
-        if (!objectManager.TryGetId(mapEventParty, out var partyId)) return;
+        if (!objectManager.TryGetHandle(mapEventParty, out var partyId)) return;
 
         coalescer.FlushInstance(partyId, network);
     }
 
     private void FlushSide(
         MapEventSide side,
-        HashSet<string> flushedIds)
+        HashSet<uint> flushedIds)
     {
         if (side == null) return;
 
         foreach (MapEventParty party in side.Parties)
         {
-            if (!objectManager.TryGetId(party, out var partyId) || !flushedIds.Add(partyId))
+            if (!objectManager.TryGetHandle(party, out var partyId) || !flushedIds.Add(partyId))
                 continue;
 
             coalescer.FlushInstance(partyId, network);

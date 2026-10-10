@@ -23,7 +23,6 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace Coop.Core.Server.Services.SiegeEvents.Handlers;
 
@@ -117,9 +116,10 @@ internal class ServerSiegeEntryHandler : IHandler
 
         if (alreadyEntered)
         {
-            network.Send(peer, new NetworkPartyEnterSettlement(
-                Compact(request.SettlementId, typeof(Settlement)),
-                Compact(request.PartyId, typeof(MobileParty))));
+            if (!objectManager.TryGetHandleWithLogging(settlement, out var settlementHandle) ||
+                !objectManager.TryGetHandleWithLogging(party, out var partyHandle))
+                return false;
+            network.Send(peer, new NetworkPartyEnterSettlement(settlementHandle, partyHandle));
         }
         else
         {
@@ -497,12 +497,12 @@ internal class ServerSiegeEntryHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.PartyId, out var party)) return;
 
-            if (party.MapEvent?.IsSiegeAssault == true &&
-                party.Party.Side == BattleSideEnum.Attacker)
+            if ((party.MapEvent?.IsSiegeAssault == true && party.Party.Side == BattleSideEnum.Attacker) ||
+                (party.MapEvent?.IsSallyOut == true && party.Party.Side == BattleSideEnum.Defender))
             {
                 messageBroker.Publish(
                     party,
-                    new PlayerLeaveBattleAttempted(party.Party, obj.FinishLocalMenus));
+                    new PlayerLeaveBattleAttempted(party.Party, obj.FinishLocalMenus, breakSiege: true));
                 network.Send(peer, new NetworkBreakSiegeApproved(
                     SiegeBreakOutcome.Applied,
                     obj.FinishLocalMenus,

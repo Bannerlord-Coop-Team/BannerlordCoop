@@ -8,8 +8,9 @@ namespace Missions.Messages;
 /// message). Battle host election uses it to promote a successor when the departed controller was the host, or
 /// to drop the controller from the successor line otherwise.
 /// <para>
-/// <see cref="WasRetreat"/> means the player's party withdraws and the battle reserve must forget it for a
-/// clean re-spawn on rejoin. Both a graceful retreat and a campaign-server disconnect use that behavior.
+/// <see cref="WasRetreat"/> means the departure withdraws the player's fielded party and the battle reserve
+/// must forget it for a clean re-spawn on rejoin. It describes mission-membership cleanup, not whether the
+/// player should be excluded from the eventual map-event outcome.
 /// </para>
 /// </summary>
 public readonly struct MissionMemberDeparted : IEvent

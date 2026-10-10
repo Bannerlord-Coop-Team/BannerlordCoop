@@ -5,6 +5,7 @@ using Common.Logging;
 using Common.Network.Session;
 using GameInterface;
 using GameInterface.Services.Locations;
+using GameInterface.Services.Hideouts;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Time.UI;
@@ -15,7 +16,11 @@ using Missions.Agents.Patches;
 using Missions.Agents.Voice;
 using Missions.Battles;
 using Missions.Data;
+#if DEBUG
+using Missions.Diagnostics;
+#endif
 using Missions.Locations;
+using Missions.Hideouts;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Patches;
 using Missions.Services.Network;
@@ -42,10 +47,19 @@ public class MissionModule : Module
     internal const string AgentVoicePatchCategory = "CoopAgentVoicePatches";
     internal const string WeaponDropPatchCategory = "CoopWeaponDropPatches";
     internal const string WeaponPickupPatchCategory = "CoopWeaponPickupPatches";
+    internal const string PilotSeatPatchCategory = "CoopPilotSeatPatches";
+    internal const string HideoutPatchCategory = "CoopHideoutPatches";
 
     protected override void Load(ContainerBuilder builder)
     {
+#if DEBUG
+        builder.RegisterType<SiegeInteractionDebugBehavior>().AsSelf()
+            .As<ISiegeInteractionDebugBehavior>().InstancePerDependency();
+        builder.RegisterType<AgentHitSoundFixtureHandler>().As<IAgentHitSoundFixtureHandler>()
+            .InstancePerLifetimeScope().AutoActivate();
+#endif
         builder.RegisterType<ReceivePathDiagnostics>().As<IReceivePathDiagnostics>().InstancePerDependency();
+        builder.RegisterType<SiegeGateHitApplier>().As<ISiegeGateHitApplier>().InstancePerDependency();
         base.Load(builder);
 
         foreach (HarmonyPatchCategoryRegistration registration in CreatePatchCategoryRegistrations())
@@ -191,6 +205,10 @@ public class MissionModule : Module
             .As<ICoopFieldBattleLauncher>()
             .InstancePerLifetimeScope();
 
+        builder.RegisterType<CoopHideoutMissionLauncher>()
+            .As<ICoopHideoutMissionLauncher>()
+            .InstancePerLifetimeScope();
+
         // Builds the coop walls-assault siege mission (mirrors SandBoxMissions.OpenSiegeMissionWithDeployment
         // with the same coop swaps). Resolved by the GameInterface battle flow as ICoopSiegeBattleLauncher.
         builder.RegisterType<CoopSiegeBattleLauncher>()
@@ -296,6 +314,11 @@ public class MissionModule : Module
 
     internal static IEnumerable<HarmonyPatchCategoryRegistration> CreatePatchCategoryRegistrations()
     {
+#if DEBUG
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(SiegeInteractionDebugBehavior).Assembly, "CoopSiegeInteractionDebug");
+#endif
+        yield return new HarmonyPatchCategoryRegistration(typeof(HideoutDepletionPatch).Assembly, HideoutPatchCategory);
         yield return new HarmonyPatchCategoryRegistration(
             typeof(AddMissileAuxPatch).Assembly,
             MissilePatchCategory);
@@ -314,5 +337,8 @@ public class MissionModule : Module
         yield return new HarmonyPatchCategoryRegistration(
             typeof(AgentPickupPatch).Assembly,
             WeaponPickupPatchCategory);
+        yield return new HarmonyPatchCategoryRegistration(
+            typeof(ReplicatedPilotPointPatch).Assembly,
+            PilotSeatPatchCategory);
     }
 }

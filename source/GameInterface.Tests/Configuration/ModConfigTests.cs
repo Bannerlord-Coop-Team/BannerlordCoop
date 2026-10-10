@@ -47,7 +47,7 @@ public class ModConfigTests : IDisposable
         Assert.True(File.Exists(ConfigPath), "first load should create mod-config.json");
         Assert.Equal(File.ReadAllText(ShippedTemplatePath), File.ReadAllText(ConfigPath));
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
-        Assert.False(config.Difficulty.BirthAndDeath);
+        Assert.True(config.Difficulty.BirthAndDeath);
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public class ModConfigTests : IDisposable
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PersuasionSuccessChance);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.ClanMemberDeathChance);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.BattleDeath);
-        Assert.False(config.Difficulty.BirthAndDeath);
+        Assert.True(config.Difficulty.BirthAndDeath);
         Assert.False(config.Difficulty.AutoAllocateClanMemberPerks);
         Assert.Equal(1000, config.ModOptions.BattleSize);
         Assert.True(config.UnknownKeys == null || config.UnknownKeys.Count == 0);
@@ -156,7 +156,7 @@ public class ModConfigTests : IDisposable
         _ = NewModConfig().Data;
 
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
-        Assert.False(config.Difficulty.BirthAndDeath);
+        Assert.True(config.Difficulty.BirthAndDeath);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
         Assert.True(config.ModOptions.ClientsCanUseCheats);
@@ -176,7 +176,7 @@ public class ModConfigTests : IDisposable
         _ = NewModConfig().Data;
 
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.BattleDeath);
-        Assert.False(config.Difficulty.BirthAndDeath);
+        Assert.True(config.Difficulty.BirthAndDeath);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
         Assert.True(config.ModOptions.ClientsCanUseCheats);
@@ -290,12 +290,14 @@ public class ModConfigTests : IDisposable
         Assert.True(options.FastForwardEnabled);
         Assert.True(options.AutoPauseEnabled);
         Assert.False(options.ClientsCanUseCheats);
-        Assert.True(options.GoldFoodInfluenceChangeInSettlements);
-        Assert.Equal(GoldFoodChangeMode.OneDayMax, options.GoldFoodInfluenceChangeInBattles);
+        Assert.False(options.GoldFoodInfluenceChangeInSettlements);
+        Assert.Equal(GoldFoodChangeMode.Disabled, options.GoldFoodInfluenceChangeInBattles);
         Assert.False(options.GoldFoodInfluenceChangeForDisconnectedPlayers);
-        Assert.Equal(24, options.PlayerBattleAiJoinWindowHours);
+        Assert.Equal(6, options.PlayerBattleAiJoinWindowHours);
         Assert.True(options.SpeedLimitWhilePlayersInBattle);
+        Assert.True(options.EnsureUnaffiliatedWanderers);
         Assert.Equal(32, options.WandererLimit);
+        Assert.Equal(1, options.SpawnRateWanderers);
         Assert.False(options.WandererLimitScalesWithPlayers);
         Assert.Equal(4, options.PlayerKingdomClanTierRequired);
         Assert.True(options.SmithingStaminaRecoveryOutsideSettlements);
@@ -303,6 +305,9 @@ public class ModConfigTests : IDisposable
         Assert.Equal(1f, options.MaximumLootersMultiplier);
         Assert.Equal(LordDefectionRetryMode.Vanilla, options.LordDefectionRetries);
         Assert.True(options.ShowPlayerNameplates);
+        Assert.True(options.CoopClansEnabled);
+        Assert.False(options.EnableHeroExecutions);
+        Assert.False(options.BlockAiWarDeclarationsOnOfflinePlayers);
     }
 
     /// <summary>
@@ -325,6 +330,7 @@ public class ModConfigTests : IDisposable
         // Read back a value rather than only the overflow: an unparsed block would leave every
         // property null, which the defaults comparison below would accept as a vacuous pass.
         Assert.Equal(1f, config.ModOptions.MaximumLootersMultiplier);
+        Assert.True(config.ModOptions.CoopClansEnabled);
         Assert.Equal(ModConfigProvider.ModOptions, new ModOptions(config.ModOptions));
     }
 
@@ -362,6 +368,26 @@ public class ModConfigTests : IDisposable
 
         Assert.Null(config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
+    }
+
+    [Theory]
+    [InlineData("true", true)]
+    [InlineData("false", false)]
+    [InlineData("\"yes\"", false)]
+    [InlineData("1", true)]
+    public void BlockAiWarDeclarationsOnOfflinePlayers_ReadsTheKey_AndSkipsOnlyABadValue(string value, bool expected)
+    {
+        File.WriteAllText(ConfigPath, @"{
+  ""modOptions"": {
+    ""blockAiWarDeclarationsOnOfflinePlayers"": " + value + @",
+    ""wandererLimit"": 40
+  }
+}");
+
+        var options = new ModOptions(NewModConfig().Data.ModOptions);
+
+        Assert.Equal(expected, options.BlockAiWarDeclarationsOnOfflinePlayers);
+        Assert.Equal(40, options.WandererLimit);
     }
 
     [Fact]

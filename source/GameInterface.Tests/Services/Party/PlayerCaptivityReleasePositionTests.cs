@@ -12,6 +12,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.Villages.Interfaces;
 using GameInterface.Surrogates;
 using HarmonyLib;
 using Moq;
@@ -35,6 +36,7 @@ public class PlayerCaptivityReleasePositionTests
     private readonly Mock<IObjectManager> objectManager = new();
     private readonly Mock<INetwork> network = new();
     private readonly Mock<ITroopRosterInterface> troopRosterInterface = new();
+    private readonly Mock<IVillageHostileActionInterface> villageHostileActionInterface = new();
     private readonly PartyDoneLogicHandler handler;
 
     public PlayerCaptivityReleasePositionTests()
@@ -44,7 +46,8 @@ public class PlayerCaptivityReleasePositionTests
             messageBroker.Object,
             objectManager.Object,
             network.Object,
-            troopRosterInterface.Object);
+            troopRosterInterface.Object,
+            villageHostileActionInterface.Object);
     }
 
     [Fact]
@@ -56,11 +59,11 @@ public class PlayerCaptivityReleasePositionTests
         var releasePosition = Position(72.5f, 18.25f);
         var leftPrisonerDelta = new TroopRosterData(new[]
         {
-            new TroopRosterElementData("player-character", -1, 0, 0),
+            new TroopRosterElementData(1, -1, 0, 0),
         });
         var rightPrisonerDelta = EmptyRosterData();
 
-        SetupObject("player-character", playerCharacter);
+        SetupObject(1, playerCharacter);
         MarkPlayerHero(playerHero, "player-hero");
         try
         {
@@ -95,10 +98,10 @@ public class PlayerCaptivityReleasePositionTests
         var releasePosition = Position(10f, 11f);
         var leftPrisonerDelta = new TroopRosterData(new[]
         {
-            new TroopRosterElementData("non-player-character", -1, 0, 0),
+            new TroopRosterElementData(2, -1, 0, 0),
         });
 
-        SetupObject("non-player-character", nonPlayerCharacter);
+        SetupObject(2, nonPlayerCharacter);
 
         var releaseEvents = handler.CreatePlayerCaptivityReleaseEvents(
             leftPrisonerDelta,
@@ -110,7 +113,7 @@ public class PlayerCaptivityReleasePositionTests
 
         Assert.Empty(releaseEvents);
         var keptElement = Assert.Single(filteredLeftPrisonerDelta.Data);
-        Assert.Equal("non-player-character", keptElement.CharacterId);
+        Assert.Equal(2u, keptElement.CharacterId);
         Assert.Equal(-1, keptElement.Number);
     }
 
@@ -123,14 +126,14 @@ public class PlayerCaptivityReleasePositionTests
         var releasePosition = Position(1f, 2f);
         var leftPrisonerDelta = new TroopRosterData(new[]
         {
-            new TroopRosterElementData("player-character", -1, 0, 0),
+            new TroopRosterElementData(1, -1, 0, 0),
         });
         var rightPrisonerDelta = new TroopRosterData(new[]
         {
-            new TroopRosterElementData("player-character", 1, 0, 0),
+            new TroopRosterElementData(1, 1, 0, 0),
         });
 
-        SetupObject("player-character", playerCharacter);
+        SetupObject(1, playerCharacter);
         MarkPlayerHero(playerHero, "player-hero");
         try
         {
@@ -161,14 +164,14 @@ public class PlayerCaptivityReleasePositionTests
         var releasePosition = Position(3f, 4f);
         var leftPrisonerDelta = new TroopRosterData(new[]
         {
-            new TroopRosterElementData("player-character", 1, 0, 0),
+            new TroopRosterElementData(1, 1, 0, 0),
         });
         var rightPrisonerDelta = new TroopRosterData(new[]
         {
-            new TroopRosterElementData("player-character", -1, 0, 0),
+            new TroopRosterElementData(1, -1, 0, 0),
         });
 
-        SetupObject("player-character", playerCharacter);
+        SetupObject(1, playerCharacter);
         MarkPlayerHero(playerHero, "player-hero");
         try
         {
@@ -202,14 +205,14 @@ public class PlayerCaptivityReleasePositionTests
         var releasePosition = Position(5f, 6f);
         var leftPrisonerDelta = new TroopRosterData(new[]
         {
-            new TroopRosterElementData("player-character", 1, 0, 0),
+            new TroopRosterElementData(1, 1, 0, 0),
         });
         var rightPrisonerDelta = new TroopRosterData(new[]
         {
-            new TroopRosterElementData("player-character", -1, 0, 0),
+            new TroopRosterElementData(1, -1, 0, 0),
         });
 
-        SetupObject("player-character", playerCharacter);
+        SetupObject(1, playerCharacter);
         MarkPlayerHero(playerHero, "player-hero");
         try
         {
@@ -278,6 +281,11 @@ public class PlayerCaptivityReleasePositionTests
     private void SetupObject<T>(string id, T obj)
     {
         objectManager.Setup(o => o.TryGetObjectWithLogging<T>(id, out obj)).Returns(true);
+    }
+
+    private void SetupObject<T>(uint handle, T obj)
+    {
+        objectManager.Setup(o => o.TryGetObjectWithLogging<T>(handle, out obj)).Returns(true);
     }
 
     private void MarkPlayerHero(Hero hero, string heroId)

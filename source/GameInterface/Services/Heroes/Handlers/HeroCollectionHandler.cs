@@ -5,7 +5,6 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -65,8 +64,8 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            if (!TryGetId(data.Instance, out string HeroId)) return;
-            if (!TryGetId(data.Value, out string ChildId)) return;
+            if (!TryGetHandle(data.Instance, out uint HeroId)) return;
+            if (!TryGetHandle(data.Value, out uint ChildId)) return;
 
             network.SendAll(new NetworkUpdateChildrenList(HeroId, ChildId));
         }
@@ -98,8 +97,8 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            if (!TryGetId(data.Instance, out string HeroId)) return;
-            if (!TryGetId(data.Value, out string CaravanId)) return;
+            if (!TryGetHandle(data.Instance, out uint HeroId)) return;
+            if (!TryGetHandle(data.Value, out uint CaravanId)) return;
 
             network.SendAll(new NetworkUpdateCaravanList(HeroId, CaravanId));
         }
@@ -131,8 +130,8 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            if (!TryGetId(data.Instance, out string HeroId)) return;
-            if (!TryGetId(data.Value, out string CaravanId)) return;
+            if (!TryGetHandle(data.Instance, out uint HeroId)) return;
+            if (!TryGetHandle(data.Value, out uint CaravanId)) return;
 
             network.SendAll(new NetworkRemoveCaravanList(HeroId, CaravanId));
         }
@@ -164,8 +163,8 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            if (!TryGetId(data.Instance, out string HeroId)) return;
-            if (!TryGetId(data.Value, out string WorkshopId)) return;
+            if (!TryGetHandle(data.Instance, out uint HeroId)) return;
+            if (!TryGetHandle(data.Value, out uint WorkshopId)) return;
 
             network.SendAll(new NetworkUpdateWorkshopList(HeroId, WorkshopId));
         }
@@ -200,8 +199,8 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            if (!TryGetId(data.Instance, out string HeroId)) return;
-            if (!TryGetId(data.Value, out string WorkshopId)) return;
+            if (!TryGetHandle(data.Instance, out uint HeroId)) return;
+            if (!TryGetHandle(data.Value, out uint WorkshopId)) return;
 
             network.SendAll(new NetworkRemoveWorkshopList(HeroId, WorkshopId));
         }
@@ -229,14 +228,14 @@ namespace GameInterface.Services.Heroes.Handlers
             });
         }
 
-        private bool TryGetId<T>(T value, out string id)
+        private bool TryGetHandle<T>(T value, out uint handle)
         {
-            id = null;
+            handle = 0;
             if (value == null) return false;
 
-            if (!objectManager.TryGetId(value, out id))
+            if (!objectManager.TryGetHandle(value, out handle))
             {
-                Logger.Error("Unable to get ID for instance of type {type}", value.GetType());
+                Logger.Error("Unable to get handle for instance of type {type}", value.GetType());
                 return false;
             }
             return true;

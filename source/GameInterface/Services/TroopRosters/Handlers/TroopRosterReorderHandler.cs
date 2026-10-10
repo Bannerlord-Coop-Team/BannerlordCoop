@@ -10,7 +10,6 @@ using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
-using static GameInterface.Services.ObjectManager.ObjectManager;
 
 namespace GameInterface.Services.TroopRosters.Handlers;
 
@@ -55,17 +54,24 @@ internal class TroopRosterReorderHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetIdWithLogging(data.TroopRoster, out var troopRosterId)) return;
+            if (!objectManager.TryGetHandleWithLogging(data.TroopRoster, out var troopRosterId)) return;
 
             if (data.OrderData == null) return;
 
             // Apply on the server
             ApplyReorder(data.OrderData.IndexCharacterIds, data.TroopRoster);
 
-            var compactId = Compact(troopRosterId, typeof(TroopRoster));
-            sendCoalescer?.FlushInstance(compactId, network);
+            sendCoalescer?.FlushInstance(troopRosterId, network);
 
-            var message = new NetworkApplyTroopRosterOrder(troopRosterId, data.OrderData);
+            var characterHandles = new Dictionary<int, uint>();
+            foreach (var entry in data.OrderData.IndexCharacterIds)
+            {
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(entry.Value, out var character) ||
+                    !objectManager.TryGetHandleWithLogging(character, out var characterHandle)) return;
+                characterHandles[entry.Key] = characterHandle;
+            }
+
+            var message = new NetworkApplyTroopRosterOrder(troopRosterId, characterHandles);
             network.SendAll(message);
         });
     }
@@ -81,12 +87,23 @@ internal class TroopRosterReorderHandler : IHandler
             // Apply on clients
             using (new AllowedThread())
             {
-                ApplyReorder(data.OrderData.IndexCharacterIds, troopRoster);
+                ApplyReorder(data.IndexCharacterIds, troopRoster);
             }
         });
     }
 
     private void ApplyReorder(Dictionary<int, string> indexCharacterIds, TroopRoster troopRoster)
+    {
+        foreach (var orderData in indexCharacterIds)
+        {
+            if (!objectManager.TryGetObjectWithLogging<CharacterObject>(orderData.Value, out var character)) return;
+
+            var characterIndex = troopRoster.FindIndexOfTroop(character);
+            troopRoster.SwapTroopsAtIndices(characterIndex, orderData.Key);
+        }
+    }
+
+    private void ApplyReorder(Dictionary<int, uint> indexCharacterIds, TroopRoster troopRoster)
     {
         foreach (var orderData in indexCharacterIds)
         {

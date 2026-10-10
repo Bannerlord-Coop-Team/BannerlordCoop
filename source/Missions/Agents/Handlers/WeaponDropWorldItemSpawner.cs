@@ -8,7 +8,9 @@ namespace Missions.Agents.Handlers;
 /// <summary>Creates and removes canonical dropped-weapon entities for network reconciliation.</summary>
 public interface IWeaponDropWorldItemSpawner
 {
+    bool IsReady { get; }
     bool IsPresent(SpawnedItemEntity item);
+    bool IsRemoved(SpawnedItemEntity item);
     bool TryGetState(
         SpawnedItemEntity item,
         out MatrixFrame frame,
@@ -26,6 +28,11 @@ public interface IWeaponDropWorldItemSpawner
 /// <inheritdoc cref="IWeaponDropWorldItemSpawner"/>
 public sealed class WeaponDropWorldItemSpawner : IWeaponDropWorldItemSpawner
 {
+    public bool IsReady =>
+        Mission.Current != null &&
+        Mission.Current.CurrentState == Mission.State.Continuing &&
+        Mission.Current.Scene != null;
+
     public bool IsPresent(SpawnedItemEntity item) =>
         item != null &&
         !item.IsRemoved &&
@@ -33,6 +40,9 @@ public sealed class WeaponDropWorldItemSpawner : IWeaponDropWorldItemSpawner
         (!item.IsDeactivated ||
          (item.WeaponCopy.Item != null &&
           item.WeaponCopy.Item.ItemFlags.HasAnyFlag(ItemFlags.CannotBePickedUp)));
+
+    public bool IsRemoved(SpawnedItemEntity item) =>
+        item != null && item.IsRemoved;
 
     public bool TryGetState(
         SpawnedItemEntity item,
@@ -63,7 +73,7 @@ public sealed class WeaponDropWorldItemSpawner : IWeaponDropWorldItemSpawner
         out SpawnedItemEntity item)
     {
         item = null;
-        if (Mission.Current == null || weapon.IsEmpty) return false;
+        if (!IsReady || weapon.IsEmpty) return false;
 
         GameEntity entity = Mission.Current.SpawnWeaponWithNewEntityAux(
             weapon,

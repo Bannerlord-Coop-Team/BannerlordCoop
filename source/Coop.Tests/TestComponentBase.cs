@@ -1,8 +1,10 @@
-﻿using Autofac;
+﻿using GameInterface.Services.UI.PlayerList;
+using Autofac;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
 using Common.Tests.Utils;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Kingdoms;
 using Coop.Core.Server.Services.MobileParties;
 using Coop.Tests.Mocks;
@@ -13,14 +15,17 @@ using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Chat;
+using GameInterface.Services.Voice;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Interfaces;
+using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Interfaces;
@@ -31,6 +36,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Save.Interfaces;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Time.Interfaces;
 using GameInterface.Services.TroopRosters.Interfaces;
@@ -91,18 +97,23 @@ internal abstract class TestComponentBase
 
         builder.RegisterType<ObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
+        RegisterMock<IPartyBehaviorWireMapper>(builder);
         builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomCreationSettlementTracker>().As<IKingdomCreationSettlementTracker>().InstancePerLifetimeScope();
         builder.RegisterType<KingdomDecisionDataConverter>().As<IKingdomDecisionDataConverter>().InstancePerLifetimeScope();
 
         RegisterMock<ILogger>(builder);
         RegisterMock<IGameInterface>(builder);
-        RegisterMock<IModConfig>(builder);
+        var modConfig = new Mock<IModConfig>();
+        modConfig.SetupGet(config => config.Data).Returns(new ModConfigData());
+        builder.RegisterInstance(modConfig).AsSelf().SingleInstance();
+        builder.RegisterInstance(modConfig.Object).As<IModConfig>().SingleInstance();
         RegisterMock<IAutoSyncPatchCollector>(builder);
         RegisterMock<IHeroInterface>(builder);
         RegisterMock<IModuleInfoProvider>(builder);
         RegisterMock<IRegistryManager>(builder);
         RegisterMock<IMapEventLoadCleaner>(builder);
+        RegisterMock<IHideoutResultEncounter>(builder);
         RegisterPlayerManagerMock(builder);
         RegisterMock<IPlayerPartyRestorer>(builder);
         RegisterMock<IPlayerCreationRollback>(builder);
@@ -119,23 +130,31 @@ internal abstract class TestComponentBase
         RegisterMock<IGameStateInterface>(builder);
         RegisterMock<ISettlementInterface>(builder);
         RegisterMock<ISiegeEventInterface>(builder);
+        RegisterMock<ISiegeBreakOut>(builder);
         RegisterMock<IAttachmentIdMapper>(builder);
         RegisterMock<IAutoRegistryFactory>(builder);
         RegisterMock<IBattleTroopReserveBuilder>(builder);
         RegisterMock<IMapEventInitializationBarrier>(builder);
         RegisterMock<IConnectedPlayerCountService>(builder);
         RegisterMock<IChatService>(builder);
+        RegisterMock<IPlayerListService>(builder);
+        RegisterMock<IPlayerActivityReader>(builder);
+        RegisterMock<IPlatformDisplayNameProvider>(builder);
+        RegisterMock<IVoiceClient>(builder);
         RegisterMock<IChatPlayerNameResolver>(builder);
         // BattleHostHandler (MissionModule, auto-activated) needs the registry and the troop ledger,
         // which the real containers get from GameInterfaceModule — not loaded here.
         RegisterMock<IBattleHostRegistry>(builder);
         RegisterMock<IBattleTroopLedger>(builder);
+        RegisterMock<IRetreatedMapEventPartyTracker>(builder);
         // LocationHostHandler (MissionModule, auto-activated) needs its registry the same way.
         RegisterMock<ILocationHostRegistry>(builder);
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
+        RegisterMock<IIssueOwnershipRegistry>(builder);
         RegisterMock<IServerOptionsProvider>(builder);
+        RegisterMock<ISteamBanList>(builder);
         RegisterMock<ISaveNotificationInterface>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the

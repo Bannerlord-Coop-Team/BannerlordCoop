@@ -3,6 +3,8 @@ using Common;
 using Common.Logging;
 using GameInterface.Configuration;
 using GameInterface.Services.Heroes.Audit;
+using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Utils.Commands;
@@ -14,6 +16,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -39,7 +42,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">Optional case-insensitive hero name prefix</param>
     /// <returns>Strings of the matching heroes</returns>
-
     public sealed class HeroListCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -433,13 +435,181 @@ public class HeroDebugCommand
         }
     }
 
+    public sealed class HeroSetAgeCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.hero";
+
+        public string Name => "set_age";
+
+        public string Description => "Sets the age of heroes matching a display name or registered id on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("hero_name_or_id", "The exact hero display name or registered id. Quote multi-word values."),
+            new ExpectedArgs("age", "The age in years."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.set_age")) return Failed(error);
+
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            {
+                return Failed($"Unable to get {nameof(IObjectManager)}");
+            }
+
+            if (float.TryParse(args[1], out float age) == false)
+            {
+                return Failed($"{args[1]} is not a valid float");
+            }
+
+            string heroNameOrId = args[0];
+            var heroes = Campaign.Current.CampaignObjectManager.GetAllHeroes()
+                .Where(h => h.Name?.ToString() == heroNameOrId)
+                .ToList();
+
+            if (heroes.Count == 0)
+            {
+                if (objectManager.TryGetObject<Hero>(heroNameOrId, out var hero))
+                {
+                    heroes.Add(hero);
+                }
+                else
+                {
+                    return Failed($"Unable to find hero with id or name: {heroNameOrId}");
+                }
+            }
+
+            foreach (var hero in heroes)
+            {
+                var ageInTicks = (long)(CampaignTime.TimeTicksPerYear * age);
+                hero.SetBirthDay(new CampaignTime(CampaignTime.CurrentTicks - ageInTicks));
+            }
+
+            return Succeeded($"Set age to {age} for {heroes.Count} hero(es) matching '{heroNameOrId}'");
+        }
+    }
+
+    public sealed class HeroKillPlayerCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.hero";
+
+        public string Name => "kill_player";
+
+        public string Description => "Kills a living registered player hero on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("hero_id", "The registered player hero id."),
+            new ExpectedArgs("death_detail", "One of old_age, battle, or execution."),
+            new ExpectedArgs("killer_hero_id", "The optional registered killer hero id.", false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.kill_player")) return Failed(error);
+
+            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+                return Failed("Unable to resolve ObjectManager.");
+            if (!objectManager.TryGetObject(args[0], out Hero hero))
+                return Failed($"Hero with id {args[0]} not found.");
+            if (!hero.IsPlayerHero() || !hero.IsAlive)
+                return Failed("The hero must be a living registered player.");
+
+            KillCharacterAction.KillCharacterActionDetail detail;
+            switch (args[1].ToLowerInvariant())
+            {
+                case "old_age":
+                    detail = KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge;
+                    break;
+                case "battle":
+                    detail = KillCharacterAction.KillCharacterActionDetail.DiedInBattle;
+                    break;
+                case "execution":
+                    detail = KillCharacterAction.KillCharacterActionDetail.Executed;
+                    break;
+                default:
+                    return Failed($"Unknown death detail: {args[1]}. Expected old_age, battle, or execution.");
+            }
+
+            Hero killer = null;
+            if (args.Count == 3 && !objectManager.TryGetObject(args[2], out killer))
+                return Failed($"Hero with id {args[2]} not found.");
+            if (detail == KillCharacterAction.KillCharacterActionDetail.Executed && killer == null)
+                return Failed("Execution requires a killer hero id, use coop.debug.hero.list to find one.");
+
+            hero.AddDeathMark(killer, detail);
+            KillCharacterAction.ApplyByDeathMarkForced(hero, true);
+            return Succeeded($"Player {hero.Name} was killed with detail {detail}.");
+        }
+    }
+
+    public sealed class HeroIllDaysCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.hero";
+
+        public string Name => "ill_days";
+
+        public string Description => "Reports the local player's illness duration on clients or matching heroes on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("hero_name", "The exact hero display name required on the server. Quote multi-word values.", false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+            {
+                if (Campaign.Current.MainHeroIllDays == -1)
+                {
+                    return Succeeded($"{Hero.MainHero.Name} is not ill.");
+                }
+
+                return Succeeded($"{Hero.MainHero.Name} has been ill for {Campaign.Current.MainHeroIllDays} day(s).");
+            }
+
+            if (args.Count == 0)
+            {
+                return Failed("A hero name is required when running this command on the server.");
+            }
+
+            if (!ContainerProvider.TryResolve<IAgingCampaignBehaviorInterface>(out var agingBehaviorInterface))
+                return Failed("Unable to resolve behavior interface.");
+
+            string heroName = args[0];
+
+            var heroes = Campaign.Current.CampaignObjectManager.GetAllHeroes()
+                .Where(h => h.Name?.ToString() == heroName)
+                .ToList();
+
+            if (heroes.Count == 0)
+            {
+                return Failed($"Unable to find hero with name: {heroName}");
+            }
+
+            StringBuilder stringBuilder = new StringBuilder();
+            foreach (var hero in heroes)
+            {
+                stringBuilder.AppendLine($"{hero.StringId}: {agingBehaviorInterface.GetPlayerIllDays(hero)}");
+            }
+
+            return Succeeded(stringBuilder.ToString());
+        }
+    }
+
     // coop.debug.hero.set_hitpoints
     /// <summary>
     /// Sets the hitpoints of a hero
     /// </summary>
     /// <param name="args">heroId and hitPoints value to set </param>
     /// <returns>information if it changed</returns>
-
     public sealed class HeroSetHitpointsCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -489,7 +659,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">heroId and BannerItem value to set </param>
     /// <returns>information if it changed</returns>
-
     public sealed class HeroSetBannerItemCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -539,7 +708,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">none are used</param>
     /// <returns>returns all banneritems </returns>
-
     public sealed class HeroListBannerItemsCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -570,7 +738,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">HeroId</param>
     /// <returns>returns banneritem info from hero </returns>
-
     public sealed class HeroGetBannerItemCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -607,7 +774,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">none are used</param>
     /// <returns>returns all issues available </returns>
-
     public sealed class HeroIssuesCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -645,7 +811,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">heroId and issue value to set </param>
     /// <returns>information if it changed</returns>
-
     public sealed class HeroSetIssueCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -697,7 +862,6 @@ public class HeroDebugCommand
     /// </summary>
     /// <param name="args">HeroId</param>
     /// <returns>returns Issue info from hero </returns>
-
     public sealed class HeroGetIssueCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -732,7 +896,6 @@ public class HeroDebugCommand
     /// <summary>
     /// View available volunteers for a target hero
     /// </summary>
-
     public sealed class HeroVolunteersCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";
@@ -780,7 +943,6 @@ public class HeroDebugCommand
     /// <summary>
     /// Runs the authoritative volunteer refresh for one settlement.
     /// </summary>
-
     public sealed class HeroRefreshVolunteersCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.hero";

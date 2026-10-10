@@ -10,7 +10,7 @@ namespace GameInterface.Services.UI.Donate;
 internal static class CommunityLinks
 {
     private const string DiscordUrl = "https://discord.gg/ngC4RVb";
-    private const string PatreonUrl = "https://www.patreon.com/c/bannerlordcoop/membership";
+    private const string PatreonUrl = "https://www.patreon.com/16338430/join";
 
     public static void OpenDiscord() => Open(DiscordUrl);
 

@@ -1,10 +1,10 @@
 ﻿Subscribe<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
 {
-    var valueIds = new List<string>();
+    var valueIds = new List<uint>();
     for (int i = 0; i < data.Value.Count; i++)
     {
         if (data.Value[i] == null) continue;
-        if (!objectManager.TryGetId(data.Value[i], out string id)) continue;
+        if (!objectManager.TryGetHandle(data.Value[i], out uint id)) continue;
         valueIds.Add(id);
     }
     network.SendAll(new {{ MemberDeclaringTypeName}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueIds));
@@ -32,7 +32,7 @@ SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_S
 
 Subscribe<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_AddLocalMessage>((instanceId, data) => 
 {
-    if (!objectManager.TryGetId(data.Value, out string id)) return;
+    if (!objectManager.TryGetHandle(data.Value, out uint id)) return;
     network.SendAll(new {{ MemberDeclaringTypeName}}_{{ MemberName }}_AddNetworkMessage(instanceId, id));
 });
 SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_AddNetworkMessage>((instance, data) => 
@@ -42,7 +42,7 @@ SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_
 });
 Subscribe<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveLocalMessage>((instanceId, data) => 
 {
-    if (!objectManager.TryGetId(data.Value, out string id)) return;
+    if (!objectManager.TryGetHandle(data.Value, out uint id)) return;
     network.SendAll(new {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveNetworkMessage(instanceId, id));
 });
 SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringTypeName}}_{{ MemberName }}_RemoveNetworkMessage>((instance, data) => 

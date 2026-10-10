@@ -1,13 +1,10 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.UI.CoopOptions.Providers.UITab;
 using GameInterface.Configuration;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.UI.CoopOptions.Providers;
-using GameInterface.Services.UI.CoopOptions.Providers.BugReportTab;
-using GameInterface.Services.UI.CoopOptions.Providers.ChatTab;
-using GameInterface.Services.UI.CoopOptions.Providers.KillFeedTab;
-using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab;
 using GameInterface.Services.UI.CoopOptions.Providers.NetworkTab;
-using GameInterface.Services.UI.CoopOptions.Providers.PlayerNameplatesTab;
+using GameInterface.Services.UI.CoopOptions.Providers.VoiceTab;
 using GameInterface.Services.UI.Donate;
 using System;
 using System.Collections.Generic;
@@ -25,6 +22,7 @@ public class CoopOptionsVM : ViewModel
 
     private ModOptions modOptions;
     private CoopOptionsTabVM selectedTab;
+    private bool finalized;
 
     public string MovieTextHeader => "Coop Options";
     public string ApplyButtonText => "Apply";
@@ -78,27 +76,18 @@ public class CoopOptionsVM : ViewModel
     public bool IsApplyButtonVisible => SelectedTab?.CanApply == true;
 
     [DataSourceProperty]
-    public CoopOptionsTabVM KillFeedTab { get; set; }
-
-    [DataSourceProperty]
-    public CoopOptionsTabVM MapTimeTab { get; set; }
-
-    [DataSourceProperty]
-    public CoopOptionsTabVM BugReportTab { get; set; }
-
-    [DataSourceProperty]
-    public CoopOptionsTabVM ChatTab { get; set; }
-
-    [DataSourceProperty]
-    public CoopOptionsTabVM PlayerNameplatesTab { get; set; }
-
-    [DataSourceProperty]
     public CoopOptionsTabVM NetworkTab { get; set; }
+
+    [DataSourceProperty]
+    public CoopOptionsTabVM UITab { get; set; }
+
+    [DataSourceProperty]
+    public CoopOptionsTabVM VoiceTab { get; set; }
 
     public void ActionApply()
     {
         var tab = SelectedTab;
-        if (tab == null) return;
+        if (tab?.CanApply != true) return;
 
         string message = "Coop options successfully updated.";
 
@@ -133,6 +122,8 @@ public class CoopOptionsVM : ViewModel
 
     public override void OnFinalize()
     {
+        if (finalized) return;
+        finalized = true;
         messageBroker.Unsubscribe<ModConfigApplied>(HandleModConfigApplied);
         foreach (var tab in Tabs)
             tab.OnFinalize();
@@ -170,6 +161,9 @@ public class CoopOptionsVM : ViewModel
             SetTabReference(tab.Id, tab);
         }
 
+        if (UITab?.Sections.FirstOrDefault() is UISection uiSection)
+            uiSection.NameplatesAvailable = modOptions.ShowPlayerNameplates;
+
         if (SelectedTab == null && Tabs.Count > 0)
             SelectTab(Tabs[0]);
     }
@@ -189,30 +183,15 @@ public class CoopOptionsVM : ViewModel
 
     private void SetTabReference(string tabId, CoopOptionsTabVM tab)
     {
-        if (tabId == KillFeedOptionsTabProvider.TabId)
+        if (tabId == UIOptionsTabProvider.TabId)
         {
-            KillFeedTab = tab;
-            OnPropertyChanged(nameof(KillFeedTab));
+            UITab = tab;
+            OnPropertyChanged(nameof(UITab));
         }
-        else if (tabId == MapTimeOptionsTabProvider.TabId)
+        else if (tabId == VoiceOptionsTabProvider.TabId)
         {
-            MapTimeTab = tab;
-            OnPropertyChanged(nameof(MapTimeTab));
-        }
-        else if (tabId == BugReportOptionsTabProvider.TabId)
-        {
-            BugReportTab = tab;
-            OnPropertyChanged(nameof(BugReportTab));
-        }
-        else if (tabId == ChatOptionsTabProvider.TabId)
-        {
-            ChatTab = tab;
-            OnPropertyChanged(nameof(ChatTab));
-        }
-        else if (tabId == PlayerNameplatesOptionsTabProvider.TabId)
-        {
-            PlayerNameplatesTab = tab;
-            OnPropertyChanged(nameof(PlayerNameplatesTab));
+            VoiceTab = tab;
+            OnPropertyChanged(nameof(VoiceTab));
         }
         else if (tabId == NetworkOptionsTabProvider.TabId)
         {

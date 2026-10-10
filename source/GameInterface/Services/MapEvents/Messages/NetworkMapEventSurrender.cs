@@ -16,10 +16,13 @@ public readonly struct NetworkMapEventSurrender : ICommand
     public readonly string MapEventId;
     [ProtoMember(2)]
     public readonly BattleSideEnum Side;
+    [ProtoMember(3)]
+    public readonly int HostEpoch;
 
-    public NetworkMapEventSurrender(string mapEventId, BattleSideEnum side)
+    public NetworkMapEventSurrender(string mapEventId, BattleSideEnum side, int hostEpoch = 0)
     {
         MapEventId = mapEventId;
         Side = side;
+        HostEpoch = hostEpoch;
     }
 }

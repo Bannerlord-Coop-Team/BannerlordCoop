@@ -30,6 +30,11 @@ internal class PartyVisibilityOnServerPatch
     [HarmonyPrefix]
     internal static void PrefixIsVisible(MobileParty __instance, ref bool value)
     {
+#if DEBUG
+        // Restore the exact captured fixture state through the native visibility setter.
+        if (global::GameInterface.Services.SiegeEvents.Commands.DefenderSiegeFixtureCommands.IsRestoringCapturedVisibility(__instance))
+            return;
+#endif
         if (ModInformation.IsServer || DebugPartyVisibility.ForceAllVisible)
         {
             value = __instance.IsActive;

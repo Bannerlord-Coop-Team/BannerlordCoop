@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Commands;
 using System;
 using System.Collections;

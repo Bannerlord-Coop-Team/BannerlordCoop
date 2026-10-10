@@ -8,9 +8,12 @@ internal class NetworkCreateHideout : ICommand
 {
     [ProtoMember(1)]
     public string HideoutId { get; }
+    [ProtoMember(2)]
+    public uint Handle { get; }
 
-    public NetworkCreateHideout(string hideoutId)
+    public NetworkCreateHideout(string hideoutId, uint handle)
     {
         HideoutId = hideoutId;
+        Handle = handle;
     }
 }

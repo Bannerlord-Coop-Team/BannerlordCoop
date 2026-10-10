@@ -23,13 +23,21 @@ internal readonly struct NetworkStartAttackMission : ICommand
     [ProtoMember(5)]
     public readonly MissionInitializerRecord MissionInitializer;
 
+    [ProtoMember(6)]
+    public readonly bool IsHideout;
+
+    [ProtoMember(7)]
+    public readonly bool IsDirectAssault;
+
     public NetworkStartAttackMission(string mapEventId, MissionInitializerRecord missionInitializer,
-        string initiatingPartyId)
+        string initiatingPartyId, bool isHideout = false, bool isDirectAssault = false)
     {
         MapEventId = mapEventId;
         RandomTerrainSeed = missionInitializer.RandomTerrainSeed;
         AtmosphereOnCampaign = missionInitializer.AtmosphereOnCampaign;
         InitiatingPartyId = initiatingPartyId;
         MissionInitializer = missionInitializer;
+        IsHideout = isHideout;
+        IsDirectAssault = isDirectAssault;
     }
 }

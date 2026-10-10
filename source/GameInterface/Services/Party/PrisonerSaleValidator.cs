@@ -28,6 +28,15 @@ internal class PrisonerSaleValidator : IPrisonerSaleValidator
             var requestedHealthy = Math.Max(requested.Number - requestedWounded, 0);
             var availableWounded = Math.Min(Math.Max(available.WoundedNumber, 0), Math.Max(available.Number, 0));
             var availableHealthy = Math.Max(available.Number - availableWounded, 0);
+            var validatedIndex = validatedRoster.FindIndexOfTroop(requested.Character);
+            if (validatedIndex >= 0)
+            {
+                // Earlier entries may have already used part of this character's available stack.
+                var alreadyValidated = validatedRoster.GetElementCopyAtIndex(validatedIndex);
+                availableWounded -= alreadyValidated.WoundedNumber;
+                availableHealthy -= alreadyValidated.Number - alreadyValidated.WoundedNumber;
+            }
+
             var woundedToSell = Math.Min(requestedWounded, availableWounded);
             var healthyToSell = Math.Min(requestedHealthy, availableHealthy);
             var totalToSell = healthyToSell + woundedToSell;
@@ -40,7 +49,7 @@ internal class PrisonerSaleValidator : IPrisonerSaleValidator
                 totalToSell,
                 false,
                 woundedToSell,
-                preserveTroopXp ? available.Xp : 0,
+                preserveTroopXp && validatedIndex < 0 ? available.Xp : 0,
                 true);
         }
 

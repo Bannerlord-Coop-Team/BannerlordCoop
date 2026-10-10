@@ -8,10 +8,7 @@ namespace GameInterface.Services.Smithing.Interfaces;
 
 public interface ISmithingVMsProvider : IGameAbstraction
 {
-    void SetCurrentSmeltingVM(SmeltingVM smeltingVM);
-    void SetCurrentRefinementVM(RefinementVM refinementVM);
     void SetCurrentCraftingVM(CraftingVM craftingVM);
-    void SetCurrentWeaponDesignVM(WeaponDesignVM weaponDesignVM);
 
     SmeltingVM GetCurrentSmeltingVM();
     RefinementVM GetCurrentRefinementVM();
@@ -23,39 +20,21 @@ public interface ISmithingVMsProvider : IGameAbstraction
 
 public class SmithingVMsProvider : ISmithingVMsProvider
 {
-    private SmeltingVM currentSmeltingVM = null;
-    private RefinementVM currentRefinementVM = null;
     private CraftingVM currentCraftingVM = null;
-    private WeaponDesignVM currentWeaponDesignVM = null;
-
-    public void SetCurrentSmeltingVM(SmeltingVM smeltingVM)
-    {
-        currentSmeltingVM = smeltingVM;
-    }
-
-    public void SetCurrentRefinementVM(RefinementVM refinementVM)
-    {
-        currentRefinementVM = refinementVM;
-    }
 
     public void SetCurrentCraftingVM(CraftingVM craftingVM)
     {
         currentCraftingVM = craftingVM;
     }
 
-    public void SetCurrentWeaponDesignVM(WeaponDesignVM weaponDesignVM)
-    {
-        currentWeaponDesignVM = weaponDesignVM;
-    }
-
     public SmeltingVM GetCurrentSmeltingVM()
     {
-        return currentSmeltingVM;
+        return currentCraftingVM?.Smelting;
     }
 
     public RefinementVM GetCurrentRefinementVM()
     {
-        return currentRefinementVM;
+        return currentCraftingVM?.Refinement;
     }
 
     public CraftingVM GetCurrentCraftingVM()
@@ -65,13 +44,11 @@ public class SmithingVMsProvider : ISmithingVMsProvider
 
     public WeaponDesignVM GetCurrentWeaponDesignVM()
     {
-        return currentWeaponDesignVM;
+        return currentCraftingVM?.WeaponDesign;
     }
 
     public CraftingOrder GetActiveCraftingOrder()
     {
-        if (currentWeaponDesignVM == null) return null;
-
-        return currentWeaponDesignVM.ActiveCraftingOrder?.CraftingOrder;
+        return currentCraftingVM?.WeaponDesign?.ActiveCraftingOrder?.CraftingOrder;
     }
 }

@@ -36,9 +36,11 @@ public class ConnectionContext
         ISendCoalescer coalescer,
         IAttachmentIdMapper attachmentIdMapper,
         IExistingPlayerSender existingPlayerSender,
+        ISteamBanList steamBanList,
         IServerOptionsProvider serverOptionsProvider,
         IJoinCampaignBaselineSender joinCampaignBaselineSender,
-        IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender)
+        IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender,
+        IJoinValidationDenialLog joinValidationDenialLog)
     {
         MessageBroker = messageBroker;
         Network = network;
@@ -55,9 +57,11 @@ public class ConnectionContext
         Coalescer = coalescer;
         AttachmentIdMapper = attachmentIdMapper;
         ExistingPlayerSender = existingPlayerSender;
+        SteamBanList = steamBanList;
         ServerOptionsProvider = serverOptionsProvider;
         JoinCampaignBaselineSender = joinCampaignBaselineSender;
         JoinCampaignKingdomBaseLineSender = joinCampaignKingdomBaseLineSender;
+        JoinValidationDenialLog = joinValidationDenialLog;
     }
 
     public IMessageBroker MessageBroker { get; }
@@ -75,7 +79,9 @@ public class ConnectionContext
     public ISendCoalescer Coalescer { get; }
     public IAttachmentIdMapper AttachmentIdMapper { get; }
     public IExistingPlayerSender ExistingPlayerSender { get; }
+    public ISteamBanList SteamBanList { get; }
     public IServerOptionsProvider ServerOptionsProvider { get; }
     public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
     public IJoinCampaignKingdomBaseLineSender JoinCampaignKingdomBaseLineSender { get; }
+    public IJoinValidationDenialLog JoinValidationDenialLog { get; }
 }

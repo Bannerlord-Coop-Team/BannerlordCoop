@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Services.Alleys.Interfaces;
 using GameInterface.Services.Alleys.Messages;
+using GameInterface.Services.Clans;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
 using System.Collections.Generic;
@@ -60,6 +61,7 @@ internal class AlleyManagementPatches
     private static bool AbandonAlleyFromClanMenuPrefix(Alley alley)
     {
         if (ModInformation.IsServer) return true;
+        if (!CoopClanPermissions.CanManageClan(alley.Owner?.Clan)) return false;
 
         MessageBroker.Instance.Publish(alley, new AbandonAlleyRequested(alley, fromClanScreen: true));
         return false;

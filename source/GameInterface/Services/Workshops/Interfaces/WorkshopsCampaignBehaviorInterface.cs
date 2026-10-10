@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -24,6 +25,7 @@ public interface IWorkshopsCampaignBehaviorInterface : IGameAbstraction
     void RunTownWorkshop(Town townComponent, Workshop workshop);
 
     bool TickOneProductionCycleForPlayerWorkshop(Production production, Workshop workshop, bool effectCapital);
+    void TransferPlayerWorkshopsIfNeeded(WorkshopsCampaignBehavior behavior);
 }
 
 internal class WorkshopsCampaignBehaviorInterface : IWorkshopsCampaignBehaviorInterface
@@ -51,6 +53,16 @@ internal class WorkshopsCampaignBehaviorInterface : IWorkshopsCampaignBehaviorIn
     public bool TickOneProductionCycleForPlayerWorkshop(Production production, Workshop workshop, bool effectCapital)
     {
         return TickOneProductionCycleForPlayerWorkshopInternal(production, workshop, effectCapital);
+    }
+
+    public void TransferPlayerWorkshopsIfNeeded(WorkshopsCampaignBehavior behavior)
+    {
+        foreach (var player in playerManager.Players)
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var playerHero)) continue;
+
+            TransferPlayerWorkshopsIfNeededInternal(behavior, playerHero);
+        }
     }
 
     private void RunTownWorkshopInternal(Town townComponent, Workshop workshop)
@@ -263,6 +275,25 @@ internal class WorkshopsCampaignBehaviorInterface : IWorkshopsCampaignBehaviorIn
     private bool IsWarehouseAtLimit(Hero owner, Settlement settlement)
     {
         return GetWarehouseItemRosterWeight(owner, settlement) >= (float)Campaign.Current.Models.WorkshopModel.WarehouseCapacity;
+    }
+
+    private void TransferPlayerWorkshopsIfNeededInternal(WorkshopsCampaignBehavior behavior, Hero playerHero)
+    {
+        int count = playerHero.OwnedWorkshops.Count;
+        List<Workshop> list = playerHero.OwnedWorkshops.ToList<Workshop>();
+        for (int i = 0; i < count; i++)
+        {
+            Workshop workshop = list[i];
+            if (workshop.Settlement.MapFaction.IsAtWarWith(playerHero.MapFaction))
+            {
+                Hero notableOwnerForWorkshop = Campaign.Current.Models.WorkshopModel.GetNotableOwnerForWorkshop(workshop);
+                if (notableOwnerForWorkshop != null)
+                {
+                    WorkshopType workshopType = behavior.DecideBestWorkshopType(workshop.Settlement, false, workshop.WorkshopType);
+                    ChangeOwnerOfWorkshopAction.ApplyByWar(workshop, notableOwnerForWorkshop, workshopType);
+                }
+            }
+        }
     }
 
     private WorkshopsCampaignBehavior GetWorkshopsBehavior()

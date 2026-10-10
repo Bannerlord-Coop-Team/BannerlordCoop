@@ -1,4 +1,5 @@
-﻿using SandBox.View.Map.Managers;
+﻿using GameInterface.Services.CampaignService.Handlers;
+using SandBox.View.Map.Managers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -12,6 +13,10 @@ public static class PartyVisualsExtensions
 
         if (Campaign.Current == null) return;
         if (MobilePartyVisualManager.Current == null) return;
+
+        // Block party visual changes causing access violations
+        // while client is on the game over screen before disconnecting
+        if (GameOverState.IsGameOver) return;
 
         MobilePartyVisualManager.Current.AddNewPartyVisualForParty(partyBase);
     }

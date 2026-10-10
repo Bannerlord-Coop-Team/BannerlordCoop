@@ -1,4 +1,5 @@
 ﻿using Common.Util;
+using GameInterface.Services.Villages;
 using HarmonyLib;
 using Helpers;
 using System.Collections.Generic;
@@ -29,5 +30,21 @@ internal class InventoryScreenHelperPatches
     static void Finalizer()
     {
         AllowedThread.RevokeThisThread();
+    }
+}
+
+[HarmonyPatch(typeof(InventoryScreenHelper), nameof(InventoryScreenHelper.CloseScreen))]
+internal class InventoryForceTransferClosePatches
+{
+    [HarmonyPrefix]
+    public static void CloseScreenPrefix(bool fromCancel)
+    {
+        // Cancel runs Reset(true) then DoneLogic, and the Done prefix would
+        // otherwise claim the force attribution as a zero-take commit. Drop
+        // the attribution first so the cancel preserves the pool and stops
+        // gating unrelated party screens. Done closes keep the slot so the
+        // Done prefix can claim it.
+        if (fromCancel)
+            ForceTransferScreenTracker.Clear();
     }
 }

@@ -1,0 +1,169 @@
+<Prefab>
+  <Constants>
+    <Constant Name="Encyclopedia.Canvas.Width" BrushLayer="Default" BrushName="Encyclopedia.Canvas" BrushValueType="Width" />
+    <Constant Name="Encyclopedia.Canvas.Height" BrushLayer="Default" BrushName="Encyclopedia.Canvas" BrushValueType="Height" />
+    <Constant Name="Encyclopedia.Width" Value="!Encyclopedia.Canvas.Width" Additive="-35"/>
+    <Constant Name="Encyclopedia.Height" Value="!Encyclopedia.Canvas.Height" Additive="-202"/>
+  </Constants>
+  <Window>
+    <BrushWidget DoNotAcceptEvents="true" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Brush="Encyclopedia.Page.SoundBrush">
+      <Children>
+        <Widget DoNotAcceptEvents="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="!Encyclopedia.Width" SuggestedHeight="!Encyclopedia.Height" HorizontalAlignment="Center" VerticalAlignment="Center" MarginTop="156" >
+          <Children>
+            <ListPanel DoNotAcceptEvents="true" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent">
+              <Children>
+                <ScrollbarWidget Id="LeftSideScrollbar" WidthSizePolicy="Fixed" HeightSizePolicy="StretchToParent" SuggestedWidth="0" HorizontalAlignment="Left" VerticalAlignment="Center" MarginLeft="0" AlignmentAxis="Vertical" Handle="LeftSideScrollbarHandle" MaxValue="100" MinValue="0">
+                  <Children>
+                    <Widget Id="LeftSideScrollbarHandle" WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="50" HorizontalAlignment="Center" />
+                  </Children>
+                </ScrollbarWidget>
+                <ScrollablePanel Id="LeftSideScrollablePanel" WidthSizePolicy="Fixed" HeightSizePolicy="StretchToParent" SuggestedWidth="370" HorizontalAlignment="Center" VerticalAlignment="Center" AutoHideScrollBars="true" ClipRect="LeftSideRect" InnerPanel="LeftSideRect\LeftSideList" MouseScrollAxis="Vertical" VerticalScrollbar="..\LeftSideScrollbar">
+                  <Children>
+                    <!--Vertical Divider-->
+                    <Widget WidthSizePolicy="Fixed" HeightSizePolicy="StretchToParent" SuggestedWidth="2" HorizontalAlignment="Right" Sprite="Encyclopedia\divider_vertical" />
+                    <!--Right Side Character Owner, Notables, Villages-->
+                    <Widget Id="LeftSideRect" DoNotAcceptEvents="true" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" MarginBottom="10" ClipContents="true">
+                      <Children>
+                        <ListPanel Id="LeftSideList" DoNotAcceptEvents="true" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="10">
+                          <Children>
+                            <!--Left Side Character Properties-->
+                            <Widget Id="ActionButtons" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren">
+                              <Children>
+                                <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom">
+                                  <Children>
+                                    <!--Settlement Name-->
+                                    <RichTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="5" MarginLeft="55" MarginRight="55" Brush="Encyclopedia.SubPage.Title.Text" Brush.TextHorizontalAlignment="Center" Brush.TextVerticalAlignment="Top" Text="@SettlementName" />
+                                    <NavigationScopeTargeter ScopeID="EncyclopediaSettlementPropertiesScope" ScopeParent="..\Properties" ScopeMovements="Vertical" AlternateScopeMovements="Horizontal" AlternateMovementStepSize="4" />
+                                    <EncyclopediaSettlementPageStats Id="Properties" />
+                                    <ListPanel WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom">
+                                      <Children>
+                                        <!--Culture Text-->
+                                        <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" HorizontalAlignment="Left" MarginLeft="42" MarginRight="42" Brush="Encyclopedia.SubPage.History.Text" Text="@CultureText" />
+                                        <!--Bound Settlement Text-->
+                                        <RichTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" HorizontalAlignment="Left" MarginLeft="42" MarginRight="42" IsVisible="@HasBoundSettlement" Brush="Encyclopedia.SubPage.History.Text" Command.LinkClick="ExecuteBoundSettlementLink" Text="@BoundSettlementText"/>
+                                      </Children>
+                                    </ListPanel>
+                                    <BrushWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="280" SuggestedHeight="506" HorizontalAlignment="Center" MarginRight="4" Brush="Encyclopedia.SubPage.Settlement.Image" Sprite="@SettlementImageID"/>
+                                  </Children>
+                                </ListPanel>
+                                <!--Bookmark Button-->
+                                <NavigationScopeTargeter ScopeID="EncyclopediaSettlementBookmarkButtonScope" ScopeParent="..\BookmarkButton" />
+                                <ButtonWidget Id="BookmarkButton" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="50" SuggestedHeight="50" HorizontalAlignment="Left" VerticalAlignment="Top" PositionXOffset="5" Brush="Encyclopedia.Bookmark.Button" Command.Click="ExecuteSwitchBookmarkedState" IsSelected="@IsBookmarked" GamepadNavigationIndex="0">
+                                  <Children>
+                                    <HintWidget DataSource="{BookmarkHint}" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" Command.HoverBegin="ExecuteBeginHint" Command.HoverEnd="ExecuteEndHint"/>
+                                  </Children>
+                                </ButtonWidget>
+                                <!--Tracker Button-->
+                                <Widget Id="ToggleIndicator" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="37" SuggestedHeight="37" HorizontalAlignment="Right" VerticalAlignment="Top" PositionXOffset="-10" PositionYOffset="10" Sprite="SPGeneral\Nameplates\tracked_ring" IsDisabled="true" IsVisible="@IsVisualTrackerSelected" />
+                                <NavigationScopeTargeter ScopeID="EncyclopediaSettlementTrackButtonScope" ScopeParent="..\TrackButton" />
+                                <ListPanel Id="TrackButton" WidthSizePolicy="Fixed" HeightSizePolicy="CoverChildren" SuggestedWidth="37" HorizontalAlignment="Right" VerticalAlignment="Top" StackLayout.LayoutMethod="VerticalTopToBottom" PositionXOffset="-10" PositionYOffset="10" >
+                                  <Children>
+                                    <ButtonWidget Id="EncyclopediaItemTrackButton" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="37" SuggestedHeight="37" Brush="Encyclopedia.Settlement.TrackButton" Command.Click="ExecuteTrack" GamepadNavigationIndex="1" />
+                                    <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" SuggestedHeight="20" MarginTop="7" VerticalAlignment="Bottom" Brush="Encyclopedia.TrackInfoText" Text="@TrackText" />
+                                  </Children>
+                                </ListPanel>
+                                <TutorialHighlightItemBrushWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="55" SuggestedHeight="55" HorizontalAlignment="Right" VerticalAlignment="Top" PositionXOffset="-2" PositionYOffset="1" Brush="TutorialHighlightBrush" IsEnabled="false" IsHighlightEnabled="@IsTrackerButtonHighlightEnabled" IsVisible="false" />
+                              </Children>
+                            </Widget>
+                          </Children>
+                        </ListPanel>
+                      </Children>
+                    </Widget>
+                  </Children>
+                </ScrollablePanel>
+                <ScrollablePanel Id="RightSideScrollablePanel" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" HorizontalAlignment="Center" VerticalAlignment="Center" AutoHideScrollBars="true" ClipRect="RightSideRect" InnerPanel="RightSideRect\RightSideList" MouseScrollAxis="Vertical" VerticalScrollbar="..\RightSideScrollbar">
+                  <Children>
+                    <!--Right Side Character Owner, Notables, Villages-->
+                    <Widget Id="RightSideRect" DoNotAcceptEvents="true" WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" ClipContents="true">
+                      <Children>
+                        <ListPanel Id="RightSideList" DoNotAcceptEvents="true" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginTop="10" MarginBottom="10" MarginLeft="10">
+                          <Children>
+                            <!--Owner, Notables, Villages-->
+                            <Widget DoNotAcceptEvents="true" WidthSizePolicy="Fixed" HeightSizePolicy="CoverChildren" SuggestedWidth="739">
+                              <Children>
+                                <ListPanel DoNotAcceptEvents="true" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" StackLayout.LayoutMethod="VerticalTopToBottom">
+                                  <Children>
+                                    <!--Settlement Info Text-->
+                                    <RichTextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="25" MarginRight="25" MarginTop="25" Brush="Encyclopedia.SubPage.Info.Text" Text="@InformationText" />
+                                    <!--Workshop Icons-->
+                                    <NavigationScopeTargeter ScopeID="EncyclopediaSettlementWorkshopsListScope" ScopeParent="..\WorkshopsList" ScopeMovements="Horizontal" />
+                                    <NavigatableListPanel Id="WorkshopsList" DataSource="{Workshops}" WidthSizePolicy="CoverChildren" HeightSizePolicy="CoverChildren" MarginLeft="20" MarginTop="10" StackLayout.LayoutMethod="HorizontalLeftToRight" IsVisible="@HasWorkshops">
+                                      <ItemTemplate>
+                                        <BrushWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="70" SuggestedHeight="50" MarginLeft="5" MarginRight="5" MarginTop="5" MarginBottom="5" Brush="Encyclopedia.SubPage.Element">
+                                          <Children>
+                                            <ShopVisualIconBrushWidget WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="35" SuggestedHeight="26" VerticalAlignment="Center" HorizontalAlignment="Center" Brush="TownManamgement.Shop.Icon.Brush" ShopId="@ShopId"/>
+                                            <HintWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Command.HoverBegin="ExecuteBeginHint" Command.HoverEnd="ExecuteEndHint" />
+                                          </Children>
+                                        </BrushWidget>
+                                      </ItemTemplate>
+                                    </NavigatableListPanel>
+                                    <!--Owner Divider-->
+                                    <EncyclopediaDivider Id="OwnerDivider" MarginTop="40" Parameter.Title="@OwnerText" Parameter.ItemList="..\OwnerList" GamepadNavigationIndex="0"/>
+                                    <!--Bound Town, Owner, Owner Banner-->
+                                    <NavigationScopeTargeter ScopeID="EncyclopediaSettlementOwnerListScope" ScopeParent="..\OwnerList"  ScopeMovements="Horizontal" />
+                                    <ListPanel Id="OwnerList" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="20" MarginTop="20">
+                                      <Children>
+                                        <EncyclopediaSubPageElement DataSource="{Owner}" SuggestedWidth="123" SuggestedHeight="89" MarginRight="45" GamepadNavigationIndex="0"/>
+                                        <!--Ownner Banner Image-->
+                                        <EncyclopediaClanSubPageElement DataSource="{OwnerBanner}" HorizontalAlignment="Center" MarginTop="1" GamepadNavigationIndex="1"/>
+                                      </Children>
+                                    </ListPanel>
+                                    <!--Notables Divider-->
+                                    <EncyclopediaDivider Id="NotablesDivider" MarginTop="60" Parameter.Title="@NotableCharactersText" Parameter.ItemList="..\NotablesGrid" GamepadNavigationIndex="0"/>
+                                    <!--Notables Grid-->
+                                    <NavigationScopeTargeter ScopeID="EncyclopediaSettlementNotablesGridScope" ScopeParent="..\NotablesGrid" ScopeMovements="Horizontal" AlternateScopeMovements="Vertical" AlternateMovementStepSize="7" />
+                                    <NavigatableGridWidget Id="NotablesGrid" DataSource="{NotableCharacters}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" SuggestedWidth="350" SuggestedHeight="350" HorizontalAlignment="Left" MarginTop="10" DefaultCellWidth="100" DefaultCellHeight="105" ColumnCount="7" MarginLeft="15">
+                                      <ItemTemplate>
+                                        <!--Notable-->
+                                        <EncyclopediaSubPageElement />
+                                      </ItemTemplate>
+                                    </NavigatableGridWidget>
+                                    <!--Settlements Divider-->
+                                    <EncyclopediaDivider Id="SettlementsDivider" MarginTop="30" Parameter.Title="@SettlementsText" Parameter.ItemList="..\SettlementsGrid" GamepadNavigationIndex="0"/>
+                                    <!--Settlements Grid-->
+                                    <NavigationScopeTargeter ScopeID="EncyclopediaSettlementSettlementsGridScope" ScopeParent="..\SettlementsGrid" ScopeMovements="Horizontal" AlternateScopeMovements="Vertical" AlternateMovementStepSize="7" />
+                                    <NavigatableGridWidget Id="SettlementsGrid" DataSource="{Settlements}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" SuggestedWidth="350" SuggestedHeight="350" HorizontalAlignment="Left" MarginTop="5" DefaultCellWidth="100" DefaultCellHeight="140" ColumnCount="7" MarginLeft="20" MarginBottom="50">
+                                      <ItemTemplate>
+                                        <ButtonWidget DoNotPassEventsToChildren="true" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="90" SuggestedHeight="90" Brush="Encyclopedia.SubPage.Element" Command.Click="ExecuteLink" UpdateChildrenStates="true">
+                                          <Children>
+                                            <DefaultLayerSpriteChangerBrushWidget Id="VillageImage" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="80" SuggestedHeight="80" HorizontalAlignment="Center" VerticalAlignment="Center" Brush="Encyclopedia.SubPage.Element.Settlement.ButtonBrush" SpriteBrush="Encyclopedia.SubPage.Element.Settlement.SpriteBrush" SpriteBrushLayerName="@FileName" />
+                                            <HintWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="StretchToParent" Command.HoverBegin="ExecuteBeginHint" Command.HoverEnd="ExecuteEndHint" />
+                                            <TextWidget WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" VerticalAlignment="Top" PositionYOffset="95" Brush="Encyclopedia.SubPage.Element.Name.Text" Brush.FontSize="18" Text="@NameText" />
+                                          </Children>
+                                        </ButtonWidget>
+                                      </ItemTemplate>
+                                    </NavigatableGridWidget>
+                                  </Children>
+                                </ListPanel>
+                              </Children>
+                            </Widget>
+                            <!--Event Log-->
+                            <ListPanel DataSource="{History}" WidthSizePolicy="StretchToParent" HeightSizePolicy="CoverChildren" MarginLeft="26" MarginRight="10" MarginTop="34" MarginBottom="55" StackLayout.LayoutMethod="VerticalTopToBottom">
+                              <ItemTemplate>
+                                <EncyclopediaSubPageHistoryElement/>
+                              </ItemTemplate>
+                            </ListPanel>
+                          </Children>
+                        </ListPanel>
+                      </Children>
+                    </Widget>
+                  </Children>
+                </ScrollablePanel>
+                <ScrollbarWidget Id="RightSideScrollbar" WidthSizePolicy="CoverChildren" HeightSizePolicy="StretchToParent" MarginRight="4" MarginBottom="54" MarginTop="15" AlignmentAxis="Vertical" HorizontalAlignment="Right" VerticalAlignment="Center" Handle="RightSideScrollbarHandle" MinValue="0" MaxValue="100">
+                  <Children>
+                    <BrushWidget WidthSizePolicy="Fixed" HeightSizePolicy="StretchToParent" SuggestedWidth="2" HorizontalAlignment="Center" Brush="Encyclopedia.Scrollbar.Flat.Bed" />
+                    <BrushWidget Id="RightSideScrollbarHandle" WidthSizePolicy="Fixed" HeightSizePolicy="Fixed" SuggestedWidth="8" SuggestedHeight="50" HorizontalAlignment="Center" Brush="Encyclopedia.Scrollbar.Flat.Handle"/>
+                  </Children>
+                </ScrollbarWidget>
+              </Children>
+            </ListPanel>
+            <!--Bottom Shadow-->
+            <BrushWidget DoNotAcceptEvents="true" WidthSizePolicy="StretchToParent" HeightSizePolicy="Fixed" SuggestedHeight="150" MarginRight="5" VerticalAlignment="Bottom" HorizontalAlignment="Center" Brush="Encyclopedia.Scroll.Shadow" Brush.VerticalFlip="false"/>
+            <!--Previous And Next Buttons-->
+            <EncyclopediaQuickNavigation/>
+          </Children>
+        </Widget>
+      </Children>
+    </BrushWidget>
+  </Window>
+</Prefab>

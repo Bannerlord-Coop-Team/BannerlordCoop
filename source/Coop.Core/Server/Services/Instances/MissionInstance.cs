@@ -1,4 +1,5 @@
 ﻿using LiteNetLib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -16,7 +17,7 @@ internal class MissionInstance
     public string Id { get; }
 
     /// <summary>
-    /// P2P socket endpoints presented via NAT-introduction requests.
+    /// P2P socket endpoints presented via NAT-introduction requests, keyed by controller and campaign connection.
     /// </summary>
     public List<Endpoints> PunchEndpoints { get; } = new List<Endpoints>();
 
@@ -30,16 +31,29 @@ internal class MissionInstance
     /// <summary>Controller ids currently routed through this instance (relay-fallback membership).</summary>
     public IReadOnlyCollection<string> Controllers => Memberships.Select(member => member.ControllerId).ToArray();
 
-    /// <summary>The internal (LAN) and external (WAN) endpoints a peer presents for NAT introduction.</summary>
+    /// <summary>The campaign connection and socket endpoints presented for NAT introduction.</summary>
     public readonly struct Endpoints
     {
+        public readonly string ControllerId;
+        public readonly NetPeer CampaignPeer;
         public readonly IPEndPoint Internal;
         public readonly IPEndPoint External;
 
-        public Endpoints(IPEndPoint @internal, IPEndPoint external)
+        /// <summary>When the punch arrived, so an endpoint that never joins the mission can expire.</summary>
+        public readonly DateTime PunchedUtc;
+
+        public Endpoints(
+            string controllerId,
+            NetPeer campaignPeer,
+            IPEndPoint @internal,
+            IPEndPoint external,
+            DateTime punchedUtc)
         {
+            ControllerId = controllerId;
+            CampaignPeer = campaignPeer;
             Internal = @internal;
             External = external;
+            PunchedUtc = punchedUtc;
         }
     }
 }
@@ -49,11 +63,17 @@ internal sealed class MissionMembership
     public string ControllerId { get; }
     public NetPeer Peer { get; set; }
     public MissionInstance Instance { get; }
+    public Guid PeerCredential { get; set; }
 
-    public MissionMembership(string controllerId, NetPeer peer, MissionInstance instance)
+    public MissionMembership(
+        string controllerId,
+        NetPeer peer,
+        MissionInstance instance,
+        Guid peerCredential)
     {
         ControllerId = controllerId;
         Peer = peer;
         Instance = instance;
+        PeerCredential = peerCredential;
     }
 }

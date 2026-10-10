@@ -1,4 +1,4 @@
-﻿using Common.Commands;
+using Common.Commands;
 using GameInterface.Services.LiveTesting;
 using Serilog;
 

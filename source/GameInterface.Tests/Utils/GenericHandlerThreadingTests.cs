@@ -58,7 +58,7 @@ public class GenericHandlerThreadingTests
 
         var instance = new TestInstance();
         var objectManager = new Mock<IObjectManager>();
-        objectManager.Setup(o => o.TryGetObjectWithLogging("inst-1", out instance)).Returns(true);
+        objectManager.Setup(o => o.TryGetObjectWithLogging(1u, out instance)).Returns(true);
 
         Action<MessagePayload<TestValueEvent>> subscriber = null;
         var messageBroker = new Mock<IMessageBroker>();
@@ -86,7 +86,7 @@ public class GenericHandlerThreadingTests
         // and the marshaling would be unobservable.
         Assert.NotEqual(publishThreadId, gameLoopThreadId);
 
-        subscriber(new MessagePayload<TestValueEvent>(this, new TestValueEvent("inst-1")));
+        subscriber(new MessagePayload<TestValueEvent>(this, new TestValueEvent(1)));
 
         Assert.True(applied.Wait(ApplyTimeout), "apply did not run on the game-loop thread within the timeout");
         Assert.Same(instance, appliedInstance);
@@ -101,8 +101,8 @@ public class GenericHandlerThreadingTests
         var instance = new TestInstance();
         var value = new TestReference();
         var objectManager = new Mock<IObjectManager>();
-        objectManager.Setup(o => o.TryGetObjectWithLogging("inst-1", out instance)).Returns(true);
-        objectManager.Setup(o => o.TryGetObjectWithLogging("val-1", out value)).Returns(true);
+        objectManager.Setup(o => o.TryGetObjectWithLogging(1u, out instance)).Returns(true);
+        objectManager.Setup(o => o.TryGetObjectWithLogging(2u, out value)).Returns(true);
 
         Action<MessagePayload<TestReferenceEvent>> subscriber = null;
         var messageBroker = new Mock<IMessageBroker>();
@@ -132,7 +132,7 @@ public class GenericHandlerThreadingTests
         // and the marshaling would be unobservable.
         Assert.NotEqual(publishThreadId, gameLoopThreadId);
 
-        subscriber(new MessagePayload<TestReferenceEvent>(this, new TestReferenceEvent("inst-1", "val-1")));
+        subscriber(new MessagePayload<TestReferenceEvent>(this, new TestReferenceEvent(1, 2)));
 
         Assert.True(applied.Wait(ApplyTimeout), "apply did not run on the game-loop thread within the timeout");
         Assert.Same(instance, appliedInstance);
@@ -146,17 +146,17 @@ public class GenericHandlerThreadingTests
 
     private record TestValueEvent : GenericNetworkEvent<TestInstance, int>
     {
-        public override string InstanceId { get; set; }
+        public override uint InstanceId { get; set; }
 
-        public TestValueEvent(string instanceId) : base(instanceId) { }
+        public TestValueEvent(uint instanceId) : base(instanceId) { }
     }
 
     private record TestReferenceEvent : GenericNetworkReferenceEvent<TestInstance, TestReference>
     {
-        public override string InstanceId { get; set; }
-        public override string ValueId { get; set; }
+        public override uint InstanceId { get; set; }
+        public override uint ValueId { get; set; }
 
-        public TestReferenceEvent(string instanceId, string valueId) : base(instanceId, valueId) { }
+        public TestReferenceEvent(uint instanceId, uint valueId) : base(instanceId, valueId) { }
     }
 
     private class TestHandler : GenericHandler<TestHandler, TestInstance>

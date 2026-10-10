@@ -55,6 +55,25 @@ public sealed class ScreenshotCaptureStateTests
     }
 
     [Fact]
+    public void Advance_AcceptsStableSingleUseFileWhenFilesystemClockTrailsRequester()
+    {
+        var inspector = new StubInspector(true, PassingEvidence());
+        ScreenshotCaptureState capture = CreateCapture();
+        BmpScreenshotObservation observation = ValidObservation(100, RequestedUtc.AddSeconds(-1));
+
+        ScreenshotCaptureAdvanceResult first = capture.Advance(
+            RequestedUtc.AddSeconds(1), 20, observation, inspector);
+        ScreenshotCaptureAdvanceResult completed = capture.Advance(
+            RequestedUtc.AddSeconds(2), 21, observation, inspector);
+
+        Assert.Equal(ScreenshotCaptureStatus.Pending, first.Status);
+        Assert.False(first.Stable);
+        Assert.Equal(ScreenshotCaptureStatus.Complete, completed.Status);
+        Assert.True(completed.Stable);
+        Assert.Equal(1, inspector.StableInspectionCount);
+    }
+
+    [Fact]
     public void Advance_InspectionRaceRequiresTwoNewObservations()
     {
         var inspector = new StubInspector(false, null);

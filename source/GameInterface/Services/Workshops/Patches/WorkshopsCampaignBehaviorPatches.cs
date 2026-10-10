@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Workshops.Interfaces;
 using GameInterface.Services.Workshops.Messages;
 using HarmonyLib;
 using System;
@@ -96,6 +97,34 @@ internal class WorkshopsCampaignBehaviorPatches
     {
         var message = new TownWorkshopRun(townComponent, workshop);
         MessageBroker.Instance.Publish(__instance, message);
+
+        return false;
+    }
+
+    [HarmonyPatch(nameof(WorkshopsCampaignBehavior.HandleDailyExpense))]
+    [HarmonyPrefix]
+    public static bool HandleDailyExpensePrefix(WorkshopsCampaignBehavior __instance, Workshop shop)
+    {
+        if (!shop.WorkshopType.IsHidden)
+        {
+            if (!shop.Owner.IsPlayerHero())
+            {
+                __instance.HandleNotableWorkshopExpense(shop);
+                return false;
+            }
+            __instance.HandlePlayerWorkshopExpense(shop);
+        }
+
+        return false;
+    }
+
+    [HarmonyPatch(nameof(WorkshopsCampaignBehavior.TransferPlayerWorkshopsIfNeeded))]
+    [HarmonyPrefix]
+    public static bool TransferPlayerWorkshopsIfNeededPrefix(WorkshopsCampaignBehavior __instance)
+    {
+        if (!ContainerProvider.TryResolve<IWorkshopsCampaignBehaviorInterface>(out var workshopsCampaignBehaviorInterface)) return false;
+
+        workshopsCampaignBehaviorInterface.TransferPlayerWorkshopsIfNeeded(__instance);
 
         return false;
     }

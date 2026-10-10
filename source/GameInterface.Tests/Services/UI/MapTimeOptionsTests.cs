@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using GameInterface.Services.UI.CoopOptions.Providers.UITab;
+using Common.Messaging;
 using GameInterface.Services.UI.CoopOptions;
 using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab;
 using GameInterface.Services.UI.CoopOptions.Providers.MapTimeTab.Sections;
@@ -19,12 +20,12 @@ public class MapTimeOptionsTests
         try
         {
             var viewModel = CoopOptionsVMTestFactory.Create(new CoopOptionsStore(filePath), new MessageBroker());
-            var tab = viewModel.Tabs[1];
+            var tab = viewModel.UITab;
 
-            Assert.Equal(MapTimeOptionsTabProvider.TabName, tab.Name);
-            Assert.Equal(MapTimeOptionsTabProvider.TabId, tab.Id);
+            Assert.Equal("UI", tab.Name);
+            Assert.Equal(UIOptionsTabProvider.TabId, tab.Id);
             
-            var section = Assert.IsType<MapTimeSection>(Assert.Single(tab.Sections));
+            var section = Assert.IsType<UISection>(Assert.Single(tab.Sections)).MapTime;
             Assert.Equal(MapTimeSection.SectionId, section.Id);
             Assert.True(section.ShowMapTimeInMissions);
         }
@@ -46,8 +47,8 @@ public class MapTimeOptionsTests
         {
             var store = new CoopOptionsStore(filePath);
             var viewModel = CoopOptionsVMTestFactory.Create(store, new MessageBroker());
-            var tab = viewModel.Tabs[1];
-            var section = Assert.IsType<MapTimeSection>(Assert.Single(tab.Sections));
+            var tab = viewModel.UITab;
+            var section = Assert.IsType<UISection>(Assert.Single(tab.Sections)).MapTime;
 
             tab.ExecuteSelection();
             section.ShowMapTimeInMissions = false;

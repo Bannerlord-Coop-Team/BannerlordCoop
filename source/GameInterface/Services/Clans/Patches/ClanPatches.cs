@@ -2,8 +2,10 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
@@ -24,16 +26,6 @@ internal class ClanPatches
         {
             MessageBroker.Instance.Publish(__result, new SettlementRebelClanInitialized(__result));
         }
-    }
-
-    [HarmonyPatch(nameof(Clan.PlayerClan))]
-    [HarmonyPatch(MethodType.Getter)]
-    [HarmonyPrefix]
-    static bool PlayerClanGetter()
-    {
-        if (Campaign.Current == null) return false;
-        
-        return true;
     }
 
     // Patch for server to use passed down ClientHero instead of server's MainHero
@@ -91,5 +83,18 @@ internal class ClanPatches
 
         var message = new UpdateBannerColorsOfClan(__instance);
         MessageBroker.Instance.Publish(__instance, message);
+    }
+
+    [HarmonyPatch(nameof(Clan.GetHeirApparents))]
+    [HarmonyPostfix]
+    public static void GetHeirApparentsPostfix(Dictionary<Hero, int> __result)
+    {
+        foreach (var heirApparent in new List<Hero>(__result.Keys))
+        {
+            if (heirApparent.IsPlayerHero())
+            {
+                __result.Remove(heirApparent);
+            }
+        }
     }
 }

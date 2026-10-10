@@ -5,6 +5,9 @@ using Common.Network;
 using GameInterface.Services.Buildings.Messages;
 using GameInterface.Services.Buildings.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Settlements;
+using LiteNetLib;
 using Helpers;
 using Serilog;
 using System.Collections.Generic;
@@ -22,15 +25,18 @@ internal class BuildingHelperHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
 
     public BuildingHelperHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<DefaultBuildingChanged>(Handle_DefaultBuildingChanged);
         messageBroker.Subscribe<ChangeDefaultBuilding>(Handle_ChangeDefaultBuilding);
@@ -77,6 +83,7 @@ internal class BuildingHelperHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Building>(data.NewDefaultId, out var newDefault)) return;
             if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
+            if (!CanManageTown(obj.Who, town)) return;
 
             BuildingHelper.ChangeDefaultBuilding(newDefault, town);
         });
@@ -105,6 +112,7 @@ internal class BuildingHelperHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
+            if (!CanManageTown(obj.Who, town)) return;
 
             var buildings = new List<Building>();
             if (data.BuildingIds != null)
@@ -137,26 +145,40 @@ internal class BuildingHelperHandler : IHandler
 
     private void Handle_BoostBuildingProcessWithGold(MessagePayload<BoostBuildingProcessWithGold> obj)
     {
-        var data = obj.What;
-
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Town>(obj.What.TownId, out var town)) return;
+            if (!CanManageTown(obj.Who, town)) return;
 
-            int difference = 0;
-            if (data.Gold < town.BoostBuildingProcess)
-            {
-                difference = town.BoostBuildingProcess - data.Gold;
-                GiveGoldAction.ApplyBetweenCharacters(null, hero, difference, false);
-            }
-            else if (data.Gold > town.BoostBuildingProcess)
-            {
-                difference = data.Gold - town.BoostBuildingProcess;
-                GiveGoldAction.ApplyBetweenCharacters(hero, null, difference, false);
-            }
-            town.BoostBuildingProcess = data.Gold;
+            // Keep the town.BoostBuildingProcess field write in a named method so TownSync can register it
+            ApplyBoostBuildingProcessWithGold(obj.What);
         });
+    }
+
+    internal void ApplyBoostBuildingProcessWithGold(BoostBuildingProcessWithGold data)
+    {
+        if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
+        if (!objectManager.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
+
+        int difference = 0;
+        if (data.Gold < town.BoostBuildingProcess)
+        {
+            difference = town.BoostBuildingProcess - data.Gold;
+            GiveGoldAction.ApplyBetweenCharacters(null, hero, difference, false);
+        }
+        else if (data.Gold > town.BoostBuildingProcess)
+        {
+            difference = data.Gold - town.BoostBuildingProcess;
+            GiveGoldAction.ApplyBetweenCharacters(hero, null, difference, false);
+        }
+        town.BoostBuildingProcess = data.Gold;
+    }
+
+    private bool CanManageTown(object sender, Town town)
+    {
+        return sender is NetPeer peer && playerManager.TryGetPlayer(peer, out var player) &&
+            objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) &&
+            SettlementMenuAccess.CanUseSettlement(hero, town.Settlement);
     }
 
     private void Handle_RefreshPlayerSettlementManagementVM(MessagePayload<RefreshPlayerSettlementManagementVM> obj)

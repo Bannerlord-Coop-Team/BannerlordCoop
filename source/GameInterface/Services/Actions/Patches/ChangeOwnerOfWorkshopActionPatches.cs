@@ -6,7 +6,6 @@ using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -89,28 +88,21 @@ internal class ChangeOwnerOfWorkshopActionPatches
         }
     }
 
-    public static void ApplyInternalOverride(Workshop workshop, Hero newOwner, WorkshopType workshopType, int capital, int cost, Action onApplied = null)
+    public static void ApplyInternalOverride(Workshop workshop, Hero newOwner, WorkshopType workshopType, int capital, int cost)
     {
         GameThread.RunSafe(() =>
         {
-            try
+            Hero owner = workshop.Owner;
+            workshop.ChangeOwnerOfWorkshop(newOwner, workshopType, capital);
+            if (newOwner.IsPlayerHero())
             {
-                Hero owner = workshop.Owner;
-                workshop.ChangeOwnerOfWorkshop(newOwner, workshopType, capital);
-                if (newOwner.IsPlayerHero())
-                {
-                    GiveGoldAction.ApplyBetweenCharacters(newOwner, owner, cost, false);
-                }
-                if (owner.IsPlayerHero())
-                {
-                    GiveGoldAction.ApplyBetweenCharacters(null, owner, cost, false);
-                }
-                CampaignEventDispatcher.Instance.OnWorkshopOwnerChanged(workshop, owner);
+                GiveGoldAction.ApplyBetweenCharacters(newOwner, owner, cost, false);
             }
-            finally
+            if (owner.IsPlayerHero())
             {
-                onApplied?.Invoke();
+                GiveGoldAction.ApplyBetweenCharacters(null, owner, cost, false);
             }
+            CampaignEventDispatcher.Instance.OnWorkshopOwnerChanged(workshop, owner);
         });
     }
 }

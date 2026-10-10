@@ -11,9 +11,9 @@ namespace Coop.Core.Client.Services.MobileParties.Messages;
 internal record NetworkPartyLeaveSettlement : ICommand
 {
     [ProtoMember(1)]
-    public string PartyId { get; }
+    public uint PartyId { get; }
 
-    public NetworkPartyLeaveSettlement(string partyId)
+    public NetworkPartyLeaveSettlement(uint partyId)
     {
         PartyId = partyId;
     }

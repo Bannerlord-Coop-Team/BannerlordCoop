@@ -23,7 +23,7 @@ namespace GameInterface.Services.MapEvents.Commands;
 /// Battle fixture commands for deployment, scoreboard inspection, mission exit, and combat outcomes. Run the
 /// direct kill commands on the battle-authority client because it owns the AI/enemy
 /// agents, so each kill goes through the coop death path: <c>Agent.Die</c>, the mission death callback,
-/// the death broadcast, and the server-roster casualty, exactly like <c>coop.debug.mapevent.kms</c>.
+/// the death broadcast, and the server-roster casualty, exactly like <c>coop.debug.map_event.kms</c>.
 /// </summary>
 internal class BattleTeamKillCommands
 {

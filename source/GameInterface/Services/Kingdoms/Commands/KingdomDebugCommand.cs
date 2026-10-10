@@ -746,7 +746,7 @@ public class KingdomDebugCommand
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The player controller id."),
-            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("kingdom_id", "The registered kingdom id, or none to restore a kingdomless clan."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -789,7 +789,9 @@ public class KingdomDebugCommand
                 return Failed($"Clan not found for player {controllerId} with clan id: {player.ClanId}");
             }
 
-            if (!objectManager.TryGetObject(kingdomId, out Kingdom kingdom))
+            bool restoreKingdomlessState = string.Equals(kingdomId, "none", StringComparison.OrdinalIgnoreCase);
+            Kingdom kingdom = null;
+            if (!restoreKingdomlessState && !objectManager.TryGetObject(kingdomId, out kingdom))
             {
                 return Failed($"Kingdom not found with id: {kingdomId}");
             }
@@ -797,7 +799,9 @@ public class KingdomDebugCommand
             Kingdom previousKingdom = clan.Kingdom;
             if (previousKingdom == kingdom)
             {
-                return Succeeded($"Player {controllerId}'s clan {clan.StringId} is already in kingdom {kingdom.StringId}.");
+                return Succeeded(restoreKingdomlessState
+                    ? $"Player {controllerId}'s clan {clan.StringId} is already kingdomless."
+                    : $"Player {controllerId}'s clan {clan.StringId} is already in kingdom {kingdom.StringId}.");
             }
 
             // Server-authoritative apply: run with patches live (no AllowedThread) so membership
@@ -811,16 +815,18 @@ public class KingdomDebugCommand
             if (clan.Kingdom != kingdom)
             {
                 string currentKingdomId = clan.Kingdom?.StringId ?? "<none>";
-                return Succeeded($"Tried to force player {controllerId}'s clan {clan.StringId} to join {kingdom.StringId}, but current kingdom is {currentKingdomId}.");
+                return Failed($"Tried to move player {controllerId}'s clan {clan.StringId} to {kingdomId}, but current kingdom is {currentKingdomId}.");
             }
 
             string previousKingdomId = previousKingdom?.StringId ?? "<none>";
+            if (restoreKingdomlessState)
+                return Succeeded($"Restored player {controllerId}'s clan {clan.StringId} to kingdomless state. Previous kingdom: {previousKingdomId}.");
+
             return Succeeded($"Forced player {controllerId}'s clan {clan.StringId} to join kingdom {kingdom.StringId}. Previous kingdom: {previousKingdomId}.");
         }
     }
 
     // coop.debug.kingdom.force_player_vassalage Player khuzait true
-
     public sealed class KingdomForcePlayerVassalageCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.kingdom";
@@ -1622,47 +1628,63 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">kingdom1Id, kingdom2Id</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("force_ally", "coop.debug.kingdom")]
-    public static string ForceAlly(List<string> args)
+    public sealed class KingdomForceAllyCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
-        {
-            return "Command is only available to run on the server";
-        }
+        public string Prefix => "coop.debug.kingdom";
 
-        if (args.Count < 2)
-        {
-            return "Usage: coop.debug.kingdom.force_ally <kingdom1Id> <kingdom2Id> (run on the server)";
-        }
+        public string Name => "force_ally";
 
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
+        public string Description => "Forms an alliance between two kingdoms on the server.";
 
-        if (TryGetKingdomPair(objectManager, args, out var kingdom1, out var kingdom2, out var pairError) == false)
-        {
-            return pairError;
-        }
+        public CoopCommandSide Side => CoopCommandSide.Server;
 
-        var behavior = Campaign.Current.GetCampaignBehavior<AllianceCampaignBehavior>();
-        if (behavior == null)
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "AllianceCampaignBehavior is not available.";
-        }
+            new ExpectedArgs("kingdom1_id", "The first registered kingdom id."),
+            new ExpectedArgs("kingdom2_id", "The second registered kingdom id."),
+        };
 
-        if (behavior.IsAllyWithKingdom(kingdom1, kingdom2))
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return $"'{kingdom1.Name}' and '{kingdom2.Name}' are already allied.";
-        }
+            if (ModInformation.IsClient)
+            {
+                return Failed("Command is only available to run on the server");
+            }
 
-        if (kingdom1.IsAtWarWith(kingdom2))
-        {
-            MakePeaceAction.Apply(kingdom1, kingdom2);
-        }
+            if (args.Count < 2)
+            {
+                return Failed("Usage: coop.debug.kingdom.force_ally <kingdom1Id> <kingdom2Id> (run on the server)");
+            }
 
-        behavior.StartAlliance(kingdom1, kingdom2);
-        return $"Forced alliance between '{kingdom1.Name}' and '{kingdom2.Name}'.";
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (TryGetKingdomPair(objectManager, args, out var kingdom1, out var kingdom2, out var pairError) == false)
+            {
+                return Failed(pairError);
+            }
+
+            var behavior = Campaign.Current.GetCampaignBehavior<AllianceCampaignBehavior>();
+            if (behavior == null)
+            {
+                return Failed("AllianceCampaignBehavior is not available.");
+            }
+
+            if (behavior.IsAllyWithKingdom(kingdom1, kingdom2))
+            {
+                return Succeeded($"'{kingdom1.Name}' and '{kingdom2.Name}' are already allied.");
+            }
+
+            if (kingdom1.IsAtWarWith(kingdom2))
+            {
+                MakePeaceAction.Apply(kingdom1, kingdom2);
+            }
+
+            behavior.StartAlliance(kingdom1, kingdom2);
+            return Succeeded($"Forced alliance between '{kingdom1.Name}' and '{kingdom2.Name}'.");
+        }
     }
 
     // coop.debug.kingdom.force_trade_agreement
@@ -1672,54 +1694,70 @@ public class KingdomDebugCommand
     /// </summary>
     /// <param name="args">kingdom1Id, kingdom2Id</param>
     /// <returns>result message</returns>
-    [CommandLineArgumentFunction("force_trade_agreement", "coop.debug.kingdom")]
-    public static string ForceTradeAgreement(List<string> args)
+    public sealed class KingdomForceTradeAgreementCoopCommand : ICoopCommand
     {
-        if (ModInformation.IsClient)
+        public string Prefix => "coop.debug.kingdom";
+
+        public string Name => "force_trade_agreement";
+
+        public string Description => "Forms a trade agreement between two kingdoms on the server.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            return "Command is only available to run on the server";
-        }
+            new ExpectedArgs("kingdom1_id", "The first registered kingdom id."),
+            new ExpectedArgs("kingdom2_id", "The second registered kingdom id."),
+        };
 
-        if (args.Count < 2)
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return "Usage: coop.debug.kingdom.force_trade_agreement <kingdom1Id> <kingdom2Id> (run on the server)";
+            if (ModInformation.IsClient)
+            {
+                return Failed("Command is only available to run on the server");
+            }
+
+            if (args.Count < 2)
+            {
+                return Failed("Usage: coop.debug.kingdom.force_trade_agreement <kingdom1Id> <kingdom2Id> (run on the server)");
+            }
+
+            if (TryGetObjectManager(out var objectManager) == false)
+            {
+                return Failed("Unable to resolve ObjectManager");
+            }
+
+            if (TryGetKingdomPair(objectManager, args, out var kingdom1, out var kingdom2, out var pairError) == false)
+            {
+                return Failed(pairError);
+            }
+
+            var behavior = Campaign.Current.GetCampaignBehavior<TradeAgreementsCampaignBehavior>();
+            if (behavior == null)
+            {
+                return Failed("TradeAgreementsCampaignBehavior is not available.");
+            }
+
+            if (behavior.HasTradeAgreement(kingdom1, kingdom2, out _))
+            {
+                return Succeeded($"'{kingdom1.Name}' and '{kingdom2.Name}' already have a trade agreement.");
+            }
+
+            if (kingdom1.IsAtWarWith(kingdom2))
+            {
+                MakePeaceAction.Apply(kingdom1, kingdom2);
+            }
+
+            behavior.MakeTradeAgreement(
+                kingdom1,
+                kingdom2,
+                Campaign.Current.Models.TradeAgreementModel.GetTradeAgreementDurationInYears(kingdom1, kingdom2));
+
+            return Succeeded($"Forced trade agreement between '{kingdom1.Name}' and '{kingdom2.Name}'.");
         }
-
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
-
-        if (TryGetKingdomPair(objectManager, args, out var kingdom1, out var kingdom2, out var pairError) == false)
-        {
-            return pairError;
-        }
-
-        var behavior = Campaign.Current.GetCampaignBehavior<TradeAgreementsCampaignBehavior>();
-        if (behavior == null)
-        {
-            return "TradeAgreementsCampaignBehavior is not available.";
-        }
-
-        if (behavior.HasTradeAgreement(kingdom1, kingdom2, out _))
-        {
-            return $"'{kingdom1.Name}' and '{kingdom2.Name}' already have a trade agreement.";
-        }
-
-        if (kingdom1.IsAtWarWith(kingdom2))
-        {
-            MakePeaceAction.Apply(kingdom1, kingdom2);
-        }
-
-        behavior.MakeTradeAgreement(
-            kingdom1,
-            kingdom2,
-            Campaign.Current.Models.TradeAgreementModel.GetTradeAgreementDurationInYears(kingdom1, kingdom2));
-
-        return $"Forced trade agreement between '{kingdom1.Name}' and '{kingdom2.Name}'.";
     }
 
-    internal static bool TryGetKingdomPair(IObjectManager objectManager, List<string> args, out Kingdom kingdom1, out Kingdom kingdom2, out string error)
+    internal static bool TryGetKingdomPair(IObjectManager objectManager, IReadOnlyList<string> args, out Kingdom kingdom1, out Kingdom kingdom2, out string error)
     {
         kingdom2 = null;
         error = null;
@@ -2560,7 +2598,6 @@ public class KingdomDebugCommand
     /// <param name="kingdomDecision">kingdom decision result.</param>
     /// <param name="message">message result.</param>
     /// <returns>True if kingdomdecision is successfully returned, else false.</returns>
-
     //private static bool TryGetMakePeaceKingdomDecision(IObjectManager objectManager, IReadOnlyList<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
     //{
     //    if (args.Count < 7)

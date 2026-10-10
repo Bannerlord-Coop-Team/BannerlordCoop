@@ -1,8 +1,11 @@
 ﻿using Common;
 using Common.Commands;
+using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.CampaignService.Commands;
 using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.UI.Commands;
+using Moq;
 using Serilog;
 using System;
 using System.Collections;
@@ -32,7 +35,6 @@ public class SystemDeveloperDirectCommandTests
         "HeroDeveloperCommands",
         "InventoryCommands",
         "TradeSkillCommands",
-        "IssuesDebugCommand",
         "ItemObjectCommands",
         "ItemRosterDebugCommands",
         "AiLordPeaceReleaseFixtureCommands",
@@ -51,9 +53,9 @@ public class SystemDeveloperDirectCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(103, commandTypes.Length);
+        Assert.Equal(102, commandTypes.Length);
 #else
-        Assert.Equal(92, commandTypes.Length);
+        Assert.Equal(90, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -97,9 +99,11 @@ public class SystemDeveloperDirectCommandTests
     [Fact]
     public void ProcessCommand_ReadsCountOnlyForOptionalOrConditionalArguments()
     {
+        // Voice is a new injected command; its defensive argument guard is covered separately.
         string[] countReaders = GetCommandTypes()
+            .Where(type => type != typeof(ModOptionsCommands.VoiceEnabledCoopCommand))
             .Where(type => CallsArgumentCount(type.GetMethod(nameof(ICoopCommand.ProcessCommand))))
-            .Select(type => ((ICoopCommand)Activator.CreateInstance(type)).Name)
+            .Select(type => CreateCommand(type).Name)
             .OrderBy(name => name)
             .ToArray();
 
@@ -108,7 +112,6 @@ public class SystemDeveloperDirectCommandTests
             new[]
             {
                 "advance_time",
-                "complete",
                 "force_autosave",
                 "instrument",
                 "is_ironman_mode",
@@ -120,7 +123,6 @@ public class SystemDeveloperDirectCommandTests
             new[]
             {
                 "advance_time",
-                "complete",
                 "force_autosave",
                 "instrument",
                 "is_ironman_mode",
@@ -220,8 +222,18 @@ public class SystemDeveloperDirectCommandTests
     private static ICoopCommand[] CreateCommands()
     {
         return GetCommandTypes()
-            .Select(type => (ICoopCommand)Activator.CreateInstance(type))
+            .Select(CreateCommand)
             .ToArray();
+    }
+
+    private static ICoopCommand CreateCommand(Type type)
+    {
+        if (type == typeof(ModOptionsCommands.VoiceEnabledCoopCommand))
+            return new ModOptionsCommands.VoiceEnabledCoopCommand(Mock.Of<INetwork>(), Mock.Of<IMessageBroker>());
+        // Only the metadata is read here, so the server dependencies can stay empty.
+        if (type == typeof(UnstuckCommand.UnstuckCoopCommand))
+            return new UnstuckCommand.UnstuckCoopCommand(null, null, null, null);
+        return (ICoopCommand)Activator.CreateInstance(type)!;
     }
 
     private sealed class TestArgs : ICoopCommandArgs

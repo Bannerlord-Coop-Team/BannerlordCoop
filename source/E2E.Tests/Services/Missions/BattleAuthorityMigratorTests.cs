@@ -47,6 +47,7 @@ public class BattleAuthorityMigratorTests
             Mock.Of<IAgentFormationAssigner>(),
             Mock.Of<IMissionContext>(),
             reinforcementFielder.Object,
+            Mock.Of<IBattleInstanceLifecycle>(),
             Mock.Of<IBattleResultCommitter>());
 
         broker.Publish(this, new MissionPeerDisconnected("dropped", mapEventId));
@@ -91,6 +92,7 @@ public class BattleAuthorityMigratorTests
             Mock.Of<IAgentFormationAssigner>(),
             missionContext.Object,
             Mock.Of<IReinforcementFielder>(),
+            Mock.Of<IBattleInstanceLifecycle>(),
             resultCommitter.Object);
 
         broker.Publish(this, new BattleHostMigrated(mapEventId, "host", "peer"));

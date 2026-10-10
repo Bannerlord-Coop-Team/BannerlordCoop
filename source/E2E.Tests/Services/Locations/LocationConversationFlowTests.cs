@@ -162,6 +162,8 @@ public sealed class LocationConversationFlowTests : MapEventTestBase
 
         Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkAllowLocationConversation>().Single().Generation);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkLocationConversationDenied>());
+
+        Server.PumpGameThread();
     }
 
     [Fact]

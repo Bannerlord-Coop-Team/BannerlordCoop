@@ -53,6 +53,14 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
         restoredPlayer = player;
         if (player == null) return false;
         if (!objectManager.TryGetObjectWithLogging(player.HeroId, out Hero hero)) return false;
+
+        // A dead registered hero is waiting for heir selection. Keep its saved party association
+        // intact instead of restoring the dead hero into the roster as its leader.
+        if (hero.IsDead)
+        {
+            return objectManager.TryGetObjectWithLogging(player.MobilePartyId, out MobileParty _);
+        }
+
         if (hero.Clan == null || hero.CharacterObject == null)
         {
             Logger.Error(
@@ -126,7 +134,11 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
                 player.HeroId,
                 partyId,
                 clanId,
-                characterObjectId);
+                characterObjectId,
+                player.OriginalClanId ?? player.ClanId)
+            {
+                CrimeRatings = player.CrimeRatings
+            };
         }
 
         return true;
@@ -252,7 +264,9 @@ internal class PlayerPartyRestorer : IPlayerPartyRestorer
             position = hero.LastKnownClosestSettlement.GatePosition;
         if (!position.IsValid()) return null;
 
-        var component = new LordPartyComponent(hero, null, null);
+        var recoveryArgs = new LordPartyComponent.InitializationArgs(position, 0, hero.LastKnownClosestSettlement);
+
+        var component = new LordPartyComponent(hero, null, recoveryArgs);
         var party = MobileParty.CreateParty($"{hero.StringId}_recovered_{Guid.NewGuid():N}", component);
         party.InitializeMobilePartyAtPosition(position);
         return party;

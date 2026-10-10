@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Clans;
 using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -37,6 +38,11 @@ internal class WageChangesSettlementPatch
         {
             if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == MobileParty_SetWagePaymentLimit)
             {
+                yield return new CodeInstruction(OpCodes.Ldarg_0)
+                {
+                    labels = instruction.labels,
+                    blocks = instruction.blocks,
+                };
                 yield return new CodeInstruction(OpCodes.Call, MobileParty_SetWagePaymentLimitOverride);
                 continue;
             }
@@ -44,8 +50,12 @@ internal class WageChangesSettlementPatch
         }
     }
 
-    private static void SetWagePaymentLimitOverride(MobileParty instance, int newValue)
+    private static void SetWagePaymentLimitOverride(MobileParty instance, int newValue, ClanFinanceExpenseItemVM viewModel)
     {
+        // Constructor property setters initialize the display; opening a screen must not change wages.
+        if (viewModel.WageLimitHint == null) return;
+        if (ModInformation.IsClient && !CoopClanPermissions.CanManageParty(instance)) return;
+
         if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed())
         {
             instance.SetWagePaymentLimit(newValue);

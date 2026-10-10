@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.UI.Notifications.Messages;
@@ -18,14 +18,19 @@ public interface IClanVariablesCampaignBehaviorInterface : IGameAbstraction
 public class ClanVariablesCampaignBehaviorInterface : IClanVariablesCampaignBehaviorInterface
 {
     private readonly IMessageBroker messageBroker;
+    private readonly IClanFinance clanFinance;
 
-    public ClanVariablesCampaignBehaviorInterface(IMessageBroker messageBroker)
+    public ClanVariablesCampaignBehaviorInterface(IMessageBroker messageBroker, IClanFinance clanFinance)
     {
         this.messageBroker = messageBroker;
+        this.clanFinance = clanFinance;
     }
 
     public void DailyTickClan(ClanVariablesCampaignBehavior behavior, Clan clan)
     {
+        // A coop clan member's original clan still exists, don't run changes for it
+        if (clan.Leader?.Clan != clan) return;
+
         if (!clan.IsBanditFaction)
         {
             if (clan.Kingdom != null)
@@ -55,6 +60,10 @@ public class ClanVariablesCampaignBehaviorInterface : IClanVariablesCampaignBeha
             }
             int num = MathF.Round(Campaign.Current.Models.ClanFinanceModel.CalculateClanGoldChange(clan, false, true, false).ResultNumber);
             GiveGoldAction.ApplyBetweenCharacters(null, clan.Leader, num, true);
+
+            // Apply coop clan finances (non-leader member gold changes)
+            if (clan.IsPlayerClan()) num += clanFinance.ApplyDailyTransfers(clan);
+
             if (clan.MapFaction.Leader == clan.Leader && clan.Kingdom != null)
             {
                 int num2 = (clan.Kingdom.KingdomBudgetWallet < 2000000) ? 1000 : 0;
@@ -71,8 +80,8 @@ public class ClanVariablesCampaignBehaviorInterface : IClanVariablesCampaignBeha
             // Replace Clan.PlayerClan usage
             if (clan.IsPlayerClan())
             {
-                // Notify players of their daily gold changes
-                var message = new NotifyDailyGoldChange(clan, num);
+                // Notify clan leader of their daily gold change
+                var message = new NotifyDailyGoldChange(clan.Leader, num);
                 messageBroker.Publish(behavior, message);
             }
         }

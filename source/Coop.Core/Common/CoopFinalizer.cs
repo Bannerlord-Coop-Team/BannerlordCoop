@@ -3,6 +3,7 @@ using Common.Messaging;
 using Coop.Core.Common.Services.Connection.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Interfaces;
+using System.Threading;
 
 namespace Coop.Core.Common;
 
@@ -12,6 +13,17 @@ namespace Coop.Core.Common;
 public interface ICoopFinalizer
 {
     void Finalize(string closeText);
+
+    /// <summary>
+    /// Makes every finalize in this session whose teardown has not run yet, including one queued after its hide timed out,
+    /// show <paramref name="closeText"/> once instead of its own text.
+    /// </summary>
+    void SetCloseText(string closeText);
+
+    /// <summary>
+    /// Shows the <see cref="SetCloseText"/> text once for a session that ended without a <see cref="Finalize"/> showing it.
+    /// </summary>
+    void ShowCloseText();
 }
 
 /// <inheritdoc cref="ICoopFinalizer"/>
@@ -19,11 +31,31 @@ public class CoopFinalizer : ICoopFinalizer
 {
     private readonly IMessageBroker messageBroker;
     private readonly ILoadingInterface loadingInterface;
+    // Set on the network thread and read by a finalize on the game thread.
+    private volatile string closeTextOverride;
+    // Set when a finalize or ShowCloseText reaches its popup, so the SetCloseText text shows only once.
+    private int closeTextShown;
 
     public CoopFinalizer(IMessageBroker messageBroker, ILoadingInterface loadingInterface)
     {
         this.messageBroker = messageBroker;
         this.loadingInterface = loadingInterface;
+    }
+
+    public void SetCloseText(string closeText)
+    {
+        closeTextOverride = closeText;
+    }
+
+    public void ShowCloseText()
+    {
+        if (Interlocked.Exchange(ref closeTextShown, 1) != 0) return;
+
+        string closeText = closeTextOverride;
+        if (string.IsNullOrEmpty(closeText) == false)
+        {
+            messageBroker.Publish(this, new SendPopupMessage(closeText));
+        }
     }
 
     /// <summary>
@@ -45,10 +77,22 @@ public class CoopFinalizer : ICoopFinalizer
         // message handler denying validation runs there), so marshal it. Blocking so the screen is
         // down before the teardown messages below, and inline (no marshal) when already on the game
         // thread — e.g. the validation-timeout path.
-        GameThread.RunSafe(loadingInterface.HideLoadingScreen, blocking: true);
+        GameThread.RunCleanupSafe(loadingInterface.HideLoadingScreen, then: () => EndCoop(closeText));
+    }
 
-        // Only show pop-up with valid message
-        if (string.IsNullOrEmpty(closeText) == false)
+    private void EndCoop(string closeText)
+    {
+        // Read here rather than when Finalize starts, so a SetCloseText that arrives while a timed-out hide
+        // waits in the queue still wins.
+        string overrideText = closeTextOverride;
+        closeText = overrideText ?? closeText;
+
+        // After the hide above, whose marshal throws once the session is cancelled, and before EndCoopMode,
+        // whose teardown can wake a caller that shows the close text itself.
+        bool firstToShow = Interlocked.Exchange(ref closeTextShown, 1) == 0;
+
+        // Only show pop-up with valid message, and the SetCloseText text only once
+        if (string.IsNullOrEmpty(closeText) == false && (overrideText == null || firstToShow))
         {
             messageBroker.Publish(this, new SendPopupMessage(closeText));
         }

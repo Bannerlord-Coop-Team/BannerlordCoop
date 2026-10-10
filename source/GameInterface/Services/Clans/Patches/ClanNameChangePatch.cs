@@ -9,6 +9,7 @@ using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Clans.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_STATIC_FIXES_CATEGORY)]
 [HarmonyPatch(typeof(Clan))]
 public class ClanNameChangePatch
 {

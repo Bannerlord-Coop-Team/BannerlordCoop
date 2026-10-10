@@ -8,10 +8,13 @@ namespace GameInterface.Services.WeaponDesigns.Messages
     {
         [ProtoMember(1)]
         public string WeaponDesignId { get; set; }
+        [ProtoMember(2)]
+        public uint Handle { get; set; }
 
-        public NetworkCreateWeaponDesign(string weaponDesignId)
+        public NetworkCreateWeaponDesign(string weaponDesignId, uint handle)
         {
             WeaponDesignId = weaponDesignId;
+            Handle = handle;
         }
     }
 }

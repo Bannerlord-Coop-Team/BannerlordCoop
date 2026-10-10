@@ -1,4 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Reference Include="TaleWorlds.MountAndBlade.ViewModelCollection">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.ViewModelCollection.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.InputSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.InputSystem.dll</HintPath>
+    </Reference>
+  </ItemGroup>
   <PropertyGroup>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -38,6 +46,30 @@
          find it, and in this build that assembly's own output dir is the hit. -->
     <Content Include="..\..\deploy\mod-config.default.json">
       <Link>mod-config.default.json</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\mb2\Modules\SandBox\GUI\Prefabs\Clan\ClanMembers.xml">
+      <Link>ClanMembers.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\mb2\Modules\SandBox\GUI\Prefabs\Clan\ClanScreen.xml">
+      <Link>ClanScreen.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\mb2\Modules\SandBox\GUI\Prefabs\Clan\ClanPartiesRightPanel.xml">
+      <Link>ClanPartiesRightPanel.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\deploy\ModuleData\global_strings.xml">
+      <Link>global_strings.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\deploy\SubModule.xml">
+      <Link>coop_SubModule.xml</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\..\mb2\Modules\Native\ModuleData\module_strings.xml">
+      <Link>native_module_strings.xml</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
@@ -114,6 +146,9 @@
     </Reference>
     <Reference Include="TaleWorlds.Library">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.GauntletUI.PrefabSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.PrefabSystem.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Localization">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>

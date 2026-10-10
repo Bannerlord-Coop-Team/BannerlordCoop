@@ -1,9 +1,12 @@
+﻿using Autofac;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Tests.Services.SiegeEvents;
 using HarmonyLib;
+using Moq;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -96,9 +99,17 @@ public class ClanPartiesVMPatchesTests
     {
         Campaign previousCampaign = Campaign.Current;
         Game previousGame = Game.Current;
+        ContainerProvider.TryGetContainer(out var previousContainer);
+        var builder = new ContainerBuilder();
+        builder.RegisterType<CoopClanPermissions>().As<ICoopClanPermissions>();
+        builder.RegisterInstance(Mock.Of<IClanMemberGrouping>());
+        using var container = builder.Build();
         try
         {
+            ContainerProvider.SetContainer(container);
             var mainHero = ObjectHelper.SkipConstructor<Hero>();
+            mainHero._clan = ObjectHelper.SkipConstructor<Clan>();
+            mainHero.Clan._leader = mainHero;
             var mainCharacter = ObjectHelper.SkipConstructor<CharacterObject>();
             mainCharacter._heroObject = mainHero;
             mainHero._characterObject = mainCharacter;
@@ -121,6 +132,8 @@ public class ClanPartiesVMPatchesTests
             ClanPartiesVMPatches.OnFinalizePostfix();
             Campaign.Current = previousCampaign;
             Game.Current = previousGame;
+            if (previousContainer != null) ContainerProvider.SetContainer(previousContainer);
+            else ContainerProvider.Clear();
         }
     }
 
@@ -143,6 +156,7 @@ public class ClanPartiesVMPatchesTests
     private static MobileParty CreateParty()
     {
         var party = ObjectHelper.SkipConstructor<MobileParty>();
+        party._actualClan = Hero.MainHero.Clan;
         var partyBase = ObjectHelper.SkipConstructor<PartyBase>();
         partyBase.MobileParty = party;
         AccessTools.Field(typeof(MobileParty), "<Party>k__BackingField").SetValue(party, partyBase);

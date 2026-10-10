@@ -8,12 +8,12 @@ namespace E2E.Tests.Services.Missions;
 public sealed class MovementNetworkSettingsTests
 {
     [Fact]
-    public void MissingValuesUseFiveMiBDefaults()
+    public void MissingValuesUseTenMiBDefaults()
     {
         MovementNetworkSettings settings = Create();
 
-        Assert.Equal(MovementNetworkSettings.BytesPerMiB * 5, settings.OutgoingBytesPerSecond);
-        Assert.Equal(MovementNetworkSettings.BytesPerMiB * 5, settings.IncomingBytesPerSecond);
+        Assert.Equal(MovementNetworkSettings.BytesPerMiB * 10, settings.OutgoingBytesPerSecond);
+        Assert.Equal(MovementNetworkSettings.BytesPerMiB * 10, settings.IncomingBytesPerSecond);
     }
 
     [Fact]
@@ -43,8 +43,8 @@ public sealed class MovementNetworkSettingsTests
     {
         MovementNetworkSettings settings = Create(invalid, invalid);
 
-        Assert.Equal(MovementNetworkSettings.BytesPerMiB * 5, settings.OutgoingBytesPerSecond);
-        Assert.Equal(MovementNetworkSettings.BytesPerMiB * 5, settings.IncomingBytesPerSecond);
+        Assert.Equal(MovementNetworkSettings.BytesPerMiB * 10, settings.OutgoingBytesPerSecond);
+        Assert.Equal(MovementNetworkSettings.BytesPerMiB * 10, settings.IncomingBytesPerSecond);
     }
 
     private static MovementNetworkSettings Create(

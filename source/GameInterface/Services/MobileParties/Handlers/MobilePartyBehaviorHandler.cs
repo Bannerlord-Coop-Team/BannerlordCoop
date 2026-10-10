@@ -93,7 +93,7 @@ internal class MobilePartyBehaviorHandler : IHandler
     {
         var data = obj.What.BehaviorUpdateData;
 
-        GameThread.RunSafe(() =>
+        Action apply = () =>
         {
             if (!objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty party))
                 return;
@@ -169,7 +169,12 @@ internal class MobilePartyBehaviorHandler : IHandler
                 foreach (var attachedParty in attachedParties)
                     PublishForcedPosition(attachedParty);
             }
-        });
+        };
+
+        if (obj.What.AlreadyOnGameThread)
+            apply();
+        else
+            GameThread.RunSafe(apply, context: nameof(MobilePartyBehaviorHandler));
     }
 
     private static void ApplyForcedPosition(MobileParty party, CampaignVec2 position, bool isCurrentlyAtSea)

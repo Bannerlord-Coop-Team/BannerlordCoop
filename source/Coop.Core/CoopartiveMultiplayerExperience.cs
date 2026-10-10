@@ -8,7 +8,9 @@ using Common.Network.Session;
 using Common.Network.Session.Messages;
 using Coop.Core.Client;
 using Coop.Core.Client.Messages;
+using Coop.Core.Client.Services.Discord;
 using Coop.Core.Client.Services.Session;
+using Coop.Core.Common;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Common.Session;
@@ -36,6 +38,8 @@ namespace Coop.Core
         private IMessageBroker messageBroker;
         private INetworkConfig configuration;
         private IContainer container;
+        private readonly IContainer presenceContainer;
+        private readonly IDiscordPresenceClient presenceClient;
         private readonly SteamOrDirectJoinEndpointPreparer joinEndpointPreparer = new SteamOrDirectJoinEndpointPreparer();
         private readonly ServerProcessManager serverProcessManager;
         private readonly Action<string> setCrashPhase;
@@ -71,6 +75,15 @@ namespace Coop.Core
             this.setCrashPhase = setCrashPhase ?? (_ => { });
             this.coopLogFilePath = coopLogFilePath;
 
+            if (!standaloneServerProcess)
+            {
+                var builder = new ContainerBuilder();
+                builder.RegisterModule<DiscordPresenceModule>();
+                presenceContainer = builder.Build();
+                presenceClient = presenceContainer.Resolve<IDiscordPresenceClient>();
+                presenceClient.SetMainMenu();
+            }
+
             messageBroker.Subscribe<AttemptJoin>(Handle);
             messageBroker.Subscribe<AttemptHost>(Handle);
             messageBroker.Subscribe<HostSaveGame>(Handle);
@@ -91,7 +104,19 @@ namespace Coop.Core
             }
         }
 
-        public void Dispose() => DestroyContainer();
+        public void EndSession() => DestroyContainer();
+
+        public void Dispose()
+        {
+            try
+            {
+                EndSession();
+            }
+            finally
+            {
+                presenceContainer?.Dispose();
+            }
+        }
 
         private void Handle(MessagePayload<AttemptJoin> obj)
         {
@@ -447,6 +472,7 @@ namespace Coop.Core
 
             DestroyContainer();
             setCrashPhase("starting-server");
+            presenceClient?.ClearPresence();
 
             ModInformation.IsServer = true;
 
@@ -512,6 +538,7 @@ namespace Coop.Core
             coopStarting = true;
             setCrashPhase("applying-patches");
             CancellationToken sessionCancellation = container.Resolve<CancellationTokenSource>().Token;
+            IPatchFailureReport patchFailureReport = container.Resolve<IPatchFailureReport>();
 
             Task.Factory.StartNew(() =>
             {
@@ -531,9 +558,15 @@ namespace Coop.Core
                     }
                     catch (Exception e)
                     {
-                        Logger.Error(e, "Applying patches failed while starting coop");
+                        Logger.Error(e, "Applying patches failed while starting coop. {LoadedCopies}", patchFailureReport.ListLoadedCopies(e));
                         CompleteCoopStart(startGeneration);
                         GameThread.RunSafe(loadingInterface.HideLoadingScreen);
+
+                        // A teardown during patching owns its own message.
+                        if (!sessionCancellation.IsCancellationRequested)
+                        {
+                            messageBroker.Publish(this, new SendPopupMessage(patchFailureReport.Describe(e)));
+                        }
                         return;
                     }
 
@@ -618,6 +651,11 @@ namespace Coop.Core
 
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ClientModule>();
+            if (presenceClient != null)
+            {
+                // Session teardown must not close the application-owned Discord connection.
+                builder.RegisterInstance(presenceClient).As<IDiscordPresenceClient>().ExternallyOwned();
+            }
             builder.RegisterModule<GameInterfaceModule>();
             builder.RegisterInstance(new CoopLogFile(coopLogFilePath)).As<ICoopLogFile>().SingleInstance();
 
@@ -716,6 +754,7 @@ namespace Coop.Core
                     // Post-session resolves (console cheats, leftover patches) must fail gracefully.
                     GameInterface.ContainerProvider.Clear();
                     setCrashPhase("idle");
+                    if (ModInformation.IsServer) presenceClient?.SetMainMenu();
                 }
             }
         }

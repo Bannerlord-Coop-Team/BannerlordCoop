@@ -235,7 +235,29 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
             LeaveSettlementAction.ApplyForParty(besiegerParty);
         }
 
-        Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besiegerParty);
+        var previousSiege = settlement.SiegeEvent;
+        try
+        {
+            Campaign.Current.SiegeEventManager.StartSiegeEvent(settlement, besiegerParty);
+        }
+        catch (Exception creationException)
+        {
+            var failedSiege = settlement.SiegeEvent;
+            if (failedSiege != null && !ReferenceEquals(failedSiege, previousSiege))
+            {
+                try
+                {
+                    // Construction assigns the settlement before initializing the camp's engines.
+                    failedSiege.FinalizeSiegeEvent();
+                }
+                catch (Exception cleanupException)
+                {
+                    throw new AggregateException("Failed to clear an interrupted siege", creationException, cleanupException);
+                }
+            }
+
+            throw;
+        }
     }
 
     public void JoinSiegeCamp(MobileParty party, Settlement settlement)

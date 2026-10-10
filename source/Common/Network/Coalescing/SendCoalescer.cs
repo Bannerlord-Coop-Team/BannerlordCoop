@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using LiteNetLib;
 
 namespace Common.Network.Coalescing;
@@ -140,9 +141,19 @@ public sealed class SendCoalescer : ISendCoalescer
         }
     }
 
+    public void FlushInstance(uint instanceHandle, INetwork network)
+    {
+        FlushInstance(instanceHandle.ToString(CultureInfo.InvariantCulture), network);
+    }
+
     public void DropInstance(string instanceId)
     {
         ExtractInstance(instanceId);
+    }
+
+    public void DropInstance(uint instanceHandle)
+    {
+        DropInstance(instanceHandle.ToString(CultureInfo.InvariantCulture));
     }
 
     // Removes and returns every pending payload for the instance, or null if none. The caller decides

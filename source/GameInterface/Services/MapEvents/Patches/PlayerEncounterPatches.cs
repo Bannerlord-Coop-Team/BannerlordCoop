@@ -15,16 +15,20 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using Helpers;
+using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -35,6 +39,35 @@ internal class PlayerEncounterPatches
     private static readonly object rejectedEncounterRecoveryLock = new object();
     private static readonly HashSet<PlayerEncounter> pendingRejectedEncounterRecoveries =
         new HashSet<PlayerEncounter>();
+
+    [HarmonyPatch(nameof(PlayerEncounter.JoinBattleInternal))]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> JoinBattleCampTranspiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var setter = AccessTools.PropertySetter(typeof(MobileParty), nameof(MobileParty.BesiegerCamp));
+        var apply = AccessTools.Method(typeof(PlayerEncounterPatches), nameof(ApplyJoinBattleCamp));
+        bool replaced = false;
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(setter) || instruction.Calls(apply))
+            {
+                instruction.opcode = OpCodes.Call;
+                instruction.operand = apply;
+                replaced = true;
+            }
+            yield return instruction;
+        }
+
+        if (!replaced)
+            throw new InvalidOperationException("Could not find the siege camp assignment in PlayerEncounter.JoinBattleInternal");
+    }
+
+    private static void ApplyJoinBattleCamp(MobileParty party, BesiegerCamp camp)
+    {
+        // A pending client join has no camp until the server accepts and replicates it.
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed())
+            party.BesiegerCamp = camp;
+    }
 
     [HarmonyPatch(nameof(PlayerEncounter.RestartPlayerEncounter))]
     [HarmonyPrefix]
@@ -452,6 +485,16 @@ internal class PlayerEncounterPatches
         MessageBroker.Instance.Publish(party.Ai, new PartyBehaviorChangeAttempted(party));
     }
 
+    [HarmonyPatch(nameof(PlayerEncounter.DoApplyMapEventResults))]
+    [HarmonyPrefix]
+    private static bool WaitForHideoutResults(PlayerEncounter __instance)
+    {
+        if (ModInformation.IsServer || __instance._mapEvent?.IsHideoutBattle != true) return true;
+        // The server advances this encounter after delivering its loot; native would generate it again locally.
+        __instance._stateHandled = true;
+        return false;
+    }
+
     [HarmonyPatch(nameof(PlayerEncounter.Update))]
     [HarmonyPrefix]
     public static bool UpdatePrefix()
@@ -459,15 +502,34 @@ internal class PlayerEncounterPatches
         if (ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var initializationBarrier))
             initializationBarrier.CompleteDeferredEncounterCleanup();
 
-        if (PlayerEncounter.Current == null) return false;
-        if (MapEvent.PlayerMapEvent != null) return true;
+        var playerEncounter = PlayerEncounter.Current;
+        if (playerEncounter == null) return false;
+        var mapEvent = MapEvent.PlayerMapEvent;
+        if (mapEvent != null &&
+            (!mapEvent.IsRaid ||
+             !MapEventInitializationBarrier.IsBattleResultEncounter(playerEncounter)))
+            return true;
+
+        var activeState = TaleWorlds.Core.Game.Current?.GameStateManager?.ActiveState;
+        if (activeState is PartyState or InventoryState)
+            return false;
+        if (ShouldDeferAfterBattle(
+                activeState,
+                TaleWorlds.ScreenSystem.ScreenManager.TopScreen == MapScreen.Instance))
+            return false;
         if (PlayerCaptivity.IsCaptive) return false;
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return true;
 
         var playerEncounterInterface = container.Resolve<IPlayerEncounterInterface>();
-        playerEncounterInterface.UpdateInternalAfterBattle(PlayerEncounter.Current);
+        playerEncounterInterface.UpdateInternalAfterBattle(playerEncounter);
 
         return false;
+    }
+
+    internal static bool ShouldDeferAfterBattle(TaleWorlds.Core.GameState activeState, bool isMapScreenTop)
+    {
+        // Wait for the previous loot screen to finish leaving before opening the next one.
+        return activeState is PartyState or InventoryState || !isMapScreenTop;
     }
 }

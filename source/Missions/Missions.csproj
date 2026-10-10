@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -21,7 +21,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>DEBUG;TRACE;TESTER</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <PlatformTarget>x64</PlatformTarget>
@@ -211,9 +211,14 @@
     <Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection" />
     <Publicize Include="TaleWorlds.Core" />
     <Publicize Include="TaleWorlds.Engine" />
+    <Publicize Include="TaleWorlds.InputSystem:TaleWorlds.InputSystem.InputContext._registeredGameKeys" />
     <Publicize Include="TaleWorlds.GauntletUI" />
     <Publicize Include="TaleWorlds.GauntletUI.Data" />
     <Publicize Include="TaleWorlds.MountAndBlade" />
+    <Publicize Include="TaleWorlds.MountAndBlade.View:TaleWorlds.MountAndBlade.View.MissionViews.MissionMainAgentInteractionComponent._currentInteractableObject" />
+    <Publicize Include="TaleWorlds.MountAndBlade.View:TaleWorlds.MountAndBlade.View.MissionViews.MissionMainAgentController._autoDismountModeActive" />
+    <Publicize Include="TaleWorlds.MountAndBlade.View:TaleWorlds.MountAndBlade.View.MissionViews.MissionMainAgentController._activated" />
+    <Publicize Include="TaleWorlds.MountAndBlade.View:TaleWorlds.MountAndBlade.View.Screens.MissionScreen.CameraElevation" />
     <Publicize Include="TaleWorlds.ObjectSystem" />
     <Publicize Include="TaleWorlds.SaveSystem" />
     <Publicize Include="TaleWorlds.MountAndBlade.Mission" />

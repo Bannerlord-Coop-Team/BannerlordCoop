@@ -41,7 +41,8 @@ namespace GameInterface.Services.ItemRosters.Handlers
                 return;
             }
 
-            network.SendAll(new NetworkCreateItemRoster(newId));
+            if (!objectManager.TryGetHandleWithLogging(payload.What.ItemRoster, out var handle)) return;
+            network.SendAll(new NetworkCreateItemRoster(newId, handle));
         }
 
         private void Handle(MessagePayload<NetworkCreateItemRoster> payload)
@@ -51,7 +52,7 @@ namespace GameInterface.Services.ItemRosters.Handlers
                 var newItemRoster = ObjectHelper.SkipConstructor<ItemRoster>();
                 var data = payload.What;
 
-                if (objectManager.AddExisting(data.RosterId, newItemRoster) == false)
+                if (objectManager.AddExisting(data.RosterId, newItemRoster, data.Handle) == false)
                 {
                     Logger.Error("Failed to add {type} to manager with id {id}", typeof(ItemRoster), data.RosterId);
                 }

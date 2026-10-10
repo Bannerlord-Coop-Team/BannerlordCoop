@@ -305,8 +305,8 @@ internal sealed class MarriageBarterHandler : IHandler
                 request.ProposingHeroId,
                 requireActiveConversation: true,
                 out _,
-                out _,
-                out _,
+                out var heroBeingProposedTo,
+                out var proposingHero,
                 out reason))
         {
             Logger.Warning(
@@ -316,6 +316,14 @@ internal sealed class MarriageBarterHandler : IHandler
                 reason);
             return;
         }
+
+        // The client conversation's family agreement must be recorded on the server before the offer.
+        if (proposingHero != playerHero &&
+            Romance.GetRomanticLevel(heroBeingProposedTo, proposingHero) != Romance.RomanceLevelEnum.MatchMadeByFamily)
+            ChangeRomanticStateAction.Apply(
+                heroBeingProposedTo,
+                proposingHero,
+                Romance.RomanceLevelEnum.MatchMadeByFamily);
 
         authorizations[peer] = new MarriageAuthorization(
             request.RequestId,
@@ -463,7 +471,7 @@ internal sealed class MarriageBarterHandler : IHandler
         }
         else
         {
-            if (romanticLevel != Romance.RomanceLevelEnum.MatchMadeByFamily)
+            if (!requireActiveConversation && romanticLevel != Romance.RomanceLevelEnum.MatchMadeByFamily)
             {
                 reason = "The arranged marriage has not been agreed by both clans.";
                 return false;
@@ -716,7 +724,7 @@ internal sealed class MarriageBarterHandler : IHandler
 
     private void FlushHeroGold(Hero hero)
     {
-        if (sendCoalescer == null || hero == null || !objectManager.TryGetId(hero, out var heroId)) return;
+        if (sendCoalescer == null || hero == null || !objectManager.TryGetHandle(hero, out var heroId)) return;
         sendCoalescer.FlushInstance(heroId, network);
     }
 

@@ -17,7 +17,9 @@ internal static class SiegeEncounterMenuTrace
 
     private static readonly ILogger Logger = LogManager.GetLogger(typeof(SiegeEncounterMenuTrace));
 
-    internal static bool IsCurrentMenu => CurrentMenuId == MenuId;
+    internal static bool IsCurrentMenu => IsTracedMenu(CurrentMenuId);
+
+    internal static bool IsTracedMenu(string menuId) => menuId == MenuId || menuId == "town_outside";
 
     internal static void Log(string operation, bool includeStackTrace = false)
     {
@@ -67,7 +69,7 @@ internal static class SiegeEncounterMenuActivateTracePatch
     [HarmonyPrefix]
     private static void Prefix(string menuId)
     {
-        if (menuId == SiegeEncounterMenuTrace.MenuId)
+        if (SiegeEncounterMenuTrace.IsTracedMenu(menuId))
             SiegeEncounterMenuTrace.Log($"ActivateGameMenu({menuId})", true);
     }
 }
@@ -78,7 +80,7 @@ internal static class SiegeEncounterMenuSwitchTracePatch
     [HarmonyPrefix]
     private static void Prefix(string menuId)
     {
-        if (menuId == SiegeEncounterMenuTrace.MenuId || SiegeEncounterMenuTrace.IsCurrentMenu)
+        if (SiegeEncounterMenuTrace.IsTracedMenu(menuId) || SiegeEncounterMenuTrace.IsCurrentMenu)
             SiegeEncounterMenuTrace.Log($"SwitchToMenu({menuId})", true);
     }
 }

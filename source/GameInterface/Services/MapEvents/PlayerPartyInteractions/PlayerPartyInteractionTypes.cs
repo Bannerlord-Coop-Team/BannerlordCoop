@@ -1,4 +1,4 @@
-namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
+﻿namespace GameInterface.Services.MapEvents.PlayerPartyInteractions;
 
 public enum PlayerPartyInteractionPhase
 {
@@ -10,7 +10,9 @@ public enum PlayerPartyInteractionPhase
     ProposalPending,
     TradeActive,
     HostileDemandConfirm,
-    HostileDemandPending
+    HostileDemandPending,
+    MercenaryConfirm,
+    MarriageOptions
 }
 
 public enum PlayerPartyInteractionOption
@@ -20,6 +22,9 @@ public enum PlayerPartyInteractionOption
     OfferServices,
     JoinClan,
     Vassal,
+    Mercenary,
+    ConfirmMercenary,
+    CancelMercenary,
     AcceptProposal,
     DeclineProposal,
     Leave,
@@ -27,7 +32,13 @@ public enum PlayerPartyInteractionOption
     ConfirmHostileDemand,
     CancelHostileDemand,
     RefuseHostileDemand,
-    YieldHostileDemand
+    YieldHostileDemand,
+    LeaveClan,
+    RemoveFromClan,
+    ProposeMarriage,
+    PatrilinealMarriage,
+    MatrilinealMarriage,
+    CancelMarriage
 }
 
 public enum PlayerPartyInteractionVassalUnavailableReason
@@ -39,13 +50,30 @@ public enum PlayerPartyInteractionVassalUnavailableReason
     InitiatorClanTierTooLow
 }
 
+public enum PlayerPartyInteractionMercenaryUnavailableReason
+{
+    None,
+    InitiatorHasNoClan,
+    InitiatorIsNotClanLeader,
+    InitiatorClanTierTooLow,
+    AlreadyMercenaryForThisKingdom,
+    InitiatorClanHasSettlement,
+    NotEnoughRelation,
+    ClanIsInKingdom,
+    TargetHasNoKingdom,
+    IsAtWarWithTarget,
+    IncompatibleWars
+}
 public enum PlayerPartyInteractionProposal
 {
     None,
     Trade,
     JoinClan,
     Vassal,
-    HostileDemand
+    Mercenary,
+    HostileDemand,
+    PatrilinealMarriage,
+    MatrilinealMarriage
 }
 
 public enum PlayerPartyInteractionOutcomeType
@@ -58,10 +86,16 @@ public enum PlayerPartyInteractionOutcomeType
     ClanJoinDeclined,
     VassalAccepted,
     VassalDeclined,
+    MercenaryAccepted,
+    MercenaryDeclined,
     Rejected,
     Disconnected,
     HostileDemandAccepted,
-    HostileDemandYielded
+    HostileDemandYielded,
+    ClanLeft,
+    ClanMemberRemoved,
+    MarriageAccepted,
+    MarriageDeclined
 }
 
 public enum PlayerPartyInteractionDeniedReason

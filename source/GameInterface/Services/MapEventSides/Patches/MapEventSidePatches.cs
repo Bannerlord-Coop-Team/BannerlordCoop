@@ -11,10 +11,13 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEventSides.Patches;
@@ -55,11 +58,17 @@ internal class MapEventSidePatches
         if (party?.MobileParty?.IsPlayerParty() == true && __instance.MapEvent != null)
         {
             var mapEvent = __instance.MapEvent;
-            var side = __instance.MissionSide;
 
             if (mapEvent.FindMapEventParty(party, out var existingSide) != null)
             {
                 party._mapEventSide = existingSide;
+                return false;
+            }
+
+            if (!TryGetCanonicalSide(mapEvent, __instance, out var side))
+            {
+                party._mapEventSide = null;
+                Logger.Error("Player attempted to join a map event side that is not assigned to its map event");
                 return false;
             }
 
@@ -71,6 +80,24 @@ internal class MapEventSidePatches
         }
 
         return true;
+    }
+
+    private static bool TryGetCanonicalSide(MapEvent mapEvent, MapEventSide mapEventSide, out BattleSideEnum side)
+    {
+        if (ReferenceEquals(mapEvent.DefenderSide, mapEventSide))
+        {
+            side = BattleSideEnum.Defender;
+            return true;
+        }
+
+        if (ReferenceEquals(mapEvent.AttackerSide, mapEventSide))
+        {
+            side = BattleSideEnum.Attacker;
+            return true;
+        }
+
+        side = BattleSideEnum.None;
+        return false;
     }
 
     private static bool ShouldBlockRaidAiIntervention(MapEventSide side, PartyBase party)
@@ -143,10 +170,42 @@ internal class MapEventSidePatches
         if (isPlayerParty is null)
             throw new MissingMethodException("Failed to find MobilePartyExtensions.IsPlayerParty(MobileParty)");
 
+        var toTroopRosterElementArray = typeof(Enumerable)
+            .GetMethods(BindingFlags.Public | BindingFlags.Static)
+            .Single(method =>
+                method.Name == nameof(Enumerable.ToArray) &&
+                method.IsGenericMethodDefinition &&
+                method.GetParameters().Length == 1)
+            .MakeGenericMethod(typeof(TroopRosterElement));
+
+        var materializedInstructions = new List<CodeInstruction>();
+        var materializedDeathMarkedHeroes = false;
+        foreach (var instruction in instructions)
+        {
+            materializedInstructions.Add(instruction);
+
+            if (materializedDeathMarkedHeroes ||
+                !(instruction.operand is MethodInfo method) ||
+                method.Name != "WhereQ" ||
+                !method.IsGenericMethod ||
+                method.GetGenericArguments()[0] != typeof(TroopRosterElement)) continue;
+
+            // Killing a companion can refresh this roster cache while vanilla is enumerating it
+            materializedInstructions.Add(new CodeInstruction(OpCodes.Call, toTroopRosterElementArray));
+            materializedDeathMarkedHeroes = true;
+        }
+
+        if (!materializedDeathMarkedHeroes)
+        {
+            throw new Exception(
+                "Failed to patch MapEventSide.HandleMapEventEndForPartyInternal: " +
+                "could not find the death-marked hero query.");
+        }
+
         var matcher = new Queue<CodeInstruction>();
         var patched = false;
 
-        foreach (var instruction in instructions)
+        foreach (var instruction in materializedInstructions)
         {
             matcher.Enqueue(instruction);
 

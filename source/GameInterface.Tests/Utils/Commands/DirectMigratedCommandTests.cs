@@ -34,9 +34,9 @@ public class DirectMigratedCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(121, commandTypes.Length);
+        Assert.Equal(124, commandTypes.Length);
 #else
-        Assert.Equal(102, commandTypes.Length);
+        Assert.Equal(105, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -93,6 +93,9 @@ public class DirectMigratedCommandTests
             new[]
             {
                 "battle_reward_fixture_start",
+                "engage_nearest_bandit",
+                "kms",
+                "move_to_settlement",
                 "start_naval",
                 "start_nearest_bandit_attack",
                 "upgrade_party_screen_troop",
@@ -121,6 +124,63 @@ public class DirectMigratedCommandTests
             Assert.False(result.Succeeded);
             Assert.Equal("invalid_arguments", result.ErrorCode);
             Assert.Contains("<party_id>", result.Output);
+        }
+        finally
+        {
+            ModInformation.IsServer = originalIsServer;
+        }
+    }
+
+    [Theory]
+    [InlineData("party")]
+    [InlineData("party", "settlement", "true", "extra")]
+    public void MoveToSettlement_RejectsInvalidArgumentCount(params string[] args)
+    {
+        bool originalIsServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = true;
+            ICoopCommand command = Assert.Single(
+                CreateCommands(),
+                candidate => candidate.Name == "move_to_settlement");
+            var registry = new CoopCommandRegistry(
+                new[] { command },
+                new LoggerConfiguration().CreateLogger());
+
+            CoopCommandResult result = registry.ProcessCommand(
+                $"{command.Prefix}.{command.Name}",
+                new TestArgs(args));
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("invalid_arguments", result.ErrorCode);
+        }
+        finally
+        {
+            ModInformation.IsServer = originalIsServer;
+        }
+    }
+
+    [Fact]
+    public void MoveToSettlement_UsageMarksInstantOptional()
+    {
+        bool originalIsServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = true;
+            ICoopCommand command = Assert.Single(
+                CreateCommands(),
+                candidate => candidate.Name == "move_to_settlement");
+            var registry = new CoopCommandRegistry(
+                new[] { command },
+                new LoggerConfiguration().CreateLogger());
+
+            CoopCommandResult result = registry.ProcessCommand(
+                $"{command.Prefix}.{command.Name}",
+                new TestArgs(Array.Empty<string>()));
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("invalid_arguments", result.ErrorCode);
+            Assert.Contains("[<instant>]", result.Output);
         }
         finally
         {

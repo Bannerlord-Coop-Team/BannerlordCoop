@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Coop.Core.Server;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Tests.Mocks;
 using GameInterface.Registry;
@@ -20,6 +21,7 @@ internal class ServerTestComponent : TestComponentBase
             .SingleInstance();
 
         RegisterMock<ICoopServer>(builder);
+        RegisterMock<IJoinValidationDenialLog>(builder);
 
         Container = BuildContainer(builder);
     }

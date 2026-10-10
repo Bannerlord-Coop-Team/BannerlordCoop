@@ -64,5 +64,76 @@ internal class StanceLinkPatches
         MessageBroker.Instance.Publish(__instance, new StanceLinkDeconstructed(faction1, removedStances));
         return false;
     }
-}
 
+    [HarmonyPatch(typeof(StanceLink), nameof(StanceLink.TroopCasualties1), MethodType.Setter)]
+    [HarmonyPostfix]
+    private static void PostfixTroopCasualties1(StanceLink __instance, int value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (ModInformation.IsClient) return;
+        MessageBroker.Instance.Publish(__instance, new StanceLinkTroopCasualties(__instance, value, 1));
+    }
+
+    [HarmonyPatch(typeof(StanceLink), nameof(StanceLink.TroopCasualties2), MethodType.Setter)]
+    [HarmonyPostfix]
+    private static void PostfixTroopCasualties2(StanceLink __instance, int value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (ModInformation.IsClient) return;
+        MessageBroker.Instance.Publish(__instance, new StanceLinkTroopCasualties(__instance, value, 2));
+    }
+
+    [HarmonyPatch(typeof(StanceLink), nameof(StanceLink.SuccessfulSieges1), MethodType.Setter)]
+    [HarmonyPostfix]
+    private static void PostfixSuccessfulSieges1(StanceLink __instance, int value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (ModInformation.IsClient) return;
+        MessageBroker.Instance.Publish(__instance, new StanceLinkSuccessfulSieges(__instance, value, 1));
+    }
+
+    [HarmonyPatch(typeof(StanceLink), nameof(StanceLink.SuccessfulSieges2), MethodType.Setter)]
+    [HarmonyPostfix]
+    private static void PostfixSuccessfulSieges2(StanceLink __instance, int value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (ModInformation.IsClient) return;
+        MessageBroker.Instance.Publish(__instance, new StanceLinkSuccessfulSieges(__instance, value, 2));
+    }
+
+    [HarmonyPatch(typeof(StanceLink), nameof(StanceLink.SuccessfulRaids1), MethodType.Setter)]
+    [HarmonyPostfix]
+    private static void PostfixSuccessfulRaids1(StanceLink __instance, int value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (ModInformation.IsClient) return;
+        MessageBroker.Instance.Publish(__instance, new StanceLinkSuccessfulRaids(__instance, value, 1));
+    }
+
+    [HarmonyPatch(typeof(StanceLink), nameof(StanceLink.SuccessfulRaids2), MethodType.Setter)]
+    [HarmonyPostfix]
+    private static void PostfixSuccessfulRaids12(StanceLink __instance, int value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (ModInformation.IsClient) return;
+        MessageBroker.Instance.Publish(__instance, new StanceLinkSuccessfulRaids(__instance, value, 2));
+    }
+
+    [HarmonyPatch(typeof(StanceLink), nameof(StanceLink.SuccessfulTownSieges1), MethodType.Setter)]
+    [HarmonyPostfix]
+    private static void PostfixSuccessfulTownSieges1(StanceLink __instance, int value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (ModInformation.IsClient) return;
+        MessageBroker.Instance.Publish(__instance, new StanceLinkSuccessfulTownSieges(__instance, value, 1));
+    }
+
+    [HarmonyPatch(typeof(StanceLink), nameof(StanceLink.SuccessfulTownSieges2), MethodType.Setter)]
+    [HarmonyPostfix]
+    private static void PostfixSuccessfulTownSieges2(StanceLink __instance, int value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (ModInformation.IsClient) return;
+        MessageBroker.Instance.Publish(__instance, new StanceLinkSuccessfulTownSieges(__instance, value, 2));
+    }
+}
