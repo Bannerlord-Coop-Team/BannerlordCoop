@@ -18,10 +18,13 @@ public sealed class NetworkAgentStationUse : IEvent
     /// <summary>The point's index among the usable points on that entity.</summary>
     [ProtoMember(4)] public readonly int PointIndex;
     [ProtoMember(5)] public readonly bool InUse;
-    /// <summary>Per-agent, increasing with every use or release the owner sends.</summary>
+    /// <summary>Per agent and sender, increasing with every use or release the owner sends.</summary>
     [ProtoMember(6)] public readonly long Revision;
+    /// <summary>The owner that sent the use; a new owner after a migration numbers its revisions from 1 again.</summary>
+    [ProtoMember(7)] public readonly string SenderControllerId;
 
-    public NetworkAgentStationUse(Guid agentId, Guid shipId, string stationKey, int pointIndex, bool inUse, long revision)
+    public NetworkAgentStationUse(Guid agentId, Guid shipId, string stationKey, int pointIndex, bool inUse, long revision,
+        string senderControllerId)
     {
         AgentId = agentId;
         ShipId = shipId;
@@ -29,5 +32,6 @@ public sealed class NetworkAgentStationUse : IEvent
         PointIndex = pointIndex;
         InUse = inUse;
         Revision = revision;
+        SenderControllerId = senderControllerId;
     }
 }

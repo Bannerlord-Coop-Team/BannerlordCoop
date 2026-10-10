@@ -2,8 +2,10 @@
 using Missions;
 using Missions.Agents.Handlers;
 using Missions.Battles;
+using Missions.Messages;
 using Moq;
 using System;
+using System.Runtime.Serialization;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 
@@ -120,12 +122,14 @@ public class AgentStationUseReplicatorTests
         engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), It.IsAny<bool>()), Times.Never);
     }
 
-    private static AgentStationUseReplicator CreateReplicator(INavalShipEngine engine)
+    private static AgentStationUseReplicator CreateReplicator(INavalShipEngine engine,
+        INetworkAgentRegistry? registry = null, INetworkShipRegistry? ships = null)
     {
         var component = new Mock<ICoopMissionComponent>();
         component.SetupGet(c => c.AgentMovementHandler).Returns(Mock.Of<IAgentMovementHandler>());
         component.SetupGet(c => c.AgentActionHandler).Returns(Mock.Of<IAgentActionHandler>());
-        component.SetupGet(c => c.AgentRegistry).Returns(Mock.Of<INetworkAgentRegistry>());
+        component.SetupGet(c => c.AgentRegistry).Returns(registry ?? Mock.Of<INetworkAgentRegistry>());
+        component.SetupGet(c => c.ShipRegistry).Returns(ships ?? Mock.Of<INetworkShipRegistry>());
         return new AgentStationUseReplicator(Mock.Of<IBattleNetwork>(), new MessageBroker(), Mock.Of<IBattleSession>(),
             component.Object, engine, Mock.Of<IBattleDeploymentCoordinator>());
     }
@@ -134,12 +138,47 @@ public class AgentStationUseReplicatorTests
     private static UsableMissionObject CreatePoint() => ShipTestHulls.CreatePoint();
 
     [Theory]
-    [InlineData(0, 1, true)]
-    [InlineData(3, 4, true)]
-    [InlineData(3, 3, false)]
-    [InlineData(3, 2, false)]
-    public void IsNewer_AcceptsOnlyRevisionsAfterTheLastApplied(long applied, long received, bool expected)
+    [InlineData(null, 0, "old", 1, true)]
+    [InlineData("old", 3, "old", 4, true)]
+    [InlineData("old", 3, "old", 3, false)]
+    [InlineData("old", 3, "old", 2, false)]
+    [InlineData("old", 3, "new", 1, true)]
+    public void IsNewer_AcceptsRevisionsAfterTheLastAppliedOrFromANewSender(string? appliedSender, long applied,
+        string sender, long received, bool expected)
     {
-        Assert.Equal(expected, AgentStationUseReplicator.IsNewer(applied, received));
+        Assert.Equal(expected, AgentStationUseReplicator.IsNewer(appliedSender!, applied, sender, received));
     }
+
+    [Fact]
+    public void TryApply_AcceptsTheNewOwnersRestartedRevisionsAfterAMigration()
+    {
+        var agentId = Guid.NewGuid();
+        var shipId = Guid.NewGuid();
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+        var info = new CoopAgentInfo("old", "old", "battle", agent, agentId, 1);
+        var registry = new Mock<INetworkAgentRegistry>();
+        registry.Setup(r => r.TryGetAgentInfo(agentId, out info)).Returns(true);
+        var hull = ShipTestHulls.Create();
+        var ship = new NetworkShipInfo(shipId, "old", "party", isNpcParty: true, hull, null!);
+        var ships = new Mock<INetworkShipRegistry>();
+        ships.Setup(s => s.TryGet(shipId, out ship)).Returns(true);
+        var engine = new Mock<INavalShipEngine>();
+        var point = CreatePoint();
+        engine.Setup(e => e.ResolveStation(hull, "oar", 0)).Returns(point);
+        using var replicator = CreateReplicator(engine.Object, registry.Object, ships.Object);
+
+        Assert.True(replicator.TryApply(Use(agentId, shipId, inUse: true, revision: 3, "old")));
+        Assert.False(replicator.TryApply(Use(agentId, shipId, inUse: false, revision: 1, "new")));
+
+        info.CurrentAuthority = "new";
+        Assert.True(replicator.TryApply(Use(agentId, shipId, inUse: false, revision: 1, "new")));
+        Assert.True(replicator.TryApply(Use(agentId, shipId, inUse: true, revision: 2, "new")));
+        Assert.False(replicator.TryApply(Use(agentId, shipId, inUse: false, revision: 4, "old")));
+
+        engine.Verify(e => e.ApplyStationUse(agent, point, true), Times.Exactly(2));
+        engine.Verify(e => e.ApplyStationUse(agent, point, false), Times.Once);
+    }
+
+    private static NetworkAgentStationUse Use(Guid agentId, Guid shipId, bool inUse, long revision, string sender) =>
+        new NetworkAgentStationUse(agentId, shipId, "oar", 0, inUse, revision, sender);
 }

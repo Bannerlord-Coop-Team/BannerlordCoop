@@ -45,7 +45,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
     private readonly Dictionary<Guid, long> sentRevisions = new Dictionary<Guid, long>();
     private readonly Dictionary<Guid, NetworkAgentStationUse> ownSeated = new Dictionary<Guid, NetworkAgentStationUse>();
-    private readonly Dictionary<Guid, long> appliedRevisions = new Dictionary<Guid, long>();
+    private readonly Dictionary<Guid, AppliedRevision> appliedRevisions = new Dictionary<Guid, AppliedRevision>();
     private readonly List<PendingUse> pending = new List<PendingUse>();
     private readonly Dictionary<Guid, AppliedSeat> appliedSeats = new Dictionary<Guid, AppliedSeat>();
     private float elapsed;
@@ -106,7 +106,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
             return;
 
         sentRevisions.TryGetValue(info.AgentId, out long revision);
-        var use = new NetworkAgentStationUse(info.AgentId, ship.ShipId, stationKey, pointIndex, change.InUse, revision + 1);
+        var use = new NetworkAgentStationUse(info.AgentId, ship.ShipId, stationKey, pointIndex, change.InUse, revision + 1,
+            session.OwnControllerId);
         sentRevisions[info.AgentId] = use.Revision;
         if (use.InUse) ownSeated[info.AgentId] = use;
         else ownSeated.Remove(info.AgentId);
@@ -215,21 +216,30 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         if (elapsed - entry.ReceivedAt < PendingLifetimeSeconds) return false;
 
         dropped++;
-        Logger.Warning("[NavalSync] Dropped station use {Revision} of agent {AgentId}: agent or hull {ShipId} never arrived",
-            entry.Use.Revision, entry.Use.AgentId, entry.Use.ShipId);
+        Logger.Warning("[NavalSync] Dropped station use {Revision} of agent {AgentId} from {Sender}: agent or hull {ShipId} never arrived or the sender never owned the agent",
+            entry.Use.Revision, entry.Use.AgentId, entry.Use.SenderControllerId, entry.Use.ShipId);
         return true;
     }
 
-    // [Game thread] True when settled (applied or dropped), false to retry while the agent or hull is still missing.
-    private bool TryApply(NetworkAgentStationUse use)
+    // [Game thread] True when settled (applied or dropped), false to retry while the agent or hull is still missing or
+    // this client has not yet moved the agent's authority to the sender (a new owner's uses can beat the local migration).
+    internal bool TryApply(NetworkAgentStationUse use)
     {
         var agents = missionComponent.AgentRegistry;
         if (!agents.TryGetAgentInfo(use.AgentId, out var info) || info.Agent == null
             || !missionComponent.ShipRegistry.TryGet(use.ShipId, out var ship))
             return false;
 
-        appliedRevisions.TryGetValue(use.AgentId, out long appliedRevision);
-        if (!IsNewer(appliedRevision, use.Revision) || agents.IsLocallyControlled(info.Agent))
+        if (agents.IsLocallyControlled(info.Agent))
+        {
+            dropped++;
+            return true;
+        }
+
+        if (info.CurrentAuthority != use.SenderControllerId) return false;
+
+        appliedRevisions.TryGetValue(use.AgentId, out var last);
+        if (!IsNewer(last.Sender, last.Revision, use.SenderControllerId, use.Revision))
         {
             dropped++;
             return true;
@@ -246,7 +256,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         // A sinking hull seats nobody; a late use from its owner only lets the puppet go.
         bool inUse = use.InUse && !engine.IsSinking(ship.Hull);
-        appliedRevisions[use.AgentId] = use.Revision;
+        appliedRevisions[use.AgentId] = new AppliedRevision(use.SenderControllerId, use.Revision);
         Apply(info.Agent, point, inUse);
         RecordAppliedSeat(use.AgentId, info.Agent, ship.Hull, inUse ? point : null);
         return true;
@@ -275,8 +285,12 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         applied++;
     }
 
-    /// <summary>Whether a received revision supersedes the last one applied for the agent.</summary>
-    internal static bool IsNewer(long appliedRevision, long receivedRevision) => receivedRevision > appliedRevision;
+    /// <summary>
+    /// Whether a received revision supersedes the last one applied for the agent. Each owner numbers its own uses, so a
+    /// use from a different sender than the last applied one starts a fresh sequence.
+    /// </summary>
+    internal static bool IsNewer(string appliedSender, long appliedRevision, string sender, long receivedRevision) =>
+        sender != appliedSender || receivedRevision > appliedRevision;
 
     // A joiner gets this client's current seats after the hull and crew records that precede them.
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
@@ -330,6 +344,18 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         public UsableMissionObject Point { get; }
         // Set once a local release was re-seated; the next owner revision gives the seat a fresh attempt.
         public bool Reseated { get; set; }
+    }
+
+    private readonly struct AppliedRevision
+    {
+        public AppliedRevision(string sender, long revision)
+        {
+            Sender = sender;
+            Revision = revision;
+        }
+
+        public string Sender { get; }
+        public long Revision { get; }
     }
 
     private readonly struct PendingUse
