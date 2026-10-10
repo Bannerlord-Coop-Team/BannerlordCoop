@@ -822,6 +822,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         // before replacing the encounter menu, otherwise its completion reopens the generic encounter.
         if (SiegeCaptureTransitionRetryHandler.IsBattlePresentationActive())
         {
+            Logger.Information("Parked the capture aftermath menu for {Settlement} until the battle presentation closes", settlement.StringId);
             SiegeCaptureTransitionRetryHandler.Arm(leaderParty, settlement);
             return;
         }
@@ -856,6 +857,8 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     // settlement), so besiegerParty is MainParty. An army member (asArmyMember) is routed from its encounter End.
     private void SwitchLocalPartyToSettlementTaken(Settlement settlement, bool asArmyMember = false)
     {
+        Logger.Information("Opening the capture aftermath menu for {Settlement}", settlement.StringId);
+
         // menu_settlement_taken_on_init routes on _besiegerParty == MainParty to reach the leader submenu that
         // carries Devastate/Pillage/Mercy; set the fields the client's OnMapEventEnded prefix would have set.
         // An army member keeps the prefix's _besiegerParty (the leader) and lands on the member narration.
