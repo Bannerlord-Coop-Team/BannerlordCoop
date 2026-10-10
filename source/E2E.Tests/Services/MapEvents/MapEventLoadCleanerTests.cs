@@ -263,8 +263,10 @@ public class MapEventLoadCleanerTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
-    [Fact]
-    public void FinalizePlayerMapEvents_PlayerEvent_ReleasesPartiesAndDestroysReplicatedEvent()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FinalizePlayerMapEvents_PlayerLedArmy_PreservesMembershipAndDestroysReplicatedEvent(bool halfFinalized)
     {
         var mapEventContext = CreateServerMapEvent();
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -272,7 +274,6 @@ public class MapEventLoadCleanerTests : MapEventTestBase
         string? armyId = null;
         string? followerId = null;
         string? gatheringFollowerId = null;
-        string? destinationId = null;
 
         Server.Call(() =>
         {
@@ -282,22 +283,18 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
             var follower = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var gatheringFollower = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            var destination = GameObjectCreator.CreateInitializedObject<Settlement>();
-            destination.SetSettlementComponent(GameObjectCreator.CreateInitializedObject<Town>());
-            destination._position = follower.Position;
-            follower.SetCustomHomeSettlement(destination);
-            gatheringFollower.SetCustomHomeSettlement(destination);
             var army = new Army(kingdom, attacker, Army.ArmyTypes.Raider);
             follower.Army = army;
             follower.AttachedTo = attacker;
             gatheringFollower.Army = army;
-            follower.Ai.RethinkAtNextHourlyTick = false;
+            gatheringFollower.SetMoveEscortParty(attacker, MobileParty.NavigationType.Default, false);
             Assert.True(Server.ObjectManager.TryGetId(army, out armyId));
             Assert.True(Server.ObjectManager.TryGetId(follower, out followerId));
             Assert.True(Server.ObjectManager.TryGetId(gatheringFollower, out gatheringFollowerId));
-            Assert.True(Server.ObjectManager.TryGetId(destination, out destinationId));
             Assert.Same(mapEvent, follower.MapEvent);
             Assert.Null(gatheringFollower.MapEvent);
+            if (halfFinalized)
+                mapEvent.State = MapEventState.WaitingRemoval;
 
             Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
             TestEnvironment.FlushCoalescer();
@@ -306,33 +303,102 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.Null(attacker.Party.MapEventSide);
             Assert.Null(defender.Party.MapEventSide);
             Assert.Null(follower.Party.MapEventSide);
-            Assert.Null(follower.Army);
-            Assert.Null(follower.AttachedTo);
-            Assert.Equal(AiBehavior.GoToSettlement, follower.DefaultBehavior);
-            Assert.Same(destination, follower.TargetSettlement);
-            Assert.Null(gatheringFollower.Army);
+            Assert.Same(army, attacker.Army);
+            Assert.Same(army, follower.Army);
+            Assert.Same(attacker, follower.AttachedTo);
+            Assert.Same(army, gatheringFollower.Army);
             Assert.Null(gatheringFollower.AttachedTo);
-            Assert.Equal(AiBehavior.GoToSettlement, gatheringFollower.DefaultBehavior);
-            Assert.Same(destination, gatheringFollower.TargetSettlement);
+            Assert.Same(attacker, gatheringFollower.TargetParty);
+            Assert.Equal(AiBehavior.EscortParty, gatheringFollower.DefaultBehavior);
+            Assert.Equal(3, army.Parties.Count);
             Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
-            Assert.False(Server.ObjectManager.TryGetObject<Army>(armyId, out _));
+            Assert.True(Server.ObjectManager.TryGetObject<Army>(armyId, out var registeredArmy));
+            Assert.Same(army, registeredArmy);
         }, MapEventDisabledMethods);
 
         foreach (var client in Clients)
         {
             Assert.False(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
-            Assert.False(client.ObjectManager.TryGetObject<Army>(armyId, out _));
+            Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var army));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var leader));
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(followerId, out var follower));
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(gatheringFollowerId, out var gatheringFollower));
-            Assert.True(client.ObjectManager.TryGetObject<Settlement>(destinationId, out var destination));
-            Assert.Null(follower.Army);
-            Assert.Null(follower.AttachedTo);
-            Assert.Equal(AiBehavior.GoToSettlement, follower.DefaultBehavior);
-            Assert.Same(destination, follower.TargetSettlement);
-            Assert.Null(gatheringFollower.Army);
+            Assert.Null(leader.Party.MapEventSide);
+            Assert.Null(follower.Party.MapEventSide);
+            Assert.Same(army, leader.Army);
+            Assert.Same(army, follower.Army);
+            Assert.Same(leader, follower.AttachedTo);
+            Assert.Same(army, gatheringFollower.Army);
             Assert.Null(gatheringFollower.AttachedTo);
-            Assert.Equal(AiBehavior.GoToSettlement, gatheringFollower.DefaultBehavior);
-            Assert.Same(destination, gatheringFollower.TargetSettlement);
+            Assert.Same(leader, gatheringFollower.TargetParty);
+            Assert.Equal(AiBehavior.EscortParty, gatheringFollower.DefaultBehavior);
+            Assert.Equal(3, army.Parties.Count);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FinalizePlayerMapEvents_UnattachedArmyMember_ClearsBattleNavigationButPreservesEscort(bool escortingLeader)
+    {
+        var mapEventContext = CreateServerMapEvent();
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        RegisterAsPlayerParty("loaded-player", heroId, mapEventContext.AttackerPartyId);
+        string? armyId = null;
+        string? memberId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var leader));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var opponent));
+            var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
+            var member = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var army = new Army(kingdom, leader, Army.ArmyTypes.Raider);
+            member.Army = army;
+            member.Party.MapEventSide = mapEvent.AttackerSide;
+            if (escortingLeader)
+                member.SetMoveEscortParty(leader, MobileParty.NavigationType.Default, false);
+            else
+                member.SetMoveEngageParty(opponent, MobileParty.NavigationType.Default);
+            member.PartyMoveMode = MoveModeType.Party;
+            member.MoveTargetParty = escortingLeader ? leader : opponent;
+            member.Ai.RethinkAtNextHourlyTick = false;
+            Assert.True(Server.ObjectManager.TryGetId(army, out armyId));
+            Assert.True(Server.ObjectManager.TryGetId(member, out memberId));
+            Assert.Same(mapEvent, member.MapEvent);
+            Assert.Null(member.AttachedTo);
+
+            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+            TestEnvironment.FlushCoalescer();
+
+            Assert.Null(member.MapEvent);
+            Assert.Same(army, member.Army);
+            Assert.Null(member.AttachedTo);
+            Assert.Equal(2, army.Parties.Count);
+            if (escortingLeader)
+            {
+                Assert.Same(leader, member.MoveTargetParty);
+                Assert.Same(leader, member.TargetParty);
+                Assert.Equal(AiBehavior.EscortParty, member.DefaultBehavior);
+                Assert.False(member.Ai.RethinkAtNextHourlyTick);
+            }
+            else
+            {
+                Assert.Equal(MoveModeType.Hold, member.PartyMoveMode);
+                Assert.Null(member.MoveTargetParty);
+                Assert.True(member.Ai.RethinkAtNextHourlyTick);
+            }
+        }, MapEventDisabledMethods);
+
+        foreach (var client in Clients)
+        {
+            Assert.False(client.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
+            Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var army));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(memberId, out var member));
+            Assert.Same(army, member.Army);
+            Assert.Null(member.AttachedTo);
+            Assert.Null(member.MapEvent);
         }
     }
 
