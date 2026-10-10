@@ -1,4 +1,5 @@
-﻿using Missions.Naval;
+﻿#if DEBUG
+using Missions.Naval;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Naval;
@@ -67,3 +68,4 @@ public class CoopShipSnapshotBuilderTests
         return ship;
     }
 }
+#endif

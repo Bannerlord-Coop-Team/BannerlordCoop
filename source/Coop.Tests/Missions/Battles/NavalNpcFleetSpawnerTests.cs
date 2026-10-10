@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿#if DEBUG
+using HarmonyLib;
 using Missions.Naval;
 using Xunit;
 
@@ -59,3 +60,4 @@ public class NavalNpcFleetSpawnerTests
         }
     }
 }
+#endif

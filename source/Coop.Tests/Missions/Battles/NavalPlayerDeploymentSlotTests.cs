@@ -1,4 +1,5 @@
-﻿using Missions.Naval;
+﻿#if DEBUG
+using Missions.Naval;
 using System.Collections.Generic;
 using Xunit;
 
@@ -32,3 +33,4 @@ public class NavalPlayerDeploymentSlotTests
             NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(100f, 2, 44f));
     }
 }
+#endif

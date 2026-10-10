@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿#if DEBUG
+using HarmonyLib;
 using Missions.Naval;
 using NavalDLC.Missions.NavalPhysics;
 using System;
@@ -70,3 +71,4 @@ public class NavalRopePatchesTests
         }
     }
 }
+#endif

@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿#if DEBUG
+using HarmonyLib;
 using Missions.Naval;
 using NavalDLC.CharacterDevelopment;
 using System.Linq;
@@ -95,3 +96,4 @@ public class NavalCombatHitRewardPatchTests
         return character;
     }
 }
+#endif

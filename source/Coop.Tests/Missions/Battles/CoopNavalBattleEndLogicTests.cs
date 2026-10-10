@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿#if DEBUG
+using HarmonyLib;
 using Missions.Naval;
 using TaleWorlds.Core;
 using Xunit;
@@ -135,3 +136,4 @@ public class CoopNavalBattleEndLogicTests
         }
     }
 }
+#endif

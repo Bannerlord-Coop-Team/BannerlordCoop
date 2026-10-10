@@ -1,4 +1,5 @@
-﻿using NavalDLC.DWA;
+﻿#if DEBUG
+using NavalDLC.DWA;
 using System;
 using System.Linq;
 using System.Reflection;
@@ -119,3 +120,4 @@ public class NavalTrajectoryPlannerTreeTests
         public float ComputeGoalCost(int sampleIndex, in DWAAgentState atState, (float distance, float amount) targetOcclusion) => 0f;
     }
 }
+#endif

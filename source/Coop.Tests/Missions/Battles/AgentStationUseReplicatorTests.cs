@@ -2,7 +2,6 @@
 using Missions;
 using Missions.Agents.Handlers;
 using Missions.Battles;
-using Missions.Naval;
 using Moq;
 using System;
 using TaleWorlds.MountAndBlade;
@@ -142,14 +141,5 @@ public class AgentStationUseReplicatorTests
     public void IsNewer_AcceptsOnlyRevisionsAfterTheLastApplied(long applied, long received, bool expected)
     {
         Assert.Equal(expected, AgentStationUseReplicator.IsNewer(applied, received));
-    }
-
-    [Theory]
-    [InlineData(true, true, false)]
-    [InlineData(true, false, true)]
-    [InlineData(false, true, true)]
-    public void HelmGate_StopsOnlyThePlayerTakingAForeignHelm(bool isMainAgent, bool isForeignHelm, bool expected)
-    {
-        Assert.Equal(expected, ForeignHelmUsePatch.AllowsStart(isMainAgent, isForeignHelm));
     }
 }

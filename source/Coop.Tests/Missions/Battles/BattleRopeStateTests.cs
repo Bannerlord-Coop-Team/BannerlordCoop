@@ -15,8 +15,8 @@ public class BattleRopeStateTests
     {
         var ropes = new[]
         {
-            NavalRopesTests.Rope(3, BattleRopeState.BridgeConnected),
-            NavalRopesTests.Rope(1, BattleRopeState.RopeThrown, "4:attachment_machine_2"),
+            Rope(3, BattleRopeState.BridgeConnected),
+            Rope(1, BattleRopeState.RopeThrown, "4:attachment_machine_2"),
         };
         ropes[1].CurveTarget = new[] { 1f, 2f, 3f };
         ropes[1].CurveAngle = 35f;
@@ -57,7 +57,7 @@ public class BattleRopeStateTests
     [Fact]
     public void FinalRopes_RoundTrip()
     {
-        var final = new NetworkBattleRopeFinal(Guid.NewGuid(), "peer", new[] { NavalRopesTests.Rope(2, BattleRopeState.Removed) });
+        var final = new NetworkBattleRopeFinal(Guid.NewGuid(), "peer", new[] { Rope(2, BattleRopeState.Removed) });
 
         var copy = RoundTrip(final);
 
@@ -69,7 +69,7 @@ public class BattleRopeStateTests
     [Fact]
     public void AreValid_RejectsTwoStatesForOneStation()
     {
-        var ropes = new[] { NavalRopesTests.Rope(1, BattleRopeState.Removed), NavalRopesTests.Rope(2, BattleRopeState.RopeThrown) };
+        var ropes = new[] { Rope(1, BattleRopeState.Removed), Rope(2, BattleRopeState.RopeThrown) };
 
         Assert.False(BattleRopeState.AreValid(ropes));
     }
@@ -78,7 +78,7 @@ public class BattleRopeStateTests
     public void AreValid_RejectsMoreStationsThanAHullHas()
     {
         var ropes = Enumerable.Range(0, BattleRopeState.MaxRopesPerHull + 1)
-            .Select(index => NavalRopesTests.Rope(1, BattleRopeState.RopeThrown, index + ":attachment_machine"))
+            .Select(index => Rope(1, BattleRopeState.RopeThrown, index + ":attachment_machine"))
             .ToArray();
 
         Assert.False(BattleRopeState.AreValid(ropes));
@@ -102,7 +102,7 @@ public class BattleRopeStateTests
     [InlineData("length")]
     public void IsValid_RejectsStatesAPeerCannotRebuild(string defect)
     {
-        var rope = NavalRopesTests.Rope(1, BattleRopeState.RopesPulling);
+        var rope = Rope(1, BattleRopeState.RopesPulling);
         switch (defect)
         {
             case "generation": rope.Generation = 0; break;
@@ -116,4 +116,19 @@ public class BattleRopeStateTests
 
         Assert.False(rope.IsValid);
     }
+
+    internal static BattleRopeState Rope(long generation, int state, string sourceKey = "3:attachment_machine_1") => new BattleRopeState
+    {
+        SourceKey = sourceKey,
+        Generation = generation,
+        State = state,
+        TargetShipId = state == BattleRopeState.RopeThrown ? Guid.Empty : new Guid("6f1f0a59-8fb5-4b52-9d36-1d1c9a4f0c11"),
+        TargetKey = state == BattleRopeState.RopeThrown ? null : "5:attachment_point_2",
+        Length = 12f,
+        HookFrame = NetworkBattleShipSample.FromFrame(MatrixFrame.Identity),
+        PlankFlight = state == BattleRopeState.BridgeThrown || state == BattleRopeState.BridgeConnected
+            ? new[] { 0.5f, 0f, 0.25f, 1f, 0.5f, 0f, 0f, 1f }
+            : null,
+        DecorationPlanks = state == BattleRopeState.BridgeConnected ? 12 : 0,
+    };
 }

@@ -1,4 +1,5 @@
-﻿using Missions.Naval;
+﻿#if DEBUG
+using Missions.Naval;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -50,3 +51,4 @@ public class CoopNavalBattleLauncherTests
         return mapEventParty;
     }
 }
+#endif

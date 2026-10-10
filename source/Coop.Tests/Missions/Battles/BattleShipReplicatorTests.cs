@@ -320,7 +320,7 @@ public class BattleShipReplicatorTests
     {
         var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, null, false, CreateHull(), null);
         long now = DateTime.UtcNow.Ticks;
-        var ropes = new[] { NavalRopesTests.Rope(1, BattleRopeState.RopesPulling), NavalRopesTests.Rope(2, BattleRopeState.Removed) };
+        var ropes = new[] { BattleRopeStateTests.Rope(1, BattleRopeState.RopesPulling), BattleRopeStateTests.Rope(2, BattleRopeState.Removed) };
         var sample = new NetworkBattleShipSample(ship.ShipId, Peer, 1, now + TimeSpan.FromMilliseconds(500).Ticks,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), default, ropes);
 
@@ -331,7 +331,7 @@ public class BattleShipReplicatorTests
     public void Tick_SendsTheOwnHullRopesWithEachSample()
     {
         var harness = new Harness(committed: true);
-        var ropes = new[] { NavalRopesTests.Rope(1, BattleRopeState.RopeThrown) };
+        var ropes = new[] { BattleRopeStateTests.Rope(1, BattleRopeState.RopeThrown) };
         harness.Engine.Setup(e => e.CaptureRopes(harness.OwnHull, It.IsAny<Func<MissionObject, Guid>>())).Returns(ropes);
 
         harness.Replicator.Tick(0.1f);
@@ -360,7 +360,7 @@ public class BattleShipReplicatorTests
     public void MissionLeaving_SendsTheOwnHullsFinalRopes()
     {
         var harness = new Harness(committed: true);
-        var ropes = new[] { NavalRopesTests.Rope(2, BattleRopeState.BridgeConnected) };
+        var ropes = new[] { BattleRopeStateTests.Rope(2, BattleRopeState.BridgeConnected) };
         harness.Engine.Setup(e => e.CaptureRopes(harness.OwnHull, It.IsAny<Func<MissionObject, Guid>>())).Returns(ropes);
         harness.Replicator.Tick(0.1f);
 
@@ -388,7 +388,7 @@ public class BattleShipReplicatorTests
     {
         var harness = new Harness(committed: false);
         harness.Engine.Setup(e => e.CaptureRopes(harness.OwnHull, It.IsAny<Func<MissionObject, Guid>>()))
-            .Returns(new[] { NavalRopesTests.Rope(1, BattleRopeState.RopeThrown) });
+            .Returns(new[] { BattleRopeStateTests.Rope(1, BattleRopeState.RopeThrown) });
         harness.Replicator.Tick(0.1f);
 
         harness.Broker.Publish(this, new BattleMissionLeaving("instance"));
@@ -404,7 +404,7 @@ public class BattleShipReplicatorTests
     public void ValidateFinalRopes_AcceptsOnlyTheHullAuthoritysValidRopes(string authority, string sender, bool valid, string expected)
     {
         var ship = new NetworkShipInfo(Guid.NewGuid(), authority, null, false, CreateHull(), null);
-        var rope = NavalRopesTests.Rope(3, BattleRopeState.Removed);
+        var rope = BattleRopeStateTests.Rope(3, BattleRopeState.Removed);
         if (!valid) rope.Generation = 0;
 
         var final = new NetworkBattleRopeFinal(ship.ShipId, sender, new[] { rope });
