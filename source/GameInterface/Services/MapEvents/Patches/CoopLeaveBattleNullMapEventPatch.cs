@@ -56,6 +56,25 @@ internal class CoopEncounterLeaveConditionNullMapEventPatch
     }
 }
 
+/// <summary>
+/// Same stale "encounter" menu: vanilla's attack condition reads the finished <c>PlayerEncounter</c> in
+/// <c>CheckEnemyAttackableHonorably</c> before its own no-map-event check, and the NRE breaks the whole menu refresh.
+/// </summary>
+[HarmonyPatch(typeof(EncounterGameMenuBehavior),
+    nameof(EncounterGameMenuBehavior.game_menu_encounter_attack_on_condition))]
+internal class CoopEncounterAttackConditionNullMapEventPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(ref bool __result)
+    {
+        if (MobileParty.MainParty?.MapEvent != null)
+            return true;
+
+        __result = false; // what vanilla's EncounterAttackCondition returns with no map event
+        return false;
+    }
+}
+
 [HarmonyPatch(typeof(EncounterGameMenuBehavior),
     nameof(EncounterGameMenuBehavior.game_menu_encounter_abandon_army_on_condition))]
 internal class CoopEncounterAbandonArmyConditionNullMapEventPatch
