@@ -37,7 +37,43 @@ Server setup walkthrough: https://www.youtube.com/watch?v=laZM967Eals
 
 ## Roadmap
 
-https://bannerlordcoop.com/#roadmap
+The [compact behavior map](features/README.md) lists player-visible behaviors, installed game definitions,
+co-op restrictions and verification status. Its entries are not a gameplay compatibility claim.
+
+- Shared campaign map
+- Player and AI movement synchronization
+- Map encounters
+- Party and troop management
+- Character skills and progression
+- Clan and kingdom management
+- Settlement management
+- Recruitment and trading
+- Caravans and villager parties
+- Smithing
+- Player captivity
+- Field battles
+- Village raids
+- PvE and PvP combat
+- Simulated battles
+- Players visible inside locations such as taverns and village scenes
+- Dedicated server support
+- Steam integration
+
+### Experimental Features
+
+- Sieges and sally-outs
+- Armies
+
+### Planned Features
+
+- Additional campaign systems and stability improvements
+- Hideouts
+- War Sails DLC support
+- Quests
+
+Planned items and release priorities may change as development continues.
+
+Current roadmap: https://bannerlordcoop.com/#roadmap
 
 ## Multiplayer Battles
 

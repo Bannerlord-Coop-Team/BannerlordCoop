@@ -1,0 +1,308 @@
+﻿{
+  "schemaVersion": 1,
+  "source": {
+    "head": "5f4d63cc0975174ab42cfe1da67fc6d7214065e7",
+    "syntheticTree": "9fc0c1eb1986a7c6d86549dadccd324280610431"
+  },
+  "decision": "run",
+  "verdict": "pending",
+  "inputValid": true,
+  "highestRequiredTier": "full-live",
+  "seed": "0x9fc0c1eb1986a7c6",
+  "planDigest": "4bf115206e9ec671b5dedbd85302cf18409c38690154697a60a250a147bd4b41",
+  "replayIdentity": "verification-v1:9fc0c1eb1986a7c6d86549dadccd324280610431:0x9fc0c1eb1986a7c6:4bf115206e9ec671b5dedbd85302cf18409c38690154697a60a250a147bd4b41",
+  "startedAtUtc": null,
+  "completedAtUtc": null,
+  "artifactHashes": [],
+  "processExits": [],
+  "changedPaths": [
+    "features/catalog.csv"
+  ],
+  "rejectedPaths": [],
+  "requiredTiers": [
+    "unit",
+    "deterministic-peer",
+    "process-peer",
+    "rendered-smoke",
+    "full-live"
+  ],
+  "requiredChecks": [
+    "unit",
+    "wire-copy-e2e",
+    "poller-game-thread",
+    "deterministic-peer",
+    "process-peer",
+    "rendered-smoke",
+    "full-live"
+  ],
+  "profiles": [
+    {
+      "id": "unit",
+      "tier": "unit",
+      "ordinal": 0,
+      "required": true,
+      "blocking": true,
+      "verdict": "pending",
+      "executor": "repository-dotnet-test",
+      "action": "dotnet-test",
+      "arguments": [
+        "source/CoopUnitTests.slnf",
+        "-c",
+        "Release"
+      ],
+      "scope": "Fast unit and in-process integration tests."
+    },
+    {
+      "id": "deterministic-peer",
+      "tier": "deterministic-peer",
+      "ordinal": 1,
+      "required": true,
+      "blocking": true,
+      "verdict": "pending",
+      "executor": "repository-script",
+      "action": "run-e2e",
+      "arguments": [
+        ".github/scripts/run-e2e-local-docker.sh"
+      ],
+      "scope": "Deterministic serialized peer simulation."
+    },
+    {
+      "id": "process-peer",
+      "tier": "process-peer",
+      "ordinal": 2,
+      "required": true,
+      "blocking": true,
+      "verdict": "pending",
+      "executor": "repository-dotnet-run",
+      "action": "process-peer-suite",
+      "arguments": [
+        "source/VerificationHarness/VerificationHarness.csproj",
+        "--head",
+        "{source.head}",
+        "--tree",
+        "{source.syntheticTree}",
+        "--seed",
+        "{seed}",
+        "--artifact-manifest",
+        "{artifact.manifest}"
+      ],
+      "scope": "Synthetic transport lab over real loopback UDP with one LiteNetLib server process, two isolated client processes, and Common serialization; this does not claim Bannerlord handlers, campaign state, native code, rendering, or save loading."
+    },
+    {
+      "id": "rendered-smoke",
+      "tier": "rendered-smoke",
+      "ordinal": 3,
+      "required": true,
+      "blocking": true,
+      "verdict": "pending",
+      "executor": "issue-to-pr-orchestrator",
+      "action": "rendered-smoke",
+      "arguments": [
+        "--head",
+        "{source.head}",
+        "--tree",
+        "{source.syntheticTree}",
+        "--seed",
+        "{seed}",
+        "--evidence-profile",
+        "{evidence.profile}",
+        "--repro-contract",
+        "{repro.contract}",
+        "--output",
+        "{evidence.output}"
+      ],
+      "scope": "Rendered startup and screenshot assertions."
+    },
+    {
+      "id": "full-live",
+      "tier": "full-live",
+      "ordinal": 4,
+      "required": true,
+      "blocking": true,
+      "verdict": "pending",
+      "executor": "issue-to-pr-live-operator",
+      "action": "full-live",
+      "arguments": [
+        "--head",
+        "{source.head}",
+        "--tree",
+        "{source.syntheticTree}",
+        "--seed",
+        "{seed}",
+        "--evidence-profile",
+        "{evidence.profile}",
+        "--repro-contract",
+        "{repro.contract}",
+        "--output",
+        "{evidence.output}"
+      ],
+      "scope": "Complete Windows Bannerlord live verification."
+    }
+  ],
+  "checks": [
+    {
+      "id": "unit",
+      "profile": "unit",
+      "tier": "unit",
+      "required": true,
+      "blocking": true,
+      "verdict": "pending",
+      "topology": {
+        "serverCount": 0,
+        "clientCount": 0,
+        "processCount": 1,
+        "processIsolated": false
+      },
+      "seed": "0x9fc0c1eb1986a7c6",
+      "stateDigest": null,
+      "replayIdentity": "verification-v1:9fc0c1eb1986a7c6d86549dadccd324280610431:0x9fc0c1eb1986a7c6:unit",
+      "startedAtUtc": null,
+      "completedAtUtc": null,
+      "artifactHashes": [],
+      "processExits": [],
+      "evidenceProfile": null
+    },
+    {
+      "id": "wire-copy-e2e",
+      "profile": "deterministic-peer",
+      "tier": "deterministic-peer",
+      "required": true,
+      "blocking": true,
+      "verdict": "pending",
+      "topology": {
+        "serverCount": 1,
+        "clientCount": 2,
+        "processCount": 1,
+        "processIsolated": false
+      },
+      "seed": "0x9fc0c1eb1986a7c6",
+      "stateDigest": null,
+      "replayIdentity": "verification-v1:9fc0c1eb1986a7c6d86549dadccd324280610431:0x9fc0c1eb1986a7c6:wire-copy-e2e",
+      "startedAtUtc": null,
+      "completedAtUtc": null,
+      "artifactHashes": [],
+      "processExits": [],
+      "evidenceProfile": null
+    },
+    {
+      "id": "poller-game-thread",
+      "profile": "deterministic-peer",
+      "tier": "deterministic-peer",
+      "required": true,
+      "blocking": true,
+      "verdict": "pending",
+      "topology": {
+        "serverCount": 1,
+        "clientCount": 2,
+        "processCount": 1,
+        "processIsolated": false
+      },
+      "seed": "0x9fc0c1eb1986a7c6",
+      "stateDigest": null,
+      "replayIdentity": "verification-v1:9fc0c1eb1986a7c6d86549dadccd324280610431:0x9fc0c1eb1986a7c6:poller-game-thread",
+      "startedAtUtc": null,
+      "completedAtUtc": null,
+      "artifactHashes": [],
+      "processExits": [],
+      "evidenceProfile": null
+    },
+    {
+      "id": "deterministic-peer",
+      "profile": "deterministic-peer",
+      "tier": "deterministic-peer",
+      "required": true,
+      "blocking": true,
+      "verdict": "pending",
+      "topology": {
+        "serverCount": 1,
+        "clientCount": 2,
+        "processCount": 1,
+        "processIsolated": false
+      },
+      "seed": "0x9fc0c1eb1986a7c6",
+      "stateDigest": null,
+      "replayIdentity": "verification-v1:9fc0c1eb1986a7c6d86549dadccd324280610431:0x9fc0c1eb1986a7c6:deterministic-peer",
+      "startedAtUtc": null,
+      "completedAtUtc": null,
+      "artifactHashes": [],
+      "processExits": [],
+      "evidenceProfile": null
+    },
+    {
+      "id": "process-peer",
+      "profile": "process-peer",
+      "tier": "process-peer",
+      "required": true,
+      "blocking": true,
+      "verdict": "pending",
+      "topology": {
+        "serverCount": 1,
+        "clientCount": 2,
+        "processCount": 3,
+        "processIsolated": true
+      },
+      "seed": "0x9fc0c1eb1986a7c6",
+      "stateDigest": null,
+      "replayIdentity": "verification-v1:9fc0c1eb1986a7c6d86549dadccd324280610431:0x9fc0c1eb1986a7c6:process-peer",
+      "startedAtUtc": null,
+      "completedAtUtc": null,
+      "artifactHashes": [],
+      "processExits": [],
+      "evidenceProfile": null
+    },
+    {
+      "id": "rendered-smoke",
+      "profile": "rendered-smoke",
+      "tier": "rendered-smoke",
+      "required": true,
+      "blocking": true,
+      "verdict": "pending",
+      "topology": {
+        "serverCount": 1,
+        "clientCount": 2,
+        "processCount": 3,
+        "processIsolated": true
+      },
+      "seed": "0x9fc0c1eb1986a7c6",
+      "stateDigest": null,
+      "replayIdentity": "verification-v1:9fc0c1eb1986a7c6d86549dadccd324280610431:0x9fc0c1eb1986a7c6:rendered-smoke",
+      "startedAtUtc": null,
+      "completedAtUtc": null,
+      "artifactHashes": [],
+      "processExits": [],
+      "evidenceProfile": "functional"
+    },
+    {
+      "id": "full-live",
+      "profile": "full-live",
+      "tier": "full-live",
+      "required": true,
+      "blocking": true,
+      "verdict": "pending",
+      "topology": {
+        "serverCount": 1,
+        "clientCount": 2,
+        "processCount": 3,
+        "processIsolated": true
+      },
+      "seed": "0x9fc0c1eb1986a7c6",
+      "stateDigest": null,
+      "replayIdentity": "verification-v1:9fc0c1eb1986a7c6d86549dadccd324280610431:0x9fc0c1eb1986a7c6:full-live",
+      "startedAtUtc": null,
+      "completedAtUtc": null,
+      "artifactHashes": [],
+      "processExits": [],
+      "evidenceProfile": null
+    }
+  ],
+  "reasons": [
+    {
+      "ruleId": "unknown-path",
+      "tier": "full-live",
+      "description": "Unrecognized repository paths fail closed to the complete live profile.",
+      "paths": [
+        "features/catalog.csv"
+      ]
+    }
+  ]
+}
