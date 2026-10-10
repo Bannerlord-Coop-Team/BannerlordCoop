@@ -73,7 +73,6 @@ namespace GameInterface.Services.Heroes.Patches
             yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringsToDeliver));
             yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringToDeliver));
             yield return AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero));
-            yield return AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring));
         }
 
         [HarmonyTranspiler]
