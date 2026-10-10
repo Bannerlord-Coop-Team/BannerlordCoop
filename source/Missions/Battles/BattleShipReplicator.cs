@@ -46,6 +46,12 @@ public interface IBattleShipReplicator : IDisposable
 
     /// <summary>[Game thread] Rope state per throw station of every registered hull (diagnostics).</summary>
     object InspectRopes();
+
+    /// <summary>
+    /// [Game thread] Sends the own hulls' rope state once more as the mission ends, while the hulls are still live; samples
+    /// end with the mission, so peers would otherwise keep the last sample.
+    /// </summary>
+    void SendFinalRopes();
 }
 
 /// <inheritdoc cref="IBattleShipReplicator"/>
@@ -113,7 +119,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Subscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
         messageBroker.Subscribe<NetworkBattleShipSample>(Handle_NetworkBattleShipSample);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
-        messageBroker.Subscribe<BattleMissionLeaving>(Handle_MissionLeaving);
         messageBroker.Subscribe<NetworkBattleRopeFinal>(Handle_NetworkBattleRopeFinal);
         messageBroker.Subscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
         messageBroker.Subscribe<NetworkShipCondition>(Handle_NetworkShipCondition);
@@ -126,7 +131,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Unsubscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
         messageBroker.Unsubscribe<NetworkBattleShipSample>(Handle_NetworkBattleShipSample);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
-        messageBroker.Unsubscribe<BattleMissionLeaving>(Handle_MissionLeaving);
         messageBroker.Unsubscribe<NetworkBattleRopeFinal>(Handle_NetworkBattleRopeFinal);
         messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
         messageBroker.Unsubscribe<NetworkShipCondition>(Handle_NetworkShipCondition);
@@ -445,9 +449,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         return null;
     }
 
-    // [Game thread] Published by the battle controller before it stops the mesh; samples end here, so peers get the
-    // ropes' final state once more instead of keeping the last sample.
-    private void Handle_MissionLeaving(MessagePayload<BattleMissionLeaving> payload)
+    public void SendFinalRopes()
     {
         if (!spawnRecordsSent) return;
 

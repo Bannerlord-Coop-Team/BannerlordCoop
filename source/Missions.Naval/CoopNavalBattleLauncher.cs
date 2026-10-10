@@ -213,7 +213,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var shipDamageRouter = new BattleShipDamageRouter(network, messageBroker, controller.Session, controller.MissionComponent,
             shipEngine);
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(shipReplicator, stationUseReplicator, npcFleetSpawner,
-            shipDamageRouter));
+            shipDamageRouter, mission.GetMissionBehavior<NavalShipsLogic>()));
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(controller.Session, controller.Deployment, controller.ResultCommitter));
     }
 

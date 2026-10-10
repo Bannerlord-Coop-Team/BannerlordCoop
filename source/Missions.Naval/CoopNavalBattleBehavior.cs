@@ -1,4 +1,5 @@
 ﻿using Missions.Battles;
+using NavalDLC.Missions.MissionLogics;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
@@ -6,13 +7,18 @@ namespace Missions.Naval;
 /// <summary>Drives the coop naval services of one battle mission and tears them down with it.</summary>
 public class CoopNavalBattleBehavior : MissionLogic
 {
+    private readonly NavalShipsLogic shipsLogic;
+
     public CoopNavalBattleBehavior(IBattleShipReplicator shipReplicator, IAgentStationUseReplicator stationUseReplicator,
-        INavalNpcFleetSpawner npcFleetSpawner, IBattleShipDamageRouter shipDamageRouter)
+        INavalNpcFleetSpawner npcFleetSpawner, IBattleShipDamageRouter shipDamageRouter, NavalShipsLogic shipsLogic)
     {
         ShipReplicator = shipReplicator;
         StationUseReplicator = stationUseReplicator;
         NpcFleetSpawner = npcFleetSpawner;
         ShipDamageRouter = shipDamageRouter;
+        this.shipsLogic = shipsLogic;
+        // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached.
+        shipsLogic.MissionEndEvent += ShipReplicator.SendFinalRopes;
         CoopNavalMissionScope.IsActive = true;
     }
 
@@ -35,6 +41,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     public override void OnEndMissionInternal()
     {
         CoopNavalMissionScope.IsActive = false;
+        shipsLogic.MissionEndEvent -= ShipReplicator.SendFinalRopes;
         ShipDamageRouter.Dispose();
         StationUseReplicator.Dispose();
         ShipReplicator.Dispose();

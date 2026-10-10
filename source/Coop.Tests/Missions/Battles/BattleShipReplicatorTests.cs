@@ -357,14 +357,14 @@ public class BattleShipReplicatorTests
     }
 
     [Fact]
-    public void MissionLeaving_SendsTheOwnHullsFinalRopes()
+    public void SendFinalRopes_SendsTheOwnHullsFinalRopes()
     {
         var harness = new Harness(committed: true);
         var ropes = new[] { BattleRopeStateTests.Rope(2, BattleRopeState.BridgeConnected) };
         harness.Engine.Setup(e => e.CaptureRopes(harness.OwnHull, It.IsAny<Func<MissionObject, Guid>>())).Returns(ropes);
         harness.Replicator.Tick(0.1f);
 
-        harness.Broker.Publish(this, new BattleMissionLeaving("instance"));
+        harness.Replicator.SendFinalRopes();
 
         harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkBattleRopeFinal
             && ((NetworkBattleRopeFinal)m).ShipId == harness.OwnShipId
@@ -373,25 +373,25 @@ public class BattleShipReplicatorTests
     }
 
     [Fact]
-    public void MissionLeaving_WithoutRopes_SendsNoFinalState()
+    public void SendFinalRopes_WithoutRopes_SendsNoFinalState()
     {
         var harness = new Harness(committed: true);
         harness.Replicator.Tick(0.1f);
 
-        harness.Broker.Publish(this, new BattleMissionLeaving("instance"));
+        harness.Replicator.SendFinalRopes();
 
         harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkBattleRopeFinal)), Times.Never);
     }
 
     [Fact]
-    public void MissionLeaving_BeforeTheHullsWereAnnounced_SendsNoFinalState()
+    public void SendFinalRopes_BeforeTheHullsWereAnnounced_SendsNoFinalState()
     {
         var harness = new Harness(committed: false);
         harness.Engine.Setup(e => e.CaptureRopes(harness.OwnHull, It.IsAny<Func<MissionObject, Guid>>()))
             .Returns(new[] { BattleRopeStateTests.Rope(1, BattleRopeState.RopeThrown) });
         harness.Replicator.Tick(0.1f);
 
-        harness.Broker.Publish(this, new BattleMissionLeaving("instance"));
+        harness.Replicator.SendFinalRopes();
 
         harness.Network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
     }
