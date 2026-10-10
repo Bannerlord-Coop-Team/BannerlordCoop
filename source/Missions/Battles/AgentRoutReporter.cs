@@ -61,8 +61,7 @@ public class AgentRoutReporter : IAgentRoutReporter
     /// naval ships logic removes every hull with its crew in <c>OnEndMission</c>); peers must not despawn those, because
     /// the departure path decides which of them withdraw and which the successor adopts.
     /// </summary>
-    internal static bool IsBattlefieldRout(bool missionEnded, Mission.State missionState) =>
-        !missionEnded && missionState == Mission.State.Continuing;
+    internal static bool IsBattlefieldRout(Mission.State missionState) => missionState == Mission.State.Continuing;
 
     public void OnAgentFleeing(Agent agent)
     {
@@ -78,7 +77,7 @@ public class AgentRoutReporter : IAgentRoutReporter
     private void Handle_BattleAgentRouted(MessagePayload<BattleAgentRouted> payload)
     {
         var mission = payload.What.Agent?.Mission;
-        if (mission == null || !IsBattlefieldRout(mission.MissionEnded, mission.CurrentState)) return;
+        if (mission == null || !IsBattlefieldRout(mission.CurrentState)) return;
 
         var registry = coopMissionComponent.AgentRegistry;
 

@@ -7,15 +7,12 @@ namespace Coop.Tests.Missions.Battles;
 public class NavalMigrationRulesTests
 {
     [Theory]
-    [InlineData(false, Mission.State.Continuing, true)]
-    [InlineData(true, Mission.State.Continuing, false)]
-    [InlineData(true, Mission.State.EndingNextFrame, false)]
-    [InlineData(false, Mission.State.EndingNextFrame, false)]
-    [InlineData(false, Mission.State.Over, false)]
-    public void AgentRoutReporter_BroadcastsOnlyRoutsFromALiveBattleNotTheLeaversTeardown(
-        bool missionEnded, Mission.State state, bool expected)
+    [InlineData(Mission.State.Continuing, true)]
+    [InlineData(Mission.State.EndingNextFrame, false)]
+    [InlineData(Mission.State.Over, false)]
+    public void AgentRoutReporter_BroadcastsOnlyRoutsFromALiveBattleNotTheLeaversTeardown(Mission.State state, bool expected)
     {
-        Assert.Equal(expected, AgentRoutReporter.IsBattlefieldRout(missionEnded, state));
+        Assert.Equal(expected, AgentRoutReporter.IsBattlefieldRout(state));
     }
 
     [Theory]
