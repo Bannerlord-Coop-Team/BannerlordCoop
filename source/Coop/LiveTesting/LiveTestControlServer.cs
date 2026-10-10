@@ -881,7 +881,6 @@ namespace Coop.LiveTesting
                 topScreen,
                 activeMenu,
                 campaignLoaded,
-                navalLabCapability = ModInformation.NavalLabCapability,
                 requestedSaveName = ReadArgument(Environment.GetCommandLineArgs(), "/coopsave"),
                 loadedCampaignId = Campaign.Current?.UniqueGameId,
                 loadedSaveNameConfirmed = false,

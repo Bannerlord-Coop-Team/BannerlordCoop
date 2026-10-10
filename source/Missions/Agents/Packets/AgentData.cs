@@ -82,9 +82,6 @@ namespace Missions.Agents.Packets
             float? mountAction0TurnProgress = null,
             bool? mountAction0IsSyntheticTurn = null)
         {
-#if DEBUG
-            NavalHelmRevision = 0;
-#endif
             DeckShipIndex = 0;
             DeckLocal = Vec3.Zero;
             DeckShip = System.Guid.Empty;
@@ -193,11 +190,6 @@ namespace Missions.Agents.Packets
         /// <summary>The owner's current translation and turn inputs.</summary>
         [ProtoMember(9)]
         public uint MovementFlag { get; }
-#if DEBUG
-        // Fixed-fixture helm fence only; absent from the production Release schema.
-        [ProtoMember(10)]
-        public long NavalHelmRevision { get; set; }
-#endif
         // Deck pose: 0 is a world pose, otherwise a 1-based index into the packet's DeckShips with a hull-local position.
         [ProtoMember(11)]
         public int DeckShipIndex { get; private set; }

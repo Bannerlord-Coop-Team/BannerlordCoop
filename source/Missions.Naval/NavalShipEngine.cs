@@ -256,7 +256,7 @@ public class NavalShipEngine : INavalShipEngine
         return PlankSourceHull(agent);
     }
 
-    // A connected plank belongs to no hull; its rope's source hull is the reference frame, as in the naval lab.
+    // A connected plank belongs to no hull; its rope's source hull is the reference frame.
     private static MissionShip PlankSourceHull(Agent agent)
     {
         var shipsLogic = ShipsLogic;
@@ -384,8 +384,8 @@ public class NavalShipEngine : INavalShipEngine
             if (agent.CurrentlyUsedGameObject != null) agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
             agent.UseGameObject(point);
 
-            // A controller-less puppet never walks into the seat; seat it the way vanilla seats spawn crew (as the lab
-            // did): the helm sets its steering action and pins the pilot, an oar sits its rower down at once.
+            // A controller-less puppet never walks into the seat; seat it the way vanilla seats spawn crew: the helm
+            // sets its steering action and pins the pilot, an oar sits its rower down at once.
             var machine = PilotMachineOf(point);
             if (machine != null && machine.PilotAgent == agent) machine.OnPilotAssignedDuringSpawn();
             return;
@@ -400,7 +400,7 @@ public class NavalShipEngine : INavalShipEngine
     public bool IsSeated(Agent agent, UsableMissionObject point) =>
         agent != null && point != null && agent.IsActive() && point.UserAgent == agent && agent.CurrentlyUsedGameObject == point;
 
-    // The lab re-pinned every seated foreign actor on each hull frame write; vanilla's seat lock alone lets it slide.
+    // Re-pinned on each hull frame write, because vanilla's seat lock alone lets a seated foreign actor slide.
     public void PinToStation(Agent agent, UsableMissionObject point)
     {
         if (!point.LockUserFrames) return;

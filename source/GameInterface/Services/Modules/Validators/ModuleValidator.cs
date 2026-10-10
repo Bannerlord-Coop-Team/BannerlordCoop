@@ -39,17 +39,6 @@ public class ModuleValidator : IModuleValidator
             return false;
         }
 
-#if DEBUG
-        var serverLab = serverModules.Where(module => module.Id?.StartsWith(Common.ModInformation.NavalLabCapabilityPrefix, StringComparison.Ordinal) == true).ToArray();
-        var clientLab = clientModules.Where(module => module.Id?.StartsWith(Common.ModInformation.NavalLabCapabilityPrefix, StringComparison.Ordinal) == true).ToArray();
-        bool lab = serverLab.Length == 1 && clientLab.Length == 1 && serverLab[0].Id == clientLab[0].Id;
-        if ((serverLab.Length != 0 || clientLab.Length != 0)
-            && (!lab || !serverModules.Any(IsNavalDlc) || !clientModules.Any(IsNavalDlc)))
-        {
-            error = "Naval lab scope/capability or NavalDLC does not match.";
-            return false;
-        }
-#endif
         if (!ValidateNoDlc(clientModules, out error))
         {
             return false;

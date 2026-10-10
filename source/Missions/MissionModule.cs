@@ -214,11 +214,6 @@ public class MissionModule : Module
         // GameInterfaceModule — its handlers gate finalizes/conclusions on it too.
 #if DEBUG
         builder.RegisterType<Diagnostics.MissionInspection>().As<Diagnostics.IMissionInspection>().InstancePerDependency();
-        builder.RegisterType<NavalLabSessionStore>().As<INavalLabSessionStore>().InstancePerLifetimeScope();
-        builder.RegisterType<NavalMissionAdapterLoader>().As<INavalMissionAdapterLoader>().InstancePerDependency();
-        builder.RegisterType<NavalLabNativeState>().As<INavalLabNativeState>().InstancePerDependency();
-        builder.RegisterType<NavalLabController>().As<INavalLabController>().InstancePerDependency();
-        builder.RegisterType<NavalLabCoordinator>().As<INavalLabCoordinator>().As<INavalRopeCoordinator>().InstancePerLifetimeScope().AutoActivate();
 #endif
         builder.RegisterType<BattleHostHandler>()
             .AsSelf()
@@ -293,7 +288,6 @@ public class MissionModule : Module
             builder.RegisterAssemblyModules(LoadNavalMissionsAssembly());
     }
 
-    // Same path the DEBUG naval lab loader uses, so both share one loaded copy of the assembly.
     private static Assembly LoadNavalMissionsAssembly()
     {
         var directory = Path.GetDirectoryName(typeof(MissionModule).Assembly.Location);

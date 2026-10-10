@@ -25,20 +25,10 @@ internal class BattleCasualtyHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
 
-#if DEBUG
-    private readonly INavalLabSessionStore navalLab;
-#endif
-    public BattleCasualtyHandler(IMessageBroker messageBroker, IObjectManager objectManager
-#if DEBUG
-        , INavalLabSessionStore navalLab = null
-#endif
-        )
+    public BattleCasualtyHandler(IMessageBroker messageBroker, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
-#if DEBUG
-        this.navalLab = navalLab;
-#endif
 
         messageBroker.Subscribe<NetworkRequestBattleCasualty>(Handle_NetworkRequestBattleCasualty);
     }
@@ -57,13 +47,6 @@ internal class BattleCasualtyHandler : IHandler
         // Touches the map-event roster the game loop reads, so apply on the main thread.
         GameThread.RunSafe(() =>
         {
-#if DEBUG
-            if (navalLab?.Contains(msg.InstanceId) == true)
-            {
-                navalLab.RejectCampaignWrite("casualty");
-                return;
-            }
-#endif
             if (!objectManager.TryGetObjectWithLogging<MapEventParty>(msg.MapEventPartyId, out var mapEventParty))
                 return;
 

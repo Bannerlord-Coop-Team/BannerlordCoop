@@ -44,7 +44,7 @@ namespace Coop.Tests.Autofac
                 .Where(command => command.GetType().Assembly == typeof(MissionModule).Assembly)
                 .ToArray();
 #if DEBUG
-            Assert.Equal(26, missionCommands.Length);
+            Assert.Equal(30, missionCommands.Length);
             Assert.Equal(
                 new[] { "arm_inactive_party_deficit", "disconnect", "join_state" },
                 registeredCommands

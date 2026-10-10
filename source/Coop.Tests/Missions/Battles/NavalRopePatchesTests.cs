@@ -53,20 +53,6 @@ public class NavalRopePatchesTests
         Assert.True(routed >= 2);
     }
 
-#if DEBUG
-    [Fact]
-    public void ForceTranspiler_AfterTheLabsTranspiler_KeepsTheLabWrappers()
-    {
-        foreach (var method in RopeForcePatch.TargetMethods())
-        {
-            var lab = NavalLabRopePatches.OwnerEndpointWrites.Transpiler(PatchProcessor.GetOriginalInstructions(method)).ToArray();
-            var both = RopeForcePatch.Transpiler(lab).ToArray();
-
-            Assert.Equal(lab.Select(code => code.operand), both.Select(code => code.operand));
-        }
-    }
-#endif
-
     [Fact]
     public void ForceTranspiler_WithoutNativeCallsites_FailsClosed()
     {

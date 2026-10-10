@@ -28,14 +28,10 @@ public class NetworkRequestBattleCasualty : IEvent
     [ProtoMember(3)]
     public readonly bool Wounded;
 
-    [ProtoMember(4)]
-    public readonly string InstanceId;
-
-    public NetworkRequestBattleCasualty(string mapEventPartyId, string troopCharacterId, bool wounded, string instanceId = null)
+    public NetworkRequestBattleCasualty(string mapEventPartyId, string troopCharacterId, bool wounded)
     {
         MapEventPartyId = mapEventPartyId;
         TroopCharacterId = troopCharacterId;
         Wounded = wounded;
-        InstanceId = instanceId;
     }
 }

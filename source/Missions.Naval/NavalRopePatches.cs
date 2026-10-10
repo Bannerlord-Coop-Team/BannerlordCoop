@@ -93,7 +93,7 @@ internal class RopeThrowCurvePatch
 }
 
 // The joint's force callsites, bound directly because the physics methods can be inlined into them. Runs last, so
-// the DEBUG lab's own transpiler over the same callsites (applied by its PatchAll) keeps its wrappers.
+// another transpiler over the same callsites keeps its wrappers.
 [HarmonyPatch]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopeForcePatch

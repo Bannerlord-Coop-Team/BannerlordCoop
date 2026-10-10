@@ -149,7 +149,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     }
 
     // [Game thread] Runs after this frame's hull frame writes. A puppet the owner keeps seated is re-pinned to its station's
-    // user frame on the moved hull, as the lab did; if vanilla released it locally it is re-seated once per owner revision.
+    // user frame on the moved hull; if vanilla released it locally it is re-seated once per owner revision.
     /// <summary>
     /// An applied seat follows a remote owner's announcements. It ends when the puppet dies, when its hull sinks (the owner's
     /// agent can drown seated without a release) or when this client adopts it (host migration): from then on vanilla seats

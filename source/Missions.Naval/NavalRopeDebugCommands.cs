@@ -25,7 +25,7 @@ public static class NavalRopeDebugCommands
     internal static float Distance(ShipAttachmentMachine source, ShipAttachmentPointMachine target) =>
         source.GameEntity.GlobalPosition.Distance(NavalDebugHulls.HookPosition(target));
 
-    // The lab's check: vanilla's own attachment score for this pair, ignoring interaction range and blocking.
+    // Vanilla's own attachment score for this pair, ignoring interaction range and blocking.
     internal static bool IsAligned(ShipAttachmentMachine source, ShipAttachmentPointMachine target) =>
         ShipAttachmentMachine.ComputePotentialAttachmentValue(source, target, checkInteractionDistance: false,
             checkConnectionBlock: false, allowWiderAngleBetweenConnections: true) > 0f;
@@ -145,7 +145,7 @@ public static class NavalRopeDebugCommands
     }
 
     // coop.debug.naval.rope_throw 3 12
-    /// <summary>Throws a rope from an own station at a point of the nearest copied hull, as the naval lab's rope throw did.</summary>
+    /// <summary>Throws a rope from an own station at a point of the nearest copied hull.</summary>
     public sealed class RopeThrowCoopCommand : ICoopCommand
     {
         private readonly INavalDebugHulls hulls;

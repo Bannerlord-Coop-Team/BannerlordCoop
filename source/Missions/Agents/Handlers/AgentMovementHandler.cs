@@ -33,13 +33,6 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
     int AvailableOutgoingMovementBytes { get; }
 
     void Configure(MovementCadenceProfile profile);
-#if DEBUG
-    void ConfigureNavalLab();
-    void ConfigureNavalStationMovement(Func<CoopAgentInfo, bool> eligibility, Func<CoopAgentInfo, bool> helmEligibility = null,
-        Func<CoopAgentInfo, long?> helmRevision = null, Func<CoopAgentInfo, long, bool> acceptStationMovement = null,
-        NavalDeckPoseCapture deckCapture = null, NavalDeckFrameResolver deckFrame = null);
-    object InspectNavalStationMovement();
-#endif
 
     bool TrySetForcedBulkHz(int? hz, out string error);
 
@@ -93,10 +86,6 @@ public partial class AgentMovementHandler : IAgentMovementHandler
 #endif
 {
     private static readonly ILogger Logger = LogManager.GetLogger<AgentMovementHandler>();
-#if DEBUG
-    private volatile bool navalLab;
-    public void ConfigureNavalLab() => navalLab = true;
-#endif
 
     // Preserve the former 80-poll window at 40 Hz as a cadence-independent two-second animation.
     private const float SyntheticMountTurnDurationSeconds = 2f;
@@ -514,9 +503,6 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         recipientMovementStates.Clear();
         ConfigureShipDecks(null, null);
         ConfigureSeatedMovement(null);
-#if DEBUG
-        ConfigureNavalStationMovement(null);
-#endif
 
         movementBatchSender.Clear();
         movementRateController.Dispose();
@@ -1041,9 +1027,6 @@ public partial class AgentMovementHandler : IAgentMovementHandler
 
             Guid agentId = captured.AgentInfo.AgentId;
             if (WithholdSeatedMovement(recipient, captured)) continue;
-#if DEBUG
-            if (WithholdNavalStationMovement(controllerId, recipient, captured)) continue;
-#endif
             bool shouldSend = captured.IsMount
                 ? ShouldSendMovement(recipient, agentId, captured.MountData)
                 : ShouldSendMovement(recipient, agentId, captured.AgentData);
@@ -1199,9 +1182,6 @@ public partial class AgentMovementHandler : IAgentMovementHandler
             sentState = new LastSentMovementState();
             recipient.LastSentMovement.Add(agentId, sentState);
         }
-#if DEBUG
-        RecordNavalStationMovementSent(recipient, agentId);
-#endif
         sentState.AgentData = current;
         sentState.MountData = null;
         sentState.IsMount = false;
@@ -1707,9 +1687,6 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         AgentData[] data)
     {
         Guid[] deckShips = StampDecks(identityScopeId, compactIds, canonicalIds, data);
-#if DEBUG
-        StampNavalHelmMovement(identityScopeId, compactIds, canonicalIds, data);
-#endif
         return identityScopeId == null
             ? new MovementPacket(canonicalIds, data, deckShips)
             : new MovementPacket(identityScopeId, compactIds, data, deckShips);
@@ -1842,13 +1819,6 @@ public partial class AgentMovementHandler : IAgentMovementHandler
                 if (agentRegistry.IsLocallyControlled(agent))
                     continue;
 
-#if DEBUG
-                if (acceptNavalStationMovement?.Invoke(agentInfo, data.NavalHelmRevision) == false)
-                {
-                    _interpolator.Forget(agent);
-                    continue;
-                }
-#endif
                 // The interpolator owns a deck pose and its rebased directions every tick.
                 if (data.DeckShipIndex != 0)
                 {
@@ -2138,10 +2108,6 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         // BattleAuthorityMigrator owns battle withdrawal because it can distinguish the player's party from
         // NPC forces the departed host was running. Skip this location-style all-controller cleanup.
         if (BattleSpawnGate.IsCoopBattleActive) return;
-#if DEBUG
-        // Synthetic crew belong to this handler's fixture, not a stale location party.
-        if (navalLab) return;
-#endif
 
         // Same fork for settlement missions (SR-015): LocationAuthorityMigrator despawns only the departed
         // controller's player and companion agents; its host-owned NPC puppets survive for migration,

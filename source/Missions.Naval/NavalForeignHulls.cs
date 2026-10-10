@@ -5,7 +5,7 @@ namespace Missions.Naval;
 
 /// <summary>
 /// [Game thread writes] The hulls in the current mission that another owner simulates. Static because the Harmony
-/// gates read it; hulls that never registered here (the DEBUG lab's fixtures) stay on the vanilla path. Copy on write,
+/// gates read it; hulls that never registered here stay on the vanilla path. Copy on write,
 /// because the ship damage gate also reads it from hull contact callbacks on physics threads.
 /// </summary>
 internal static class NavalForeignHulls

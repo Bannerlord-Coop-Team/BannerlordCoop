@@ -62,9 +62,6 @@ internal class BattleHostHandler : IHandler
     private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly IBattleTroopLedger ledger;
     private readonly IBattleSizeProvider battleSizeProvider;
-#if DEBUG
-    private readonly INavalLabSessionStore navalLab;
-#endif
 
     // [Server] Highest host epoch ever issued per battle instance (BR-102), retained across assignment
     // removal: clients keep their last assignment when a battle is fully abandoned (only the server's entry
@@ -130,11 +127,7 @@ internal class BattleHostHandler : IHandler
         IControllerIdProvider controllerIdProvider,
         IBattleTroopReserveBuilder reserveBuilder,
         IBattleTroopLedger ledger,
-        IBattleSizeProvider battleSizeProvider
-#if DEBUG
-        , INavalLabSessionStore navalLab = null
-#endif
-        )
+        IBattleSizeProvider battleSizeProvider)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -145,9 +138,6 @@ internal class BattleHostHandler : IHandler
         this.reserveBuilder = reserveBuilder;
         this.ledger = ledger;
         this.battleSizeProvider = battleSizeProvider;
-#if DEBUG
-        this.navalLab = navalLab;
-#endif
 
         messageBroker.Subscribe<PlayerEnteredBattle>(Handle_PlayerEnteredBattle);
         messageBroker.Subscribe<BattleMissionReady>(Handle_BattleMissionReady);
@@ -224,15 +214,6 @@ internal class BattleHostHandler : IHandler
         // append in arrival (= mission-ready) order, so concurrent requests cannot double-elect.
         GameThread.RunSafe(() =>
         {
-#if DEBUG
-            if (navalLab?.Contains(mapEventId) == true)
-            {
-                if (navalLab.IsParticipant(mapEventId, requesterId) && requester != null
-                    && playerManager.TryGetPlayer(requester, out var player) && player.ControllerId == requesterId)
-                    ElectMissionReady(mapEventId, requesterId, requester);
-                return;
-            }
-#endif
             if (!objectManager.TryGetObjectWithLogging<MapEvent>(mapEventId, out var mapEvent))
                 return;
 

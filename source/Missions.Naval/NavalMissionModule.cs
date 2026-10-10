@@ -12,7 +12,6 @@ namespace Missions.Naval;
 /// </summary>
 public class NavalMissionModule : Module
 {
-    // The DEBUG naval lab's PatchAll over this assembly applies these too; its hulls never register, so the gates pass them.
     internal const string PatchCategory = "CoopNavalShipPatches";
 
     protected override void Load(ContainerBuilder builder)

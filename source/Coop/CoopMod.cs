@@ -128,13 +128,6 @@ namespace Coop
             var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
             ModInformation.IsNavalDlcActive = moduleInfoProvider.GetModuleInfos()
                 .Any(module => module.Id == ModInformation.NavalDlcModuleId && module.IsDlc);
-#if DEBUG
-            var navalOptInPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(typeof(CoopMod).Assembly.Location), "naval-lab.optin");
-            ModInformation.ConfigureNavalLab(
-                File.Exists(navalOptInPath) ? File.ReadAllText(navalOptInPath) : null,
-                LiveTestControlServer.ReadArgument(Environment.GetCommandLineArgs(), "/cooptestrun"),
-                ModInformation.IsNavalDlcActive);
-#endif
             StartupDiagnosticsSequence.Run(version =>
                 {
                     informationalVersion = version;

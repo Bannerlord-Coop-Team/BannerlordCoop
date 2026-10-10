@@ -15,7 +15,7 @@ using RopeState = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread] Owner-authored ropes and planks, ported from the naval lab. The owner of a rope's source hull runs
+/// [Game thread] Owner-authored ropes and planks. The owner of a rope's source hull runs
 /// vanilla's throw, pull and plank logic and publishes each throw station with its hull samples; every other client
 /// keeps a replica on its copy of that hull whose state changes and rope ticks are frozen and replaced by the owner's
 /// state. Joint forces reach only hulls this client simulates. Static because the rope patches read it.
