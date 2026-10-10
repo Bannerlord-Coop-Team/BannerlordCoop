@@ -1260,20 +1260,24 @@ public class LordBarterSyncTests : MapEventTestBase
     {
         WarDeclared,
         ClanChangedKingdom,
+        FiefGranted,
     }
 
     /// <summary>
-    /// The pinned price only holds for the war state and kingdom it was priced from, and the voided
+    /// The pinned price only holds for the war state, kingdom and fiefs it was priced from, and the voided
     /// authorization is dropped so a reopened barter gets a fresh price.
     /// </summary>
     [Theory]
     [InlineData(DefectionPriceChange.WarDeclared)]
     [InlineData(DefectionPriceChange.ClanChangedKingdom)]
+    [InlineData(DefectionPriceChange.FiefGranted)]
     public void JoinKingdomBarter_PriceInputsChangeAfterAuthorization_IsRejected(DefectionPriceChange change)
     {
         var client = Clients.First();
         var fixture = CreateDefectionFixture(client);
         var otherKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var fiefSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var fiefTownId = TestEnvironment.CreateRegisteredObject<Town>();
 
         Server.Call(() =>
         {
@@ -1300,10 +1304,18 @@ public class LordBarterSyncTests : MapEventTestBase
                         VillageHostileFactionStanceHelper.ApplyWarStance(destination, targetHero.Clan.Kingdom);
                         Assert.True(destination.IsAtWarWith(targetHero.Clan.Kingdom));
                     }
-                    else
+                    else if (change == DefectionPriceChange.ClanChangedKingdom)
                     {
                         using (new AllowedThread())
                             targetHero.Clan._kingdom = otherKingdom;
+                    }
+                    else
+                    {
+                        Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fiefSettlementId, out var settlement));
+                        Assert.True(Server.ObjectManager.TryGetObject<Town>(fiefTownId, out var town));
+                        settlement.SetSettlementComponent(town);
+                        town.OwnerClan = targetHero.Clan;
+                        Assert.Contains(town, targetHero.Clan.Fiefs);
                     }
                 }));
 
