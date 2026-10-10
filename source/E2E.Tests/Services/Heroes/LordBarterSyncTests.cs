@@ -1,4 +1,5 @@
-﻿using Common.Network;
+﻿using Common;
+using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
@@ -43,6 +44,8 @@ public class LordBarterSyncTests : MapEventTestBase
     private static IFaction? safePassageNearbyFaction;
     private static SceneNotificationData? shownJoinKingdomScene;
     private static readonly List<string> shownMessages = new();
+    private static int serverJoinKingdomPrice;
+    private static int clientJoinKingdomPrice;
 
     public LordBarterSyncTests(ITestOutputHelper output) : base(output)
     {
@@ -1086,6 +1089,96 @@ public class LordBarterSyncTests : MapEventTestBase
         return false;
     }
 
+    /// <summary>
+    /// The client can't reproduce every input of the defection price, so its barter shows the price the
+    /// server authorized, and the server holds that price after its own valuation moves on.
+    /// </summary>
+    [Fact]
+    public void JoinKingdomBarter_ClientAndServerUseTheAuthorizedPrice()
+    {
+        const int authorizedPrice = -50_000;
+        var client = Clients.First();
+        var fixture = CreateDefectionFixture(client);
+        var harmony = new Harmony($"e2e.lord-defection-price.{Guid.NewGuid():N}");
+        BarterData? clientBarter = null;
+        JoinKingdomAsClanBarterable? clientJoinKingdom = null;
+
+        Server.Call(() =>
+        {
+            new GoldBarterBehavior().RegisterEvents();
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.PlayerHeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(fixture.TargetMobilePartyId, out var targetParty));
+            playerHero.Gold = 1_000_000;
+            Assert.True(ConversationPartyHold.TryEngage(
+                Server.Resolve<ConversationPartyTracker>(),
+                client.NetPeer,
+                fixture.PlayerPartyId,
+                targetParty,
+                fixture.TargetPartyId,
+                engagerIsDefender: true));
+        });
+
+        serverJoinKingdomPrice = authorizedPrice;
+        clientJoinKingdomPrice = -1;
+        harmony.Patch(
+            AccessTools.Method(typeof(JoinKingdomAsClanBarterable), nameof(JoinKingdomAsClanBarterable.GetUnitValueForFaction)),
+            prefix: new HarmonyMethod(typeof(LordBarterSyncTests), nameof(PriceJoinKingdomPerInstance)));
+
+        try
+        {
+            client.NetworkSentMessages.Clear();
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.PlayerHeroId, out var playerHero));
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(fixture.PlayerMobilePartyId, out var playerParty));
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(fixture.TargetHeroId, out var targetHero));
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(fixture.TargetMobilePartyId, out var targetParty));
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(fixture.DestinationKingdomId, out var destination));
+
+                clientJoinKingdom = new JoinKingdomAsClanBarterable(targetHero, destination, isDefecting: true);
+                clientBarter = new BarterData(playerHero, targetHero, playerParty.Party, targetParty.Party, null);
+                clientBarter.AddBarterGroup(new DefaultsBarterGroup());
+                clientJoinKingdom.SetIsOffered(true);
+                clientBarter.AddBarterable<DefaultsBarterGroup>(clientJoinKingdom, true);
+                LordBarterPatch.BeginPlayerBarterPostfix(clientBarter);
+            });
+            PumpClients();
+
+            client.Call(() => Assert.Equal(
+                authorizedPrice,
+                clientJoinKingdom!.GetValueForFaction(clientJoinKingdom.OriginalOwner.Clan)));
+
+            var authorization = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkAuthorizeLordBarter>());
+            serverJoinKingdomPrice = authorizedPrice * 2;
+            Server.NetworkSentMessages.Clear();
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestLordBarter(
+                fixture.TargetHeroId,
+                PeaceConversationContext.MapParty,
+                fixture.TargetPartyId,
+                LordBarterKind.JoinKingdomAsClan,
+                new[] { new PeaceBarterTerm(PeaceBarterTermType.Gold, fixture.PlayerHeroId, null, null, true, -authorizedPrice) },
+                authorization.RequestId)));
+            TestEnvironment.FlushCoalescer();
+
+            var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordBarterResult>());
+            Assert.True(result.Accepted, result.Reason);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            client.Call(LordBarterPatch.ClearPendingRequest);
+            Server.Call(() => ConversationPartyHold.EndEngagement(Server.Resolve<ConversationPartyTracker>(), client.NetPeer));
+        }
+
+        Server.PumpGameThread();
+    }
+
+    private static bool PriceJoinKingdomPerInstance(ref int __result)
+    {
+        __result = ModInformation.IsServer ? serverJoinKingdomPrice : clientJoinKingdomPrice;
+        return false;
+    }
+
     [Fact]
     public void JoinKingdomBarter_PlayerChangesKingdomAfterAuthorization_IsRejected()
     {
@@ -1117,13 +1210,22 @@ public class LordBarterSyncTests : MapEventTestBase
                 engagerIsDefender: true));
         });
 
-        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkAuthorizeLordBarter(
-            requestId,
-            target.HeroId,
-            PeaceConversationContext.MapParty,
-            target.PartyId,
-            LordBarterKind.JoinKingdomAsClan,
-            authorizedKingdomId)));
+        // Pricing the defection at authorization needs ruling clans this fixture doesn't set up.
+        var harmony = AcceptEveryDefectionOffer(scoreFiefsAsZero: true);
+        try
+        {
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkAuthorizeLordBarter(
+                requestId,
+                target.HeroId,
+                PeaceConversationContext.MapParty,
+                target.PartyId,
+                LordBarterKind.JoinKingdomAsClan,
+                authorizedKingdomId)));
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
@@ -1152,6 +1254,101 @@ public class LordBarterSyncTests : MapEventTestBase
             Assert.Same(changedKingdom, playerHero.Clan.Kingdom);
             Assert.Same(targetOriginalKingdom, targetHero.Clan.Kingdom);
         });
+    }
+
+    public enum DefectionPriceChange
+    {
+        WarDeclared,
+        ClanChangedKingdom,
+        FiefGranted,
+    }
+
+    /// <summary>
+    /// The pinned price only holds for the war state, kingdom and fiefs it was priced from, and the voided
+    /// authorization is dropped so a reopened barter gets a fresh price.
+    /// </summary>
+    [Theory]
+    [InlineData(DefectionPriceChange.WarDeclared)]
+    [InlineData(DefectionPriceChange.ClanChangedKingdom)]
+    [InlineData(DefectionPriceChange.FiefGranted)]
+    public void JoinKingdomBarter_PriceInputsChangeAfterAuthorization_IsRejected(DefectionPriceChange change)
+    {
+        var client = Clients.First();
+        var fixture = CreateDefectionFixture(client);
+        var otherKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var fiefSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var fiefTownId = TestEnvironment.CreateRegisteredObject<Town>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(fixture.PlayerMobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.TargetHeroId, out var targetHero));
+            TakePrisonerAction.Apply(playerParty.Party, targetHero);
+        });
+
+        var harmony = AcceptEveryDefectionOffer();
+        try
+        {
+            var result = SendDefectionBarter(
+                client,
+                fixture,
+                PeaceConversationContext.PlayerPartyPrisoner,
+                fixture.PlayerPartyId,
+                betweenAuthorizationAndRequest: () => Server.Call(() =>
+                {
+                    Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.TargetHeroId, out var targetHero));
+                    Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(fixture.DestinationKingdomId, out var destination));
+                    Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(otherKingdomId, out var otherKingdom));
+                    if (change == DefectionPriceChange.WarDeclared)
+                    {
+                        VillageHostileFactionStanceHelper.ApplyWarStance(destination, targetHero.Clan.Kingdom);
+                        Assert.True(destination.IsAtWarWith(targetHero.Clan.Kingdom));
+                    }
+                    else if (change == DefectionPriceChange.ClanChangedKingdom)
+                    {
+                        using (new AllowedThread())
+                            targetHero.Clan._kingdom = otherKingdom;
+                    }
+                    else
+                    {
+                        Assert.True(Server.ObjectManager.TryGetObject<Settlement>(fiefSettlementId, out var settlement));
+                        Assert.True(Server.ObjectManager.TryGetObject<Town>(fiefTownId, out var town));
+                        settlement.SetSettlementComponent(town);
+                        town.OwnerClan = targetHero.Clan;
+                        Assert.Contains(town, targetHero.Clan.Fiefs);
+                    }
+                }));
+
+            Assert.False(result.Accepted);
+            Assert.Contains("situation changed", result.Reason);
+
+            Server.NetworkSentMessages.Clear();
+            client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestLordBarter(
+                fixture.TargetHeroId,
+                PeaceConversationContext.PlayerPartyPrisoner,
+                fixture.PlayerPartyId,
+                LordBarterKind.JoinKingdomAsClan,
+                Array.Empty<PeaceBarterTerm>(),
+                result.RequestId)));
+            TestEnvironment.FlushCoalescer();
+
+            var retry = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordBarterResult>());
+            Assert.False(retry.Accepted);
+            Assert.Contains("no longer authorized", retry.Reason);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.TargetHeroId, out var targetHero));
+                Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(fixture.DestinationKingdomId, out var destination));
+                Assert.NotSame(destination, targetHero.Clan.Kingdom);
+                Assert.True(targetHero.IsPrisoner);
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+
+        Server.PumpGameThread();
     }
 
     /// <summary>
@@ -1926,7 +2123,9 @@ public class LordBarterSyncTests : MapEventTestBase
         string PlayerPartyId,
         string TargetHeroId,
         string DestinationKingdomId,
-        string OriginKingdomId);
+        string OriginKingdomId,
+        string TargetMobilePartyId,
+        string TargetPartyId);
 
     /// <summary>
     /// A registered player whose clan belongs to the destination kingdom, and a target leading a clan in
@@ -1995,7 +2194,9 @@ public class LordBarterSyncTests : MapEventTestBase
             player.PartyId,
             target.HeroId,
             destinationKingdomId,
-            originKingdomId);
+            originKingdomId,
+            target.MobilePartyId,
+            target.PartyId);
     }
 
     private string CreateTownOwnedBy(string ownerHeroId)

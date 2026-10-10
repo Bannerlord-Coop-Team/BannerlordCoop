@@ -158,6 +158,15 @@ public class NetworkBarterSerializationTest
     }
 
     [Fact]
+    public void LordBarterAuthorized_RoundTrip_PreservesCorrelationAndNegativePrice()
+    {
+        var result = RoundTrip(new NetworkLordBarterAuthorized("lord-request", -3_108_299));
+
+        Assert.Equal("lord-request", result.RequestId);
+        Assert.Equal(-3_108_299, result.JoinKingdomValue);
+    }
+
+    [Fact]
     public void LordBarterAuthorizationCancellation_RoundTrip_PreservesCorrelation()
     {
         var result = RoundTrip(new NetworkCancelLordBarterAuthorization("lord-request"));
