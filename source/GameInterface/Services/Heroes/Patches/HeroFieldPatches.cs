@@ -151,14 +151,15 @@ namespace GameInterface.Services.Heroes.Patches
         }
 
         [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> FirstNameTranspiler(IEnumerable<CodeInstruction> instructions)
+        private static IEnumerable<CodeInstruction> FirstNameTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase original)
         {
             var firstNameField = AccessTools.Field(typeof(Hero), nameof(Hero._firstName));
             var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(FirstNameIntercept));
+            var isSetName = IsSetName(original);
 
             foreach (var instruction in instructions)
             {
-                if (instruction.StoresField(firstNameField))
+                if (!isSetName && instruction.StoresField(firstNameField))
                 {
                     yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
                 }
@@ -188,14 +189,15 @@ namespace GameInterface.Services.Heroes.Patches
         }
 
         [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> NameTranspiler(IEnumerable<CodeInstruction> instructions)
+        private static IEnumerable<CodeInstruction> NameTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase original)
         {
             var nameField = AccessTools.Field(typeof(Hero), nameof(Hero._name));
             var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(NameIntercept));
+            var isSetName = IsSetName(original);
 
             foreach (var instruction in instructions)
             {
-                if (instruction.StoresField(nameField))
+                if (!isSetName && instruction.StoresField(nameField))
                 {
                     yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
                 }
@@ -222,6 +224,12 @@ namespace GameInterface.Services.Heroes.Patches
             MessageBroker.Instance.Publish(instance, new NameChanged(newName?.Value, instance));
 
             instance._name = newName;
+        }
+
+        // SetName is synced with its full TextObjects by HeroDataPatches, a raw string here would overwrite them on clients
+        private static bool IsSetName(MethodBase original)
+        {
+            return original.DeclaringType == typeof(Hero) && original.Name == nameof(Hero.SetName);
         }
 
         [HarmonyTranspiler]
