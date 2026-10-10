@@ -1,4 +1,5 @@
 using Common;
+using Common.Network.Session;
 using System;
 using TaleWorlds.Core.ViewModelCollection.Information;
 using TaleWorlds.Library;
@@ -89,5 +90,15 @@ public sealed class SteamLobbyListItemVM : ViewModel
         if (!IsCompatible) return;
 
         onJoin(LobbyId);
+    }
+
+    public bool Shows(SteamLobbySummary lobby)
+    {
+        return lobby.LobbyId == LobbyId &&
+               (lobby.OwnerName?.Trim() ?? string.Empty) == OwnerName &&
+               Math.Max(0, lobby.ConnectedPlayers) == ConnectedPlayers &&
+               lobby.ProtocolVersion == ProtocolVersion &&
+               (lobby.ModVersion ?? string.Empty) == ModVersion &&
+               lobby.PasswordRequired == PasswordRequired;
     }
 }
