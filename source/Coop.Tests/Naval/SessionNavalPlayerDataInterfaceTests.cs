@@ -1,6 +1,6 @@
 ﻿#if DEBUG
 using Common.Messaging;
-using Coop.Naval.Interfaces;
+using Coop.Naval.CoopSession.Interfaces;
 using GameInterface.CoopSessionData;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.ObjectManager;

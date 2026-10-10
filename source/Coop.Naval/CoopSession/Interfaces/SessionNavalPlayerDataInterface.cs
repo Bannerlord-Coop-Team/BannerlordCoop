@@ -9,7 +9,7 @@ using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
 
-namespace Coop.Naval.Interfaces;
+namespace Coop.Naval.CoopSession.Interfaces;
 
 public interface ISessionNavalPlayerDataInterface : IGameAbstraction
 {

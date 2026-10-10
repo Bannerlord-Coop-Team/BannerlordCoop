@@ -2,8 +2,8 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Coop.Naval.Interfaces;
-using Coop.Naval.Messages;
+using Coop.Naval.CoopSession.Interfaces;
+using Coop.Naval.CoopSession.Messages;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.NavalDLC.Messages;
@@ -15,7 +15,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.ObjectSystem;
 
-namespace Coop.Naval.Handlers;
+namespace Coop.Naval.CoopSession.Handlers;
 
 internal class NavalInitializationHandler : IHandler
 {

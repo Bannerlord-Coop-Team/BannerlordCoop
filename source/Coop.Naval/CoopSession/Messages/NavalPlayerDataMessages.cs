@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace Coop.Naval.Messages;
+namespace Coop.Naval.CoopSession.Messages;
 
 [ProtoContract(SkipConstructor = true)]
 internal class NetworkInitializeServerNavalDataKeys : ICommand
