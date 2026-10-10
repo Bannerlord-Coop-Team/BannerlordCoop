@@ -1,9 +1,11 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Heroes.Patches;
 
