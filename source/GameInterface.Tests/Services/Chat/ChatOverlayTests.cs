@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Chat;
+using GameInterface.Services.Chat;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 using Xunit;
@@ -189,18 +189,16 @@ public class ChatOverlayTests
     }
 
     [Theory]
-    [InlineData(true, true, true, true)]
-    [InlineData(true, true, false, false)]
-    [InlineData(true, false, true, false)]
-    [InlineData(false, true, true, false)]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
     public void SettlementMapMenu_OnlyWhenMapMenuAndInSettlement(
-        bool isMapScreen,
         bool atMenu,
         bool hasCurrentSettlement,
         bool expected)
     {
         Assert.Equal(expected, ChatOverlay.IsSettlementMapMenu(
-            isMapScreen,
             atMenu,
             hasCurrentSettlement));
     }

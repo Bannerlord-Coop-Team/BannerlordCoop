@@ -26,6 +26,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private const string ResizerWidgetId = "CoopChatResizer";
     private const string ResizeFrameWidgetId = "CoopChatResizeFrame";
     private const string ResizeCaptureWidgetId = "CoopChatResizeCapture";
+    private const string MapMenuLayerName = "MapMenuView";
     private const int LayerOrder = 200;
     private const float ResizeTransitionSeconds = 0.14f;
 
@@ -46,6 +47,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private bool ignoreNextOutsideClick;
     private bool playerChatEnabled;
     private bool allowChatOpen;
+    private bool isSettlementMenu;
     private bool pinFeedToBottom;
     private float pinFeedLastMaxValue = -1f;
     private bool isResizing;
@@ -241,22 +243,10 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
         var focusedLayer = ScreenManager.FocusedLayer;
         if (focusedLayer == null || ReferenceEquals(focusedLayer, gauntletLayer)) return true;
+        if (focusedLayer.InputRestrictions.Order > gauntletLayer.InputRestrictions.Order) return false;
 
-        // Don't steal from another text field
-        if (focusedLayer is GauntletLayer focusedGauntletLayer &&
-            focusedGauntletLayer.UIContext.EventManager.FocusedWidget is EditableTextWidget)
-        {
-            return false;
-        }
-
-        // Settlement game menus often sit above this global layer; still allow Enter there
-        if (focusedLayer.InputRestrictions.Order > gauntletLayer.InputRestrictions.Order &&
-            !IsSettlementMapMenuActive())
-        {
-            return false;
-        }
-
-        return true;
+        return focusedLayer is not GauntletLayer focusedGauntletLayer ||
+               focusedGauntletLayer.UIContext.EventManager.FocusedWidget is not EditableTextWidget;
     }
 
     private bool UpdateVisibility()
@@ -264,10 +254,10 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         var topScreen = ScreenManager.TopScreen;
         ScreenLayer gameplayLayer;
         bool isOpenableScreen;
-        bool isSettlementMenu = false;
         bool isConversationActive = Campaign.Current?.ConversationManager?.IsConversationInProgress == true;
         bool isCampaignContext = Campaign.Current != null;
         bool isLoading = LoadingWindow.IsLoadingWindowActive;
+        isSettlementMenu = false;
 
         if (topScreen is MapScreen mapScreen)
         {
@@ -275,8 +265,8 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             var mapState = GameStateManager.Current?.ActiveState as MapState;
             bool atMenu = mapState?.AtMenu == true;
             bool hasSettlement = MobileParty.MainParty?.CurrentSettlement != null;
-            isSettlementMenu = IsSettlementMapMenu(isMapScreen: true, atMenu, hasSettlement);
-            // Open map, or settlement town/castle/village menus (not inventory/party — those leave MapScreen)
+            isSettlementMenu = IsSettlementMapMenu(atMenu, hasSettlement);
+            // Open map or settlement menus (inventory/party leave MapScreen)
             isOpenableScreen = mapState != null && (!atMenu || isSettlementMenu);
         }
         else if (topScreen is MissionScreen missionScreen)
@@ -295,9 +285,10 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         var focusedLayer = ScreenManager.FocusedLayer;
         bool isGameplayLayerFocused = ReferenceEquals(focusedLayer, gameplayLayer);
         bool isChatLayerFocused = ReferenceEquals(focusedLayer, gauntletLayer);
+        // MapMenuView only, not escape/encyclopedia/other MapScreen layers
         bool isSettlementMenuLayerFocused = isSettlementMenu &&
             topScreen is MapScreen settlementMapScreen &&
-            IsLayerOnScreen(settlementMapScreen, focusedLayer);
+            ReferenceEquals(focusedLayer, settlementMapScreen.FindLayer<GauntletLayer>(MapMenuLayerName));
 
         // Don't fall back to vanilla feed when gameplay screens clear the frame
         bool shouldShow = ShouldShowPresentation(isCampaignContext, isConversationActive, isLoading);
@@ -319,15 +310,15 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         vanillaLogGate.SetReplacementVisible(shouldShow);
         // Menus/options sit under this global layer; drop mouse so their widgets stay clickable
         if (shouldShow && !dataSource.IsOpen)
-            ApplyClosedFeedInputRestrictions(isSettlementMenu);
+            ApplyClosedFeedInputRestrictions();
 
         return shouldShow;
     }
 
-    private void ApplyClosedFeedInputRestrictions(bool settlementMenu = false)
+    private void ApplyClosedFeedInputRestrictions()
     {
         // Settlement menus need display-only even when Enter is allowed, otherwise the feed steals clicks
-        if (allowChatOpen && !settlementMenu)
+        if (allowChatOpen && !isSettlementMenu)
             SetPassiveInputRestrictions(gauntletLayer.InputRestrictions);
         else
             SetDisplayOnlyInputRestrictions(gauntletLayer.InputRestrictions);
@@ -521,15 +512,13 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
         ResolveFeedWidgets();
         bool overChat = IsPointerOverOpenChat();
-        // Do not use LatestMouseDownWidget — it stays on the last chat control after DisplayOnly
-        // map clicks, which would re-open the fullscreen capture and steal movement.
         bool holdFromChat = UpdateChatPointerCapture(overChat);
         // Resize owns the capture widget while dragging
         if (!isResizing && !applyResizeToPanel)
             SetResizeCaptureVisible(holdFromChat);
 
         bool mouseCaptureActive = holdFromChat || isResizing || applyResizeToPanel;
-        // Only claim mouse over the panel (or while dragging it); otherwise map clicks pass through
+        // Claim mouse only over the panel or while dragging, so map clicks pass through
         bool claimMouse = overChat || mouseCaptureActive;
 
         if (isInputFocused)
@@ -566,7 +555,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     {
         if (chatRootWidget == null) return false;
 
-        // Measured bounds only — avoid Gauntlet hover, which can go stale under DisplayOnly.
+        // Measured bounds only, Gauntlet hover can go stale under DisplayOnly
         return chatRootWidget.IsPointInsideMeasuredArea(
             gauntletLayer.UIContext.EventManager.MousePosition);
     }
@@ -594,7 +583,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             return;
         }
 
-        // Keyboard only here; UpdateOpenPanelCursorAndCapture adds mouse when the pointer is over chat
+        // Keyboard only, UpdateOpenPanelCursorAndCapture adds mouse over the panel
         SetOpenPanelTypingRestrictions(gauntletLayer.InputRestrictions);
         gauntletLayer.IsFocusLayer = true;
         ScreenManager.TrySetFocus(gauntletLayer);
@@ -628,7 +617,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         if (dataSource.IsOpen)
             UpdateOpenPanelCursorAndCapture();
         else
-            ApplyClosedFeedInputRestrictions(IsSettlementMapMenuActive());
+            ApplyClosedFeedInputRestrictions();
     }
 
     internal static bool ShouldReleaseInputFocus(
@@ -693,36 +682,10 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
                (isGameplayLayerFocused || isChatLayerFocused);
     }
 
-    /// <summary>Town/castle/village game menus on MapScreen; inventory/party replace the screen and stay excluded.</summary>
-    internal static bool IsSettlementMapMenu(bool isMapScreen, bool atMenu, bool hasCurrentSettlement)
+    /// <summary>AtMenu with a current settlement. Inventory/party leave MapScreen.</summary>
+    internal static bool IsSettlementMapMenu(bool atMenu, bool hasCurrentSettlement)
     {
-        return isMapScreen && atMenu && hasCurrentSettlement;
-    }
-
-    private static bool IsSettlementMapMenuActive()
-    {
-        if (ScreenManager.TopScreen is not MapScreen)
-            return false;
-
-        var mapState = GameStateManager.Current?.ActiveState as MapState;
-        return IsSettlementMapMenu(
-            isMapScreen: true,
-            atMenu: mapState?.AtMenu == true,
-            hasCurrentSettlement: MobileParty.MainParty?.CurrentSettlement != null);
-    }
-
-    private static bool IsLayerOnScreen(ScreenBase screen, ScreenLayer layer)
-    {
-        if (screen == null || layer == null) return false;
-
-        var layers = screen.Layers;
-        for (int i = 0; i < layers.Count; i++)
-        {
-            if (ReferenceEquals(layers[i], layer))
-                return true;
-        }
-
-        return false;
+        return atMenu && hasCurrentSettlement;
     }
 
     /// <summary>Closed feed on map/mission: mouse mask for hit-testing, widgets stay click-through.</summary>
