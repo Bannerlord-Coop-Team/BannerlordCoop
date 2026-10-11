@@ -65,6 +65,9 @@ namespace GameInterface.Services.Heroes.Patches
         {
             foreach(var method in AccessTools.GetDeclaredMethods(typeof(Hero)))
             {
+                // SetName only writes _name and _firstName, which HeroDataPatches syncs with their full TextObjects
+                if (method.Name == nameof(Hero.SetName)) continue;
+
                 yield return method;
             }
             yield return AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.CheckLevel));
@@ -150,15 +153,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
 
         [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> FirstNameTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase original)
+        private static IEnumerable<CodeInstruction> FirstNameTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var firstNameField = AccessTools.Field(typeof(Hero), nameof(Hero._firstName));
             var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(FirstNameIntercept));
-            var isSetName = IsSetName(original);
 
             foreach (var instruction in instructions)
             {
-                if (!isSetName && instruction.StoresField(firstNameField))
+                if (instruction.StoresField(firstNameField))
                 {
                     yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
                 }
@@ -188,15 +190,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
 
         [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> NameTranspiler(IEnumerable<CodeInstruction> instructions, MethodBase original)
+        private static IEnumerable<CodeInstruction> NameTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var nameField = AccessTools.Field(typeof(Hero), nameof(Hero._name));
             var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(NameIntercept));
-            var isSetName = IsSetName(original);
 
             foreach (var instruction in instructions)
             {
-                if (!isSetName && instruction.StoresField(nameField))
+                if (instruction.StoresField(nameField))
                 {
                     yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
                 }
@@ -223,12 +224,6 @@ namespace GameInterface.Services.Heroes.Patches
             MessageBroker.Instance.Publish(instance, new NameChanged(newName?.Value, instance));
 
             instance._name = newName;
-        }
-
-        // SetName is synced with its full TextObjects by HeroDataPatches, a raw string here would overwrite them on clients
-        private static bool IsSetName(MethodBase original)
-        {
-            return original.DeclaringType == typeof(Hero) && original.Name == nameof(Hero.SetName);
         }
 
         [HarmonyTranspiler]

@@ -5,7 +5,7 @@ using TaleWorlds.Core;
 namespace GameInterface.Services.BasicCharacterObjects.Patches;
 
 [HarmonyPatch(typeof(BasicCharacterObject))]
-internal class BasicCharacterObjectPatches
+internal class BasicCharacterObjectCulturePatch
 {
     [HarmonyPatch(nameof(BasicCharacterObject.Culture), MethodType.Getter)]
     [HarmonyPostfix]
