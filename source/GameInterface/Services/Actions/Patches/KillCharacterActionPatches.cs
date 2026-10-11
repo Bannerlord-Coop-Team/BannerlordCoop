@@ -34,8 +34,6 @@ internal class KillCharacterActionPatches
     {
         if (ModInformation.IsClient) return false;
 
-        if (victim == Hero.MainHero) return false;
-
         if (!victim.CanDie(actionDetail) && !isForced) return false;
 
         if (!victim.IsAlive) return false;
