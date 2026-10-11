@@ -84,11 +84,19 @@ internal class PartyComponentHandler : IHandler
         if (!objectManager.AddNewObject(payload.What.Instance, out var id)) return;
         if (!objectManager.TryGetHandleWithLogging(payload.What.Instance, out var handle)) return;
 
-        var typeIndex = partyTypes.IndexOf(payload.What.Instance.GetType());
+        var componentType = payload.What.Instance.GetType();
+        var typeIndex = GetTypeIndex(componentType);
+        if (typeIndex < 0)
+        {
+            Logger.Error("Unsupported party component type {Type}", componentType.FullName);
+            return;
+        }
+
         var data = new PartyComponentData(typeIndex, id, handle)
         {
             HomeSettlementId = settlementHandle,
             IsNaval = payload.What.IsNaval,
+            ConcreteTypeName = componentType == partyTypes[typeIndex] ? null : componentType.FullName,
         };
 
         network.SendAll(new NetworkCreatePartyComponent(data));
@@ -229,16 +237,49 @@ internal class PartyComponentHandler : IHandler
         });
     }
 
+    // Module subclasses (e.g. Warsails' VillagerPartyComponent child FishingPartyComponent) use their nearest listed base type's index
+    internal int GetTypeIndex(Type componentType)
+    {
+        for (var type = componentType; type != null; type = type.BaseType)
+        {
+            var typeIndex = partyTypes.IndexOf(type);
+            if (typeIndex >= 0) return typeIndex;
+        }
+
+        return -1;
+    }
+
+    internal Type ResolveComponentType(PartyComponentData data)
+    {
+        if (data.TypeIndex < 0 || data.TypeIndex >= partyTypes.Length)
+        {
+            throw new InvalidOperationException($"Invalid party component TypeIndex {data.TypeIndex}");
+        }
+
+        var baseType = partyTypes[data.TypeIndex];
+        if (data.ConcreteTypeName == null) return baseType;
+
+        var concreteType = AccessTools.TypeByName(data.ConcreteTypeName);
+        if (concreteType == null || !baseType.IsAssignableFrom(concreteType))
+        {
+            throw new InvalidOperationException($"Could not resolve party component type {data.ConcreteTypeName} as {baseType.Name}");
+        }
+
+        return concreteType;
+    }
+
     private PartyComponent CreatePartyComponent(PartyComponentData data)
     {
-        if (data.TypeIndex != 0 || data.HomeSettlementId == 0)
+        var componentType = ResolveComponentType(data);
+
+        if (componentType != typeof(BanditPartyComponent) || data.HomeSettlementId == 0)
         {
-            return (PartyComponent)ObjectHelper.SkipConstructor(partyTypes[data.TypeIndex]);
+            return (PartyComponent)ObjectHelper.SkipConstructor(componentType);
         }
 
         if (!objectManager.TryGetObjectWithLogging(data.HomeSettlementId, out Settlement relatedSettlement))
         {
-            return (PartyComponent)ObjectHelper.SkipConstructor(partyTypes[data.TypeIndex]);
+            return (PartyComponent)ObjectHelper.SkipConstructor(componentType);
         }
 
         using (new AllowedThread())

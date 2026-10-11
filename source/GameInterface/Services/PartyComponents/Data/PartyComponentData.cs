@@ -27,4 +27,11 @@ public record PartyComponentData(int TypeIndex, string Id, uint Handle)
     /// </summary>
     [ProtoMember(5)]
     public bool IsNaval { get; set; } = false;
+
+    /// <summary>
+    /// Optional: the full name of a module subclass of the <see cref="TypeIndex"/> type, so the client creates the same type.
+    /// Null when the component is exactly the <see cref="TypeIndex"/> type.
+    /// </summary>
+    [ProtoMember(6)]
+    public string ConcreteTypeName { get; set; }
 }
