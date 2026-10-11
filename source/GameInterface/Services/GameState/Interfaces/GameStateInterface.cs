@@ -23,6 +23,11 @@ public interface IGameStateInterface : IGameAbstraction
     void StartNewGame();
     void LoadSaveData(byte[] saveData);
     void LoadGame(string saveName);
+
+    /// <summary>
+    /// Loads the named save, or starts a new campaign when no save has that name.
+    /// </summary>
+    void LoadGameOrStartNew(string saveName);
     void EndGame();
 }
 
@@ -110,6 +115,24 @@ internal class GameStateInterface : IGameStateInterface
             if (save == null)
             {
                 Logger.Error("Failed to load save with name {SaveName}", saveName);
+                return;
+            }
+
+            ForceLoadSave(save);
+        }, blocking: true);
+    }
+
+    public void LoadGameOrStartNew(string saveName)
+    {
+        messageBroker.Publish(this, new GameLoadStarted());
+        GameThread.Run(() =>
+        {
+            var save = MBSaveLoad.GetSaveFiles(null).SingleOrDefault(x => x.Name == saveName);
+
+            if (save == null)
+            {
+                Logger.Information("No save named {SaveName}, starting a new campaign", saveName);
+                MBGameManager.StartNewGame(new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign)));
                 return;
             }
 

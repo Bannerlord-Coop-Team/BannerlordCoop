@@ -29,7 +29,7 @@ public sealed class InitialServerStateNavalStartupTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Start_StartsNewCampaignOnlyWithNavalDlc(bool navalDlcActive)
+    public void Start_LoadsNavalSaveOnlyWithNavalDlc(bool navalDlcActive)
     {
         ModInformation.IsNavalDlcActive = navalDlcActive;
         var game = new Mock<IGameStateInterface>();
@@ -40,7 +40,7 @@ public sealed class InitialServerStateNavalStartupTests : IDisposable
 
         state.Start();
 
-        game.Verify(value => value.StartNewGame(), navalDlcActive ? Times.Once() : Times.Never());
+        game.Verify(value => value.LoadGameOrStartNew("MP_Naval"), navalDlcActive ? Times.Once() : Times.Never());
         game.Verify(value => value.LoadGame("MP"), navalDlcActive ? Times.Never() : Times.Once());
         game.VerifyNoOtherCalls();
     }
