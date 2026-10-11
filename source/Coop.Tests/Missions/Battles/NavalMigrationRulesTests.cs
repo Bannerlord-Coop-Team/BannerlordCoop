@@ -24,13 +24,14 @@ public class NavalMigrationRulesTests
     }
 
     [Theory]
-    [InlineData(true, false, false, true)]
-    [InlineData(false, false, false, false)]
-    [InlineData(true, true, false, false)]
-    [InlineData(true, false, true, false)]
-    public void AgentStationUseReplicator_DropsAnAppliedSeatOnceThePuppetIsAdoptedDeadOrItsHullSinks(bool alive, bool ownedHere,
-        bool hullSinking, bool expected)
+    [InlineData(true, true, false, false, true)]
+    [InlineData(false, true, false, false, false)]
+    [InlineData(true, false, false, false, false)]
+    [InlineData(true, true, true, false, false)]
+    [InlineData(true, true, false, true, false)]
+    public void AgentStationUseReplicator_DropsAnAppliedSeatOnceThePuppetIsAdoptedDeadWithdrawnOrItsHullSinks(bool alive,
+        bool registered, bool ownedHere, bool hullSinking, bool expected)
     {
-        Assert.Equal(expected, AgentStationUseReplicator.KeepsAppliedSeat(alive, ownedHere, hullSinking));
+        Assert.Equal(expected, AgentStationUseReplicator.KeepsAppliedSeat(alive, registered, ownedHere, hullSinking));
     }
 }

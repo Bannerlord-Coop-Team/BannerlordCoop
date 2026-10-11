@@ -118,8 +118,51 @@ public class AgentStationUseReplicatorTests
 
         replicator.RefreshAppliedSeats();
 
-        // Vanilla Agent.OnRemove already stops a removed agent using its station.
+        // While the mission runs, vanilla Agent.OnRemove stops a removed agent using its station.
         engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Fact]
+    public void RefreshAppliedSeats_ReleasesAndForgetsAWithdrawnPuppetStillSeated()
+    {
+        var engine = new Mock<INavalShipEngine>();
+        engine.Setup(e => e.IsAlive(It.IsAny<Agent>())).Returns(true);
+        engine.Setup(e => e.IsSeated(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>())).Returns(true);
+        using var replicator = CreateReplicator(engine.Object, Mock.Of<INetworkAgentRegistry>());
+        var point = CreatePoint();
+        replicator.RecordAppliedSeat(Guid.NewGuid(), null!, null!, point);
+
+        replicator.RefreshAppliedSeats();
+        replicator.RefreshAppliedSeats();
+
+        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), point, false), Times.Once);
+        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), true), Times.Never);
+        engine.Verify(e => e.PinToStation(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>()), Times.Never);
+    }
+
+    [Fact]
+    public void RefreshAppliedSeats_NeverReseatsAWithdrawnPuppetThatWasAlreadyReleased()
+    {
+        var engine = new Mock<INavalShipEngine>();
+        engine.Setup(e => e.IsAlive(It.IsAny<Agent>())).Returns(true);
+        engine.Setup(e => e.IsSeated(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>())).Returns(false);
+        using var replicator = CreateReplicator(engine.Object, Mock.Of<INetworkAgentRegistry>());
+        replicator.RecordAppliedSeat(Guid.NewGuid(), null!, null!, CreatePoint());
+
+        replicator.RefreshAppliedSeats();
+        replicator.RefreshAppliedSeats();
+
+        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), It.IsAny<bool>()), Times.Never);
+        engine.Verify(e => e.PinToStation(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>()), Times.Never);
+    }
+
+    // Every agent is registered to a remote owner, so an applied seat stays this client's to follow.
+    private static INetworkAgentRegistry RemoteOwnerRegistry()
+    {
+        var info = new CoopAgentInfo("owner", "owner", "battle", null!, Guid.Empty, 1);
+        var registry = new Mock<INetworkAgentRegistry>();
+        registry.Setup(r => r.TryGetAgentInfo(It.IsAny<Guid>(), out info)).Returns(true);
+        return registry.Object;
     }
 
     private static AgentStationUseReplicator CreateReplicator(INavalShipEngine engine,
@@ -128,7 +171,7 @@ public class AgentStationUseReplicatorTests
         var component = new Mock<ICoopMissionComponent>();
         component.SetupGet(c => c.AgentMovementHandler).Returns(Mock.Of<IAgentMovementHandler>());
         component.SetupGet(c => c.AgentActionHandler).Returns(Mock.Of<IAgentActionHandler>());
-        component.SetupGet(c => c.AgentRegistry).Returns(registry ?? Mock.Of<INetworkAgentRegistry>());
+        component.SetupGet(c => c.AgentRegistry).Returns(registry ?? RemoteOwnerRegistry());
         component.SetupGet(c => c.ShipRegistry).Returns(ships ?? Mock.Of<INetworkShipRegistry>());
         return new AgentStationUseReplicator(Mock.Of<IBattleNetwork>(), broker ?? new MessageBroker(), Mock.Of<IBattleSession>(),
             component.Object, engine, Mock.Of<IBattleDeploymentCoordinator>());

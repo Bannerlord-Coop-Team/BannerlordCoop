@@ -390,9 +390,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                 if (agent == null || agent.IsMount || !IsOwnPartyAgent(agent, playerParty, playerHero)) continue;
 
                 lifecycle.RecordWithdrawnHealth(agent);
-                if (agent.IsActive())
-                    agent.FadeOut(false, true);
                 registry.RemoveAgent(info.AgentId);
+                FadeOutWithdrawnAgent(agent);
                 casualties.Forget(info.AgentId);
                 despawnedRiders.Add(agent);
                 despawned++;
@@ -454,9 +453,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                 if (!isRetreatersOwn) continue;
 
                 lifecycle.RecordWithdrawnHealth(agent);
-                if (agent.IsActive())
-                    agent.FadeOut(false, true);
                 registry.RemoveAgent(info.AgentId);
+                FadeOutWithdrawnAgent(agent);
                 casualties.Forget(info.AgentId);
                 despawnedRiders.Add(agent);
                 despawned++;
@@ -471,6 +469,17 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             else if (candidates > 0)
                 Logger.Warning("[BattleSync] Withdrawal of {Controller} matched 0 of its {Count} registered troop(s) — selection found no own-party agents; anything left is keyed to a controller that no longer answers", controllerId, candidates);
         });
+    }
+
+    // [Game thread] Vanilla Agent.OnRemove skips the station release once the mission has ended, leaving a hull machine
+    // ticking a removed user. Deregistered first, so the naval release patch does not report the release as a desync.
+    private static void FadeOutWithdrawnAgent(Agent agent)
+    {
+        if (!agent.IsActive()) return;
+
+        if (agent.CurrentlyUsedGameObject != null)
+            agent.StopUsingGameObject(isSuccessful: false, Agent.StopUsingGameObjectFlags.None);
+        agent.FadeOut(false, true);
     }
 
     // [Game thread] Clean up a departed controller's registered MOUNTS. A horse registered to a controller

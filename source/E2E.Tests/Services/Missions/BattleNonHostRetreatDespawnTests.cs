@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
 using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment.MockEngine;
+using HarmonyLib;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.Players;
@@ -683,4 +686,72 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
             BattleSpawnGate.EndBattle();
         }
     }
+
+    /// <summary>
+    /// R33: a withdrawn crew member seated at a hull station must leave it before it fades out. Removal in an ended
+    /// mission skips vanilla's station release, so the helm kept ticking a removed pilot and the remaining client crashed.
+    /// </summary>
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    [Trait("Requirement", "BR-051")]
+    public void Retreat_SeatedOwnPartyTroop_LeavesItsStationBeforeFadingOut(bool hostRetreats, bool battleConcluded)
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, partyIds) = SetupCoopBattle("A", "B");
+        var remaining = Clients.Skip(1).First();
+        var troopId = Guid.NewGuid();
+        var harmony = new Harmony("retreat-station-release-tests." + Guid.NewGuid());
+        harmony.Patch(AccessTools.Method(typeof(Agent), nameof(Agent.FadeOut)),
+            prefix: new HarmonyMethod(typeof(BattleNonHostRetreatDespawnTests), nameof(RecordStationAtFadeOut)) { priority = Priority.First });
+        stationsAtFadeOut.Clear();
+
+        try
+        {
+            remaining.Call(() =>
+            {
+                var mock = fixture.CreateMission(remaining);
+                var controller = remaining.Resolve<CoopBattleController>();
+                var registry = remaining.Resolve<INetworkAgentRegistry>();
+
+                controller.Session.TryBegin(mapEventId);
+                var assignment = hostRetreats
+                    ? new BattleHostAssignment("A", new[] { "B" })
+                    : new BattleHostAssignment("B", new[] { "A" });
+                remaining.Resolve<IBattleHostRegistry>().Set(mapEventId, assignment);
+                BattleSpawnGate.BeginBattle(mapEventId);
+                mock.PlayerTeam = mock.DefenderTeam;
+                if (battleConcluded) controller.ResultCommitter.AcceptResolvedState(BattleState.DefenderVictory);
+
+                Assert.True(remaining.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var retreaterParty));
+                var character = (CharacterObject)Game.Current.PlayerTroop;
+                var origin = new CoopAgentOrigin(character, retreaterParty.Party, -1, null, new UniqueTroopDescriptor(31));
+                var troop = mock.SpawnAgent(new AgentBuildData(character)
+                    .Controller(AgentControllerType.None).Team(mock.DefenderTeam.Shell).TroopOrigin(origin));
+                Assert.True(registry.TryRegisterAgent("A", troopId, troop));
+                Assert.True(AgentMirror.TryGet(troop, out var mirror));
+                mirror.CurrentlyUsedGameObject = (StandingPoint)FormatterServices.GetUninitializedObject(typeof(StandingPoint));
+
+                remaining.Resolve<IMessageBroker>().Publish(this, new MissionPeerLeft("A", mapEventId));
+
+                Assert.Null(Assert.Single(stationsAtFadeOut));
+                Assert.Null(mirror.CurrentlyUsedGameObject);
+                Assert.False(mirror.IsActive, "the withdrawn troop must still fade out");
+                Assert.False(registry.TryGetAgentInfo(troopId, out _));
+
+                GC.KeepAlive(controller);
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            BattleSpawnGate.EndBattle();
+        }
+    }
+
+    private static readonly List<UsableMissionObject?> stationsAtFadeOut = new();
+
+    private static void RecordStationAtFadeOut(Agent __instance) => stationsAtFadeOut.Add(__instance.CurrentlyUsedGameObject);
 }
