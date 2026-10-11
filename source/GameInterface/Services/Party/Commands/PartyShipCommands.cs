@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Commands;
 using Common.Logging;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Commands;
 using Serilog;
 using System;
@@ -14,7 +15,7 @@ using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Party.Commands;
 
-/// <summary>Debug commands that give a player's party War Sails ships and list them.</summary>
+/// <summary>Debug commands that give, list, damage and remove a player's War Sails ships.</summary>
 public class PartyShipCommands
 {
     internal const string DefaultHullId = "northern_light_ship";
@@ -54,20 +55,98 @@ public class PartyShipCommands
                 return Failed("NavalDLC is not active on the server.");
 
             var hullId = args.Count == 2 ? args[1] : DefaultHullId;
-            if (!MapEventDebugCommands.TryGetPlayerParty(args[0], requireReady: false, out _, out var party, out var error))
+            if (!MapEventDebugCommands.TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var party, out var error))
                 return Failed(error);
 
             var hull = MBObjectManager.Instance.GetObject<ShipHull>(hullId);
             if (hull == null)
                 return Failed($"No ship hull has id {hullId}.");
 
-            ChangeShipOwnerAction.ApplyByProduction(party.Party, new Ship(hull));
+            var ship = new Ship(hull);
+            ChangeShipOwnerAction.ApplyByProduction(party.Party, ship);
 
-            // Campaign ships are not registered or replicated, so the client only sees it after reloading the server save.
-            Logger.Information("Added a {HullId} ship to party {PartyId} of player {ControllerId}; the client must rejoin to see the ship",
-                hullId, party.StringId, args[0]);
-            return Succeeded($"Added {hullId} to {party.StringId} (ships={party.Ships.Count}). " +
-                   $"Player {args[0]} must rejoin to see the ship.");
+            var shipId = DescribeId(objectManager, ship);
+            Logger.Information("Added {HullId} ship {ShipId} to party {PartyId} of player {ControllerId}",
+                hullId, shipId, party.StringId, args[0]);
+            return Succeeded($"Added {hullId} {shipId} to {party.StringId} (ships={party.Ships.Count}).");
+        }
+    }
+
+    // coop.debug.party.damage_ship PlayerOne 0 200
+    /// <summary>Damages one of a player's ships through the vanilla damage path, which sinks it at 0 hit points.</summary>
+    public sealed class DamageShipCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.party";
+
+        public string Name => "damage_ship";
+
+        public string Description => "Damages a player's ship by index (from list_ships); it sinks at 0 hit points.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The player whose ship is damaged.", true),
+            new ExpectedArgs("ship_index", "The ship's index in list_ships.", true),
+            new ExpectedArgs("damage", "Raw damage before the ship damage model, greater than 0.", true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+
+            if (!ModInformation.IsNavalDlcActive)
+                return Failed("NavalDLC is not active on the server.");
+
+            if (!float.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var damage) || damage <= 0f)
+                return Failed("damage must be a number greater than 0.");
+
+            if (!TryGetPlayerShip(args[0], args[1], out var objectManager, out var ship, out var error))
+                return Failed(error);
+
+            var shipId = DescribeId(objectManager, ship);
+            ship.OnShipDamaged(damage, null, out _);
+
+            return Succeeded(ship.Owner == null
+                ? $"{shipId} sank."
+                : $"{shipId} hp={ship.HitPoints:0}/{ship.MaxHitPoints:0}.");
+        }
+    }
+
+    // coop.debug.party.remove_ship PlayerOne 0
+    /// <summary>Destroys one of a player's ships through DestroyShipAction.</summary>
+    public sealed class RemoveShipCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.party";
+
+        public string Name => "remove_ship";
+
+        public string Description => "Destroys a player's ship by index (from list_ships).";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The player whose ship is destroyed.", true),
+            new ExpectedArgs("ship_index", "The ship's index in list_ships.", true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+
+            if (!ModInformation.IsNavalDlcActive)
+                return Failed("NavalDLC is not active on the server.");
+
+            if (!TryGetPlayerShip(args[0], args[1], out var objectManager, out var ship, out var error))
+                return Failed(error);
+
+            var shipId = DescribeId(objectManager, ship);
+            DestroyShipAction.Apply(ship);
+
+            return Succeeded($"Removed {shipId}.");
         }
     }
 
@@ -134,14 +213,36 @@ public class PartyShipCommands
             if (!ModInformation.IsNavalDlcActive)
                 return Failed("NavalDLC is not active.");
 
-            if (!MapEventDebugCommands.TryGetPlayerParty(args[0], requireReady: false, out _, out var party, out var error))
+            if (!MapEventDebugCommands.TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var party, out var error))
                 return Failed(error);
 
             var ships = party.Ships
-                .Select(ship => $"{ship.ShipHull.StringId}(hp={ship.HitPoints:0}/{ship.MaxHitPoints:0})")
+                .Select((ship, index) => $"[{index}] {DescribeId(objectManager, ship)} {ship.ShipHull.StringId} " +
+                    $"name=\"{ship.Name}\" owner={ship.Owner?.Id ?? "none"} " +
+                    $"hp={ship.HitPoints:0}/{ship.MaxHitPoints:0} sail={ship.SailHitPoints:0}/{ship.MaxSailHitPoints:0}")
                 .ToArray();
             return Succeeded($"{party.StringId} ships={ships.Length}" +
                    (ships.Length == 0 ? "" : ": " + string.Join(", ", ships)));
         }
+    }
+
+    private static string DescribeId(IObjectManager objectManager, Ship ship) =>
+        objectManager.TryGetId(ship, out var shipId) ? shipId : "unregistered";
+
+    private static bool TryGetPlayerShip(string controllerId, string indexText, out IObjectManager objectManager, out Ship ship, out string error)
+    {
+        ship = null;
+        if (!MapEventDebugCommands.TryGetPlayerParty(controllerId, requireReady: false, out objectManager, out var party, out error))
+            return false;
+
+        if (!int.TryParse(indexText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index) ||
+            index < 0 || index >= party.Ships.Count)
+        {
+            error = $"ship_index must be an integer from 0 to {party.Ships.Count - 1}; {party.StringId} has {party.Ships.Count} ships.";
+            return false;
+        }
+
+        ship = party.Ships[index];
+        return true;
     }
 }
