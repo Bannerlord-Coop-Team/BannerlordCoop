@@ -1,4 +1,5 @@
-﻿using Coop.Naval.Storms.Interfaces;
+﻿#if DEBUG
+using Coop.Naval.Storms.Interfaces;
 using Coop.Naval.Storms.Patches;
 using HarmonyLib;
 using NavalDLC.Map;
@@ -91,3 +92,4 @@ public class StormSyncTests
         return storm;
     }
 }
+#endif
