@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using NavalDLC.CampaignBehaviors;
 
-namespace Coop.Naval.Patches;
+namespace Coop.Naval.GenericPatches;
 
 [HarmonyPatch(typeof(NavalInitializationCampaignBehavior))]
 internal class NavalIntroductionPopupPatch

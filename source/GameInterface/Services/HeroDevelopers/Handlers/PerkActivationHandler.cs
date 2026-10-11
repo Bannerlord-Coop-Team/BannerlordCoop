@@ -26,17 +26,21 @@ internal class PerkActivationHandler : IHandler
         this.objectManager = objectManager;
         this.network = network;
 
-        messageBroker.Subscribe<UpdateRosterVersionAfterPerkChange>(Handle_UpdateRosterVersionAfterPerkActivation);
-        messageBroker.Subscribe<NetworkUpdateRosterVersionAfterPerkChange>(Handle_NetworkUpdateRosterVersionAfterPerkActivation);
+        messageBroker.Subscribe<UpdateMemberRosterVersionAfterPerkChange>(Handle_UpdateMemberRosterVersionAfterPerkActivation);
+        messageBroker.Subscribe<NetworkUpdateMemberRosterVersionAfterPerkChange>(Handle_NetworkUpdateMemberRosterVersionAfterPerkActivation);
+        messageBroker.Subscribe<UpdateItemRosterVersionAfterPerkChange>(Handle_UpdateItemRosterVersionAfterPerkActivation);
+        messageBroker.Subscribe<NetworkUpdateItemRosterVersionAfterPerkChange>(Handle_NetworkUpdateItemRosterVersionAfterPerkActivation);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<UpdateRosterVersionAfterPerkChange>(Handle_UpdateRosterVersionAfterPerkActivation);
-        messageBroker.Unsubscribe<NetworkUpdateRosterVersionAfterPerkChange>(Handle_NetworkUpdateRosterVersionAfterPerkActivation);
+        messageBroker.Unsubscribe<UpdateMemberRosterVersionAfterPerkChange>(Handle_UpdateMemberRosterVersionAfterPerkActivation);
+        messageBroker.Unsubscribe<NetworkUpdateMemberRosterVersionAfterPerkChange>(Handle_NetworkUpdateMemberRosterVersionAfterPerkActivation);
+        messageBroker.Unsubscribe<UpdateItemRosterVersionAfterPerkChange>(Handle_UpdateItemRosterVersionAfterPerkActivation);
+        messageBroker.Unsubscribe<NetworkUpdateItemRosterVersionAfterPerkChange>(Handle_NetworkUpdateItemRosterVersionAfterPerkActivation);
     }
 
-    private void Handle_UpdateRosterVersionAfterPerkActivation(MessagePayload<UpdateRosterVersionAfterPerkChange> obj)
+    private void Handle_UpdateMemberRosterVersionAfterPerkActivation(MessagePayload<UpdateMemberRosterVersionAfterPerkChange> obj)
     {
         var data = obj.What;
 
@@ -44,12 +48,12 @@ internal class PerkActivationHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(data.MemberRoster, out var memberRosterId)) return;
 
-            var message = new NetworkUpdateRosterVersionAfterPerkChange(memberRosterId);
+            var message = new NetworkUpdateMemberRosterVersionAfterPerkChange(memberRosterId);
             network.SendAll(message);
         });
     }
 
-    private void Handle_NetworkUpdateRosterVersionAfterPerkActivation(MessagePayload<NetworkUpdateRosterVersionAfterPerkChange> obj)
+    private void Handle_NetworkUpdateMemberRosterVersionAfterPerkActivation(MessagePayload<NetworkUpdateMemberRosterVersionAfterPerkChange> obj)
     {
         var data = obj.What;
 
@@ -58,6 +62,31 @@ internal class PerkActivationHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<TroopRoster>(data.MemberRosterId, out var memberRoster)) return;
 
             memberRoster.UpdateVersion();
+        });
+    }
+
+    private void Handle_UpdateItemRosterVersionAfterPerkActivation(MessagePayload<UpdateItemRosterVersionAfterPerkChange> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(data.ItemRoster, out var itemRosterId)) return;
+
+            var message = new NetworkUpdateItemRosterVersionAfterPerkChange(itemRosterId);
+            network.SendAll(message);
+        });
+    }
+
+    private void Handle_NetworkUpdateItemRosterVersionAfterPerkActivation(MessagePayload<NetworkUpdateItemRosterVersionAfterPerkChange> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<ItemRoster>(data.ItemRosterId, out var itemRoster)) return;
+
+            itemRoster.UpdateVersion();
         });
     }
 }

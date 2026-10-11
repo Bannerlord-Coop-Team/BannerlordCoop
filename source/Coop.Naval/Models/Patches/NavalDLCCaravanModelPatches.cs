@@ -3,7 +3,7 @@ using HarmonyLib;
 using NavalDLC.GameComponents;
 using TaleWorlds.CampaignSystem;
 
-namespace Coop.Naval.Patches;
+namespace Coop.Naval.Models.Patches;
 
 /// <summary>
 /// Vanilla uses a Hero.MainHero check for the caravan's owner to give it extra money when forming.

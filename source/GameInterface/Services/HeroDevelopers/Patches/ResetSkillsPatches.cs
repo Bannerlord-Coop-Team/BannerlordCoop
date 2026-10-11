@@ -49,7 +49,7 @@ internal class PerkHelperPatches
 
         hero.PartyBelongedTo.MemberRoster.UpdateVersion();
        
-        var message = new UpdateRosterVersionAfterPerkChange(hero.PartyBelongedTo.MemberRoster);
+        var message = new UpdateMemberRosterVersionAfterPerkChange(hero.PartyBelongedTo.MemberRoster);
         MessageBroker.Instance.Publish(null, message);
 
         return false;

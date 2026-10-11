@@ -4,7 +4,7 @@ using HarmonyLib;
 using NavalDLC.GameComponents;
 using TaleWorlds.CampaignSystem;
 
-namespace Coop.Naval.Patches;
+namespace Coop.Naval.Models.Patches;
 
 [HarmonyPatch(typeof(NavalDLCClanPoliticsModel))]
 internal class NavalDLCClanPoliticsModelPatches

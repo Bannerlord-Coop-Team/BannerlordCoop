@@ -4,7 +4,7 @@ using System;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
-namespace Coop.Naval.Patches;
+namespace Coop.Naval.Models.Patches;
 
 /// <summary>
 /// Guards NavalDLCMapDistanceModel against navigation caches that are not registered yet.

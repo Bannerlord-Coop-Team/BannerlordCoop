@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace Coop.Naval.Patches;
+namespace Coop.Naval.Models.Patches;
 
 [HarmonyPatch(typeof(NavalDLCClanFinanceModel))]
 internal class NavalDLCClanFinanceModelPatches
