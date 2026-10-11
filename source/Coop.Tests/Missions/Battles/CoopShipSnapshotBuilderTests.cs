@@ -1,5 +1,9 @@
 ﻿#if DEBUG
+using GameInterface.Policies;
+using HarmonyLib;
 using Missions.Naval;
+using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Naval;
@@ -48,6 +52,38 @@ public class CoopShipSnapshotBuilderTests
         Assert.False(CoopShipSnapshots.Contains(source));
         Assert.False(CoopShipSnapshots.Contains(null));
     }
+
+    [Fact]
+    public void Build_RunsWithOriginalsAllowedSoTheSnapshotStaysOffTheShipSyncPatches()
+    {
+        var source = CreateOwnedShip(CreateParty(), hitPoints: 600f);
+        var harmony = new Harmony("coop.tests.naval.ship_snapshot_builder");
+        try
+        {
+            // Read by the constructor and both HitPoints writes; its foreach keeps the JIT from inlining it.
+            harmony.Patch(
+                AccessTools.PropertyGetter(typeof(Ship), nameof(Ship.MaxHitPoints)),
+                postfix: new HarmonyMethod(typeof(CoopShipSnapshotBuilderTests), nameof(RecordOriginalsAllowed)));
+            recordedOriginalsAllowed = new List<bool>();
+
+            new CoopShipSnapshotBuilder().Build(source);
+
+            Assert.NotEmpty(recordedOriginalsAllowed);
+            Assert.All(recordedOriginalsAllowed, allowed => Assert.True(allowed));
+            Assert.False(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
+        }
+        finally
+        {
+            recordedOriginalsAllowed = null;
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    [ThreadStatic]
+    private static List<bool> recordedOriginalsAllowed;
+
+    private static void RecordOriginalsAllowed() =>
+        recordedOriginalsAllowed?.Add(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
 
     private static PartyBase CreateParty()
     {
