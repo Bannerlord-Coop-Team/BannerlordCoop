@@ -82,7 +82,7 @@ public class UnsupportedModuleWarningHandlerTests
         var provider = new TestModuleInfoProvider(
             Module("Native", isOfficial: true),
             Module("Coop", isOfficial: false),
-            Module("NavalDLC", isOfficial: true, isDlc: true));
+            Module("SomeDlc", isOfficial: true, isDlc: true));
 
         var coordinator = new UnsupportedModuleWarningHandler(provider, new TestOptionsStore(), _ => {});
         InquiryData inquiry = null;
@@ -90,7 +90,23 @@ public class UnsupportedModuleWarningHandlerTests
         coordinator.TryShowPrompt(true, value => inquiry = value);
 
         Assert.NotNull(inquiry);
-        Assert.Contains("- NavalDLC", inquiry.Text);
+        Assert.Contains("- SomeDlc", inquiry.Text);
+    }
+
+    [Fact]
+    public void NavalDlc_DoesNotShowWarning()
+    {
+        var provider = new TestModuleInfoProvider(
+            Module("Native", isOfficial: true),
+            Module("Coop", isOfficial: false),
+            Module("NavalDLC", isOfficial: true, isDlc: true));
+
+        var coordinator = new UnsupportedModuleWarningHandler(provider, new TestOptionsStore(), _ => {});
+        InquiryData inquiry = null;
+
+        coordinator.TryShowPrompt(true, value => inquiry = value);
+
+        Assert.Null(inquiry);
     }
 
     [Fact]

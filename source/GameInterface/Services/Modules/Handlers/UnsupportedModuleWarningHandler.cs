@@ -154,6 +154,11 @@ public class UnsupportedModuleWarningHandler
             return false;
         }
 
+        if (module.IsDlc && module.Id == Common.ModInformation.NavalDlcModuleId)
+        {
+            return false;
+        }
+
         return !module.IsOfficial || module.IsDlc;
     }
 
