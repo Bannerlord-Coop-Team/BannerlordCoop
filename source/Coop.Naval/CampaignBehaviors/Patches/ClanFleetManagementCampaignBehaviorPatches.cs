@@ -1,8 +1,10 @@
 ﻿using Common;
 using Coop.Naval.CampaignBehaviors.Interfaces;
 using GameInterface;
+using GameInterface.Services.Clans;
 using HarmonyLib;
 using NavalDLC.CampaignBehaviors;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -37,5 +39,16 @@ internal class ClanFleetManagementCampaignBehaviorPatches
         campaignBehaviorInterface.SendShipToParty(ship, mobileParty);
 
         return false;
+    }
+
+    // Same gate as managing a clan member's inventory and troops, otherwise any clan member could take another party's ships
+    [HarmonyPatch(nameof(ClanFleetManagementCampaignBehavior.conversation_clan_member_manage_fleet_on_condition))]
+    [HarmonyPostfix]
+    public static void ConversationClanMemberManageFleetOnConditionPostfix(ref bool __result)
+    {
+        if (!CoopClanPermissions.CanManageParty(Hero.OneToOneConversationHero?.PartyBelongedTo))
+        {
+            __result = false;
+        }  
     }
 }
