@@ -15,6 +15,7 @@ using Missions.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
@@ -704,6 +705,9 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
         var remaining = Clients.Skip(1).First();
         var troopId = Guid.NewGuid();
         var harmony = new Harmony("retreat-station-release-tests." + Guid.NewGuid());
+        // StandingPoint's base static ctor scans native script components, which the test engine lacks.
+        harmony.Patch(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"),
+            prefix: new HarmonyMethod(typeof(BattleNonHostRetreatDespawnTests), nameof(SkipNativeScriptCache)));
         harmony.Patch(AccessTools.Method(typeof(Agent), nameof(Agent.FadeOut)),
             prefix: new HarmonyMethod(typeof(BattleNonHostRetreatDespawnTests), nameof(RecordStationAtFadeOut)) { priority = Priority.First });
         stationsAtFadeOut.Clear();
@@ -754,4 +758,6 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
     private static readonly List<UsableMissionObject?> stationsAtFadeOut = new();
 
     private static void RecordStationAtFadeOut(Agent __instance) => stationsAtFadeOut.Add(__instance.CurrentlyUsedGameObject);
+
+    private static bool SkipNativeScriptCache() => false;
 }
