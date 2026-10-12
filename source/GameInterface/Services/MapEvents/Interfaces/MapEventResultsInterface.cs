@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Util;
+using GameInterface.Services.Clans.Extensions;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Participation;
@@ -14,12 +15,15 @@ using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.Villages.Commands;
 #endif
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
@@ -36,7 +40,8 @@ public interface IMapEventResultsInterface : IGameAbstraction
         string mapEventPartyId,
         out ItemRoster lootedItems,
         out TroopRoster lootedMembers,
-        out TroopRoster lootedPrisoners);
+        out TroopRoster lootedPrisoners,
+        out List<Ship> lootedShips);
     public void CalculateAndCommitMapEventResults(MapEvent mapEvent, out NetworkPlayerLootData networkPlayerLootData);
 }
 
@@ -71,6 +76,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
         var lootedItems = new Dictionary<string, ItemRosterElement[]>();
         var lootedMembers = new Dictionary<string, TroopRosterData>();
         var lootedPrisoners = new Dictionary<string, TroopRosterData>();
+        var lootedShips = new Dictionary<string, LootedShipsData>();
 
         GameThread.RunSafe(() =>
         {
@@ -94,9 +100,24 @@ public class MapEventResultsInterface : IMapEventResultsInterface
 
                 lootedPrisoners[mapEventPartyId] = troopRosterInterface.PackTroopRosterData(playerLootedPrisoners.Value);
             }
+
+            foreach (var playerLootedShips in playerLootData.LootedShips)
+            {
+                if (!objectManager.TryGetIdWithLogging(playerLootedShips.Key, out var mapEventPartyId)) continue;
+
+                var shipIds = new List<string>();
+                foreach (var ship in playerLootedShips.Value)
+                {
+                    if (!objectManager.TryGetIdWithLogging(ship, out var shipId)) continue;
+                    
+                    shipIds.Add(shipId);
+                }
+
+                lootedShips[mapEventPartyId] = new LootedShipsData(shipIds.ToArray());
+            }
         });
 
-        return new NetworkPlayerLootData(lootedItems, lootedMembers, lootedPrisoners);
+        return new NetworkPlayerLootData(lootedItems, lootedMembers, lootedPrisoners, lootedShips);
     }
 
     public PlayerLootData UnpackPlayerLootData(NetworkPlayerLootData networkPlayerLootData)
@@ -104,9 +125,11 @@ public class MapEventResultsInterface : IMapEventResultsInterface
         var lootedItems = new Dictionary<MapEventParty, ItemRoster>();
         var lootedMembers = new Dictionary<MapEventParty, TroopRoster>();
         var lootedPrisoners = new Dictionary<MapEventParty, TroopRoster>();
+        var lootedShips = new Dictionary<MapEventParty, List<Ship>>();
         var networkLootedItems = networkPlayerLootData.LootedItems ?? new();
         var networkLootedMembers = networkPlayerLootData.LootedMembers ?? new();
         var networkLootedPrisoners = networkPlayerLootData.LootedPrisoners ?? new();
+        var networkLootedShips = networkPlayerLootData.LootedShips ?? new();
 
         GameThread.RunSafe(() =>
         {
@@ -151,9 +174,16 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     }
                 }
             }
+
+            foreach (var playerLootedShips in networkLootedShips)
+            {
+                if (!objectManager.TryGetObjectWithLogging<MapEventParty>(playerLootedShips.Key, out var mapEventParty)) continue;
+
+                lootedShips[mapEventParty] = UnpackShips(playerLootedShips.Value);
+            }
         });
 
-        return new PlayerLootData(lootedItems, lootedMembers, lootedPrisoners);
+        return new PlayerLootData(lootedItems, lootedMembers, lootedPrisoners, lootedShips);
     }
 
     public void UnpackPlayerLootDataForParty(
@@ -161,13 +191,15 @@ public class MapEventResultsInterface : IMapEventResultsInterface
         string mapEventPartyId,
         out ItemRoster lootedItems,
         out TroopRoster lootedMembers,
-        out TroopRoster lootedPrisoners)
+        out TroopRoster lootedPrisoners,
+        out List<Ship> lootedShips)
     {
         using (new AllowedThread())
         {
             lootedItems = new ItemRoster();
             lootedMembers = new TroopRoster();
             lootedPrisoners = new TroopRoster();
+            lootedShips = new List<Ship>();
 
             if (networkPlayerLootData.LootedItems?.TryGetValue(mapEventPartyId, out var itemElements) == true)
                 lootedItems.Add(itemElements);
@@ -183,7 +215,22 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                 foreach (var troopRosterElement in troopRosterInterface.UnpackTroopRosterData(prisonerData))
                     lootedPrisoners.Add(troopRosterElement);
             }
+
+            if (networkPlayerLootData.LootedShips?.TryGetValue(mapEventPartyId, out var shipData) == true)
+                UnpackShips(shipData);
         }
+    }
+
+    private List<Ship> UnpackShips(LootedShipsData shipData)
+    {
+        var ships = new List<Ship>();
+        foreach (var shipId in shipData.ShipIds ?? Array.Empty<string>())
+        {
+            if (objectManager.TryGetObjectWithLogging<Ship>(shipId, out var ship))
+                ships.Add(ship);
+        }
+
+        return ships;
     }
 
     public void CalculateAndCommitMapEventResults(MapEvent mapEvent, out NetworkPlayerLootData networkPlayerLootData)
@@ -207,30 +254,22 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                     playerLootData.LootedItems[winnerPlayerParty] = new();
                     playerLootData.LootedMembers[winnerPlayerParty] = new();
                     playerLootData.LootedPrisoners[winnerPlayerParty] = new();
+                    playerLootData.LootedShips[winnerPlayerParty] = new();
                 }
 
-                // Replace the following check to just check if its a naval map event. Only used for MapEvents involving players
-                // mapEvent.IsPlayerMapEvent && PlayerEncounter.Current.IsNavalEncounterFinishedWithDisengage
-                if (mapEvent.IsNavalMapEvent) // TODO Change to only do this for naval encounters where ships disengage rather than total victories(?)
-                {
-                    mapEvent.LootDefeatedPartyShips(winnerParties, defeatedParties); // TODO
-                }
-                else
-                {
-                    LootDefeatedPartyCasualties(winnerParties, defeatedParties, winnerPlayerParties, winningSideIncludesPlayers, playerLootData.LootedItems);
-                    LootDefeatedPartyItems(winnerParties, defeatedParties, playerLootData.LootedItems);
-                    LootDefeatedPartyPrisoners(winnerParties, defeatedParties, playerLootData.LootedMembers);
-                    mapEvent.LootDefeatedPartyShips(winnerParties, defeatedParties); // TODO
-                    CaptureDefeatedPartyMembers(mapEvent, winnerParties, defeatedParties, playerLootData.LootedPrisoners);
+                LootDefeatedPartyCasualties(winnerParties, defeatedParties, winnerPlayerParties, winningSideIncludesPlayers, playerLootData.LootedItems);
+                LootDefeatedPartyItems(winnerParties, defeatedParties, playerLootData.LootedItems);
+                LootDefeatedPartyPrisoners(winnerParties, defeatedParties, playerLootData.LootedMembers);
+                LootDefeatedPartyShips(mapEvent, winnerParties, defeatedParties, playerLootData.LootedShips);
+                CaptureDefeatedPartyMembers(mapEvent, winnerParties, defeatedParties, playerLootData.LootedPrisoners);
 #if DEBUG
-                    raidLootWarningFixture?.SeedLoot(mapEvent, playerLootData.LootedItems);
+                raidLootWarningFixture?.SeedLoot(mapEvent, playerLootData.LootedItems);
 #endif
-                }
 
                 SplitHideoutLoot(mapEvent, playerLootData);
 
-                // Need to patch the gold change to display plunder message
                 mapEvent.CommitCalculatedMapEventResults();
+
                 // Commit XP, renown, influence, morale, and gold only for parties that remained in the battle.
                 MapEventPatches.CommitCalculatedMapEventResults(mapEvent, party => !retreatedPartyTracker.IsRetreated(mapEvent, party.Party));
             }
@@ -619,6 +658,79 @@ public class MapEventResultsInterface : IMapEventResultsInterface
             }
 
             defeatedPrisonRoster.RemoveZeroCounts();
+        }
+    }
+
+    // Vanilla gives the main party's ships to PlayerEncounter.ReceivedLootShips, players get them in their loot instead
+    private void LootDefeatedPartyShips(
+        MapEvent mapEvent,
+        MBReadOnlyList<MapEventParty> winnerParties,
+        MBReadOnlyList<MapEventParty> defeatedParties,
+        Dictionary<MapEventParty, List<Ship>> playerLootShips)
+    {
+        if (!mapEvent.IsNavalMapEvent || mapEvent.RetreatingSide != BattleSideEnum.None ||
+            (mapEvent.MapEventSettlement != null && mapEvent.MapEventSettlement.IsVillage))
+            return;
+
+        BattleRewardModel battleRewardModel = Campaign.Current.Models.BattleRewardModel;
+
+        MBList<Ship> shipsToLoot = new MBList<Ship>();
+        foreach (MapEventParty defeatedParty in defeatedParties)
+        {
+            foreach (Ship ship in defeatedParty.Party.Ships.ToList())
+            {
+                ship.OnShipDamaged(battleRewardModel.CalculateShipDamageAfterDefeat(ship), null, out _);
+                if (ship.HitPoints > 0f)
+                {
+                    shipsToLoot.Add(ship);
+                }
+            }
+        }
+
+        MBReadOnlyList<KeyValuePair<Ship, MapEventParty>> distributedShips =
+            battleRewardModel.DistributeDefeatedPartyShipsAmongWinners(mapEvent, shipsToLoot, winnerParties);
+
+        // Vanilla leaves the main party out of the ship plunder because it gets the loot screen instead
+        List<MapEventParty> plunderingParties = battleRewardModel.GetWinnerPartiesThatCanPlunderGoldFromShips(winnerParties)
+            .Where(party => !playerLootShips.ContainsKey(party))
+            .ToList();
+        PartyBase winnerLeaderParty = mapEvent.Winner.LeaderParty;
+        bool canPlunderGold = winnerLeaderParty.LeaderHero != null && plunderingParties.Count > 0;
+
+        int plunderedGold = 0;
+        foreach (KeyValuePair<Ship, MapEventParty> distributedShip in distributedShips)
+        {
+            if (distributedShip.Value != null)
+            {
+                if (playerLootShips.TryGetValue(distributedShip.Value, out List<Ship> playerShips))
+                {
+                    playerShips.Add(distributedShip.Key);
+                }
+                else
+                {
+                    ChangeShipOwnerAction.ApplyByLooting(distributedShip.Value.Party, distributedShip.Key);
+                }
+                continue;
+            }
+
+            if (canPlunderGold)
+            {
+                plunderedGold += (int)Campaign.Current.Models.ShipCostModel.GetShipTradeValue(distributedShip.Key, winnerLeaderParty, null);
+            }
+            DestroyShipAction.Apply(distributedShip.Key);
+        }
+
+        if (plunderedGold <= 0) return;
+
+        int totalContribution = plunderingParties.Sum(party => party.ContributionToBattle);
+        foreach (MapEventParty plunderingParty in plunderingParties)
+        {
+            int goldShare = MathF.Floor((float)plunderingParty.ContributionToBattle / totalContribution * plunderedGold);
+            if (plunderingParty.Party.MobileParty.ActualClan.IsPlayerClan())
+            {
+                goldShare = MathF.Floor(goldShare * Campaign.Current.Models.ShipCostModel.GetShipSellingPenalty());
+            }
+            plunderingParty.PlunderedGold += goldShare;
         }
     }
 
