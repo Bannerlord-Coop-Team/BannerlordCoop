@@ -69,6 +69,11 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         // An issue with a quest ends as a consequence of the quest outcome, which is handled on its own
         if (issue.IssueQuest != null)
         {
+            if (ModInformation.IsServer && issue.IssueQuest.IsOngoing)
+            {
+                observed = issue;
+            }
+
             return true;
         }
 
