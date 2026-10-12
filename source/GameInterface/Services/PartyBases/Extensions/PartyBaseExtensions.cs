@@ -1,4 +1,5 @@
-﻿using SandBox.View.Map.Managers;
+﻿using GameInterface.Services.MobileParties.Extensions;
+using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -13,6 +14,13 @@ public static class PartyBaseExtensions
         if (MobilePartyVisualManager.Current == null) return null;
 
         return MobilePartyVisualManager.Current._partiesAndVisuals.TryGetValue(partyBase, out var partyVisual) ? partyVisual : null;
+    }
+
+    public static bool IsPlayerParty(this PartyBase party)
+    {
+        if (party?.MobileParty == null) return false;
+
+        return party.MobileParty.IsPlayerParty();
     }
 
     public static string GetPartyName(this PartyBase party)
