@@ -138,6 +138,35 @@ public class ShipSyncTests : SyncTestBase
     }
 
     [Fact]
+    public void Client_EquipUpgradePiece_AppliesOnServer()
+    {
+        SetShipHullLimits();
+        var playerPartyId = CreateServerPlayerParty();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.True(Server.ObjectManager.TryGetObject(playerPartyId, out MobileParty playerParty));
+            ChangeShipOwnerAction.ApplyByTransferring(playerParty.Party, ship);
+        });
+
+        var requestingClient = Clients.First();
+        requestingClient.Call(() =>
+        {
+            Assert.True(requestingClient.ObjectManager.TryGetObject(shipId, out Ship ship));
+            Assert.True(requestingClient.ObjectManager.TryGetObject(upgradePieceId, out ShipUpgradePiece piece));
+            ship.EquipUpgradePiece("slot1", piece);
+        });
+
+        Assert.True(Server.ObjectManager.TryGetObject(shipId, out Ship serverShip));
+        Assert.True(Server.ObjectManager.TryGetObject(upgradePieceId, out ShipUpgradePiece serverPiece));
+        Assert.Same(serverPiece, serverShip._shipPieces["slot1"]);
+
+        AssertClientPieces(("slot1", upgradePieceId), ("slot2", null));
+        AssertUnlockedPieces(upgradePieceId);
+    }
+
+    [Fact]
     public void Server_DestroyShipAction_UnregistersShip()
     {
         Server.Call(() =>

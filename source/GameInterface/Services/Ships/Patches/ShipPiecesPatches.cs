@@ -22,10 +22,6 @@ internal class ShipPiecesPatches
     [HarmonyPostfix]
     private static void Postfix_ResetUnlockedUpgradePieces(Ship __instance) => PublishPieces(__instance);
 
-    [HarmonyPatch(nameof(Ship.Figurehead), MethodType.Setter)]
-    [HarmonyPostfix]
-    private static void Postfix_SetFigurehead(Ship __instance) => __instance.UpdateVersionNo();
-
     private static void PublishPieces(Ship ship)
     {
         if (ModInformation.IsClient) return;

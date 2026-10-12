@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Ships.Data;
 using ProtoBuf;
 
 namespace GameInterface.Services.Ships.Messages;
@@ -10,26 +11,22 @@ internal readonly struct NetworkShipPiecesChanged : ICommand
     public readonly uint ShipHandle;
 
     [ProtoMember(2)]
-    public readonly string[] SlotTags;
+    public readonly ShipSlotPieceData[] Slots;
 
     [ProtoMember(3)]
-    public readonly uint[] PieceHandles;
-
-    [ProtoMember(4)]
     public readonly uint[] UnlockedPieceHandles;
 
-    [ProtoMember(5)]
+    // Protobuf reads a null array back as empty, and vanilla treats a null unlocked list differently
+    [ProtoMember(4)]
     public readonly bool HasUnlockedPieces;
 
     public NetworkShipPiecesChanged(
         uint shipHandle,
-        string[] slotTags,
-        uint[] pieceHandles,
+        ShipSlotPieceData[] slots,
         uint[] unlockedPieceHandles)
     {
         ShipHandle = shipHandle;
-        SlotTags = slotTags;
-        PieceHandles = pieceHandles;
+        Slots = slots;
         UnlockedPieceHandles = unlockedPieceHandles;
         HasUnlockedPieces = unlockedPieceHandles != null;
     }
