@@ -699,4 +699,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_1c6724bc"
+    name="{=!}Yolda Gezen Egemen"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.vlandia"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_V2"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Başka nerde gezicem ki?"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_vlandia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.heavy_nasalhelm_over_imperial_leather" />
+        <equipment slot="Cape" id="Item.battania_shoulder_furr" />
+        <equipment slot="Body" id="Item.khuzait_heavy_armor" />
+        <equipment slot="Gloves" id="Item.khuzait_heavy_armor_bracer" />
+        <equipment slot="Leg" id="Item.mail_cavalier_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
