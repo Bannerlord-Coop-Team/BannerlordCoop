@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Extentions;
 using HarmonyLib;
+using NavalDLC.Missions.Objects;
 using NavalDLC.View;
 using NavalDLC.View.Map.Managers;
 using System.Collections.Generic;
@@ -75,8 +76,11 @@ internal class AnchorVisualManagerPatches
     private sealed class OtherPlayerFleetVisual
     {
         private readonly MobileParty owner;
+        private readonly List<SailVisual> sailVisuals = new();
         private GameEntity entity;
+        private Ship flagShip;
         private ShipHull flagshipHull;
+        private uint cachedVersion;
         private CampaignVec2 cachedPosition = CampaignVec2.Invalid;
 
         public OtherPlayerFleetVisual(MobileParty owner)
@@ -86,14 +90,24 @@ internal class AnchorVisualManagerPatches
 
         public void Update(Scene mapScene)
         {
-            var hull = owner.Party.FlagShip?.ShipHull;
-            if (entity == null || hull != flagshipHull)
+            var currentFlagShip = owner.Party.FlagShip;
+            var hull = currentFlagShip?.ShipHull;
+            if (entity == null || currentFlagShip != flagShip || hull != flagshipHull)
             {
                 Remove();
 
                 // Without a physics body or a MapScreen.VisualsOfEntities entry the fleet can't be hovered or clicked
                 entity = NavalDLCViewHelpers.ShipVisualHelper.GetFlagshipEntity(owner.Party, mapScene);
+                NavalDLCViewHelpers.ShipVisualHelper.CollectSailVisuals(entity.WeakEntity, sailVisuals);
+                flagShip = currentFlagShip;
                 flagshipHull = hull;
+                cachedVersion = currentFlagShip?.VersionNo ?? 0;
+            }
+            // Same as AnchorVisual.OnVisualUpdate, upgrades and figureheads change the ship's version but not its hull
+            else if (currentFlagShip != null && currentFlagShip.VersionNo != cachedVersion)
+            {
+                cachedVersion = currentFlagShip.VersionNo;
+                NavalDLCViewHelpers.ShipVisualHelper.RefreshShipVisuals(entity.WeakEntity, currentFlagShip, sailVisuals);
             }
 
             var anchor = owner.Anchor;
@@ -109,6 +123,7 @@ internal class AnchorVisualManagerPatches
         {
             entity?.Remove(111);
             entity = null;
+            sailVisuals.Clear();
             cachedPosition = CampaignVec2.Invalid;
         }
 
