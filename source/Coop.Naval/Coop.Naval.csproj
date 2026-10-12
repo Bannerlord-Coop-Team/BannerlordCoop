@@ -172,6 +172,11 @@
       <Private>false</Private>
     </Reference>
     <Publicize Include="NavalDLC" />
+    <Reference Include="NavalDLC.View">
+      <HintPath>../../mb2/Modules/NavalDLC/bin/Win64_Shipping_Client/NavalDLC.View.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Publicize Include="NavalDLC.View" />
     <Publicize Include="TaleWorlds.ScreenSystem" />
     <Publicize Include="TaleWorlds.MountAndBlade.View" />
     <Publicize Include="TaleWorlds.MountAndBlade.GauntletUI" />
