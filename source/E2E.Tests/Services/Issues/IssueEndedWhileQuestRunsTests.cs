@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Util;
 using E2E.Tests.Environment;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
@@ -30,6 +31,17 @@ public class IssueEndedWhileQuestRunsTests : IDisposable
     public void AnIssueEndedWhileItsQuestRunsIsAnnouncedAndClearedEverywhere()
     {
         scenario.Accept(scenario.ClientA);
+        var ownerQuest = scenario.QuestOf(scenario.ClientA);
+
+        scenario.ClientA.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                ownerQuest.StartQuest();
+            }
+
+            Assert.Contains(ownerQuest, Campaign.Current.QuestManager.Quests);
+        });
 
         scenario.Server.Call(() =>
         {
@@ -48,6 +60,12 @@ public class IssueEndedWhileQuestRunsTests : IDisposable
                 Assert.Null(notable.Issue);
             });
         }
+
+        scenario.ClientA.Call(() =>
+        {
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.DoesNotContain(ownerQuest, Campaign.Current.QuestManager.Quests);
+        });
 
         scenario.Server.Call(() =>
         {

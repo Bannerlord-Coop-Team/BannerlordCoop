@@ -6,6 +6,9 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Issues.Framework.Gating;
 
+/// <summary>
+/// Vanilla only stops <c>Clan.PlayerClan</c> from offering issues, which on the server is not a player, so this stops every player hero and their clan.
+/// </summary>
 [HarmonyPatch(typeof(Hero), nameof(Hero.CanHaveCampaignIssues))]
 internal class PlayerHeroIssueOwnerGate
 {

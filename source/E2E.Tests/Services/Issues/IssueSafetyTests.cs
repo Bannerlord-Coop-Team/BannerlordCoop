@@ -10,6 +10,8 @@ using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 using ArmyNeedsSuppliesIssue = TaleWorlds.CampaignSystem.Issues.ArmyNeedsSuppliesIssueBehavior.ArmyNeedsSuppliesIssue;
 
@@ -81,15 +83,84 @@ public class IssueSafetyTests : IDisposable
             using (new AllowedThread())
             {
                 hero.StayingInSettlement = settlement;
+                hero.Occupation = Occupation.GangLeader;
             }
 
             Assert.False(settlement.IsTown);
 
-            var registry = Server.Container.Resolve<IQuestTypeRegistry>();
-            Assert.True(registry.TryGetByName(GangLeaderIssueName, out var descriptor));
-
-            Assert.False(descriptor.CreationCaptureStrategy.TryBuildDebugCapture(hero, out _));
+            Assert.False(GangLeaderCaptureStrategy().TryBuildDebugCapture(hero, out _));
         });
+    }
+
+    [Fact]
+    public void GangLeaderDebugCapture_IsRefusedForAHeroThatIsNotANotable()
+    {
+        var heroId = CreateHeroInATownWithAHideout();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.False(hero.IsNotable);
+
+            Assert.False(GangLeaderCaptureStrategy().TryBuildDebugCapture(hero, out _));
+        });
+    }
+
+    [Fact]
+    public void GangLeaderDebugCapture_IsBuiltForAGangLeaderInATown()
+    {
+        var heroId = CreateHeroInATownWithAHideout();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+            using (new AllowedThread())
+            {
+                hero.Occupation = Occupation.GangLeader;
+            }
+
+            Assert.True(GangLeaderCaptureStrategy().TryBuildDebugCapture(hero, out var captured));
+            Assert.NotEmpty(captured);
+        });
+    }
+
+    private ICreationCaptureStrategy GangLeaderCaptureStrategy()
+    {
+        Assert.True(Server.Container.Resolve<IQuestTypeRegistry>().TryGetByName(GangLeaderIssueName, out var descriptor));
+        return descriptor.CreationCaptureStrategy;
+    }
+
+    private string CreateHeroInATownWithAHideout()
+    {
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var townSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        var hideoutSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var hideoutId = TestEnvironment.CreateRegisteredObject<Hideout>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(townSettlementId, out var townSettlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Town>(townId, out var town));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(hideoutSettlementId, out var hideoutSettlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Hideout>(hideoutId, out var hideout));
+
+            using (new AllowedThread())
+            {
+                townSettlement.Town = town;
+                hero.StayingInSettlement = townSettlement;
+                hideoutSettlement.SetSettlementComponent(hideout);
+
+                Campaign.Current._hideouts ??= new MBList<Hideout>();
+                Campaign.Current._hideouts.Add(hideout);
+            }
+
+            Assert.True(townSettlement.IsTown);
+        });
+
+        return heroId;
     }
 
     private CoopCommandResult Give(string heroId, string questType)
