@@ -31,23 +31,27 @@ public class HeroFieldsHandlerThreadingTests
     }
 
     [Fact]
-    public void ChangeFirstName_PublishedWhileCreationIsStillQueued_AppliesAfterTheQueueDrains()
+    public void ChangeCulture_PublishedWhileCreationIsStillQueued_AppliesAfterTheQueueDrains()
     {
         Assert.True(GameThread.Instance.IsInitialized, "game-loop pump was not initialized");
 
         var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+        var culture = (CultureObject)FormatterServices.GetUninitializedObject(typeof(CultureObject));
         bool registered = false;
 
         var objectManager = new Mock<IObjectManager>();
         objectManager
             .Setup(o => o.TryGetObjectWithLogging("hero-1", out hero))
             .Returns(() => Volatile.Read(ref registered));
+        objectManager
+            .Setup(o => o.TryGetObjectWithLogging("empire", out culture))
+            .Returns(true);
 
-        Action<MessagePayload<ChangeFirstName>> subscriber = null;
+        Action<MessagePayload<ChangeCulture>> subscriber = null;
         var messageBroker = new Mock<IMessageBroker>();
         messageBroker
-            .Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<ChangeFirstName>>>()))
-            .Callback<Action<MessagePayload<ChangeFirstName>>>(s => subscriber = s);
+            .Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<ChangeCulture>>>()))
+            .Callback<Action<MessagePayload<ChangeCulture>>>(s => subscriber = s);
 
         using var handler = new HeroFieldsHandler(messageBroker.Object, objectManager.Object);
         Assert.NotNull(subscriber);
@@ -70,10 +74,10 @@ public class HeroFieldsHandlerThreadingTests
             // The marshaled hero creation, still waiting in the game-thread queue.
             GameThread.EnqueueSafe(() => Volatile.Write(ref registered, true));
 
-            // The one-shot name apply arrives on the poller thread while the creation is still
-            // queued. Resolving here instead of in queue order would drop the name forever.
-            subscriber(new MessagePayload<ChangeFirstName>(this, new ChangeFirstName("New Name", "hero-1")));
-            Assert.Null(hero._firstName);
+            // The one-shot culture apply arrives on the poller thread while the creation is still
+            // queued. Resolving here instead of in queue order would drop the culture forever.
+            subscriber(new MessagePayload<ChangeCulture>(this, new ChangeCulture("empire", "hero-1")));
+            Assert.Null(hero.Culture);
         }
         finally
         {
@@ -84,7 +88,6 @@ public class HeroFieldsHandlerThreadingTests
         // the queue has drained, so the creation and the apply have both run by the time it returns.
         GameThread.Run(() => { }, blocking: true);
 
-        Assert.NotNull(hero._firstName);
-        Assert.Equal("New Name", hero._firstName.Value);
+        Assert.Same(culture, hero.Culture);
     }
 }

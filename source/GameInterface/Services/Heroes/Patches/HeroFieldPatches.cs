@@ -14,7 +14,6 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Patches
 {
@@ -65,9 +64,6 @@ namespace GameInterface.Services.Heroes.Patches
         {
             foreach(var method in AccessTools.GetDeclaredMethods(typeof(Hero)))
             {
-                // SetName only writes _name and _firstName, which HeroDataPatches syncs with their full TextObjects
-                if (method.Name == nameof(Hero.SetName)) continue;
-
                 yield return method;
             }
             yield return AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.CheckLevel));
@@ -150,43 +146,6 @@ namespace GameInterface.Services.Heroes.Patches
             MessageBroker.Instance.Publish(instance, new CharacterObjectChanged(newCharacterObject, instance));
 
             instance._characterObject = newCharacterObject;
-        }
-
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> FirstNameTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var firstNameField = AccessTools.Field(typeof(Hero), nameof(Hero._firstName));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(FirstNameIntercept));
-
-            foreach (var instruction in instructions)
-            {
-                if (instruction.StoresField(firstNameField))
-                {
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
-        public static void FirstNameIntercept(Hero instance, TextObject newName)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._firstName = newName;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client updated managed {var}", nameof(Hero._firstName));
-                instance._firstName = newName;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName?.Value, instance));
-
-            instance._firstName = newName;
         }
 
         [HarmonyTranspiler]
