@@ -17,8 +17,11 @@ internal class ShipLifetimePatches
 
     [HarmonyPatch(typeof(DestroyShipAction), nameof(DestroyShipAction.ApplyInternal))]
     [HarmonyPostfix]
-    private static void Postfix_DestroyShipAction(Ship ship)
+    private static void Postfix_DestroyShipAction(Ship ship, bool __runOriginal)
     {
+        // A prefix that blocked the destroy means the ship was not actually destroyed
+        if (!__runOriginal) return;
+
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
