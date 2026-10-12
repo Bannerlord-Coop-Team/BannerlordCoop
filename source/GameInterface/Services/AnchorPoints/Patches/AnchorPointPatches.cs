@@ -37,6 +37,20 @@ internal class AnchorPointPatches
         return false;
     }
 
+    [HarmonyPatch(nameof(AnchorPoint.OnPartyInteraction))]
+    [HarmonyPrefix]
+    public static bool OnPartyInteractionPrefix(MobileParty mobileParty)
+    {
+        if (ModInformation.IsServer) return true;
+
+        // Stop interacting so the request isn't sent every tick until the server's at sea update arrives
+        mobileParty.Ai.AiBehaviorInteractable = null;
+
+        MessageBroker.Instance.Publish(mobileParty, new EmbarkAtAnchorRequested(mobileParty));
+
+        return false;
+    }
+
     [HarmonyPatch(nameof(AnchorPoint.HourlyTick))]
     [HarmonyPrefix]
     public static bool HourlyTickPrefix(AnchorPoint __instance, ref bool __state)

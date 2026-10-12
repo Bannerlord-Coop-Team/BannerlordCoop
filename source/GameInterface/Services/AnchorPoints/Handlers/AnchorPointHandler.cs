@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.AnchorPoints.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -30,6 +31,9 @@ internal class AnchorPointHandler : IHandler
 
         messageBroker.Subscribe<FleetArrived>(Handle_FleetArrived);
         messageBroker.Subscribe<NetworkNotifyFleetArrived>(Handle_NetworkNotifyFleetArrived);
+
+        messageBroker.Subscribe<EmbarkAtAnchorRequested>(Handle_EmbarkAtAnchorRequested);
+        messageBroker.Subscribe<NetworkEmbarkAtAnchor>(Handle_NetworkEmbarkAtAnchor);
     }
 
     public void Dispose()
@@ -39,6 +43,36 @@ internal class AnchorPointHandler : IHandler
 
         messageBroker.Unsubscribe<FleetArrived>(Handle_FleetArrived);
         messageBroker.Unsubscribe<NetworkNotifyFleetArrived>(Handle_NetworkNotifyFleetArrived);
+
+        messageBroker.Unsubscribe<EmbarkAtAnchorRequested>(Handle_EmbarkAtAnchorRequested);
+        messageBroker.Unsubscribe<NetworkEmbarkAtAnchor>(Handle_NetworkEmbarkAtAnchor);
+    }
+
+    private void Handle_EmbarkAtAnchorRequested(MessagePayload<EmbarkAtAnchorRequested> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+
+        network.SendAll(new NetworkEmbarkAtAnchor(mobilePartyId));
+    }
+
+    private void Handle_NetworkEmbarkAtAnchor(MessagePayload<NetworkEmbarkAtAnchor> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MobilePartyId, out var mobileParty)) return;
+
+            var anchor = mobileParty.Anchor;
+            if (anchor == null || !anchor.IsValid || mobileParty.IsCurrentlyAtSea) return;
+
+            // Vanilla clears the interaction, targets the anchor and sets sail there
+            anchor.OnPartyInteraction(mobileParty);
+            mobileParty.SetMoveModeHold();
+
+            // SetSailAtPosition writes the position directly, so push it and the sea state to clients
+            messageBroker.Publish(this, new PartyBehaviorChangeAttempted(mobileParty, forcePosition: true, isCurrentlyAtSea: true));
+        });
     }
 
     private void Handle_CallFleetRequested(MessagePayload<CallFleetRequested> obj)
