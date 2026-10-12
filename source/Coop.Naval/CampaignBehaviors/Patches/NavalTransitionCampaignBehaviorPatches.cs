@@ -1,8 +1,11 @@
 ﻿using Common.Messaging;
+using Coop.Naval.CampaignBehaviors.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using NavalDLC.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
@@ -23,6 +26,15 @@ internal class NavalTransitionCampaignBehaviorPatches
     {
         var party = MobileParty.MainParty;
         MessageBroker.Instance.Publish(party, new EndSettlementEncounterAttempted(party, SettlementLeaveType.SetSail));
+
+        return false;
+    }
+
+    [HarmonyPatch(nameof(NavalTransitionCampaignBehavior.repair_ships_consequence))]
+    [HarmonyPrefix]
+    public static bool RepairShipsConsequencePrefix(NavalTransitionCampaignBehavior __instance, MenuCallbackArgs args)
+    {
+        MessageBroker.Instance.Publish(__instance, new RequestRepairShipsAtPort(MobileParty.MainParty, Settlement.CurrentSettlement));
 
         return false;
     }
