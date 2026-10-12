@@ -48,14 +48,14 @@ internal class PlayerLandSeaTransitionPatches
 }
 
 [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.FinishNavigationTransitionInternal))]
-internal class PlayerLandSeaTransitionFinishPatch
+internal class LandSeaTransitionFinishPatch
 {
-    // Each side flips IsCurrentlyAtSea itself when its transition ends, so the server sends its result to stop them drifting apart
+    // Each side flips IsCurrentlyAtSea itself when its transition ends, and a client may not run the transition at all,
+    // so the server sends its result for every party to stop them drifting apart
     [HarmonyPostfix]
     private static void Postfix(MobileParty __instance)
     {
         if (ModInformation.IsClient) return;
-        if (!__instance.IsPlayerParty()) return;
 
         MessageBroker.Instance.Publish(__instance, new PartyBehaviorChangeAttempted(__instance, forcePosition: true, isCurrentlyAtSea: __instance.IsCurrentlyAtSea));
     }
