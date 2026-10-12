@@ -156,6 +156,8 @@ Recent history uses short imperative summaries, for example `fixed deployment` a
 
 Before any `gh pr edit`, re-fetch the live PR (`gh pr view --json title,body`) and edit from that, because PR titles and descriptions may have been manually edited and a cached draft may be stale. Default to not touching the description unless asked, and change only the specific thing requested. Never hand-add any Claude/Anthropic attribution (a `Claude-Session:` trailer, a session URL, `Co-Authored-By`) to a commit or PR.
 
+Every PR must retain an exact `## Bot Changelog Entry` heading. For War Sails updates, leave that section empty because the update does not add a tester-visible co-op change. Do not add a changelog bullet just to populate the section.
+
 ### Review Comments & PR Prose (use the established maintainer voice)
 
 GitHub review comments, inline PR comments, and PR descriptions should match the established style below. A separate register should not be introduced.
