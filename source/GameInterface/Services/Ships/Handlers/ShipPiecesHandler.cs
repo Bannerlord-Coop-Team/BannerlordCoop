@@ -12,7 +12,7 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.Ships.Handlers;
 
 /// <summary>
-/// Replicates ship slot pieces and unlocked pieces from the server, and routes client equip requests to it.
+/// Replicates ship slot pieces and unlocked pieces from the server to clients.
 /// </summary>
 internal class ShipPiecesHandler : IHandler
 {
@@ -31,8 +31,6 @@ internal class ShipPiecesHandler : IHandler
 
         messageBroker.Subscribe<ShipPiecesChanged>(Handle_ShipPiecesChanged);
         messageBroker.Subscribe<NetworkShipPiecesChanged>(Handle_NetworkShipPiecesChanged);
-        messageBroker.Subscribe<ShipUpgradePieceEquipRequested>(Handle_ShipUpgradePieceEquipRequested);
-        messageBroker.Subscribe<NetworkRequestEquipShipUpgradePiece>(Handle_NetworkRequestEquipShipUpgradePiece);
     }
 
     /// <summary>
@@ -42,8 +40,6 @@ internal class ShipPiecesHandler : IHandler
     {
         messageBroker.Unsubscribe<ShipPiecesChanged>(Handle_ShipPiecesChanged);
         messageBroker.Unsubscribe<NetworkShipPiecesChanged>(Handle_NetworkShipPiecesChanged);
-        messageBroker.Unsubscribe<ShipUpgradePieceEquipRequested>(Handle_ShipUpgradePieceEquipRequested);
-        messageBroker.Unsubscribe<NetworkRequestEquipShipUpgradePiece>(Handle_NetworkRequestEquipShipUpgradePiece);
     }
 
     /// <summary>
@@ -121,43 +117,6 @@ internal class ShipPiecesHandler : IHandler
 
             ship.Owner?.MobileParty?.SetNavalVisualAsDirty();
             ship.UpdateVersionNo();
-        });
-    }
-
-    /// <summary>
-    /// Forwards a client's blocked equip to the server, which applies it and replicates the result.
-    /// </summary>
-    private void Handle_ShipUpgradePieceEquipRequested(MessagePayload<ShipUpgradePieceEquipRequested> obj)
-    {
-        var data = obj.What;
-
-        if (!objectManager.TryGetHandleWithLogging(data.Ship, out var shipHandle)) return;
-
-        uint pieceHandle = 0;
-        if (data.Piece != null && !objectManager.TryGetHandleWithLogging(data.Piece, out pieceHandle)) return;
-
-        network.SendAll(new NetworkRequestEquipShipUpgradePiece(shipHandle, data.SlotTag, pieceHandle));
-    }
-
-    /// <summary>
-    /// Applies a client's equip request on the server with patches live so the pieces snapshot goes out.
-    /// </summary>
-    private void Handle_NetworkRequestEquipShipUpgradePiece(MessagePayload<NetworkRequestEquipShipUpgradePiece> obj)
-    {
-        if (ModInformation.IsClient) return;
-
-        var data = obj.What;
-
-        GameThread.RunSafe(() =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<Ship>(data.ShipHandle, out var ship)) return;
-
-            ShipUpgradePiece piece = null;
-            if (data.PieceHandle != 0 && !objectManager.TryGetObjectWithLogging(data.PieceHandle, out piece)) return;
-
-            if (!ship.HasSlot(data.SlotTag)) return;
-
-            ship.EquipUpgradePiece(data.SlotTag, piece);
         });
     }
 }

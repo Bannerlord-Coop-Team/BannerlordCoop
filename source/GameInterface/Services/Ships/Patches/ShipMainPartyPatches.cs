@@ -1,8 +1,6 @@
 ﻿using Common;
-using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
-using GameInterface.Services.Ships.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.Core;
@@ -45,19 +43,13 @@ internal class ShipMainPartyPatches
     }
 
     /// <summary>
-    /// Sends a client's equip on a managed ship to the server, otherwise equips the piece locally.
+    /// Equips a piece and unlocks it for player-owned ships.
     /// </summary>
     [HarmonyPatch(nameof(Ship.EquipUpgradePiece))]
     [HarmonyPrefix]
     public static bool EquipUpgradePiecePrefix(Ship __instance, string slotTag, ShipUpgradePiece newUpgradePiece)
     {
         __instance.GetPieceAtSlot(slotTag);
-
-        if (ModInformation.IsClient && IsManaged(__instance))
-        {
-            MessageBroker.Instance.Publish(__instance, new ShipUpgradePieceEquipRequested(__instance, slotTag, newUpgradePiece));
-            return false;
-        }
 
         // Replace PartyBase.MainParty usage
         if (__instance.Owner.IsPlayerParty() && newUpgradePiece != null)

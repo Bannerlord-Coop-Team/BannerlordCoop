@@ -36,14 +36,4 @@ public class ShipMessageSerializationTests
         Assert.False(withNull.HasUnlockedPieces);
         Assert.True(withEmpty.HasUnlockedPieces);
     }
-
-    [Fact]
-    public void EquipRequest_PreservesClearedSlot()
-    {
-        var copy = Serializer.DeepClone(new NetworkRequestEquipShipUpgradePiece(3, "fore", 0));
-
-        Assert.Equal(3u, copy.ShipHandle);
-        Assert.Equal("fore", copy.SlotTag);
-        Assert.Equal(0u, copy.PieceHandle);
-    }
 }
