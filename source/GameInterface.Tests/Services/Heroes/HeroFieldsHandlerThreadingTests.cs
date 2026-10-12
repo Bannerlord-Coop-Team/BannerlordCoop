@@ -31,7 +31,7 @@ public class HeroFieldsHandlerThreadingTests
     }
 
     [Fact]
-    public void ChangeName_PublishedWhileCreationIsStillQueued_AppliesAfterTheQueueDrains()
+    public void ChangeFirstName_PublishedWhileCreationIsStillQueued_AppliesAfterTheQueueDrains()
     {
         Assert.True(GameThread.Instance.IsInitialized, "game-loop pump was not initialized");
 
@@ -43,11 +43,11 @@ public class HeroFieldsHandlerThreadingTests
             .Setup(o => o.TryGetObjectWithLogging("hero-1", out hero))
             .Returns(() => Volatile.Read(ref registered));
 
-        Action<MessagePayload<ChangeName>> subscriber = null;
+        Action<MessagePayload<ChangeFirstName>> subscriber = null;
         var messageBroker = new Mock<IMessageBroker>();
         messageBroker
-            .Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<ChangeName>>>()))
-            .Callback<Action<MessagePayload<ChangeName>>>(s => subscriber = s);
+            .Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<ChangeFirstName>>>()))
+            .Callback<Action<MessagePayload<ChangeFirstName>>>(s => subscriber = s);
 
         using var handler = new HeroFieldsHandler(messageBroker.Object, objectManager.Object);
         Assert.NotNull(subscriber);
@@ -72,8 +72,8 @@ public class HeroFieldsHandlerThreadingTests
 
             // The one-shot name apply arrives on the poller thread while the creation is still
             // queued. Resolving here instead of in queue order would drop the name forever.
-            subscriber(new MessagePayload<ChangeName>(this, new ChangeName("New Name", "hero-1")));
-            Assert.Null(hero._name);
+            subscriber(new MessagePayload<ChangeFirstName>(this, new ChangeFirstName("New Name", "hero-1")));
+            Assert.Null(hero._firstName);
         }
         finally
         {
@@ -84,7 +84,7 @@ public class HeroFieldsHandlerThreadingTests
         // the queue has drained, so the creation and the apply have both run by the time it returns.
         GameThread.Run(() => { }, blocking: true);
 
-        Assert.NotNull(hero._name);
-        Assert.Equal("New Name", hero._name.Value);
+        Assert.NotNull(hero._firstName);
+        Assert.Equal("New Name", hero._firstName.Value);
     }
 }

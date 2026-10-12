@@ -18,7 +18,6 @@ namespace Coop.Core.Client.Services.Heroes.Handlers
             messageBroker.Subscribe<NetworkLastTimeStampChanged>(Handle);
             messageBroker.Subscribe<NetworkCharacterObjectChanged>(Handle);
             messageBroker.Subscribe<NetworkFirstNameChanged>(Handle);
-            messageBroker.Subscribe<NetworkNameChanged>(Handle);
             messageBroker.Subscribe<NetworkHairTagsChanged>(Handle);
             messageBroker.Subscribe<NetworkBeardTagsChanged>(Handle);
             messageBroker.Subscribe<NetworkTattooTagsChanged>(Handle);
@@ -105,12 +104,6 @@ namespace Coop.Core.Client.Services.Heroes.Handlers
             messageBroker.Publish(this, new ChangeHairTags(data.HairTags, data.HeroId));
         }
 
-        private void Handle(MessagePayload<NetworkNameChanged> payload)
-        {
-            var data = payload.What;
-            messageBroker.Publish(this, new ChangeName(data.NewName, data.HeroId));
-        }
-
         private void Handle(MessagePayload<NetworkFirstNameChanged> payload)
         {
             var data = payload.What;
@@ -134,7 +127,6 @@ namespace Coop.Core.Client.Services.Heroes.Handlers
             messageBroker.Unsubscribe<NetworkLastTimeStampChanged>(Handle);
             messageBroker.Unsubscribe<NetworkCharacterObjectChanged>(Handle);
             messageBroker.Unsubscribe<NetworkFirstNameChanged>(Handle);
-            messageBroker.Unsubscribe<NetworkNameChanged>(Handle);
             messageBroker.Unsubscribe<NetworkHairTagsChanged>(Handle);
             messageBroker.Unsubscribe<NetworkBeardTagsChanged>(Handle);
             messageBroker.Unsubscribe<NetworkTattooTagsChanged>(Handle);

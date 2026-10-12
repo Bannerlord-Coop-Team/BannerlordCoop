@@ -26,7 +26,6 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Subscribe<ChangeLastTimeStamp>(Handle);
             messageBroker.Subscribe<ChangeCharacterObject>(Handle);
             messageBroker.Subscribe<ChangeFirstName>(Handle);
-            messageBroker.Subscribe<ChangeName>(Handle);
             messageBroker.Subscribe<ChangeHeroState>(Handle);
             messageBroker.Subscribe<ChangeHeroLevel>(Handle);
             messageBroker.Subscribe<ChangeSpcDaysInLocation>(Handle);
@@ -43,7 +42,6 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Unsubscribe<ChangeLastTimeStamp>(Handle);
             messageBroker.Unsubscribe<ChangeCharacterObject>(Handle);
             messageBroker.Unsubscribe<ChangeFirstName>(Handle);
-            messageBroker.Unsubscribe<ChangeName>(Handle);
             messageBroker.Unsubscribe<ChangeHeroState>(Handle);
             messageBroker.Unsubscribe<ChangeHeroLevel>(Handle);
             messageBroker.Unsubscribe<ChangeSpcDaysInLocation>(Handle);
@@ -159,13 +157,6 @@ namespace GameInterface.Services.Heroes.Handlers
                     instance.ChangeState((Hero.CharacterStates)data.HeroState);
                 }
             });
-        }
-
-        private void Handle(MessagePayload<ChangeName> payload)
-        {
-            var data = payload.What;
-
-            MarshalApply(data.HeroId, nameof(ChangeName), instance => instance._name = new TextObject(data.NewName));
         }
 
         private void Handle(MessagePayload<ChangeFirstName> payload)

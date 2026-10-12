@@ -85,28 +85,6 @@ namespace Coop.IntegrationTests.Heroes
             }
         }
         [Fact]
-        public void ServerRecievesNameChanged()
-        {
-            var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
-            foreach (var client in TestEnvironment.Clients)
-            {
-                client.CreateRegisteredObject<Hero>("hero1");
-            }
-
-            var triggerMessage = new NameChanged("TestName", hero);
-
-            var server = TestEnvironment.Server;
-
-            server.SimulateMessage(this, triggerMessage);
-
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkNameChanged>());
-
-            foreach (EnvironmentInstance client in TestEnvironment.Clients)
-            {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeName>());
-            }
-        }
-        [Fact]
         public void ServerRecievesHairTagsChanged()
         {
             var hero = TestEnvironment.Server.CreateRegisteredObject<Hero>("hero1");
