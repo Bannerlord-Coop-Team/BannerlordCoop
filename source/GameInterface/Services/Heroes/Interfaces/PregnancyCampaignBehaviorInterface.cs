@@ -4,7 +4,6 @@ using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Missions;
 using GameInterface.Services.Players;
 using GameInterface.Services.UI.Notifications.Messages;
-using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -116,9 +115,7 @@ public class PregnancyCampaignBehaviorInterface : IPregnancyCampaignBehaviorInte
         RepairMissingParentCharacterData(father.CharacterObject);
 
         CharacterObject characterTemplateForOffspring = Campaign.Current.Models.HeroCreationModel.GetCharacterTemplateForOffspring(mother, father, isOffspringFemale);
-        ValueTuple<CampaignTime, CampaignTime> birthAndDeathDay = Campaign.Current.Models.HeroCreationModel.GetBirthAndDeathDay(characterTemplateForOffspring, true, 0);
-        CampaignTime birthDay = birthAndDeathDay.Item1;
-        CampaignTime deathDay = birthAndDeathDay.Item2;
+        var (birthDay, deathDay) = Campaign.Current.Models.HeroCreationModel.GetBirthAndDeathDay(characterTemplateForOffspring, true, 0);
         Hero hero = HeroCreator.CreateHero(characterTemplateForOffspring, true, birthDay, deathDay);
         HeroCreator.HeroInitializationArgs heroInitializationArgs = new HeroCreator.HeroInitializationArgs(hero, true)
             .SetMother(mother)
@@ -153,12 +150,7 @@ public class PregnancyCampaignBehaviorInterface : IPregnancyCampaignBehaviorInte
     {
         if (parentCharacter._culture == null)
         {
-            // Use patched getter to pick up the hero culture fallback
-            var culture = parentCharacter.Culture;
-            if (culture != null)
-            {
-                parentCharacter.Culture = culture;
-            }
+            parentCharacter.Culture = parentCharacter.HeroObject.Culture;
         }
 
         if (parentCharacter.BodyPropertyRange == null)

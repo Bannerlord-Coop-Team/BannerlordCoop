@@ -190,43 +190,6 @@ namespace GameInterface.Services.Heroes.Patches
         }
 
         [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> NameTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var nameField = AccessTools.Field(typeof(Hero), nameof(Hero._name));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(NameIntercept));
-
-            foreach (var instruction in instructions)
-            {
-                if (instruction.StoresField(nameField))
-                {
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
-        public static void NameIntercept(Hero instance, TextObject newName)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._name = newName;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client updated managed {var}", nameof(Hero._name));
-                instance._name = newName;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new NameChanged(newName?.Value, instance));
-
-            instance._name = newName;
-        }
-
-        [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> HeroStateTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var heroStateField = AccessTools.Field(typeof(Hero), nameof(Hero._heroState));
