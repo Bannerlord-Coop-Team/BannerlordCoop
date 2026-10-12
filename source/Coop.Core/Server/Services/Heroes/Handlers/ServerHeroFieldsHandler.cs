@@ -22,8 +22,6 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
             this.objectManager = objectManager;
             messageBroker.Subscribe<LastTimeStampChanged>(Handle);
             messageBroker.Subscribe<CharacterObjectChanged>(Handle);
-            messageBroker.Subscribe<FirstNameChanged>(Handle);
-            messageBroker.Subscribe<NameChanged>(Handle);
             messageBroker.Subscribe<HairTagsChanged>(Handle);
             messageBroker.Subscribe<BeardTagsChanged>(Handle);
             messageBroker.Subscribe<TattooTagsChanged>(Handle);
@@ -149,24 +147,6 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
             network.SendAll(new NetworkHairTagsChanged(data.HairTags, heroId));
         }
 
-        private void Handle(MessagePayload<NameChanged> payload)
-        {
-            var data = payload.What;
-
-            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
-
-            network.SendAll(new NetworkNameChanged(data.NewName, heroId));
-        }
-
-        private void Handle(MessagePayload<FirstNameChanged> payload)
-        {
-            var data = payload.What;
-
-            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
-
-            network.SendAll(new NetworkFirstNameChanged(data.NewName, heroId));
-        }
-
         private void Handle(MessagePayload<CharacterObjectChanged> payload)
         {
             var data = payload.What;
@@ -190,8 +170,6 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
         {
             messageBroker.Unsubscribe<LastTimeStampChanged>(Handle);
             messageBroker.Unsubscribe<CharacterObjectChanged>(Handle);
-            messageBroker.Unsubscribe<FirstNameChanged>(Handle);
-            messageBroker.Unsubscribe<NameChanged>(Handle);
             messageBroker.Unsubscribe<HairTagsChanged>(Handle);
             messageBroker.Unsubscribe<BeardTagsChanged>(Handle);
             messageBroker.Unsubscribe<TattooTagsChanged>(Handle);
