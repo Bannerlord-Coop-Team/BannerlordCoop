@@ -670,4 +670,33 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_86cf913d"
+    name="{=!}Hannibal Barca"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.aserai"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_A5"
+    coop_location="lordshall"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="God has given to man no sharper spur to victory than contempt of death, so you should think to yourself that every day is your last. That way, you&apos;re always motivated."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_aserai" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Cape" id="Item.aserai_scale_shoulder_c" />
+        <equipment slot="Body" id="Item.aserai_armor_02" />
+        <equipment slot="Gloves" id="Item.guarded_padded_vambrace" />
+        <equipment slot="Leg" id="Item.wrapped_shoes" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
