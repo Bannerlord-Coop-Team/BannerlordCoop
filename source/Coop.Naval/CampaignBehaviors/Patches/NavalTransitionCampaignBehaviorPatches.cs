@@ -1,5 +1,8 @@
-﻿using HarmonyLib;
+﻿using Common.Messaging;
+using GameInterface.Services.MobileParties.Messages.Behavior;
+using HarmonyLib;
 using NavalDLC.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Naval.CampaignBehaviors.Patches;
 
@@ -11,5 +14,16 @@ internal class NavalTransitionCampaignBehaviorPatches
     public static void WaitHereOnConditionPostfix(ref bool __result)
     {
         __result = false;
+    }
+
+    // Leave through the server like the land leave button, the reply finishes the encounter at sea
+    [HarmonyPatch(nameof(NavalTransitionCampaignBehavior.set_sail_consequence))]
+    [HarmonyPrefix]
+    public static bool SetSailConsequencePrefix()
+    {
+        var party = MobileParty.MainParty;
+        MessageBroker.Instance.Publish(party, new EndSettlementEncounterAttempted(party, SettlementLeaveType.SetSail));
+
+        return false;
     }
 }
