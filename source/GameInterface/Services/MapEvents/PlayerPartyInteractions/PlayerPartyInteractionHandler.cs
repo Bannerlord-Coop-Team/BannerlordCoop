@@ -1628,7 +1628,11 @@ internal class PlayerPartyInteractionHandler : IHandler
 
         try
         {
-            conversationManager.OpenMapConversation(playerData, otherData);
+            if (myParty.MobileParty?.IsCurrentlyAtSea == true)
+                CampaignMission.OpenConversationMission(playerData, otherData);
+            else
+                conversationManager.OpenMapConversation(playerData, otherData);
+
             PlayerPartyInteractionDialogState.RefreshConversation();
             openedConversationSessionIds.Add(sessionId);
         }
