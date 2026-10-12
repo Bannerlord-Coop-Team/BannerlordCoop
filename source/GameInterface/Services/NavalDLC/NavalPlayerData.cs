@@ -7,6 +7,7 @@ namespace GameInterface.Services.NavalDLC;
 /// Some data structures used by the NavalDLC need to live inside the CoopSession for client specific data
 /// UnlockedFigureheadsByMainHero assumes there is only the one player who can unlock figureheads
 /// NavalDLCFigureheadCampaignBehavior._lastFigureheadLootTime assumes only one player loots figureheads
+/// ClanFleetManagementCampaignBehavior._sentTroops assumes only one player sends troops away with ships
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class NavalPlayerData
@@ -19,11 +20,17 @@ public class NavalPlayerData
     [ProtoMember(2)]
     public Dictionary<string, long> PlayerLastFigureheadLootTimes { get; }
 
+    // Dictionary<PlayerHeroId, List<SentTroopsData>>
+    [ProtoMember(3)]
+    public Dictionary<string, List<SentTroopsData>> PlayerSentTroops { get; }
+
     public NavalPlayerData(
         Dictionary<string, List<string>> playerUnlockedFigureHeads,
-        Dictionary<string, long> playerLastFigureheadLootTimes)
+        Dictionary<string, long> playerLastFigureheadLootTimes,
+        Dictionary<string, List<SentTroopsData>> playerSentTroops)
     {
         PlayerUnlockedFigureHeads = playerUnlockedFigureHeads ?? new();
         PlayerLastFigureheadLootTimes = playerLastFigureheadLootTimes ?? new();
+        PlayerSentTroops = playerSentTroops ?? new();
     }
 }
