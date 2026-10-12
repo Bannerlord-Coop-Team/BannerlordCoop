@@ -2,6 +2,7 @@
 using GameInterface.Services.MobileParties;
 using SandBox.View.Map;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Engine;
 
 namespace GameInterface.Services.PartyVisuals;
 
@@ -20,14 +21,34 @@ public interface IMapVisualRange : IGameAbstraction
 public class MapVisualRange : IMapVisualRange
 {
     private const float VisualRange = 50f;
+    private const int MaxRefreshesPerFrame = 10;
+
+    private int budgetFrame = -1;
+    private int refreshesThisFrame;
 
     public bool ShouldRefresh(PartyBase party)
     {
         if (ModInformation.IsServer || DebugPartyVisibility.ForceAllVisible)
         {
-            return IsNearCamera(party);
+            return IsNearCamera(party) && TryUseFrameBudget();
         }
 
+        return true;
+    }
+
+    // Spreads rebuilds over frames, a skipped visual stays dirty and is rebuilt on a later frame
+    private bool TryUseFrameBudget()
+    {
+        int frame = Utilities.EngineFrameNo;
+        if (frame != budgetFrame)
+        {
+            budgetFrame = frame;
+            refreshesThisFrame = 0;
+        }
+
+        if (refreshesThisFrame >= MaxRefreshesPerFrame) return false;
+
+        refreshesThisFrame++;
         return true;
     }
 
