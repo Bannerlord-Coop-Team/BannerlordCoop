@@ -179,10 +179,28 @@ internal class MobilePartyBehaviorHandler : IHandler
 
     private static void ApplyForcedPosition(MobileParty party, CampaignVec2 position, bool isCurrentlyAtSea)
     {
+        // A local transition that finishes after this would flip IsCurrentlyAtSea away from the forced state
+        if (party.IsTransitionInProgress)
+            party.CancelNavigationTransition();
+
         party.Position = position;
 
         if (party.IsCurrentlyAtSea != isCurrentlyAtSea)
+        {
             party.ChangeIsCurrentlyAtSeaCheat();
+
+            // Settlement menu options like leave and set sail depend on the sea state
+            if (party == MobileParty.MainParty)
+                RefreshCurrentMenu();
+        }
+    }
+
+    private static void RefreshCurrentMenu()
+    {
+        var menuContext = Campaign.Current?.CurrentMenuContext;
+        if (menuContext == null) return;
+
+        Campaign.Current.GameMenuManager.RefreshMenuOptions(menuContext);
     }
 
     private static List<MobileParty> ApplyServerForcedPosition(
