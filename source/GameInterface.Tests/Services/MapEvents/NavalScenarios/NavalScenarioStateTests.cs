@@ -1,0 +1,103 @@
+﻿#if DEBUG
+using GameInterface.Services.MapEvents.NavalScenarios;
+using System.Linq;
+using Xunit;
+
+namespace GameInterface.Tests.Services.MapEvents.NavalScenarios;
+
+public class NavalScenarioStateTests
+{
+    private static NavalScenarioConfig Config(string preset, params string[] players)
+    {
+        Assert.True(new NavalScenarioResolver().TryResolve(new[] { preset }.Concat(players).ToArray(), players,
+            out var config, out var error), error);
+        return config;
+    }
+
+    private static string[] Steps(NavalScenarioConfig config, string localControllerId, bool isServer = false) =>
+        NavalScenarioState.StepsFor(config, localControllerId, isServer).ToArray();
+
+    [Fact]
+    public void StepsFor_TheAttackedPlayerEntersTheBattleAndEveryPlayerPressesReady()
+    {
+        var config = Config("vs_pirates", "PlayerOne", "PlayerTwo");
+
+        Assert.Equal(new[] { NavalScenarioState.AttackStep, NavalScenarioState.ReadyStep }, Steps(config, "PlayerOne"));
+        Assert.Equal(new[] { NavalScenarioState.ReadyStep }, Steps(config, "PlayerTwo"));
+    }
+
+    [Fact]
+    public void StepsFor_PlacementPresetsAddTheirTimelineSteps()
+    {
+        Assert.Equal(new[] { NavalScenarioState.ReadyStep, NavalScenarioState.PlaceStep, NavalScenarioState.RopeStep },
+            Steps(Config("boarding", "PlayerOne", "PlayerTwo"), "PlayerTwo"));
+        Assert.Equal(new[] { NavalScenarioState.ReadyStep, NavalScenarioState.PlaceStep, NavalScenarioState.HelmStep },
+            Steps(Config("ramming", "PlayerOne", "PlayerTwo"), "PlayerTwo"));
+        Assert.Equal(new[] { NavalScenarioState.ReadyStep, NavalScenarioState.DisconnectStep },
+            Steps(Config("migration", "PlayerOne", "PlayerTwo"), "PlayerTwo"));
+    }
+
+    [Fact]
+    public void StepsFor_TheServerJoinsTheLateJoinerWhoThenEntersOnItsOwn()
+    {
+        var config = Config("late_join", "PlayerOne", "PlayerTwo");
+
+        Assert.Equal(new[] { NavalScenarioState.LateJoinStep }, Steps(config, null, isServer: true));
+        Assert.Empty(Steps(Config("vs_pirates", "PlayerOne"), null, isServer: true));
+        Assert.Equal(new[] { NavalScenarioState.AttackStep, NavalScenarioState.ReadyStep }, Steps(config, "PlayerOne"));
+        Assert.Equal(new[] { NavalScenarioState.LateJoinAttackStep, NavalScenarioState.ReadyStep }, Steps(config, "PlayerTwo"));
+    }
+
+    [Fact]
+    public void StepsFor_AClientOutsideTheScenarioRunsNothing()
+    {
+        var config = Config("boarding", "PlayerOne");
+
+        Assert.Empty(Steps(config, "PlayerTwo"));
+        Assert.Empty(Steps(config, null));
+        Assert.Empty(Steps(null, "PlayerOne"));
+    }
+
+    [Fact]
+    public void Start_ReplacesTheScenarioAndPhasesOnlyMoveForward()
+    {
+        var state = new NavalScenarioState();
+        Assert.Equal(NavalScenarioPhase.None, state.Phase);
+        state.Advance(NavalScenarioPhase.Fighting);
+        Assert.Equal(NavalScenarioPhase.None, state.Phase);
+
+        var first = Config("vs_pirates", "PlayerOne");
+        state.Start(first, "PlayerOne", isServer: false);
+        Assert.Same(first, state.Current);
+        Assert.Equal(NavalScenarioPhase.Staging, state.Phase);
+
+        state.Advance(NavalScenarioPhase.Fighting);
+        state.Advance(NavalScenarioPhase.Deploying);
+        Assert.Equal(NavalScenarioPhase.Fighting, state.Phase);
+
+        var second = Config("solo", "PlayerOne");
+        state.Start(second, "PlayerOne", isServer: false);
+        Assert.Same(second, state.Current);
+        Assert.Equal(NavalScenarioPhase.Staging, state.Phase);
+        Assert.All(state.Steps, step => Assert.Equal(NavalScenarioStepStatus.Pending, step.Status));
+    }
+
+    [Fact]
+    public void Complete_RecordsTheFirstOutcomeOfAPendingStepOnly()
+    {
+        var state = new NavalScenarioState();
+        state.Start(Config("vs_pirates", "PlayerOne"), "PlayerOne", isServer: false);
+
+        Assert.True(state.IsPending(NavalScenarioState.AttackStep));
+        state.Complete(NavalScenarioState.AttackStep, false, "refused");
+        state.Complete(NavalScenarioState.AttackStep, true, "accepted");
+        state.Complete(NavalScenarioState.RopeStep, true, "not a step of this scenario");
+
+        var attack = state.Steps.Single(step => step.Name == NavalScenarioState.AttackStep);
+        Assert.False(state.IsPending(NavalScenarioState.AttackStep));
+        Assert.Equal(NavalScenarioStepStatus.Failed, attack.Status);
+        Assert.Equal("refused", attack.Detail);
+        Assert.DoesNotContain(state.Steps, step => step.Name == NavalScenarioState.RopeStep);
+    }
+}
+#endif

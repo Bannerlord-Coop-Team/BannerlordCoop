@@ -35,6 +35,9 @@ using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Logging;
+#if DEBUG
+using GameInterface.Services.MapEvents.NavalScenarios;
+#endif
 using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Data;
@@ -162,6 +165,9 @@ public class GameInterfaceModule : Module
         builder.RegisterType<DefenderFixtureBehaviorIdentity>().As<IDefenderFixtureBehaviorIdentity>().InstancePerDependency();
         builder.RegisterType<DefenderSiegeContextFixture>().As<IDefenderSiegeContextFixture>().InstancePerLifetimeScope();
         builder.RegisterType<DefenderFixtureCaptivityActions>().As<IDefenderFixtureCaptivityActions>().InstancePerDependency();
+        builder.RegisterType<NavalScenarioState>().As<INavalScenarioState>().InstancePerLifetimeScope();
+        builder.RegisterType<NavalScenarioResolver>().As<INavalScenarioResolver>().InstancePerDependency();
+        builder.RegisterType<NavalScenarioStager>().As<INavalScenarioStager>().InstancePerDependency();
 #endif
         builder.RegisterType<SiegeMapEventLeaderReconciler>().As<ISiegeMapEventLeaderReconciler>().InstancePerDependency();
         builder.RegisterType<AiSiegeAssaultReadiness>().As<IAiSiegeAssaultReadiness>().InstancePerDependency();
