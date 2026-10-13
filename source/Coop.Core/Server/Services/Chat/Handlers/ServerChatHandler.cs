@@ -16,7 +16,7 @@ using System.Linq;
 
 namespace Coop.Core.Server.Services.Chat.Handlers;
 
-/// <summary>Authenticates chat senders and routes global and direct messages.</summary>
+/// <summary>Authenticates chat senders and routes global, group, and direct messages.</summary>
 internal sealed class ServerChatHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ServerChatHandler>();
@@ -25,17 +25,20 @@ internal sealed class ServerChatHandler : IHandler
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
     private readonly IChatPlayerNameResolver playerNameResolver;
+    private readonly IChatFactionMembership factionMembership;
 
     public ServerChatHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IPlayerManager playerManager,
-        IChatPlayerNameResolver playerNameResolver)
+        IChatPlayerNameResolver playerNameResolver,
+        IChatFactionMembership factionMembership)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.playerManager = playerManager;
         this.playerNameResolver = playerNameResolver;
+        this.factionMembership = factionMembership;
 
         messageBroker.Subscribe<NetworkSendChatMessage>(HandleChatMessage);
         messageBroker.Subscribe<NetworkRequestChatParticipants>(HandleParticipantRequest);
@@ -131,6 +134,12 @@ internal sealed class ServerChatHandler : IHandler
             case ChatChannel.Global:
                 RouteGlobal(sender, text);
                 return;
+            case ChatChannel.Clan:
+                RouteClan(senderPeer, sender, text);
+                return;
+            case ChatChannel.Kingdom:
+                RouteKingdom(senderPeer, sender, text);
+                return;
             case ChatChannel.Direct:
                 RouteDirect(senderPeer, sender, request.RecipientControllerId, text);
                 return;
@@ -142,8 +151,50 @@ internal sealed class ServerChatHandler : IHandler
 
     private void RouteGlobal(Player sender, string text)
     {
+        RouteToMatchingPlayers(ChatChannel.Global, sender, text, _ => true);
+    }
+
+    private void RouteClan(NetPeer senderPeer, Player sender, string text)
+    {
+        // Match live Hero.Clan references. Player.ClanId is join-time and goes stale after JoinClan.
+        if (!factionMembership.TryGetClan(sender, out var clan))
+        {
+            SendSystemMessage(senderPeer, string.Empty, "You are not in a clan.");
+            return;
+        }
+
+        RouteToMatchingPlayers(
+            ChatChannel.Clan,
+            sender,
+            text,
+            player => factionMembership.TryGetClan(player, out var otherClan) &&
+                      ReferenceEquals(otherClan, clan));
+    }
+
+    private void RouteKingdom(NetPeer senderPeer, Player sender, string text)
+    {
+        if (!factionMembership.TryGetKingdom(sender, out var kingdom))
+        {
+            SendSystemMessage(senderPeer, string.Empty, "You are not in a kingdom.");
+            return;
+        }
+
+        RouteToMatchingPlayers(
+            ChatChannel.Kingdom,
+            sender,
+            text,
+            player => factionMembership.TryGetKingdom(player, out var otherKingdom) &&
+                      ReferenceEquals(otherKingdom, kingdom));
+    }
+
+    private void RouteToMatchingPlayers(
+        ChatChannel channel,
+        Player sender,
+        string text,
+        Func<Player, bool> matches)
+    {
         var message = new NetworkChatMessage(
-            ChatChannel.Global,
+            channel,
             sender.ControllerId,
             playerNameResolver.Resolve(sender),
             string.Empty,
@@ -153,6 +204,7 @@ internal sealed class ServerChatHandler : IHandler
         var sentPeers = new HashSet<NetPeer>();
         foreach (var player in playerManager.Players)
         {
+            if (!matches(player)) continue;
             if (playerManager.TryGetPeer(player.ControllerId, out var peer) && sentPeers.Add(peer))
                 network.SendImmediate(peer, message);
         }

@@ -164,6 +164,113 @@ public class ChatVMTests
     }
 
     [Fact]
+    public void SetGroupChannelMembership_InsertsClanAndKingdomBeforeDirects()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.AddParticipant("other-controller", "Other Hero");
+
+        vm.SetGroupChannelMembership(inClan: true, inKingdom: true);
+
+        Assert.Equal(6, vm.Channels.Count);
+        Assert.True(vm.Channels[0].IsAll);
+        Assert.True(vm.Channels[1].IsEvents);
+        Assert.True(vm.Channels[2].IsGlobal);
+        Assert.True(vm.Channels[3].IsClan);
+        Assert.True(vm.Channels[4].IsKingdom);
+        Assert.True(vm.Channels[5].IsDirect);
+
+        vm.SetGroupChannelMembership(inClan: false, inKingdom: true);
+
+        Assert.Equal(5, vm.Channels.Count);
+        Assert.True(vm.Channels[3].IsKingdom);
+        Assert.True(vm.Channels[4].IsDirect);
+        Assert.DoesNotContain(vm.Channels, channel => channel.IsClan);
+    }
+
+    [Fact]
+    public void ActionSend_ClanChannel_SendsClanRequest()
+    {
+        var sent = new List<NetworkSendChatMessage>();
+        var vm = new ChatVM(sent.Add, () => "local");
+        vm.SetGroupChannelMembership(inClan: true, inKingdom: false);
+        vm.Channels.Single(channel => channel.IsClan).ExecuteSelection();
+        vm.WrittenText = "for the clan";
+
+        vm.ActionSend();
+
+        var request = Assert.Single(sent);
+        Assert.Equal(ChatChannel.Clan, request.Channel);
+        Assert.Equal("for the clan", request.Text);
+    }
+
+    [Fact]
+    public void ActionSend_KingdomChannel_SendsKingdomRequest()
+    {
+        var sent = new List<NetworkSendChatMessage>();
+        var vm = new ChatVM(sent.Add, () => "local");
+        vm.SetGroupChannelMembership(inClan: false, inKingdom: true);
+        vm.Channels.Single(channel => channel.IsKingdom).ExecuteSelection();
+        vm.WrittenText = "for the realm";
+
+        vm.ActionSend();
+
+        var request = Assert.Single(sent);
+        Assert.Equal(ChatChannel.Kingdom, request.Channel);
+        Assert.Equal("for the realm", request.Text);
+    }
+
+    [Fact]
+    public void Receive_ClanMessage_ShowsInClosedFeed_NotInAll()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+
+        vm.Receive(new NetworkChatMessage(
+            ChatChannel.Clan,
+            "other-controller",
+            "Other Hero",
+            string.Empty,
+            string.Empty,
+            "rally at the keep"));
+
+        // Tab listing stays membership-owned. History still feeds the closed panel.
+        Assert.DoesNotContain(vm.Channels, channel => channel.IsClan);
+        Assert.False(vm.IsOpen);
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Clan] Other Hero: rally at the keep"));
+
+        vm.SetOpen(true);
+        Assert.DoesNotContain(vm.VisibleLines, line => line.Text.Contains("[Clan]"));
+
+        vm.SetGroupChannelMembership(inClan: true, inKingdom: false);
+        vm.Channels.Single(channel => channel.IsClan).ExecuteSelection();
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Clan] Other Hero: rally at the keep"));
+    }
+
+    [Fact]
+    public void Receive_KingdomMessage_ShowsInClosedFeed_NotInAll()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+
+        vm.Receive(new NetworkChatMessage(
+            ChatChannel.Kingdom,
+            "other-controller",
+            "Other Hero",
+            string.Empty,
+            string.Empty,
+            "hold the pass"));
+
+        Assert.DoesNotContain(vm.Channels, channel => channel.IsKingdom);
+        Assert.False(vm.IsOpen);
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Kingdom] Other Hero: hold the pass"));
+
+        vm.SetOpen(true);
+        Assert.DoesNotContain(vm.VisibleLines, line => line.Text.Contains("[Kingdom]"));
+
+        vm.SetGroupChannelMembership(inClan: false, inKingdom: true);
+        vm.Channels.Single(channel => channel.IsKingdom).ExecuteSelection();
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Kingdom] Other Hero: hold the pass"));
+    }
+
+    [Fact]
     public void ReceiveEvent_AppendsToEventsAndAll_NotGlobal()
     {
         var vm = new ChatVM(_ => { }, () => "local");
