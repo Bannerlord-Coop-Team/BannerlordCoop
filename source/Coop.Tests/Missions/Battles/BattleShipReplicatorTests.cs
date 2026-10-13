@@ -51,6 +51,25 @@ public class BattleShipReplicatorTests
             m is NetworkBattleShipSample && ((NetworkBattleShipSample)m).OwnerControllerId == Own)), Times.Exactly(2));
     }
 
+    [Fact]
+    public void Tick_AfterDeploymentCommit_AnnouncesEveryOwnHullOfAFleetInOneRecordSet()
+    {
+        var harness = new Harness(committed: true);
+        var second = CreateHull();
+        var third = CreateHull();
+        harness.Registry.TryRegister(new NetworkShipInfo(Guid.NewGuid(), Own, "MapEventParty_1", false, second, null));
+        harness.Registry.TryRegister(new NetworkShipInfo(Guid.NewGuid(), Own, "MapEventParty_1", false, third, null));
+        harness.LiveHulls.Add(second);
+        harness.LiveHulls.Add(third);
+
+        harness.Replicator.Tick(0.1f);
+
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m =>
+            m is NetworkSpawnBattleShips && ((NetworkSpawnBattleShips)m).Ships.Length == 3)), Times.Once);
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m =>
+            m is NetworkBattleShipSample && ((NetworkBattleShipSample)m).OwnerControllerId == Own)), Times.Exactly(3));
+    }
+
     [Theory]
     [InlineData(Peer, Peer, 5, 0, null)]
     [InlineData(Peer, "someone_else", 5, 0, "not_authority")]

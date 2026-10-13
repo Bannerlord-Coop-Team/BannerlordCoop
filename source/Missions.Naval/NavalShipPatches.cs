@@ -6,6 +6,7 @@ using NavalDLC.Missions.Deployment;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.ShipControl;
+using NavalDLC.ViewModelCollection.OrderOfBattle;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -87,6 +88,16 @@ internal class PlayerFleetDeploymentSlotPatch
         float teamRange = planningSide.GetTeamSpawnPathOffsetRange(mission.GetInitialSpawnPathData(team.Side).Path, team);
         spawnPathOffset = NavalPlayerDeploymentSlot.ShiftSpawnPathOffset(spawnPathOffset, rank, teamRange);
     }
+}
+
+// The order of battle restores its saved ship layout by Ship reference; a coop battle fields fresh snapshots that never
+// match, so it would empty every formation whose ship can move and remove all own hulls but the flagship at Ready.
+[HarmonyPatch(typeof(NavalOrderOfBattleVM), "LoadConfigurationShips")]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class CoopOrderOfBattleShipLayoutPatch
+{
+    [HarmonyPrefix]
+    internal static bool Prefix() => !CoopNavalMissionScope.IsActive;
 }
 
 // Owners announce station use; the replicator ignores agents this client does not drive.

@@ -473,6 +473,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             teams.Setup(t => t.ResolveReplicatedTeam(BattleSideEnum.Defender, false)).Returns(mission.DefenderTeam.Shell);
             var engine = new Mock<INavalShipEngine>();
             engine.SetupGet(e => e.Hulls).Returns(new List<MissionObject>());
+            engine.SetupGet(e => e.AreInitialShipsDeployed).Returns(true);
             Formation noFormation = null!;
             engine.Setup(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out noFormation))
                 .Returns((MissionObject)null!);
@@ -517,6 +518,68 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             spawner.DrainPendingPuppets();
 
             Assert.False(client.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(agentId, out _));
+        });
+    }
+
+    // Vanilla's team setup spawns a hull for every set ship assignment, so a copy spawned before it got a local twin.
+    [Fact]
+    public void ForeignHullRecord_WaitsForTheInitialShipDeploymentThenSpawnsOnce()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (_, partyIds) = SetupCoopBattle("local", "enemy");
+        var client = Clients.First();
+        var shipId = Guid.NewGuid();
+
+        client.Call(() =>
+        {
+            var mission = fixture.CreateMission(client);
+            mission.PlayerTeam = mission.AttackerTeam;
+            mission.AddTeam(BattleSideEnum.Defender);
+
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var enemyParty));
+            var mapEventParty = enemyParty.MapEvent.DefenderSide.Parties
+                .Single(party => party.Party == enemyParty.Party);
+            Assert.True(client.ObjectManager.TryGetId(mapEventParty, out var mapEventPartyId));
+
+            var broker = client.Resolve<IMessageBroker>();
+            var deployment = new Mock<IBattleDeploymentCoordinator>();
+            var missionComponent = client.Resolve<ICoopMissionComponent>();
+            var session = new Mock<IBattleSession>();
+            session.SetupGet(s => s.OwnControllerId).Returns("local");
+            var teams = new Mock<IBattleTeamResolver>();
+            teams.Setup(t => t.ResolveReplicatedTeam(BattleSideEnum.Defender, false)).Returns(mission.DefenderTeam.Shell);
+            var engine = new Mock<INavalShipEngine>();
+            var copy = CreateTestHull();
+            engine.SetupGet(e => e.Hulls).Returns(new List<MissionObject> { copy });
+            bool initialShipsDeployed = false;
+            engine.SetupGet(e => e.AreInitialShipsDeployed).Returns(() => initialShipsDeployed);
+            Formation noFormation = null!;
+            engine.Setup(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out noFormation))
+                .Returns(copy);
+            using var replicator = new BattleShipReplicator(Mock.Of<IBattleNetwork>(), broker, session.Object,
+                deployment.Object, missionComponent, engine.Object, teams.Object, client.ObjectManager,
+                new HostEpochPolicy(), Mock.Of<IBattleResultCommitter>());
+
+            broker.Publish(this, new NetworkSpawnBattleShips(new[]
+            {
+                new BattleShipSpawnData(shipId, "host", mapEventPartyId, true, BattleSideEnum.Defender, 0,
+                    NetworkBattleShipSample.FromFrame(TaleWorlds.Library.MatrixFrame.Identity), "northern_light_ship", null, null, null, null,
+                    100f, 50f, 1, ""),
+            }));
+            for (int tick = 0; tick < BattleShipReplicator.ForeignHullSpawnAttempts + 1; tick++)
+                replicator.Tick(BattleShipReplicator.ForeignHullRetrySeconds + 0.1f);
+
+            engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out noFormation), Times.Never);
+            Assert.False(missionComponent.ShipRegistry.TryGet(shipId, out _));
+            Assert.False(missionComponent.ShipRegistry.HasSpawnFailed(shipId));
+
+            initialShipsDeployed = true;
+            replicator.Tick(0.1f);
+            replicator.Tick(0.1f);
+
+            engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out noFormation), Times.Once);
+            Assert.True(missionComponent.ShipRegistry.TryGet(shipId, out var ship));
+            Assert.Same(copy, ship.Hull);
         });
     }
 

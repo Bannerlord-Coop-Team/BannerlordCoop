@@ -535,6 +535,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         if (Mission.Current == null || session.IsOwn(data.OwnerControllerId) || Registry.TryGet(data.ShipId, out _))
             return true;
+        if (!engine.AreInitialShipsDeployed) return false;
 
         var team = teamResolver.ResolveReplicatedTeam(data.Side, isOwn: false);
         if (team == null) return false;

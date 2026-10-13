@@ -45,6 +45,19 @@ public class NavalShipEngine : INavalShipEngine
 
     public bool IsDeploymentMode => ShipsLogic?.IsDeploymentMode == true;
 
+    public bool AreInitialShipsDeployed
+    {
+        get
+        {
+            var mission = Mission.Current;
+            if (mission == null) return false;
+
+            // The deployment controller removes itself once deployment finishes, long after its team setup.
+            var deployment = mission.GetMissionBehavior<DeploymentMissionController>();
+            return deployment == null || deployment.TeamSetupOver;
+        }
+    }
+
     public BattleShipSpawnData Describe(MissionObject hull, NetworkShipInfo identity)
     {
         var ship = (MissionShip)hull;
