@@ -4,6 +4,7 @@ using Missions.Agents.Handlers;
 using Missions.Battles;
 using Missions.Messages;
 using Moq;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Runtime.Serialization;
 using TaleWorlds.MountAndBlade;
@@ -254,6 +255,39 @@ public class AgentStationUseReplicatorTests
 
         Assert.True(seatedWhileOwned);
         Assert.False(replicator.IsOwnSeat(agentId));
+    }
+
+    [Fact]
+    public void Inspect_SeparatesOwnerReleasesFromSinkingReleases()
+    {
+        var agentId = Guid.NewGuid();
+        var shipId = Guid.NewGuid();
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+        var info = new CoopAgentInfo("owner", "owner", "battle", agent, agentId, 1);
+        var registry = new Mock<INetworkAgentRegistry>();
+        registry.Setup(r => r.TryGetAgentInfo(It.IsAny<Guid>(), out info)).Returns(true);
+        var hull = ShipTestHulls.Create();
+        var ship = new NetworkShipInfo(shipId, "owner", "party", isNpcParty: true, hull, null!);
+        var ships = new Mock<INetworkShipRegistry>();
+        ships.Setup(s => s.TryGet(shipId, out ship)).Returns(true);
+        var engine = new Mock<INavalShipEngine>();
+        var point = CreatePoint();
+        engine.Setup(e => e.ResolveStation(hull, "oar", 0)).Returns(point);
+        engine.Setup(e => e.IsAlive(It.IsAny<Agent>())).Returns(true);
+        engine.Setup(e => e.IsSeated(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>())).Returns(true);
+        using var replicator = CreateReplicator(engine.Object, registry.Object, ships.Object);
+
+        replicator.TryApply(Use(agentId, shipId, inUse: true, revision: 1, "owner"));
+        replicator.TryApply(Use(agentId, shipId, inUse: false, revision: 2, "owner"));
+        engine.Setup(e => e.IsSinking(hull)).Returns(true);
+        replicator.TryApply(Use(agentId, shipId, inUse: true, revision: 3, "owner"));
+        replicator.RecordAppliedSeat(agentId, agent, hull, point);
+        replicator.RefreshAppliedSeats();
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.Equal(1, (long)inspected["ownerReleases"]!);
+        Assert.Equal(1, (long)inspected["sinkingUseReleases"]!);
+        Assert.Equal(1, (long)inspected["sinkingSafetyNetReleases"]!);
     }
 
     private static NetworkAgentStationUse Use(Guid agentId, Guid shipId, bool inUse, long revision, string sender) =>

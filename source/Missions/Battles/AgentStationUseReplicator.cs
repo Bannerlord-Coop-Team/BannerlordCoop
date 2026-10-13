@@ -51,7 +51,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private float elapsed;
     private bool seatsAnnounced;
     private bool applyingRemote;
-    private long sent, applied, dropped, localPuppetReleases, pinned, sinkingReleases, withdrawnReleases;
+    private long sent, applied, dropped, localPuppetReleases, pinned, ownerReleases, sinkingUseReleases, sinkingSafetyNetReleases,
+        withdrawnReleases;
 
     public AgentStationUseReplicator(
         IBattleNetwork network,
@@ -209,9 +210,10 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
             appliedSeats.Remove(agentId);
     }
 
+    // Safety net for an owner whose crew drowns seated without a release; normally the owner's releases arrive first.
     private void ReleaseFromSinkingHull(Guid agentId, AppliedSeat seat)
     {
-        sinkingReleases++;
+        sinkingSafetyNetReleases++;
         Logger.Information("[NavalSync] Released puppet {AgentId} from a station of a sinking hull", agentId);
         Apply(seat.Agent, seat.Point, inUse: false);
     }
@@ -275,6 +277,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         // A sinking hull seats nobody; a late use from its owner only lets the puppet go.
         bool inUse = use.InUse && !engine.IsSinking(ship.Hull);
+        if (!use.InUse) ownerReleases++;
+        else if (!inUse) sinkingUseReleases++;
         appliedRevisions[use.AgentId] = new AppliedRevision(use.SenderControllerId, use.Revision);
         Apply(info.Agent, point, inUse);
         RecordAppliedSeat(use.AgentId, info.Agent, ship.Hull, inUse ? point : null);
@@ -343,7 +347,9 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         dropped,
         localPuppetReleases,
         pinned,
-        sinkingReleases,
+        ownerReleases,
+        sinkingUseReleases,
+        sinkingSafetyNetReleases,
         withdrawnReleases,
         appliedSeats = appliedSeats.Count,
         pending = pending.Count,
