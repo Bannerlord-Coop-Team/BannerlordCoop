@@ -537,7 +537,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         if (string.IsNullOrEmpty(newHost))
             newHost = session.OwnControllerId;
 
-        if (!AppliesHostMigration(resultCommitter))
+        if (!AppliesHostMigration(resultCommitter, IsNavalMission()))
         {
             withdrawnHosts.Remove(previousHost);
             Logger.Information("[BattleSync] Keeping the agents of {Old} as they are after the host change to {New}: this client already holds the battle's result",
@@ -792,11 +792,16 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     }
 
     /// <summary>
-    /// Whether a host change moves agents and hulls on this client. Once it holds the battle's result its mission has
-    /// ended or ends with that result, so nothing is adopted, revived or re-crewed on it.
+    /// Whether a host change moves agents and hulls on this client. Once a naval client holds the battle's result its
+    /// mission has ended or ends with that result, so nothing is adopted, revived or re-crewed on it; a land battle's AI
+    /// keeps running for the players still in it.
     /// </summary>
-    internal static bool AppliesHostMigration(IBattleResultCommitter resultCommitter) =>
-        !resultCommitter.TryGetResolvedState(out _);
+    internal static bool AppliesHostMigration(IBattleResultCommitter resultCommitter, bool isNavalMission) =>
+        !isNavalMission || !resultCommitter.TryGetResolvedState(out _);
+
+    // A naval mission registers every fielded hull, and the map event is already gone after the result is committed.
+    private bool IsNavalMission() =>
+        coopMissionComponent.ShipRegistry != null && coopMissionComponent.ShipRegistry.Ships.Count > 0;
 
     /// <summary>
     /// A land formation needs an explicit Charge to engage. A naval hull's crew must not get one: its ship order drives

@@ -57,9 +57,11 @@ public class BattleAuthorityMigratorTests
     }
 
     [Theory]
-    [InlineData(false, 1)]
-    [InlineData(true, 0)]
-    public void PromotionToThisClient_AdoptsOnlyWhileTheResultIsOpen(bool resultHeld, int expectedPromotions)
+    [InlineData(true, false, 1)]
+    [InlineData(true, true, 0)]
+    [InlineData(false, false, 1)]
+    [InlineData(false, true, 1)]
+    public void PromotionToThisClient_AdoptsUnlessANavalResultIsHeld(bool isNaval, bool resultHeld, int expectedPromotions)
     {
         const string mapEventId = "battle";
         using var broker = new MessageBroker();
@@ -73,6 +75,11 @@ public class BattleAuthorityMigratorTests
         registry.Setup(value => value.GetControllerIds()).Returns(Array.Empty<string>());
         var mission = new Mock<ICoopMissionComponent>();
         mission.SetupGet(value => value.AgentRegistry).Returns(registry.Object);
+        var ships = new Mock<INetworkShipRegistry>();
+        ships.SetupGet(value => value.Ships).Returns(isNaval
+            ? new[] { new NetworkShipInfo(Guid.NewGuid(), "host", "party", isNpcParty: true, null!, null!) }
+            : Array.Empty<NetworkShipInfo>());
+        mission.SetupGet(value => value.ShipRegistry).Returns(ships.Object);
         var missionContext = new Mock<IMissionContext>();
         missionContext.SetupGet(value => value.ControllersInMission).Returns(Array.Empty<string>());
 

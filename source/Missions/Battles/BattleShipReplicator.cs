@@ -172,7 +172,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         var migrated = payload.What;
         if (migrated.MapEventId != session.InstanceId) return;
-        if (!BattleAuthorityMigrator.AppliesHostMigration(resultCommitter)) return;
+        if (!BattleAuthorityMigrator.AppliesHostMigration(resultCommitter, isNavalMission: true)) return;
 
         GameThread.RunSafe(() => TransferNpcHulls(migrated.NewHostControllerId ?? session.OwnControllerId),
             context: nameof(Handle_BattleHostMigrated));

@@ -91,6 +91,8 @@ internal class BattleHostHandler : IHandler
         public HostEndpoint HostEndpoint;
         public BattleState ResolvedState;
         public bool Concluded;
+        // Recorded at the election, because the map event is finalized and gone once the result is committed.
+        public bool IsNaval;
     }
 
     private sealed class PartyHealthReports
@@ -366,6 +368,7 @@ internal class BattleHostHandler : IHandler
             }
 
             MarkPresent(mapEventId, requesterId);
+            GetOrCreateRuntimeState(mapEventId).IsNaval = mapEvent.IsNavalMapEvent;
 
             if (hostRegistry.TryGet(mapEventId, out var existing))
             {
@@ -1088,8 +1091,9 @@ internal class BattleHostHandler : IHandler
 
             if (assignment.HostControllerId == controllerId)
             {
-                // A promotion after the commit would hand the ended mission's AI and hulls to a peer for nothing.
-                if (IsConcluded(mapEventId))
+                // A promotion after the commit would hand the ended naval mission's AI and hulls to a peer (the R32 helm
+                // crash); a land battle still promotes, so the AI the host ran keeps moving for the remaining players.
+                if (KeepsHostAfterConclusion(mapEventId))
                 {
                     Logger.Information("[BattleHost] Host {Host} left concluded battle {MapEventId}; keeping the assignment at epoch {Epoch} without promoting",
                         controllerId, mapEventId, assignment.Epoch);
@@ -1281,8 +1285,8 @@ internal class BattleHostHandler : IHandler
     }
 
     // [Server, game thread] The map event applied this battle's result while the instance was still occupied.
-    private bool IsConcluded(string mapEventId) =>
-        battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) && runtimeState.Concluded;
+    private bool KeepsHostAfterConclusion(string mapEventId) =>
+        battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) && runtimeState.Concluded && runtimeState.IsNaval;
 
     // Append the requester to the successor line unless it is already the host or already queued. Returns the
     // new immutable assignment via <paramref name="updated"/>, or false when nothing changed.
