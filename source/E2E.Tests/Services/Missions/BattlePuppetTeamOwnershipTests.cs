@@ -7,6 +7,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment.MockEngine;
+using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.TroopSupply;
 using HarmonyLib;
@@ -433,7 +434,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             var registry = client.Resolve<INetworkAgentRegistry>();
             Assert.False(registry.TryGetAgentInfo(agentId, out _));
 
-            var hull = CreateTestHull();
+            var hull = MissionTestObjects.CreateHull();
             Assert.True(missionComponent.ShipRegistry.TryRegister(
                 new NetworkShipInfo(shipId, "host", mapEventPartyId, true, hull, null)));
             spawner.DrainPendingPuppets();
@@ -514,7 +515,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             spawner.DrainPendingPuppets();
 
             Assert.True(missionComponent.ShipRegistry.TryRegister(
-                new NetworkShipInfo(shipId, "host", mapEventPartyId, true, CreateTestHull(), null)));
+                new NetworkShipInfo(shipId, "host", mapEventPartyId, true, MissionTestObjects.CreateHull(), null)));
             spawner.DrainPendingPuppets();
 
             Assert.False(client.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(agentId, out _));
@@ -549,7 +550,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             var teams = new Mock<IBattleTeamResolver>();
             teams.Setup(t => t.ResolveReplicatedTeam(BattleSideEnum.Defender, false)).Returns(mission.DefenderTeam.Shell);
             var engine = new Mock<INavalShipEngine>();
-            var copy = CreateTestHull();
+            var copy = MissionTestObjects.CreateHull();
             engine.SetupGet(e => e.Hulls).Returns(new List<MissionObject> { copy });
             bool initialShipsDeployed = false;
             engine.SetupGet(e => e.AreInitialShipsDeployed).Returns(() => initialShipsDeployed);
@@ -581,27 +582,6 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             Assert.True(missionComponent.ShipRegistry.TryGet(shipId, out var ship));
             Assert.Same(copy, ship.Hull);
         });
-    }
-
-    // ScriptComponentBehavior's type initializer reads the managed module type catalog the engine normally fills.
-    private static MissionObject CreateTestHull()
-    {
-        var managed = typeof(TaleWorlds.Engine.ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
-        var field = AccessTools.Field(managed, "_moduleTypes");
-        var previous = field.GetValue(null);
-        try
-        {
-            if (previous == null) field.SetValue(null, new Dictionary<string, Type>());
-            return (MissionObject)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(TestHull));
-        }
-        finally
-        {
-            field.SetValue(null, previous);
-        }
-    }
-
-    private sealed class TestHull : MissionObject
-    {
     }
 
     [Fact]

@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.Serialization;
 using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;
-using HarmonyLib;
+using E2E.Tests.Util;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
@@ -126,7 +124,7 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
             peerAgent = mock.SpawnAgent(
                 new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
             Assert.True(registry.TryRegisterAgent("owner", agentId, peerAgent));
-            peerAgent.UseGameObject(CreateStandingPoint());
+            peerAgent.UseGameObject(MissionTestObjects.CreateStandingPoint());
             Assert.NotNull(peerAgent.CurrentlyUsedGameObject);
 
             broker.Publish(this, new NetworkBattleAgentRouted(agentId));
@@ -169,23 +167,5 @@ public class BattleRoutMirrorTests : MissionTestEnvironment
         });
 
         Assert.Equal(1, observer.InternalMessages.GetMessageCount<NetworkBattleAgentFleeing>());
-    }
-
-    // ScriptComponentBehavior's type initializer reads the managed module type catalog the engine normally fills; run
-    // first without it, the initializer fails for every later test in the process.
-    private static StandingPoint CreateStandingPoint()
-    {
-        var managed = typeof(TaleWorlds.Engine.ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
-        var field = AccessTools.Field(managed, "_moduleTypes");
-        var previous = field.GetValue(null);
-        try
-        {
-            if (previous == null) field.SetValue(null, new Dictionary<string, Type>());
-            return (StandingPoint)FormatterServices.GetUninitializedObject(typeof(StandingPoint));
-        }
-        finally
-        {
-            field.SetValue(null, previous);
-        }
     }
 }
