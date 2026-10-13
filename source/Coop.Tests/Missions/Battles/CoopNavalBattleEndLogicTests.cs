@@ -111,6 +111,21 @@ public class CoopNavalBattleEndLogicTests
         Assert.Equal(expected, CoopNavalBattleEndLogic.CountsReserve(simulatedHere, isSunk));
     }
 
+    [Theory]
+    [InlineData(false, 18, 18)]
+    [InlineData(true, 18, 0)]
+    [InlineData(true, 0, 0)]
+    public void CrewAboard_DropsWithASunkHull(bool isSunk, int formationCrew, int expected)
+    {
+        Assert.Equal(expected, CoopNavalBattleEndLogic.CrewAboard(isSunk, formationCrew));
+    }
+
+    [Fact]
+    public void IsSideDepleted_KeepsASideWithOnlySwimmingCrewAlive()
+    {
+        Assert.False(CoopNavalBattleEndLogic.IsSideDepleted(liveHumans: 18, reserve: 0));
+    }
+
     [Fact]
     public void DescribeResult_NamesVictoryDefeatAndNone()
     {

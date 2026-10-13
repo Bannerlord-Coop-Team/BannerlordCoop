@@ -117,6 +117,8 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
                 {
                     side = side.ToString(),
                     aliveAgents = tally.LiveHumans,
+                    crewAboard = tally.CrewAboard,
+                    offHullAgents = Math.Max(0, tally.LiveHumans - tally.CrewAboard),
                     hulls = tally.Hulls,
                     afloatHulls = tally.HullsAfloat,
                     hullsOutOfAction = tally.HullsOutOfAction,
@@ -174,6 +176,12 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
 
     /// <summary>Only reserve on a hull this client simulates and that has not sunk can still field, so only it keeps a side alive.</summary>
     internal static bool CountsReserve(bool simulatedHere, bool isSunk) => simulatedHere && !isSunk;
+
+    /// <summary>
+    /// Crew still serving a hull. A sinking hull's crew swim off its formation yet stay alive, and like vanilla's spawn logic
+    /// the side tally keeps counting them, so only this count drops with the hull.
+    /// </summary>
+    internal static int CrewAboard(bool isSunk, int formationCrew) => isSunk ? 0 : formationCrew;
 
     internal static string DescribeResult(MissionResult result)
     {
@@ -234,6 +242,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
             int crew = ship.Formation != null && crewByFormation.TryGetValue(ship.Formation, out int count) ? count : 0;
             int reserve = CountsReserve(!NavalForeignHulls.Contains(ship), ship.IsSunk) ? SpawnableReserveOf(ship) : 0;
             tally.Hulls++;
+            tally.CrewAboard += CrewAboard(ship.IsSunk, crew);
             if (!ship.IsSunk) tally.HullsAfloat++;
             if (IsHullOutOfAction(ship.IsSunk, crew, reserve)) tally.HullsOutOfAction++;
             tally.Reserve += reserve;
@@ -251,6 +260,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private struct SideTally
     {
         public int LiveHumans;
+        public int CrewAboard;
         public int Hulls;
         public int HullsAfloat;
         public int HullsOutOfAction;
