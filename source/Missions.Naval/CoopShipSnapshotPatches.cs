@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Naval;
 
 namespace Missions.Naval;
@@ -34,6 +35,12 @@ internal class SnapshotShipDamageXpPatch
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class SnapshotShipHitPointsSyncScopePatch
 {
+    [ThreadStatic]
+    private static int snapshotWrites;
+
+    /// <summary>True while a snapshot's hit point setter, its postfixes included, runs on this thread.</summary>
+    internal static bool IsWritingSnapshot => snapshotWrites > 0;
+
     private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
     {
         AccessTools.PropertySetter(typeof(Ship), nameof(Ship.HitPoints)),
@@ -45,9 +52,30 @@ internal class SnapshotShipHitPointsSyncScopePatch
     [HarmonyPriority(Priority.First)]
     private static void Prefix(Ship __instance, out IDisposable __state)
     {
-        __state = CoopShipSnapshots.Contains(__instance) ? CallOriginalPolicy.AllowOriginalsForCurrentOperation() : null;
+        __state = null;
+        if (!CoopShipSnapshots.Contains(__instance)) return;
+
+        snapshotWrites++;
+        __state = CallOriginalPolicy.AllowOriginalsForCurrentOperation();
     }
 
+    // Finalizers run after every postfix, so the flag covers the campaign postfixes on the setter.
     [HarmonyFinalizer]
-    private static void Finalizer(IDisposable __state) => __state?.Dispose();
+    private static void Finalizer(IDisposable __state)
+    {
+        if (__state == null) return;
+
+        snapshotWrites--;
+        __state.Dispose();
+    }
+}
+
+// The campaign HitPoints postfix (ShipHitPointsPatches) refreshes the open menu for main-party ships; a snapshot is no
+// campaign ship, and while a mission opens or runs that menu context can have no handler.
+[HarmonyPatch(typeof(GameMenuManager), nameof(GameMenuManager.RefreshMenuOptions))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class SnapshotShipMenuRefreshPatch
+{
+    [HarmonyPrefix]
+    internal static bool Prefix() => !SnapshotShipHitPointsSyncScopePatch.IsWritingSnapshot;
 }

@@ -4,6 +4,7 @@ using System;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 
@@ -40,8 +41,9 @@ public class CoopShipSnapshotBuilder : ICoopShipSnapshotBuilder
             snapshot.RandomValue = source.RandomValue;
             snapshot.CustomSailPatternId = source.CustomSailPatternId;
             snapshot.IsInvulnerable = source.IsInvulnerable;
-            snapshot.HitPoints = source.HitPoints;
-            snapshot.SailHitPoints = source.SailHitPoints;
+            // Fields, not the setters: their campaign postfixes (the port menu refresh) are for the party's own ships.
+            snapshot._hitPoints = source._hitPoints;
+            snapshot._sailHitPoints = source._sailHitPoints;
             return snapshot;
         }
     }
@@ -66,8 +68,8 @@ public class CoopShipSnapshotBuilder : ICoopShipSnapshotBuilder
                 snapshot.Figurehead = MBObjectManager.Instance.GetObject<Figurehead>(data.FigureheadId);
             snapshot.RandomValue = data.RandomValue;
             snapshot.CustomSailPatternId = data.CustomSailPatternId ?? "";
-            snapshot.HitPoints = data.HitPoints;
-            snapshot.SailHitPoints = data.SailHitPoints;
+            snapshot._hitPoints = MathF.Clamp(data.HitPoints, 0f, snapshot.MaxHitPoints);
+            snapshot._sailHitPoints = MathF.Clamp(data.SailHitPoints, 0f, snapshot.MaxSailHitPoints);
             return snapshot;
         }
     }

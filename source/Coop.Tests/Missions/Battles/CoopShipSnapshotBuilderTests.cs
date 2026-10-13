@@ -60,7 +60,7 @@ public class CoopShipSnapshotBuilderTests
         var harmony = new Harmony("coop.tests.naval.ship_snapshot_builder");
         try
         {
-            // Read by the constructor and both HitPoints writes; its foreach keeps the JIT from inlining it.
+            // Read by the constructor's HitPoints write; its foreach keeps the JIT from inlining it.
             harmony.Patch(
                 AccessTools.PropertyGetter(typeof(Ship), nameof(Ship.MaxHitPoints)),
                 postfix: new HarmonyMethod(typeof(CoopShipSnapshotBuilderTests), nameof(RecordOriginalsAllowed)));
@@ -77,6 +77,41 @@ public class CoopShipSnapshotBuilderTests
             recordedOriginalsAllowed = null;
             harmony.UnpatchAll(harmony.Id);
         }
+    }
+
+    [Fact]
+    public void Build_CopiesTheHitPointsWithoutRunningTheirSettersOnTheOwnedSnapshot()
+    {
+        var source = CreateOwnedShip(CreateParty(), hitPoints: 600f);
+        source.SailHitPoints = 200f;
+        var harmony = new Harmony("coop.tests.naval.ship_snapshot_builder_setters");
+        try
+        {
+            // The campaign HitPoints postfix only acts on a ship that has an owner, which the snapshot has once built.
+            var probe = new HarmonyMethod(typeof(CoopShipSnapshotBuilderTests), nameof(RecordOwnedSetter));
+            harmony.Patch(AccessTools.PropertySetter(typeof(Ship), nameof(Ship.HitPoints)), postfix: probe);
+            harmony.Patch(AccessTools.PropertySetter(typeof(Ship), nameof(Ship.SailHitPoints)), postfix: probe);
+            recordedOwnedSetters = new List<Ship>();
+
+            var snapshot = new CoopShipSnapshotBuilder().Build(source);
+
+            Assert.Empty(recordedOwnedSetters);
+            Assert.Equal(600f, snapshot.HitPoints);
+            Assert.Equal(200f, snapshot.SailHitPoints);
+        }
+        finally
+        {
+            recordedOwnedSetters = null;
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    [ThreadStatic]
+    private static List<Ship> recordedOwnedSetters;
+
+    private static void RecordOwnedSetter(Ship __instance)
+    {
+        if (__instance.Owner != null) recordedOwnedSetters?.Add(__instance);
     }
 
     [ThreadStatic]

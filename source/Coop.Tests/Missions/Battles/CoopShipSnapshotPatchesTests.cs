@@ -61,6 +61,53 @@ public class CoopShipSnapshotPatchesTests
         Assert.False(CallOriginalPolicy.AreOriginalsAllowedForCurrentOperation);
     }
 
+    [Fact]
+    public void SnapshotHitPointWrites_HoldTheMenuRefreshOnlyWhileTheirPostfixesRun()
+    {
+        var snapshot = new CoopShipSnapshotBuilder().Build(CreateOwnedShip());
+        var ship = CreateOwnedShip();
+
+        var recorded = RecordPostfixMenuRefresh(() =>
+        {
+            snapshot.HitPoints = 100f;
+            snapshot.SailHitPoints = 50f;
+            ship.HitPoints = 100f;
+        });
+
+        Assert.Equal(new[] { false, false, true }, recorded);
+        Assert.False(SnapshotShipHitPointsSyncScopePatch.IsWritingSnapshot);
+        Assert.True(SnapshotShipMenuRefreshPatch.Prefix());
+    }
+
+    // The probe postfix stands in for the campaign HitPoints postfix that refreshes the open menu.
+    private static List<bool> RecordPostfixMenuRefresh(Action writeHitPoints)
+    {
+        var probeHarmony = new Harmony("coop.tests.naval.ship_snapshot_menu_probe");
+        var scopeHarmony = new Harmony("coop.tests.naval.ship_snapshot_menu_scope");
+        try
+        {
+            var probe = new HarmonyMethod(typeof(CoopShipSnapshotPatchesTests), nameof(MenuRefreshProbe));
+            probeHarmony.Patch(AccessTools.PropertySetter(typeof(Ship), nameof(Ship.HitPoints)), postfix: probe);
+            probeHarmony.Patch(AccessTools.PropertySetter(typeof(Ship), nameof(Ship.SailHitPoints)), postfix: probe);
+            scopeHarmony.CreateClassProcessor(typeof(SnapshotShipHitPointsSyncScopePatch)).Patch();
+            recordedMenuRefreshes = new List<bool>();
+
+            writeHitPoints();
+            return recordedMenuRefreshes;
+        }
+        finally
+        {
+            recordedMenuRefreshes = null;
+            scopeHarmony.UnpatchAll(scopeHarmony.Id);
+            probeHarmony.UnpatchAll(probeHarmony.Id);
+        }
+    }
+
+    [ThreadStatic]
+    private static List<bool> recordedMenuRefreshes;
+
+    private static void MenuRefreshProbe() => recordedMenuRefreshes?.Add(SnapshotShipMenuRefreshPatch.Prefix());
+
     // The probe stands in for the generated AutoSync setter prefix, which declares no priority. It is patched before
     // the scope patch, so only the priority can put the scope first.
     private static List<bool> RecordSyncPrefixScope(Action writeHitPoints)
