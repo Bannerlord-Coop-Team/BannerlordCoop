@@ -96,7 +96,6 @@ public class DirectMigratedCommandTests
                 "engage_nearest_bandit",
                 "kms",
                 "move_to_settlement",
-                "start_naval",
                 "start_nearest_bandit_attack",
                 "upgrade_party_screen_troop",
             },

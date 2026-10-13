@@ -13,7 +13,8 @@ public class StartNavalCoopCommandTests
     [Theory]
     [InlineData(false, true, "Run this command on the server.", "PlayerOne")]
     [InlineData(true, false, "NavalDLC is not active on the server.", "PlayerOne")]
-    [InlineData(true, true, "The two players must be different.", "PlayerOne", "PlayerOne")]
+    [InlineData(true, true, "The players must be different.", "PlayerOne", "PlayerOne")]
+    [InlineData(true, true, "The players must be different.", "PlayerOne", "PlayerTwo", "PlayerThree", "PlayerTwo")]
     public void ProcessCommand_RejectsInvalidRequestsBeforeTouchingTheCampaign(
         bool isServer, bool navalDlcActive, string expectedOutput, params string[] args)
     {

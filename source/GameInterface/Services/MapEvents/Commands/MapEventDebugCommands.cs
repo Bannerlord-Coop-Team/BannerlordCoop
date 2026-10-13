@@ -811,10 +811,12 @@ public class MapEventDebugCommands
         }
     }
 
-    // coop.debug.map_event.start_naval PlayerOne PlayerTwo
+    // coop.debug.map_event.start_naval PlayerOne PlayerTwo PlayerThree
     /// <summary>Moves the players' parties onto the nearest hostile AI party at sea and starts a naval battle with it.</summary>
     public sealed class StartNavalCoopCommand : ICoopCommand
     {
+        internal const int MaxPlayers = 6;
+
         public string Prefix => "coop.debug.map_event";
 
         public string Name => "start_naval";
@@ -827,6 +829,10 @@ public class MapEventDebugCommands
         {
             new ExpectedArgs("controller_id", "The player the AI fleet attacks.", true),
             new ExpectedArgs("ally_controller_id", "A second player who joins the defending side.", false),
+            new ExpectedArgs("ally_controller_id_3", "A third player who joins the defending side.", false),
+            new ExpectedArgs("ally_controller_id_4", "A fourth player who joins the defending side.", false),
+            new ExpectedArgs("ally_controller_id_5", "A fifth player who joins the defending side.", false),
+            new ExpectedArgs("ally_controller_id_6", "A sixth player who joins the defending side.", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -837,50 +843,98 @@ public class MapEventDebugCommands
             if (!ModInformation.IsNavalDlcActive)
                 return Failed("NavalDLC is not active on the server.");
 
-            var allyControllerId = args.Count == 2 ? args[1] : null;
-            if (allyControllerId == args[0])
-                return Failed("The two players must be different.");
+            var controllerIds = args.ToArray();
+            if (controllerIds.Distinct().Count() != controllerIds.Length)
+                return Failed("The players must be different.");
 
-            if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+            if (!TryResolvePlayerFleets(controllerIds, out var objectManager, out var playerParties, out var error))
                 return Failed(error);
 
-            MobileParty allyParty = null;
-            if (allyControllerId != null &&
-                !TryGetPlayerParty(allyControllerId, requireReady: true, out _, out allyParty, out error))
-                return Failed(error);
-
-            if (playerParty.Ships.Count == 0)
-                return Failed($"Player {args[0]} has no ships.");
-
-            if (allyParty != null && allyParty.Ships.Count == 0)
-                return Failed($"Player {allyControllerId} has no ships.");
-
-            var playerPosition = playerParty.Position.ToVec2();
-            var enemyParty = MobileParty.All
-                .Where(party => IsNavalEnemy(party, playerParty))
-                .OrderBy(party => party.Position.ToVec2().DistanceSquared(playerPosition))
-                .FirstOrDefault();
+            var enemyParty = FindNavalEnemy(playerParties[0]);
             if (enemyParty == null)
-                return Failed($"No hostile AI party with ships is at sea for player {args[0]}.");
+                return Failed($"No hostile AI party with ships is at sea for player {controllerIds[0]}.");
 
-            PlaceAtSea(playerParty, enemyParty.Position);
-            if (allyParty != null)
-                PlaceAtSea(allyParty, enemyParty.Position);
-
-            StartBattleAction.Apply(enemyParty.Party, playerParty.Party);
-            var mapEvent = playerParty.MapEvent;
-            if (mapEvent == null)
-                return Failed($"StartBattleAction did not create a map event against {enemyParty.StringId}.");
-
-            if (!objectManager.TryGetId(mapEvent, out string mapEventId))
-                return Failed("The naval map event is not registered.");
-
-            if (allyParty != null && !TryJoinNavalAlly(objectManager, mapEventId, enemyParty, playerParty, allyParty, out error))
+            if (!TryStart(objectManager, playerParties, enemyParty, out var mapEvent, out var mapEventId, out error))
                 return Failed(error);
 
             return Succeeded($"Started naval map event {mapEventId} (naval={mapEvent.IsNavalMapEvent}): " +
-                   $"{enemyParty.StringId} with {enemyParty.Ships.Count} ships attacks player {args[0]}" +
-                   (allyParty == null ? "." : $", joined by player {allyControllerId}."));
+                   $"{enemyParty.StringId} with {enemyParty.Ships.Count} ships attacks player {controllerIds[0]}" +
+                   (controllerIds.Length == 1 ? "." : $", joined by player {string.Join(", ", controllerIds.Skip(1))}."));
+        }
+
+        /// <summary>[Game thread, server] The connected players' parties, each of which must own a ship.</summary>
+        internal static bool TryResolvePlayerFleets(
+            IReadOnlyList<string> controllerIds,
+            out IObjectManager objectManager,
+            out MobileParty[] playerParties,
+            out string error)
+        {
+            objectManager = null;
+            playerParties = new MobileParty[controllerIds.Count];
+            for (int i = 0; i < controllerIds.Count; i++)
+            {
+                if (!TryGetPlayerParty(controllerIds[i], requireReady: true, out objectManager, out playerParties[i], out error))
+                    return false;
+
+                if (playerParties[i].Ships.Count == 0)
+                {
+                    error = $"Player {controllerIds[i]} has no ships.";
+                    return false;
+                }
+            }
+
+            error = null;
+            return true;
+        }
+
+        /// <summary>[Game thread, server] The hostile AI party with ships at sea nearest to <paramref name="playerParty"/>, or null.</summary>
+        internal static MobileParty FindNavalEnemy(MobileParty playerParty)
+        {
+            var playerPosition = playerParty.Position.ToVec2();
+            return MobileParty.All
+                .Where(party => IsNavalEnemy(party, playerParty))
+                .OrderBy(party => party.Position.ToVec2().DistanceSquared(playerPosition))
+                .FirstOrDefault();
+        }
+
+        /// <summary>
+        /// [Game thread, server] Moves every player party onto <paramref name="enemyParty"/>, which attacks the first one,
+        /// and joins the others to the defending side.
+        /// </summary>
+        internal static bool TryStart(
+            IObjectManager objectManager,
+            IReadOnlyList<MobileParty> playerParties,
+            MobileParty enemyParty,
+            out MapEvent mapEvent,
+            out string mapEventId,
+            out string error)
+        {
+            mapEventId = null;
+            foreach (var playerParty in playerParties)
+                PlaceAtSea(playerParty, enemyParty.Position);
+
+            StartBattleAction.Apply(enemyParty.Party, playerParties[0].Party);
+            mapEvent = playerParties[0].MapEvent;
+            if (mapEvent == null)
+            {
+                error = $"StartBattleAction did not create a map event against {enemyParty.StringId}.";
+                return false;
+            }
+
+            if (!objectManager.TryGetId(mapEvent, out mapEventId))
+            {
+                error = "The naval map event is not registered.";
+                return false;
+            }
+
+            for (int i = 1; i < playerParties.Count; i++)
+            {
+                if (!TryJoinNavalAlly(objectManager, mapEventId, enemyParty, playerParties[0], playerParties[i], out error))
+                    return false;
+            }
+
+            error = null;
+            return true;
         }
 
         private static bool IsNavalEnemy(MobileParty party, MobileParty playerParty)
@@ -896,7 +950,7 @@ public class MapEventDebugCommands
                    FactionManager.IsAtWarAgainstFaction(party.MapFaction, playerParty.MapFaction);
         }
 
-        private static void PlaceAtSea(MobileParty party, CampaignVec2 position)
+        internal static void PlaceAtSea(MobileParty party, CampaignVec2 position)
         {
             if (party.CurrentSettlement != null)
                 LeaveSettlementAction.ApplyForParty(party);
@@ -914,7 +968,7 @@ public class MapEventDebugCommands
                     resetMovementToHold: true));
         }
 
-        private static bool TryJoinNavalAlly(
+        internal static bool TryJoinNavalAlly(
             IObjectManager objectManager,
             string mapEventId,
             MobileParty enemyParty,
