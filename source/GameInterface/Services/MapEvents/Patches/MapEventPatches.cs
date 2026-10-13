@@ -181,7 +181,19 @@ internal class MapEventPatches
         };
 
         // Skip unchanged client writes before the managed setter reports them.
-        return state != __instance.BattleState;
+        if (state == __instance.BattleState) return false;
+
+        // A coop mission's victory winds the local mission down (PlayerEncounter.SetPlayerVictoriousInternal); the server
+        // applies it after every member reports, so the local write mirrors the setter without the managed write.
+        if ((state == BattleState.AttackerVictory || state == BattleState.DefenderVictory)
+            && BattleConclusionGate.IsInCoopBattleMission)
+        {
+            __instance._battleState = state;
+            __instance.OnBattleWon();
+            return false;
+        }
+
+        return true;
     }
 
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]
