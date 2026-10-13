@@ -77,6 +77,32 @@ public class UnsupportedModuleWarningHandlerTests
     }
 
     [Fact]
+    public void CommunityModules_AreListedByNameWithId()
+    {
+        var provider = new TestModuleInfoProvider(
+            Module("Native", isOfficial: true),
+            Module("Coop", isOfficial: false),
+            Module("Bannerlord.UIExtenderEx", isOfficial: false, name: "UIExtenderEx"),
+            Module("Bannerlord.Harmony", isOfficial: false, name: "Harmony"),
+            Module("ExampleMod", isOfficial: false, name: "ExampleMod"));
+
+        var coordinator = new UnsupportedModuleWarningHandler(provider, new TestOptionsStore(), _ => {});
+        InquiryData inquiry = null;
+
+        coordinator.TryShowPrompt(true, value => inquiry = value);
+
+        Assert.NotNull(inquiry);
+        Assert.Equal(
+            "Bannerlord Coop may be unstable when used with additional modules. " +
+            "The following active modules are not supported:\n\n" +
+            "- ExampleMod\n" +
+            "- Harmony (Bannerlord.Harmony)\n" +
+            "- UIExtenderEx (Bannerlord.UIExtenderEx)\n\n" +
+            "Continue at your own risk.",
+            inquiry.Text);
+    }
+
+    [Fact]
     public void OfficialOptionalModule_ShowsWarning()
     {
         var provider = new TestModuleInfoProvider(
@@ -216,11 +242,13 @@ public class UnsupportedModuleWarningHandlerTests
     private static ModuleInfo Module(
         string id,
         bool isOfficial,
-        bool isDlc = false)
+        bool isDlc = false,
+        string name = null)
     {
         return new ModuleInfo
         {
             Id = id,
+            Name = name,
             IsOfficial = isOfficial,
             IsDlc = isDlc,
         };

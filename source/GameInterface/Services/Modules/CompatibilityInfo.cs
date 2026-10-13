@@ -9,6 +9,10 @@ namespace GameInterface.Services.Modules;
 public struct ModuleInfo
 {
     public string Id { get; set; }
+    /// <summary>
+    /// The display name the launcher shows for this module, used in player-facing messages.
+    /// </summary>
+    public string Name { get; set; }
     public bool IsOfficial { get; set; }
     /// <summary>
     /// True if this module is official optional content (DLC). Coop does not support DLC,
@@ -20,6 +24,7 @@ public struct ModuleInfo
     public ModuleInfo(string id, bool isOfficial, bool isDlc, ApplicationVersion version)
     {
         Id = id;
+        Name = null;
         IsOfficial = isOfficial;
         IsDlc = isDlc;
         Version = version;
@@ -40,7 +45,10 @@ public class TaleWorldsModuleInfoProvider : IModuleInfoProvider
         foreach (TaleWorlds.ModuleManager.ModuleInfo moduleInfo in modules)
         {
             bool isDlc = moduleInfo.Type == TaleWorlds.ModuleManager.ModuleType.OfficialOptional;
-            yield return new ModuleInfo(moduleInfo.Id, moduleInfo.IsOfficial, isDlc, moduleInfo.Version);
+            yield return new ModuleInfo(moduleInfo.Id, moduleInfo.IsOfficial, isDlc, moduleInfo.Version)
+            {
+                Name = moduleInfo.Name,
+            };
         }
     }
 }

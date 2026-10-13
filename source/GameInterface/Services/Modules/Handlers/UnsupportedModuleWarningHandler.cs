@@ -30,7 +30,7 @@ public class UnsupportedModuleWarningHandler
     private bool warningsSuppressed; 
     private bool modulesEvaluated;
     private bool promptShown;
-    private string[] unsupportedModuleIds = Array.Empty<string>();
+    private string[] unsupportedModuleLabels = Array.Empty<string>();
     
     public UnsupportedModuleWarningHandler(
         IModuleInfoProvider moduleInfoProvider,
@@ -56,7 +56,7 @@ public class UnsupportedModuleWarningHandler
         }
 
         EvaluateModules();
-        if (unsupportedModuleIds.Length == 0)
+        if (unsupportedModuleLabels.Length == 0)
         {
             return;
         }
@@ -69,7 +69,7 @@ public class UnsupportedModuleWarningHandler
         promptShown = true;
         showInquiry(new InquiryData(
             PromptTitle,
-            BuildPromptText(unsupportedModuleIds),
+            BuildPromptText(unsupportedModuleLabels),
             true,
             true,
             "Continue",
@@ -130,14 +130,26 @@ public class UnsupportedModuleWarningHandler
         var modules = moduleInfoProvider.GetModuleInfos().ToArray();
         var hasConflictingCoopVariants = modules.Any(module => IsCoopVariant(module, CoopModuleId)) &&
                                          modules.Any(module => IsCoopVariant(module, CoopNightlyModuleId));
-        unsupportedModuleIds = modules
+        unsupportedModuleLabels = modules
             .Where(module => IsUnsupported(module) ||
                              (hasConflictingCoopVariants && IsCoopVariant(module)))
-            .Select(module => module.Id)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(id => id, StringComparer.OrdinalIgnoreCase)
+            .Where(module => !string.IsNullOrWhiteSpace(module.Id))
+            .GroupBy(module => module.Id, StringComparer.OrdinalIgnoreCase)
+            .Select(group => GetDisplayLabel(group.First()))
+            .OrderBy(label => label, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    // Players know mods by the launcher name, the id still matches the folder in Modules.
+    private static string GetDisplayLabel(ModuleInfo module)
+    {
+        var name = module.Name?.Trim();
+        if (string.IsNullOrEmpty(name) || string.Equals(name, module.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            return module.Id;
+        }
+
+        return $"{name} ({module.Id})";
     }
 
     private static bool IsUnsupported(ModuleInfo module)
@@ -165,11 +177,11 @@ public class UnsupportedModuleWarningHandler
             : string.Equals(module.Id, moduleId, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string BuildPromptText(string[] moduleIds)
+    private static string BuildPromptText(string[] moduleLabels)
     {
         return "Bannerlord Coop may be unstable when used with additional modules. " +
                "The following active modules are not supported:\n\n" +
-               string.Join("\n", moduleIds.Select(id => "- " + id)) +
+               string.Join("\n", moduleLabels.Select(label => "- " + label)) +
                "\n\nContinue at your own risk.";
     }
 }
