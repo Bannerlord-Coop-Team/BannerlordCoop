@@ -29,6 +29,10 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalShipEngine>()
             .As<INavalShipEngine>()
             .InstancePerDependency();
+        // Registered after MissionModule's AgentFormationAssigner, so it is the one resolved.
+        builder.RegisterType<NavalAgentFormationAssigner>()
+            .As<IAgentFormationAssigner>()
+            .InstancePerDependency();
         builder.RegisterType<NavalInspectCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();

@@ -14,7 +14,7 @@ public interface IAgentFormationAssigner
     /// <summary>
     /// Assign <paramref name="agent"/> to its team's formation for its character's troop class. Returns the
     /// formation (for a caller that needs it, e.g. to also call <c>SetControlledByAI</c>), or null if the
-    /// agent has no character/team yet or its team has no matching formation.
+    /// agent has no character/team yet, its team has no matching formation or the formation cannot take it.
     /// </summary>
     Formation Assign(Agent agent);
 
@@ -34,11 +34,7 @@ public class AgentFormationAssigner : IAgentFormationAssigner
     {
         if (agent.Character == null || agent.Team == null) return null;
 
-        var formation = agent.Team.GetFormation(agent.Character.GetFormationClass());
-        if (formation != null)
-            agent.Formation = formation;
-
-        return formation;
+        return Join(agent, agent.Team.GetFormation(agent.Character.GetFormationClass()));
     }
 
     public Formation Assign(Agent agent, int formationIndex)
@@ -46,10 +42,17 @@ public class AgentFormationAssigner : IAgentFormationAssigner
         if (formationIndex < 0) return Assign(agent);
         if (agent.Team == null) return null;
 
-        var formation = agent.Team.GetFormation((FormationClass)formationIndex);
-        if (formation != null)
-            agent.Formation = formation;
+        return Join(agent, agent.Team.GetFormation((FormationClass)formationIndex));
+    }
 
+    /// <summary>Whether <paramref name="formation"/> can take an agent now; a refused agent keeps its current formation.</summary>
+    protected virtual bool CanJoin(Formation formation) => true;
+
+    private Formation Join(Agent agent, Formation formation)
+    {
+        if (formation == null || !CanJoin(formation)) return null;
+
+        agent.Formation = formation;
         return formation;
     }
 }
