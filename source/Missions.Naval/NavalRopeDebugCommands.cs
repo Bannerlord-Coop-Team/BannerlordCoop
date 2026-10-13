@@ -176,43 +176,48 @@ public static class NavalRopeDebugCommands
             error = hulls.TryGetOwnHull(out var own);
             if (error != null) return Failed(error);
 
-            var sources = hulls.RopeStations(own);
-            if (sourceIndex >= sources.Length) return Failed($"The own hull has {sources.Length} rope stations.");
-            var source = sources[sourceIndex];
-            if (source.PilotAgent != null) return Failed($"Rope station {sourceIndex} is in use by {source.PilotAgent.Name}.");
-            if (!IsStationFree(source)) return Failed($"Rope station {sourceIndex} already holds a rope.");
-
-            var foreign = hulls.NearestForeignHull(own);
-            if (foreign == null) return Failed("There is no other player's hull to throw at.");
-            var targets = hulls.AttachmentPoints(foreign);
-
-            int chosen;
-            float distance;
-            if (targetIndex == null)
-            {
-                chosen = BestTarget(source, targets, out distance);
-                if (chosen < 0) return Failed($"No free, aligned attachment point is within {ThrowRange} m of rope station {sourceIndex}.");
-            }
-            else
-            {
-                chosen = targetIndex.Value;
-                if (chosen >= targets.Length) return Failed($"The other hull has {targets.Length} attachment points.");
-                distance = Distance(source, targets[chosen]);
-                if (!IsInRange(distance)) return Failed($"Attachment point {chosen} is {distance:F1} m away, beyond {ThrowRange} m.");
-                if (!IsTargetFree(targets[chosen])) return Failed($"Attachment point {chosen} already holds a rope.");
-                if (!IsAligned(source, targets[chosen])) return Failed($"Attachment point {chosen} does not face rope station {sourceIndex}.");
-            }
-
-            var target = targets[chosen];
-            // Explicit target selection bypasses the player's aim, not the rope's flight, pull or break behavior.
-            source.ConnectWithAttachmentPointMachine(target, forceBridge: false);
-            if (source.CurrentAttachment == null) return Failed("Vanilla did not create the rope.");
-
-            return new CoopCommandResult(true, string.Format(CultureInfo.InvariantCulture,
-                "NAVAL_ROPE_THROW ownShip={0} source={1}:{2} targetShip={3} target={4}:{5} distance={6:F1} state={7}",
-                hulls.ShipIdOf(own), sourceIndex, KeyOf(source, own), hulls.ShipIdOf(foreign), chosen, KeyOf(target, foreign),
-                distance, source.CurrentAttachment.State));
+            return Throw(hulls, own, hulls.NearestForeignHull(own), sourceIndex, targetIndex);
         }
+    }
+
+    /// <summary>[Game thread] Throws a rope from an own station at a point of <paramref name="foreign"/>, the closest eligible one when no target is given.</summary>
+    internal static CoopCommandResult Throw(INavalDebugHulls hulls, MissionShip own, MissionShip foreign, int sourceIndex, int? targetIndex)
+    {
+        var sources = hulls.RopeStations(own);
+        if (sourceIndex >= sources.Length) return Failed($"The own hull has {sources.Length} rope stations.");
+        var source = sources[sourceIndex];
+        if (source.PilotAgent != null) return Failed($"Rope station {sourceIndex} is in use by {source.PilotAgent.Name}.");
+        if (!IsStationFree(source)) return Failed($"Rope station {sourceIndex} already holds a rope.");
+
+        if (foreign == null) return Failed("There is no other player's hull to throw at.");
+        var targets = hulls.AttachmentPoints(foreign);
+
+        int chosen;
+        float distance;
+        if (targetIndex == null)
+        {
+            chosen = BestTarget(source, targets, out distance);
+            if (chosen < 0) return Failed($"No free, aligned attachment point is within {ThrowRange} m of rope station {sourceIndex}.");
+        }
+        else
+        {
+            chosen = targetIndex.Value;
+            if (chosen >= targets.Length) return Failed($"The other hull has {targets.Length} attachment points.");
+            distance = Distance(source, targets[chosen]);
+            if (!IsInRange(distance)) return Failed($"Attachment point {chosen} is {distance:F1} m away, beyond {ThrowRange} m.");
+            if (!IsTargetFree(targets[chosen])) return Failed($"Attachment point {chosen} already holds a rope.");
+            if (!IsAligned(source, targets[chosen])) return Failed($"Attachment point {chosen} does not face rope station {sourceIndex}.");
+        }
+
+        var target = targets[chosen];
+        // Explicit target selection bypasses the player's aim, not the rope's flight, pull or break behavior.
+        source.ConnectWithAttachmentPointMachine(target, forceBridge: false);
+        if (source.CurrentAttachment == null) return Failed("Vanilla did not create the rope.");
+
+        return new CoopCommandResult(true, string.Format(CultureInfo.InvariantCulture,
+            "NAVAL_ROPE_THROW ownShip={0} source={1}:{2} targetShip={3} target={4}:{5} distance={6:F1} state={7}",
+            hulls.ShipIdOf(own), sourceIndex, KeyOf(source, own), hulls.ShipIdOf(foreign), chosen, KeyOf(target, foreign),
+            distance, source.CurrentAttachment.State));
     }
 }
 #endif

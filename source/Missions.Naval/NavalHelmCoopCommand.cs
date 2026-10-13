@@ -48,7 +48,13 @@ public sealed class NavalHelmCoopCommand : ICoopCommand
     {
         if (!TryParse(args, out var request, out var error)) return Failed(error);
 
-        error = hulls.TryGetOwnHull(out var hull);
+        return Drive(hulls, request);
+    }
+
+    /// <summary>[Game thread] Seats the main agent at the own hull's helm and holds <paramref name="request"/>'s input on it.</summary>
+    internal static CoopCommandResult Drive(INavalDebugHulls hulls, HelmRequest request)
+    {
+        string error = hulls.TryGetOwnHull(out var hull);
         if (error != null) return Failed(error);
         error = TakeHelm(hull, Agent.Main);
         if (error != null) return Failed(error);
