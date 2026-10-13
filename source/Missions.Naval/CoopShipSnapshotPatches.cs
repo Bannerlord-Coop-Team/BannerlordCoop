@@ -1,5 +1,9 @@
-﻿using HarmonyLib;
+﻿using GameInterface.Policies;
+using HarmonyLib;
 using NavalDLC.CharacterDevelopment;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
 
@@ -22,4 +26,28 @@ internal class SnapshotShipDamageXpPatch
 {
     [HarmonyPrefix]
     private static bool Prefix(Ship ship) => !CoopShipSnapshots.Contains(ship);
+}
+
+// Mission damage and condition sync write a snapshot's hit points, which the campaign ship sync would log as a client
+// write to a managed ship on every hit. Registered campaign ships keep the sync behaviour.
+[HarmonyPatch]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class SnapshotShipHitPointsSyncScopePatch
+{
+    private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
+    {
+        AccessTools.PropertySetter(typeof(Ship), nameof(Ship.HitPoints)),
+        AccessTools.PropertySetter(typeof(Ship), nameof(Ship.SailHitPoints)),
+    };
+
+    // First, so the AutoSync setter prefix (default priority) already runs inside the scope.
+    [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
+    private static void Prefix(Ship __instance, out IDisposable __state)
+    {
+        __state = CoopShipSnapshots.Contains(__instance) ? CallOriginalPolicy.AllowOriginalsForCurrentOperation() : null;
+    }
+
+    [HarmonyFinalizer]
+    private static void Finalizer(IDisposable __state) => __state?.Dispose();
 }
