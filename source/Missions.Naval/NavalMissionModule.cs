@@ -63,6 +63,9 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalRopeDebugCommands.RopeThrowCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
+        builder.RegisterType<NavalScenarioStatusCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
 #endif
     }
 }

@@ -2,6 +2,9 @@
 using Common.Messaging;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
+#if DEBUG
+using GameInterface.Services.MapEvents.NavalScenarios;
+#endif
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
@@ -49,6 +52,10 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly INavalShipEngine shipEngine;
     private readonly IBattleTeamResolver teamResolver;
     private readonly IPlayerManager playerManager;
+#if DEBUG
+    private readonly INavalScenarioState scenarioState;
+    private readonly INavalDebugHulls debugHulls;
+#endif
 
     public CoopNavalBattleLauncher(
         IMessageBroker messageBroker,
@@ -59,8 +66,17 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         IBattleNetwork network,
         INavalShipEngine shipEngine,
         IBattleTeamResolver teamResolver,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager
+#if DEBUG
+        , INavalScenarioState scenarioState,
+        INavalDebugHulls debugHulls
+#endif
+        )
     {
+#if DEBUG
+        this.scenarioState = scenarioState;
+        this.debugHulls = debugHulls;
+#endif
         this.playerManager = playerManager;
         this.network = network;
         this.shipEngine = shipEngine;
@@ -183,6 +199,9 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
 
         behaviorAttacher.Attach(mission);
         AttachNavalServices(mission, playerSide.GetOppositeSide());
+#if DEBUG
+        AttachScenario(mission, mapEventId);
+#endif
         mission.SetPlayerCanTakeControlOfAnotherAgentWhenDead();
         Logger.Information("[NavalBattle] Opened coop naval battle for {MapEventId} (player side {Side})", mapEventId, playerSide);
         return mission;
@@ -216,6 +235,18 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
             shipDamageRouter, mission.GetMissionBehavior<NavalShipsLogic>()));
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(controller.Session, controller.Deployment, controller.ResultCommitter));
     }
+
+#if DEBUG
+    // A DEBUG naval scenario staged this battle, so its client steps run inside the mission.
+    private void AttachScenario(Mission mission, string mapEventId)
+    {
+        if (scenarioState.Current?.MapEventId != mapEventId) return;
+
+        var controller = mission.GetMissionBehavior<CoopBattleController>();
+        mission.AddMissionBehavior(new NavalScenarioMissionLogic(scenarioState, debugHulls, controller.Session,
+            controller.MissionComponent.ShipRegistry));
+    }
+#endif
 
     // Own party only: vanilla GetMapEventPartiesOfPlayerTeams takes the first non-NPC party as the player's,
     // which is another player's party whenever two players share a side.
