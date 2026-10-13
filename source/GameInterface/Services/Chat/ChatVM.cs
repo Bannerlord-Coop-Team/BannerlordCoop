@@ -12,6 +12,8 @@ internal sealed class ChatVM : ViewModel
     internal const string AllChannelId = "__all__";
     internal const string EventsChannelId = "__events__";
     internal const string GlobalChannelId = "__global__";
+    internal const string ClanChannelId = "__clan__";
+    internal const string KingdomChannelId = "__kingdom__";
     private const int MaxHistoryPerChannel = 50;
     private const int VisibleHistoryLines = 12;
     internal const float DefaultChatBoxSizeX = 520f;
@@ -35,7 +37,7 @@ internal sealed class ChatVM : ViewModel
     private bool playerChatEnabled = true;
     private float chatBoxSizeX;
     private float chatBoxSizeY;
-    // Closed fade feed: Events + Global + DMs (All stays public-only)
+    // Closed-panel fade feed (Events, Global, Clan, Kingdom, DMs). All stays Events+Global only.
     private readonly List<ChatLineVM> passiveHistory = new List<ChatLineVM>();
 
     public ChatVM(
@@ -57,9 +59,12 @@ internal sealed class ChatVM : ViewModel
         chatBoxSizeX = DefaultChatBoxSizeX;
         chatBoxSizeY = DefaultChatBoxSizeY;
 
-        EnsureFixedChannel(AllChannelId, "All", ChatChannelKind.All);
-        EnsureFixedChannel(EventsChannelId, "Events", ChatChannelKind.Events);
-        EnsureFixedChannel(GlobalChannelId, "Global", ChatChannelKind.Global);
+        EnsureFixedChannel(AllChannelId, "All", ChatChannelKind.All, addToList: true);
+        EnsureFixedChannel(EventsChannelId, "Events", ChatChannelKind.Events, addToList: true);
+        EnsureFixedChannel(GlobalChannelId, "Global", ChatChannelKind.Global, addToList: true);
+        // Listed only while the local player belongs to that group
+        EnsureFixedChannel(ClanChannelId, "Clan", ChatChannelKind.Clan, addToList: false);
+        EnsureFixedChannel(KingdomChannelId, "Kingdom", ChatChannelKind.Kingdom, addToList: false);
         SelectChannel(channelsById[AllChannelId]);
     }
 
@@ -84,6 +89,8 @@ internal sealed class ChatVM : ViewModel
                 return $"Direct message: {selectedChannel.Name.TrimEnd(' ', '*')}";
             if (selectedChannel.IsEvents) return "Events";
             if (selectedChannel.IsGlobal) return "Global chat";
+            if (selectedChannel.IsClan) return "Clan chat";
+            if (selectedChannel.IsKingdom) return "Kingdom chat";
             return "All";
         }
     }
@@ -176,7 +183,8 @@ internal sealed class ChatVM : ViewModel
         string text = WrittenText.Trim();
         if (text.Length == 0) return;
 
-        var channel = selectedChannel.IsDirect ? ChatChannel.Direct : ChatChannel.Global;
+        if (!TryGetSendChannel(selectedChannel, out var channel)) return;
+
         string recipientControllerId = channel == ChatChannel.Direct
             ? selectedChannel.ControllerId
             : string.Empty;
@@ -230,12 +238,21 @@ internal sealed class ChatVM : ViewModel
         // Only tick the source lists
         TickHistory(EventsChannelId, dt);
         TickHistory(GlobalChannelId, dt);
+        TickHistory(ClanChannelId, dt);
+        TickHistory(KingdomChannelId, dt);
         foreach (var pair in histories)
         {
             if (IsFixedChannelId(pair.Key)) continue;
             for (int i = 0; i < pair.Value.Count; i++)
                 pair.Value[i].HandleFading(dt);
         }
+    }
+
+    /// <summary>Lists Clan and Kingdom tabs before DMs when the local player belongs to them.</summary>
+    public void SetGroupChannelMembership(bool inClan, bool inKingdom)
+    {
+        SetFixedChannelListed(ClanChannelId, inClan);
+        SetFixedChannelListed(KingdomChannelId, inKingdom);
     }
 
     public void AddParticipant(string controllerId, string displayName)
@@ -313,6 +330,16 @@ internal sealed class ChatVM : ViewModel
                 line = $"[Global] {DisplayName(message.SenderName, message.SenderControllerId)}: {message.Text}";
                 AddParticipant(message.SenderControllerId, message.SenderName);
                 break;
+            case ChatChannel.Clan:
+                channelId = ClanChannelId;
+                line = $"[Clan] {DisplayName(message.SenderName, message.SenderControllerId)}: {message.Text}";
+                AddParticipant(message.SenderControllerId, message.SenderName);
+                break;
+            case ChatChannel.Kingdom:
+                channelId = KingdomChannelId;
+                line = $"[Kingdom] {DisplayName(message.SenderName, message.SenderControllerId)}: {message.Text}";
+                AddParticipant(message.SenderControllerId, message.SenderName);
+                break;
             case ChatChannel.Direct:
                 bool sentByLocalPlayer = string.Equals(
                     message.SenderControllerId,
@@ -348,14 +375,70 @@ internal sealed class ChatVM : ViewModel
             incomingDirect);
     }
 
-    private void EnsureFixedChannel(string channelId, string displayName, ChatChannelKind kind)
+    private void EnsureFixedChannel(string channelId, string displayName, ChatChannelKind kind, bool addToList)
     {
         if (channelsById.ContainsKey(channelId)) return;
 
         var channel = new ChatChannelVM(channelId, displayName, kind, SelectChannel);
         channelsById.Add(channelId, channel);
         histories.Add(channelId, new List<ChatLineVM>());
-        Channels.Add(channel);
+        if (addToList) Channels.Add(channel);
+    }
+
+    private void SetFixedChannelListed(string channelId, bool listed)
+    {
+        if (!channelsById.TryGetValue(channelId, out var channel)) return;
+
+        bool present = Channels.Contains(channel);
+        if (listed == present) return;
+
+        if (!listed)
+        {
+            if (ReferenceEquals(selectedChannel, channel))
+                SelectChannel(channelsById[AllChannelId]);
+            Channels.Remove(channel);
+            return;
+        }
+
+        Channels.Insert(IndexForGroupChannel(channel.Kind), channel);
+    }
+
+    private int IndexForGroupChannel(ChatChannelKind kind)
+    {
+        // After Global (and after Clan when inserting Kingdom), before the first DM
+        for (int i = 0; i < Channels.Count; i++)
+        {
+            var existing = Channels[i];
+            if (existing.IsDirect) return i;
+            if (kind == ChatChannelKind.Clan && existing.IsKingdom) return i;
+        }
+
+        return Channels.Count;
+    }
+
+    private static bool TryGetSendChannel(ChatChannelVM selected, out ChatChannel channel)
+    {
+        if (selected.IsDirect)
+        {
+            channel = ChatChannel.Direct;
+            return true;
+        }
+
+        if (selected.IsClan)
+        {
+            channel = ChatChannel.Clan;
+            return true;
+        }
+
+        if (selected.IsKingdom)
+        {
+            channel = ChatChannel.Kingdom;
+            return true;
+        }
+
+        // All and Global both send on Global. Events is blocked before this.
+        channel = ChatChannel.Global;
+        return selected.IsAll || selected.IsGlobal;
     }
 
     private ChatChannelVM EnsureDirectChannel(string controllerId, string displayName)
@@ -401,7 +484,7 @@ internal sealed class ChatVM : ViewModel
         history.Add(line);
         ChatLineVM trimmed = TrimHistory(history);
 
-        // Also append to All (public feeds only)
+        // All is Events+Global only (not Clan, Kingdom, or DMs)
         ChatLineVM allTrimmed = null;
         bool feedsAll = channelId == EventsChannelId || channelId == GlobalChannelId;
         if (feedsAll)
@@ -411,7 +494,6 @@ internal sealed class ChatVM : ViewModel
             allTrimmed = TrimHistory(allHistory);
         }
 
-        // Closed fade feed includes Global, Events, DMs
         passiveHistory.Add(line);
         ChatLineVM passiveTrimmed = TrimHistory(passiveHistory);
 
@@ -506,6 +588,8 @@ internal sealed class ChatVM : ViewModel
     {
         TickHistoryForceVisible(EventsChannelId);
         TickHistoryForceVisible(GlobalChannelId);
+        TickHistoryForceVisible(ClanChannelId);
+        TickHistoryForceVisible(KingdomChannelId);
         foreach (var pair in histories)
         {
             if (IsFixedChannelId(pair.Key)) continue;
@@ -525,7 +609,9 @@ internal sealed class ChatVM : ViewModel
     {
         return string.Equals(channelId, AllChannelId, StringComparison.Ordinal) ||
                string.Equals(channelId, EventsChannelId, StringComparison.Ordinal) ||
-               string.Equals(channelId, GlobalChannelId, StringComparison.Ordinal);
+               string.Equals(channelId, GlobalChannelId, StringComparison.Ordinal) ||
+               string.Equals(channelId, ClanChannelId, StringComparison.Ordinal) ||
+               string.Equals(channelId, KingdomChannelId, StringComparison.Ordinal);
     }
 
     private static string DisplayName(string name, string controllerId)

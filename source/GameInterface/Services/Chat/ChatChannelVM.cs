@@ -8,7 +8,9 @@ internal enum ChatChannelKind
     All = 0,
     Events = 1,
     Global = 2,
-    Direct = 3,
+    Clan = 3,
+    Kingdom = 4,
+    Direct = 5,
 }
 
 /// <summary>One selectable feed or direct-message channel.</summary>
@@ -43,6 +45,10 @@ internal sealed class ChatChannelVM : ViewModel
     public bool IsEvents => Kind == ChatChannelKind.Events;
 
     public bool IsGlobal => Kind == ChatChannelKind.Global;
+
+    public bool IsClan => Kind == ChatChannelKind.Clan;
+
+    public bool IsKingdom => Kind == ChatChannelKind.Kingdom;
 
     public bool IsDirect => Kind == ChatChannelKind.Direct;
 

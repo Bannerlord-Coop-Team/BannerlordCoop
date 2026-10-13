@@ -108,6 +108,7 @@ public class ChatServiceTests
             playerManager.Object,
             playerNameResolver.Object,
             controllerIdProvider.Object,
+            Mock.Of<IChatFactionMembership>(),
             optionsStore.Object,
             messageBroker,
             eventLog.Object,
