@@ -1,5 +1,9 @@
-﻿using Missions.Battles;
+﻿using Common.Logging;
+using Missions.Battles;
 using NavalDLC.Missions.MissionLogics;
+using NavalDLC.Missions.Objects;
+using Serilog;
+using System.Linq;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
@@ -7,7 +11,13 @@ namespace Missions.Naval;
 /// <summary>Drives the coop naval services of one battle mission and tears them down with it.</summary>
 public class CoopNavalBattleBehavior : MissionLogic
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<CoopNavalBattleBehavior>();
+
+    // Fewer agents than this leaving in one tick is ordinary combat; more is worth a line in the log.
+    internal const int AgentDropThreshold = 10;
+
     private readonly NavalShipsLogic shipsLogic;
+    private int lastAgentCount = -1;
 
     public CoopNavalBattleBehavior(IBattleShipReplicator shipReplicator, IAgentStationUseReplicator stationUseReplicator,
         INavalNpcFleetSpawner npcFleetSpawner, IBattleShipDamageRouter shipDamageRouter, NavalShipsLogic shipsLogic)
@@ -19,6 +29,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         this.shipsLogic = shipsLogic;
         // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached.
         shipsLogic.MissionEndEvent += ShipReplicator.SendFinalRopes;
+        shipsLogic.ShipRemovedEvent += OnShipRemoved;
         CoopNavalMissionScope.IsActive = true;
     }
 
@@ -36,12 +47,48 @@ public class CoopNavalBattleBehavior : MissionLogic
         ShipReplicator.Tick(dt);
         StationUseReplicator.Tick(dt);
         NpcFleetSpawner.Tick();
+        LogAgentCountDrop();
+    }
+
+    // Runs after DefaultNavalMissionLogic's deployment finish, so this is the hull set the battle starts with.
+    public override void OnDeploymentFinished()
+    {
+        base.OnDeploymentFinished();
+        var hulls = shipsLogic.AllShips.Select(ship =>
+            $"{ship.Index}:{ship.Team?.TeamSide}/{ship.Formation?.FormationIndex}" +
+            $"{(NavalForeignHulls.Contains(ship) ? ":copy" : "")}:{ship.Controller?.ControllerType}" +
+            $"{(ship.IsRemoved || !ship.GameEntity.IsValid ? ":removed" : "")}");
+        Logger.Information("[NavalSync] Deployment finished with {Count} hull(s) [{Hulls}], {Copies} copy(ies), {Agents} agent(s)",
+            shipsLogic.AllShips.Count, string.Join(", ", hulls), NavalForeignHulls.All.Count(), Mission.Agents.Count);
+    }
+
+    // A removed hull is pooled during deployment and its entity removed later, so no copy reference may outlive it.
+    private void OnShipRemoved(MissionShip ship)
+    {
+        bool wasCopy = NavalForeignHulls.Contains(ship);
+        if (wasCopy) NavalForeignHulls.Remove(ship);
+        if (shipsLogic.IsMissionEnding) return;
+
+        Logger.Information("[NavalSync] Hull {Index} on {Team} formation {Formation} removed (copy {Copy}, pooled {Pooled})",
+            ship.Index, ship.Team?.TeamSide, ship.Formation?.FormationIndex, wasCopy, shipsLogic.IsDeploymentMode);
+    }
+
+    internal static bool IsAgentCountDrop(int before, int after) => before >= 0 && before - after >= AgentDropThreshold;
+
+    private void LogAgentCountDrop()
+    {
+        int count = Mission.Agents.Count;
+        if (IsAgentCountDrop(lastAgentCount, count))
+            Logger.Warning("[NavalSync] Active agents fell from {Before} to {After} in one tick (deployment mode {DeploymentMode})",
+                lastAgentCount, count, shipsLogic.IsDeploymentMode);
+        lastAgentCount = count;
     }
 
     public override void OnEndMissionInternal()
     {
         CoopNavalMissionScope.IsActive = false;
         shipsLogic.MissionEndEvent -= ShipReplicator.SendFinalRopes;
+        shipsLogic.ShipRemovedEvent -= OnShipRemoved;
         ShipDamageRouter.Dispose();
         StationUseReplicator.Dispose();
         ShipReplicator.Dispose();
