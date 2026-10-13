@@ -87,6 +87,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly Dictionary<Guid, NetworkBattleShipSample> heldSamples = new Dictionary<Guid, NetworkBattleShipSample>();
     private readonly Dictionary<Guid, NetworkBattleRopeFinal> heldFinalRopes = new Dictionary<Guid, NetworkBattleRopeFinal>();
     private readonly HashSet<Guid> heldForDeployment = new HashSet<Guid>();
+    // The host AI hulls last migrated to, so an AI copy whose record was still waiting registers under it too.
+    private string npcHullHost;
     private bool spawningForeignHull;
     private bool spawnRecordsSent;
     private float sendElapsed;
@@ -194,27 +196,33 @@ public class BattleShipReplicator : IBattleShipReplicator
     /// <summary>[Game thread] Moves every AI hull to <paramref name="newHost"/> and flips local simulation where ours changed.</summary>
     internal int TransferNpcHulls(string newHost)
     {
+        npcHullHost = newHost;
         int transferred = 0;
         foreach (var ship in Registry.Ships)
         {
             if (!ship.IsNpcParty || ship.CurrentAuthority == newHost) continue;
 
-            bool wasOwn = IsOwnHull(ship);
-            ship.CurrentAuthority = newHost;
-            bool isOwn = IsOwnHull(ship);
-            if (isOwn && !wasOwn)
-                ReplaceNpcHull(ship.ShipId);
-            else if (wasOwn && !isOwn)
-                ReleaseNpcHull(ship);
-
-            // The old owner's interpolation target must not keep writing frames to a hull this client now simulates.
-            var stream = GetStream(ship.ShipId);
-            stream.Target = null;
+            TransferNpcHull(ship, newHost);
             transferred++;
-            Logger.Information("[NavalSync] AI hull {ShipId} moved to host {Host}{Local}", ship.ShipId, newHost, isOwn ? " (this client)" : "");
         }
 
         return transferred;
+    }
+
+    private void TransferNpcHull(NetworkShipInfo ship, string newHost)
+    {
+        bool wasOwn = IsOwnHull(ship);
+        ship.CurrentAuthority = newHost;
+        bool isOwn = IsOwnHull(ship);
+        if (isOwn && !wasOwn)
+            ReplaceNpcHull(ship.ShipId);
+        else if (wasOwn && !isOwn)
+            ReleaseNpcHull(ship);
+
+        // The old owner's interpolation target must not keep writing frames to a hull this client now simulates.
+        var stream = GetStream(ship.ShipId);
+        stream.Target = null;
+        Logger.Information("[NavalSync] AI hull {ShipId} moved to host {Host}{Local}", ship.ShipId, newHost, isOwn ? " (this client)" : "");
     }
 
     public string ReplaceNpcHull(Guid shipId)
@@ -589,10 +597,14 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         failedHullSpawns.Remove(data.ShipId);
         bool wasHeld = heldForDeployment.Remove(data.ShipId);
-        Registry.TryRegister(new NetworkShipInfo(data.ShipId, data.OwnerControllerId, data.MapEventPartyId, data.IsNpcParty, hull, formation));
+        var ship = new NetworkShipInfo(data.ShipId, data.OwnerControllerId, data.MapEventPartyId, data.IsNpcParty, hull, formation);
+        bool registered = Registry.TryRegister(ship);
         Logger.Information("[NavalSync] Spawned foreign hull {ShipId} ({Hull}) of {Owner} on team {Team} formation {Formation}{Held}",
             data.ShipId, data.HullId, data.OwnerControllerId, team.TeamSide, formation?.FormationIndex,
             wasHeld ? " after local deployment" : "");
+        // A host migration while the record waited only moved the registered AI hulls.
+        if (registered && ship.IsNpcParty && npcHullHost != null && ship.CurrentAuthority != npcHullHost)
+            TransferNpcHull(ship, npcHullHost);
         ApplyHeldState(data.ShipId);
         return true;
     }
