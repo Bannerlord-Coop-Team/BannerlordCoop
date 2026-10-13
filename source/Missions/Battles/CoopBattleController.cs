@@ -647,7 +647,7 @@ public class CoopBattleController : CoopMissionController
         else
             SiegeEngineStateReporter.ReportOnLeavingIfHost();
 
-        // Retry the result-ready report before tearing the instance down. Duplicate reports are idempotent.
+        // Retry the result-ready report before tearing the instance down; one already sent at this epoch is skipped.
         ResultCommitter.ReportResolvedResult(missionResult);
 
         // Retreats are reported separately by OnRetreatMission

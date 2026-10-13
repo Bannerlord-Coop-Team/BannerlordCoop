@@ -18,7 +18,10 @@ public interface IBattleResultCommitter
     /// <summary>Remember the host's resolved state until this client's deployment is safe to conclude.</summary>
     void AcceptResolvedState(BattleState battleState);
 
-    /// <summary>Report the remembered state at the current host epoch, if one exists.</summary>
+    /// <summary>
+    /// Report the remembered state at the current host epoch, if one exists. The server keeps each member's last report, so
+    /// a state already reported at this epoch is not sent again; a new epoch (host migration) reports again.
+    /// </summary>
     void ReportAcceptedResult();
 
     /// <summary>Get the resolved state for a late joiner's mesh catch-up.</summary>
@@ -35,6 +38,8 @@ public class BattleResultCommitter : IBattleResultCommitter
     private readonly INetwork relayNetwork;
     private readonly IBattleSession session;
     private BattleState resolvedState;
+    private BattleState reportedState;
+    private int reportedEpoch;
 
     public BattleResultCommitter(IBattleNetwork battleNetwork, INetwork relayNetwork, IBattleSession session)
     {
@@ -79,19 +84,31 @@ public class BattleResultCommitter : IBattleResultCommitter
         if (!session.HasInstance || !TryGetResolvedState(out var battleState))
             return;
 
-        Logger.Information("[BattleSync] Reporting resolved mission result {State} for instance {Instance}",
-            battleState, session.InstanceId);
-        relayNetwork.SendAll(new NetworkBattleResultReady(session.InstanceId, battleState, session.HostEpoch));
+        int hostEpoch = session.HostEpoch;
+        lock (resolvedStateGate)
+        {
+            if (IsAlreadyReported(reportedState, reportedEpoch, battleState, hostEpoch)) return;
+
+            reportedState = battleState;
+            reportedEpoch = hostEpoch;
+        }
+
+        Logger.Information("[BattleSync] Reporting resolved mission result {State} for instance {Instance} at host epoch {Epoch}",
+            battleState, session.InstanceId, hostEpoch);
+        relayNetwork.SendAll(new NetworkBattleResultReady(session.InstanceId, battleState, hostEpoch));
 
         if (session.IsLocalHost)
         {
             battleNetwork.SendAll(new NetworkBattleResultSnapshot(
                 session.InstanceId,
                 session.OwnControllerId,
-                session.HostEpoch,
+                hostEpoch,
                 battleState));
         }
     }
+
+    internal static bool IsAlreadyReported(BattleState reportedState, int reportedEpoch, BattleState battleState, int hostEpoch)
+        => IsSupportedResultState(reportedState) && reportedState == battleState && reportedEpoch == hostEpoch;
 
     public bool TryGetResolvedState(out BattleState battleState)
     {
