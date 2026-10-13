@@ -17,9 +17,9 @@ namespace Missions.Battles;
 /// <summary>
 /// Replicates naval hulls over the mission mesh. Own hulls register when they spawn, are announced to peers at
 /// the first deployment commit and stream their frame, helm input and ropes at 20 Hz; other owners' hulls are
-/// spawned as kinematic copies and follow those samples. Ropes ride the samples because each one carries every
-/// station's generation-ordered state, so a later sample repairs a rejected one; leaving sends them once more. Owners also
-/// send a hull's damage state when it changes, and copies take it on.
+/// spawned as kinematic copies once this client's deployment is over and follow those samples. Ropes ride the samples
+/// because each one carries every station's generation-ordered state, so a later sample repairs a rejected one; leaving
+/// sends them once more. Owners also send a hull's damage state when it changes, and copies take it on.
 /// </summary>
 public interface IBattleShipReplicator : IDisposable
 {
@@ -83,6 +83,10 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly List<HullSwap> hullSwaps = new List<HullSwap>();
     private readonly Dictionary<Guid, NetworkShipCondition> pendingConditions = new Dictionary<Guid, NetworkShipCondition>();
     private readonly Dictionary<Guid, FailedHullSpawn> failedHullSpawns = new Dictionary<Guid, FailedHullSpawn>();
+    // The latest sample and final ropes of a hull whose spawn record waits, applied as soon as the copy spawns.
+    private readonly Dictionary<Guid, NetworkBattleShipSample> heldSamples = new Dictionary<Guid, NetworkBattleShipSample>();
+    private readonly Dictionary<Guid, NetworkBattleRopeFinal> heldFinalRopes = new Dictionary<Guid, NetworkBattleRopeFinal>();
+    private readonly HashSet<Guid> heldForDeployment = new HashSet<Guid>();
     private bool spawningForeignHull;
     private bool spawnRecordsSent;
     private float sendElapsed;
@@ -141,6 +145,11 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Unsubscribe<NetworkShipCondition>(Handle_NetworkShipCondition);
         hullSwaps.Clear();
         pendingConditions.Clear();
+        pendingForeignHulls.Clear();
+        failedHullSpawns.Clear();
+        heldSamples.Clear();
+        heldFinalRopes.Clear();
+        heldForDeployment.Clear();
     }
 
     // [Game thread] Published synchronously by the spawn postfix. Hulls this client fields go on PlayerTeam; the
@@ -349,6 +358,8 @@ public class BattleShipReplicator : IBattleShipReplicator
 
             Registry.Remove(ship.ShipId);
             streams.Remove(ship.ShipId);
+            Logger.Information("[NavalSync] Hull {ShipId} of {Owner} left the mission (deployment mode {DeploymentMode}); dropped it",
+                ship.ShipId, ship.CurrentAuthority, engine.IsDeploymentMode);
         }
     }
 
@@ -495,7 +506,14 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         if (Mission.Current == null || final == null) return;
 
-        if (!Registry.TryGet(final.ShipId, out var ship) || ValidateFinalRopes(ship, session.OwnControllerId, final) != null)
+        if (!Registry.TryGet(final.ShipId, out var ship))
+        {
+            if (IsAwaitingSpawn(final.ShipId)) heldFinalRopes[final.ShipId] = final;
+            else finalRopesRejected++;
+            return;
+        }
+
+        if (ValidateFinalRopes(ship, session.OwnControllerId, final) != null)
         {
             finalRopesRejected++;
             return;
@@ -517,12 +535,17 @@ public class BattleShipReplicator : IBattleShipReplicator
     private void Handle_NetworkSpawnBattleShips(MessagePayload<NetworkSpawnBattleShips> payload)
     {
         var records = payload.What.Ships ?? Array.Empty<BattleShipSpawnData>();
-        GameThread.RunSafe(() =>
-        {
-            pendingForeignHulls.AddRange(records.Where(record => record != null));
-            DrainPendingForeignHulls();
-        }, context: nameof(Handle_NetworkSpawnBattleShips));
+        GameThread.RunSafe(() => AcceptSpawnRecords(records), context: nameof(Handle_NetworkSpawnBattleShips));
     }
+
+    /// <summary>[Game thread] Queues other owners' hull records and spawns the copies that can spawn now.</summary>
+    internal void AcceptSpawnRecords(IEnumerable<BattleShipSpawnData> records)
+    {
+        pendingForeignHulls.AddRange(records.Where(record => record != null));
+        DrainPendingForeignHulls();
+    }
+
+    private bool IsAwaitingSpawn(Guid shipId) => pendingForeignHulls.Any(record => record.ShipId == shipId);
 
     private void DrainPendingForeignHulls()
     {
@@ -536,6 +559,15 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (Mission.Current == null || session.IsOwn(data.OwnerControllerId) || Registry.TryGet(data.ShipId, out _))
             return true;
         if (!engine.AreInitialShipsDeployed) return false;
+
+        // Vanilla's deployment finish runs over every hull and pools removed ones, so a copy spawns once it is over.
+        if (engine.IsDeploymentMode)
+        {
+            if (heldForDeployment.Add(data.ShipId))
+                Logger.Information("[NavalSync] Holding foreign hull {ShipId} ({Hull}) of {Owner} until local deployment ends",
+                    data.ShipId, data.HullId, data.OwnerControllerId);
+            return false;
+        }
 
         var team = teamResolver.ResolveReplicatedTeam(data.Side, isOwn: false);
         if (team == null) return false;
@@ -556,10 +588,35 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (hull == null) return GiveUpForeignHullSpawn(data, team);
 
         failedHullSpawns.Remove(data.ShipId);
+        bool wasHeld = heldForDeployment.Remove(data.ShipId);
         Registry.TryRegister(new NetworkShipInfo(data.ShipId, data.OwnerControllerId, data.MapEventPartyId, data.IsNpcParty, hull, formation));
-        Logger.Information("[NavalSync] Spawned foreign hull {ShipId} ({Hull}) of {Owner} on team {Team} formation {Formation}",
-            data.ShipId, data.HullId, data.OwnerControllerId, team.TeamSide, formation?.FormationIndex);
+        Logger.Information("[NavalSync] Spawned foreign hull {ShipId} ({Hull}) of {Owner} on team {Team} formation {Formation}{Held}",
+            data.ShipId, data.HullId, data.OwnerControllerId, team.TeamSide, formation?.FormationIndex,
+            wasHeld ? " after local deployment" : "");
+        ApplyHeldState(data.ShipId);
         return true;
+    }
+
+    // The owner's latest state received while the copy waited, so it does not sit at the record's frame until the next sample.
+    private void ApplyHeldState(Guid shipId)
+    {
+        if (pendingConditions.TryGetValue(shipId, out var condition))
+        {
+            pendingConditions.Remove(shipId);
+            AcceptCondition(condition);
+        }
+
+        if (heldSamples.TryGetValue(shipId, out var sample))
+        {
+            heldSamples.Remove(shipId);
+            AcceptSample(sample);
+        }
+
+        if (heldFinalRopes.TryGetValue(shipId, out var final))
+        {
+            heldFinalRopes.Remove(shipId);
+            AcceptFinalRopes(final);
+        }
     }
 
     // [Game thread] Counts a failed spawn; true once the hull is dropped, which also drops the crew buffered for it.
@@ -574,6 +631,9 @@ public class BattleShipReplicator : IBattleShipReplicator
         }
 
         failedHullSpawns.Remove(data.ShipId);
+        heldForDeployment.Remove(data.ShipId);
+        heldSamples.Remove(data.ShipId);
+        heldFinalRopes.Remove(data.ShipId);
         Registry.MarkSpawnFailed(data.ShipId);
         Logger.Error("[NavalSync] Could not spawn hull {ShipId} ({Hull}) of {Owner} on team {Team} after {Attempts} attempts; dropping it and its crew",
             data.ShipId, data.HullId, data.OwnerControllerId, team.TeamSide, attempts);
@@ -597,12 +657,14 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         if (sample == null) return;
 
-        var stream = GetStream(sample.ShipId);
         if (!Registry.TryGet(sample.ShipId, out var ship))
         {
-            stream.Reject("unknown_ship");
+            if (IsAwaitingSpawn(sample.ShipId)) HoldSample(sample);
+            else GetStream(sample.ShipId).Reject("unknown_ship");
             return;
         }
+
+        var stream = GetStream(sample.ShipId);
 
         var rejection = ValidateSample(ship, session.OwnControllerId, sample, stream.Accepted, stream.AcceptedEpoch);
         // BR-102: an AI hull follows the host, so a superseded hosting generation is dropped like siege state.
@@ -624,6 +686,15 @@ public class BattleShipReplicator : IBattleShipReplicator
         stream.Accepted = sample.Sequence;
         stream.Elapsed = 0;
     }
+
+    private void HoldSample(NetworkBattleShipSample sample)
+    {
+        if (!heldSamples.TryGetValue(sample.ShipId, out var held) || IsNewerSample(sample, held))
+            heldSamples[sample.ShipId] = sample;
+    }
+
+    internal static bool IsNewerSample(NetworkBattleShipSample sample, NetworkBattleShipSample than) =>
+        sample.HostEpoch > than.HostEpoch || (sample.HostEpoch == than.HostEpoch && sample.Sequence > than.Sequence);
 
     /// <summary>Why a sample must be dropped, or null to accept it.</summary>
     internal static string ValidateSample(NetworkShipInfo ship, string ownControllerId, NetworkBattleShipSample sample,
@@ -789,6 +860,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         spawnRecordsSent,
         pendingForeignHulls = pendingForeignHulls.Count,
+        heldForDeployment = heldForDeployment.Count,
+        heldSamples = heldSamples.Count,
         ships = Registry.Ships.Select(ship =>
         {
             streams.TryGetValue(ship.ShipId, out var stream);

@@ -20,6 +20,7 @@ using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
 
+[Collection("Mission.Current")]
 public class BattleShipReplicatorTests
 {
     private const string Own = "local";
@@ -763,6 +764,118 @@ public class BattleShipReplicatorTests
         Assert.Equal(2, copy.Condition.SinkingState);
     }
 
+    [Fact]
+    public void AcceptSpawnRecords_DuringLocalDeployment_HoldsTheCopyAndSpawnsItOnceAfterwardWithTheLatestState()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: true);
+        bool deploying = true;
+        harness.Engine.SetupGet(e => e.IsDeploymentMode).Returns(() => deploying);
+        var copy = harness.SetupForeignSpawn();
+        var record = ForeignRecord(Guid.NewGuid());
+        var frame = NetworkBattleShipSample.FromFrame(MatrixFrame.Identity);
+        var latestCondition = new NetworkShipCondition(record.ShipId, Peer, 2, 0, Condition(500f));
+
+        harness.Replicator.AcceptSpawnRecords(new[] { record });
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, Peer, 1, frame));
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, Peer, 3, frame));
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, Peer, 2, frame));
+        harness.Replicator.AcceptCondition(new NetworkShipCondition(record.ShipId, Peer, 1, 0, Condition(800f)));
+        harness.Replicator.AcceptCondition(latestCondition);
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+        var whileDeploying = JObject.FromObject(harness.Replicator.Inspect());
+
+        deploying = false;
+        harness.Replicator.Tick(0.016f);
+        harness.Replicator.Tick(0.016f);
+
+        Assert.Equal(1, (int)whileDeploying["heldForDeployment"]!);
+        Assert.Equal(1, (int)whileDeploying["heldSamples"]!);
+        harness.Engine.Verify(e => e.SpawnForeignHull(record, It.IsAny<Team>(), out It.Ref<Formation>.IsAny), Times.Once);
+        harness.Engine.Verify(e => e.ApplyInput(copy, It.IsAny<BattleShipInput>()), Times.Once);
+        harness.Engine.Verify(e => e.ApplyCondition(copy, latestCondition.Condition), Times.Once);
+        harness.Engine.Verify(e => e.ApplyCondition(It.IsAny<MissionObject>(), It.IsAny<BattleShipCondition>()), Times.Once);
+        var inspected = Inspected(harness, record.ShipId);
+        Assert.Equal(3, (long)inspected["accepted"]!);
+        Assert.Equal(0, (long)inspected["rejects"]!);
+        Assert.Equal(0, (int)JObject.FromObject(harness.Replicator.Inspect())["heldSamples"]!);
+    }
+
+    [Fact]
+    public void AcceptSpawnRecords_BeforeTheInitialShipsAreDeployed_WaitsEvenOutsideDeploymentMode()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: true);
+        bool deployed = false;
+        harness.SetupForeignSpawn(initialShipsDeployed: false);
+        harness.Engine.SetupGet(e => e.AreInitialShipsDeployed).Returns(() => deployed);
+        var record = ForeignRecord(Guid.NewGuid());
+
+        harness.Replicator.AcceptSpawnRecords(new[] { record });
+        harness.Replicator.Tick(0.1f);
+        harness.Engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out It.Ref<Formation>.IsAny),
+            Times.Never);
+
+        deployed = true;
+        harness.Replicator.Tick(0.1f);
+        harness.Engine.Verify(e => e.SpawnForeignHull(record, It.IsAny<Team>(), out It.Ref<Formation>.IsAny), Times.Once);
+    }
+
+    [Fact]
+    public void AcceptSample_ForAShipWithNoWaitingRecord_RejectsItAsUnknown()
+    {
+        var harness = new Harness(committed: true);
+        var shipId = Guid.NewGuid();
+
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(shipId, Peer, 1,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity)));
+
+        var inspected = JObject.FromObject(harness.Replicator.Inspect());
+        Assert.Equal(0, (int)inspected["heldSamples"]!);
+        harness.Engine.Verify(e => e.ApplyInput(It.IsAny<MissionObject>(), It.IsAny<BattleShipInput>()), Times.Never);
+    }
+
+    [Fact]
+    public void Dispose_DropsTheRecordsAndStateHeldForDeployment()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: true);
+        harness.Engine.SetupGet(e => e.IsDeploymentMode).Returns(true);
+        harness.SetupForeignSpawn();
+        var record = ForeignRecord(Guid.NewGuid());
+        harness.Replicator.AcceptSpawnRecords(new[] { record });
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, Peer, 1,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity)));
+
+        harness.Replicator.Dispose();
+
+        var inspected = JObject.FromObject(harness.Replicator.Inspect());
+        Assert.Equal(0, (int)inspected["pendingForeignHulls"]!);
+        Assert.Equal(0, (int)inspected["heldForDeployment"]!);
+        Assert.Equal(0, (int)inspected["heldSamples"]!);
+    }
+
+    [Theory]
+    [InlineData(1, 5, 1, 4, true)]
+    [InlineData(1, 4, 1, 4, false)]
+    [InlineData(1, 3, 1, 4, false)]
+    [InlineData(2, 1, 1, 9, true)]
+    [InlineData(1, 9, 2, 1, false)]
+    public void IsNewerSample_OrdersByHostEpochThenSequence(int epoch, long sequence, int thanEpoch, long thanSequence, bool expected)
+    {
+        var frame = NetworkBattleShipSample.FromFrame(MatrixFrame.Identity);
+        var sample = new NetworkBattleShipSample(Guid.Empty, Peer, sequence, frame, hostEpoch: epoch);
+        var than = new NetworkBattleShipSample(Guid.Empty, Peer, thanSequence, frame, hostEpoch: thanEpoch);
+
+        Assert.Equal(expected, BattleShipReplicator.IsNewerSample(sample, than));
+    }
+
+    private static BattleShipSpawnData ForeignRecord(Guid shipId) =>
+        new BattleShipSpawnData(shipId, Peer, "MapEventParty_2", false, BattleSideEnum.Defender, 0,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null,
+            100f, 50f, 1, "");
+
     private static BattleShipCondition Condition(float hitPoints) =>
         new BattleShipCondition(hitPoints, 300f, 100f, new[] { 80f, 80f, 80f, 80f, 80f, 80f }, 0);
 
@@ -772,6 +885,7 @@ public class BattleShipReplicatorTests
     {
         public Mock<IBattleNetwork> Network { get; } = new Mock<IBattleNetwork>();
         public Mock<INavalShipEngine> Engine { get; } = new Mock<INavalShipEngine>();
+        public Mock<IBattleTeamResolver> TeamResolver { get; } = new Mock<IBattleTeamResolver>();
         public MessageBroker Broker { get; } = new MessageBroker();
         public NetworkShipRegistry Registry { get; } = new NetworkShipRegistry();
         public MissionObject OwnHull { get; } = CreateHull();
@@ -811,8 +925,26 @@ public class BattleShipReplicatorTests
             resultCommitter.Setup(c => c.TryGetResolvedState(out resolvedState)).Returns(resultHeld);
 
             Replicator = new BattleShipReplicator(Network.Object, Broker, session.Object, deployment.Object,
-                component.Object, engine.Object, Mock.Of<IBattleTeamResolver>(), Mock.Of<IObjectManager>(), new HostEpochPolicy(),
+                component.Object, engine.Object, TeamResolver.Object, Mock.Of<IObjectManager>(), new HostEpochPolicy(),
                 resultCommitter.Object);
+        }
+
+        // A foreign record resolves a team and spawns one live copy hull.
+        public MissionObject SetupForeignSpawn(bool initialShipsDeployed = true)
+        {
+            var team = (Team)RuntimeHelpers.GetUninitializedObject(typeof(Team));
+            TeamResolver.Setup(r => r.ResolveReplicatedTeam(It.IsAny<BattleSideEnum>(), false)).Returns(team);
+            if (initialShipsDeployed) Engine.SetupGet(e => e.AreInitialShipsDeployed).Returns(true);
+
+            var copy = CreateHull();
+            Formation formation = null!;
+            Engine.Setup(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), team, out formation))
+                .Returns(() =>
+                {
+                    LiveHulls.Add(copy);
+                    return copy;
+                });
+            return copy;
         }
     }
 }

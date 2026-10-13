@@ -49,10 +49,12 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private readonly List<PendingUse> pending = new List<PendingUse>();
     private readonly Dictionary<Guid, AppliedSeat> appliedSeats = new Dictionary<Guid, AppliedSeat>();
     private float elapsed;
+    // While this client deploys, copies are held back, so their crew's uses wait without aging.
+    private float deploymentHeldAt;
     private bool seatsAnnounced;
     private bool applyingRemote;
     private long sent, applied, dropped, localPuppetReleases, pinned, ownerReleases, sinkingUseReleases, sinkingSafetyNetReleases,
-        withdrawnReleases;
+        withdrawnReleases, removedHullSeats;
 
     public AgentStationUseReplicator(
         IBattleNetwork network,
@@ -127,17 +129,21 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private void Handle_NetworkAgentStationUse(MessagePayload<NetworkAgentStationUse> payload)
     {
         var use = payload.What;
-        GameThread.RunSafe(() =>
-        {
-            if (use == null) return;
-            pending.Add(new PendingUse(use, elapsed));
-            DrainPending();
-        }, context: nameof(Handle_NetworkAgentStationUse));
+        GameThread.RunSafe(() => AcceptUse(use), context: nameof(Handle_NetworkAgentStationUse));
+    }
+
+    /// <summary>[Game thread] Applies an owner's station use now, or keeps it pending until its agent and hull are here.</summary>
+    internal void AcceptUse(NetworkAgentStationUse use)
+    {
+        if (use == null) return;
+        pending.Add(new PendingUse(use, elapsed));
+        DrainPending();
     }
 
     public void Tick(float dt)
     {
         elapsed += Math.Max(0f, dt);
+        if (engine.IsDeploymentMode) deploymentHeldAt = elapsed;
         PruneOwnSeats();
         if (!seatsAnnounced && deployment.IsCommitted)
         {
@@ -163,11 +169,11 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
     /// <summary>
     /// An applied seat follows a remote owner's announcements. It ends when the puppet dies, when it is deregistered (its
-    /// owner's party withdrew), when its hull sinks (the owner's agent can drown seated without a release) or when this client
-    /// adopts it (host migration): from then on vanilla seats it, possibly on a replacement hull.
+    /// owner's party withdrew), when its hull sinks (the owner's agent can drown seated without a release) or leaves the
+    /// mission, or when this client adopts it (host migration): from then on vanilla seats it, possibly on a replacement hull.
     /// </summary>
-    internal static bool KeepsAppliedSeat(bool alive, bool registered, bool ownedHere, bool hullSinking) =>
-        alive && registered && !ownedHere && !hullSinking;
+    internal static bool KeepsAppliedSeat(bool alive, bool registered, bool ownedHere, bool hullSinking, bool hullRemoved) =>
+        alive && registered && !ownedHere && !hullSinking && !hullRemoved;
 
     // [Game thread] Runs after this frame's hull frame writes. A puppet the owner keeps seated is re-pinned to its station's
     // user frame on the moved hull; if vanilla released it locally it is re-seated once per owner revision.
@@ -183,11 +189,13 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
             bool registered = missionComponent.AgentRegistry.TryGetAgentInfo(entry.Key, out var info);
             bool ownedHere = registered && info.CurrentAuthority == session.OwnControllerId;
             bool hullSinking = engine.IsSinking(seat.Hull);
-            if (!KeepsAppliedSeat(alive, registered, ownedHere, hullSinking))
+            bool hullRemoved = engine.IsHullRemoved(seat.Hull);
+            if (!KeepsAppliedSeat(alive, registered, ownedHere, hullSinking, hullRemoved))
             {
                 leftAgents.Add(entry.Key);
                 if (alive && !ownedHere && hullSinking) ReleaseFromSinkingHull(entry.Key, seat);
                 else if (alive && !registered && engine.IsSeated(seat.Agent, seat.Point)) ReleaseWithdrawn(entry.Key, seat);
+                else if (alive && hullRemoved) ForgetRemovedHullSeat(entry.Key);
                 continue;
             }
 
@@ -197,7 +205,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
                 seat.Reseated = true;
                 localPuppetReleases++;
-                Logger.Warning("[NavalSync] Puppet {AgentId} was released from its station locally; re-seating it once", entry.Key);
+                Logger.Warning("[NavalSync] Puppet {AgentId} was released from its station {Station} locally; re-seating it once",
+                    entry.Key, DescribeStation(seat.Point));
                 Apply(seat.Agent, seat.Point, inUse: true);
                 if (!engine.IsSeated(seat.Agent, seat.Point)) continue;
             }
@@ -218,6 +227,13 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         Apply(seat.Agent, seat.Point, inUse: false);
     }
 
+    // Vanilla's own removal moves the crew off a removed or pooled hull; re-seating onto its machines would bind a puppet to them.
+    private void ForgetRemovedHullSeat(Guid agentId)
+    {
+        removedHullSeats++;
+        Logger.Warning("[NavalSync] Puppet {AgentId}'s station is on a hull that left the mission; no longer seating it there", agentId);
+    }
+
     // Removal in an ended mission skips vanilla's station release, so a withdrawn puppet must not stay a machine's user.
     private void ReleaseWithdrawn(Guid agentId, AppliedSeat seat)
     {
@@ -232,9 +248,12 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         pending.RemoveAll(entry => TryApply(entry.Use) || Expire(entry));
     }
 
+    internal static bool IsPendingExpired(float elapsed, float receivedAt, float deploymentHeldAt) =>
+        elapsed - Math.Max(receivedAt, deploymentHeldAt) >= PendingLifetimeSeconds;
+
     private bool Expire(PendingUse entry)
     {
-        if (elapsed - entry.ReceivedAt < PendingLifetimeSeconds) return false;
+        if (!IsPendingExpired(elapsed, entry.ReceivedAt, deploymentHeldAt)) return false;
 
         dropped++;
         Logger.Warning("[NavalSync] Dropped station use {Revision} of agent {AgentId} from {Sender}: agent or hull {ShipId} never arrived or the sender never owned the agent",
@@ -263,6 +282,14 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         if (!IsNewer(last.Sender, last.Revision, use.SenderControllerId, use.Revision))
         {
             dropped++;
+            return true;
+        }
+
+        if (engine.IsHullRemoved(ship.Hull))
+        {
+            dropped++;
+            Logger.Warning("[NavalSync] Dropped station use {Revision} of agent {AgentId}: hull {ShipId} left the mission",
+                use.Revision, use.AgentId, use.ShipId);
             return true;
         }
 
@@ -330,9 +357,10 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         }, context: nameof(Handle_PeerEntered));
     }
 
-    public string DescribeStation(Agent agent)
+    public string DescribeStation(Agent agent) => DescribeStation(agent?.CurrentlyUsedGameObject);
+
+    private string DescribeStation(UsableMissionObject point)
     {
-        var point = agent?.CurrentlyUsedGameObject;
         if (point == null || !engine.TryDescribeStation(point, out var hull, out var stationKey, out int pointIndex)
             || !missionComponent.ShipRegistry.TryGetByHull(hull, out var ship))
             return null;
@@ -351,6 +379,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         sinkingUseReleases,
         sinkingSafetyNetReleases,
         withdrawnReleases,
+        removedHullSeats,
         appliedSeats = appliedSeats.Count,
         pending = pending.Count,
         ownSeated = ownSeated.Count,

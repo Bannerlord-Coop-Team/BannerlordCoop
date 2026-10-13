@@ -488,6 +488,8 @@ public class NavalShipEngine : INavalShipEngine
 
     public bool IsSinking(MissionObject hull) => hull is MissionShip ship && ship.IsSinking;
 
+    public bool IsHullRemoved(MissionObject hull) => hull is MissionShip ship && (ship.IsRemoved || !ship.GameEntity.IsValid);
+
     public void ApplyCondition(MissionObject hull, BattleShipCondition condition)
     {
         var ship = (MissionShip)hull;

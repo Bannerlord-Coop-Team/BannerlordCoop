@@ -116,6 +116,9 @@ public interface INavalShipEngine
     /// <summary>Whether the hull is sinking or has sunk.</summary>
     bool IsSinking(MissionObject hull);
 
+    /// <summary>Whether the hull left the mission: removed, pooled by deployment, or its entity is gone.</summary>
+    bool IsHullRemoved(MissionObject hull);
+
     /// <summary>
     /// [Game thread] Sets an owner's damage state on a copied hull, or carries it onto a replacement hull: HP, fire and
     /// sails, and sinking through the vanilla path. A copy also takes the sunk state; a simulated hull sinks on its own.

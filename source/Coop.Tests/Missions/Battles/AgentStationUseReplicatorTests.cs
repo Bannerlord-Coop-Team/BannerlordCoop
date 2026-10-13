@@ -72,6 +72,86 @@ public class AgentStationUseReplicatorTests
     }
 
     [Fact]
+    public void RefreshAppliedSeats_NeverReseatsOntoAHullThatLeftTheMission()
+    {
+        var engine = new Mock<INavalShipEngine>();
+        engine.Setup(e => e.IsAlive(It.IsAny<Agent>())).Returns(true);
+        engine.Setup(e => e.IsSeated(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>())).Returns(false);
+        var hull = ShipTestHulls.Create();
+        engine.Setup(e => e.IsHullRemoved(hull)).Returns(true);
+        using var replicator = CreateReplicator(engine.Object);
+        replicator.RecordAppliedSeat(Guid.NewGuid(), null!, hull, CreatePoint());
+
+        replicator.RefreshAppliedSeats();
+        engine.Setup(e => e.IsHullRemoved(hull)).Returns(false);
+        replicator.RefreshAppliedSeats();
+
+        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), It.IsAny<bool>()), Times.Never);
+        engine.Verify(e => e.PinToStation(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>()), Times.Never);
+        Assert.Equal(1, (long)JObject.FromObject(replicator.Inspect())["removedHullSeats"]!);
+    }
+
+    [Fact]
+    public void TryApply_DropsAUseOnAHullThatLeftTheMission()
+    {
+        var agentId = Guid.NewGuid();
+        var shipId = Guid.NewGuid();
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+        var info = new CoopAgentInfo("owner", "owner", "battle", agent, agentId, 1);
+        var registry = new Mock<INetworkAgentRegistry>();
+        registry.Setup(r => r.TryGetAgentInfo(agentId, out info)).Returns(true);
+        var hull = ShipTestHulls.Create();
+        var ship = new NetworkShipInfo(shipId, "owner", "party", isNpcParty: false, hull, null!);
+        var ships = new Mock<INetworkShipRegistry>();
+        ships.Setup(s => s.TryGet(shipId, out ship)).Returns(true);
+        var engine = new Mock<INavalShipEngine>();
+        engine.Setup(e => e.IsHullRemoved(hull)).Returns(true);
+        engine.Setup(e => e.ResolveStation(hull, "oar", 0)).Returns(CreatePoint());
+        using var replicator = CreateReplicator(engine.Object, registry.Object, ships.Object);
+
+        Assert.True(replicator.TryApply(Use(agentId, shipId, inUse: true, revision: 1, "owner")));
+
+        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), It.IsAny<bool>()), Times.Never);
+        Assert.Equal(1, (long)JObject.FromObject(replicator.Inspect())["dropped"]!);
+    }
+
+    [Theory]
+    [InlineData(9.9f, 0f, 0f, false)]
+    [InlineData(10f, 0f, 0f, true)]
+    [InlineData(30f, 0f, 25f, false)]
+    [InlineData(35f, 0f, 25f, true)]
+    [InlineData(30f, 22f, 10f, false)]
+    public void IsPendingExpired_CountsTheLifetimeFromWhenLocalDeploymentLastHeldTheCopies(float elapsed, float receivedAt,
+        float deploymentHeldAt, bool expected)
+    {
+        Assert.Equal(expected, AgentStationUseReplicator.IsPendingExpired(elapsed, receivedAt, deploymentHeldAt));
+    }
+
+    [Fact]
+    public void Tick_KeepsAUseForAHeldHullPendingThroughALongDeployment()
+    {
+        var agentId = Guid.NewGuid();
+        var shipId = Guid.NewGuid();
+        var engine = new Mock<INavalShipEngine>();
+        bool deploying = true;
+        engine.SetupGet(e => e.IsDeploymentMode).Returns(() => deploying);
+        using var replicator = CreateReplicator(engine.Object, Mock.Of<INetworkAgentRegistry>());
+        replicator.Tick(0.1f);
+        replicator.AcceptUse(Use(agentId, shipId, inUse: true, revision: 1, "owner"));
+
+        for (int i = 0; i < 30; i++) replicator.Tick(1f);
+        long droppedWhileDeploying = (long)JObject.FromObject(replicator.Inspect())["dropped"]!;
+        deploying = false;
+        for (int i = 0; i < 9; i++) replicator.Tick(1f);
+        long droppedJustAfter = (long)JObject.FromObject(replicator.Inspect())["dropped"]!;
+        replicator.Tick(1.5f);
+
+        Assert.Equal(0, droppedWhileDeploying);
+        Assert.Equal(0, droppedJustAfter);
+        Assert.Equal(1, (long)JObject.FromObject(replicator.Inspect())["dropped"]!);
+    }
+
+    [Fact]
     public void RefreshAppliedSeats_ForgetsAPuppetThatIsNoLongerActive()
     {
         var engine = new Mock<INavalShipEngine>();
