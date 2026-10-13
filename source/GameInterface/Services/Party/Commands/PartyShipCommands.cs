@@ -10,6 +10,7 @@ using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -192,20 +193,21 @@ public class PartyShipCommands
     }
 
     // coop.debug.party.list_ships PlayerOne
-    /// <summary>Lists the ships this machine's copy of a player's party owns.</summary>
+    // coop.debug.party.list_ships MobileParty_southern_pirates_13
+    /// <summary>Lists the ships this machine's copy of a party owns, addressed by player controller id or party id.</summary>
     public sealed class ListShipsCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.party";
 
         public string Name => "list_ships";
 
-        public string Description => "Lists the ships of a player's party on this machine.";
+        public string Description => "Lists the ships of a party on this machine.";
 
         public CoopCommandSide Side => CoopCommandSide.Both;
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("controller_id", "The player whose party ships are listed.", true),
+            new ExpectedArgs("party", "A player controller id, or a MobileParty or PartyBase id.", true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -213,7 +215,7 @@ public class PartyShipCommands
             if (!ModInformation.IsNavalDlcActive)
                 return Failed("NavalDLC is not active.");
 
-            if (!MapEventDebugCommands.TryGetPlayerParty(args[0], requireReady: false, out var objectManager, out var party, out var error))
+            if (!TryGetListedParty(args[0], out var objectManager, out var party, out var error))
                 return Failed(error);
 
             var ships = party.Ships
@@ -221,9 +223,28 @@ public class PartyShipCommands
                     $"name=\"{ship.Name}\" owner={ship.Owner?.Id ?? "none"} " +
                     $"hp={ship.HitPoints:0}/{ship.MaxHitPoints:0} sail={ship.SailHitPoints:0}/{ship.MaxSailHitPoints:0}")
                 .ToArray();
-            return Succeeded($"{party.StringId} ships={ships.Length}" +
+            return Succeeded($"{party.Id} ships={ships.Length}" +
                    (ships.Length == 0 ? "" : ": " + string.Join(", ", ships)));
         }
+    }
+
+    // A controller id names the player's party; any other id is looked up as a registered MobileParty or PartyBase.
+    private static bool TryGetListedParty(string id, out IObjectManager objectManager, out PartyBase party, out string error)
+    {
+        party = null;
+        if (MapEventDebugCommands.TryGetPlayerParty(id, requireReady: false, out objectManager, out var playerParty, out error))
+        {
+            party = playerParty.Party;
+            return true;
+        }
+
+        if (objectManager == null) return false;
+
+        if (objectManager.TryGetObject<object>(id, out var registered))
+            party = registered is MobileParty mobileParty ? mobileParty.Party : registered as PartyBase;
+
+        error = party == null ? $"No player, MobileParty or PartyBase has id {id}." : null;
+        return party != null;
     }
 
     private static string DescribeId(IObjectManager objectManager, Ship ship) =>
