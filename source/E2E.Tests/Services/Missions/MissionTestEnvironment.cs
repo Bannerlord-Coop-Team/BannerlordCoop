@@ -16,6 +16,8 @@ using Missions.Messages;
 using SandBox.GauntletUI.Map;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
@@ -46,6 +48,25 @@ public class MissionTestEnvironment : E2ETestEnvironment
             AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
         };
     }
+
+    /// <summary>
+    /// <see cref="MapEventDisabledMethods"/> plus the reward, loot and menu steps a victory finalization runs, which need
+    /// campaign state the headless server does not have.
+    /// </summary>
+    protected IReadOnlyList<MethodBase> VictoryConclusionDisabledMethods()
+        => MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
+            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
+            .Append(AccessTools.Method(typeof(MapEvent), "CaptureDefeatedPartyMembers"))
+            .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
+            .Append(AccessTools.Method(typeof(MapEventRegistry), "CloseDestroyedMapEventEncounterIfNeeded"))
+            .ToList();
 
     /// <summary>Sets a client's network identity — the value host election ranks by.</summary>
     protected void SetControllerId(EnvironmentInstance instance, string controllerId)

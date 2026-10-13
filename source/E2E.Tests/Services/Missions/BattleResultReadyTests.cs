@@ -10,16 +10,12 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
-using HarmonyLib;
 using Missions.Battles;
 using Missions.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.GameComponents;
-using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -560,19 +556,4 @@ public class BattleResultReadyTests : MissionTestEnvironment
     {
         Server.Call(() => Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _)));
     }
-
-    private IReadOnlyList<MethodBase> VictoryConclusionDisabledMethods()
-        => MapEventDisabledMethods
-            .Append(AccessTools.Method(typeof(DefaultBattleRewardModel), nameof(DefaultBattleRewardModel.GetCaptureMemberChancesForWinnerParties)))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyCasualties"))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyItems"))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyPrisoners"))
-            .Append(AccessTools.Method(typeof(MapEvent), "LootDefeatedPartyShips"))
-            .Append(AccessTools.Method(typeof(MapEvent), "CalculateMapEventResults"))
-            .Append(AccessTools.Method(typeof(MapEvent), "CommitCalculatedMapEventResults"))
-            .Append(AccessTools.Method(typeof(MapEvent), "CaptureDefeatedPartyMembers"))
-            .Append(AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"))
-            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
-            .Append(AccessTools.Method(typeof(MapEventRegistry), "CloseDestroyedMapEventEncounterIfNeeded"))
-            .ToList();
 }
