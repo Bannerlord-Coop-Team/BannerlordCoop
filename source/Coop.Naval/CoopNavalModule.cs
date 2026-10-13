@@ -3,6 +3,7 @@ using Common.Commands;
 using Common.Messaging;
 using Common.Util;
 using GameInterface;
+using GameInterface.Registry.Auto;
 using GameInterface.Services;
 using System;
 using System.Collections.Generic;
@@ -38,12 +39,21 @@ public class CoopNavalModule : Module
             builder.RegisterType(type).As(interfaceToRegister).InstancePerLifetimeScope();
         }
 
+        // RegistryModule skips this assembly so the registries are only registered with the services they need
+        foreach (var type in GetConcreteTypes<object>().Where(IsAutoRegistry))
+        {
+            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
+        }
+
         // Load coop commands within Coop.Naval
         foreach (var type in GetConcreteTypes<ICoopCommand>())
         {
             builder.RegisterType(type).As<ICoopCommand>().InstancePerDependency();
         }
     }
+
+    private static bool IsAutoRegistry(Type type) =>
+        type.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IAutoRegistry<>));
 
     private static IEnumerable<Type> GetConcreteTypes<T>() =>
         typeof(CoopNavalModule).Assembly.GetTypes().Where(t => typeof(T).IsAssignableFrom(t) && t.IsConcrete());

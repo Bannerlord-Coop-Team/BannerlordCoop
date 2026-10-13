@@ -49,7 +49,7 @@ namespace Coop.Tests.Server.Services.Save
                 new InventoryPlayerData(new(), new()),
                 new HeroMeetingData(new()),
                 new AgingPlayerData(new()),
-                new NavalPlayerData(new(), new(), new()));
+                new NavalPlayerData(new(), new(), new(), new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId + ".json";
 

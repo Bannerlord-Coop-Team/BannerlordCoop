@@ -8,6 +8,7 @@ namespace GameInterface.Services.NavalDLC;
 /// UnlockedFigureheadsByMainHero assumes there is only the one player who can unlock figureheads
 /// NavalDLCFigureheadCampaignBehavior._lastFigureheadLootTime assumes only one player loots figureheads
 /// ClanFleetManagementCampaignBehavior._sentTroops assumes only one player sends troops away with ships
+/// RaftStateCampaignBehavior._playerCachedShips and _cachedAnchorPoint assumes only one player has cached ships that can be restored
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class NavalPlayerData
@@ -24,13 +25,19 @@ public class NavalPlayerData
     [ProtoMember(3)]
     public Dictionary<string, List<SentTroopsData>> PlayerSentTroops { get; }
 
+    // Dictionary<PlayerHeroId, PlayerCachedFleetData>
+    [ProtoMember(4)]
+    public Dictionary<string, PlayerCachedFleetData> PlayerCachedFleets { get; }
+
     public NavalPlayerData(
         Dictionary<string, List<string>> playerUnlockedFigureHeads,
         Dictionary<string, long> playerLastFigureheadLootTimes,
-        Dictionary<string, List<SentTroopsData>> playerSentTroops)
+        Dictionary<string, List<SentTroopsData>> playerSentTroops,
+        Dictionary<string, PlayerCachedFleetData> playerCachedFleets)
     {
         PlayerUnlockedFigureHeads = playerUnlockedFigureHeads ?? new();
         PlayerLastFigureheadLootTimes = playerLastFigureheadLootTimes ?? new();
         PlayerSentTroops = playerSentTroops ?? new();
+        PlayerCachedFleets = playerCachedFleets ?? new();
     }
 }

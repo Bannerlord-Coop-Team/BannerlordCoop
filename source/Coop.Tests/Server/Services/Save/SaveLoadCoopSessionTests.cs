@@ -79,7 +79,7 @@ namespace Coop.Tests.Server.Services.Save
                 new InventoryPlayerData(new(), new()),
                 new HeroMeetingData(new()),
                 new AgingPlayerData(new()),
-                new NavalPlayerData(new(), new(), new()));
+                new NavalPlayerData(new(), new(), new(), new()));
 
             string saveFile = sessionData.UniqueGameId;
 
@@ -136,7 +136,7 @@ namespace Coop.Tests.Server.Services.Save
                 },
             };
 
-            var navalPlayerData = new NavalPlayerData(new(), new(), new());
+            var navalPlayerData = new NavalPlayerData(new(), new(), new(), new());
             navalPlayerData.PlayerUnlockedFigureHeads["MyHero1"] = new() { "figurehead_1", "figurehead_2" };
             navalPlayerData.PlayerLastFigureheadLootTimes["MyHero1"] = 2702;
 

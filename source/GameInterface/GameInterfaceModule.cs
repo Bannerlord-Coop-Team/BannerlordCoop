@@ -76,6 +76,8 @@ public class GameInterfaceModule : Module
     // TODO move to config
     public const string HarmonyId = "Bannerlord.Coop";
 
+    internal const string CoopNavalAssemblyName = "Coop.Naval";
+
     private static readonly Harmony harmony = new Harmony(HarmonyId);
 
     private static readonly ILogger Logger = LogManager.GetLogger<GameInterfaceModule>();
@@ -234,7 +236,7 @@ public class GameInterfaceModule : Module
     private static bool TryLoadCoopNavalAssembly(out Assembly assembly)
     {
         var directory = Path.GetDirectoryName(typeof(GameInterfaceModule).Assembly.Location);
-        var path = Path.Combine(directory, "Coop.Naval.dll");
+        var path = Path.Combine(directory, CoopNavalAssemblyName + ".dll");
 
         if (!File.Exists(path))
         {
