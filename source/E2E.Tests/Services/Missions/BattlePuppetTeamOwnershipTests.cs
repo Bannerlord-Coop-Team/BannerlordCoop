@@ -442,6 +442,84 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void CrewRecord_IsDroppedOnceItsHullGivesUpSpawning()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (_, partyIds) = SetupCoopBattle("local", "enemy");
+        var client = Clients.First();
+        var agentId = Guid.NewGuid();
+        var shipId = Guid.NewGuid();
+        var characterId = CreateRegisteredObject<CharacterObject>();
+
+        client.Call(() =>
+        {
+            var mission = fixture.CreateMission(client);
+            mission.PlayerTeam = mission.AttackerTeam;
+            mission.AddTeam(BattleSideEnum.Defender);
+
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var enemyParty));
+            var mapEventParty = enemyParty.MapEvent.DefenderSide.Parties
+                .Single(party => party.Party == enemyParty.Party);
+            Assert.True(client.ObjectManager.TryGetId(mapEventParty, out var mapEventPartyId));
+
+            var broker = client.Resolve<IMessageBroker>();
+            var deployment = new Mock<IBattleDeploymentCoordinator>();
+            deployment.SetupGet(d => d.IsCommitted).Returns(true);
+            var missionComponent = client.Resolve<ICoopMissionComponent>();
+            var session = new Mock<IBattleSession>();
+            session.SetupGet(s => s.OwnControllerId).Returns("local");
+            var teams = new Mock<IBattleTeamResolver>();
+            teams.Setup(t => t.ResolveReplicatedTeam(BattleSideEnum.Defender, false)).Returns(mission.DefenderTeam.Shell);
+            var engine = new Mock<INavalShipEngine>();
+            engine.SetupGet(e => e.Hulls).Returns(new List<MissionObject>());
+            Formation noFormation = null!;
+            engine.Setup(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out noFormation))
+                .Returns((MissionObject)null!);
+            using var replicator = new BattleShipReplicator(Mock.Of<IBattleNetwork>(), broker, session.Object,
+                deployment.Object, missionComponent, engine.Object, teams.Object, client.ObjectManager,
+                new HostEpochPolicy(), Mock.Of<IBattleResultCommitter>());
+            using var spawner = new PuppetSpawner(
+                broker,
+                client.ObjectManager,
+                client.Resolve<GameInterface.Services.Players.IPlayerManager>(),
+                missionComponent,
+                Mock.Of<IBattleSession>(),
+                new CasualtyAttributionMap(),
+                deployment.Object,
+                Mock.Of<IAgentFormationAssigner>(),
+                new BattleAgentBudget(),
+                client.Resolve<IMissionWeaponDataMapper>());
+
+            broker.Publish(this, new NetworkSpawnBattleShips(new[]
+            {
+                new BattleShipSpawnData(shipId, "host", mapEventPartyId, true, BattleSideEnum.Defender, 0,
+                    NetworkBattleShipSample.FromFrame(TaleWorlds.Library.MatrixFrame.Identity), "northern_light_ship", null, null, null, null,
+                    100f, 50f, 1, ""),
+            }));
+            var record = new BattleAgentSpawnData(
+                agentId, characterId, default, BattleSideEnum.Defender, 100f, "host", mapEventPartyId, 1,
+                new Equipment(), new BodyProperties(), new MissionEquipmentData(new()), shipId: shipId);
+            broker.Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
+            for (int tick = 1; tick < BattleShipReplicator.ForeignHullSpawnAttempts; tick++)
+            {
+                Assert.False(missionComponent.ShipRegistry.HasSpawnFailed(shipId));
+                replicator.Tick(BattleShipReplicator.ForeignHullRetrySeconds + 0.1f);
+            }
+
+            Assert.True(missionComponent.ShipRegistry.HasSpawnFailed(shipId));
+            engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out noFormation),
+                Times.Exactly(BattleShipReplicator.ForeignHullSpawnAttempts));
+            spawner.DrainPendingPuppets();
+
+            Assert.True(missionComponent.ShipRegistry.TryRegister(
+                new NetworkShipInfo(shipId, "host", mapEventPartyId, true, CreateTestHull(), null)));
+            spawner.DrainPendingPuppets();
+
+            Assert.False(client.Resolve<INetworkAgentRegistry>().TryGetAgentInfo(agentId, out _));
+        });
+    }
+
     // ScriptComponentBehavior's type initializer reads the managed module type catalog the engine normally fills.
     private static MissionObject CreateTestHull()
     {

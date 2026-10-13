@@ -18,6 +18,11 @@ public interface INetworkShipRegistry
     bool TryRebindHull(Guid shipId, MissionObject hull);
 
     bool Remove(Guid shipId);
+
+    /// <summary>Records a foreign hull this client gave up spawning, so its buffered crew is dropped; registering it clears this.</summary>
+    void MarkSpawnFailed(Guid shipId);
+
+    bool HasSpawnFailed(Guid shipId);
 }
 
 /// <summary>One registered hull: who simulates it, who fielded it, and its local mission object and formation.</summary>
@@ -50,6 +55,7 @@ public class NetworkShipRegistry : INetworkShipRegistry
 {
     // Game thread only: hulls register on spawn and are read by the per-tick stream and spawn paths.
     private readonly Dictionary<Guid, NetworkShipInfo> ships = new Dictionary<Guid, NetworkShipInfo>();
+    private readonly HashSet<Guid> failedSpawns = new HashSet<Guid>();
 
     public IReadOnlyList<NetworkShipInfo> Ships => ships.Values.ToList();
 
@@ -59,6 +65,7 @@ public class NetworkShipRegistry : INetworkShipRegistry
         if (TryGetByHull(ship.Hull, out _)) return false;
 
         ships.Add(ship.ShipId, ship);
+        failedSpawns.Remove(ship.ShipId);
         return true;
     }
 
@@ -86,4 +93,11 @@ public class NetworkShipRegistry : INetworkShipRegistry
     }
 
     public bool Remove(Guid shipId) => ships.Remove(shipId);
+
+    public void MarkSpawnFailed(Guid shipId)
+    {
+        if (shipId != Guid.Empty && !ships.ContainsKey(shipId)) failedSpawns.Add(shipId);
+    }
+
+    public bool HasSpawnFailed(Guid shipId) => failedSpawns.Contains(shipId);
 }

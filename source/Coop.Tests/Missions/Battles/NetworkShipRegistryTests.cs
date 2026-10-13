@@ -72,5 +72,29 @@ public class NetworkShipRegistryTests
         Assert.False(registry.TryRebindHull(first.ShipId, null));
     }
 
+    [Fact]
+    public void MarkSpawnFailed_HoldsUntilTheHullRegisters()
+    {
+        var registry = new NetworkShipRegistry();
+        var ship = new NetworkShipInfo(Guid.NewGuid(), "host", "MapEventParty_9", true, CreateHull(), null);
+
+        registry.MarkSpawnFailed(ship.ShipId);
+        bool failedBeforeRegister = registry.HasSpawnFailed(ship.ShipId);
+        registry.TryRegister(ship);
+        registry.MarkSpawnFailed(ship.ShipId);
+
+        Assert.True(failedBeforeRegister);
+        Assert.False(registry.HasSpawnFailed(ship.ShipId));
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(BattleShipReplicator.ForeignHullSpawnAttempts - 1, false)]
+    [InlineData(BattleShipReplicator.ForeignHullSpawnAttempts, true)]
+    public void IsForeignHullSpawnExhausted_StopsRetryingAfterTheBoundedAttempts(int attempts, bool expected)
+    {
+        Assert.Equal(expected, BattleShipReplicator.IsForeignHullSpawnExhausted(attempts));
+    }
+
     private static MissionObject CreateHull() => ShipTestHulls.Create();
 }

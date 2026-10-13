@@ -63,6 +63,9 @@ public class BattleShipReplicator : IBattleShipReplicator
     internal const float InterpolationSeconds = 0.05f;
     // Measured on this client's mission clock from receipt, since peers' wall clocks are not in step.
     internal const float SampleLifetimeSeconds = 1f;
+    // A foreign hull that cannot spawn (no free formation or ships logic yet) is retried this often before it is dropped.
+    internal const int ForeignHullSpawnAttempts = 5;
+    internal const float ForeignHullRetrySeconds = 1f;
 
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
@@ -79,6 +82,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly List<BattleShipSpawnData> pendingForeignHulls = new List<BattleShipSpawnData>();
     private readonly List<HullSwap> hullSwaps = new List<HullSwap>();
     private readonly Dictionary<Guid, NetworkShipCondition> pendingConditions = new Dictionary<Guid, NetworkShipCondition>();
+    private readonly Dictionary<Guid, FailedHullSpawn> failedHullSpawns = new Dictionary<Guid, FailedHullSpawn>();
     private bool spawningForeignHull;
     private bool spawnRecordsSent;
     private float sendElapsed;
@@ -534,6 +538,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         var team = teamResolver.ResolveReplicatedTeam(data.Side, isOwn: false);
         if (team == null) return false;
+        if (failedHullSpawns.TryGetValue(data.ShipId, out var failed) && elapsed < failed.RetryAt) return false;
 
         MissionObject hull;
         Formation formation;
@@ -547,18 +552,34 @@ public class BattleShipReplicator : IBattleShipReplicator
             spawningForeignHull = false;
         }
 
-        if (hull == null)
-        {
-            Logger.Error("[NavalSync] Could not spawn hull {ShipId} ({Hull}) of {Owner} on team {Team}",
-                data.ShipId, data.HullId, data.OwnerControllerId, team.TeamSide);
-            return true;
-        }
+        if (hull == null) return GiveUpForeignHullSpawn(data, team);
 
+        failedHullSpawns.Remove(data.ShipId);
         Registry.TryRegister(new NetworkShipInfo(data.ShipId, data.OwnerControllerId, data.MapEventPartyId, data.IsNpcParty, hull, formation));
         Logger.Information("[NavalSync] Spawned foreign hull {ShipId} ({Hull}) of {Owner} on team {Team} formation {Formation}",
             data.ShipId, data.HullId, data.OwnerControllerId, team.TeamSide, formation?.FormationIndex);
         return true;
     }
+
+    // [Game thread] Counts a failed spawn; true once the hull is dropped, which also drops the crew buffered for it.
+    private bool GiveUpForeignHullSpawn(BattleShipSpawnData data, Team team)
+    {
+        failedHullSpawns.TryGetValue(data.ShipId, out var failed);
+        int attempts = failed.Attempts + 1;
+        if (!IsForeignHullSpawnExhausted(attempts))
+        {
+            failedHullSpawns[data.ShipId] = new FailedHullSpawn(attempts, elapsed + ForeignHullRetrySeconds);
+            return false;
+        }
+
+        failedHullSpawns.Remove(data.ShipId);
+        Registry.MarkSpawnFailed(data.ShipId);
+        Logger.Error("[NavalSync] Could not spawn hull {ShipId} ({Hull}) of {Owner} on team {Team} after {Attempts} attempts; dropping it and its crew",
+            data.ShipId, data.HullId, data.OwnerControllerId, team.TeamSide, attempts);
+        return true;
+    }
+
+    internal static bool IsForeignHullSpawnExhausted(int attempts) => attempts >= ForeignHullSpawnAttempts;
 
     private void Handle_NetworkBattleShipSample(MessagePayload<NetworkBattleShipSample> payload)
     {
@@ -718,6 +739,18 @@ public class BattleShipReplicator : IBattleShipReplicator
         public Vec3 Local { get; }
         public float Time { get; }
         public float Speed { get; }
+    }
+
+    private readonly struct FailedHullSpawn
+    {
+        public FailedHullSpawn(int attempts, float retryAt)
+        {
+            Attempts = attempts;
+            RetryAt = retryAt;
+        }
+
+        public int Attempts { get; }
+        public float RetryAt { get; }
     }
 
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)

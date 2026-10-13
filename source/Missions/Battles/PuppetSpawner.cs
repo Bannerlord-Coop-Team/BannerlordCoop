@@ -407,7 +407,13 @@ public class PuppetSpawner : IPuppetSpawner
         // Crew of a hull waits for that hull and joins its local formation, which is the hull's ship assignment.
         NetworkShipInfo crewShip = null;
         if (data.ShipId != Guid.Empty && !coopMissionComponent.ShipRegistry.TryGet(data.ShipId, out crewShip))
-            return false;                                               // hull not spawned yet — buffer
+        {
+            if (!coopMissionComponent.ShipRegistry.HasSpawnFailed(data.ShipId)) return false; // hull not spawned yet — buffer
+
+            // The ship replicator gave up on this hull and logged it, so its crew is dropped with it.
+            DiscardPendingFormations(data.AgentId);
+            return true;
+        }
 
         if (!objectManager.TryGetObjectWithLogging(data.CharacterId, out CharacterObject character))
         {
