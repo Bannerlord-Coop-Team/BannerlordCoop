@@ -246,8 +246,9 @@ public class NavalScenarioMissionLogic : MissionLogic
             $"the battle host disconnects now and reconnects in {config.ReconnectSeconds:0} s");
         float reconnectSeconds = config.ReconnectSeconds;
 
-        // Both run as the console would, off the mission tick; the reconnect outlives this session's container.
-        GameThread.RunSafe(() => RunConsoleCommand(DisconnectCommand), context: nameof(Disconnect));
+        // Both run as the console would, off the mission tick (RunSafe would run inline here); the reconnect outlives
+        // this session's container.
+        GameThread.EnqueueSafe(() => RunConsoleCommand(DisconnectCommand), context: nameof(Disconnect));
         Task.Delay(TimeSpan.FromSeconds(reconnectSeconds)).ContinueWith(_ =>
             GameThread.RunSafe(() => RunConsoleCommand(ReconnectCommand), context: nameof(Disconnect)));
     }
