@@ -47,32 +47,32 @@ public class ModuleValidator : IModuleValidator
         serverModules = serverModules.Where(ShouldValidateModule).ToList();
         clientModules = clientModules.Where(ShouldValidateModule).ToList();
 
+        // Every mismatch is reported at once, otherwise a joiner fixes one module per attempt.
+        var errors = new List<string>();
+
         foreach (var serverModule in serverModules)
         {
             var clientModule = clientModules.FirstOrDefault(module => module.Id == serverModule.Id);
 
             if (clientModule.Id == null)
             {
-                error = $"To join the server the module '{serverModule.Id}' with version '{serverModule.Version.ToString()}' is required.";
-                return false;
+                errors.Add($"To join the server the module '{serverModule.Id}' with version '{serverModule.Version.ToString()}' is required.");
             }
             else if (!serverModule.Version.IsSame(clientModule.Version, true))
             {
-                error = $"Wrong version of module '{serverModule.Id}' detected. Server uses '{serverModule.Version.ToString()}', client uses '{clientModule.Version.ToString()}'.";
-                return false;
-                    
+                errors.Add($"Wrong version of module '{serverModule.Id}' detected. Server uses '{serverModule.Version.ToString()}', client uses '{clientModule.Version.ToString()}'.");
             }
         }
 
         var modulesOnlyClientSide = clientModules.Where(clientModule =>
-            serverModules.All(serverModule => serverModule.Id != clientModule.Id)).ToList();
+            serverModules.All(serverModule => serverModule.Id != clientModule.Id));
 
-        if (modulesOnlyClientSide.Any())
+        errors.AddRange(modulesOnlyClientSide.Select(clientModule =>
+            $"Server does not support module '{clientModule.Id}'."));
+
+        if (errors.Any())
         {
-            error = string.Join(Environment.NewLine,
-                modulesOnlyClientSide.Select(clientModule =>
-                    $"Server does not support module '{clientModule.Id}'."));
-
+            error = string.Join(Environment.NewLine, errors);
             return false;
         }
 

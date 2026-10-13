@@ -202,6 +202,60 @@ public class ModuleValidatorTests
     }
 
     [Fact]
+    public void Validate_ReportsEveryMismatch_WhenClientHasSeveralModuleProblems()
+    {
+        var serverModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "ModuleA", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 352) },
+            new ModuleInfo { Id = "ModuleB", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 0, 352) },
+            new ModuleInfo { Id = "ModuleC", Version = new ApplicationVersion(ApplicationVersionType.Release, 2, 0, 0, 352) }
+        };
+
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "ModuleB", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 1, 0, 352) },
+            new ModuleInfo { Id = "ModuleD", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 352) },
+            new ModuleInfo { Id = "ModuleE", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 352) }
+        };
+
+        var validator = new ModuleValidator();
+
+        var result = validator.Validate(serverModules, clientModules, out var error);
+
+        Assert.False(result);
+        Assert.Equal(string.Join(System.Environment.NewLine,
+            "To join the server the module 'ModuleA' with version 'v1.0.0.352' is required.",
+            "Wrong version of module 'ModuleB' detected. Server uses 'v1.2.0.352', client uses 'v1.1.0.352'.",
+            "To join the server the module 'ModuleC' with version 'v2.0.0.352' is required.",
+            "Server does not support module 'ModuleD'.",
+            "Server does not support module 'ModuleE'."), error);
+    }
+
+    [Fact]
+    public void Validate_KeepsLoneCoopReasonExact_WhenOnlyClientHasCoop()
+    {
+        // The client compares this reason exactly to join a server without Coop, so extra lines would break that.
+        var version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 352);
+        var serverModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "ModuleA", Version = version }
+        };
+
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "ModuleA", Version = version },
+            new ModuleInfo { Id = "Coop", Version = version }
+        };
+
+        var validator = new ModuleValidator();
+
+        var result = validator.Validate(serverModules, clientModules, out var error);
+
+        Assert.False(result);
+        Assert.Equal("Server does not support module 'Coop'.", error);
+    }
+
+    [Fact]
     public void Validate_Succeeds_WhenOnlyClientHasStoryMode()
     {
         var version = new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 0, 352);
