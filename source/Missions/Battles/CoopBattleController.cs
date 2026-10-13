@@ -116,7 +116,8 @@ public class CoopBattleController : CoopMissionController
         IBattleDamageDataMapper battleDamageDataMapper,
         IMissionWeaponDataMapper missionWeaponDataMapper,
         ISiegeGateHitApplier siegeGateHitApplier,
-        IBattleTeamResolver teamResolver)
+        IBattleTeamResolver teamResolver,
+        IBattleAgentFader agentFader)
         : base(
             network,
             messageBroker,
@@ -144,7 +145,7 @@ public class CoopBattleController : CoopMissionController
             missionContext);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, coopMissionComponent, session, casualties);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties, lifecycle);
-        puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
+        puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties, agentFader);
         puppetDeathApplier = new PuppetDeathApplier(
             messageBroker,
             coopMissionComponent,
@@ -162,7 +163,7 @@ public class CoopBattleController : CoopMissionController
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         OwnedAgentReplicator ownedAgentReplicator = null;
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder, lifecycle,
-            resultCommitter, changedAgentIds => ownedAgentReplicator.BroadcastAuthorityRefresh(changedAgentIds));
+            resultCommitter, agentFader, changedAgentIds => ownedAgentReplicator.BroadcastAuthorityRefresh(changedAgentIds));
         ownedAgentReplicator = new OwnedAgentReplicator(
             network,
             messageBroker,

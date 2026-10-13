@@ -65,6 +65,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     private readonly IBattleResultCommitter resultCommitter;
     private readonly Action<IReadOnlyCollection<Guid>> authorityChanged;
     private readonly IBattleInstanceLifecycle lifecycle;
+    private readonly IBattleAgentFader fader;
 
     // Hosts whose own party withdrew — read when the promotion lands so the adoption knows to leave those
     // troops to the despawn instead of adopting them. Only touched from broker handlers,
@@ -90,6 +91,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         IReinforcementFielder reinforcementFielder,
         IBattleInstanceLifecycle lifecycle,
         IBattleResultCommitter resultCommitter,
+        IBattleAgentFader fader,
         Action<IReadOnlyCollection<Guid>> authorityChanged = null)
     {
         this.relayNetwork = relayNetwork;
@@ -106,6 +108,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         this.resultCommitter = resultCommitter;
         this.authorityChanged = authorityChanged;
         this.lifecycle = lifecycle;
+        this.fader = fader;
 
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_PeerLeft);
@@ -391,7 +394,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
 
                 lifecycle.RecordWithdrawnHealth(agent);
                 registry.RemoveAgent(info.AgentId);
-                FadeOutWithdrawnAgent(agent);
+                fader.FadeOut(agent, hideInstantly: false, hideMount: true);
                 casualties.Forget(info.AgentId);
                 despawnedRiders.Add(agent);
                 despawned++;
@@ -454,7 +457,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
 
                 lifecycle.RecordWithdrawnHealth(agent);
                 registry.RemoveAgent(info.AgentId);
-                FadeOutWithdrawnAgent(agent);
+                fader.FadeOut(agent, hideInstantly: false, hideMount: true);
                 casualties.Forget(info.AgentId);
                 despawnedRiders.Add(agent);
                 despawned++;
@@ -469,17 +472,6 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             else if (candidates > 0)
                 Logger.Warning("[BattleSync] Withdrawal of {Controller} matched 0 of its {Count} registered troop(s) — selection found no own-party agents; anything left is keyed to a controller that no longer answers", controllerId, candidates);
         });
-    }
-
-    // [Game thread] Vanilla Agent.OnRemove skips the station release once the mission has ended, leaving a hull machine
-    // ticking a removed user. Deregistered first, so the naval release patch does not report the release as a desync.
-    private static void FadeOutWithdrawnAgent(Agent agent)
-    {
-        if (!agent.IsActive()) return;
-
-        if (agent.CurrentlyUsedGameObject != null)
-            agent.StopUsingGameObject(isSuccessful: false, Agent.StopUsingGameObjectFlags.None);
-        agent.FadeOut(false, true);
     }
 
     // [Game thread] Clean up a departed controller's registered MOUNTS. A horse registered to a controller
@@ -520,8 +512,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
                 continue;
             }
 
-            if (!ridden && agent.IsActive())
-                agent.FadeOut(false, true);
+            if (!ridden)
+                fader.FadeOut(agent, hideInstantly: false, hideMount: true);
 
             registry.RemoveAgent(info.AgentId);
             removed++;

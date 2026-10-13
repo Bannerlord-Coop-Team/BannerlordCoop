@@ -264,6 +264,7 @@ public class MissionModule : Module
         // Slots spawned agents into their team formation so vanilla's formation markers/order-targeting see
         // them. Injected into the battle spawn sub-services (stateless, so transient lifetime is moot).
         builder.RegisterType<AgentFormationAssigner>().As<IAgentFormationAssigner>().InstancePerDependency();
+        builder.RegisterType<BattleAgentFader>().As<IBattleAgentFader>().InstancePerDependency();
         builder.RegisterType<PuppetMountStateRepairer>()
             .As<IPuppetMountStateRepairer>()
             .InstancePerDependency();

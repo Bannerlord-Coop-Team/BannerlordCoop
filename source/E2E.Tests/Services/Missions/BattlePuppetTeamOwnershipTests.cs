@@ -488,7 +488,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             using var applier = new PuppetRoutApplier(
                 client.Resolve<IMessageBroker>(),
                 client.Resolve<ICoopMissionComponent>(),
-                new CasualtyAttributionMap());
+                new CasualtyAttributionMap(),
+                new BattleAgentFader());
             using var spawner = new PuppetSpawner(
                 client.Resolve<IMessageBroker>(),
                 client.ObjectManager,
