@@ -63,19 +63,22 @@ internal class PlayerCaptivityServerHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
     private readonly IPlayerPartyLookup playerPartyLookup;
+    private readonly ConversationPartyTracker conversationPartyTracker;
 
     public PlayerCaptivityServerHandler(
         IObjectManager objectManager,
         INetwork network,
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
-        IPlayerPartyLookup playerPartyLookup)
+        IPlayerPartyLookup playerPartyLookup,
+        ConversationPartyTracker conversationPartyTracker)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.playerPartyLookup = playerPartyLookup;
+        this.conversationPartyTracker = conversationPartyTracker;
 
         // ModInformation is evaluated per call (tests flip it per instance), so each handler
         // guards itself instead of gating the subscriptions here.
@@ -144,6 +147,9 @@ internal class PlayerCaptivityServerHandler : IHandler
         // the captivity-end flow reactivates the party.
         playerParty.IsActive = false;
 
+        // A captive's client doesn't finish its encounter until it's released, so the captor would stay held until then
+        ReleaseConversationHold(hero);
+
         // BR-061: surviving companion heroes riding in the surrendered party become prisoners of the
         // captor through the same TakePrisonerAction that captured the leader, BEFORE the rosters are
         // emptied below (which would silently discard them). Each capture runs with patches live, so its
@@ -168,6 +174,17 @@ internal class PlayerCaptivityServerHandler : IHandler
         RemoveVisual(playerParty);
         if (playerParty.LeaderHero != null)
             playerParty.ChangePartyLeader(null);
+    }
+
+    // Same release the client's PlayerEncounter.Finish would send through NetworkConversationEnded
+    private void ReleaseConversationHold(Hero playerHero)
+    {
+        if (!objectManager.TryGetId(playerHero, out var heroId)) return;
+
+        var player = playerManager.Players.FirstOrDefault(candidate => candidate.HeroId == heroId);
+        if (player == null || !playerManager.TryGetPeer(player.ControllerId, out var peer)) return;
+
+        ConversationPartyHold.EndEngagement(conversationPartyTracker, peer);
     }
 
     /// <summary>
