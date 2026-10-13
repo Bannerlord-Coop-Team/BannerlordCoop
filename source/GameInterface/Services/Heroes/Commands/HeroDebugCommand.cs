@@ -18,6 +18,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -1193,6 +1194,68 @@ public class HeroDebugCommand
 
             return Succeeded($"Set effective relation between '{effectiveHero1.Name}' and '{effectiveHero2.Name}' to " +
                 CharacterRelationManager.GetHeroRelation(effectiveHero1, effectiveHero2));
+        }
+    }
+
+    // coop.debug.hero.repair_main_hero
+    /// <summary>
+    /// Recreates the Hero.MainHero state that Hero.OnDeath nulls, for repairing saves
+    /// </summary>
+    public sealed class HeroRepairMainHeroCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.hero";
+
+        public string Name => "repair_main_hero";
+
+        public string Description => "Recreates any null developer, skills, traits, perks, attributes or volunteer types on the main hero.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+
+            Hero mainHero = Hero.MainHero;
+            if (mainHero == null) return Failed("Hero.MainHero is null.");
+
+            // Same defaults as the vanilla Hero() constructor
+            var restored = new List<string>();
+            if (mainHero._heroDeveloper == null)
+            {
+                mainHero._heroDeveloper = new HeroDeveloper(mainHero);
+                restored.Add("developer");
+            }
+            if (mainHero._heroSkills == null)
+            {
+                mainHero._heroSkills = new PropertyOwner<SkillObject>();
+                restored.Add("skills");
+            }
+            if (mainHero._heroTraits == null)
+            {
+                mainHero._heroTraits = new PropertyOwner<TraitObject>();
+                restored.Add("traits");
+            }
+            if (mainHero._heroPerks == null)
+            {
+                mainHero._heroPerks = new PropertyOwner<PerkObject>();
+                restored.Add("perks");
+            }
+            if (mainHero._characterAttributes == null)
+            {
+                mainHero._characterAttributes = new PropertyOwner<CharacterAttribute>();
+                restored.Add("attributes");
+            }
+            if (mainHero.VolunteerTypes == null)
+            {
+                mainHero.VolunteerTypes = new CharacterObject[6];
+                restored.Add("volunteer types");
+            }
+
+            if (restored.Count == 0) return Succeeded($"{mainHero.Name} ({mainHero.HeroState}) has nothing missing.");
+
+            return Succeeded($"Restored {string.Join(", ", restored)} on {mainHero.Name} ({mainHero.HeroState}).");
         }
     }
 }
