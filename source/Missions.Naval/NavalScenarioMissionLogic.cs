@@ -6,6 +6,7 @@ using Missions.Battles;
 using NavalDLC.GauntletUI.MissionViews;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
+using NavalDLC.ViewModelCollection.OrderOfBattle;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -27,7 +28,6 @@ public class NavalScenarioMissionLogic : MissionLogic
     internal const string DisconnectCommand = "coop.debug.connection.disconnect";
     internal const string ReconnectCommand = "coop.debug.connection.reconnect";
 
-    private const float ReadyRetrySeconds = 3f;
     private const float TargetWaitSeconds = 90f;
     // A teleported hull settles on the water before its rope or helm step.
     private const float SettleSeconds = 2f;
@@ -39,9 +39,9 @@ public class NavalScenarioMissionLogic : MissionLogic
     private readonly IBattleSession session;
     private readonly INetworkShipRegistry registry;
     private readonly NavalScenarioConfig config;
+    private readonly INavalScenarioReadyPress readyPress = new NavalScenarioReadyPress(
+        press => GameThread.EnqueueSafe(press, context: "NavalScenarioMissionLogic.PressReady"));
 
-    private float readyCooldown;
-    private int readyPresses;
     private float sinceDeployment;
     private float sincePlacement;
     private float ropeCooldown;
@@ -76,8 +76,8 @@ public class NavalScenarioMissionLogic : MissionLogic
         }
 
         state.Advance(NavalScenarioPhase.Fighting);
-        Complete(NavalScenarioState.ReadyStep, true, readyPresses > 0
-            ? $"Ready pressed {readyPresses} time(s) on the naval order of battle"
+        Complete(NavalScenarioState.ReadyStep, true, readyPress.Presses > 0
+            ? $"Ready pressed {readyPress.Presses} time(s) on the naval order of battle"
             : "deployment finished without the scenario pressing Ready");
 
         sinceDeployment += dt;
@@ -90,21 +90,35 @@ public class NavalScenarioMissionLogic : MissionLogic
         base.OnRemoveBehavior();
     }
 
-    // The order of battle's Ready button runs ExecuteBeginMission; it refuses while the assignment is dirty or a ship is unmanned.
+    // Ready's FinishDeployment removes two behaviors, which breaks Mission.OnTick's reverse index over them, so the
+    // press runs after the tick returns, as a click on the order of battle's UI layer does.
     private void TickReady(float dt)
     {
-        readyCooldown -= dt;
-        if (!state.IsPending(NavalScenarioState.ReadyStep) || readyCooldown > 0f) return;
+        if (!state.IsPending(NavalScenarioState.ReadyStep)) return;
 
-        var view = Mission.GetMissionBehavior<MissionGauntletNavalOrderOfBattleView>();
+        readyPress.Tick(dt, () => ReadyOrderOfBattle() != null, PressReady);
+    }
+
+    private void PressReady()
+    {
+        ReadyOrderOfBattle().ExecuteBeginMission();
+        Logger.Information("[NavalScenario] Pressed Ready ({Presses}) for {MapEventId}", readyPress.Presses, config.MapEventId);
+    }
+
+    // The order of battle when its Ready button would accept; ExecuteBeginMission refuses while the assignment is
+    // dirty or a ship is unmanned. Null once this mission is gone, its deployment finished or the step completed.
+    private NavalOrderOfBattleVM ReadyOrderOfBattle()
+    {
+        var mission = Mission;
+        if (mission == null || Mission.Current != mission || mission.MissionEnded || mission.IsDeploymentFinished) return null;
+        if (state.Current != config || !state.IsPending(NavalScenarioState.ReadyStep)) return null;
+
+        var view = mission.GetMissionBehavior<MissionGauntletNavalOrderOfBattleView>();
         var orderOfBattle = view?._dataSource;
         if (orderOfBattle == null || !IsReadyEnabled(view._isActive, orderOfBattle.IsAssignmentDirty, orderOfBattle.CanStartMission))
-            return;
+            return null;
 
-        readyPresses++;
-        readyCooldown = ReadyRetrySeconds;
-        orderOfBattle.ExecuteBeginMission();
-        Logger.Information("[NavalScenario] Pressed Ready ({Presses}) for {MapEventId}", readyPresses, config.MapEventId);
+        return orderOfBattle;
     }
 
     internal static bool IsReadyEnabled(bool viewActive, bool assignmentDirty, bool canStartMission) =>
