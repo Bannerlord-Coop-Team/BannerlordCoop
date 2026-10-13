@@ -658,7 +658,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         if (mount != null) interpolator.Forget(mount);
 
         ConvertPuppetToHostAi(agent, activateAi);
-        if (!agent.IsRunningAway && agent.Formation != null &&
+        if (!agent.IsRunningAway && agent.Formation != null && ShouldChargeAdoptedFormation(IsShipCrew(agent.Formation)) &&
             Mission.Current.GetMissionBehavior<CoopHideoutMissionLogic>()?.PreserveStealthPosture != true)
             agent.Formation.SetMovementOrder(MovementOrder.MovementOrderCharge);
 
