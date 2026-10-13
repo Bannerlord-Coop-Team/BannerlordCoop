@@ -135,6 +135,7 @@ public class NavalScenarioMissionLogic : MissionLogic
         sincePlacement += dt;
         if (state.IsPending(NavalScenarioState.RopeStep)) TickRope(dt);
         if (state.IsPending(NavalScenarioState.HelmStep) && sincePlacement >= SettleSeconds) DriveHelm();
+        if (state.IsPending(NavalScenarioState.SinkStep) && sinceDeployment >= config.DelaySeconds) HitWeakestAiHull();
         if (state.IsPending(NavalScenarioState.DisconnectStep) && sinceDeployment >= config.DelaySeconds) Disconnect();
     }
 
@@ -233,6 +234,29 @@ public class NavalScenarioMissionLogic : MissionLogic
         var result = NavalHelmCoopCommand.Drive(hulls, request);
         Complete(NavalScenarioState.HelmStep, result.Succeeded, result.Output);
     }
+
+    // The battle host owns the AI hulls, so its hit applies there and replicates as the hull's condition.
+    private void HitWeakestAiHull()
+    {
+        if (!session.IsLocalHost)
+        {
+            Complete(NavalScenarioState.SinkStep, true, "not the battle host, which hits the AI hull");
+            return;
+        }
+
+        var target = AfloatAiHulls().OrderBy(hull => hull.HitPoints / hull.ShipOrigin.MaxHitPoints).FirstOrDefault();
+        if (target == null)
+        {
+            Complete(NavalScenarioState.SinkStep, false, "no afloat AI hull was fielded");
+            return;
+        }
+
+        var result = NavalDamageCoopCommand.Hit(hulls.ShipIdOf(target).ToString(), hull => SinkingHitDamage(hull.ShipOrigin.MaxHitPoints),
+            "NAVAL_DAMAGE");
+        Complete(NavalScenarioState.SinkStep, result.Succeeded, result.Output);
+    }
+
+    internal static float SinkingHitDamage(float maxHitPoints) => maxHitPoints * NavalScenarioPresets.SinkingHitRatio;
 
     private void Disconnect()
     {

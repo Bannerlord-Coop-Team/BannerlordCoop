@@ -53,6 +53,16 @@ public class NavalScenarioMissionLogicTests
         AssertNear(new Vec2(0f, 1f), direction);
     }
 
+    [Fact]
+    public void SinkingHitDamage_TakesMoreThanThePreDamagedHullHasLeftButNotAHealthyHull()
+    {
+        const float maxHitPoints = 10000f;
+        float damage = NavalScenarioMissionLogic.SinkingHitDamage(maxHitPoints);
+
+        Assert.Equal(2f * maxHitPoints * NavalScenarioPresets.SinkingHullHitPointRatio, damage, 3);
+        Assert.True(damage < maxHitPoints);
+    }
+
     private static void AssertNear(Vec2 expected, Vec2 actual)
     {
         Assert.InRange(actual.x, expected.x - Tolerance, expected.x + Tolerance);

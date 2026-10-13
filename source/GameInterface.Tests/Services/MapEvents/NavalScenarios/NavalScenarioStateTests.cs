@@ -37,6 +37,18 @@ public class NavalScenarioStateTests
             Steps(Config("migration", "PlayerOne", "PlayerTwo"), "PlayerTwo"));
     }
 
+    // Every client carries the step; only the battle host hits the pre-damaged AI hull.
+    [Fact]
+    public void StepsFor_TheSinkingPresetHitsThePreDamagedHullAfterDeploying()
+    {
+        var config = Config("sinking", "PlayerOne", "PlayerTwo");
+
+        Assert.Equal(new[] { NavalScenarioState.AttackStep, NavalScenarioState.ReadyStep, NavalScenarioState.SinkStep },
+            Steps(config, "PlayerOne"));
+        Assert.Equal(new[] { NavalScenarioState.ReadyStep, NavalScenarioState.SinkStep }, Steps(config, "PlayerTwo"));
+        Assert.DoesNotContain(NavalScenarioState.SinkStep, Steps(Config("vs_pirates", "PlayerOne"), "PlayerOne"));
+    }
+
     [Fact]
     public void StepsFor_TheServerJoinsTheLateJoinerWhoThenEntersOnItsOwn()
     {

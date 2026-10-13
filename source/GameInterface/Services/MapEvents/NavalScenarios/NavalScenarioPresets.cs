@@ -42,7 +42,10 @@ public sealed class NavalScenarioPreset
     /// <summary>Metres between the placed hulls; unused by <see cref="NavalScenarioPlacement.Deployment"/>.</summary>
     public float Spacing { get; set; }
 
-    /// <summary>One AI ship starts at <see cref="NavalScenarioPresets.SinkingHullHitPointRatio"/> of its hit points.</summary>
+    /// <summary>
+    /// One AI ship starts at <see cref="NavalScenarioPresets.SinkingHullHitPointRatio"/> of its hit points, and the battle
+    /// host hits it <c>delay</c> seconds after its deployment.
+    /// </summary>
     public bool SinkingEnemyHull { get; set; }
 
     /// <summary>The battle host client disconnects <c>delay</c> seconds after its deployment and reconnects later.</summary>
@@ -69,6 +72,12 @@ public static class NavalScenarioPresets
     public const int MaxEnemyHulls = 8;
 
     public const float SinkingHullHitPointRatio = 0.05f;
+
+    /// <summary>
+    /// The raw hull damage the battle host deals that ship, as a share of its maximum: twice what it has left, so the
+    /// owner's damage reduction cannot keep it afloat, while a healthy hull would survive it.
+    /// </summary>
+    public const float SinkingHitRatio = 2f * SinkingHullHitPointRatio;
 
     public const float DefaultDelaySeconds = 20f;
 
@@ -107,7 +116,7 @@ public static class NavalScenarioPresets
         new NavalScenarioPreset
         {
             Name = "sinking",
-            Description = "vs_pirates; one AI ship starts at 5% hit points.",
+            Description = "vs_pirates; one AI ship starts at 5% hit points and the battle host hits it delay seconds after deploying.",
             SinkingEnemyHull = true,
         },
         new NavalScenarioPreset
