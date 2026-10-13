@@ -289,7 +289,11 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             ReferenceEquals(focusedLayer, settlementMapScreen.FindLayer<GauntletLayer>(MapMenuLayerName));
 
         // Don't fall back to vanilla feed when gameplay screens clear the frame
-        bool shouldShow = ShouldShowPresentation(isCampaignContext, isConversationActive, isLoading);
+        // Reverts to vanilla log when coop chat is disabled
+        bool shouldShow = playerChatEnabled && ShouldShowPresentation(
+            isCampaignContext,
+            isConversationActive,
+            isLoading);
         allowChatOpen = ShouldAllowChatOpen(
             isOpenableScreen && !isLoading,
             isConversationActive,
