@@ -811,8 +811,11 @@ public class BattleShipReplicatorTests
         harness.Engine.SetupGet(e => e.IsDeploymentMode).Returns(() => deploying);
         var copy = harness.SetupForeignSpawn();
         var record = AiRecord(Guid.NewGuid());
+        var heldCondition = new NetworkShipCondition(record.ShipId, Peer, 4, HostEpoch - 1, Condition(420f));
 
         harness.Replicator.AcceptSpawnRecords(new[] { record });
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, Peer, 5, MovedFrame(), hostEpoch: HostEpoch - 1));
+        harness.Replicator.AcceptCondition(heldCondition);
         harness.Replicator.Tick(0.1f);
         harness.Broker.Publish(this, new BattleHostMigrated(Instance, Peer, Own));
         GameThread.Run(() => { }, blocking: true);
@@ -824,7 +827,40 @@ public class BattleShipReplicatorTests
         Assert.True(harness.Registry.TryGet(record.ShipId, out var ship));
         Assert.Equal(Own, ship.CurrentAuthority);
         Assert.Equal(Peer, ship.OriginalOwner);
+        harness.Engine.Verify(e => e.ApplyCondition(copy, heldCondition.Condition), Times.Once);
+        harness.Engine.Verify(e => e.ApplyForeignFrame(copy, It.Is<MatrixFrame>(f => f.origin.x == 5f)), Times.Once);
         harness.Engine.Verify(e => e.ParkHullAgents(copy), Times.Once);
+    }
+
+    [Fact]
+    public void AcceptSpawnRecords_AiRecordHeldThroughAHostMigrationToThisClient_KeepsAHullThatSankWhileHeldSunk()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: true);
+        bool deploying = true;
+        harness.Engine.SetupGet(e => e.IsDeploymentMode).Returns(() => deploying);
+        var copy = harness.SetupForeignSpawn();
+        BattleShipCondition applied = null;
+        harness.Engine.Setup(e => e.ApplyCondition(copy, It.IsAny<BattleShipCondition>()))
+            .Callback((MissionObject _, BattleShipCondition condition) => applied = condition);
+        harness.Engine.Setup(e => e.ReadCondition(copy)).Returns(() => applied);
+        var record = AiRecord(Guid.NewGuid());
+        var sunk = new NetworkShipCondition(record.ShipId, Peer, 4, HostEpoch - 1,
+            new BattleShipCondition(0f, 0f, 0f, new float[6], BattleShipCondition.Sunk));
+
+        harness.Replicator.AcceptSpawnRecords(new[] { record });
+        harness.Replicator.AcceptCondition(sunk);
+        harness.Broker.Publish(this, new BattleHostMigrated(Instance, Peer, Own));
+        GameThread.Run(() => { }, blocking: true);
+
+        deploying = false;
+        harness.Replicator.Tick(0.016f);
+        harness.Replicator.Tick(0.016f);
+
+        Assert.True(harness.Registry.TryGet(record.ShipId, out var ship));
+        Assert.Equal(Own, ship.CurrentAuthority);
+        harness.Engine.Verify(e => e.ApplyCondition(copy, sunk.Condition), Times.Once);
+        harness.Engine.Verify(e => e.ParkHullAgents(It.IsAny<MissionObject>()), Times.Never);
     }
 
     [Fact]
@@ -837,8 +873,11 @@ public class BattleShipReplicatorTests
         var copy = harness.SetupForeignSpawn();
         var record = AiRecord(Guid.NewGuid());
         var frame = NetworkBattleShipSample.FromFrame(MatrixFrame.Identity);
+        var heldCondition = new NetworkShipCondition(record.ShipId, Peer, 4, HostEpoch - 1,
+            new BattleShipCondition(0f, 0f, 0f, new float[6], BattleShipCondition.Sunk));
 
         harness.Replicator.AcceptSpawnRecords(new[] { record });
+        harness.Replicator.AcceptCondition(heldCondition);
         harness.Replicator.TransferNpcHulls("successor");
         deploying = false;
         harness.Replicator.Tick(0.016f);
@@ -847,6 +886,7 @@ public class BattleShipReplicatorTests
 
         Assert.True(harness.Registry.TryGet(record.ShipId, out var ship));
         Assert.Equal("successor", ship.CurrentAuthority);
+        harness.Engine.Verify(e => e.ApplyCondition(copy, heldCondition.Condition), Times.Once);
         harness.Engine.Verify(e => e.ApplyInput(copy, It.IsAny<BattleShipInput>()), Times.Once);
         harness.Engine.Verify(e => e.ParkHullAgents(It.IsAny<MissionObject>()), Times.Never);
         var inspected = Inspected(harness, record.ShipId);
@@ -932,6 +972,13 @@ public class BattleShipReplicatorTests
         new BattleShipSpawnData(shipId, Peer, "MapEventParty_9", true, BattleSideEnum.Defender, 0,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null,
             100f, 50f, 1, "");
+
+    private static float[] MovedFrame()
+    {
+        var frame = MatrixFrame.Identity;
+        frame.origin = new Vec3(5f, 0f, 0f);
+        return NetworkBattleShipSample.FromFrame(frame);
+    }
 
     private static BattleShipCondition Condition(float hitPoints) =>
         new BattleShipCondition(hitPoints, 300f, 100f, new[] { 80f, 80f, 80f, 80f, 80f, 80f }, 0);

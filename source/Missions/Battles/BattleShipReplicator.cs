@@ -452,6 +452,11 @@ public class BattleShipReplicator : IBattleShipReplicator
             return;
         }
 
+        TakeCondition(ship, stream, condition);
+    }
+
+    private void TakeCondition(NetworkShipInfo ship, ShipStream stream, NetworkShipCondition condition)
+    {
         engine.ApplyCondition(ship.Hull, condition.Condition);
         stream.Condition = condition.Condition;
         stream.ConditionRevision = condition.Revision;
@@ -604,9 +609,48 @@ public class BattleShipReplicator : IBattleShipReplicator
             wasHeld ? " after local deployment" : "");
         // A host migration while the record waited only moved the registered AI hulls.
         if (registered && ship.IsNpcParty && npcHullHost != null && ship.CurrentAuthority != npcHullHost)
+        {
+            ApplyDepartedHostState(ship);
             TransferNpcHull(ship, npcHullHost);
+        }
+
         ApplyHeldState(data.ShipId);
         return true;
+    }
+
+    // The departed host's last held state goes on before the move, so the new host takes over from its pose and damage.
+    // Its epoch is behind by now, so only the authority, order and validity checks apply.
+    private void ApplyDepartedHostState(NetworkShipInfo ship)
+    {
+        var departedHost = ship.CurrentAuthority;
+        var stream = GetStream(ship.ShipId);
+        if (pendingConditions.TryGetValue(ship.ShipId, out var condition) && condition.OwnerControllerId == departedHost)
+        {
+            pendingConditions.Remove(ship.ShipId);
+            if (ValidateCondition(ship, session.OwnControllerId, condition, stream.ConditionRevision, stream.ConditionEpoch) == null)
+                TakeCondition(ship, stream, condition);
+        }
+
+        if (heldSamples.TryGetValue(ship.ShipId, out var sample) && sample.OwnerControllerId == departedHost)
+        {
+            heldSamples.Remove(ship.ShipId);
+            if (ValidateSample(ship, session.OwnControllerId, sample, stream.Accepted, stream.AcceptedEpoch) == null)
+            {
+                TakeSample(ship, stream, sample);
+                // The move clears the interpolation target, so the frame is written now.
+                var frame = NetworkBattleShipSample.ToFrame(sample.Frame);
+                engine.ApplyForeignFrame(ship.Hull, frame);
+                stream.Written = frame;
+                stream.HasWritten = true;
+                stream.Applied = sample.Sequence;
+            }
+        }
+
+        if (heldFinalRopes.TryGetValue(ship.ShipId, out var final) && final.OwnerControllerId == departedHost)
+        {
+            heldFinalRopes.Remove(ship.ShipId);
+            AcceptFinalRopes(final);
+        }
     }
 
     // The owner's latest state received while the copy waited, so it does not sit at the record's frame until the next sample.
@@ -688,6 +732,11 @@ public class BattleShipReplicator : IBattleShipReplicator
             return;
         }
 
+        TakeSample(ship, stream, sample);
+    }
+
+    private void TakeSample(NetworkShipInfo ship, ShipStream stream, NetworkBattleShipSample sample)
+    {
         if (ship.IsNpcParty) stream.AcceptedEpoch = sample.HostEpoch;
 
         engine.ApplyInput(ship.Hull, sample.Input);
