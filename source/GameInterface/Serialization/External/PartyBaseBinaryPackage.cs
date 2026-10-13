@@ -1,9 +1,7 @@
 ﻿using GameInterface.Services.PartyVisuals.Extensions;
 using System;
 using System.Collections.Generic;
-using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Library;
 
 namespace GameInterface.Serialization.External;
 
@@ -39,10 +37,6 @@ public class PartyBaseBinaryPackage : BinaryPackageBase<PartyBase>
     protected override void UnpackInternal()
     {
         base.UnpackFields();
-
-        // _ships is excluded from the package; ships join it through the replicated Ship.Owner.
-        if (Object._ships == null)
-            Object._ships = new MBList<Ship>();
 
         Object.MobileParty.CreateNewPartyVisual();
     }

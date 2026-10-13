@@ -3,7 +3,6 @@ using SandBox;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
-using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -63,9 +62,6 @@ namespace GameInterface.Tests.Bootstrap
             RegisterType<PerkObject>();
             RegisterType<BannerEffect>();
             RegisterType<CharacterAttribute>();
-            RegisterType<ShipHull>();
-            RegisterType<ShipUpgradePiece>();
-            RegisterType<Figurehead>();
         }
 
         private static uint itemCounter = 0;
