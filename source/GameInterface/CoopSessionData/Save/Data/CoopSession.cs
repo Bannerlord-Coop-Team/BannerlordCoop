@@ -54,7 +54,7 @@ public class CoopSession : ICoopSession
         new InventoryPlayerData(new(), new()),
         new HeroMeetingData(new()),
         new AgingPlayerData(new()),
-        new NavalPlayerData(new(), new()));
+        new NavalPlayerData(new(), new(), new(), new()));
 
     [ProtoMember(1)]
     public string UniqueGameId { get; }

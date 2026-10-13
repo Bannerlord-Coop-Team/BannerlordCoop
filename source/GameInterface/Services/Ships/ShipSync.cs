@@ -3,29 +3,23 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem.Naval;
 
 namespace GameInterface.Services.Ships;
-
-/// <summary>
-/// Auto sync for campaign <see cref="Ship"/> state.
-/// </summary>
 internal class ShipSync : IAutoSync
 {
-    public ShipSync(AutoSyncRegistry autoSyncRegistry)
+    public ShipSync(AutoSyncRegistry AutoSyncRegistry)
     {
-        // The setter keeps both owners' PartyBase ship lists in step on every machine.
-        autoSyncRegistry.AddProperty(AccessTools.Property(typeof(Ship), nameof(Ship.Owner)));
+        //// Fields
+        AutoSyncRegistry.AddField(AccessTools.Field(typeof(Ship), nameof(Ship.ShipHull)));
+        AutoSyncRegistry.AddField(AccessTools.Field(typeof(Ship), nameof(Ship._name)));
 
-        // Raw fields, so a client never re-clamps against its own MaxHitPoints. Coalesced because sea damage,
-        // storms and simulated battle rounds hit whole fleets at once; mission snapshots are unregistered.
-        autoSyncRegistry.AddField(AccessTools.Field(typeof(Ship), nameof(Ship._hitPoints)),
-            coalesce: true, suppressClientDiagnosticWhenUnregistered: true);
-        autoSyncRegistry.AddField(AccessTools.Field(typeof(Ship), nameof(Ship._sailHitPoints)),
-            coalesce: true, suppressClientDiagnosticWhenUnregistered: true);
-
-        autoSyncRegistry.AddField(AccessTools.Field(typeof(Ship), nameof(Ship._name)));
-
-        autoSyncRegistry.AddProperty(AccessTools.Property(typeof(Ship), nameof(Ship.IsInvulnerable)));
-        autoSyncRegistry.AddProperty(AccessTools.Property(typeof(Ship), nameof(Ship.IsTradeable)));
-        autoSyncRegistry.AddProperty(AccessTools.Property(typeof(Ship), nameof(Ship.IsUsedByQuest)));
-        autoSyncRegistry.AddProperty(AccessTools.Property(typeof(Ship), nameof(Ship.CustomSailPatternId)));
+        //// Properties
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Ship), nameof(Ship.Figurehead)));
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Ship), nameof(Ship.IsInvulnerable)));
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Ship), nameof(Ship.IsTradeable)));
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Ship), nameof(Ship.IsUsedByQuest)));
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Ship), nameof(Ship.RandomValue)));
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Ship), nameof(Ship.CustomSailPatternId)));
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Ship), nameof(Ship.Owner)));
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Ship), nameof(Ship.HitPoints)));
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Ship), nameof(Ship.SailHitPoints)));
     }
 }

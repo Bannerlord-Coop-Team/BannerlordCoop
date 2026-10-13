@@ -10,10 +10,12 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Extensions;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.HeirSelection.Interfaces;
@@ -24,6 +26,7 @@ public interface IApplyHeirSelectionActionInterface : IGameAbstraction
     void ApplyByRetirement(Hero originalHero, Hero heir);
     void ApplyByRetirementWithoutHeir(Hero originalHero);
     void AppointClanLeader(Hero originalHero, Hero successor);
+    void TransferFleetToHeir(MobileParty originalParty, MobileParty heirParty);
 }
 
 public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterface
@@ -156,6 +159,34 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
         }
 
         messageBroker.Publish(this, new ChangePlayerCharacterAfterHeirSelection(originalHero, heir));
+    }
+
+    // Substitute for fleet transfer that happens during ChangePlayerCharacterAction.Apply to run on the server
+    public void TransferFleetToHeir(MobileParty originalParty, MobileParty heirParty)
+    {
+        if (originalParty == null || heirParty == null || originalParty == heirParty) return;
+        if (originalParty.Ships.Count == 0) return;
+
+        var anchorPosition = originalParty.Anchor.Position;
+        var lastUsedDisembarkPosition = originalParty.Anchor.GetLastUsedDisembarkPosition();
+
+        // A crew left at sea keeps its weakest ship
+        Ship keptShip = originalParty.MemberRoster.TotalManCount <= 1 || !originalParty.IsCurrentlyAtSea
+            ? null
+            : originalParty.Ships.MinBy(ship => ship.HitPoints);
+        for (int i = originalParty.Ships.Count - 1; i >= 0; i--)
+        {
+            if (originalParty.Ships[i] != keptShip)
+            {
+                ChangeShipOwnerAction.ApplyByTransferring(heirParty.Party, originalParty.Ships[i]);
+            }
+        }
+
+        if (heirParty.Ships.Count > 0 && anchorPosition.IsValid() && !heirParty.Anchor.IsValid && !heirParty.IsCurrentlyAtSea)
+        {
+            heirParty.Anchor.SetPosition(anchorPosition);
+            heirParty.Anchor.SetLastUsedDisembarkPosition(lastUsedDisembarkPosition);
+        }
     }
 
     private void TransferAssets(Hero originalHero, Hero heir)

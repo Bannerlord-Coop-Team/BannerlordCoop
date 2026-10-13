@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.UI.PlayerList;
 using Autofac;
+using Common.Commands;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
@@ -34,6 +35,7 @@ using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players.Interfaces;
 using GameInterface.Services.Save.Interfaces;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Services.SiegeEvents;
@@ -156,6 +158,8 @@ internal abstract class TestComponentBase
         RegisterMock<IServerOptionsProvider>(builder);
         RegisterMock<ISteamBanList>(builder);
         RegisterMock<ISaveNotificationInterface>(builder);
+        RegisterMock<IPlayerMessageInterface>(builder);
+        RegisterMock<ICoopCommandArgsFactory>(builder);
 
         // ISaveInterface is consumed by TransferSaveState's constructor, which packages a save the
         // moment the state is entered. Give it a non-null default so simply entering the state does

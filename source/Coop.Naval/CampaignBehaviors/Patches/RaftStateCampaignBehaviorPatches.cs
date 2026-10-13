@@ -1,9 +1,9 @@
 ﻿using Common;
-using GameInterface.Extentions;
+using GameInterface;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Players.Interfaces;
 using HarmonyLib;
 using NavalDLC.CampaignBehaviors;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -47,10 +47,10 @@ internal class RaftStateCampaignBehaviorPatches
         if (ModInformation.IsClient) return false;
         if (!hero.IsPlayerHero()) return false;
 
-        // The hero has already left their party here, so find it by owner
-        var playerParty = Campaign.Current.CampaignObjectManager.GetPlayerMobileParties().FirstOrDefault(party => party.Owner == hero);
+        if (!ContainerProvider.TryResolve<IPlayerPartyLookup>(out var playerPartyLookup)) return false;
 
-        if (playerParty != null && playerParty.IsInRaftState)
+        // The hero has already left their party here, so find it through the player registry
+        if (playerPartyLookup.TryGetPlayerParty(hero, out var playerParty) && playerParty.IsInRaftState)
         {
             RaftStateChangeAction.DeactivateRaftStateForParty(playerParty);
         }
@@ -62,8 +62,8 @@ internal class RaftStateCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool OnHeroPrisonerReleasedPrefix(Hero prisoner)
     {
-        // Clients need the raft state menu, open it if the prisoner is their player character
-        if (ModInformation.IsClient) return prisoner == Hero.MainHero;
+        // PlayerRaftHandler strands a released player at sea on the server, and the synced raft state opens the client's raft menu
+        if (ModInformation.IsClient) return false;
 
         // Server calls MakeHeroFugitiveAction.Apply for non player heroes
         return !prisoner.IsPlayerHero();

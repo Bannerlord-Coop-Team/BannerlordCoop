@@ -10,8 +10,11 @@ public readonly struct EndSettlementEncounterAttempted : IEvent
 {
     public readonly MobileParty Party;
 
-    public EndSettlementEncounterAttempted(MobileParty party)
+    public readonly SettlementLeaveType LeaveType;
+
+    public EndSettlementEncounterAttempted(MobileParty party, SettlementLeaveType leaveType = SettlementLeaveType.Leave)
     {
         Party = party;
+        LeaveType = leaveType;
     }
 }

@@ -439,6 +439,24 @@ internal class HeirSelectionHandler : IHandler
 
         heirSelectionCampaignBehaviorInterface.OnBeforePlayerCharacterChanged(data.OriginalHero, originalParty);
 
+        // Same as ChangePlayerCharacterAction.Apply, a fleet called by the old party stops travelling
+        if (originalParty?.Anchor != null && originalParty.Anchor.IsMovingToPoint)
+        {
+            originalParty.Anchor.ResetMoveTarget();
+        }
+
+        // Same as ChangePlayerCharacterAction.Apply, the player's fleet is transferred to their heir
+        if (objectManager.TryGetObjectWithLogging<MobileParty>(replacementPlayer.MobilePartyId, out var heirParty))
+        {
+            applyHeirSelectionActionInterface.TransferFleetToHeir(originalParty, heirParty);
+        }
+
+        // Same as ChangePlayerCharacterAction.Apply, which only runs on the client
+        if (originalParty != null && originalParty.IsTransitionInProgress)
+        {
+            originalParty.CancelNavigationTransition();
+        }
+
         Logger.Information($"Transferred controller {registeredPlayer.ControllerId} from hero {originalHeroId} to heir {heirId}");
 
         messageBroker.Publish(this, new PlayerHeirSelectionCompleted(data.Heir));
@@ -540,6 +558,8 @@ internal class HeirSelectionHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.NewMainPartyId, out var newMainParty)) return;
 
             heirSelectionCampaignBehaviorInterface.OnPlayerCharacterChanged(oldPlayerHero, newPlayerHero, newMainParty, data.IsMainPartyChanged);
+
+            messageBroker.Publish(this, new PlayerCharacterChangedOnServer(oldPlayerHero, newPlayerHero, newMainParty, data.IsMainPartyChanged));
         });
     }
 }

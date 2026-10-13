@@ -16,6 +16,7 @@ using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Interfaces;
 using GameInterface.Services.TroopRosters.Messages;
 using Helpers;
 using LiteNetLib;
@@ -61,17 +62,20 @@ internal class PlayerCaptivityServerHandler : IHandler
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
+    private readonly IPlayerPartyLookup playerPartyLookup;
 
     public PlayerCaptivityServerHandler(
         IObjectManager objectManager,
         INetwork network,
         IMessageBroker messageBroker,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IPlayerPartyLookup playerPartyLookup)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
+        this.playerPartyLookup = playerPartyLookup;
 
         // ModInformation is evaluated per call (tests flip it per instance), so each handler
         // guards itself instead of gating the subscriptions here.
@@ -333,7 +337,7 @@ internal class PlayerCaptivityServerHandler : IHandler
             return;
         }
 
-        if (!TryGetPlayerHeroOfParty(playerParty, out var playerHero))
+        if (!playerPartyLookup.TryGetPlayerHero(playerParty, out var playerHero))
         {
             Logger.Error("Refused partial surrender of {PartyId}: no registered player hero resolves for it", surrenderedPartyId);
             return;
@@ -370,27 +374,6 @@ internal class PlayerCaptivityServerHandler : IHandler
 
         captorParty = enemySide.Parties.FirstOrDefault(p => p.Party?.NumberOfHealthyMembers > 0)?.Party ?? leader;
         return captorParty != null;
-    }
-
-    /// <summary>
-    /// Resolves the player hero registered for <paramref name="playerParty"/>. A player party's component
-    /// leader is not reliably set on the server, so the player registry is the source of truth (the inverse
-    /// of <see cref="TryGetPlayerParty"/>). The registry keys players by the MOBILE party's id, which is
-    /// distinct from the <see cref="PartyBase"/> id used on the battle-leave wire.
-    /// </summary>
-    private bool TryGetPlayerHeroOfParty(MobileParty playerParty, out Hero playerHero)
-    {
-        playerHero = null;
-
-        if (!objectManager.TryGetId(playerParty, out var mobilePartyId)) return false;
-
-        foreach (var player in playerManager.Players)
-        {
-            if (player.MobilePartyId == mobilePartyId)
-                return objectManager.TryGetObject(player.HeroId, out playerHero);
-        }
-
-        return false;
     }
 
     /// <summary>
@@ -487,7 +470,7 @@ internal class PlayerCaptivityServerHandler : IHandler
         var playerHero = payload.What.PrisonerHero;
         if (playerHero == null) return;
 
-        if (!TryGetPlayerParty(playerHero, out var playerParty))
+        if (!playerPartyLookup.TryGetPlayerParty(playerHero, out var playerParty))
         {
             Logger.Error("Could not resolve a player party for released hero {HeroId}; cannot restore it", playerHero.StringId);
             return;
@@ -684,25 +667,6 @@ internal class PlayerCaptivityServerHandler : IHandler
         }
 
         network.SendAll(new NetworkDestroyPartyVisual(mobilePartyHandle));
-    }
-
-    /// <summary>
-    /// Resolves the <see cref="MobileParty"/> registered to the player that owns <paramref name="hero"/>.
-    /// </summary>
-    private bool TryGetPlayerParty(Hero hero, out MobileParty playerParty)
-    {
-        playerParty = null;
-
-        if (!objectManager.TryGetId(hero, out var heroId))
-            return false;
-
-        foreach (var player in playerManager.Players)
-        {
-            if (player.HeroId == heroId)
-                return objectManager.TryGetObject(player.MobilePartyId, out playerParty);
-        }
-
-        return false;
     }
 
     /// <summary>

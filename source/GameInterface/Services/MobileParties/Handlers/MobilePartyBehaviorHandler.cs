@@ -75,7 +75,9 @@ internal class MobilePartyBehaviorHandler : IHandler
             return;
 
         data.ForcePosition = obj.What.ForcePosition;
-        data.IsCurrentlyAtSea = obj.What.IsCurrentlyAtSea;
+        // Unforced changes keep the party's own sea state from the snapshot instead of the message's default
+        if (obj.What.ForcePosition)
+            data.IsCurrentlyAtSea = obj.What.IsCurrentlyAtSea;
         data.ResetMovementToHold = obj.What.ResetMovementToHold;
 
         if (ModInformation.IsClient)
@@ -132,6 +134,11 @@ internal class MobilePartyBehaviorHandler : IHandler
                 if (ModInformation.IsClient && data.ForcePosition)
                     ApplyForcedPosition(party, data.PartyPosition, data.IsCurrentlyAtSea);
 
+                // A party spawned at sea or one whose transition only ran on the server has no local transition to get there
+                if (ModInformation.IsClient && !data.ForcePosition && !party.IsControlledByThisInstance() &&
+                    !party.IsTransitionInProgress && party.IsCurrentlyAtSea != data.IsCurrentlyAtSea)
+                    party.IsCurrentlyAtSea = data.IsCurrentlyAtSea;
+
                 if (ModInformation.IsClient && data.ResetMovementToHold)
                 {
                     party.SetMoveModeHold();
@@ -179,10 +186,28 @@ internal class MobilePartyBehaviorHandler : IHandler
 
     private static void ApplyForcedPosition(MobileParty party, CampaignVec2 position, bool isCurrentlyAtSea)
     {
+        // A local transition that finishes after this would flip IsCurrentlyAtSea away from the forced state
+        if (party.IsTransitionInProgress)
+            party.CancelNavigationTransition();
+
         party.Position = position;
 
         if (party.IsCurrentlyAtSea != isCurrentlyAtSea)
+        {
             party.ChangeIsCurrentlyAtSeaCheat();
+
+            // Settlement menu options like leave and set sail depend on the sea state
+            if (party == MobileParty.MainParty)
+                RefreshCurrentMenu();
+        }
+    }
+
+    private static void RefreshCurrentMenu()
+    {
+        var menuContext = Campaign.Current?.CurrentMenuContext;
+        if (menuContext == null) return;
+
+        Campaign.Current.GameMenuManager.RefreshMenuOptions(menuContext);
     }
 
     private static List<MobileParty> ApplyServerForcedPosition(

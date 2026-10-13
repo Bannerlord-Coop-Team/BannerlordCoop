@@ -40,9 +40,8 @@ internal class PartyBaseRegistry : AutoRegistryBase<PartyBase>
 
     public override void OnClientCreated(PartyBase obj, string id)
     {
-        // Field initializer skipped by the constructor-less create; Ship.Owner adds to it directly.
-        if (obj._ships == null)
-            obj._ships = new MBList<Ship>();
+        // Client created parties skip the field initializer, so the ship list starts null
+        obj._ships = new MBList<Ship>();
     }
 
     public override void OnClientDestroyed(PartyBase obj, string id)

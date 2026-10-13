@@ -215,7 +215,19 @@ public class ServerSettlementExitEnterHandler : IHandler
 
             var leftSettlement = mobileParty.CurrentSettlement;
             LeaveHideoutMapEvent(mobileParty);
+
+            // Vanilla disembarks before leaving, otherwise leaving at sea resets the anchor
+            if (payload.LeaveType == SettlementLeaveType.Disembark && leftSettlement != null)
+            {
+                settlementInterface.PartyDisembark(mobileParty, leftSettlement);
+            }
+
             settlementInterface.PartyLeaveSettlement(mobileParty);
+
+            if (payload.LeaveType == SettlementLeaveType.SetSail && leftSettlement != null)
+            {
+                settlementInterface.PartySetSail(mobileParty, leftSettlement);
+            }
 
             network.Send(
                 peer,

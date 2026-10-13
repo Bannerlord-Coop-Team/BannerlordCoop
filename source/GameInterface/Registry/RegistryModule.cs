@@ -22,10 +22,12 @@ internal class RegistryModule : Module
         base.Load(builder);
     }
 
+    // Coop.Naval registers its own registries, otherwise they'd be registered without the naval services they need
     private IEnumerable<Type> GetRegistries()
     {
         return AppDomain.CurrentDomain.GetDomainTypes()
             .Where(t => t.IsConcrete() &&
+                        t.Assembly.GetName().Name != GameInterfaceModule.CoopNavalAssemblyName &&
                         t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IAutoRegistry<>)));
     }
 }

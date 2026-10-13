@@ -1,79 +1,58 @@
-﻿using Common.Network.Coalescing;
-using Common.Util;
-using GameInterface.Registry.Auto;
+﻿using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Ships;
 
-/// <summary>
-/// Registry for campaign <see cref="Ship"/> objects. Save-loaded ships derive their id from the owning party and
-/// their index in its ship list; ships created mid-session are reconciled on join through the id remap.
-/// </summary>
 internal class ShipRegistry : AutoRegistryBase<Ship>
 {
-    private static readonly FieldInfo ShipPiecesField = AccessTools.Field(typeof(Ship), nameof(Ship._shipPieces));
-
-    private readonly ISendCoalescer coalescer;
-
-    public ShipRegistry(
-        ILogger logger,
-        IAutoRegistryFactory autoRegistryFactory,
-        IObjectManager objectManager,
-        ISendCoalescer coalescer = null)
+    public ShipRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
         : base(logger, autoRegistryFactory, objectManager)
     {
-        this.coalescer = coalescer;
     }
 
     public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(Ship));
 
-    // DestroyShipAction is static, so ShipLifetimePatches publishes the destroy.
     public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
     public override void RegisterAllObjects()
     {
-        foreach (var party in MobileParty.All)
+        foreach (var party in Campaign.Current.CampaignObjectManager.MobileParties)
         {
-            RegisterPartyShips(party.StringId, party.Party);
+            if (party.Ships == null) continue;
+
+            var index = 0;
+            foreach (var ship in party.Ships)
+            {
+                RegisterExistingObject($"MobileParty_{party.StringId}_{index++}", ship);
+            }
         }
 
-        foreach (var settlement in Settlement.All)
+        foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
         {
-            RegisterPartyShips(settlement.StringId, settlement.Party);
-        }
-    }
+            if (settlement.Party == null || settlement.Party.Ships == null) continue;
 
-    private void RegisterPartyShips(string ownerId, PartyBase owner)
-    {
-        var ships = owner?.Ships;
-        if (ships == null) return;
-
-        for (int i = 0; i < ships.Count; i++)
-        {
-            RegisterExistingObject($"{ownerId}_{i}", ships[i]);
+            var index = 0;
+            foreach (var ship in settlement.Party.Ships)
+            {
+                RegisterExistingObject($"Settlement_{settlement.StringId}_{index++}", ship);
+            }
         }
     }
 
     public override void OnClientCreated(Ship obj, string id)
     {
-        // The skipped constructor leaves the field initializers unset; _shipPieces is readonly, hence reflection.
-        ShipPiecesField.SetValue(obj, new Dictionary<string, ShipUpgradePiece>());
-        obj._isVersionDirty = true;
-
-        using (new AllowedThread())
-        {
-            obj.IsTradeable = true;
-            obj.CustomSailPatternId = "";
-        }
+        // Initialise the dictionary by creating it and dirtying the version number
+        ReflectionUtils.SetPrivateField(typeof(Ship), nameof(Ship._shipPieces), obj, new Dictionary<string, ShipUpgradePiece>());
+        obj.UpdateVersionNo();
     }
 
     public override void OnClientDestroyed(Ship obj, string id)
@@ -86,9 +65,5 @@ internal class ShipRegistry : AutoRegistryBase<Ship>
 
     public override void OnServerDestroyed(Ship obj, string id)
     {
-        // Pending hit point updates must not follow the destroy.
-        coalescer?.DropInstance(id);
-        if (objectManager.TryGetHandle(obj, out var handle))
-            coalescer?.DropInstance(handle);
     }
 }

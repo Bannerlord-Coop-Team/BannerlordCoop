@@ -10,6 +10,7 @@ using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Handlers;
 using GameInterface.Services.Players;
+using GameInterface.Services.Players.Interfaces;
 using GameInterface.Services.Settlements.Handlers;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Tests.Bootstrap;
@@ -121,7 +122,8 @@ public class SettlementSneakInTests
                 objectManager.Object,
                 network.Object,
                 messageBroker,
-                playerManager.Object);
+                playerManager.Object,
+                new PlayerPartyLookup(objectManager.Object, playerManager.Object));
 
             using (ContainerProvider.UseContainerThreadSafe(container))
             {

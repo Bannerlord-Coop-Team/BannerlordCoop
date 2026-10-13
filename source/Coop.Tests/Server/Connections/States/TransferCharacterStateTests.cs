@@ -84,7 +84,7 @@ namespace Coop.Tests.Server.Connections.States
             {
                 ["lord_6_1"] = 1351,
             };
-            var navalPlayerData = new NavalPlayerData(new(), new());
+            var navalPlayerData = new NavalPlayerData(new(), new(), new(), new());
             navalPlayerData.PlayerUnlockedFigureHeads["Hero_Player"] = new() { "figurehead_1" };
             navalPlayerData.PlayerLastFigureheadLootTimes["Hero_Player"] = 2702;
             var session = new CoopSession(
