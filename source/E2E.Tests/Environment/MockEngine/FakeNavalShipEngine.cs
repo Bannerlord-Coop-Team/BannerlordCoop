@@ -274,6 +274,38 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         fake.AppliedConditions++;
     }
 
+    public bool TryGetWeapon(MissionObject hull, out MissionObject weapon, out string weaponKey)
+    {
+        var fake = Of(hull);
+        weapon = fake.Weapon!;
+        weaponKey = fake.WeaponKey;
+        return weapon != null;
+    }
+
+    public BattleShipWeaponState ReadWeaponState(MissionObject weapon) => HullOfWeapon(weapon).WeaponState;
+
+    public void ApplyWeaponState(MissionObject weapon, BattleShipWeaponState state, BattleShipWeaponState previous)
+    {
+        var fake = HullOfWeapon(weapon);
+        fake.WeaponState = state;
+        fake.AppliedWeaponStates++;
+    }
+
+    public bool ReplayWeaponShot(MissionObject weapon, NetworkShipWeaponShot shot, Agent shooter, bool playLaunchEffects)
+    {
+        HullOfWeapon(weapon).ReplayedShots.Add((shot, shooter, playLaunchEffects));
+        return true;
+    }
+
+    /// <summary>The weapons this client last claimed to simulate.</summary>
+    public IReadOnlyCollection<MissionObject> SimulatedWeapons { get; private set; } = Array.Empty<MissionObject>();
+
+    public void SetSimulatedWeapons(IReadOnlyCollection<MissionObject> own) => SimulatedWeapons = own.ToList();
+
+    public void ClearSimulatedWeapons() => SimulatedWeapons = Array.Empty<MissionObject>();
+
+    private FakeHull HullOfWeapon(MissionObject weapon) => hulls.Single(fake => ReferenceEquals(fake.Weapon, weapon));
+
     private FakeHull HullOfStation(UsableMissionObject point) =>
         hulls.Single(fake => fake.Stations.Values.Any(station => ReferenceEquals(station, point)));
 }
@@ -323,6 +355,22 @@ public sealed class FakeHull
     public List<NetworkApplyShipDamage> AppliedDamage { get; } = new();
     public Dictionary<(string Key, int Index), UsableMissionObject> Stations { get; } = new();
     public Dictionary<UsableMissionObject, Agent> Seats { get; } = new(ReferenceEqualityComparer.Instance);
+    /// <summary>The hull's ship siege weapon, a constructor-skipped ballista, once <see cref="ArmWeapon"/> mounted it.</summary>
+    public RangedSiegeWeapon? Weapon { get; private set; }
+    public string WeaponKey { get; private set; } = null!;
+    /// <summary>The owner's simulated weapon state, or the last state a copy applied.</summary>
+    public BattleShipWeaponState WeaponState { get; set; } = new(0f, 0f, 0, 4);
+    public int AppliedWeaponStates { get; set; }
+    /// <summary>The owner's shots a copy replayed, with the shooter it used and whether the launch effects played.</summary>
+    public List<(NetworkShipWeaponShot Shot, Agent? Shooter, bool LaunchEffects)> ReplayedShots { get; } = new();
+
+    /// <summary>Mounts the hull's ship siege weapon at a content path, as its prefab would.</summary>
+    public RangedSiegeWeapon ArmWeapon(string key = "3:ballista_holder/0:ship_ballista")
+    {
+        Weapon ??= MissionTestObjects.CreateShipWeapon();
+        WeaponKey = key;
+        return Weapon;
+    }
 
     /// <summary>The usable point at a station's content path, created on first use like a hull's prefab points.</summary>
     public UsableMissionObject Station(string key, int index = 0)

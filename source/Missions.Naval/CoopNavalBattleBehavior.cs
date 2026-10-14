@@ -21,8 +21,9 @@ public class CoopNavalBattleBehavior : MissionLogic
 
     public CoopNavalBattleBehavior(IBattleShipReplicator shipReplicator, IAgentStationUseReplicator stationUseReplicator,
         INavalNpcFleetSpawner npcFleetSpawner, INavalMigrationReserveFielder migrationReserveFielder,
-        IBattleShipDamageRouter shipDamageRouter, NavalShipsLogic shipsLogic)
+        IBattleShipDamageRouter shipDamageRouter, IBattleShipWeaponReplicator shipWeaponReplicator, NavalShipsLogic shipsLogic)
     {
+        ShipWeaponReplicator = shipWeaponReplicator;
         MigrationReserveFielder = migrationReserveFielder;
         ShipReplicator = shipReplicator;
         StationUseReplicator = stationUseReplicator;
@@ -45,11 +46,14 @@ public class CoopNavalBattleBehavior : MissionLogic
 
     public IBattleShipDamageRouter ShipDamageRouter { get; }
 
+    public IBattleShipWeaponReplicator ShipWeaponReplicator { get; }
+
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);
         ShipReplicator.Tick(dt);
         StationUseReplicator.Tick(dt);
+        ShipWeaponReplicator.Tick(dt);
         NpcFleetSpawner.Tick();
         MigrationReserveFielder.Tick();
         LogAgentCountDrop();
@@ -94,6 +98,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         CoopNavalMissionScope.IsActive = false;
         shipsLogic.MissionEndEvent -= ShipReplicator.SendFinalRopes;
         shipsLogic.ShipRemovedEvent -= OnShipRemoved;
+        ShipWeaponReplicator.Dispose();
         ShipDamageRouter.Dispose();
         StationUseReplicator.Dispose();
         ShipReplicator.Dispose();

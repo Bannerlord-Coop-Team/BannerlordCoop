@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
@@ -258,6 +259,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             Stations = new AgentStationUseReplicator(Network, Broker, controller.Session, controller.MissionComponent, engine,
                 controller.Deployment);
             Damage = new BattleShipDamageRouter(Network, Broker, controller.Session, controller.MissionComponent, engine);
+            Weapons = new BattleShipWeaponReplicator(Network, Broker, controller.Session, controller.MissionComponent, engine, Ships,
+                controller.HostEpochPolicy);
             var reinforcements = new Mock<IReinforcementFielder>();
             reinforcements.Setup(fielder => fielder.TakeMigrationReserve(It.IsAny<BattleSideEnum>())).Returns(() =>
             {
@@ -280,6 +283,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         public BattleShipReplicator Ships { get; }
         public AgentStationUseReplicator Stations { get; }
         public BattleShipDamageRouter Damage { get; }
+        public BattleShipWeaponReplicator Weapons { get; }
         public NavalMigrationReserveFielder MigrationReserve { get; }
         /// <summary>The AI reserve the reinforcement fielder's roster recovery hands over at the next tick, as after a promotion.</summary>
         public List<CoopAgentOrigin> RecoveredReserve { get; } = new();
@@ -288,11 +292,12 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
 
         public void Call(Action action, IEnumerable<MethodBase>? disabledMethods = null) => Instance.Call(action, disabledMethods);
 
-        /// <summary>One naval services tick in the live order: the ship replicator, station use, then the migration reserve.</summary>
+        /// <summary>One naval services tick in the live order: the ship replicator, station use, weapons, then the migration reserve.</summary>
         public void Tick(float dt = TickSeconds) => Call(() =>
         {
             Ships.Tick(dt);
             Stations.Tick(dt);
+            Weapons.Tick(dt);
             MigrationReserve.Tick();
         });
 
@@ -365,6 +370,24 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             return entry;
         }
 
+        public JObject WeaponStats()
+        {
+            JObject stats = null!;
+            Call(() => stats = JObject.FromObject(Weapons.Inspect()));
+            return stats;
+        }
+
+        /// <summary>The projectile capture's event for a shot this client's simulated weapon on <paramref name="shipId"/> launched.</summary>
+        public void FireWeapon(Guid shipId, Agent? shooter, Vec3 position, Vec3 direction, string missileItemId) => Call(() =>
+        {
+            Assert.True(Registry.TryGet(shipId, out var ship));
+            var weapon = Engine.Of(ship.Hull).Weapon!;
+            var missile = (ItemObject)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(ItemObject));
+            // The registry's StringId setter patch lets only allowed threads name an object.
+            using (new AllowedThread()) missile.StringId = missileItemId;
+            Broker.Publish(weapon, new SiegeWeaponFired(weapon, shooter!, position, direction, Mat3.Identity, 60f, 62f, missile));
+        });
+
         public JObject StationStats()
         {
             JObject stats = null!;
@@ -407,6 +430,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
 
         internal void DisposeShipServices()
         {
+            Weapons.Dispose();
             Damage.Dispose();
             Stations.Dispose();
             Ships.Dispose();

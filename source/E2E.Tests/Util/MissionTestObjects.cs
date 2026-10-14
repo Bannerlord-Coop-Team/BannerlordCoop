@@ -12,6 +12,8 @@ internal static class MissionTestObjects
 
     internal static StandingPoint CreateStandingPoint() => Uninitialized<StandingPoint>();
 
+    internal static RangedSiegeWeapon CreateShipWeapon() => Uninitialized<Ballista>();
+
     // ScriptComponentBehavior's type initializer reads the managed module type catalog the engine normally fills; run
     // first without it, the initializer fails for every later test in the process.
     private static T Uninitialized<T>()

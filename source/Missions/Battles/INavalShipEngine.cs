@@ -137,6 +137,31 @@ public interface INavalShipEngine
     /// sails, and sinking through the vanilla path. A copy also takes the sunk state; a simulated hull sinks on its own.
     /// </summary>
     void ApplyCondition(MissionObject hull, BattleShipCondition condition);
+
+    /// <summary>The hull's ship siege weapon and its content path below the hull; false when the hull carries none.</summary>
+    bool TryGetWeapon(MissionObject hull, out MissionObject weapon, out string weaponKey);
+
+    /// <summary>The aim targets, weapon state and ammo of a ship siege weapon.</summary>
+    BattleShipWeaponState ReadWeaponState(MissionObject weapon);
+
+    /// <summary>
+    /// [Game thread] Turns, loads and animates a weapon this client does not simulate the way its owner's state says;
+    /// <paramref name="previous"/> is the state applied before, or null.
+    /// </summary>
+    void ApplyWeaponState(MissionObject weapon, BattleShipWeaponState state, BattleShipWeaponState previous);
+
+    /// <summary>
+    /// [Game thread] Plays an owner's shot on a weapon this client does not simulate, with a projectile that deals no
+    /// damage here; with no <paramref name="shooter"/> any inert puppet fires it. The release animation and sound play once
+    /// per volley, when <paramref name="playLaunchEffects"/>. False when it could not be shown.
+    /// </summary>
+    bool ReplayWeaponShot(MissionObject weapon, NetworkShipWeaponShot shot, Agent shooter, bool playLaunchEffects);
+
+    /// <summary>[Game thread] Simulates only <paramref name="own"/> ship weapons here; every other one follows its owner.</summary>
+    void SetSimulatedWeapons(IReadOnlyCollection<MissionObject> own);
+
+    /// <summary>[Game thread] Hands ship weapon simulation back to the defaults when the battle ends.</summary>
+    void ClearSimulatedWeapons();
 }
 
 /// <summary>An agent a hull replacement moves: whether it is the hull's crew and, when it stood aboard, its hull-local deck position.</summary>

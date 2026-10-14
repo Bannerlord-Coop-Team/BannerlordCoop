@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.ObjectManager;
+﻿using GameInterface.Services.MapEvents;
+using GameInterface.Services.ObjectManager;
 using Missions.Battles;
 using Missions.Messages;
 using NavalDLC.Missions.MissionLogics;
@@ -17,6 +18,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.ObjectSystem;
 using SinkingState = NavalDLC.Missions.NavalPhysics.NavalPhysics.SinkingState;
 
 namespace Missions.Naval;
@@ -608,6 +610,89 @@ public class NavalShipEngine : INavalShipEngine
         ship.PrepareForAbandonment();
         burning?.StartFire();
         ship.ShipsLogic.OnShipBurned(ship);
+    }
+
+    public bool TryGetWeapon(MissionObject hull, out MissionObject weapon, out string weaponKey)
+    {
+        weapon = null;
+        weaponKey = null;
+        var ship = (MissionShip)hull;
+        var siegeWeapon = ship.ShipSiegeWeapon;
+        if (siegeWeapon == null || !ship.GameEntity.IsValid || !siegeWeapon.GameEntity.IsValid) return false;
+
+        weaponKey = EntityPath(siegeWeapon.GameEntity, ship.GameEntity);
+        if (weaponKey == null) return false;
+
+        weapon = siegeWeapon;
+        return true;
+    }
+
+    public BattleShipWeaponState ReadWeaponState(MissionObject weapon)
+    {
+        var siegeWeapon = (RangedSiegeWeapon)weapon;
+        return new BattleShipWeaponState(siegeWeapon.TargetDirection, siegeWeapon.TargetReleaseAngle, (int)siegeWeapon.State,
+            siegeWeapon.AmmoCount);
+    }
+
+    // Never assigns State: its setter runs the simulator's side effects, ShootProjectile among them.
+    public void ApplyWeaponState(MissionObject weapon, BattleShipWeaponState state, BattleShipWeaponState previous)
+    {
+        var siegeWeapon = (RangedSiegeWeapon)weapon;
+        if (!siegeWeapon.GameEntity.IsValid) return;
+
+        // The HandleUserAiming prefix re-asserts the targets each tick, so vanilla's speed-limited approach turns the weapon.
+        SiegeMissionAuthorityGate.SetRemoteAim(siegeWeapon.Id.Id, state.Direction, state.ReleaseAngle);
+        siegeWeapon.SetAmmo(state.AmmoCount);
+        if (previous != null && previous.WeaponState == state.WeaponState) return;
+
+        var weaponState = (RangedSiegeWeapon.WeaponState)state.WeaponState;
+        SiegeMachineStateReplicator.PlayWeaponStateAnimation(siegeWeapon, weaponState);
+        ShowLoadedProjectile(siegeWeapon,
+            weaponState == RangedSiegeWeapon.WeaponState.Idle || weaponState == RangedSiegeWeapon.WeaponState.WaitingBeforeIdle);
+    }
+
+    public bool ReplayWeaponShot(MissionObject weapon, NetworkShipWeaponShot shot, Agent shooter, bool playLaunchEffects)
+    {
+        var siegeWeapon = (RangedSiegeWeapon)weapon;
+        var mission = Mission.Current;
+        if (mission == null || !siegeWeapon.GameEntity.IsValid) return false;
+
+        shooter = shooter ?? SiegeWeaponFireReplicator.FindStandInShooter();
+        var missileItem = MBObjectManager.Instance.GetObject<ItemObject>(shot.MissileItemId);
+        if (shooter == null || missileItem == null) return false;
+
+        // Not added as a ship siege missile, so not even an ungated OnHit would deal hull damage from it.
+        var ignored = siegeWeapon.GameEntity.Root.GetFirstScriptOfType<MissionObject>() ?? siegeWeapon;
+        mission.AddCustomMissile(shooter, new MissionWeapon(missileItem, null, null, 1), shot.Position, shot.Direction,
+            shot.Orientation, shot.BaseSpeed, shot.Speed, addRigidBody: false, ignored);
+        if (!playLaunchEffects) return true;
+
+        SiegeWeaponFireReplicator.PlayFireAnimation(siegeWeapon);
+        ShowLoadedProjectile(siegeWeapon, false);
+        if (siegeWeapon.FireSoundIndex >= 0)
+            SoundManager.StartOneShotEventWithIndex(siegeWeapon.FireSoundIndex, siegeWeapon.GameEntity.GetGlobalFrame().origin);
+        return true;
+    }
+
+    // Vanilla shows and hides the loaded projectile only on the simulating client.
+    private static void ShowLoadedProjectile(RangedSiegeWeapon siegeWeapon, bool visible)
+    {
+        var projectile = siegeWeapon.Projectile;
+        if (projectile != null && projectile.GameEntity.IsValid) projectile.GameEntity.SetVisibilityExcludeParents(visible);
+    }
+
+    public void SetSimulatedWeapons(IReadOnlyCollection<MissionObject> own)
+    {
+        // No host-wide default at sea: a ship weapon not claimed here belongs to its hull's owner.
+        SiegeMissionAuthorityGate.IsLocalAuthority = false;
+        SiegeMissionAuthorityGate.SetClaimedMachines(new HashSet<int>(own.Select(weapon => weapon.Id.Id)), new HashSet<int>());
+        SiegeMissionAuthorityGate.IsAuthorityKnown = true;
+    }
+
+    public void ClearSimulatedWeapons()
+    {
+        SiegeMissionAuthorityGate.IsAuthorityKnown = false;
+        SiegeMissionAuthorityGate.ResetClaimedMachines();
     }
 
     // The machine whose pilot point this is; the point entity sits at most a few levels below its machine.

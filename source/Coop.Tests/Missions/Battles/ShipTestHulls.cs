@@ -15,6 +15,8 @@ internal static class ShipTestHulls
 
     internal static UsableMissionObject CreatePoint() => Uninitialized<StandingPoint>();
 
+    internal static RangedSiegeWeapon CreateWeapon() => Uninitialized<Ballista>();
+
     private static T Uninitialized<T>()
     {
         var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;

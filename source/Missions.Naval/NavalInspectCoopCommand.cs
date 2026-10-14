@@ -43,6 +43,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             shipSync = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipReplicator.Inspect(),
             shipDamage = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipDamageRouter.Inspect(),
             shipDamageGate = NavalShipDamageGate.Inspect(),
+            shipWeapons = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipWeaponReplicator.Inspect(),
             shipDecks = controller.MissionComponent.AgentMovementHandler.InspectShipDecks(),
             hostEpoch = controller.Session.HostEpoch,
             npcFleet = InspectNpcFleet(controller, mission.GetMissionBehavior<CoopNavalBattleBehavior>()),
