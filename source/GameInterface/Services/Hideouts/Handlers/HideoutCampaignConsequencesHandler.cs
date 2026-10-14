@@ -463,7 +463,7 @@ internal sealed class HideoutCampaignConsequencesHandler : IHandler
                 ChangeRelationAction.ApplyRelationChangeBetweenHeroes(participant, leader, (int)DefaultPerks.Charm.EffortForThePeople.PrimaryBonus, true);
             }
         }
-        messageBroker.Publish(this, new NotifyCleanHideoutRelations(participant, (int)DefaultPerks.Charm.EffortForThePeople.PrimaryBonus));
+        messageBroker.Publish(this, new NotifyCleanHideoutRelations(participant, 2));
     }
 
     private readonly struct ConsequenceResult
