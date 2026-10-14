@@ -234,6 +234,12 @@ namespace GameInterface.Services.Kingdoms.Extentions
             return true;
         }
 
+        internal static bool IsPlayerTargetedCallToWarProposal(KingdomDecision decision)
+        {
+            return decision is ProposeCallToWarAgreementDecision { CalledKingdom: Kingdom calledKingdom }
+                   && calledKingdom.IsPlayerKingdom();
+        }
+
         internal static bool TryRedirectPlayerProposeCallToWarAgreementOffer(KingdomDecision decision, DecisionOutcome chosenOutcome)
         {
             if (decision is not ProposeCallToWarAgreementDecision callToWarDecision

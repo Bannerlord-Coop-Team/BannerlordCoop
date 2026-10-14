@@ -1094,7 +1094,9 @@ namespace GameInterface.Services.Kingdoms
                 outcomeKey,
                 notificationText));
 
-            if (!TryApplyDeclareWarOutcome(state.Decision, outcomeIndex))
+            // A refused call to war on a player kingdom applies nothing, but native OnShowDecision would still offer it to them.
+            if (!TryApplyDeclareWarOutcome(state.Decision, outcomeIndex)
+                && !CoopKingdomElection.IsPlayerTargetedCallToWarProposal(state.Decision))
             {
                 state.Election.ApplyChosenOutcomeCoop();
             }
