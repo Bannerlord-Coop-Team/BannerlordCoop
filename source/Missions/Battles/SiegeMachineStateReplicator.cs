@@ -1915,10 +1915,16 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         if (peerWeaponState.TryGetValue(id, out var previous) && previous == weaponState) return;
         peerWeaponState[id] = weaponState;
 
+        PlayWeaponStateAnimation(rangedWeapon, (RangedSiegeWeapon.WeaponState)weaponState);
+    }
+
+    /// <summary>[Game thread] The arm animation a non-simulating client plays when a ranged weapon enters a replicated state.</summary>
+    internal static void PlayWeaponStateAnimation(RangedSiegeWeapon rangedWeapon, RangedSiegeWeapon.WeaponState weaponState)
+    {
         var skeletons = rangedWeapon.SkeletonOwnerObjects;
         if (skeletons == null) return;
 
-        switch ((RangedSiegeWeapon.WeaponState)weaponState)
+        switch (weaponState)
         {
             case RangedSiegeWeapon.WeaponState.Reloading:
             {

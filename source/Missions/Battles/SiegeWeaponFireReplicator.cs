@@ -97,6 +97,9 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
     // [Owner] one of our simulated siege machines fired — broadcast the resolved launch so the rest replay it.
     private void Handle_LocalFire(MessagePayload<SiegeWeaponFired> payload)
     {
+        // Naval ship weapons fire through the same capture; BattleShipWeaponReplicator keys them by hull, not local id.
+        if (Mission.Current?.IsSiegeBattle != true) return;
+
         var fire = payload.What;
         if (!machineState.TryGetMachineAuthority(
                 fire.Weapon.Id.Id,
@@ -251,7 +254,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
 
     // Vanilla plays FireAnimations on the machine's skeleton owners when it enters WaitingBeforeProjectileLeaving
     // (RangedSiegeWeapon.OnRangedSiegeWeaponStateChange); a peer never reaches that state, so drive it directly.
-    private static void PlayFireAnimation(RangedSiegeWeapon weapon)
+    internal static void PlayFireAnimation(RangedSiegeWeapon weapon)
     {
         var skeletons = weapon.SkeletonOwnerObjects;
         var animations = weapon.FireAnimations;
@@ -294,7 +297,7 @@ public class SiegeWeaponFireReplicator : ISiegeWeaponFireReplicator
         return true;
     }
 
-    private static Agent FindStandInShooter()
+    internal static Agent FindStandInShooter()
     {
         foreach (var agent in Mission.Current.Agents)
         {
