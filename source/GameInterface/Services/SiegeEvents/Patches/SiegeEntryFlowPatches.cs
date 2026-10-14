@@ -305,11 +305,11 @@ internal class SiegeEntryFlowPatches
 
     // Try-to-get-away accept: route the camp removal and clear it locally up front under AllowedThread
     // (applied without forwarding or the client-write error log). The approval must not touch the menus,
-    // the accept flow continues into the debrief on its own. Runs first because
-    // EncounterGameMenuBehaviorPatches replaces the body with a false-returning prefix, which would skip this one.
+    // the accept flow continues into the debrief on its own. Runs after EncounterGameMenuBehaviorPatches sends the
+    // sacrifice, and before its false-returning body replacement, which would skip this one.
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_encounter_leave_your_soldiers_behind_accept_on_consequence))]
     [HarmonyPrefix]
-    [HarmonyPriority(Priority.First)]
+    [HarmonyPriority(Priority.High)]
     private static bool LeaveSoldiersBehindAcceptPrefix()
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;

@@ -67,10 +67,7 @@ public class EncounterGameMenuBehaviorInterface : IEncounterGameMenuBehaviorInte
 
         // TODO: Send message for CompanionGrievanceBehavior.OnPlayerDesertedBattle
 
-        if (mainParty.BesiegerCamp != null)
-        {
-            mainParty.BesiegerCamp = null;
-        }
+        // BesiegerCamp isn't cleared here, the siege break SiegeEntryFlowPatches routes after this request does it.
     }
 
     private void RemoveTroopsForTryToGetAway(EncounterGameMenuBehavior behavior, MobileParty mainParty, int numberOfTroopsToRemove)

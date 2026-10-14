@@ -6,8 +6,10 @@ using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Handlers;
@@ -20,6 +22,9 @@ internal class LeaveSoldiersBehindHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IEncounterGameMenuBehaviorInterface encounterGameMenuBehaviorInterface;
+
+    // Only touched on the game thread.
+    private readonly ConditionalWeakTable<MobileParty, MapEvent> appliedMapEvents = new ConditionalWeakTable<MobileParty, MapEvent>();
 
     public LeaveSoldiersBehindHandler(
         IMessageBroker messageBroker,
@@ -62,7 +67,19 @@ internal class LeaveSoldiersBehindHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
 
+            // A repeated request for the same map event (double click, resent message) must not sacrifice twice.
+            var mapEvent = mainParty.MapEvent;
+            if (mapEvent != null && appliedMapEvents.TryGetValue(mainParty, out var appliedMapEvent) && appliedMapEvent == mapEvent)
+            {
+                Logger.Warning("Ignoring repeated leave soldiers behind for {Party}", mainParty.StringId);
+                return;
+            }
+
             encounterGameMenuBehaviorInterface.LeftSoldiersBehindConsequence(encounterGameMenuBehavior, mainHero, mainParty);
+
+            if (mapEvent == null) return;
+            appliedMapEvents.Remove(mainParty);
+            appliedMapEvents.Add(mainParty, mapEvent);
         });
     }
 
