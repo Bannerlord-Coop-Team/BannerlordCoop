@@ -190,6 +190,11 @@ internal class HideoutCampaignBehaviorPatch
         PublishConsequence(HideoutCampaignConsequence.GrantClearRewards);
     }
 
+    // Use coop re-implementation in handler that doesn't use Hero.MainHero
+    [HarmonyPatch(nameof(HideoutCampaignBehavior.SetCleanHideoutRelations))]
+    [HarmonyPrefix]
+    public static bool SetCleanHideoutRelations() => false;
+
     [HarmonyPatch(nameof(HideoutCampaignBehavior.HourlyTickSettlement))]
     [HarmonyPrefix]
     public static bool HourlyTickSettlement(Settlement settlement)
