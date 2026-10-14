@@ -170,7 +170,10 @@ internal class PortScreenChangesHandler : IHandler
     {
         data = new();
         if (!objectManager.TryGetHandleWithLogging(info.Ship, out var shipHandle)) return false;
-        if (!objectManager.TryGetHandleWithLogging(info.Figurehead, out var figureheadHandle)) return false;
+
+        // A removed figurehead is null, sent as handle 0
+        uint figureheadHandle = 0;
+        if (info.Figurehead != null && !objectManager.TryGetHandleWithLogging(info.Figurehead, out figureheadHandle)) return false;
 
         data = new(shipHandle, figureheadHandle);
         return true;
@@ -201,7 +204,9 @@ internal class PortScreenChangesHandler : IHandler
     {
         info = new();
         if (!objectManager.TryGetObjectWithLogging<Ship>(data.ShipHandle, out var ship)) return false;
-        if (!objectManager.TryGetObjectWithLogging<Figurehead>(data.FigureheadHandle, out var figurehead)) return false;
+
+        Figurehead figurehead = null;
+        if (data.FigureheadHandle != 0 && !objectManager.TryGetObjectWithLogging<Figurehead>(data.FigureheadHandle, out figurehead)) return false;
 
         info = new(ship, figurehead);
         return true;

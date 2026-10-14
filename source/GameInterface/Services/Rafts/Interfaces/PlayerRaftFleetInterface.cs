@@ -1,4 +1,6 @@
-﻿using GameInterface.CoopSessionData;
+﻿using Common.Messaging;
+using GameInterface.CoopSessionData;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.NavalDLC;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Interfaces;
@@ -41,14 +43,16 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IObjectManager objectManager;
     private readonly IPlayerPartyLookup playerPartyLookup;
+    private readonly IMessageBroker messageBroker;
 
     private Dictionary<string, PlayerCachedFleetData> PlayerCachedFleets => coopSessionProvider.CoopSession.NavalPlayerData.PlayerCachedFleets;
 
-    public PlayerRaftFleetInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager, IPlayerPartyLookup playerPartyLookup)
+    public PlayerRaftFleetInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager, IPlayerPartyLookup playerPartyLookup, IMessageBroker messageBroker)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
         this.playerPartyLookup = playerPartyLookup;
+        this.messageBroker = messageBroker;
     }
 
     public void StrandAfterRelease(MobileParty party)
@@ -60,16 +64,21 @@ public class PlayerRaftFleetInterface : IPlayerRaftFleetInterface
         {
             if (!TryGetPlayerHeroId(party, out var playerHeroId)) return;
 
+            // Cached before the ships are removed, same as vanilla
+            var anchorPosition = party.Anchor.Position;
+            var disembarkPosition = party.Anchor.GetLastUsedDisembarkPosition();
+
             var ships = new List<CachedShipData>();
             for (int i = party.Ships.Count - 1; i >= 0; i--)
             {
                 var ship = party.Ships[i];
                 ships.Add(CreateShipData(ship));
                 ship.Owner = null;
+
+                // The fleet is rebuilt from its cached data, so the ownerless ship is unregistered everywhere
+                messageBroker.Publish(this, new InstanceDestroyed<Ship>(ship));
             }
 
-            var anchorPosition = party.Anchor.Position;
-            var disembarkPosition = party.Anchor.GetLastUsedDisembarkPosition();
             PlayerCachedFleets[playerHeroId] = new PlayerCachedFleetData(
                 ships,
                 anchorPosition.X,

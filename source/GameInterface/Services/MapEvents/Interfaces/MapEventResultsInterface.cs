@@ -217,7 +217,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
             }
 
             if (networkPlayerLootData.LootedShips?.TryGetValue(mapEventPartyId, out var shipData) == true)
-                UnpackShips(shipData);
+                lootedShips = UnpackShips(shipData);
         }
     }
 

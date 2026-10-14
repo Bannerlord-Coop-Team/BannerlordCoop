@@ -16,7 +16,7 @@ internal class NavalDLCClanFinanceModelPatches
     [HarmonyPrefix]
     private static bool CalculateClanGoldChangePrefix(NavalDLCClanFinanceModel __instance, ref ExplainedNumber __result, Clan clan, bool includeDescriptions, bool applyWithdrawals, bool includeDetails)
     {
-        ContainerProvider.TryResolve<IClanFinance>(out var finance);
+        if (!ContainerProvider.TryResolve<IClanFinance>(out var finance)) return true;
 
         // Same gate as DefaultClanFinanceModelPatches.CalculateClanGoldChangePrefix
         if (clan.Leader?.Clan == clan && finance.CanChangeGold(clan.Leader)) return true;
