@@ -280,7 +280,7 @@ internal class SiegeAftermathPatches
             // Make sure the leading player actually gets the choice menu: their local encounter flow
             // usually opens it, but if it doesn't (encounter torn down first), the server would wait
             // on this pending entry forever.
-            MessageBroker.Instance.Publish(null, new SiegeAftermathChoicePrompted(leaderParty, settlement));
+            MessageBroker.Instance.Publish(null, new SiegeAftermathChoicePrompted(leaderParty, settlement, settlement.OwnerClan));
             return false;
         }
 
