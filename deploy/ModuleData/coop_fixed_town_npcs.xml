@@ -758,4 +758,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_538d1444"
+    name="{=!}Saber Storm"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.vlandia"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_EW6"
+    coop_location="center"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Have you seen the rest of the boys? We got a war to win."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_vlandia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.guards_kettle_over_padded_coif" />
+        <equipment slot="Cape" id="Item.pauldron_over_scale_armor" />
+        <equipment slot="Body" id="Item.ringed_desert_armor" />
+        <equipment slot="Gloves" id="Item.reinforced_mail_mitten" />
+        <equipment slot="Leg" id="Item.mail_cavalier_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
