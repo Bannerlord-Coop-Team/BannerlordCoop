@@ -1152,10 +1152,10 @@ internal class DefaultNotificationsHandler : IHandler
             if (TryGetNotificationsBehavior(out var notificationsBehavior))
                 notificationsBehavior.OnHeroesMarried(firstHero, secondHero, obj.What.ShowNotification);
 
+            ShowMarriageSceneForMainHero(firstHero, secondHero);
+
             if (TryGetLogsBehavior(out var logsBehavior))
                 logsBehavior.OnHeroesMarried(firstHero, secondHero, obj.What.ShowNotification);
-
-            ShowMarriageSceneForMainHero(firstHero, secondHero);
         });
     }
 
