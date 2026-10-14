@@ -30,16 +30,20 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IBattleResultCommitter resultCommitter;
     private readonly INavalNpcFleetSpawner npcFleet;
+    private readonly IBattleShipReplicator shipReplicator;
+    private readonly INavalShipEngine shipEngine;
 
     private bool endChecksReleased;
 
     public CoopNavalBattleEndLogic(IBattleSession session, IBattleDeploymentCoordinator deployment, IBattleResultCommitter resultCommitter,
-        INavalNpcFleetSpawner npcFleet)
+        INavalNpcFleetSpawner npcFleet, IBattleShipReplicator shipReplicator, INavalShipEngine shipEngine)
     {
         this.session = session;
         this.deployment = deployment;
         this.resultCommitter = resultCommitter;
         this.npcFleet = npcFleet;
+        this.shipReplicator = shipReplicator;
+        this.shipEngine = shipEngine;
     }
 
     public override void OnDeploymentFinished()
@@ -242,15 +246,9 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
             if (ship.Team == null) continue;
 
             int crew = ship.Formation != null && crewByFormation.TryGetValue(ship.Formation, out int count) ? count : 0;
-            // A copy's reserve is queued on its owner, so only a hull simulated here has any.
-            int reserve = NavalForeignHulls.Contains(ship) ? 0 : SpawnableReserveOf(ship);
+            // A copy's reserve is queued on its owner, which reports it with the hull's samples.
+            int reserve = NavalForeignHulls.Contains(ship) ? shipReplicator.ReportedReserveOf(ship) : shipEngine.ReadSpawnableReserve(ship);
             yield return new NavalHullCount(ship.Team.Side, ship.IsSunk, crew, reserve);
         }
-    }
-
-    private int SpawnableReserveOf(MissionShip ship)
-    {
-        int active = _navalAgentsLogic.GetActiveAgentsOfShip(ship)?.Count ?? 0;
-        return Math.Max(0, _navalAgentsLogic.GetTotalTroopCountOfShip(ship, spawnableReservesOnly: true) - active);
     }
 }

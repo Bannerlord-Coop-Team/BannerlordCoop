@@ -48,6 +48,12 @@ public interface IBattleShipReplicator : IDisposable
     object InspectRopes();
 
     /// <summary>
+    /// [Game thread] The fieldable reserve another owner last reported for its hull; none once its samples stopped, as they do
+    /// when the hull sank or its owner left.
+    /// </summary>
+    int ReportedReserveOf(MissionObject hull);
+
+    /// <summary>
     /// [Game thread] Sends the own hulls' rope state once more as the mission ends, while the hulls are still live; samples
     /// end with the mission, so peers would otherwise keep the last sample.
     /// </summary>
@@ -402,7 +408,7 @@ public class BattleShipReplicator : IBattleShipReplicator
             stream.Sent++;
             network.SendAll(new NetworkBattleShipSample(ship.ShipId, session.OwnControllerId, stream.Sent,
                 NetworkBattleShipSample.FromFrame(engine.GetFrame(ship.Hull)), engine.ReadInput(ship.Hull),
-                engine.CaptureRopes(ship.Hull, ShipIdOf), session.HostEpoch));
+                engine.CaptureRopes(ship.Hull, ShipIdOf), session.HostEpoch, engine.ReadSpawnableReserve(ship.Hull)));
             SendConditionIfChanged(ship, stream);
         }
     }
@@ -746,7 +752,19 @@ public class BattleShipReplicator : IBattleShipReplicator
         stream.TargetReceivedAt = elapsed;
         stream.Accepted = sample.Sequence;
         stream.Elapsed = 0;
+        stream.ReportedReserve = sample.SpawnableReserve;
     }
+
+    public int ReportedReserveOf(MissionObject hull)
+    {
+        if (!Registry.TryGetByHull(hull, out var ship) || IsOwnHull(ship) || !streams.TryGetValue(ship.ShipId, out var stream))
+            return 0;
+
+        return IsReportFresh(stream.Accepted > 0, elapsed - stream.TargetReceivedAt) ? stream.ReportedReserve : 0;
+    }
+
+    /// <summary>Whether an owner's last sample still speaks for its hull; owners stream at 20 Hz while the hull floats.</summary>
+    internal static bool IsReportFresh(bool hasSample, float sinceSample) => hasSample && sinceSample <= SampleLifetimeSeconds;
 
     private void HoldSample(NetworkBattleShipSample sample)
     {
@@ -770,6 +788,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (!newEpoch && sample.Sequence <= acceptedSequence) return "stale";
         if (!sample.HasValidFrame) return "invalid_frame";
         if (!sample.Input.IsValid) return "invalid_input";
+        if (sample.SpawnableReserve < 0) return "invalid_reserve";
         if (!BattleRopeState.AreValid(sample.Ropes)) return "invalid_ropes";
         return null;
     }
@@ -955,6 +974,7 @@ public class BattleShipReplicator : IBattleShipReplicator
                 sinking = condition?.SinkingState,
                 isSunk = condition?.SinkingState == BattleShipCondition.Sunk,
                 conditionRevision = stream?.ConditionRevision ?? 0,
+                reserve = IsOwnHull(ship) ? engine.ReadSpawnableReserve(ship.Hull) : ReportedReserveOf(ship.Hull),
             };
         }).ToArray(),
     };
@@ -1005,6 +1025,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         public BattleShipCondition Condition;
         public long ConditionRevision;
         public int ConditionEpoch;
+        /// <summary>The fieldable reserve in the last accepted sample.</summary>
+        public int ReportedReserve;
 
         public void Reject(string reason)
         {

@@ -46,6 +46,53 @@ public class NavalNaturalEndScenarioTests : NavalBattleTestEnvironment
         AssertMapEventRemoved(battle.MapEventId);
     }
 
+    // K4: B's hull holds reserve only B tracks. B's samples carry it, so when every agent of the players' side is down at once
+    // the host still counts that reserve: B's hull stays in action and the side is not depleted until the reserve is spent.
+    [Fact]
+    public void MassKillOnAPeerHullWithReserve_DoesNotDepleteTheSide_UntilThatReserveIsSpent()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out var b, out var concluded);
+        battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var hullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
+        battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f));
+        b.Hull(hullB).SpawnableReserve = 20;
+        battle.CommitAll();
+        battle.TickAll(2);
+
+        Assert.Equal(20, (int)a.Stream(hullB)["reserve"]!);
+        var players = EndTally(a, BattleSideEnum.Attacker, liveHumans: 0);
+        Assert.Equal(20, players.Reserve);
+        Assert.False(players.IsDepleted);
+        Assert.Equal(1, players.HullsOutOfAction);
+        Assert.False(players.IsOutOfAction);
+
+        b.Hull(hullB).SpawnableReserve = 2;
+        battle.TickAll(2);
+        Assert.True(EndTally(a, BattleSideEnum.Attacker, liveHumans: 0).IsOutOfAction);
+
+        b.Hull(hullB).SpawnableReserve = 0;
+        battle.TickAll(2);
+        Assert.True(EndTally(a, BattleSideEnum.Attacker, liveHumans: 0).IsDepleted);
+        Assert.Equal(0, concluded());
+    }
+
+    // K4: a peer's reserve stops counting once its samples stop, as when the peer leaves the battle.
+    [Fact]
+    public void PeerReserve_StopsCountingOnceItsSamplesStop()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out var b, out _);
+        var hullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
+        b.Hull(hullB).SpawnableReserve = 20;
+        battle.CommitAll();
+        battle.TickAll(2);
+        Assert.Equal(20, EndTally(a, BattleSideEnum.Attacker, liveHumans: 0).Reserve);
+
+        b.Call(b.Network.Stop);
+        a.Ticks(25);
+
+        Assert.Equal(0, EndTally(a, BattleSideEnum.Attacker, liveHumans: 0).Reserve);
+    }
+
     // vs_pirates fought to the end: B's hits sink both AI hulls on the host, every client sees them sunk, the pirate side is
     // out of action although its swimmers live, and the host's result concludes the battle once.
     [Fact]

@@ -113,6 +113,9 @@ public interface INavalShipEngine
     /// <summary>The hull's current damage state.</summary>
     BattleShipCondition ReadCondition(MissionObject hull);
 
+    /// <summary>Troops queued on a hull this client simulates that can still field; none on a copy, whose queue lives on its owner.</summary>
+    int ReadSpawnableReserve(MissionObject hull);
+
     /// <summary>Whether the hull is sinking or has sunk.</summary>
     bool IsSinking(MissionObject hull);
 

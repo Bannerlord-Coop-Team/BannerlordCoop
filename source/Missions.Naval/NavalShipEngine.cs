@@ -486,6 +486,17 @@ public class NavalShipEngine : INavalShipEngine
             (int)ship.Physics.NavalSinkingState);
     }
 
+    // The reserve vanilla's IsSideDepleted counts per hull: queued troops of a hull that still spawns reinforcements.
+    public int ReadSpawnableReserve(MissionObject hull)
+    {
+        var ship = (MissionShip)hull;
+        var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
+        if (agentsLogic == null || ship.Team == null || NavalForeignHulls.Contains(ship)) return 0;
+
+        int active = agentsLogic.GetActiveAgentsOfShip(ship)?.Count ?? 0;
+        return Math.Max(0, agentsLogic.GetTotalTroopCountOfShip(ship, spawnableReservesOnly: true) - active);
+    }
+
     public bool IsSinking(MissionObject hull) => hull is MissionShip ship && ship.IsSinking;
 
     public bool IsHullRemoved(MissionObject hull) => hull is MissionShip ship && (ship.IsRemoved || !ship.GameEntity.IsValid);

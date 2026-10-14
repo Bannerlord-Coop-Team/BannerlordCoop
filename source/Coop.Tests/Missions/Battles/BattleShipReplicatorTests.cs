@@ -110,6 +110,64 @@ public class BattleShipReplicatorTests
         harness.Engine.Verify(e => e.ApplyForeignFrame(copy, It.IsAny<MatrixFrame>()), Times.Exactly(2));
     }
 
+    // K4: only a hull's owner tracks its reserve queue, so its samples carry it to the battle host's end check.
+    [Fact]
+    public void Tick_OwnSamplesCarryTheHullsSpawnableReserve()
+    {
+        var harness = new Harness(committed: true);
+        harness.Engine.Setup(e => e.ReadSpawnableReserve(harness.OwnHull)).Returns(7);
+
+        harness.Replicator.Tick(0.1f);
+
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m =>
+            m is NetworkBattleShipSample && ((NetworkBattleShipSample)m).SpawnableReserve == 7)), Times.Once);
+    }
+
+    [Fact]
+    public void ReportedReserveOf_FollowsTheOwnersLatestSample_UntilItsSamplesStop()
+    {
+        var harness = new Harness(committed: false);
+        var copy = CreateHull();
+        var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_2", false, copy, null);
+        harness.Registry.TryRegister(ship);
+        harness.LiveHulls.Add(copy);
+        var frame = NetworkBattleShipSample.FromFrame(MatrixFrame.Identity);
+        Assert.Equal(0, harness.Replicator.ReportedReserveOf(copy));
+
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 1, frame, spawnableReserve: 12));
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 2, frame, spawnableReserve: 9));
+        harness.Replicator.Tick(0.9f);
+        int whileStreaming = harness.Replicator.ReportedReserveOf(copy);
+        harness.Replicator.Tick(0.2f);
+
+        Assert.Equal(9, whileStreaming);
+        Assert.Equal(0, harness.Replicator.ReportedReserveOf(copy));
+        Assert.Equal(0, harness.Replicator.ReportedReserveOf(harness.OwnHull));
+    }
+
+    [Theory]
+    [InlineData(true, 0f, true)]
+    [InlineData(true, 1f, true)]
+    [InlineData(true, 1.01f, false)]
+    [InlineData(false, 0f, false)]
+    public void IsReportFresh_OnlyWithinASamplesLifetime(bool hasSample, float sinceSample, bool expected)
+    {
+        Assert.Equal(expected, BattleShipReplicator.IsReportFresh(hasSample, sinceSample));
+    }
+
+    [Fact]
+    public void Sample_KeepsItsReserveOverTheWire_AndANegativeReserveIsRejected()
+    {
+        var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_2", false, CreateHull(), null);
+        var frame = NetworkBattleShipSample.FromFrame(MatrixFrame.Identity);
+
+        var wire = Serializer.DeepClone(new NetworkBattleShipSample(ship.ShipId, Peer, 1, frame, spawnableReserve: 14));
+
+        Assert.Equal(14, wire.SpawnableReserve);
+        Assert.Equal("invalid_reserve", BattleShipReplicator.ValidateSample(ship, Own,
+            new NetworkBattleShipSample(ship.ShipId, Peer, 1, frame, spawnableReserve: -1), 0, 0));
+    }
+
     private static JToken Inspected(Harness harness, Guid shipId) =>
         JObject.FromObject(harness.Replicator.Inspect())["ships"]!.Single(entry => (Guid)entry["shipId"]! == shipId);
 

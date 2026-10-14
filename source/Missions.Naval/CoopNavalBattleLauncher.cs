@@ -234,7 +234,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(shipReplicator, stationUseReplicator, npcFleetSpawner,
             shipDamageRouter, mission.GetMissionBehavior<NavalShipsLogic>()));
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(controller.Session, controller.Deployment, controller.ResultCommitter,
-            npcFleetSpawner));
+            npcFleetSpawner, shipReplicator, shipEngine));
     }
 
 #if DEBUG

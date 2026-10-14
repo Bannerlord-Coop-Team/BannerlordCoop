@@ -208,6 +208,12 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         return new BattleShipCondition(fake.HitPoints, fake.SailHitPoints, fake.FireHitPoints, null, fake.SinkingState);
     }
 
+    public int ReadSpawnableReserve(MissionObject hull)
+    {
+        var fake = Of(hull);
+        return fake.IsCopy ? 0 : fake.SpawnableReserve;
+    }
+
     public bool IsSinking(MissionObject hull) => Of(hull).SinkingState > 0;
 
     public bool IsHullRemoved(MissionObject hull)
@@ -252,6 +258,8 @@ public sealed class FakeHull
     public float SailHitPoints { get; set; } = FakeNavalShipEngine.FullSailHitPoints;
     public float FireHitPoints { get; set; }
     public int SinkingState { get; set; }
+    /// <summary>Troops queued on the hull that can still field, as its NavalShipAgents would hold them.</summary>
+    public int SpawnableReserve { get; set; }
     /// <summary>Left the mission: no longer one of the engine's hulls.</summary>
     public bool IsRemoved { get; set; }
     /// <summary>Pooled by deployment: still listed but removed for every station and condition purpose.</summary>
