@@ -30,6 +30,9 @@ public interface INavalNpcFleetSpawner
     /// <summary>[Game thread] Spawns the fleet once its conditions hold.</summary>
     void Tick();
 
+    /// <summary>The side whose fleet this spawner tried to field and could not, otherwise <see cref="BattleSideEnum.None"/>.</summary>
+    BattleSideEnum FailedSide { get; }
+
     /// <summary>Spawner state (diagnostics).</summary>
     object Inspect();
 }
@@ -136,6 +139,11 @@ public class NavalNpcFleetSpawner : INavalNpcFleetSpawner
     }
 
     internal static string Outcome(int hullsSpawned) => hullsSpawned > 0 ? Fielded : Failed;
+
+    public BattleSideEnum FailedSide => FailedSideOf(state, enemySide);
+
+    internal static BattleSideEnum FailedSideOf(string state, BattleSideEnum enemySide) =>
+        state == Failed ? enemySide : BattleSideEnum.None;
 
     private void SpawnFleet(Mission mission, CoopTroopSupplier supplier, MBList<MapEventParty> parties)
     {

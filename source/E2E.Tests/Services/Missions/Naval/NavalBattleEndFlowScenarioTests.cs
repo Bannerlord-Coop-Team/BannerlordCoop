@@ -86,37 +86,6 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
             AssertHost(peer.Instance, battle.MapEventId, expectedHost, successors);
     }
 
-    // A two-player battle whose host the server elects from the mission-ready order, with every member on the mesh.
-    private NavalBattle StartServerBattle(bool atSea, out NavalPeer a, out NavalPeer b, out Func<int> concluded)
-    {
-        var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Attacker) });
-        a = battle["A"];
-        b = battle["B"];
-        Server.Call(() => Server.GetRegisteredObject<MapEvent>(battle.MapEventId).Position =
-            new CampaignVec2(Vec2.Zero, isOnLand: !atSea));
-
-        foreach (var peer in battle.Peers)
-        {
-            var member = peer;
-            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(member.Id, member.Instance.NetPeer));
-            EnterBattle(member.Instance, battle.MapEventId);
-            Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionEntered(member.Id, battle.MapEventId));
-        }
-        AssertHost(Server, battle.MapEventId, "A", "B");
-
-        int conclusions = 0;
-        Server.Resolve<IMessageBroker>().Subscribe<MapEventConcluded>(_ => conclusions++);
-        concluded = () => conclusions;
-        return battle;
-    }
-
     // coop.debug.naval.win on the host: its end logic resolves the battle and the committer reports it.
-    private void ReportWin(NavalPeer host) => host.Call(() =>
-    {
-        host.Controller.ResultCommitter.AcceptResolvedState(BattleState.AttackerVictory);
-        host.Controller.ResultCommitter.ReportAcceptedResult();
-    }, VictoryConclusionDisabledMethods());
-
-    private void AssertMapEventRemoved(string mapEventId) =>
-        Server.Call(() => Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _)));
+    private void ReportWin(NavalPeer host) => ResolveOnHost(host, BattleState.AttackerVictory);
 }

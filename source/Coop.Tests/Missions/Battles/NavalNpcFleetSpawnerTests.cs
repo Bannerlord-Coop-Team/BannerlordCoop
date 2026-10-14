@@ -1,6 +1,7 @@
 ﻿#if DEBUG
 using HarmonyLib;
 using Missions.Naval;
+using TaleWorlds.Core;
 using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
@@ -41,6 +42,16 @@ public class NavalNpcFleetSpawnerTests
     public void Outcome_ReportsAFailedAttemptInsteadOfStayingReady(int hullsSpawned, string expected)
     {
         Assert.Equal(expected, NavalNpcFleetSpawner.Outcome(hullsSpawned));
+    }
+
+    [Theory]
+    [InlineData(NavalNpcFleetSpawner.Failed, BattleSideEnum.Defender)]
+    [InlineData(NavalNpcFleetSpawner.Fielded, BattleSideEnum.None)]
+    [InlineData(NavalNpcFleetSpawner.WaitingForReserve, BattleSideEnum.None)]
+    [InlineData(NavalNpcFleetSpawner.AlreadyFielded, BattleSideEnum.None)]
+    public void FailedSideOf_NamesTheEnemySideOnlyAfterAFailedAttempt(string state, BattleSideEnum expected)
+    {
+        Assert.Equal(expected, NavalNpcFleetSpawner.FailedSideOf(state, BattleSideEnum.Defender));
     }
 
     [Fact]

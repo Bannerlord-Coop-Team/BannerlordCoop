@@ -6,8 +6,12 @@ using GameInterface.Services.MapEvents;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.Players;
 using Newtonsoft.Json.Linq;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -61,6 +65,61 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         }
 
         return battle;
+    }
+
+    /// <summary>A two-player battle at sea or on land whose host the server elects from the mission-ready order, every member on the mesh.</summary>
+    protected NavalBattle StartServerBattle(bool atSea, out NavalPeer a, out NavalPeer b, out Func<int> concluded)
+    {
+        var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Attacker) });
+        a = battle["A"];
+        b = battle["B"];
+        Server.Call(() => Server.GetRegisteredObject<MapEvent>(battle.MapEventId).Position =
+            new CampaignVec2(Vec2.Zero, isOnLand: !atSea));
+
+        foreach (var peer in battle.Peers)
+        {
+            var member = peer;
+            Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(member.Id, member.Instance.NetPeer));
+            EnterBattle(member.Instance, battle.MapEventId);
+            Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionEntered(member.Id, battle.MapEventId));
+        }
+        AssertHost(Server, battle.MapEventId, "A", "B");
+
+        int conclusions = 0;
+        Server.Resolve<IMessageBroker>().Subscribe<MapEventConcluded>(_ => conclusions++);
+        concluded = () => conclusions;
+        return battle;
+    }
+
+    /// <summary>The battle host's end logic resolving the battle: its committer reports the result and snapshots it to the peers.</summary>
+    protected void ResolveOnHost(NavalPeer host, BattleState state) => host.Call(() =>
+    {
+        host.Controller.ResultCommitter.AcceptResolvedState(state);
+        host.Controller.ResultCommitter.ReportAcceptedResult();
+    }, VictoryConclusionDisabledMethods());
+
+    protected void AssertMapEventRemoved(string mapEventId) =>
+        Server.Call(() => Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _)));
+
+    /// <summary>
+    /// A client's naval end tally for a side, counted over its hulls the way <c>CoopNavalBattleEndLogic</c> counts them;
+    /// <paramref name="crew"/> holds the live crew per hull and defaults to none.
+    /// </summary>
+    protected static NavalSideTally EndTally(NavalPeer peer, BattleSideEnum side, int liveHumans,
+        IReadOnlyDictionary<Guid, int>? crew = null)
+    {
+        NavalSideTally tally = null!;
+        peer.Call(() =>
+        {
+            var hulls = peer.Registry.Ships.Select(ship =>
+            {
+                var hull = peer.Engine.Of(ship.Hull);
+                int crewAboard = crew != null && crew.TryGetValue(ship.ShipId, out int count) ? count : 0;
+                return new NavalHullCount(hull.Side, hull.SinkingState == BattleShipCondition.Sunk, crewAboard, 0);
+            }).ToList();
+            tally = NavalSideTally.Count(side, liveHumans, hulls);
+        });
+        return tally;
     }
 
     private static string MapEventPartyIdOf(EnvironmentInstance instance, string partyId)

@@ -73,6 +73,21 @@ public class CoopNavalBattleEndLogicTests
         Assert.Equal(expected, CoopNavalBattleEndLogic.ShouldCheckEnd(isLocalHost, released));
     }
 
+    // K3: a failed AI fleet never fields its side, which would otherwise hold the end checks, and the battle, open forever.
+    [Theory]
+    [InlineData(true, true, false, BattleSideEnum.None, false)]
+    [InlineData(true, true, false, BattleSideEnum.Defender, true)]
+    [InlineData(true, false, true, BattleSideEnum.Attacker, true)]
+    [InlineData(true, true, false, BattleSideEnum.Attacker, false)]
+    [InlineData(false, true, false, BattleSideEnum.Defender, false)]
+    [InlineData(true, false, false, BattleSideEnum.Defender, false)]
+    [InlineData(true, true, true, BattleSideEnum.None, true)]
+    public void ShouldReleaseHold_LetsTheSideOfAFailedFleetStartEmpty(bool activated, bool attackerFielded, bool defenderFielded,
+        BattleSideEnum failedFleetSide, bool expected)
+    {
+        Assert.Equal(expected, CoopNavalBattleEndLogic.ShouldReleaseHold(activated, attackerFielded, defenderFielded, failedFleetSide));
+    }
+
     [Fact]
     public void SideTally_UsesVanillasOutOfActionTroopCount()
     {

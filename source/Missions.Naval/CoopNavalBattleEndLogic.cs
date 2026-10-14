@@ -1,5 +1,7 @@
-﻿using Missions.Battles;
+﻿using Common.Logging;
+using Missions.Battles;
 using NavalDLC.Missions.Objects;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,17 +24,22 @@ internal enum NavalBattleOutcome
 /// </summary>
 public class CoopNavalBattleEndLogic : NavalBattleEndLogic
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<CoopNavalBattleEndLogic>();
+
     private readonly IBattleSession session;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly IBattleResultCommitter resultCommitter;
+    private readonly INavalNpcFleetSpawner npcFleet;
 
     private bool endChecksReleased;
 
-    public CoopNavalBattleEndLogic(IBattleSession session, IBattleDeploymentCoordinator deployment, IBattleResultCommitter resultCommitter)
+    public CoopNavalBattleEndLogic(IBattleSession session, IBattleDeploymentCoordinator deployment, IBattleResultCommitter resultCommitter,
+        INavalNpcFleetSpawner npcFleet)
     {
         this.session = session;
         this.deployment = deployment;
         this.resultCommitter = resultCommitter;
+        this.npcFleet = npcFleet;
     }
 
     public override void OnDeploymentFinished()
@@ -129,6 +136,15 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         };
     }
 
+    /// <summary>
+    /// The land hold's release rule, where a side whose AI fleet failed to field counts like a land side whose reserve was
+    /// abandoned: it may start empty, so its depletion ends the battle instead of the hold keeping it open forever.
+    /// </summary>
+    internal static bool ShouldReleaseHold(bool deploymentActivated, bool attackerFielded, bool defenderFielded,
+        BattleSideEnum failedFleetSide) =>
+        CoopBattleController.ShouldReleaseEndConditionHold(deploymentActivated, attackerFielded, defenderFielded,
+            failedFleetSide == BattleSideEnum.Attacker, failedFleetSide == BattleSideEnum.Defender);
+
     /// <summary>Whether this client runs the end checks: the battle host, once both sides have fielded troops.</summary>
     internal static bool ShouldCheckEnd(bool isLocalHost, bool endChecksReleased) => isLocalHost && endChecksReleased;
 
@@ -185,8 +201,12 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
             else if (team.Side == BattleSideEnum.Defender) defenderFielded = true;
         }
 
-        return CoopBattleController.ShouldReleaseEndConditionHold(deployment.IsActivated, attackerFielded, defenderFielded,
-            attackerMissingReserveAccepted: false, defenderMissingReserveAccepted: false);
+        var failedFleetSide = npcFleet.FailedSide;
+        bool released = ShouldReleaseHold(deployment.IsActivated, attackerFielded, defenderFielded, failedFleetSide);
+        if (released && failedFleetSide != BattleSideEnum.None)
+            Logger.Warning("[NavalBattle] End checks released for {MapEventId} although the {Side} AI fleet failed to field",
+                session.InstanceId, failedFleetSide);
+        return released;
     }
 
     // A copy's crew are puppets in the hull's formation, which the copy's NavalShipAgents never tracks.
