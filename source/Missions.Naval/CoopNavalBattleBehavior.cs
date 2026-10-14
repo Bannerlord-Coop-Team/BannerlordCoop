@@ -20,8 +20,10 @@ public class CoopNavalBattleBehavior : MissionLogic
     private int lastAgentCount = -1;
 
     public CoopNavalBattleBehavior(IBattleShipReplicator shipReplicator, IAgentStationUseReplicator stationUseReplicator,
-        INavalNpcFleetSpawner npcFleetSpawner, IBattleShipDamageRouter shipDamageRouter, NavalShipsLogic shipsLogic)
+        INavalNpcFleetSpawner npcFleetSpawner, INavalMigrationReserveFielder migrationReserveFielder,
+        IBattleShipDamageRouter shipDamageRouter, NavalShipsLogic shipsLogic)
     {
+        MigrationReserveFielder = migrationReserveFielder;
         ShipReplicator = shipReplicator;
         StationUseReplicator = stationUseReplicator;
         NpcFleetSpawner = npcFleetSpawner;
@@ -39,6 +41,8 @@ public class CoopNavalBattleBehavior : MissionLogic
 
     public INavalNpcFleetSpawner NpcFleetSpawner { get; }
 
+    public INavalMigrationReserveFielder MigrationReserveFielder { get; }
+
     public IBattleShipDamageRouter ShipDamageRouter { get; }
 
     public override void OnMissionTick(float dt)
@@ -47,6 +51,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         ShipReplicator.Tick(dt);
         StationUseReplicator.Tick(dt);
         NpcFleetSpawner.Tick();
+        MigrationReserveFielder.Tick();
         LogAgentCountDrop();
     }
 

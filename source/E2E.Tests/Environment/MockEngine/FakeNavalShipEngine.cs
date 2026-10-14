@@ -202,6 +202,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             SinkingState = old.SinkingState,
             Team = old.Team,
             Formation = old.Formation,
+            CrewCapacity = old.CrewCapacity,
         };
         hulls.Add(fresh);
         return fresh.Hull;
@@ -240,6 +241,19 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
     {
         var fake = Of(hull);
         return fake.IsCopy ? 0 : fake.SpawnableReserve;
+    }
+
+    public BattleSideEnum SideOf(MissionObject hull) => Of(hull).Side;
+
+    public int AddHullReserve(MissionObject hull, IReadOnlyList<IAgentOriginBase> origins)
+    {
+        var fake = Of(hull);
+        if (fake.IsCopy || fake.IsRemoved || fake.SinkingState > 0) return 0;
+
+        int taken = Math.Min(origins.Count, Math.Max(0, fake.CrewCapacity - fake.SpawnableReserve));
+        fake.ReservedOrigins.AddRange(origins.Take(taken));
+        fake.SpawnableReserve += taken;
+        return taken;
     }
 
     public bool IsSinking(MissionObject hull) => Of(hull).SinkingState > 0;
@@ -288,6 +302,10 @@ public sealed class FakeHull
     public int SinkingState { get; set; }
     /// <summary>Troops queued on the hull that can still field, as its NavalShipAgents would hold them.</summary>
     public int SpawnableReserve { get; set; }
+    /// <summary>How many troops the hull's reserve holds at most.</summary>
+    public int CrewCapacity { get; set; } = 40;
+    /// <summary>The troops <see cref="FakeNavalShipEngine.AddHullReserve"/> queued on the hull.</summary>
+    public List<IAgentOriginBase> ReservedOrigins { get; } = new();
     /// <summary>Left the mission: no longer one of the engine's hulls.</summary>
     public bool IsRemoved { get; set; }
     /// <summary>Pooled by deployment: still listed but removed for every station and condition purpose.</summary>

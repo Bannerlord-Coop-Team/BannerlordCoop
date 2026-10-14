@@ -229,12 +229,14 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
             controller.MissionComponent, shipEngine, controller.Deployment);
         var npcFleetSpawner = new NavalNpcFleetSpawner(controller.Session, shipReplicator, controller.MissionComponent.ShipRegistry,
             shipSnapshotBuilder, objectManager, playerManager, enemySide);
+        var migrationReserveFielder = new NavalMigrationReserveFielder(controller.Session, controller.ReinforcementFielder,
+            controller.MissionComponent.ShipRegistry, shipEngine, shipReplicator);
         var shipDamageRouter = new BattleShipDamageRouter(network, messageBroker, controller.Session, controller.MissionComponent,
             shipEngine);
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(shipReplicator, stationUseReplicator, npcFleetSpawner,
-            shipDamageRouter, mission.GetMissionBehavior<NavalShipsLogic>()));
+            migrationReserveFielder, shipDamageRouter, mission.GetMissionBehavior<NavalShipsLogic>()));
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(controller.Session, controller.Deployment, controller.ResultCommitter,
-            npcFleetSpawner, shipReplicator, shipEngine));
+            npcFleetSpawner, shipReplicator, shipEngine, migrationReserveFielder));
     }
 
 #if DEBUG

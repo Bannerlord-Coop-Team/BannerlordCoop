@@ -7,7 +7,9 @@ using Missions;
 using Missions.Battles;
 using Missions.Messages;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.Players;
+using Moq;
 using Newtonsoft.Json.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -118,7 +120,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 int reserve = hull.IsCopy ? peer.Ships.ReportedReserveOf(ship.Hull) : peer.Engine.ReadSpawnableReserve(ship.Hull);
                 return new NavalHullCount(hull.Side, hull.SinkingState == BattleShipCondition.Sunk, crewAboard, reserve);
             }).ToList();
-            tally = NavalSideTally.Count(side, liveHumans, hulls);
+            tally = NavalSideTally.Count(side, liveHumans, hulls, peer.MigrationReserve.PendingReserve(side));
         });
         return tally;
     }
@@ -256,6 +258,15 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             Stations = new AgentStationUseReplicator(Network, Broker, controller.Session, controller.MissionComponent, engine,
                 controller.Deployment);
             Damage = new BattleShipDamageRouter(Network, Broker, controller.Session, controller.MissionComponent, engine);
+            var reinforcements = new Mock<IReinforcementFielder>();
+            reinforcements.Setup(fielder => fielder.TakeMigrationReserve(It.IsAny<BattleSideEnum>())).Returns(() =>
+            {
+                var recovered = RecoveredReserve.ToList();
+                RecoveredReserve.Clear();
+                return recovered;
+            });
+            MigrationReserve = new NavalMigrationReserveFielder(controller.Session, reinforcements.Object,
+                controller.MissionComponent.ShipRegistry, engine, Ships);
         }
 
         public string Id { get; }
@@ -269,16 +280,20 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         public BattleShipReplicator Ships { get; }
         public AgentStationUseReplicator Stations { get; }
         public BattleShipDamageRouter Damage { get; }
+        public NavalMigrationReserveFielder MigrationReserve { get; }
+        /// <summary>The AI reserve the reinforcement fielder's roster recovery hands over at the next tick, as after a promotion.</summary>
+        public List<CoopAgentOrigin> RecoveredReserve { get; } = new();
         public INetworkShipRegistry Registry => Controller.MissionComponent.ShipRegistry;
         public INetworkAgentRegistry Agents => Controller.MissionComponent.AgentRegistry;
 
         public void Call(Action action, IEnumerable<MethodBase>? disabledMethods = null) => Instance.Call(action, disabledMethods);
 
-        /// <summary>One naval services tick in the live order: the ship replicator, then station use.</summary>
+        /// <summary>One naval services tick in the live order: the ship replicator, station use, then the migration reserve.</summary>
         public void Tick(float dt = TickSeconds) => Call(() =>
         {
             Ships.Tick(dt);
             Stations.Tick(dt);
+            MigrationReserve.Tick();
         });
 
         public void Ticks(int count)

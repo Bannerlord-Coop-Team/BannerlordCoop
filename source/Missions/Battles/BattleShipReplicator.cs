@@ -53,6 +53,9 @@ public interface IBattleShipReplicator : IDisposable
     /// </summary>
     int ReportedReserveOf(MissionObject hull);
 
+    /// <summary>[Game thread] Whether an AI hull this client took over is still being replaced by a simulated one.</summary>
+    bool IsReplacingHull(Guid shipId);
+
     /// <summary>
     /// [Game thread] Sends the own hulls' rope state once more as the mission ends, while the hulls are still live; samples
     /// end with the mission, so peers would otherwise keep the last sample.
@@ -242,6 +245,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         hullSwaps.Add(new HullSwap(shipId));
         return null;
     }
+
+    public bool IsReplacingHull(Guid shipId) => hullSwaps.Any(swap => swap.ShipId == shipId);
 
     // A hull handed away mid-swap gets its parked agents back before it turns into a copy.
     private void ReleaseNpcHull(NetworkShipInfo ship)

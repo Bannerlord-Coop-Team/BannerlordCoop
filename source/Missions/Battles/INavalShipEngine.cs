@@ -1,6 +1,7 @@
 ﻿using Missions.Messages;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -115,6 +116,15 @@ public interface INavalShipEngine
 
     /// <summary>Troops queued on a hull this client simulates that can still field; none on a copy, whose queue lives on its owner.</summary>
     int ReadSpawnableReserve(MissionObject hull);
+
+    /// <summary>The battle side of the hull's team.</summary>
+    BattleSideEnum SideOf(MissionObject hull);
+
+    /// <summary>
+    /// [Game thread] Queues troops on an afloat hull this client simulates, in order and up to its crew capacity, and has its
+    /// team spawn them as reinforcements. How many it took; none on a copy.
+    /// </summary>
+    int AddHullReserve(MissionObject hull, IReadOnlyList<IAgentOriginBase> origins);
 
     /// <summary>Whether the hull is sinking or has sunk.</summary>
     bool IsSinking(MissionObject hull);

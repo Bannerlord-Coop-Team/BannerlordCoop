@@ -32,11 +32,13 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private readonly INavalNpcFleetSpawner npcFleet;
     private readonly IBattleShipReplicator shipReplicator;
     private readonly INavalShipEngine shipEngine;
+    private readonly INavalMigrationReserveFielder migrationReserve;
 
     private bool endChecksReleased;
 
     public CoopNavalBattleEndLogic(IBattleSession session, IBattleDeploymentCoordinator deployment, IBattleResultCommitter resultCommitter,
-        INavalNpcFleetSpawner npcFleet, IBattleShipReplicator shipReplicator, INavalShipEngine shipEngine)
+        INavalNpcFleetSpawner npcFleet, IBattleShipReplicator shipReplicator, INavalShipEngine shipEngine,
+        INavalMigrationReserveFielder migrationReserve)
     {
         this.session = session;
         this.deployment = deployment;
@@ -44,6 +46,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         this.npcFleet = npcFleet;
         this.shipReplicator = shipReplicator;
         this.shipEngine = shipEngine;
+        this.migrationReserve = migrationReserve;
     }
 
     public override void OnDeploymentFinished()
@@ -236,7 +239,8 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
             if (team.Side == side) liveHumans += team.ActiveAgents.Count(agent => agent.IsHuman);
         }
 
-        return NavalSideTally.Count(side, liveHumans, HullCounts(crewByFormation));
+        // Reserve a promoted host recovered still waits for a hull, yet keeps the side alive.
+        return NavalSideTally.Count(side, liveHumans, HullCounts(crewByFormation), migrationReserve.PendingReserve(side));
     }
 
     private IEnumerable<NavalHullCount> HullCounts(Dictionary<Formation, int> crewByFormation)

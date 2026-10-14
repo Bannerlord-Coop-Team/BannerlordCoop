@@ -497,6 +497,34 @@ public class NavalShipEngine : INavalShipEngine
         return Math.Max(0, agentsLogic.GetTotalTroopCountOfShip(ship, spawnableReservesOnly: true) - active);
     }
 
+    public BattleSideEnum SideOf(MissionObject hull) => ((MissionShip)hull).Team?.Side ?? BattleSideEnum.None;
+
+    public int AddHullReserve(MissionObject hull, IReadOnlyList<IAgentOriginBase> origins)
+    {
+        var ship = (MissionShip)hull;
+        var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
+        if (agentsLogic == null || ship.Team == null || ship.IsSinking || ship.IsRemoved || NavalForeignHulls.Contains(ship)) return 0;
+
+        // A taken-over hull never had its crew target set; vanilla's unbalanced AutoComputeDesiredTroopCountsPerShip uses the capacity.
+        agentsLogic.SetDesiredTroopCountOfShip(ship, ship.TotalCrewCapacity);
+        int added = 0;
+        foreach (var origin in origins)
+        {
+            if (!agentsLogic.AddReservedTroopToShip(origin, ship)) break;
+            added++;
+        }
+
+        // The NPC fleet spawner's crewing: the team spawns its hulls' reserve on reinforcement timers.
+        var teamSide = ship.Team.TeamSide;
+        if (added > 0 && !agentsLogic.GetSpawnReinforcementsOnTick(teamSide))
+        {
+            agentsLogic.InitializeReinforcementTimers(teamSide);
+            agentsLogic.SetSpawnReinforcementsOnTick(teamSide, true, resetShips: false);
+        }
+
+        return added;
+    }
+
     public bool IsSinking(MissionObject hull) => hull is MissionShip ship && ship.IsSinking;
 
     public bool IsHullRemoved(MissionObject hull) => hull is MissionShip ship && (ship.IsRemoved || !ship.GameEntity.IsValid);

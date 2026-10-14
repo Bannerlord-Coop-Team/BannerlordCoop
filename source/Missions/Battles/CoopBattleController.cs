@@ -65,6 +65,10 @@ public class CoopBattleController : CoopMissionController
 
     /// <summary>BR-102: the battle's shared host-epoch receiver policy for host-authority messages.</summary>
     public IHostEpochPolicy HostEpochPolicy { get; }
+
+    /// <summary>Recovers a promoted host's newly owned reserve; a naval battle takes it to field on its hulls.</summary>
+    public IReinforcementFielder ReinforcementFielder => reinforcementFielder;
+
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
     private readonly IAgentDeathReporter deathReporter;

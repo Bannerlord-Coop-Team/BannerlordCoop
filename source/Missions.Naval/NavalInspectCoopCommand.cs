@@ -83,6 +83,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
         return new
         {
             spawner = naval?.NpcFleetSpawner.Inspect(),
+            migrationReserve = naval?.MigrationReserveFielder.Inspect(),
             isLocalHost = controller.Session.IsLocalHost,
             hulls = hulls.Length,
             sinkingOrSunk = hulls.Length - afloat.Length,

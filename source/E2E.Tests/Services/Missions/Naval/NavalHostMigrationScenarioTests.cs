@@ -1,4 +1,6 @@
-﻿using TaleWorlds.Core;
+﻿using GameInterface.Services.MapEvents.TroopSupply;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit.Abstractions;
@@ -79,6 +81,41 @@ public class NavalHostMigrationScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(pirates.Length, b.Engine.Boardings.Count);
         b.Ticks(3);
         Assert.Equal(pirates.Length, b.Engine.Boardings.Count);
+    }
+
+    // K5: the old host's queued AI crew left with it. The promoted host recovers those troops from the roster (the
+    // reinforcement fielder's recovery, stubbed here) and queues them on the AI hulls once each is replaced by a simulated one,
+    // up to each hull's capacity; until then they keep the pirate side alive as pending reserve, and afterwards its samples
+    // report them to every client.
+    [Fact]
+    public void Migration_TheNewHostQueuesTheRecoveredAiReserveOnTheHullsItNowSimulates()
+    {
+        using var battle = StartPirateBattle(out var a, out var b, out var c, out var pirates);
+        foreach (var pirate in pirates)
+        {
+            a.Hull(pirate).SpawnableReserve = 10;
+            b.Hull(pirate).CrewCapacity = 8;
+        }
+        battle.TickAll(2);
+        Assert.All(pirates, pirate => Assert.Equal(10, (int)c.Stream(pirate)["reserve"]!));
+
+        battle.MigrateHost(a, "B");
+        b.Call(() => b.RecoveredReserve.AddRange(Enumerable.Range(1, 15).Select(seed => new CoopAgentOrigin(
+            (CharacterObject)Game.Current.PlayerTroop, null, 0, null, new UniqueTroopDescriptor(seed), battle.PirateMapEventPartyId))));
+        b.Tick();
+
+        var whileSwapping = EndTally(b, BattleSideEnum.Defender, liveHumans: 0);
+        Assert.All(pirates, pirate => Assert.Equal(0, b.Hull(pirate).SpawnableReserve));
+        Assert.Equal(15, whileSwapping.Reserve);
+        Assert.False(whileSwapping.IsDepleted);
+
+        b.Ticks(3);
+        Assert.All(pirates, pirate => Assert.False(b.Hull(pirate).IsCopy));
+        Assert.Equal(new[] { 8, 7 }, pirates.Select(pirate => b.Hull(pirate).SpawnableReserve));
+        Assert.Equal(15, EndTally(b, BattleSideEnum.Defender, liveHumans: 0).Reserve);
+
+        battle.TickAll(2);
+        Assert.Equal(new[] { 8, 7 }, pirates.Select(pirate => (int)c.Stream(pirate)["reserve"]!));
     }
 
     // vs_pirates for three players; the battle host A simulates two AI hulls.
