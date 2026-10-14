@@ -123,7 +123,8 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
 
             using var current = Process.GetCurrentProcess();
             string? currentPath = ProgramPath(current);
-            int[] sameProgram = pids.Where(pid => pid != current.Id && IsSameProgram(pid, currentPath)).ToArray();
+            string? currentApp = HostedApplication(ReadCommandLine(current.Id));
+            int[] sameProgram = pids.Where(pid => pid != current.Id && IsSameProgram(pid, currentPath, currentApp)).ToArray();
             return FormatOwners(pids.Select(NameOwner).ToArray(), current.Id, current.ProcessName, sameProgram);
         }
         catch (Exception)
@@ -132,20 +133,113 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
         }
     }
 
-    // The dedicated server engine runs as a generic dotnet host, so only the same executable marks a leftover server.
-    // The paths are compared, never logged, because they hold the user name.
-    private static bool IsSameProgram(int pid, string? currentPath)
+    // Paths and command lines are compared, never logged, because they hold the user name.
+    private static bool IsSameProgram(int pid, string? currentPath, string? currentApp)
     {
-        if (currentPath == null) return false;
-
         try
         {
             using var process = Process.GetProcessById(pid);
-            return string.Equals(ProgramPath(process), currentPath, StringComparison.OrdinalIgnoreCase);
+            string? path = ProgramPath(process);
+            string? app = path != null && IsGenericHost(path) ? HostedApplication(ReadCommandLine(pid)) : null;
+            return IsSameProgram(currentPath, currentApp, path, app);
         }
         catch (Exception)
         {
             return false;
+        }
+    }
+
+    /// <summary>
+    /// True when the other process runs this process's executable and, for a generic .NET host such as the
+    /// dedicated server engine's dotnet.exe, the same hosted application. One dotnet.exe can run any app, so
+    /// the executable alone says nothing; an unknown hosted application never counts as the same program.
+    /// </summary>
+    internal static bool IsSameProgram(string? currentPath, string? currentApp, string? otherPath, string? otherApp)
+    {
+        if (currentPath == null || otherPath == null) return false;
+        if (!string.Equals(currentPath, otherPath, StringComparison.OrdinalIgnoreCase)) return false;
+        if (!IsGenericHost(currentPath)) return true;
+
+        return currentApp != null && string.Equals(currentApp, otherApp, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsGenericHost(string path) =>
+        GenericHostNames.Contains(System.IO.Path.GetFileNameWithoutExtension(path), StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The application a dotnet host runs: the file name of the first .dll on its command line, as in
+    /// "dotnet.exe TaleWorlds.Starter.DotNetCore.dll _MODULES_...". Null when there is none.
+    /// </summary>
+    internal static string? HostedApplication(string? commandLine)
+    {
+        if (string.IsNullOrWhiteSpace(commandLine)) return null;
+
+        foreach (string arg in SplitCommandLine(commandLine!).Skip(1))
+        {
+            if (arg.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) return System.IO.Path.GetFileName(arg);
+        }
+
+        return null;
+    }
+
+    // Whitespace separates arguments except inside double quotes; enough to find the hosted .dll.
+    private static IEnumerable<string> SplitCommandLine(string commandLine)
+    {
+        var current = new System.Text.StringBuilder();
+        bool quoted = false;
+        foreach (char c in commandLine)
+        {
+            if (c == '"')
+            {
+                quoted = !quoted;
+                continue;
+            }
+
+            if (char.IsWhiteSpace(c) && !quoted)
+            {
+                if (current.Length > 0) yield return current.ToString();
+                current.Clear();
+                continue;
+            }
+
+            current.Append(c);
+        }
+
+        if (current.Length > 0) yield return current.ToString();
+    }
+
+    // ProcessCommandLineInformation (Windows 8.1+) needs only limited query access, unlike reading the target's PEB.
+    internal static string? ReadCommandLine(int pid)
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return null;
+
+        IntPtr handle = IntPtr.Zero;
+        IntPtr buffer = IntPtr.Zero;
+        try
+        {
+            handle = OpenProcess(ProcessQueryLimitedInformation, false, pid);
+            if (handle == IntPtr.Zero) return null;
+
+            NtQueryInformationProcess(handle, ProcessCommandLineInformation, IntPtr.Zero, 0, out int size);
+            if (size <= 0 || size > MaxCommandLineBytes) return null;
+
+            buffer = Marshal.AllocHGlobal(size);
+            if (NtQueryInformationProcess(handle, ProcessCommandLineInformation, buffer, size, out _) != 0) return null;
+
+            // UNICODE_STRING: ushort Length (bytes), ushort MaximumLength, then the text pointer at pointer alignment.
+            int length = Marshal.ReadInt16(buffer) & 0xFFFF;
+            IntPtr text = Marshal.ReadIntPtr(buffer, IntPtr.Size);
+            return text == IntPtr.Zero ? null : Marshal.PtrToStringUni(text, length / 2);
+        }
+        catch (Exception)
+        {
+            // EntryPointNotFound on older Windows or Wine; the leftover-server hint is only skipped.
+            return null;
+        }
+        finally
+        {
+            if (buffer != IntPtr.Zero) Marshal.FreeHGlobal(buffer);
+            if (handle != IntPtr.Zero) CloseHandle(handle);
         }
     }
 
@@ -284,8 +378,21 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
     private const int AfInet6 = 23;
     private const int UdpTableOwnerPid = 1;
     private const uint ErrorInsufficientBuffer = 122;
+    private const uint ProcessQueryLimitedInformation = 0x1000;
+    private const int ProcessCommandLineInformation = 60;
+    private const int MaxCommandLineBytes = 1 << 20;
 
     [DllImport("iphlpapi.dll")]
     private static extern uint GetExtendedUdpTable(
         IntPtr table, ref int size, bool order, int addressFamily, int tableClass, int reserved);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint desiredAccess, bool inheritHandle, int processId);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("ntdll.dll")]
+    private static extern int NtQueryInformationProcess(
+        IntPtr processHandle, int processInformationClass, IntPtr processInformation, int length, out int returnLength);
 }

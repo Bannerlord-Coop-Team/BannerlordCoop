@@ -135,6 +135,65 @@ public class UdpBindDiagnosticsTests
                 new[] { (1234, (string?)"dotnet"), (5678, (string?)"dotnet") }, 99, "dotnet", new[] { 1234 }));
     }
 
+    private const string EngineHost = @"C:\Games\DedicatedServer\engine\dotnet\dotnet.exe";
+    private const string EngineApp = "TaleWorlds.Starter.DotNetCore.dll";
+
+    [Fact]
+    public void IsSameProgram_SameDotnetHost_OnlyTheSameHostedApplicationMatches()
+    {
+        // Two different assemblies run by one dotnet.exe: only the co-op engine is the same program (#3891).
+        Assert.True(UdpBindDiagnostics.IsSameProgram(EngineHost, EngineApp, EngineHost, EngineApp));
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, EngineApp, EngineHost, "SomeOtherTool.dll"));
+    }
+
+    [Fact]
+    public void IsSameProgram_UnknownHostedApplication_NeverMatches()
+    {
+        // A command line that could not be read must not turn an unrelated dotnet process into a co-op server.
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, EngineApp, EngineHost, null));
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, null, EngineHost, null));
+    }
+
+    [Fact]
+    public void IsSameProgram_OtherExecutable_NeverMatches()
+    {
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, EngineApp, @"C:\Program Files\dotnet\dotnet.exe", EngineApp));
+        Assert.False(UdpBindDiagnostics.IsSameProgram(null, EngineApp, EngineHost, EngineApp));
+    }
+
+    [Fact]
+    public void IsSameProgram_DedicatedExecutable_MatchesOnItsPath()
+    {
+        const string server = @"C:\Games\DedicatedServer\BannerlordCoopServer.exe";
+        Assert.True(UdpBindDiagnostics.IsSameProgram(server, null, server, null));
+    }
+
+    [Theory]
+    [InlineData(@"""C:\Games\engine\dotnet\dotnet.exe"" TaleWorlds.Starter.DotNetCore.dll _MODULES_*Native*Coop*_MODULES_ /dedicatedcustomserver 7210 EU 0", EngineApp)]
+    [InlineData(@"dotnet exec --runtimeconfig x.json ""C:\My Tools\Other Tool.dll"" --port 4200", "Other Tool.dll")]
+    [InlineData(@"dotnet.exe --version", null)]
+    [InlineData(@"", null)]
+    [InlineData(null, null)]
+    public void HostedApplication_IsTheFirstDllOnTheCommandLine(string? commandLine, string? expected)
+    {
+        Assert.Equal(expected, UdpBindDiagnostics.HostedApplication(commandLine));
+    }
+
+    [Fact]
+    public void ReadCommandLine_CurrentProcess_ReturnsItsCommandLine()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            Assert.Null(UdpBindDiagnostics.ReadCommandLine(Environment.ProcessId));
+            return;
+        }
+
+        using var current = System.Diagnostics.Process.GetCurrentProcess();
+        string? commandLine = UdpBindDiagnostics.ReadCommandLine(current.Id);
+        Assert.NotNull(commandLine);
+        Assert.Contains(current.ProcessName, commandLine, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public void FormatOwners_CurrentProcess_IsThisProcess()
     {
