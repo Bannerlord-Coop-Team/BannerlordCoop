@@ -5,12 +5,15 @@ using Common.Network;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using LiteNetLib;
 using Serilog;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -22,20 +25,22 @@ internal class LeaveSoldiersBehindHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IEncounterGameMenuBehaviorInterface encounterGameMenuBehaviorInterface;
+    private readonly IPlayerManager playerManager;
 
-    // Only touched on the game thread.
-    private readonly ConditionalWeakTable<MobileParty, MapEvent> appliedMapEvents = new ConditionalWeakTable<MobileParty, MapEvent>();
+    private readonly ConditionalWeakTable<MobileParty, MapEvent> appliedMapEvents = new();
 
     public LeaveSoldiersBehindHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IEncounterGameMenuBehaviorInterface encounterGameMenuBehaviorInterface)
+        IEncounterGameMenuBehaviorInterface encounterGameMenuBehaviorInterface,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.encounterGameMenuBehaviorInterface = encounterGameMenuBehaviorInterface;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<PlayerLeftSoldiersBehind>(Handle_PlayerLeftSoldiersBehind);
         messageBroker.Subscribe<NetworkPlayerLeftSoldiersBehind>(Handle_NetworkPlayerLeftSoldiersBehind);
@@ -59,7 +64,16 @@ internal class LeaveSoldiersBehindHandler : IHandler
 
     private void Handle_NetworkPlayerLeftSoldiersBehind(MessagePayload<NetworkPlayerLeftSoldiersBehind> obj)
     {
+        if (ModInformation.IsClient) return;
+
         var data = obj.What;
+
+        if (obj.Who is not NetPeer peer || !playerManager.TryGetPlayer(peer, out var player) ||
+            player.HeroId != data.MainHeroId || player.MobilePartyId != data.MainPartyId)
+        {
+            Logger.Warning("Ignoring leave soldiers behind for party {PartyId} the sender does not control", data.MainPartyId);
+            return;
+        }
 
         GameThread.RunSafe(() =>
         {
@@ -67,9 +81,15 @@ internal class LeaveSoldiersBehindHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
 
-            // A repeated request for the same map event (double click, resent message) must not sacrifice twice.
             var mapEvent = mainParty.MapEvent;
-            if (mapEvent != null && appliedMapEvents.TryGetValue(mainParty, out var appliedMapEvent) && appliedMapEvent == mapEvent)
+            if (mapEvent == null || mapEvent.IsFinalized || mapEvent.BattleState != BattleState.None)
+            {
+                Logger.Warning("Ignoring leave soldiers behind: party {Party} is not in an unresolved battle", mainParty.StringId);
+                return;
+            }
+
+            // A repeated request for the same map event (double click, resent message) must not sacrifice twice.
+            if (appliedMapEvents.TryGetValue(mainParty, out var appliedMapEvent) && appliedMapEvent == mapEvent)
             {
                 Logger.Warning("Ignoring repeated leave soldiers behind for {Party}", mainParty.StringId);
                 return;
@@ -77,7 +97,6 @@ internal class LeaveSoldiersBehindHandler : IHandler
 
             encounterGameMenuBehaviorInterface.LeftSoldiersBehindConsequence(encounterGameMenuBehavior, mainHero, mainParty);
 
-            if (mapEvent == null) return;
             appliedMapEvents.Remove(mainParty);
             appliedMapEvents.Add(mainParty, mapEvent);
         });

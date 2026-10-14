@@ -214,7 +214,9 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             sallyOut ? MapEvent.BattleTypes.SallyOut : MapEvent.BattleTypes.Siege);
         var leavingClient = Clients.First();
         SetMainParty(leavingClient, partyId);
-        SetMainHero(leavingClient);
+        var heroId = SetMainHero(leavingClient);
+        RegisterAsPlayerParty("PlayerOne", heroId, partyId);
+        TestEnvironment.ConnectRegisteredPlayer(leavingClient, "PlayerOne");
         var siegeEventId = SetClientOnlyCamp(leavingClient, partyId);
         SetCamp(Server, partyId, siegeEventId);
         AddEncounterGameMenuBehavior(Server);
@@ -242,6 +244,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
         AddEncounterGameMenuBehavior(Server);
         var client = Clients.First();
+        RegisterAsPlayerParty("PlayerOne", heroId, partyId);
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
 
         using var recorder = new LeftSoldiersBehindRecorder();
         client.Call(() =>
@@ -879,7 +883,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
         .ToList();
 
-    private void SetMainHero(EnvironmentInstance instance)
+    private string SetMainHero(EnvironmentInstance instance)
     {
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
         instance.Call(() =>
@@ -888,6 +892,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             Game.Current.PlayerTroop = hero.CharacterObject;
             Assert.Same(hero, Hero.MainHero);
         });
+        return heroId;
     }
 
     private static void AddEncounterGameMenuBehavior(EnvironmentInstance instance)
