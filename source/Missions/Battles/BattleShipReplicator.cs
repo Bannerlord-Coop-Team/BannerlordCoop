@@ -96,6 +96,9 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly Dictionary<Guid, NetworkBattleShipSample> heldSamples = new Dictionary<Guid, NetworkBattleShipSample>();
     private readonly Dictionary<Guid, NetworkBattleRopeFinal> heldFinalRopes = new Dictionary<Guid, NetworkBattleRopeFinal>();
     private readonly HashSet<Guid> heldForDeployment = new HashSet<Guid>();
+    // Departures come over the campaign connection and samples over the mission mesh, so a departed owner's late sample is not
+    // ordered behind its departure; its reserve stays dropped until the controller enters again.
+    private readonly HashSet<string> departedControllers = new HashSet<string>();
     // The host AI hulls last migrated to, so an AI copy whose record was still waiting registers under it too.
     private string npcHullHost;
     private bool spawningForeignHull;
@@ -165,6 +168,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         heldSamples.Clear();
         heldFinalRopes.Clear();
         heldForDeployment.Clear();
+        departedControllers.Clear();
     }
 
     // [Game thread] Published synchronously by the spawn postfix. Hulls this client fields go on PlayerTeam; the
@@ -762,6 +766,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         stream.TargetReceivedAt = elapsed;
         stream.Accepted = sample.Sequence;
         stream.Elapsed = 0;
+        if (departedControllers.Contains(sample.OwnerControllerId)) return;
+
         stream.ReportedReserve = sample.SpawnableReserve;
         stream.HasReportedReserve = true;
     }
@@ -783,7 +789,6 @@ public class BattleShipReplicator : IBattleShipReplicator
     private void Handle_MissionPeerDisconnected(MessagePayload<MissionPeerDisconnected> payload) =>
         ForgetReportsOfDeparted(payload.What.ControllerId, payload.What.InstanceId);
 
-    // On the game thread, so the departure stays ordered behind the samples the owner sent before it left.
     private void ForgetReportsOfDeparted(string controllerId, string instanceId)
     {
         if (string.IsNullOrEmpty(controllerId) || (instanceId != null && instanceId != session.InstanceId)) return;
@@ -791,9 +796,10 @@ public class BattleShipReplicator : IBattleShipReplicator
         GameThread.RunSafe(() => ForgetReportedReserveOf(controllerId), context: nameof(ForgetReportsOfDeparted));
     }
 
-    /// <summary>[Game thread] Drops the reserve a departed controller reported for the hulls it held.</summary>
+    /// <summary>[Game thread] Drops the reserve a departed controller reported for the hulls it held, and ignores its late reports.</summary>
     internal void ForgetReportedReserveOf(string controllerId)
     {
+        departedControllers.Add(controllerId);
         foreach (var ship in Registry.Ships)
         {
             if (ship.CurrentAuthority == controllerId && streams.TryGetValue(ship.ShipId, out var stream))
@@ -947,6 +953,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         GameThread.RunSafe(() =>
         {
+            departedControllers.Remove(entered.ControllerId);
             if (spawnRecordsSent && !session.IsOwn(entered.ControllerId))
                 SendSpawnRecords(entered.ControllerId);
         }, context: nameof(Handle_PeerEntered));

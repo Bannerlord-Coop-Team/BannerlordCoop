@@ -107,9 +107,13 @@ public class NavalNaturalEndScenarioTests : NavalBattleTestEnvironment
         battle.TickAll(2);
         Assert.Equal(20, EndTally(a, BattleSideEnum.Attacker, liveHumans: 0).Reserve);
 
-        b.Call(b.Network.Stop);
         a.Call(() => a.Broker.Publish(a, new MissionPeerLeft(b.Id, battle.MapEventId)));
-        a.Ticks(2);
+        a.Ticks(1);
+        long acceptedAtDeparture = (long)a.Stream(hullB)["accepted"]!;
+        // B's mission mesh is not ordered with the departure, so its samples can still arrive after it.
+        battle.TickAll(2);
+
+        Assert.True((long)a.Stream(hullB)["accepted"]! > acceptedAtDeparture);
 
         Assert.Equal(0, EndTally(a, BattleSideEnum.Attacker, liveHumans: 0).Reserve);
         Assert.True(EndTally(a, BattleSideEnum.Attacker, liveHumans: 0).IsDepleted);

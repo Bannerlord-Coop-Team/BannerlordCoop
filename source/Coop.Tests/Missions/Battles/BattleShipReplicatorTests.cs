@@ -141,7 +141,7 @@ public class BattleShipReplicatorTests
     }
 
     [Fact]
-    public void ReportedReserveOf_DropsTheReport_WhenItsOwnerLeaves_UntilAFreshReport()
+    public void ReportedReserveOf_DropsTheReport_WhenItsOwnerLeaves()
     {
         var harness = new Harness(committed: false);
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
@@ -151,11 +151,29 @@ public class BattleShipReplicatorTests
         harness.Replicator.ForgetReportedReserveOf("someone_else");
         int afterOtherLeft = harness.Replicator.ReportedReserveOf(copy);
         harness.Replicator.ForgetReportedReserveOf(Peer);
-        int afterOwnerLeft = harness.Replicator.ReportedReserveOf(copy);
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 2, frame, spawnableReserve: 4));
 
         Assert.Equal(12, afterOtherLeft);
-        Assert.Equal(0, afterOwnerLeft);
+        Assert.Equal(0, harness.Replicator.ReportedReserveOf(copy));
+    }
+
+    // M12 r1: the departure comes over the campaign connection, so a sample the owner sent before leaving can arrive after it.
+    [Fact]
+    public void ReportedReserveOf_IgnoresALateSampleOfADepartedOwner_UntilItEntersAgain()
+    {
+        var harness = new Harness(committed: false);
+        var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
+        var frame = NetworkBattleShipSample.FromFrame(MatrixFrame.Identity);
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 1, frame, spawnableReserve: 12));
+
+        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
+        GameThread.Run(() => { }, blocking: true);
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 2, frame, spawnableReserve: 9));
+        int afterLateSample = harness.Replicator.ReportedReserveOf(copy);
+        harness.Broker.Publish(this, new NetworkMissionPeerEntered(Peer, Instance));
+        GameThread.Run(() => { }, blocking: true);
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 3, frame, spawnableReserve: 4));
+
+        Assert.Equal(0, afterLateSample);
         Assert.Equal(4, harness.Replicator.ReportedReserveOf(copy));
     }
 
