@@ -224,8 +224,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         public Guid FieldPlayerHull(NavalPeer owner, Vec3 position) =>
             owner.FieldOwnHull(owner.Side, position, PartyIds[owner.Id]);
 
-        public Guid FieldAiHull(NavalPeer host, BattleSideEnum side, Vec3 position) =>
-            host.FieldAiHull(side, position, PirateMapEventPartyId);
+        public Guid FieldAiHull(NavalPeer host, BattleSideEnum side, Vec3 position, int? formationIndex = null) =>
+            host.FieldAiHull(side, position, PirateMapEventPartyId, formationIndex);
 
         public void Dispose()
         {
@@ -307,11 +307,20 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             return shipId;
         }
 
-        /// <summary>[Battle host] An AI party's hull, registered and announced through the replicator.</summary>
-        public Guid FieldAiHull(BattleSideEnum side, Vec3 position, string mapEventPartyId)
+        /// <summary>
+        /// [Battle host] An AI party's hull, registered and announced through the replicator; with a
+        /// <paramref name="formationIndex"/> it takes that formation of the side's main team, as the NPC fleet spawner does.
+        /// </summary>
+        public Guid FieldAiHull(BattleSideEnum side, Vec3 position, string mapEventPartyId, int? formationIndex = null)
         {
             var shipId = Guid.Empty;
-            Call(() => shipId = Ships.RegisterNpcHull(Engine.Field(side, position).Hull, null, mapEventPartyId));
+            Call(() =>
+            {
+                var team = formationIndex == null ? null
+                    : side == BattleSideEnum.Attacker ? Mission.AttackerTeam.Shell : Mission.DefenderTeam.Shell;
+                var hull = Engine.Field(side, position, formationIndex ?? 0, team);
+                shipId = Ships.RegisterNpcHull(hull.Hull, hull.Formation!, mapEventPartyId);
+            });
             Assert.NotEqual(Guid.Empty, shipId);
             return shipId;
         }
@@ -348,14 +357,18 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             return stats;
         }
 
-        /// <summary>A headless agent registered under <paramref name="authority"/>, as a replicated crew member or own troop.</summary>
-        public Agent RegisterAgent(Guid agentId, string authority)
+        /// <summary>
+        /// A headless agent registered under <paramref name="authority"/>, as a replicated crew member or own troop; with a
+        /// <paramref name="team"/> it joins that team, as crew join their hull's team.
+        /// </summary>
+        public Agent RegisterAgent(Guid agentId, string authority, MockTeam? team = null)
         {
             Agent agent = null!;
             Call(() =>
             {
-                agent = Mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
-                    .Controller(authority == Id ? AgentControllerType.AI : AgentControllerType.None));
+                var build = new AgentBuildData(Game.Current.PlayerTroop)
+                    .Controller(authority == Id ? AgentControllerType.AI : AgentControllerType.None);
+                agent = Mission.SpawnAgent(team == null ? build : build.Team(team.Shell));
                 Assert.True(Agents.TryRegisterAgent(authority, agentId, agent));
             });
             return agent;

@@ -1,4 +1,5 @@
 ﻿using E2E.Tests.Util;
+using HarmonyLib;
 using Missions.Battles;
 using Missions.Messages;
 using TaleWorlds.Core;
@@ -42,15 +43,38 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
 
     public List<MissionObject> Releases { get; } = new();
 
-    /// <summary>Creates a simulated hull this client fields, as vanilla's team setup does.</summary>
-    public FakeHull Field(BattleSideEnum side, Vec3 position, int formationIndex = 0)
+    /// <summary>
+    /// Creates a simulated hull this client fields, as vanilla's team setup does; with a <paramref name="team"/> it takes that
+    /// team's formation at <paramref name="formationIndex"/>.
+    /// </summary>
+    public FakeHull Field(BattleSideEnum side, Vec3 position, int formationIndex = 0, Team? team = null)
     {
         var hull = new FakeHull(MissionTestObjects.CreateHull(), side, formationIndex, isCopy: false)
         {
             Frame = new MatrixFrame(Mat3.Identity, position),
+            Team = team,
+            Formation = team == null ? null : FormationOf(team, formationIndex),
         };
         hulls.Add(hull);
         return hull;
+    }
+
+    // NavalShipsLogic.FindFirstFormationWithoutShip: a copy takes its team's first formation no live hull holds here.
+    private int FirstFreeFormation(Team team)
+    {
+        var taken = hulls.Where(hull => !hull.IsRemoved && hull.Team == team && hull.Formation != null)
+            .Select(hull => hull.FormationIndex).ToHashSet();
+        return Enumerable.Range(0, 8).First(index => !taken.Contains(index));
+    }
+
+    // The headless team's formation shell, carrying its index as a live Formation does.
+    private static Formation? FormationOf(Team team, int formationIndex)
+    {
+        if (!MockTeam.ForShell(team, out var mockTeam)) return null;
+
+        var formation = mockTeam.GetFormation((FormationClass)formationIndex).Shell;
+        AccessTools.Field(typeof(Formation), nameof(Formation.FormationIndex)).SetValue(formation, (FormationClass)formationIndex);
+        return formation;
     }
 
     public FakeHull Of(MissionObject hull) => hulls.Single(candidate => ReferenceEquals(candidate.Hull, hull));
@@ -73,15 +97,18 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             return null!;
         }
 
-        var copy = new FakeHull(MissionTestObjects.CreateHull(), data.Side, data.FormationIndex, isCopy: true)
+        int formationIndex = FirstFreeFormation(team);
+        var copy = new FakeHull(MissionTestObjects.CreateHull(), data.Side, formationIndex, isCopy: true)
         {
             Frame = NetworkBattleShipSample.ToFrame(data.Frame),
             HitPoints = data.HitPoints,
             SailHitPoints = data.SailHitPoints,
             Team = team,
+            Formation = FormationOf(team, formationIndex),
             SpawnData = data,
         };
         hulls.Add(copy);
+        formation = copy.Formation!;
         return copy.Hull;
     }
 
@@ -174,6 +201,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             FireHitPoints = old.FireHitPoints,
             SinkingState = old.SinkingState,
             Team = old.Team,
+            Formation = old.Formation,
         };
         hulls.Add(fresh);
         return fresh.Hull;
@@ -265,6 +293,8 @@ public sealed class FakeHull
     /// <summary>Pooled by deployment: still listed but removed for every station and condition purpose.</summary>
     public bool IsPooled { get; set; }
     public Team? Team { get; set; }
+    /// <summary>The local formation the hull is assigned to, which differs per client for the same ship.</summary>
+    public Formation? Formation { get; set; }
     public BattleShipSpawnData? SpawnData { get; set; }
     public BattleRopeState[] Ropes { get; set; } = Array.Empty<BattleRopeState>();
     public int FrameWrites { get; set; }

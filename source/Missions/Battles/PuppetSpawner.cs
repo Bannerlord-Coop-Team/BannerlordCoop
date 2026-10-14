@@ -162,15 +162,32 @@ public class PuppetSpawner : IPuppetSpawner
             var pending = pendingFormations[id];
             // A new owner's update can arrive before the authority handoff on the other connection.
             if (info.AuthorityRevision < pending.Data.AuthorityRevision) continue;
+            // Crew joining a hull whose copy has not spawned here yet waits for it, like its spawn record does.
+            bool resolved = TryResolveCrewFormation(pending.Data.ShipId, pending.Data.FormationIndex, out int formationIndex);
+            if (!resolved && !coopMissionComponent.ShipRegistry.HasSpawnFailed(pending.Data.ShipId)) continue;
             pendingFormations.Remove(id);
-            if (info.CurrentAuthority != pending.Controller || info.AuthorityRevision != pending.Data.AuthorityRevision
+            if (!resolved || info.CurrentAuthority != pending.Controller || info.AuthorityRevision != pending.Data.AuthorityRevision
                 || session.IsOwn(info.CurrentAuthority) || info.Agent == null || !info.Agent.IsActive()) continue;
 
-            if (pending.Data.FormationIndex == -1)
+            if (formationIndex == -1)
                 info.Agent.Formation = null;
             else
-                formationAssigner.Assign(info.Agent, pending.Data.FormationIndex);
+                formationAssigner.Assign(info.Agent, formationIndex);
         }
+    }
+
+    /// <summary>
+    /// The local formation for an owner's crew update. Each client fields a hull into its first free formation, so a crew
+    /// member follows its hull's ship id; false while that hull is not registered here.
+    /// </summary>
+    private bool TryResolveCrewFormation(Guid shipId, int ownerFormationIndex, out int formationIndex)
+    {
+        formationIndex = ownerFormationIndex;
+        if (shipId == Guid.Empty || coopMissionComponent.ShipRegistry == null) return true;
+        if (!coopMissionComponent.ShipRegistry.TryGet(shipId, out var ship) || ship.Formation == null) return false;
+
+        formationIndex = (int)ship.Formation.FormationIndex;
+        return true;
     }
 
     // Refresh an existing remote puppet from a snapshot without changing local or newer-authority membership.
@@ -179,18 +196,22 @@ public class PuppetSpawner : IPuppetSpawner
         if (session.IsOwn(info.CurrentAuthority) || info.CurrentAuthority != data.OwnerControllerId
             || info.AuthorityRevision != data.AuthorityRevision || info.Agent == null || !info.Agent.IsActive()) return;
         if (data.FormationIndex < -1 || data.FormationIndex >= (int)FormationClass.NumberOfAllFormations) return;
+        if (!TryResolveCrewFormation(data.ShipId, data.FormationIndex, out int formationIndex)) return;
 
-        if (data.FormationIndex == -1)
+        if (formationIndex == -1)
             info.Agent.Formation = null;
         else
-            formationAssigner.Assign(info.Agent, data.FormationIndex);
+            formationAssigner.Assign(info.Agent, formationIndex);
     }
 
     private void RetainPendingFormation(Guid agentId, PendingAuthority authority)
     {
         if (pendingFormations.TryGetValue(agentId, out var pending)
             && pending.Controller == authority.ControllerId && pending.Data.AuthorityRevision == authority.Revision)
+        {
             authority.FormationIndex = pending.Data.FormationIndex;
+            authority.FormationShipId = pending.Data.ShipId;
+        }
     }
 
     private void DiscardPendingFormations(Guid agentId)
@@ -489,10 +510,14 @@ public class PuppetSpawner : IPuppetSpawner
 
         // Retained spawns carry the last accepted formation even after their authority migrates; otherwise crew
         // join their hull's formation.
-        if (pendingAuthority?.FormationIndex == -1)
+        int? retainedFormation = null;
+        if (pendingAuthority?.FormationIndex is int retained
+            && TryResolveCrewFormation(pendingAuthority.FormationShipId, retained, out int retainedIndex))
+            retainedFormation = retainedIndex;
+        if (retainedFormation == -1)
             agent.Formation = null;
         else
-            formationAssigner.Assign(agent, pendingAuthority?.FormationIndex
+            formationAssigner.Assign(agent, retainedFormation
                 ?? (crewShip?.Formation != null ? (int)crewShip.Formation.FormationIndex : data.FormationIndex));
         if (retainedPlayerBootstrap)
         {
@@ -696,6 +721,7 @@ public class PuppetSpawner : IPuppetSpawner
                 if (revision > authority.Revision)
                 {
                     authority.FormationIndex = null;
+                    authority.FormationShipId = Guid.Empty;
                     authority.ControllerId = controllerId;
                     authority.Revision = revision;
                 }
@@ -921,6 +947,8 @@ public class PuppetSpawner : IPuppetSpawner
         public string ControllerId;
         public long Revision;
         public int? FormationIndex;
+        /// <summary>The hull <see cref="FormationIndex"/> was the owner's formation of, or empty.</summary>
+        public Guid FormationShipId;
         public readonly string OriginalOwner;
         public readonly string MovementScopeId;
         public readonly ushort MovementId;

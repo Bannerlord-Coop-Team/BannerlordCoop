@@ -140,7 +140,7 @@ public class OwnedAgentReplicator : IOwnedAgentReplicator
                 || deployment.ShouldWithhold(IsOwnPartyAgent(agent, character))) continue;
 
             updates.Add(new BattleAgentFormationData(info.AgentId,
-                agent.Formation == null ? -1 : (int)agent.Formation.FormationIndex, info.AuthorityRevision));
+                agent.Formation == null ? -1 : (int)agent.Formation.FormationIndex, info.AuthorityRevision, GetCrewShipId(agent)));
             if (updates.Count == NetworkBattleAgentFormations.MaxUpdates)
             {
                 network.SendAll(new NetworkBattleAgentFormations(session.InstanceId, session.OwnControllerId, updates.ToArray()));
