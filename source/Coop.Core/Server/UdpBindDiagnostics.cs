@@ -48,6 +48,7 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
     private static readonly string[] CoopServerNames = { "Bannerlord", "BannerlordCoopServer" };
     // Generic hosts that also run tests and tools, so a name match says nothing about a co-op server.
     private static readonly string[] GenericHostNames = { "dotnet", "testhost" };
+    private static readonly char[] PathSeparators = { '\\', '/' };
 
     public UdpBindFailure Describe(int port)
     {
@@ -123,7 +124,7 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
 
             using var current = Process.GetCurrentProcess();
             string? currentPath = ProgramPath(current);
-            string? currentApp = HostedApplication(ReadCommandLine(current.Id));
+            string? currentApp = HostedApplication(ReadCommandLine(current.Id), ReadWorkingDirectory(current.Id));
             int[] sameProgram = pids.Where(pid => pid != current.Id && IsSameProgram(pid, currentPath, currentApp)).ToArray();
             return FormatOwners(pids.Select(NameOwner).ToArray(), current.Id, current.ProcessName, sameProgram);
         }
@@ -140,7 +141,9 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
         {
             using var process = Process.GetProcessById(pid);
             string? path = ProgramPath(process);
-            string? app = path != null && IsGenericHost(path) ? HostedApplication(ReadCommandLine(pid)) : null;
+            string? app = path != null && IsGenericHost(path)
+                ? HostedApplication(ReadCommandLine(pid), ReadWorkingDirectory(pid))
+                : null;
             return IsSameProgram(currentPath, currentApp, path, app);
         }
         catch (Exception)
@@ -163,23 +166,65 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
         return currentApp != null && string.Equals(currentApp, otherApp, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsGenericHost(string path) =>
-        GenericHostNames.Contains(System.IO.Path.GetFileNameWithoutExtension(path), StringComparer.OrdinalIgnoreCase);
+    // Windows paths are parsed by hand, not with System.IO.Path, so the result does not depend on the OS running it.
+    private static bool IsGenericHost(string path)
+    {
+        string name = path.Substring(path.LastIndexOfAny(PathSeparators) + 1);
+        int dot = name.LastIndexOf('.');
+        return GenericHostNames.Contains(dot > 0 ? name.Substring(0, dot) : name, StringComparer.OrdinalIgnoreCase);
+    }
 
     /// <summary>
-    /// The application a dotnet host runs: the file name of the first .dll on its command line, as in
-    /// "dotnet.exe TaleWorlds.Starter.DotNetCore.dll _MODULES_...". Null when there is none.
+    /// The application a dotnet host runs: the full path of the first .dll on its command line, as in
+    /// "dotnet.exe TaleWorlds.Starter.DotNetCore.dll _MODULES_...". A relative .dll is resolved against the
+    /// process's working directory, where the dotnet host looks for it. Null when there is no .dll or its
+    /// path cannot be resolved, so two apps that only share a file name are never confused.
     /// </summary>
-    internal static string? HostedApplication(string? commandLine)
+    internal static string? HostedApplication(string? commandLine, string? workingDirectory)
     {
         if (string.IsNullOrWhiteSpace(commandLine)) return null;
 
         foreach (string arg in SplitCommandLine(commandLine!).Skip(1))
         {
-            if (arg.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) return System.IO.Path.GetFileName(arg);
+            if (arg.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) return ResolveWindowsPath(arg, workingDirectory);
         }
 
         return null;
+    }
+
+    // Accepts both slash forms and folds "." and ".." segments. Drive-relative ("C:app.dll") and
+    // root-relative ("\app.dll") paths stay unresolved because they depend on per-drive state.
+    internal static string? ResolveWindowsPath(string path, string? workingDirectory)
+    {
+        string normalized = path.Replace('/', '\\');
+        bool unc = normalized.StartsWith(@"\\", StringComparison.Ordinal);
+        bool absolute = unc ||
+            (normalized.Length >= 3 && char.IsLetter(normalized[0]) && normalized[1] == ':' && normalized[2] == '\\');
+        if (!absolute)
+        {
+            if (normalized.StartsWith(@"\", StringComparison.Ordinal) || (normalized.Length >= 2 && normalized[1] == ':')) return null;
+            string? root = string.IsNullOrEmpty(workingDirectory) ? null : ResolveWindowsPath(workingDirectory!, null);
+            if (root == null) return null;
+
+            normalized = root.TrimEnd('\\') + @"\" + normalized;
+            unc = normalized.StartsWith(@"\\", StringComparison.Ordinal);
+        }
+
+        var segments = new List<string>();
+        foreach (string segment in normalized.Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (segment == ".") continue;
+            if (segment == "..")
+            {
+                // Never above the drive or the UNC share.
+                if (segments.Count > (unc ? 2 : 1)) segments.RemoveAt(segments.Count - 1);
+                continue;
+            }
+
+            segments.Add(segment);
+        }
+
+        return (unc ? @"\\" : "") + string.Join(@"\", segments);
     }
 
     // Whitespace separates arguments except inside double quotes; enough to find the hosted .dll.
@@ -241,6 +286,68 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
             if (buffer != IntPtr.Zero) Marshal.FreeHGlobal(buffer);
             if (handle != IntPtr.Zero) CloseHandle(handle);
         }
+    }
+
+    /// <summary>
+    /// The process's current directory, read from its PEB. Only called for a process running this process's
+    /// own executable, so both have the same bitness and the same PEB layout. Null when it cannot be read.
+    /// </summary>
+    internal static string? ReadWorkingDirectory(int pid)
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return null;
+
+        IntPtr handle = IntPtr.Zero;
+        IntPtr buffer = IntPtr.Zero;
+        try
+        {
+            handle = OpenProcess(ProcessQueryLimitedInformation | ProcessVmRead, false, pid);
+            if (handle == IntPtr.Zero) return null;
+
+            // PROCESS_BASIC_INFORMATION is six pointer-sized fields; PebBaseAddress is the second.
+            int infoSize = 6 * IntPtr.Size;
+            buffer = Marshal.AllocHGlobal(infoSize);
+            if (NtQueryInformationProcess(handle, ProcessBasicInformation, buffer, infoSize, out _) != 0) return null;
+            IntPtr peb = Marshal.ReadIntPtr(buffer, IntPtr.Size);
+
+            // PEB.ProcessParameters, then RTL_USER_PROCESS_PARAMETERS.CurrentDirectory.DosPath (a UNICODE_STRING).
+            bool is64 = IntPtr.Size == 8;
+            IntPtr parameters = ReadPointer(handle, peb + (is64 ? 0x20 : 0x10));
+            if (parameters == IntPtr.Zero) return null;
+            byte[]? text = ReadMemory(handle, parameters + (is64 ? 0x38 : 0x24), 2 * IntPtr.Size);
+            if (text == null) return null;
+
+            int length = BitConverter.ToUInt16(text, 0);
+            IntPtr address = is64 ? new IntPtr(BitConverter.ToInt64(text, 8)) : new IntPtr(BitConverter.ToInt32(text, 4));
+            if (length == 0 || length > MaxCommandLineBytes || address == IntPtr.Zero) return null;
+
+            byte[]? chars = ReadMemory(handle, address, length);
+            return chars == null ? null : System.Text.Encoding.Unicode.GetString(chars);
+        }
+        catch (Exception)
+        {
+            // Same fallback as ReadCommandLine: without the directory a relative hosted app stays unknown.
+            return null;
+        }
+        finally
+        {
+            if (buffer != IntPtr.Zero) Marshal.FreeHGlobal(buffer);
+            if (handle != IntPtr.Zero) CloseHandle(handle);
+        }
+    }
+
+    private static IntPtr ReadPointer(IntPtr handle, IntPtr address)
+    {
+        byte[]? bytes = ReadMemory(handle, address, IntPtr.Size);
+        if (bytes == null) return IntPtr.Zero;
+        return IntPtr.Size == 8 ? new IntPtr(BitConverter.ToInt64(bytes, 0)) : new IntPtr(BitConverter.ToInt32(bytes, 0));
+    }
+
+    private static byte[]? ReadMemory(IntPtr handle, IntPtr address, int size)
+    {
+        var bytes = new byte[size];
+        return ReadProcessMemory(handle, address, bytes, new IntPtr(size), out IntPtr read) && read.ToInt64() == size
+            ? bytes
+            : null;
     }
 
     private static string? ProgramPath(Process process)
@@ -379,6 +486,8 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
     private const int UdpTableOwnerPid = 1;
     private const uint ErrorInsufficientBuffer = 122;
     private const uint ProcessQueryLimitedInformation = 0x1000;
+    private const uint ProcessVmRead = 0x0010;
+    private const int ProcessBasicInformation = 0;
     private const int ProcessCommandLineInformation = 60;
     private const int MaxCommandLineBytes = 1 << 20;
 
@@ -391,6 +500,10 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
 
     [DllImport("kernel32.dll")]
     private static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool ReadProcessMemory(
+        IntPtr process, IntPtr baseAddress, [Out] byte[] buffer, IntPtr size, out IntPtr bytesRead);
 
     [DllImport("ntdll.dll")]
     private static extern int NtQueryInformationProcess(

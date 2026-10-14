@@ -136,14 +136,44 @@ public class UdpBindDiagnosticsTests
     }
 
     private const string EngineHost = @"C:\Games\DedicatedServer\engine\dotnet\dotnet.exe";
-    private const string EngineApp = "TaleWorlds.Starter.DotNetCore.dll";
+    private const string EngineBin = @"C:\Games\DedicatedServer\bin\Win64_Shipping_Server";
+    private const string EngineApp = EngineBin + @"\TaleWorlds.Starter.DotNetCore.dll";
+    private const string EngineCommandLine =
+        @"""C:\Games\DedicatedServer\engine\dotnet\dotnet.exe"" TaleWorlds.Starter.DotNetCore.dll _MODULES_*Native*Coop*_MODULES_ /dedicatedcustomserver 7210 EU 0";
 
     [Fact]
     public void IsSameProgram_SameDotnetHost_OnlyTheSameHostedApplicationMatches()
     {
         // Two different assemblies run by one dotnet.exe: only the co-op engine is the same program (#3891).
-        Assert.True(UdpBindDiagnostics.IsSameProgram(EngineHost, EngineApp, EngineHost, EngineApp));
-        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, EngineApp, EngineHost, "SomeOtherTool.dll"));
+        string? current = UdpBindDiagnostics.HostedApplication(EngineCommandLine, EngineBin);
+        string? engine = UdpBindDiagnostics.HostedApplication(EngineCommandLine, EngineBin);
+        string? other = UdpBindDiagnostics.HostedApplication(@"dotnet.exe C:\Tools\SomeOtherTool.dll", EngineBin);
+
+        Assert.True(UdpBindDiagnostics.IsSameProgram(EngineHost, current, EngineHost, engine));
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, current, EngineHost, other));
+    }
+
+    [Fact]
+    public void IsSameProgram_SameDllNameInAnotherFolder_DoesNotMatch()
+    {
+        // Same host, same file name, different assemblies: the folder tells them apart.
+        string? current = UdpBindDiagnostics.HostedApplication(@"dotnet.exe C:\Games\A\Server.dll", null);
+        string? absolute = UdpBindDiagnostics.HostedApplication(@"dotnet.exe D:\Tools\B\Server.dll", null);
+        string? relative = UdpBindDiagnostics.HostedApplication(@"dotnet.exe Server.dll", @"D:\Tools\B");
+
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, current, EngineHost, absolute));
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, current, EngineHost, relative));
+        Assert.True(UdpBindDiagnostics.IsSameProgram(EngineHost, current,
+            EngineHost, UdpBindDiagnostics.HostedApplication(@"dotnet.exe Server.dll", @"C:\Games\A")));
+    }
+
+    [Fact]
+    public void IsSameProgram_RelativeDllWithoutWorkingDirectory_NeverMatches()
+    {
+        // Without the working directory a relative .dll could be any assembly with that name.
+        Assert.Null(UdpBindDiagnostics.HostedApplication(EngineCommandLine, null));
+        Assert.False(UdpBindDiagnostics.IsSameProgram(EngineHost, EngineApp,
+            EngineHost, UdpBindDiagnostics.HostedApplication(EngineCommandLine, null)));
     }
 
     [Fact]
@@ -168,15 +198,38 @@ public class UdpBindDiagnosticsTests
         Assert.True(UdpBindDiagnostics.IsSameProgram(server, null, server, null));
     }
 
+    // Windows paths on purpose: the parsing must give the same result when the tests run on Linux or macOS.
     [Theory]
-    [InlineData(@"""C:\Games\engine\dotnet\dotnet.exe"" TaleWorlds.Starter.DotNetCore.dll _MODULES_*Native*Coop*_MODULES_ /dedicatedcustomserver 7210 EU 0", EngineApp)]
-    [InlineData(@"dotnet exec --runtimeconfig x.json ""C:\My Tools\Other Tool.dll"" --port 4200", "Other Tool.dll")]
-    [InlineData(@"dotnet.exe --version", null)]
-    [InlineData(@"", null)]
-    [InlineData(null, null)]
-    public void HostedApplication_IsTheFirstDllOnTheCommandLine(string? commandLine, string? expected)
+    [InlineData(EngineCommandLine, EngineBin, EngineApp)]
+    [InlineData(@"dotnet exec --runtimeconfig x.json ""C:\My Tools\Other Tool.dll"" --port 4200", null, @"C:\My Tools\Other Tool.dll")]
+    [InlineData(@"dotnet.exe ..\bin/./Server.dll", @"C:\Games\engine\", @"C:\Games\bin\Server.dll")]
+    [InlineData(@"dotnet.exe Server.dll", @"\\host\share\games", @"\\host\share\games\Server.dll")]
+    [InlineData(@"dotnet.exe ..\..\..\Server.dll", @"\\host\share\games", @"\\host\share\Server.dll")]
+    [InlineData(@"dotnet.exe C:Server.dll", @"C:\Games", null)]
+    [InlineData(@"dotnet.exe \Server.dll", @"C:\Games", null)]
+    [InlineData(@"dotnet.exe --version", @"C:\Games", null)]
+    [InlineData(@"", @"C:\Games", null)]
+    [InlineData(null, @"C:\Games", null)]
+    public void HostedApplication_IsTheFullPathOfTheFirstDll(string? commandLine, string? workingDirectory, string? expected)
     {
-        Assert.Equal(expected, UdpBindDiagnostics.HostedApplication(commandLine));
+        Assert.Equal(expected, UdpBindDiagnostics.HostedApplication(commandLine, workingDirectory));
+    }
+
+    [Fact]
+    public void ReadWorkingDirectory_CurrentProcess_IsItsCurrentDirectory()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            Assert.Null(UdpBindDiagnostics.ReadWorkingDirectory(Environment.ProcessId));
+            return;
+        }
+
+        string? directory = UdpBindDiagnostics.ReadWorkingDirectory(Environment.ProcessId);
+        Assert.NotNull(directory);
+        Assert.Equal(
+            Environment.CurrentDirectory.TrimEnd('\\'),
+            directory!.TrimEnd('\\'),
+            ignoreCase: true);
     }
 
     [Fact]
