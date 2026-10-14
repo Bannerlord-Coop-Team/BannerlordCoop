@@ -73,11 +73,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     }
 
     /// <summary>[Game thread] Coop replacement for the spawn logic's side depletion.</summary>
-    internal bool IsSideDepletedHere(BattleSideEnum side)
-    {
-        var tally = Tally(side, LiveHumansByFormation());
-        return IsSideDepleted(tally.LiveHumans, tally.Reserve);
-    }
+    internal bool IsSideDepletedHere(BattleSideEnum side) => Tally(side, LiveHumansByFormation()).IsDepleted;
 
     /// <summary>[Game thread] Coop replacement for vanilla's per-hull out-of-action check.</summary>
     internal bool AreAnySideHullsOutOfAction(BattleSideEnum playerSide, BattleSideEnum enemySide,
@@ -86,8 +82,8 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         var crewByFormation = LiveHumansByFormation();
         var player = Tally(playerSide, crewByFormation);
         var enemy = Tally(enemySide, crewByFormation);
-        playerHullsOutOfAction = IsSideOutOfAction(player.Hulls, player.HullsOutOfAction);
-        enemyHullsOutOfAction = IsSideOutOfAction(enemy.Hulls, enemy.HullsOutOfAction);
+        playerHullsOutOfAction = player.IsOutOfAction;
+        enemyHullsOutOfAction = enemy.IsOutOfAction;
         return playerHullsOutOfAction || enemyHullsOutOfAction;
     }
 
@@ -164,25 +160,6 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         return NavalBattleOutcome.None;
     }
 
-    /// <summary>Vanilla's spawn-logic rule: no live troops and no spawnable reserve.</summary>
-    internal static bool IsSideDepleted(int liveHumans, int reserve) => liveHumans + reserve == 0;
-
-    /// <summary>Vanilla's per-hull rule: sunk, or at most three troops aboard and in reserve.</summary>
-    internal static bool IsHullOutOfAction(bool isSunk, int liveCrew, int reserve) =>
-        isSunk || liveCrew + reserve <= MinTroopCountForOutOfActionCheck;
-
-    /// <summary>A side is out of action only when it has hulls and every one of them is.</summary>
-    internal static bool IsSideOutOfAction(int hulls, int hullsOutOfAction) => hulls > 0 && hullsOutOfAction == hulls;
-
-    /// <summary>Only reserve on a hull this client simulates and that has not sunk can still field, so only it keeps a side alive.</summary>
-    internal static bool CountsReserve(bool simulatedHere, bool isSunk) => simulatedHere && !isSunk;
-
-    /// <summary>
-    /// Crew still serving a hull. A sinking hull's crew swim off its formation yet stay alive, and like vanilla's spawn logic
-    /// the side tally keeps counting them, so only this count drops with the hull.
-    /// </summary>
-    internal static int CrewAboard(bool isSunk, int formationCrew) => isSunk ? 0 : formationCrew;
-
     internal static string DescribeResult(MissionResult result)
     {
         if (result?.PlayerVictory == true) return "victory";
@@ -227,43 +204,33 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         return counts;
     }
 
-    private SideTally Tally(BattleSideEnum side, Dictionary<Formation, int> crewByFormation)
+    private NavalSideTally Tally(BattleSideEnum side, Dictionary<Formation, int> crewByFormation)
     {
-        var tally = new SideTally();
+        int liveHumans = 0;
         foreach (var team in Mission.Teams)
         {
-            if (team.Side == side) tally.LiveHumans += team.ActiveAgents.Count(agent => agent.IsHuman);
+            if (team.Side == side) liveHumans += team.ActiveAgents.Count(agent => agent.IsHuman);
         }
 
+        return NavalSideTally.Count(side, liveHumans, HullCounts(crewByFormation));
+    }
+
+    private IEnumerable<NavalHullCount> HullCounts(Dictionary<Formation, int> crewByFormation)
+    {
         foreach (MissionShip ship in _navalShipsLogic.AllShips)
         {
-            if (ship.Team == null || ship.Team.Side != side) continue;
+            if (ship.Team == null) continue;
 
             int crew = ship.Formation != null && crewByFormation.TryGetValue(ship.Formation, out int count) ? count : 0;
-            int reserve = CountsReserve(!NavalForeignHulls.Contains(ship), ship.IsSunk) ? SpawnableReserveOf(ship) : 0;
-            tally.Hulls++;
-            tally.CrewAboard += CrewAboard(ship.IsSunk, crew);
-            if (!ship.IsSunk) tally.HullsAfloat++;
-            if (IsHullOutOfAction(ship.IsSunk, crew, reserve)) tally.HullsOutOfAction++;
-            tally.Reserve += reserve;
+            // A copy's reserve is queued on its owner, so only a hull simulated here has any.
+            int reserve = NavalForeignHulls.Contains(ship) ? 0 : SpawnableReserveOf(ship);
+            yield return new NavalHullCount(ship.Team.Side, ship.IsSunk, crew, reserve);
         }
-
-        return tally;
     }
 
     private int SpawnableReserveOf(MissionShip ship)
     {
         int active = _navalAgentsLogic.GetActiveAgentsOfShip(ship)?.Count ?? 0;
         return Math.Max(0, _navalAgentsLogic.GetTotalTroopCountOfShip(ship, spawnableReservesOnly: true) - active);
-    }
-
-    private struct SideTally
-    {
-        public int LiveHumans;
-        public int CrewAboard;
-        public int Hulls;
-        public int HullsAfloat;
-        public int HullsOutOfAction;
-        public int Reserve;
     }
 }

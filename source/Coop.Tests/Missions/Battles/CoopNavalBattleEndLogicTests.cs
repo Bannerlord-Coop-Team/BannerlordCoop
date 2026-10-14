@@ -1,5 +1,6 @@
 ﻿#if DEBUG
 using HarmonyLib;
+using Missions.Battles;
 using Missions.Naval;
 using TaleWorlds.Core;
 using Xunit;
@@ -72,58 +73,10 @@ public class CoopNavalBattleEndLogicTests
         Assert.Equal(expected, CoopNavalBattleEndLogic.ShouldCheckEnd(isLocalHost, released));
     }
 
-    [Theory]
-    [InlineData(0, 0, true)]
-    [InlineData(0, 5, false)]
-    [InlineData(1, 0, false)]
-    public void IsSideDepleted_NeedsNoLiveTroopAndNoFieldableReserve(int liveHumans, int reserve, bool expected)
-    {
-        Assert.Equal(expected, CoopNavalBattleEndLogic.IsSideDepleted(liveHumans, reserve));
-    }
-
-    [Theory]
-    [InlineData(true, 20, 30, true)]
-    [InlineData(false, 3, 0, true)]
-    [InlineData(false, 1, 2, true)]
-    [InlineData(false, 2, 2, false)]
-    [InlineData(false, 4, 0, false)]
-    [InlineData(false, 0, 0, true)]
-    public void IsHullOutOfAction_FollowsVanillasSunkOrThreeTroopsRule(bool isSunk, int liveCrew, int reserve, bool expected)
-    {
-        Assert.Equal(expected, CoopNavalBattleEndLogic.IsHullOutOfAction(isSunk, liveCrew, reserve));
-    }
-
-    [Theory]
-    [InlineData(0, 0, false)]
-    [InlineData(2, 1, false)]
-    [InlineData(2, 2, true)]
-    public void IsSideOutOfAction_NeedsEveryHullOutOfAction(int hulls, int hullsOutOfAction, bool expected)
-    {
-        Assert.Equal(expected, CoopNavalBattleEndLogic.IsSideOutOfAction(hulls, hullsOutOfAction));
-    }
-
-    [Theory]
-    [InlineData(true, false, true)]
-    [InlineData(true, true, false)]
-    [InlineData(false, false, false)]
-    public void CountsReserve_OnlyOnAnAfloatHullSimulatedHere(bool simulatedHere, bool isSunk, bool expected)
-    {
-        Assert.Equal(expected, CoopNavalBattleEndLogic.CountsReserve(simulatedHere, isSunk));
-    }
-
-    [Theory]
-    [InlineData(false, 18, 18)]
-    [InlineData(true, 18, 0)]
-    [InlineData(true, 0, 0)]
-    public void CrewAboard_DropsWithASunkHull(bool isSunk, int formationCrew, int expected)
-    {
-        Assert.Equal(expected, CoopNavalBattleEndLogic.CrewAboard(isSunk, formationCrew));
-    }
-
     [Fact]
-    public void IsSideDepleted_KeepsASideWithOnlySwimmingCrewAlive()
+    public void SideTally_UsesVanillasOutOfActionTroopCount()
     {
-        Assert.False(CoopNavalBattleEndLogic.IsSideDepleted(liveHumans: 18, reserve: 0));
+        Assert.Equal(TaleWorlds.MountAndBlade.NavalBattleEndLogic.MinTroopCountForOutOfActionCheck, NavalSideTally.MinTroopCountForOutOfAction);
     }
 
     [Fact]
