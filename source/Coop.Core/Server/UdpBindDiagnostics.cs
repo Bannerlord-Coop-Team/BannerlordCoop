@@ -122,7 +122,38 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
             if (pids.Count == 0) return null;
 
             using var current = Process.GetCurrentProcess();
-            return FormatOwners(pids.Select(NameOwner).ToArray(), current.Id, current.ProcessName);
+            string? currentPath = ProgramPath(current);
+            int[] sameProgram = pids.Where(pid => pid != current.Id && IsSameProgram(pid, currentPath)).ToArray();
+            return FormatOwners(pids.Select(NameOwner).ToArray(), current.Id, current.ProcessName, sameProgram);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    // The dedicated server engine runs as a generic dotnet host, so only the same executable marks a leftover server.
+    // The paths are compared, never logged, because they hold the user name.
+    private static bool IsSameProgram(int pid, string? currentPath)
+    {
+        if (currentPath == null) return false;
+
+        try
+        {
+            using var process = Process.GetProcessById(pid);
+            return string.Equals(ProgramPath(process), currentPath, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private static string? ProgramPath(Process process)
+    {
+        try
+        {
+            return process.MainModule?.FileName;
         }
         catch (Exception)
         {
@@ -214,17 +245,20 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
     }
 
     // Owners are distinct pids, each with its process name, or null when the process has exited.
-    internal static string FormatOwners(IReadOnlyList<(int Pid, string? Name)> owners, int currentPid, string currentName)
+    // sameProgramPids are owners running this process's own executable.
+    internal static string FormatOwners(IReadOnlyList<(int Pid, string? Name)> owners, int currentPid, string currentName,
+        IReadOnlyCollection<int>? sameProgramPids = null)
     {
         IEnumerable<string> shown = owners
             .Take(MaxOwners)
-            .Select(owner => DescribeOwner(owner.Pid, owner.Name, currentPid, currentName));
+            .Select(owner => DescribeOwner(owner.Pid, owner.Name, currentPid, currentName,
+                sameProgramPids != null && sameProgramPids.Contains(owner.Pid)));
         string more = owners.Count > MaxOwners ? $" (and {owners.Count - MaxOwners} more)" : "";
         return "opened by " + string.Join("; ", shown) + more + ".";
     }
 
     // "Windows pid" because Wine reports its own process ids, not Unix ones.
-    private static string DescribeOwner(int pid, string? name, int currentPid, string currentName)
+    private static string DescribeOwner(int pid, string? name, int currentPid, string currentName, bool sameProgram)
     {
         if (pid == currentPid) return $"this process (Windows pid {pid})";
         if (name == null)
@@ -233,7 +267,7 @@ public class UdpBindDiagnostics : IUdpBindDiagnostics
         }
 
         string owner = $"{name} (Windows pid {pid})";
-        return IsCoopServer(name, currentName)
+        return sameProgram || IsCoopServer(name, currentName)
             ? owner + ", a co-op server, probably one still running from an earlier session (its window may be hidden)"
             : owner;
     }

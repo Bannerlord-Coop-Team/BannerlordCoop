@@ -126,6 +126,16 @@ public class UdpBindDiagnosticsTests
     }
 
     [Fact]
+    public void FormatOwners_GenericHostRunningThisExecutable_IsALeftoverCoopServer()
+    {
+        // The dedicated server engine is a dotnet host, so a server left running holds the port as "dotnet" (#3889).
+        Assert.Equal(
+            "opened by dotnet (Windows pid 1234)" + CoopHint + "; dotnet (Windows pid 5678).",
+            UdpBindDiagnostics.FormatOwners(
+                new[] { (1234, (string?)"dotnet"), (5678, (string?)"dotnet") }, 99, "dotnet", new[] { 1234 }));
+    }
+
+    [Fact]
     public void FormatOwners_CurrentProcess_IsThisProcess()
     {
         Assert.Equal(
