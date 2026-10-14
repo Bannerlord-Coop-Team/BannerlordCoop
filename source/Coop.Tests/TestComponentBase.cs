@@ -18,6 +18,7 @@ using GameInterface.Services.Chat;
 using GameInterface.Services.Voice;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Services.MapTracking;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Kingdoms;
@@ -117,6 +118,7 @@ internal abstract class TestComponentBase
         RegisterPlayerManagerMock(builder);
         RegisterMock<IPlayerPartyRestorer>(builder);
         RegisterMock<IPlayerCreationRollback>(builder);
+        RegisterMock<IPlayerMapTracking>(builder);
         RegisterMock<ITimeControlInterface>(builder);
         RegisterMock<ITroopRosterInterface>(builder);
         RegisterMock<IMapTimeTrackerInterface>(builder);
