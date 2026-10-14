@@ -9,8 +9,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Locations;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.Locations.Patches;
@@ -68,7 +70,7 @@ internal class PlayerLocationEntryPatches
         Handle(scene, location, __result);
     }
 
-    private static void Handle(string scene, Location location, Mission mission)
+    internal static void Handle(string scene, Location location, Mission mission)
     {
         // The interior is owned locally by the player who entered it; the server has no main party
         // walking into a tavern, so it never requests an instance for itself.
@@ -143,5 +145,17 @@ internal class PlayerLocationEntryPatches
             }
             throw;
         }
+    }
+}
+
+[HarmonyPatch(typeof(RetirementEncounter))]
+internal class RetirementLocationEntryPatch
+{
+    [HarmonyPatch(nameof(RetirementEncounter.CreateAndOpenMissionController))]
+    [HarmonyPostfix]
+    public static void Postfix(Location nextLocation, IMission __result)
+    {
+        var mission = __result as Mission;
+        PlayerLocationEntryPatches.Handle(mission?.SceneName, nextLocation, mission);
     }
 }

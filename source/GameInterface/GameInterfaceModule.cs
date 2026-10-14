@@ -23,8 +23,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Hideouts;
-using GameInterface.Services.Issues.Generic;
-using GameInterface.Services.Issues.Interfaces;
+using GameInterface.Services.Issues;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.LiveTesting;
@@ -127,12 +126,15 @@ public class GameInterfaceModule : Module
         builder.RegisterType<NetworkOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<LocalMovementBandwidth>().As<ILocalMovementBandwidth>().InstancePerDependency();
         builder.RegisterType<ChatPlayerName>().As<IChatPlayerNameResolver>().InstancePerDependency();
+        builder.RegisterType<ChatVanillaLogGate>().As<IChatVanillaLogGate>().InstancePerDependency();
+        builder.RegisterType<ChatEventLog>().As<IChatEventLog>().InstancePerDependency();
         builder.RegisterType<PlayerPartyRestorer>().As<IPlayerPartyRestorer>().InstancePerDependency();
         builder.RegisterType<PlayerCreationRollback>().As<IPlayerCreationRollback>().InstancePerDependency();
         builder.RegisterType<ServerPlayerUnstuck>().As<IServerPlayerUnstuck>().InstancePerDependency();
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
         builder.RegisterType<PartyBehaviorWireMapper>().As<IPartyBehaviorWireMapper>().InstancePerDependency();
         builder.RegisterType<AlleyGarrisonData>().As<IAlleyGarrisonData>().InstancePerDependency();
+        builder.RegisterModule<IssuesModule>();
 #if DEBUG
         builder.RegisterType<ClanLordMovementFixture>().As<IClanLordMovementFixture>().SingleInstance();
         builder.RegisterType<ClanLordMovementFixtureRules>().As<IClanLordMovementFixtureRules>().InstancePerDependency();
@@ -143,10 +145,6 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PeacePursuitCleaner>().As<IPeacePursuitCleaner>().InstancePerDependency();
         builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().SingleInstance();
-        builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().SingleInstance();
-        builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().SingleInstance();
-        builder.RegisterType<IssueGenerationRegistry>().As<IIssueGenerationRegistry>().SingleInstance();
-        builder.RegisterType<AwaitingAlternativeSolutionTroopsRegistry>().As<IAwaitingAlternativeSolutionTroopsRegistry>().SingleInstance();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().SingleInstance();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().SingleInstance();
         builder.RegisterType<LocationConversationAgentGuard>().As<ILocationConversationAgentGuard>().InstancePerDependency();
