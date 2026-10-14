@@ -98,7 +98,8 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     }
 
     // A hull swap rebinds the ship to a fresh hull, and an authority move flips who simulates, so both restart the stream.
-    // A hull without a weapon is looked up again, in case it registered before its weapon was found.
+    // A hull without a weapon is looked up again, in case it registered before its weapon was found. Only Tick refreshes, right
+    // before the simulation claim, so a stream's IsOwn always matches the weapons this client simulates.
     private void RefreshWeapons()
     {
         foreach (var shipId in streams.Keys.ToArray())
@@ -164,7 +165,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         if (disposed) return;
 
         var fire = payload.What;
-        if (fire?.Weapon == null || !TryFindOwnWeapon(fire.Weapon, out var shipId, out var stream)) return;
+        if (fire?.Weapon == null || !TryFindStream(fire.Weapon, out var shipId, out var stream) || !stream.IsOwn) return;
 
         var shooterId = Guid.Empty;
         if (fire.Shooter != null && missionComponent.AgentRegistry.TryGetAgentInfo(fire.Shooter, out var info))
@@ -173,15 +174,6 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         network.SendAll(new NetworkShipWeaponShot(shipId, stream.Key, session.OwnControllerId, session.HostEpoch, shooterId,
             fire.Position, fire.Direction, fire.Orientation, fire.BaseSpeed, fire.Speed, fire.MissileItem?.StringId));
         shotsSent++;
-    }
-
-    private bool TryFindOwnWeapon(MissionObject weapon, out Guid shipId, out WeaponStream stream)
-    {
-        if (TryFindStream(weapon, out shipId, out stream)) return stream.IsOwn;
-
-        // A hull registered since the last tick has no stream yet.
-        RefreshWeapons();
-        return TryFindStream(weapon, out shipId, out stream) && stream.IsOwn;
     }
 
     private bool TryFindStream(MissionObject weapon, out Guid shipId, out WeaponStream stream)
@@ -210,7 +202,10 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         }, context: nameof(Handle_NetworkShipWeaponShot));
     }
 
-    /// <summary>[Game thread] Replays an owner's shot on this client's copy of its weapon; a shot is never held for later.</summary>
+    /// <summary>
+    /// [Game thread] Replays an owner's shot on this client's copy of its weapon; a shot is never held for later, so one for a
+    /// hull registered since the last tick is dropped.
+    /// </summary>
     internal void AcceptShot(NetworkShipWeaponShot shot)
     {
         if (shot == null) return;
@@ -285,23 +280,25 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     internal void AcceptState(NetworkShipWeaponState state)
     {
         if (state == null) return;
-        if (!Registry.TryGet(state.ShipId, out var ship))
+        if (!Registry.TryGet(state.ShipId, out var ship) || !streams.TryGetValue(state.ShipId, out var stream))
         {
+            if (Registry.HasSpawnFailed(state.ShipId))
+            {
+                DropState("spawn_failed");
+                return;
+            }
             if (!pendingStates.TryGetValue(state.ShipId, out var pending) || IsNewerState(state, pending))
                 pendingStates[state.ShipId] = state;
             return;
         }
 
-        RefreshWeapons();
-        var stream = streams[state.ShipId];
         var rejection = ValidateState(ship, session.OwnControllerId, state, stream.AppliedRevision, stream.AppliedEpoch);
         if (rejection == null && ship.IsNpcParty && hostEpochPolicy.IsStale(state.HostEpoch, session.HostEpoch))
             rejection = "stale_epoch";
         if (rejection == null && (stream.Weapon == null || stream.Key != state.WeaponKey)) rejection = "unknown_weapon";
         if (rejection != null)
         {
-            statesDropped++;
-            lastDrop = "state_" + rejection;
+            DropState(rejection);
             return;
         }
 
@@ -310,6 +307,12 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         stream.AppliedRevision = state.Revision;
         if (ship.IsNpcParty) stream.AppliedEpoch = state.HostEpoch;
         statesApplied++;
+    }
+
+    private void DropState(string reason)
+    {
+        statesDropped++;
+        lastDrop = "state_" + reason;
     }
 
     /// <summary>Why a weapon state must be dropped, or null to apply it.</summary>
@@ -336,7 +339,13 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
 
         foreach (var shipId in pendingStates.Keys.ToArray())
         {
-            if (!Registry.TryGet(shipId, out _)) continue;
+            // The ship replicator gave up on a hull that could not spawn, so its state never applies.
+            if (Registry.HasSpawnFailed(shipId))
+            {
+                pendingStates.Remove(shipId);
+                continue;
+            }
+            if (!streams.ContainsKey(shipId)) continue;
 
             var state = pendingStates[shipId];
             pendingStates.Remove(shipId);
@@ -346,7 +355,6 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
 
     private bool TryGetWeaponOf(NetworkShipInfo ship, string weaponKey, out MissionObject weapon)
     {
-        RefreshWeapons();
         weapon = streams.TryGetValue(ship.ShipId, out var stream) && stream.Key == weaponKey ? stream.Weapon : null;
         return weapon != null;
     }

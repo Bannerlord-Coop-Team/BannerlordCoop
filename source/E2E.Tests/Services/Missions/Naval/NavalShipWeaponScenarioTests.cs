@@ -47,10 +47,9 @@ public class NavalShipWeaponScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(new Vec3(40f, 5f, 4f), replayed.Shot.Position);
         Assert.Equal(Ballista, replayed.Shot.MissileItemId);
         Assert.Empty(b.Hull(hullB).ReplayedShots);
-        bool shooterIsPuppet = false;
-        a.Call(() => shooterIsPuppet = !a.Agents.IsLocallyControlled(gunnerPuppet));
-        Assert.Equal(BattleShipDamageRoute.Drop, BattleShipDamageRouter.Route(isOwnHull: true, isRoutedApply: false,
-            BattleShipDamageRouter.AttackOrigin(hasAttacker: true, shooterIsPuppet)));
+        bool shooterDrivenHere = true;
+        a.Call(() => shooterDrivenHere = a.Agents.IsLocallyControlled(replayed.Shooter));
+        Assert.False(shooterDrivenHere);
 
         b.Hit(pirate, 30f);
         battle.TickAll(2);

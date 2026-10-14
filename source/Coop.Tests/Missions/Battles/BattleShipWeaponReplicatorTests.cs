@@ -95,6 +95,7 @@ public class BattleShipWeaponReplicatorTests
         var gunnerId = Guid.NewGuid();
         var gunnerInfo = new CoopAgentInfo(Own, Own, Instance, gunner, gunnerId, 1);
         harness.Agents.Setup(a => a.TryGetAgentInfo(gunner, out gunnerInfo)).Returns(true);
+        harness.Replicator.Tick(0.01f);
 
         harness.Fire(own.Weapon, gunner);
 
@@ -112,10 +113,29 @@ public class BattleShipWeaponReplicatorTests
     {
         var harness = new Harness();
         var copy = harness.Register(Peer, isNpcParty: false);
+        harness.Replicator.Tick(0.01f);
 
         harness.Fire(copy.Weapon, null);
 
         Assert.Empty(harness.Sent<NetworkShipWeaponShot>());
+    }
+
+    // M12 r1: who simulates a weapon changes only in Tick, together with the simulation claim, so a stream never disagrees with it.
+    [Fact]
+    public void LocalFire_OfAWeaponNotClaimedYet_SendsNothing_UntilTheNextTickClaimsIt()
+    {
+        var harness = new Harness();
+        var own = harness.Register(Own, isNpcParty: false);
+
+        harness.Fire(own.Weapon, null);
+        int beforeTick = harness.Sent<NetworkShipWeaponShot>().Count;
+        harness.Replicator.Tick(0.01f);
+        harness.Fire(own.Weapon, null);
+
+        Assert.Equal(0, beforeTick);
+        Assert.Single(harness.Sent<NetworkShipWeaponShot>());
+        harness.Engine.Verify(e => e.TryGetWeapon(It.IsAny<MissionObject>(), out It.Ref<MissionObject>.IsAny, out It.Ref<string>.IsAny),
+            Times.Once);
     }
 
     [Theory]
@@ -150,14 +170,13 @@ public class BattleShipWeaponReplicatorTests
         harness.Engine.Setup(e => e.ReplayWeaponShot(copy.Weapon, It.IsAny<NetworkShipWeaponShot>(), It.IsAny<Agent>(), It.IsAny<bool>()))
             .Callback<MissionObject, NetworkShipWeaponShot, Agent, bool>((_, _, shooter, _) => shooters.Add(shooter))
             .Returns(true);
+        harness.Replicator.Tick(0.01f);
 
         harness.Replicator.AcceptShot(Shot(copy.Ship.ShipId, Peer, shooterAgentId: puppetId));
         harness.Replicator.AcceptShot(Shot(copy.Ship.ShipId, Peer, shooterAgentId: drivenId));
         harness.Replicator.AcceptShot(Shot(copy.Ship.ShipId, Peer, shooterAgentId: Guid.NewGuid()));
 
         Assert.Equal(new[] { puppet, null, null }, shooters);
-        Assert.Equal(BattleShipDamageRoute.Drop, BattleShipDamageRouter.Route(isOwnHull: true, isRoutedApply: false,
-            BattleShipDamageRouter.AttackOrigin(hasAttacker: true, attackerIsPuppet: true)));
         harness.Network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
     }
 
@@ -167,6 +186,7 @@ public class BattleShipWeaponReplicatorTests
         var harness = new Harness();
         var copy = harness.Register(Peer, isNpcParty: false);
         var ai = harness.Register(Peer, isNpcParty: true);
+        harness.Replicator.Tick(0.01f);
 
         harness.Replicator.AcceptShot(Shot(Guid.NewGuid(), Peer));
         harness.Replicator.AcceptShot(Shot(copy.Ship.ShipId, Peer, weaponKey: "1:other_weapon"));
@@ -187,6 +207,7 @@ public class BattleShipWeaponReplicatorTests
         harness.Engine.Setup(e => e.ReplayWeaponShot(copy.Weapon, It.IsAny<NetworkShipWeaponShot>(), It.IsAny<Agent>(), It.IsAny<bool>()))
             .Callback<MissionObject, NetworkShipWeaponShot, Agent, bool>((_, _, _, launch) => effects.Add(launch))
             .Returns(true);
+        harness.Replicator.Tick(0.01f);
 
         harness.Replicator.AcceptShot(Shot(copy.Ship.ShipId, Peer));
         harness.Replicator.AcceptShot(Shot(copy.Ship.ShipId, Peer));
@@ -238,6 +259,26 @@ public class BattleShipWeaponReplicatorTests
 
         harness.Engine.Verify(e => e.ApplyWeaponState(copy.Weapon, loaded, null), Times.Once);
         harness.Engine.Verify(e => e.ApplyWeaponState(copy.Weapon, reloading, loaded), Times.Once);
+    }
+
+    [Fact]
+    public void AcceptState_ForAHullThatFailedToSpawn_IsDroppedRatherThanHeld()
+    {
+        var harness = new Harness();
+        var shipId = Guid.NewGuid();
+        var state = new BattleShipWeaponState(0.3f, 0.1f, 0, 5);
+        harness.Replicator.AcceptState(new NetworkShipWeaponState(shipId, WeaponKey, Peer, 1, 0, state));
+        int heldBeforeFailure = (int)harness.Inspect()["pendingStates"]!;
+
+        harness.Registry.MarkSpawnFailed(shipId);
+        harness.Replicator.Tick(0.01f);
+        int heldAfterFailure = (int)harness.Inspect()["pendingStates"]!;
+        harness.Replicator.AcceptState(new NetworkShipWeaponState(shipId, WeaponKey, Peer, 2, 0, state));
+
+        Assert.Equal(1, heldBeforeFailure);
+        Assert.Equal(0, heldAfterFailure);
+        Assert.Equal(0, (int)harness.Inspect()["pendingStates"]!);
+        Assert.Equal("state_spawn_failed", (string)harness.Inspect()["lastDrop"]!);
     }
 
     [Fact]
