@@ -48,8 +48,8 @@ public interface IBattleShipReplicator : IDisposable
     object InspectRopes();
 
     /// <summary>
-    /// [Game thread] The fieldable reserve another owner last reported for its hull; none once its samples stopped, as they do
-    /// when the hull sank or its owner left.
+    /// [Game thread] The fieldable reserve another owner last reported for its hull; none once the hull sank, its owner left
+    /// or its authority moved.
     /// </summary>
     int ReportedReserveOf(MissionObject hull);
 
@@ -142,6 +142,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Subscribe<NetworkBattleRopeFinal>(Handle_NetworkBattleRopeFinal);
         messageBroker.Subscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
         messageBroker.Subscribe<NetworkShipCondition>(Handle_NetworkShipCondition);
+        messageBroker.Subscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
+        messageBroker.Subscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
     }
 
     public void Dispose()
@@ -154,6 +156,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Unsubscribe<NetworkBattleRopeFinal>(Handle_NetworkBattleRopeFinal);
         messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
         messageBroker.Unsubscribe<NetworkShipCondition>(Handle_NetworkShipCondition);
+        messageBroker.Unsubscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
+        messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
         hullSwaps.Clear();
         pendingConditions.Clear();
         pendingForeignHulls.Clear();
@@ -231,6 +235,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         // The old owner's interpolation target must not keep writing frames to a hull this client now simulates.
         var stream = GetStream(ship.ShipId);
         stream.Target = null;
+        stream.ForgetReportedReserve();
         Logger.Information("[NavalSync] AI hull {ShipId} moved to host {Host}{Local}", ship.ShipId, newHost, isOwn ? " (this client)" : "");
     }
 
@@ -758,18 +763,43 @@ public class BattleShipReplicator : IBattleShipReplicator
         stream.Accepted = sample.Sequence;
         stream.Elapsed = 0;
         stream.ReportedReserve = sample.SpawnableReserve;
+        stream.HasReportedReserve = true;
     }
 
+    // Kept past the sample lifetime: vanilla latches a depleted side the first frame it reads one, so one long frame must not
+    // end the battle. Sinking, the owner leaving or an authority move drop it instead.
     public int ReportedReserveOf(MissionObject hull)
     {
         if (!Registry.TryGetByHull(hull, out var ship) || IsOwnHull(ship) || !streams.TryGetValue(ship.ShipId, out var stream))
             return 0;
+        if (!stream.HasReportedReserve || stream.Condition?.SinkingState == BattleShipCondition.Sunk) return 0;
 
-        return IsReportFresh(stream.Accepted > 0, elapsed - stream.TargetReceivedAt) ? stream.ReportedReserve : 0;
+        return stream.ReportedReserve;
     }
 
-    /// <summary>Whether an owner's last sample still speaks for its hull; owners stream at 20 Hz while the hull floats.</summary>
-    internal static bool IsReportFresh(bool hasSample, float sinceSample) => hasSample && sinceSample <= SampleLifetimeSeconds;
+    private void Handle_MissionPeerLeft(MessagePayload<MissionPeerLeft> payload) =>
+        ForgetReportsOfDeparted(payload.What.ControllerId, payload.What.InstanceId);
+
+    private void Handle_MissionPeerDisconnected(MessagePayload<MissionPeerDisconnected> payload) =>
+        ForgetReportsOfDeparted(payload.What.ControllerId, payload.What.InstanceId);
+
+    // On the game thread, so the departure stays ordered behind the samples the owner sent before it left.
+    private void ForgetReportsOfDeparted(string controllerId, string instanceId)
+    {
+        if (string.IsNullOrEmpty(controllerId) || (instanceId != null && instanceId != session.InstanceId)) return;
+
+        GameThread.RunSafe(() => ForgetReportedReserveOf(controllerId), context: nameof(ForgetReportsOfDeparted));
+    }
+
+    /// <summary>[Game thread] Drops the reserve a departed controller reported for the hulls it held.</summary>
+    internal void ForgetReportedReserveOf(string controllerId)
+    {
+        foreach (var ship in Registry.Ships)
+        {
+            if (ship.CurrentAuthority == controllerId && streams.TryGetValue(ship.ShipId, out var stream))
+                stream.ForgetReportedReserve();
+        }
+    }
 
     private void HoldSample(NetworkBattleShipSample sample)
     {
@@ -1030,8 +1060,15 @@ public class BattleShipReplicator : IBattleShipReplicator
         public BattleShipCondition Condition;
         public long ConditionRevision;
         public int ConditionEpoch;
-        /// <summary>The fieldable reserve in the last accepted sample.</summary>
+        /// <summary>The fieldable reserve in the last accepted sample, until the hull's owner leaves or its authority moves.</summary>
         public int ReportedReserve;
+        public bool HasReportedReserve;
+
+        public void ForgetReportedReserve()
+        {
+            ReportedReserve = 0;
+            HasReportedReserve = false;
+        }
 
         public void Reject(string reason)
         {

@@ -76,9 +76,29 @@ public class NavalNaturalEndScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(0, concluded());
     }
 
-    // K4: a peer's reserve stops counting once its samples stop, as when the peer leaves the battle.
+    // M9: vanilla latches a depleted side the first frame it reads one. A host frame longer than the sample lifetime, with B's
+    // samples late, keeps B's reported reserve, so the players' side with no live human stays undepleted.
     [Fact]
-    public void PeerReserve_StopsCountingOnceItsSamplesStop()
+    public void HostFrameHitch_WithOnlyPeerReserve_DoesNotDepleteTheSide()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out var b, out var concluded);
+        var hullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
+        b.Hull(hullB).SpawnableReserve = 20;
+        battle.CommitAll();
+        battle.TickAll(2);
+
+        a.Tick(BattleShipReplicator.SampleLifetimeSeconds + 1f);
+
+        var players = EndTally(a, BattleSideEnum.Attacker, liveHumans: 0);
+        Assert.False((bool)a.Stream(hullB)["streaming"]!);
+        Assert.Equal(20, players.Reserve);
+        Assert.False(players.IsDepleted);
+        Assert.Equal(0, concluded());
+    }
+
+    // K4: a peer's reserve stops counting once the peer leaves the battle.
+    [Fact]
+    public void PeerReserve_StopsCounting_OnceItsOwnerLeaves()
     {
         using var battle = StartServerBattle(atSea: true, out var a, out var b, out _);
         var hullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
@@ -88,9 +108,11 @@ public class NavalNaturalEndScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(20, EndTally(a, BattleSideEnum.Attacker, liveHumans: 0).Reserve);
 
         b.Call(b.Network.Stop);
-        a.Ticks(25);
+        a.Call(() => a.Broker.Publish(a, new MissionPeerLeft(b.Id, battle.MapEventId)));
+        a.Ticks(2);
 
         Assert.Equal(0, EndTally(a, BattleSideEnum.Attacker, liveHumans: 0).Reserve);
+        Assert.True(EndTally(a, BattleSideEnum.Attacker, liveHumans: 0).IsDepleted);
     }
 
     // vs_pirates fought to the end: B's hits sink both AI hulls on the host, every client sees them sunk, the pirate side is
