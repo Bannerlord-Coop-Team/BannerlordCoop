@@ -22,7 +22,7 @@ public class UnsupportedModuleWarningHandlerTests
             Module("StoryMode", isOfficial: true),
             Module(coopModuleId, isOfficial: false));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
         var shown = 0;
 
         coordinator.TryShowPrompt(true, _ => shown++);
@@ -39,7 +39,7 @@ public class UnsupportedModuleWarningHandlerTests
             Module("Coop", isOfficial: false),
             Module("CoopNightly", isOfficial: false));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
         InquiryData inquiry = null;
 
         coordinator.TryShowPrompt(true, value => inquiry = value);
@@ -58,7 +58,7 @@ public class UnsupportedModuleWarningHandlerTests
             Module("ExampleMod", isOfficial: false),
             Module("AnotherMod", isOfficial: false));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
         InquiryData inquiry = null;
 
         coordinator.TryShowPrompt(true, value => inquiry = value);
@@ -82,11 +82,14 @@ public class UnsupportedModuleWarningHandlerTests
         var provider = new TestModuleInfoProvider(
             Module("Native", isOfficial: true),
             Module("Coop", isOfficial: false),
-            Module("Bannerlord.UIExtenderEx", isOfficial: false, name: "UIExtenderEx"),
-            Module("Bannerlord.Harmony", isOfficial: false, name: "Harmony"),
-            Module("ExampleMod", isOfficial: false, name: "ExampleMod"));
+            Module("Bannerlord.UIExtenderEx", isOfficial: false),
+            Module("Bannerlord.Harmony", isOfficial: false),
+            Module("ExampleMod", isOfficial: false));
+        provider.Names["Bannerlord.UIExtenderEx"] = "UIExtenderEx";
+        provider.Names["Bannerlord.Harmony"] = "Harmony";
+        provider.Names["ExampleMod"] = "ExampleMod";
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
         InquiryData inquiry = null;
 
         coordinator.TryShowPrompt(true, value => inquiry = value);
@@ -110,7 +113,7 @@ public class UnsupportedModuleWarningHandlerTests
             Module("Coop", isOfficial: false),
             Module("NavalDLC", isOfficial: true, isDlc: true));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
         InquiryData inquiry = null;
 
         coordinator.TryShowPrompt(true, value => inquiry = value);
@@ -128,7 +131,7 @@ public class UnsupportedModuleWarningHandlerTests
             Module("DedicatedServer.Linux", isOfficial: false),
             Module("DedicatedServer.Windows", isOfficial: false));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
         var shown = 0;
 
         coordinator.TryShowPrompt(true, _ => shown++);
@@ -142,7 +145,7 @@ public class UnsupportedModuleWarningHandlerTests
         var provider = new TestModuleInfoProvider(
             Module("ExampleMod", isOfficial: false));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
         var shown = 0;
 
         coordinator.TryShowPrompt(false, _ => shown++);
@@ -160,7 +163,7 @@ public class UnsupportedModuleWarningHandlerTests
             Module("Native", isOfficial: true),
             Module("Coop", isOfficial: false));
 
-        var coordinator = new UnsupportedModuleWarningHandler(provider, new TestOptionsStore(), _ => {});
+        var coordinator = new UnsupportedModuleWarningHandler(provider, provider, new TestOptionsStore(), _ => {});
 
         coordinator.TryShowPrompt(true, _ => { });
         coordinator.TryShowPrompt(true, _ => { });
@@ -178,6 +181,7 @@ public class UnsupportedModuleWarningHandlerTests
 
         var firstLaunchHandler = new UnsupportedModuleWarningHandler(
             provider,
+            provider,
             store,
             _ => { });
         firstLaunchHandler.TryShowPrompt(
@@ -190,6 +194,7 @@ public class UnsupportedModuleWarningHandlerTests
         inquiry.AffirmativeAction?.Invoke();
 
         var secondLaunchHandler = new UnsupportedModuleWarningHandler(
+            provider,
             provider,
             store, _ => { });
         var shownOnNextLaunch = 0;
@@ -210,6 +215,7 @@ public class UnsupportedModuleWarningHandlerTests
 
         var firstLaunchHandler = new UnsupportedModuleWarningHandler(
             provider,
+            provider,
             store,
             _ => { });
         firstLaunchHandler.TryShowPrompt(
@@ -229,6 +235,7 @@ public class UnsupportedModuleWarningHandlerTests
         
         var secondLaunchHandler = new UnsupportedModuleWarningHandler(
             provider,
+            provider,
             store,
             _ => { });
         var shownOnNextLaunch = 0;
@@ -242,22 +249,20 @@ public class UnsupportedModuleWarningHandlerTests
     private static ModuleInfo Module(
         string id,
         bool isOfficial,
-        bool isDlc = false,
-        string name = null)
+        bool isDlc = false)
     {
         return new ModuleInfo
         {
             Id = id,
-            Name = name,
             IsOfficial = isOfficial,
             IsDlc = isDlc,
         };
     }
 
     /// <summary>
-    /// Supplies module information for unsupported module warning tests
+    /// Supplies module information and display names for unsupported module warning tests
     /// </summary>
-    private sealed class TestModuleInfoProvider : IModuleInfoProvider
+    private sealed class TestModuleInfoProvider : IModuleInfoProvider, IModuleNameProvider
     {
         private readonly IEnumerable<ModuleInfo> modules;
 
@@ -268,10 +273,17 @@ public class UnsupportedModuleWarningHandlerTests
 
         public int RequestCount { get; private set; }
 
+        public Dictionary<string, string> Names { get; } = new Dictionary<string, string>();
+
         public IEnumerable<ModuleInfo> GetModuleInfos()
         {
             RequestCount++;
             return modules;
+        }
+
+        public string GetDisplayName(string moduleId)
+        {
+            return Names.TryGetValue(moduleId, out var name) ? name : null;
         }
     }
     

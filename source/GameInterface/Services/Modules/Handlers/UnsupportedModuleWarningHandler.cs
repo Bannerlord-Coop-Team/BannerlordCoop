@@ -23,6 +23,7 @@ public class UnsupportedModuleWarningHandler
     private const string DedicatedServerModulePrefix = "DedicatedServer.";
     
     private readonly IModuleInfoProvider moduleInfoProvider;
+    private readonly IModuleNameProvider moduleNameProvider;
     private readonly ICoopOptionsStore optionsStore;
     private readonly Action<Exception> reportError;
     
@@ -34,10 +35,13 @@ public class UnsupportedModuleWarningHandler
     
     public UnsupportedModuleWarningHandler(
         IModuleInfoProvider moduleInfoProvider,
+        IModuleNameProvider moduleNameProvider,
         ICoopOptionsStore optionsStore,
         Action<Exception> reportError)
     {
         this.moduleInfoProvider = moduleInfoProvider ?? throw new ArgumentNullException(nameof(moduleInfoProvider));
+        if (moduleNameProvider == null) throw new ArgumentNullException(nameof(moduleNameProvider));
+        this.moduleNameProvider = moduleNameProvider;
         this.optionsStore = optionsStore ?? throw new ArgumentNullException(nameof(optionsStore));
         this.reportError = reportError;
     }
@@ -141,9 +145,9 @@ public class UnsupportedModuleWarningHandler
     }
 
     // Players know mods by the launcher name, the id still matches the folder in Modules.
-    private static string GetDisplayLabel(ModuleInfo module)
+    private string GetDisplayLabel(ModuleInfo module)
     {
-        var name = module.Name?.Trim();
+        var name = moduleNameProvider.GetDisplayName(module.Id)?.Trim();
         if (string.IsNullOrEmpty(name) || string.Equals(name, module.Id, StringComparison.OrdinalIgnoreCase))
         {
             return module.Id;
