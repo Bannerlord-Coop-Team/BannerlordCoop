@@ -63,6 +63,7 @@ internal sealed class SteamLobbyListQueryPlan
 
     public IReadOnlyList<ulong> Results => results;
     public bool WasTruncated { get; private set; }
+    public bool HasPendingRanges => pendingRanges.Count > 0;
 
     public SteamLobbyListQueryPlan()
     {
