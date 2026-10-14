@@ -44,9 +44,10 @@ internal class ServerSiegeAftermathHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.LeaderParty, out var leaderPartyId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.PreviousOwnerClan, out var previousOwnerClanId)) return;
 
         // Broadcast; each client checks locally whether it is the leader.
-        network.SendAll(new NetworkPromptSiegeAftermathChoice(settlementId, leaderPartyId));
+        network.SendAll(new NetworkPromptSiegeAftermathChoice(settlementId, leaderPartyId, previousOwnerClanId));
     }
 
     // Runs on the game thread already — published from the ApplyAftermath postfix; only resolves an id and broadcasts, so no GameThread.RunSafe.
@@ -88,10 +89,11 @@ internal class ServerSiegeAftermathHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(prompt.Settlement, out var settlementId)) continue;
             if (!objectManager.TryGetIdWithLogging(prompt.LeaderParty, out var leaderPartyId)) continue;
+            if (!objectManager.TryGetIdWithLogging(prompt.PreviousOwnerClan, out var previousOwnerClanId)) continue;
 
             // Send every valid prompt to the entering peer. The client-side leader check makes this
             // a no-op for other players and lets a reconnected leader resume the saved choice.
-            network.Send(peer, new NetworkPromptSiegeAftermathChoice(settlementId, leaderPartyId));
+            network.Send(peer, new NetworkPromptSiegeAftermathChoice(settlementId, leaderPartyId, previousOwnerClanId));
         }
     }
 

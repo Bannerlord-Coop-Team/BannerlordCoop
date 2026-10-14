@@ -141,6 +141,7 @@ public sealed class SiegeAftermathPendingTests : IDisposable
         var prompt = Assert.Single(prompts);
         Assert.Same(current.Settlement, prompt.Settlement);
         Assert.Same(current.Pending.LeaderParty, prompt.LeaderParty);
+        Assert.Same(current.Pending.PreviousOwnerClan, prompt.PreviousOwnerClan);
     }
 
     [Fact]
