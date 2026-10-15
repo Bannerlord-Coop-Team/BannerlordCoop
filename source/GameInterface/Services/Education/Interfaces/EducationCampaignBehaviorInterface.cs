@@ -172,38 +172,34 @@ public class EducationCampaignBehaviorInterface : IEducationCampaignBehaviorInte
                     || clanHero.IsPlayerHero()
                     || clanHero.Age >= Campaign.Current.Models.AgeModel.HeroComesOfAge) continue;
 
-                // Find most suitable educator
-                var heroEducator = FindFirstSuitableHeroEducator(playerClan, clanHero);
-                if (heroEducator == null) continue;
-
-                if (!playerManager.TryGetPlayer(heroEducator, out var playerEducator)) continue;
-
                 EducationCampaignBehavior.ChildAgeState lastDoneStage = educationBehavior.GetLastDoneStage(clanHero);
-                if (lastDoneStage != EducationCampaignBehavior.ChildAgeState.Year16)
-                {
-                    EducationCampaignBehavior.ChildAgeState childAgeState = (EducationCampaignBehavior.ChildAgeState)MathF.Max((int)(lastDoneStage + 1), (int)educationBehavior.GetClosestStage(clanHero));
-                    int age = EducationCampaignBehavior.ChildStateToAge(childAgeState);
+                if (lastDoneStage == EducationCampaignBehavior.ChildAgeState.Year16) continue;
 
-                    if ((clanHero.BirthDay + CampaignTime.Years(age)).IsPast && !HasNotificationForAge(clanHero, age))
-                    {
-                        educationBehavior.DoEducationUntil(clanHero, childAgeState);
-                        if (clanHero.IsDisabled) continue;
+                EducationCampaignBehavior.ChildAgeState childAgeState = (EducationCampaignBehavior.ChildAgeState)MathF.Max((int)(lastDoneStage + 1), (int)educationBehavior.GetClosestStage(clanHero));
+                int age = EducationCampaignBehavior.ChildStateToAge(childAgeState);
 
-                        // A stage the educator never finished was just done automatically, close its notice before sending the new one
-                        CancelPendingNotifications((childKey, _) => childKey.Item1 == clanHero && childKey.Item2 < age);
+                if (!(clanHero.BirthDay + CampaignTime.Years(age)).IsPast || HasNotificationForAge(clanHero, age)) continue;
 
-                        // Save pending notification on the server. No other client should get the same notification and it shouldn't be re-sent
-                        pendingNotifications.Add((clanHero, age), playerEducator.ControllerId);
+                // Earlier stages are completed randomly on schedule, only the current stage waits for an educator
+                educationBehavior.DoEducationUntil(clanHero, childAgeState);
+                if (clanHero.IsDisabled) continue;
 
-                        // Send notification to display on clients, equivalent to calling ShowEducationNotification in vanilla
-                        var message = new SendEducationNotification(
-                            clanHero,
-                            age,
-                            educationBehavior._previousEducations.TryGetValue(clanHero, out var education) ? education : (short)-1,
-                            playerEducator.ControllerId);
-                        messageBroker.Publish(this, message);
-                    }
-                }
+                // A stage the educator never finished was just done automatically, close its notice before sending the new one
+                CancelPendingNotifications((childKey, _) => childKey.Item1 == clanHero && childKey.Item2 < age);
+
+                var heroEducator = FindFirstSuitableHeroEducator(playerClan, clanHero);
+                if (heroEducator == null || !playerManager.TryGetPlayer(heroEducator, out var playerEducator)) continue;
+
+                // Save pending notification on the server. No other client should get the same notification and it shouldn't be re-sent
+                pendingNotifications.Add((clanHero, age), playerEducator.ControllerId);
+
+                // Send notification to display on clients, equivalent to calling ShowEducationNotification in vanilla
+                var message = new SendEducationNotification(
+                    clanHero,
+                    age,
+                    educationBehavior._previousEducations.TryGetValue(clanHero, out var education) ? education : (short)-1,
+                    playerEducator.ControllerId);
+                messageBroker.Publish(this, message);
             }
         }
     }
