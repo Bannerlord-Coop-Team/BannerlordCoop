@@ -22,8 +22,6 @@ namespace Coop.Core.Client.Services.Villages.Handlers
 
             messageBroker.Subscribe<NetworkChangeVillageTradeBound>(HandleTrade);
 
-            messageBroker.Subscribe<NetworkChangeVillageHearth>(HandleHearth);
-
             messageBroker.Subscribe<NetworkChangeVillageTradeTaxAccumulated>(HandleTradeTax);
 
             messageBroker.Subscribe<NetworkChangeVillageDemandTime>(HandleLastDemandSatsifiedTime);
@@ -35,8 +33,6 @@ namespace Coop.Core.Client.Services.Villages.Handlers
             messageBroker.Unsubscribe<NetworkChangeVillageState>(HandleVillageState);
 
             messageBroker.Unsubscribe<NetworkChangeVillageTradeBound>(HandleTrade);
-
-            messageBroker.Unsubscribe<NetworkChangeVillageHearth>(HandleHearth);
 
             messageBroker.Unsubscribe<NetworkChangeVillageTradeTaxAccumulated>(HandleTradeTax);
 
@@ -57,15 +53,6 @@ namespace Coop.Core.Client.Services.Villages.Handlers
             var obj = payload.What;
 
             var message = new ChangeVillageTradeTaxAccumulated(obj.VillageId, obj.TradeTaxAccumulated);
-            messageBroker.Publish(this, message);
-        }
-
-        private void HandleHearth(MessagePayload<NetworkChangeVillageHearth> payload)
-        {
-            var obj = payload.What;
-
-            var message = new ChangeVillageHearth(obj.VillageId, obj.Hearth);
-
             messageBroker.Publish(this, message);
         }
 
