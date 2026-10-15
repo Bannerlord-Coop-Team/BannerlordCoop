@@ -1,9 +1,10 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 #if DEBUG
 using GameInterface.Services.GameMenus.Patches;
 #endif
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
+using SandBox.CampaignBehaviors;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -40,6 +41,14 @@ internal class PlayerLeaveSettlementPatch
 
         return false;
     }
+}
+
+[HarmonyPatch(typeof(RetirementCampaignBehavior))]
+internal class PlayerLeaveRetirementSettlementPatch
+{
+    [HarmonyPatch(nameof(RetirementCampaignBehavior.retirement_menu_on_leave))]
+    [HarmonyPrefix]
+    public static bool Prefix() => PlayerLeaveSettlementPatch.RequestLeave();
 }
 
 [HarmonyPatch(
