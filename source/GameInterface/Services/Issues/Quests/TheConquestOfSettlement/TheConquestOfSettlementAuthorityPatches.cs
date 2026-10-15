@@ -49,11 +49,11 @@ internal static class TheConquestOfSettlementEventPatches
     }
 
     [HarmonyFinalizer]
-    private static void Finalizer((IDisposable Scope, bool WasApplying, Hero PreviousTrigger) state)
+    private static void Finalizer((IDisposable Scope, bool WasApplying, Hero PreviousTrigger) __state)
     {
-        IsApplying = state.WasApplying;
-        TriggeringHero = state.PreviousTrigger;
-        state.Scope?.Dispose();
+        IsApplying = __state.WasApplying;
+        TriggeringHero = __state.PreviousTrigger;
+        __state.Scope?.Dispose();
     }
 }
 
