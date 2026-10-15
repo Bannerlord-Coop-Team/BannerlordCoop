@@ -27,6 +27,8 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
+using GameInterface.Services.MapTracking;
+using GameInterface.Services.MapTracking.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
@@ -316,6 +318,59 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         var tradeStates = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().ToArray();
         Assert.Contains(tradeStates, s => s.PartyId == initiatorPartyId && s.Phase == PlayerPartyInteractionPhase.TradeActive);
         Assert.Contains(tradeStates, s => s.PartyId == responderPartyId && s.Phase == PlayerPartyInteractionPhase.TradeActive);
+    }
+
+    [Fact]
+    public void MapTrackingRequest_AcceptedByResponder_TracksBothPlayers()
+    {
+        var (client1, client2, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        Assert.Contains(PlayerPartyInteractionOption.RequestMapTracking, GetInitiatorOptions(sessionId, initiatorPartyId));
+
+        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.RequestMapTracking);
+        Server.NetworkSentMessages.Clear();
+        SubmitOption(client2, sessionId, responderPartyId, PlayerPartyInteractionOption.AcceptProposal);
+
+        Assert.Equal(
+            PlayerPartyInteractionOutcomeType.MapTrackingAccepted,
+            Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
+        Assert.True(Server.NetworkSentMessages.GetMessages<NetworkPlayerMapTrackingChanged>().Single().IsTracking);
+        Assert.Contains("PlayerTwo", GetServerPlayer("PlayerOne").MapTrackedControllerIds);
+        Assert.Contains("PlayerOne", GetServerPlayer("PlayerTwo").MapTrackedControllerIds);
+    }
+
+    [Fact]
+    public void StopMapTracking_ByInitiator_EndsTrackingForBothPlayers()
+    {
+        var (client1, _, initiatorPartyId, responderPartyId) = CreateTwoPlayerParties();
+        Server.Call(() => Server.Resolve<IPlayerMapTracking>().Apply("PlayerOne", "PlayerTwo", true));
+        RequestInteraction(client1, initiatorPartyId, responderPartyId);
+        var sessionId = Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionStarted>().Single().SessionId;
+        var options = GetInitiatorOptions(sessionId, initiatorPartyId);
+        Assert.Contains(PlayerPartyInteractionOption.StopMapTracking, options);
+        Assert.DoesNotContain(PlayerPartyInteractionOption.RequestMapTracking, options);
+
+        Server.NetworkSentMessages.Clear();
+        SubmitOption(client1, sessionId, initiatorPartyId, PlayerPartyInteractionOption.StopMapTracking);
+
+        Assert.Equal(
+            PlayerPartyInteractionOutcomeType.MapTrackingStopped,
+            Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionEnded>().Single().OutcomeType);
+        Assert.Empty(GetServerPlayer("PlayerOne").MapTrackedControllerIds);
+        Assert.Empty(GetServerPlayer("PlayerTwo").MapTrackedControllerIds);
+    }
+
+    private PlayerPartyInteractionOption[] GetInitiatorOptions(string sessionId, string initiatorPartyId) =>
+        Server.NetworkSentMessages.GetMessages<NetworkPlayerPartyInteractionState>().Single(s =>
+            s.SessionId == sessionId &&
+            s.PartyId == initiatorPartyId &&
+            s.Phase == PlayerPartyInteractionPhase.InitialOptions).Options;
+
+    private GameInterface.Services.Players.Data.Player GetServerPlayer(string controllerId)
+    {
+        Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
+        return player;
     }
 
     [Fact]

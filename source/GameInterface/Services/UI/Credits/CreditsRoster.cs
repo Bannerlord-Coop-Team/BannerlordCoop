@@ -21,6 +21,11 @@ internal static class CreditsRoster
         "Lord Zippykins",
         "FCharles",
         "FreddyBoyLacroy",
+        "LimaPlug",
+        "matthew",
+        "Mike B",
+        "Patrick Smalley",
+        "StickyTape",
     };
 
     /// <summary>

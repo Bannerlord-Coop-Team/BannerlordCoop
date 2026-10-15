@@ -2,6 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using Common.Messaging;
+using E2E.Tests.Environment.MockEngine;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.MapEvents.TroopSupply.Messages;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
@@ -20,6 +26,100 @@ namespace E2E.Tests.Services.Missions;
 public class BattleInstanceLifecycleTests : MissionTestEnvironment
 {
     public BattleInstanceLifecycleTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void RoutedSurvivor_IsReportedAfterRegistryRemoval()
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("A", "B");
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            fixture.CreateMission(client);
+            var session = new BattleSession(client.Resolve<IControllerIdProvider>(), client.Resolve<IBattleHostRegistry>());
+            Assert.True(session.TryBegin(mapEventId));
+            var registry = client.Resolve<INetworkAgentRegistry>();
+            var component = new Mock<ICoopMissionComponent>();
+            component.SetupGet(value => value.AgentRegistry).Returns(registry);
+            var broker = client.Resolve<IMessageBroker>();
+            using var lifecycle = new BattleInstanceLifecycle(client.Resolve<IBattleNetwork>(), client.Resolve<INetwork>(),
+                broker, client.ObjectManager, component.Object, new RecordingWorldItemRegistry(), session,
+                client.Resolve<IMissionContext>());
+            using var reporter = new AgentRoutReporter(client.Resolve<IBattleNetwork>(), broker, component.Object,
+                session, new CasualtyAttributionMap(), lifecycle);
+            var character = (CharacterObject)Game.Current.PlayerTroop;
+            var origin = new CoopAgentOrigin(character, null, 0, null, new UniqueTroopDescriptor(77), "routed-party");
+            var agent = Mission.Current.SpawnAgent(new AgentBuildData(character)
+                .Controller(AgentControllerType.AI).TroopOrigin(origin));
+            agent.Health = 37f;
+            var agentId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("A", agentId, agent));
+            broker.Publish(this, new BattleAgentRouted(agent));
+            Assert.False(registry.TryGetAgentInfo(agentId, out _));
+            lifecycle.Leave(wasRetreat: true);
+            var report = ProtoBuf.Serializer.DeepClone(client.NetworkSentMessages
+                .GetMessages<NetworkBattleTroopHealth>().Single());
+            Assert.Equal(mapEventId, report.MapEventId);
+            Assert.Equal(37f, report.Survivors[77]);
+            Assert.Equal(37f, report.RoutedSurvivors[77]);
+        });
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void WithdrawnAdoptedSurvivor_IsIncludedOnceInRequestedHolderSnapshot(bool promoted, bool collected)
+    {
+        using var fixture = new MissionEngineFixture();
+        var (mapEventId, _) = SetupCoopBattle("A", "B");
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            fixture.CreateMission(client);
+            var hosts = client.Resolve<IBattleHostRegistry>();
+            hosts.Set(mapEventId, new BattleHostAssignment(promoted ? "B" : "A", Array.Empty<string>(), 1));
+            var session = new BattleSession(client.Resolve<IControllerIdProvider>(), hosts);
+            Assert.True(session.TryBegin(mapEventId));
+            var registry = client.Resolve<INetworkAgentRegistry>();
+            var component = new Mock<ICoopMissionComponent>();
+            component.SetupGet(value => value.AgentRegistry).Returns(registry);
+            var broker = client.Resolve<IMessageBroker>();
+            using var lifecycle = new BattleInstanceLifecycle(client.Resolve<IBattleNetwork>(), client.Resolve<INetwork>(),
+                broker, client.ObjectManager, component.Object, new RecordingWorldItemRegistry(), session,
+                client.Resolve<IMissionContext>());
+            var character = (CharacterObject)Game.Current.PlayerTroop;
+            var origin = new CoopAgentOrigin(character, null, 0, null, new UniqueTroopDescriptor(77), "withdrawn-party");
+            var agent = Mission.Current.SpawnAgent(new AgentBuildData(character)
+                .Controller(AgentControllerType.AI).TroopOrigin(origin));
+            agent.Health = 37f;
+            var agentId = Guid.NewGuid();
+            Assert.True(registry.TryRegisterAgent("B", agentId, agent));
+            if (!promoted) Assert.True(registry.TryTransferAuthority("A", agentId));
+            lifecycle.RecordWithdrawnHealth(agent);
+            registry.RemoveAgent(agentId);
+            if (collected) broker.Publish(this, new NetworkBattleTroopHealthCollected(mapEventId, new[] { "withdrawn-party" }));
+            if (promoted) hosts.Set(mapEventId, new BattleHostAssignment("A", Array.Empty<string>(), 2));
+            var snapshotId = Guid.NewGuid();
+            broker.Publish(this, new NetworkRequestBattleTroopHealth(mapEventId, new[] { "withdrawn-party" }, snapshotId));
+            var report = ProtoBuf.Serializer.DeepClone(client.NetworkSentMessages
+                .GetMessages<NetworkBattleTroopHealth>().Single());
+            Assert.Equal(snapshotId, report.SnapshotId);
+            if (collected)
+            {
+                Assert.True(report.Survivors == null || report.Survivors.Count == 0);
+                Assert.True(report.RoutedSurvivors == null || report.RoutedSurvivors.Count == 0);
+                return;
+            }
+            Assert.Equal(37f, report.Survivors[77]);
+            Assert.Equal(37f, report.RoutedSurvivors[77]);
+            broker.Publish(this, new NetworkRequestBattleTroopHealth(mapEventId, new[] { "withdrawn-party" }, Guid.NewGuid()));
+            var next = client.NetworkSentMessages.GetMessages<NetworkBattleTroopHealth>().Last();
+            Assert.Empty(next.Survivors);
+            Assert.Empty(next.RoutedSurvivors);
+            Assert.Equal(37f, report.Survivors[77]);
+        });
+    }
 
     [Fact]
     [Trait("Requirement", "BR-054")]
@@ -41,6 +141,7 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
             session.TryBegin(mapEventId);
             var worldItemRegistry = new RecordingWorldItemRegistry();
             var agentRegistry = new Mock<INetworkAgentRegistry>();
+            agentRegistry.Setup(registry => registry.GetControllerIds()).Returns(Array.Empty<string>());
             var missionComponent = new Mock<ICoopMissionComponent>();
             missionComponent.SetupGet(component => component.AgentRegistry).Returns(agentRegistry.Object);
 
@@ -77,6 +178,7 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
                 client.Resolve<IBattleHostRegistry>());
             Assert.True(session.TryBegin(mapEventId));
             var agentRegistry = new Mock<INetworkAgentRegistry>();
+            agentRegistry.Setup(registry => registry.GetControllerIds()).Returns(Array.Empty<string>());
             var missionComponent = new Mock<ICoopMissionComponent>();
             missionComponent.SetupGet(component => component.AgentRegistry).Returns(agentRegistry.Object);
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Generic;
@@ -20,6 +21,9 @@ public static class QuestTypeRegistry
     public static QuestTypeDescriptor Get(IssueBase issue) => issue != null ? Get(issue.GetType()) : null;
 
     public static bool IsRegistered(Type issueType) => issueType != null && ByIssueType.ContainsKey(issueType);
+
+    public static bool IsRegisteredForBehavior(Type behaviorType) => behaviorType != null &&
+        ByIssueType.Keys.Any(issueType => issueType.DeclaringType == behaviorType);
 
     internal static void ClearAllForTests() => ByIssueType.Clear();
 }

@@ -21,11 +21,15 @@ public struct TroopReserveEntry
     [ProtoMember(5)]
     public int SupplyOrder { get; }
 
-    public TroopReserveEntry(int seed, string characterId, int formationClass, int supplyOrder = 0)
+    [ProtoMember(6)]
+    public float? Health { get; }
+
+    public TroopReserveEntry(int seed, string characterId, int formationClass, int supplyOrder = 0, float? health = null)
     {
         Seed = seed;
         CharacterId = characterId;
         FormationClass = formationClass;
         SupplyOrder = supplyOrder;
+        Health = health;
     }
 }

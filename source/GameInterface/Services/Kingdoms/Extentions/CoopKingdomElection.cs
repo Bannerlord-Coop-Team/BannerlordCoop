@@ -108,6 +108,16 @@ namespace GameInterface.Services.Kingdoms.Extentions
             return this._chosenOutcome;
         }
 
+        public DecisionOutcome ChooseCallToWarRefusal()
+        {
+            this.DetermineOfficialSupport();
+            this._chosenOutcome = this._possibleOutcomes.FirstOrDefault(outcome =>
+                outcome is ProposeCallToWarAgreementDecision.ProposeCallToWarAgreementDecisionOutcome { ShouldCallToWar: false }
+                || outcome is AcceptCallToWarAgreementDecision.AcceptCallToWarAgreementDecisionOutcome { ShouldAcceptCallToWar: false });
+
+            return this._chosenOutcome ?? this.ChooseOutcomeWithCurrentVotes();
+        }
+
         public void ApplyChosenOutcomeCoop()
         {
             // The synchronized kingdom decision is the player-facing prompt. Native's peace
@@ -222,6 +232,12 @@ namespace GameInterface.Services.Kingdoms.Extentions
             playerKingdom.AddDecision(playerDecision, ignoreInfluenceCost: true);
 
             return true;
+        }
+
+        internal static bool IsPlayerTargetedCallToWarProposal(KingdomDecision decision)
+        {
+            return decision is ProposeCallToWarAgreementDecision { CalledKingdom: Kingdom calledKingdom }
+                   && calledKingdom.IsPlayerKingdom();
         }
 
         internal static bool TryRedirectPlayerProposeCallToWarAgreementOffer(KingdomDecision decision, DecisionOutcome chosenOutcome)

@@ -23,6 +23,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Hideouts;
+using GameInterface.Services.Issues;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Kingdoms;
@@ -133,6 +134,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
         builder.RegisterType<PartyBehaviorWireMapper>().As<IPartyBehaviorWireMapper>().InstancePerDependency();
         builder.RegisterType<AlleyGarrisonData>().As<IAlleyGarrisonData>().InstancePerDependency();
+        builder.RegisterModule<IssuesModule>();
 #if DEBUG
         builder.RegisterType<ClanLordMovementFixture>().As<IClanLordMovementFixture>().InstancePerLifetimeScope();
         builder.RegisterType<ClanLordMovementFixtureRules>().As<IClanLordMovementFixtureRules>().InstancePerDependency();
