@@ -6,6 +6,8 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.Time.UI;
+using GameInterface.Services.UI.PlayerNameplates;
 using LiteNetLib;
 using Missions.Agents;
 using Missions.Agents.Handlers;
@@ -92,8 +94,11 @@ public class CoopBattleController : CoopMissionController
 
     // Answer BattleSpawnGate.HeroAgentAuthorityProbe for paths in GameInterface (e.g. HeroExtensions.IsHealthControlledByThisInstance)
     private readonly Func<Hero, bool?> heroAgentAuthorityProbe;
-    private Func<Hero, bool?> previousHeroAgentAuthorityProbe;
-    private Func<Agent, bool?> previousMountAuthorityProbe;
+    internal MissionMapTimeView MapTimeView { get; }
+    internal PlayerNameplateMissionView PlayerNameplateView { get; }
+#if DEBUG
+    internal SiegeInteractionDebugBehavior SiegeInteractionDebugBehavior { get; }
+#endif
 
     public CoopBattleController(
         IBattleNetwork network,
@@ -115,7 +120,12 @@ public class CoopBattleController : CoopMissionController
         IBattleAgentSpawnBatchCodec spawnBatchCodec,
         IBattleDamageDataMapper battleDamageDataMapper,
         IMissionWeaponDataMapper missionWeaponDataMapper,
-        ISiegeGateHitApplier siegeGateHitApplier)
+        ISiegeGateHitApplier siegeGateHitApplier,
+        MissionMapTimeView mapTimeView,
+#if DEBUG
+        SiegeInteractionDebugBehavior siegeInteractionDebugBehavior,
+#endif
+        PlayerNameplateMissionView playerNameplateView)
         : base(
             network,
             messageBroker,
@@ -123,8 +133,12 @@ public class CoopBattleController : CoopMissionController
             coopMissionComponent,
             Missions.Agents.Handlers.MovementCadenceProfile.Battle)
     {
-        try
-        {
+        MapTimeView = mapTimeView;
+        PlayerNameplateView = playerNameplateView;
+#if DEBUG
+        SiegeInteractionDebugBehavior = siegeInteractionDebugBehavior;
+#endif
+
             var session = new BattleSession(controllerIdProvider, hostRegistry);
             Session = session;
             debugMissionContext = missionContext;
@@ -152,7 +166,6 @@ public class CoopBattleController : CoopMissionController
                 coopMissionComponent,
                 casualties,
                 puppetMountStateRepairer);
-            previousMountAuthorityProbe = BattleSpawnGate.MountAuthorityProbe;
             damageRouter = new BattleDamageRouter(
                 network,
                 messageBroker,
@@ -208,24 +221,16 @@ public class CoopBattleController : CoopMissionController
             messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
 
             heroAgentAuthorityProbe = ProbeHeroAgentAuthority;
-            previousHeroAgentAuthorityProbe = BattleSpawnGate.HeroAgentAuthorityProbe;
             BattleSpawnGate.HeroAgentAuthorityProbe = heroAgentAuthorityProbe;
 
             // Decode order clips during battle setup so the first issued order does not hitch.
             coopMissionComponent.AgentVoiceHandler.WarmUp();
-        }
-        catch
-        {
-            try { Abandon(); }
-            catch (Exception error) { Logger.Error(error, "Failed mission construction cleanup"); }
-            throw;
-        }
     }
 
     protected override void DisposeMission()
     {
         Cleanup(
-            () => { if (!IsAbandoned && Session != null) messageBroker.Publish(this, new BattleMissionEnded(Session.InstanceId)); },
+            () => { if (Session != null) messageBroker.Publish(this, new BattleMissionEnded(Session.InstanceId)); },
             () => lifecycle?.Dispose(),
             () => replicator?.Dispose(),
             () => deathReporter?.Dispose(),
@@ -246,14 +251,9 @@ public class CoopBattleController : CoopMissionController
             () =>
             {
                 if (BattleSpawnGate.HeroAgentAuthorityProbe == heroAgentAuthorityProbe)
-                    BattleSpawnGate.HeroAgentAuthorityProbe = IsAbandoned ? previousHeroAgentAuthorityProbe : null;
-                previousHeroAgentAuthorityProbe = null;
-                if (IsAbandoned && BattleSpawnGate.MountAuthorityProbe == null)
-                    BattleSpawnGate.MountAuthorityProbe = previousMountAuthorityProbe;
-                previousMountAuthorityProbe = null;
+                    BattleSpawnGate.HeroAgentAuthorityProbe = null;
                 // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
                 // never bleeds into the next siege before the first tick refreshes it.
-                if (IsAbandoned) return;
                 SiegeMissionAuthorityGate.IsLocalAuthority = false;
                 SiegeMissionAuthorityGate.IsAuthorityKnown = false;
                 SiegeMissionAuthorityGate.ResetClaimedMachines();

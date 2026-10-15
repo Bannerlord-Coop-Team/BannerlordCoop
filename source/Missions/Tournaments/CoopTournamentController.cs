@@ -5,8 +5,10 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Time.UI;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.Messages;
+using GameInterface.Services.UI.PlayerNameplates;
 using LiteNetLib;
 using Missions.Data;
 using Missions.Agents;
@@ -44,6 +46,8 @@ public class CoopTournamentController : CoopMissionController
     private readonly ITournamentSpectatorAgentManager spectatorAgentManager;
     private readonly TournamentSpawnManifestBuilder manifestBuilder;
     private readonly IMissionContext missionContext;
+    internal MissionMapTimeView MapTimeView { get; }
+    internal PlayerNameplateMissionView PlayerNameplateView { get; }
     private TournamentSessionSnapshot snapshot;
     private CoopTournamentBehavior tournamentBehavior;
     private CoopTournamentFightMissionController fightController;
@@ -147,7 +151,9 @@ public class CoopTournamentController : CoopMissionController
         INetworkWorldItemRegistry worldItemRegistry,
         ITournamentSpectatorAgentManagerFactory spectatorAgentManagerFactory,
         IGuardedHitWindow guardedHitWindow,
-        IMissionContext missionContext)
+        IMissionContext missionContext,
+        MissionMapTimeView mapTimeView,
+        PlayerNameplateMissionView playerNameplateView)
         : base(
             network,
             messageBroker,
@@ -155,8 +161,9 @@ public class CoopTournamentController : CoopMissionController
             coopMissionComponent,
             Missions.Agents.Handlers.MovementCadenceProfile.Tournament)
     {
-        try
-        {
+        MapTimeView = mapTimeView;
+        PlayerNameplateView = playerNameplateView;
+
             this.relayNetwork = relayNetwork;
             this.worldItemRegistry = worldItemRegistry;
             this.guardedHitWindow = guardedHitWindow;
@@ -175,13 +182,6 @@ public class CoopTournamentController : CoopMissionController
             messageBroker.Subscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut);
             messageBroker.Subscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState);
             messageBroker.Subscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded);
-        }
-        catch
-        {
-            try { Abandon(); }
-            catch (Exception error) { Logger.Error(error, "Failed mission construction cleanup"); }
-            throw;
-        }
     }
 
     public ITournamentMissionSession Session => session;

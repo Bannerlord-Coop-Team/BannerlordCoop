@@ -187,8 +187,8 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
             new MissionOptionsComponent(),
             new HighlightsController(),
             new SandboxHighlightsController(),
-            coopController.ResolveMissionBehavior<MissionMapTimeView>(),
-            coopController.ResolveMissionBehavior<PlayerNameplateMissionView>(),
+            coopController.MapTimeView,
+            coopController.PlayerNameplateView,
             coopController
         };
         if (!behaviors.Select(behavior => behavior.GetType()).SequenceEqual(BehaviorOrder))

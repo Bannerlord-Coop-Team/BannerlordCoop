@@ -10,6 +10,8 @@ using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Time.UI;
+using GameInterface.Services.UI.PlayerNameplates;
 using LiteNetLib;
 using Missions.Data;
 using Missions.Agents.Packets;
@@ -46,6 +48,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionLi
     private readonly IMissionWeaponDataMapper missionWeaponDataMapper;
     private readonly ILocationConversationAgentGuard conversationAgentGuard;
     private readonly ILocationPartyPuppetRegistrar partyPuppetRegistrar;
+    internal MissionMapTimeView MapTimeView { get; }
+    internal PlayerNameplateMissionView PlayerNameplateView { get; }
     //private readonly BoardGameManager boardGameManager;
 
     private string instanceId;
@@ -67,7 +71,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionLi
         IMissionWeaponDataMapper missionWeaponDataMapper,
         //BoardGameManager boardGameManager,
         IObjectManager objectManager,
-        ICoopMissionComponent coopMissionComponent)
+        ICoopMissionComponent coopMissionComponent,
+        MissionMapTimeView mapTimeView,
+        PlayerNameplateMissionView playerNameplateView)
         : base(
             network,
             messageBroker,
@@ -75,8 +81,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionLi
             coopMissionComponent,
             Missions.Agents.Handlers.MovementCadenceProfile.Location)
     {
-        try
-        {
+        MapTimeView = mapTimeView;
+        PlayerNameplateView = playerNameplateView;
+
             this.relayNetwork = relayNetwork;
             this.controllerIdProvider = controllerIdProvider;
             this.hostRegistry = hostRegistry;
@@ -105,13 +112,6 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionLi
             populationDirector = new LocationPopulationDirector(messageBroker, session, bindingMap, npcPuppetSpawner);
 
             messageBroker.Subscribe<PlayerEnteredLocation>(Handle_PlayerEnteredLocation);
-        }
-        catch
-        {
-            try { Abandon(); }
-            catch (Exception error) { Logger.Error(error, "Failed mission construction cleanup"); }
-            throw;
-        }
     }
 
     protected override void DisposeMission()

@@ -124,7 +124,7 @@ public class MissionModule : Module
 
         // MissionContext mirrors the server's instance membership and must live for the whole client
         // session (it subscribes to the MissionPeer* messages over the campaign connection), so it is a
-        // single per-scope instance, AutoActivated to subscribe up front. AsSelf for tests that resolve
+        // single session instance, AutoActivated to subscribe up front. AsSelf for tests that resolve
         // the concrete type; As<IMissionContext> for LiteNetP2PClient and the membership handlers. It is
         // registered here (not via the IHandler auto-scan) because it no longer lives in the client
         // namespace the scan filters on — and registering it once keeps a single broker subscription.
@@ -144,9 +144,8 @@ public class MissionModule : Module
 
         // The location P2P controller. Resolved as ILocationMissionBehavior by PlayerLocationEntryPatches
         // and attached to every opened location mission (tavern/indoor, town centre, castle courtyard,
-        // village). Battles are not location missions and so are intentionally excluded. Transient so each
-        // mission gets a fresh controller that is disposed with that mission — InstancePerLifetimeScope
-        // would hand a disposed instance to the next mission.
+        // village). Battles are not location missions and so are intentionally excluded. Each mission scope
+        // gets a fresh controller and its view graph, which the lifetime factory disposes together.
         builder.RegisterType<CoopLocationsController>()
             .Keyed<CoopLocationsController>(MissionLifetimeFactory.MissionTag)
             .InstancePerMatchingLifetimeScope(MissionLifetimeFactory.MissionTag)
@@ -156,21 +155,12 @@ public class MissionModule : Module
         builder.Register(context =>
         {
             var controller = context.Resolve<CoopLocationsController>();
-            try
+            return new ILocationMissionBehavior[]
             {
-                return new ILocationMissionBehavior[]
-                {
-                    controller.ResolveMissionBehavior<MissionMapTimeView>(),
-                    controller.ResolveMissionBehavior<PlayerNameplateMissionView>(),
-                    controller
-                };
-            }
-            catch
-            {
-                try { controller.Abandon(); }
-                catch (Exception error) { LogManager.GetLogger<MissionModule>().Error(error, "Failed location composition cleanup"); }
-                throw;
-            }
+                controller.MapTimeView,
+                controller.PlayerNameplateView,
+                controller
+            };
         }).As<IEnumerable<ILocationMissionBehavior>>().InstancePerDependency();
 
         // Location NPC spawn-batch codec (stateless). The per-mission session/binding map/components
@@ -209,7 +199,7 @@ public class MissionModule : Module
         // Attaches the coop battle behaviors to a freshly opened battle mission. Resolved from the container
         // by BattleMissionEntryPatch (the native OpenBattleMission path) and injected into the coop launcher;
         // lives in Missions so it can name the concrete behavior types GameInterface cannot reference.
-        // Stateless, so a single per-scope instance is fine.
+        // Stateless, so a single session instance is fine.
         builder.RegisterType<CoopBattleBehaviorAttacher>()
             .As<ICoopBattleBehaviorAttacher>()
             .SingleInstance();
@@ -220,7 +210,7 @@ public class MissionModule : Module
         // Builds the coop field-battle mission (mirrors SandBoxMissions.OpenBattleMission with coop suppliers,
         // no deployment phase, and the coop behaviors attached). Resolved from the container by the GameInterface
         // battle flow (OpenAttackMission) as ICoopFieldBattleLauncher; lives in Missions so it can reference the
-        // SandBox mission behaviors. Stateless, so a single per-scope instance is fine.
+        // SandBox mission behaviors. Stateless, so a single session instance is fine.
         builder.RegisterType<CoopFieldBattleLauncher>()
             .As<ICoopFieldBattleLauncher>()
             .SingleInstance();

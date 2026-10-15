@@ -2,8 +2,6 @@
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MapEvents;
-using GameInterface.Services.Time.UI;
-using GameInterface.Services.UI.PlayerNameplates;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -15,8 +13,7 @@ namespace Missions.Battles;
 internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CoopBattleBehaviorAttacher>();
-    // Autofac-provided factory: CoopBattleController is registered InstancePerDependency, so each call
-    // builds a fresh controller with its own mission lifetime.
+    // Autofac-provided factory builds a fresh controller with its own mission lifetime.
     private readonly Func<CoopBattleController> controllerFactory;
     private readonly IMessageBroker messageBroker;
     private readonly INetwork relayNetwork;
@@ -38,10 +35,10 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
         try
         {
 #if DEBUG
-            behaviors.Add(controller.ResolveMissionBehavior<SiegeInteractionDebugBehavior>());
+            behaviors.Add(controller.SiegeInteractionDebugBehavior);
 #endif
-            behaviors.Add(controller.ResolveMissionBehavior<MissionMapTimeView>());
-            behaviors.Add(controller.ResolveMissionBehavior<PlayerNameplateMissionView>());
+            behaviors.Add(controller.MapTimeView);
+            behaviors.Add(controller.PlayerNameplateView);
             behaviors.Add(new BattleResultReadyLogic(
                 controller.ResultCommitter,
                 controller.SiegeEngineStateReporter,

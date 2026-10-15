@@ -51,22 +51,8 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         this.coopMissionComponent = coopMissionComponent;
         coopMissionComponent.AgentMovementHandler.Configure(movementCadenceProfile);
 
-        try
-        {
-            messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
-            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
-        }
-        catch
-        {
-            try
-            {
-                Cleanup(
-                    () => messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered),
-                    () => messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo));
-            }
-            catch (Exception error) { Logger.Error(error, "Failed base mission construction cleanup"); }
-            throw;
-        }
+        messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_MissionPeerEntered);
+        messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
     }
 
     public override void OnPreMissionTick(float dt)
@@ -136,11 +122,8 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     private MissionLifetime lifetime;
     private bool ended;
     private bool disposed;
-    protected bool IsAbandoned { get; private set; }
 
     internal void SetLifetime(MissionLifetime value) => lifetime = value;
-
-    internal T ResolveMissionBehavior<T>() => lifetime.Scope.Resolve<T>();
 
     public void Dispose()
     {
@@ -153,7 +136,6 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
     {
         if (ended) return;
         ended = true;
-        IsAbandoned = true;
         Cleanup(DisposeController, () => lifetime?.Dispose());
     }
 

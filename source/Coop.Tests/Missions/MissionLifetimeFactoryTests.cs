@@ -83,17 +83,6 @@ public class MissionLifetimeFactoryTests
     }
 
     [Fact]
-    public void FailedBaseConstructionRemovesAlreadyRegisteredSubscriptions()
-    {
-        var broker = new Mock<IMessageBroker>();
-        broker.Setup(x => x.Subscribe(It.IsAny<Action<MessagePayload<NetworkMissionJoinInfo>>>()))
-            .Throws(new InvalidOperationException("subscription failed"));
-        Assert.Throws<InvalidOperationException>(() => new ProbeController(new ProbeDependency(), broker.Object));
-        broker.Verify(x => x.Unsubscribe(It.IsAny<Action<MessagePayload<NetworkMissionPeerEntered>>>()), Times.Once);
-        broker.Verify(x => x.Unsubscribe(It.IsAny<Action<MessagePayload<NetworkMissionJoinInfo>>>()), Times.Once);
-    }
-
-    [Fact]
     public void AbandonedGraphReleasesDependenciesWithoutLeavingTheActiveMission()
     {
         using var session = BuildSession();

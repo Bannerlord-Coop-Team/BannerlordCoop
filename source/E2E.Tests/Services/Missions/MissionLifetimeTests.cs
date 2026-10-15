@@ -64,32 +64,6 @@ public class MissionLifetimeTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void AbandoningBattleRestoresPriorAuthorityProbes()
-    {
-        Clients.Single().Call(() =>
-        {
-            var previousHero = BattleSpawnGate.HeroAgentAuthorityProbe;
-            var previousMount = BattleSpawnGate.MountAuthorityProbe;
-            Func<Hero, bool?> hero = _ => true;
-            Func<Agent, bool?> mount = _ => true;
-            try
-            {
-                BattleSpawnGate.HeroAgentAuthorityProbe = hero;
-                BattleSpawnGate.MountAuthorityProbe = mount;
-                var controller = Clients.Single().Resolve<CoopBattleController>();
-                controller.Abandon();
-                Assert.Same(hero, BattleSpawnGate.HeroAgentAuthorityProbe);
-                Assert.Same(mount, BattleSpawnGate.MountAuthorityProbe);
-            }
-            finally
-            {
-                BattleSpawnGate.HeroAgentAuthorityProbe = previousHero;
-                BattleSpawnGate.MountAuthorityProbe = previousMount;
-            }
-        });
-    }
-
-    [Fact]
     public void FailedTournamentInitializationRemovesControllerAndEndsNativeMission()
     {
         using var fixture = new MissionEngineFixture();
@@ -128,21 +102,22 @@ public class MissionLifetimeTests : MissionTestEnvironment
         else
         {
             controller = (CoopMissionController)client.Container.Resolve(controllerType);
-            nameplates = controller.ResolveMissionBehavior<PlayerNameplateMissionView>();
-            mapTime = controller.ResolveMissionBehavior<MissionMapTimeView>();
+            if (controller is CoopBattleController battle)
+            {
+                nameplates = battle.PlayerNameplateView;
+                mapTime = battle.MapTimeView;
+            }
+            else if (controller is CoopTournamentController tournament)
+            {
+                nameplates = tournament.PlayerNameplateView;
+                mapTime = tournament.MapTimeView;
+            }
+            else
+                throw new InvalidOperationException($"Unsupported mission controller: {controller.GetType().Name}");
         }
         var nameplateResolver = typeof(PlayerNameplateMissionView)
             .GetField("controllerResolver", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(nameplates)!;
-        Assert.Same(client.Resolve<IMissionContext>(), controller.ResolveMissionBehavior<IMissionContext>());
-        Assert.Same(client.Resolve<IBattleNetwork>(), controller.ResolveMissionBehavior<IBattleNetwork>());
-        Assert.Same(client.Resolve<INetwork>(), controller.ResolveMissionBehavior<INetwork>());
-        Assert.Same(client.Resolve<IMessageBroker>(), controller.ResolveMissionBehavior<IMessageBroker>());
-        Assert.Same(client.Resolve<IPacketManager>(), controller.ResolveMissionBehavior<IPacketManager>());
-        Assert.Same(client.Resolve<IObjectManager>(), controller.ResolveMissionBehavior<IObjectManager>());
-        Assert.Same(client.Resolve<INetworkAgentRegistry>(), controller.ResolveMissionBehavior<INetworkAgentRegistry>());
-        Assert.Same(client.Resolve<INetworkWorldItemRegistry>(), controller.ResolveMissionBehavior<INetworkWorldItemRegistry>());
-
         var component = (ICoopMissionComponent)typeof(CoopMissionController)
             .GetField("coopMissionComponent", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(controller)!;
