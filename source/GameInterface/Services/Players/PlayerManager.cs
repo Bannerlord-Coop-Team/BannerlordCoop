@@ -72,6 +72,11 @@ public interface IPlayerManager
     bool TryGetPlayer(NetPeer peer, out Player player);
 
     /// <summary>
+    /// Resolves the Player controlling the given hero.
+    /// </summary>
+    bool TryGetPlayer(Hero hero, out Player player);
+
+    /// <summary>
     /// Checks whether the given player has a connected peer.
     /// </summary>
     bool IsConnected(Player player);
@@ -371,6 +376,14 @@ public class PlayerManager : IPlayerManager
     {
         return peerToPlayer.TryGetValue(peer, out player);
     }
+
+    public bool TryGetPlayer(Hero hero, out Player player)
+    {
+        player = null;
+        return hero != null && TryGetControlledObjectInfo(hero, out var control)
+            && TryGetPlayer(control.ObjectControllerId, out player);
+    }
+
     public bool IsConnected(Player player)
     {
         return peerToPlayer.Any(kvp =>
