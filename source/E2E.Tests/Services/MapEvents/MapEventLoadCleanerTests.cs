@@ -135,7 +135,7 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     public void FinalizePlayerMapEvents_PartyInAnotherEvent_PreservesAuthoritativeMembership()
     {
         var loadedEventContext = CreateServerMapEvent(commit: false);
-        var activeEventContext = CreateServerMapEvent(commit: false);
+        var activeEventContext = CreateServerMapEvent();
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
         RegisterAsPlayerParty("offline-player-foreign-event", heroId, loadedEventContext.AttackerPartyId);
 
@@ -371,6 +371,32 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.Same(army, playerFollower.Army);
             Assert.Same(armyLeader, playerFollower.AttachedTo);
         }
+    }
+
+    [Fact]
+    public void FinalizePlayerMapEvents_AiPartiesInUnregisteredEvent_ReleasesParties()
+    {
+        // a save where an AI battle already left the map event manager but its parties still link to it
+        var mapEventContext = CreateServerMapEvent(commit: false);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var attacker));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.DefenderPartyId, out var defender));
+            Assert.DoesNotContain(mapEvent, Campaign.Current.MapEventManager.MapEvents);
+            Assert.Same(mapEvent, attacker.MapEvent);
+
+            attacker.PartyMoveMode = MoveModeType.Party;
+            attacker.MoveTargetParty = defender;
+
+            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+
+            Assert.Null(attacker.Party.MapEventSide);
+            Assert.Null(defender.Party.MapEventSide);
+            Assert.Equal(MoveModeType.Hold, attacker.PartyMoveMode);
+            Assert.Null(attacker.MoveTargetParty);
+        }, MapEventDisabledMethods);
     }
 
     [Fact]

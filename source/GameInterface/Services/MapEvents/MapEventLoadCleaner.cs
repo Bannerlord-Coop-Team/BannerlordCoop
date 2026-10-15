@@ -101,6 +101,40 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                 mobileParty.ResetNavigationToHold();
             }
         }
+
+        ReleaseEndedMapEventLinks();
+    }
+
+    // A save can hold parties still linked to a battle that already ended (finalized, or no longer
+    // in the map event manager). Nothing ends that battle again, so the party never moves again and
+    // the map shows an empty 0/0 battle. Covers AI parties too, not only player battles.
+    private void ReleaseEndedMapEventLinks()
+    {
+        var liveMapEvents = new HashSet<MapEvent>(Campaign.Current.MapEventManager.MapEvents);
+        var parties = Campaign.Current.CampaignObjectManager.MobileParties
+            .Where(mobileParty => mobileParty != null)
+            .Select(mobileParty => mobileParty.Party)
+            .Concat(Settlement.All
+                .Where(settlement => settlement != null)
+                .Select(settlement => settlement.Party))
+            .Where(party => party != null);
+
+        foreach (var party in parties)
+        {
+            var mapEvent = party.MapEventSide?.MapEvent;
+            if (mapEvent == null || (!mapEvent.IsFinalized && liveMapEvents.Contains(mapEvent)))
+                continue;
+
+            logger.Warning(
+                "Releasing {PartyId} from ended map event {MapEventId} after load",
+                party.Id,
+                mapEvent.StringId);
+            party._mapEventSide = null;
+
+            var mobileParty = party.MobileParty;
+            if (mobileParty != null && mobileParty.IsActive && !mobileParty.IsPlayerParty())
+                mobileParty.ResetNavigationToHold();
+        }
     }
 
     private void RepairPartySideLinks(MapEvent mapEvent)
