@@ -10,9 +10,9 @@ using Quest = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssueQ
 
 internal sealed class TheConquestOfSettlementQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
 {
-    private readonly TheConquestOfSettlementService service;
+    private readonly ITheConquestOfSettlementService service;
 
-    public TheConquestOfSettlementQuestSolutionAcceptStrategy(TheConquestOfSettlementService service)
+    public TheConquestOfSettlementQuestSolutionAcceptStrategy(ITheConquestOfSettlementService service)
     {
         this.service = service;
     }
