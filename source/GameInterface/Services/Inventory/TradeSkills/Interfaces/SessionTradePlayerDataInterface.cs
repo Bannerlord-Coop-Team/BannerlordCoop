@@ -1,5 +1,6 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Network;
+using Common.Network.Coalescing;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Inventory.TradeSkills.Data;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
@@ -32,13 +33,15 @@ public class SessionTradePlayerDataInterface : ISessionTradePlayerDataInterface
     private ICoopSessionProvider coopSessionProvider;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly ISendCoalescer sendCoalescer;
     private TradePlayerData TradePlayerData => coopSessionProvider.CoopSession.TradePlayerData;
 
-    public SessionTradePlayerDataInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager, INetwork network)
+    public SessionTradePlayerDataInterface(ICoopSessionProvider coopSessionProvider, IObjectManager objectManager, INetwork network, ISendCoalescer sendCoalescer = null)
     {
         this.coopSessionProvider = coopSessionProvider;
         this.objectManager = objectManager;
         this.network = network;
+        this.sendCoalescer = sendCoalescer;
     }
 
     /// <summary>
@@ -70,7 +73,12 @@ public class SessionTradePlayerDataInterface : ISessionTradePlayerDataInterface
             //CampaignEventDispatcher.Instance.OnPlayerTradeProfit(gainedXp);
         }
 
-        // Update client trade data
+        // Quest listeners read the owner's roster when the completion message arrives.
+        if (playerHero.PartyBelongedTo != null &&
+            objectManager.TryGetHandleWithLogging(playerHero.PartyBelongedTo.ItemRoster, out var rosterHandle))
+        {
+            sendCoalescer?.FlushInstance(rosterHandle, network);
+        }
         network.SendAll(new NetworkUpdateTradeData(playerHeroId, purchasedItems, soldItems, isTrading));
     }
 

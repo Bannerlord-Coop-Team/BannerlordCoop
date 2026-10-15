@@ -154,7 +154,6 @@ namespace GameInterface.Services.Inventory.Interfaces
                 }
             }
 
-            sessionTradePlayerDataInterface.UpdatePlayerInventory(ownerHero, boughtItems, soldItems, isTrading);
             if (currentSettlementComponent != null && isTrading)
             {
                 // Sets the gold of the other party
@@ -172,6 +171,8 @@ namespace GameInterface.Services.Inventory.Interfaces
             {
                 GiveGoldAction.ApplyForCharacterToParty(null, partyBase, totalAmount, false);
             }
+
+            sessionTradePlayerDataInterface.UpdatePlayerInventory(ownerHero, boughtItems, soldItems, isTrading);
         }
 
         public void UpdateRosterWithData(ItemRoster targetItemRoster, ItemRosterElement[] itemRosterElements)

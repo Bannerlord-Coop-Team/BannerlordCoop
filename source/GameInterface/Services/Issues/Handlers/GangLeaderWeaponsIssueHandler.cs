@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.Inventory.TradeSkills.Messages;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.CreationCapture;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
@@ -68,6 +69,7 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
         broker.Subscribe<GangLeaderWeaponsAlternativeUpdated>(HandleAlternativeUpdated);
         broker.Subscribe<NetworkGangLeaderWeaponsAlternative>(HandleNetworkAlternative);
         broker.Subscribe<NetworkPlayerCharacterChangedAfterHeirSelection>(HandlePlayerChanged);
+        broker.Subscribe<NetworkUpdateTradeData>(HandleInventoryCompleted);
     }
 
     public void Dispose()
@@ -87,9 +89,29 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
         broker.Unsubscribe<GangLeaderWeaponsAlternativeUpdated>(HandleAlternativeUpdated);
         broker.Unsubscribe<NetworkGangLeaderWeaponsAlternative>(HandleNetworkAlternative);
         broker.Unsubscribe<NetworkPlayerCharacterChangedAfterHeirSelection>(HandlePlayerChanged);
+        broker.Unsubscribe<NetworkUpdateTradeData>(HandleInventoryCompleted);
         pendingGuardEntries.Clear();
         pendingBattle = null;
         pendingBattleRequestId = null;
+    }
+
+    private void HandleInventoryCompleted(MessagePayload<NetworkUpdateTradeData> payload)
+    {
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (ModInformation.IsClient &&
+                objects.TryGetObjectWithLogging<Hero>(data.PlayerHeroId, out var hero) &&
+                hero != null && hero == Hero.MainHero)
+            {
+                // DoneLogic is replaced; run the owning quest callback after the authoritative roster apply.
+                foreach (var quest in Campaign.Current.QuestManager.Quests.OfType<Quest>().ToArray())
+                {
+                    if (quest.IsOngoing && ownership.IsLocalPeerOwner(quest.QuestGiver))
+                        quest.OnPlayerInventoryChanged(data.PurchasedItems, data.SoldItems, data.IsTrading);
+                }
+            }
+        });
     }
 
     private void HandlePlayerChanged(MessagePayload<NetworkPlayerCharacterChangedAfterHeirSelection> payload)
