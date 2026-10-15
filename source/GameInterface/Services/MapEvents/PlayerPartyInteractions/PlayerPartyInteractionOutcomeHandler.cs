@@ -3,6 +3,7 @@ using Common.Logging;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.MapTracking;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
 using Serilog;
@@ -80,19 +81,22 @@ internal class PlayerPartyInteractionOutcomeHandler
     private readonly IClanJoinRules clanJoinRules;
     private readonly IClanLeaveRules clanLeaveRules;
     private readonly IPlayerMarriageRules playerMarriageRules;
+    private readonly IPlayerMapTracking mapTracking;
 
     public PlayerPartyInteractionOutcomeHandler(
         IObjectManager objectManager,
         IKingdomMembershipState kingdomMembershipState,
         IClanJoinRules clanJoinRules,
         IClanLeaveRules clanLeaveRules,
-        IPlayerMarriageRules playerMarriageRules)
+        IPlayerMarriageRules playerMarriageRules,
+        IPlayerMapTracking mapTracking)
     {
         this.objectManager = objectManager;
         this.kingdomMembershipState = kingdomMembershipState;
         this.clanJoinRules = clanJoinRules;
         this.clanLeaveRules = clanLeaveRules;
         this.playerMarriageRules = playerMarriageRules;
+        this.mapTracking = mapTracking;
     }
 
     public bool Handle(PlayerPartyInteractionOutcome outcome)
@@ -112,10 +116,19 @@ internal class PlayerPartyInteractionOutcomeHandler
                 return HandleClanDeparture(outcome);
             case PlayerPartyInteractionOutcomeType.MarriageAccepted:
                 return HandleMarriageAccepted(outcome);
+            case PlayerPartyInteractionOutcomeType.MapTrackingAccepted:
+                return SetMapTracking(outcome, isTracking: true);
+            case PlayerPartyInteractionOutcomeType.MapTrackingStopped:
+                return SetMapTracking(outcome, isTracking: false);
             default:
                 return true;
         }
     }
+
+    private bool SetMapTracking(PlayerPartyInteractionOutcome outcome, bool isTracking) =>
+        objectManager.TryGetObjectWithLogging(outcome.InitiatorPartyId, out PartyBase initiatorParty) &&
+        objectManager.TryGetObjectWithLogging(outcome.ResponderPartyId, out PartyBase responderParty) &&
+        mapTracking.SetTracking(initiatorParty.MobileParty, responderParty.MobileParty, isTracking);
 
     private bool HandleClanDeparture(PlayerPartyInteractionOutcome outcome)
     {

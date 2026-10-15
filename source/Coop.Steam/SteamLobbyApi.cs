@@ -32,6 +32,7 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
     private Action<ulong, bool> onCreateCompleted;
     private Action<ulong, bool> onJoinCompleted;
     private Action<IReadOnlyList<ulong>, bool> onListCompleted;
+    private Action<IReadOnlyList<ulong>> onListPage;
     private SteamLobbyListQueryPlan lobbyListQueryPlan;
     private SteamLobbyListQueryRange activeLobbyListRange;
     private readonly Dictionary<ulong, List<Action<bool>>> lobbyDataRequests = new();
@@ -220,7 +221,7 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
         }
     }
 
-    public void RequestLobbyList(Action<IReadOnlyList<ulong>, bool> onCompleted)
+    public void RequestLobbyList(Action<IReadOnlyList<ulong>, bool> onCompleted, Action<IReadOnlyList<ulong>> onPage = null)
     {
         if (listInFlight)
         {
@@ -229,6 +230,7 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
         }
 
         onListCompleted = onCompleted;
+        onListPage = onPage;
         listInFlight = true;
         lobbyListQueryPlan = new SteamLobbyListQueryPlan();
 
@@ -394,6 +396,11 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
                     "Steam lobby discovery could not split a saturated partition; results may be incomplete");
             }
 
+            if (lobbyListQueryPlan.HasPendingRanges)
+            {
+                onListPage?.Invoke(new List<ulong>(lobbyListQueryPlan.Results));
+            }
+
             RequestNextLobbyListPage();
         }
         catch (Exception ex)
@@ -414,6 +421,7 @@ public class SteamLobbyApi : ISteamPublicLobbyApi
     {
         listInFlight = false;
         onListCompleted = null;
+        onListPage = null;
         lobbyListQueryPlan = null;
         activeLobbyListRange = default;
     }

@@ -35,7 +35,6 @@ public class SystemDeveloperDirectCommandTests
         "HeroDeveloperCommands",
         "InventoryCommands",
         "TradeSkillCommands",
-        "IssuesDebugCommand",
         "ItemObjectCommands",
         "ItemRosterDebugCommands",
         "AiLordPeaceReleaseFixtureCommands",
@@ -54,9 +53,9 @@ public class SystemDeveloperDirectCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(106, commandTypes.Length);
+        Assert.Equal(102, commandTypes.Length);
 #else
-        Assert.Equal(94, commandTypes.Length);
+        Assert.Equal(90, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -113,12 +112,10 @@ public class SystemDeveloperDirectCommandTests
             new[]
             {
                 "advance_time",
-                "complete",
                 "force_autosave",
                 "instrument",
                 "is_ironman_mode",
                 "set_time_mode",
-                "social_parameter",
             },
             countReaders);
 #else
@@ -126,11 +123,9 @@ public class SystemDeveloperDirectCommandTests
             new[]
             {
                 "advance_time",
-                "complete",
                 "force_autosave",
                 "instrument",
                 "is_ironman_mode",
-                "social_parameter",
             },
             countReaders);
 #endif
