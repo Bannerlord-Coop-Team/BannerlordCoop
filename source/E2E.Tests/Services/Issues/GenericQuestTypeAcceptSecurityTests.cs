@@ -3,8 +3,10 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Handlers;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
@@ -230,6 +232,49 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
             Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(owner, out _));
+        });
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    public void RoamingGiver_RequiresThisPlayersEngagementWithThisLordsParty(
+        bool samePlayer, bool sameGiver, bool expected)
+    {
+        var fixture = SetupVillageOwner();
+        var controllerId = ConnectPlayerAwayFromIssueGiver(fixture);
+        var giverPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(giverPartyId, out var giverParty));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+            Assert.True(Server.ObjectManager.TryGetId(giverParty.Party, out var giverPartyBaseId));
+            Assert.True(Server.ObjectManager.TryGetId(playerParty.Party, out var playerPartyBaseId));
+            using (new AllowedThread())
+            {
+                giver.StayingInSettlement = null;
+                giver.PartyBelongedTo = giverParty;
+            }
+            Assert.Null(giver.CurrentSettlement);
+
+            var tracker = Server.Resolve<ConversationPartyTracker>();
+            Assert.True(tracker.TryBeginEngagement(Client.NetPeer,
+                samePlayer ? playerPartyBaseId : "another-player-party",
+                sameGiver ? giverPartyBaseId : "another-lord-party", false));
+            try
+            {
+                Assert.Equal(expected, Server.Resolve<IssueConversationHandler>()
+                    .IsRequesterPresentWithIssueGiver(controllerId, giver));
+            }
+            finally
+            {
+                tracker.TryEndEngagement(Client.NetPeer, out _, out _);
+            }
+            Assert.False(Server.Resolve<IssueConversationHandler>()
+                .IsRequesterPresentWithIssueGiver(controllerId, giver));
         });
     }
 
