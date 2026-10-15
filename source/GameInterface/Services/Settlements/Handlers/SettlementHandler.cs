@@ -31,8 +31,6 @@ public class SettlementHandler : IHandler
         this.objectManager = objectManager;
 
         messageBroker.Subscribe<ChangeSettlementBribePaid>(HandleBribePaid);
-        messageBroker.Subscribe<ChangeSettlementHitPoints>(HandleHitPoints);
-        //messageBroker.Subscribe<ChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Subscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Subscribe<ChangeSettlementLastThreatTime>(HandleLastThreatTime);
         messageBroker.Subscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
@@ -253,19 +251,6 @@ public class SettlementHandler : IHandler
 
     }
 
-    private void HandleHitPoints(MessagePayload<ChangeSettlementHitPoints> payload)
-    {
-        var obj = payload.What;
-
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
-        {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
-            return;
-        }
-
-        SettlementHitPointsPatch.RunSettlementHitPointsChange(settlement, obj.SettlementHitPoints);
-    }
-
     private void HandleBribePaid(MessagePayload<ChangeSettlementBribePaid> payload)
     {
         var obj = payload.What;
@@ -298,8 +283,6 @@ public class SettlementHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<ChangeSettlementBribePaid>(HandleBribePaid);
-        messageBroker.Unsubscribe<ChangeSettlementHitPoints>(HandleHitPoints);
-        //messageBroker.Unsubscribe<ChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Unsubscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Unsubscribe<ChangeSettlementLastThreatTime>(HandleLastThreatTime);
         messageBroker.Unsubscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
