@@ -2311,6 +2311,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         }
     }
 
+#if DEBUG
     // The ally join start_naval uses: a close from an earlier battle names that battle and must not close the join
     // into a later one, while a close naming this battle, or no battle, still does. No player interaction precedes the
     // join to clear the close.
@@ -2363,6 +2364,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
 
         client2.Call(() => Assert.Null(PlayerEncounter.Current), MapEventDisabledMethods);
     }
+#endif
 
     [Fact]
     public void HostilePlayerParties_RequestStartsDialogWithOfferServicesDisabledAndTradeAvailable()

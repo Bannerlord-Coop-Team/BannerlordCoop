@@ -36,7 +36,7 @@ public class DirectMigratedCommandTests
 #if DEBUG
         Assert.Equal(124, commandTypes.Length);
 #else
-        Assert.Equal(105, commandTypes.Length);
+        Assert.Equal(104, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {

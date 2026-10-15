@@ -811,6 +811,7 @@ public class MapEventDebugCommands
         }
     }
 
+#if DEBUG
     // coop.debug.map_event.start_naval PlayerOne PlayerTwo PlayerThree
     /// <summary>Moves the players' parties onto the nearest hostile AI party at sea and starts a naval battle with it.</summary>
     public sealed class StartNavalCoopCommand : ICoopCommand
@@ -1001,6 +1002,7 @@ public class MapEventDebugCommands
             return true;
         }
     }
+#endif
 
     // coop.debug.map_event.engage_nearest_bandit PlayerOne [excludedPartyId]
     /// <summary>

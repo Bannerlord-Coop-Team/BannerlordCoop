@@ -1,4 +1,5 @@
-﻿using Common;
+﻿#if DEBUG
+using Common;
 using Common.Commands;
 using System.Collections;
 using System.Collections.Generic;
@@ -55,3 +56,4 @@ public class StartNavalCoopCommandTests
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }
+#endif
