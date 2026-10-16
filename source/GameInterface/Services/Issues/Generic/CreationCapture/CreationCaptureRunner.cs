@@ -1,4 +1,4 @@
-using Common.Util;
+﻿using Common.Util;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;

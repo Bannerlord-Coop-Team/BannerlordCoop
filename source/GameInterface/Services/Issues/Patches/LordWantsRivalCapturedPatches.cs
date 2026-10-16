@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.Players;
@@ -64,6 +65,65 @@ internal class RivalCapturedHonorProgressPatch
         if (ModInformation.IsClient && trait == DefaultTraits.Honor && !CallOriginalPolicy.IsOriginalAllowed() &&
             ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests))
             quests.RequestTraitChange(__state);
+    }
+}
+
+[HarmonyPatch(typeof(TraitLevelingHelper))]
+internal class RivalCapturedQuestTraitRewardPatches
+{
+    [HarmonyPatch(nameof(TraitLevelingHelper.OnIssueSolvedThroughQuest), new Type[] { typeof(Hero), typeof(Tuple<TraitObject, int>[]) })]
+    [HarmonyPrefix]
+    private static bool QuestRewardsPrefix(
+        [HarmonyArgument(0)] Hero issueGiver,
+        [HarmonyArgument(1)] Tuple<TraitObject, int>[] rewards)
+    {
+        if (!IsRivalCapturedRewardOwner(issueGiver)) return true;
+
+        foreach (var reward in rewards ?? Array.Empty<Tuple<TraitObject, int>>())
+            ApplyHonorReward(issueGiver, reward?.Item1, reward?.Item2 ?? 0);
+
+        return false;
+    }
+
+    [HarmonyPatch(nameof(TraitLevelingHelper.OnIssueSolvedThroughQuest), new Type[] { typeof(Hero), typeof(TraitObject), typeof(int) })]
+    [HarmonyPrefix]
+    private static bool QuestRewardPrefix(
+        [HarmonyArgument(0)] Hero issueGiver,
+        [HarmonyArgument(1)] TraitObject trait,
+        [HarmonyArgument(2)] int xpAmount)
+    {
+        if (!IsRivalCapturedRewardOwner(issueGiver)) return true;
+
+        ApplyHonorReward(issueGiver, trait, xpAmount);
+        return false;
+    }
+
+    private static void ApplyHonorReward(Hero issueGiver, TraitObject trait, int xpAmount)
+    {
+        if (trait != DefaultTraits.Honor) return;
+        if (ModInformation.IsClient && CallOriginalPolicy.IsOriginalAllowed()) return;
+
+        if (ModInformation.IsServer)
+        {
+            if (issueGiver.Issue.IssueQuest is Quest quest &&
+                ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests) &&
+                quests.TryEnterOwnerScope(quest, out var scope))
+            {
+                using (scope) TraitLevelingHelper.AddTraitXp(trait, xpAmount);
+            }
+
+            return;
+        }
+
+        TraitLevelingHelper.AddTraitXp(trait, xpAmount);
+    }
+
+    private static bool IsRivalCapturedRewardOwner(Hero issueGiver)
+    {
+        if (issueGiver?.Issue is Issue) return true;
+        return ModInformation.IsClient && Hero.MainHero != null &&
+            GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(Hero.MainHero, out var progress) &&
+            progress.HasProperty(DefaultTraits.Honor);
     }
 }
 
@@ -190,7 +250,7 @@ internal class RivalCapturedCompletionPatches
         if (ModInformation.IsClient && RivalCapturedPlayerChangedPatch.OldPlayer != null &&
             ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership) &&
             ownership.IsLocalPeerOwner(quest.QuestGiver)) return false;
-        if (CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (!quest.IsOngoing) return false;
         if (quest.QuestGiver?.Issue?.IssueQuest != quest && __originalMethod.Name == nameof(QuestBase.CompleteQuestWithCancel))
             return true;
@@ -212,7 +272,7 @@ internal class RivalCapturedIssueCancellationPatch
     private static bool Prefix(IssueBase __instance, out IDisposable __state)
     {
         __state = null;
-        if (__instance is not Issue || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
+        if (__instance is not Issue || CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsClient) return IssueFinalizeAuthorityGuard.IsActive;
         if (IssueFinalizeAuthorityGuard.IsActive) return true;
         if (__instance.IssueQuest is Quest quest)

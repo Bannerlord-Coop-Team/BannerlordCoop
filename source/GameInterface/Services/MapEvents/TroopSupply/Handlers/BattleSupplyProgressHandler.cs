@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.TroopSupply.Messages;
 

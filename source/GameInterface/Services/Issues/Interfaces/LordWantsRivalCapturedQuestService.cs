@@ -33,6 +33,8 @@ internal interface ILordWantsRivalCapturedQuestService
     void BroadcastCreation(Issue issue);
     void MirrorCreation(NetworkRivalCapturedIssueCreated data);
     void PrepareAcceptance(Hero giver);
+    bool TryCaptureFrameworkQuestFields(Hero giver, out RivalCapturedAcceptFields fields);
+    void ApplyFrameworkQuestAcceptance(Issue issue, RivalCapturedAcceptFields fields);
     void ReplayQuestAccepted(Hero giver);
     void RejectAcceptance(Hero giver);
     bool TryCaptureQuestFields(Hero giver, out RivalCapturedAcceptFields fields);
@@ -131,6 +133,21 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
     public void RejectAcceptance(Hero giver)
     {
         if (giver?.Issue?.IssueQuest is not Quest quest || ownership.TryGetOwnerControllerId(giver, out _)) return;
+
+        // A rejected optimistic client accept must discard only its local quest so the
+        // still-available issue can be retried after the generation catches up.
+        if (ModInformation.IsClient)
+        {
+            var issue = giver.Issue;
+            issue.IssueQuest = null;
+            issue._issueState = IssueBase.IssueState.Ongoing;
+            issue.IssueDueTime = CampaignTime.DaysFromNow(1f);
+            issue.IsTriedToSolveBefore = false;
+            Campaign.Current.QuestManager.RemoveAllTrackedObjectsForQuest(quest);
+            Campaign.Current.QuestManager.OnQuestFinalized(quest);
+            return;
+        }
+
         using (new IssueFinalizeAuthorityGuard())
         {
             if (quest.IsOngoing) quest.CompleteQuestWithCancel();
@@ -381,6 +398,52 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
     {
         if (ModInformation.IsServer || giver?.Issue is not Issue || !giver.Issue.IsOngoingWithoutQuest) return;
         RequestTraitProgress(giver, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor), true);
+    }
+
+    public bool TryCaptureFrameworkQuestFields(Hero giver, out RivalCapturedAcceptFields fields)
+    {
+        fields = default;
+        if (giver?.Issue is not Issue issue || issue.IssueQuest is not Quest quest || !quest.IsOngoing ||
+            !TryGetCurrentPlayer(out var player) || !generations.TryGetGeneration(giver, out var generation))
+            return false;
+
+        fields = new RivalCapturedAcceptFields(player.ControllerId, generation, quest.QuestDueTime, CaptureState(quest));
+        return true;
+    }
+
+    public void ApplyFrameworkQuestAcceptance(Issue issue, RivalCapturedAcceptFields fields)
+    {
+        if (issue == null || !generations.TryGetGeneration(issue.IssueOwner, out var generation))
+            throw new InvalidOperationException("The rival-captured acceptance has no issue generation");
+
+        if (generation != fields.Generation && ModInformation.IsServer)
+            throw new InvalidOperationException("The rival-captured acceptance belongs to a stale issue generation");
+
+        if (generation != fields.Generation)
+            generations.SetGeneration(issue.IssueOwner, fields.Generation);
+
+        if (ModInformation.IsServer)
+        {
+            if (issue.IssueQuest is Quest quest)
+            {
+                if (quest.IsOngoing && !Campaign.Current.QuestManager.Quests.Contains(quest))
+                {
+                    using (new QuestSolutionStartAuthorityGuard())
+                        quest.QuestAcceptedConsequences();
+                }
+
+                quest.ChangeQuestDueTime(fields.DueTime);
+                ApplyState(quest, fields.State);
+            }
+            return;
+        }
+
+        if (fields.ControllerId == controllerIdProvider.ControllerId)
+            return;
+
+        issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+        issue.IsTriedToSolveBefore = true;
+        issue.IssueDueTime = CampaignTime.Never;
     }
 
     public void RequestTraitChange(int honorXp)

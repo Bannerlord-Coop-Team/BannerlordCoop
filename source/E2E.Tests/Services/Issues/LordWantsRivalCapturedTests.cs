@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -7,6 +7,9 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
+using GameInterface.Services.Issues.Framework.CreationCapture;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.MapEvents;
@@ -146,8 +149,8 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
     [Fact]
     public void CreationPreservesTheSelectedTargetAndIssueIdentityOnBothClients()
     {
-        var created = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkRivalCapturedIssueCreated>());
-        Assert.Equal(targetId, created.TargetId);
+        var created = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
+        Assert.Equal(typeof(Issue).Name, created.IssueTypeName);
         foreach (var client in environment.Clients)
         {
             client.Call(() =>
@@ -155,9 +158,9 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
                 var issue = Assert.IsType<Issue>(Get<Hero>(client, giverId).Issue);
                 Assert.Same(Get<Hero>(client, targetId), issue._targetHero);
                 Assert.Equal(created.IssueId, issue.StringId);
-                Assert.Equal(created.DueTime, issue.IssueDueTime);
             });
         }
+
     }
 
     [Fact]
@@ -185,7 +188,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
     public void RepeatedAcceptanceDoesNotRegisterOrInitializeTheQuestAgain()
     {
         Accept();
-        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestTypeQuestAccepted>());
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
         Client.SimulateMessage(Server.NetPeer, accepted);
 
         foreach (var instance in new[] { Server, Client })
@@ -414,7 +417,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
             quest.CompleteQuestWithTimeOut();
             quest.CompleteQuestWithTimeOut();
         });
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Client.Call(() =>
         {
             Assert.True(clientQuest.IsFinalized);
@@ -455,7 +458,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
             Assert.True(players.ReplacePlayer(registered, replacement));
             Assert.Null(Get<Hero>(Server, giverId).Issue);
         });
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Client.Call(() => Assert.Null(Get<Hero>(Client, giverId).Issue));
     }
 
@@ -511,7 +514,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
             Assert.True(players.AddPlayer(new Player(Controller, targetId, replacementPartyId, "", "")));
             Assert.Empty(Campaign.Current.QuestManager.Quests.OfType<Quest>());
         });
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Client.Call(() => Assert.Null(Get<Hero>(Client, giverId).Issue));
         OtherClient.Call(() => Assert.Null(Get<Hero>(OtherClient, giverId).Issue));
     }
@@ -770,7 +773,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
                 return true;
             });
         });
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         foreach (var instance in Instances)
             instance.Call(() => Assert.Null(Get<Hero>(instance, giverId).Issue));
     }

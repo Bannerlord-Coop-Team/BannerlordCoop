@@ -1017,12 +1017,21 @@ namespace GameInterface.Services.Kingdoms
             return false;
         }
 
+        // With no votes both outcomes tie at zero and the first one, calling or joining the war, would win.
+        private static bool IsUnvotedCallToWar(KingdomDecisionVoteState state)
+        {
+            return (state.Decision is ProposeCallToWarAgreementDecision || state.Decision is AcceptCallToWarAgreementDecision)
+                && !state.FinalVotes.Values.Any(vote => !vote.VoteData.IsAbstain);
+        }
+
         private void ResolveDecision(KingdomDecisionVoteState state)
         {
             if (state.IsResolved) return;
 
             state.IsResolved = true;
-            DecisionOutcome chosenOutcome = state.Election.ChooseOutcomeWithCurrentVotes();
+            DecisionOutcome chosenOutcome = IsUnvotedCallToWar(state)
+                ? state.Election.ChooseCallToWarRefusal()
+                : state.Election.ChooseOutcomeWithCurrentVotes();
             int outcomeIndex = GetOutcomeIndex(chosenOutcome, state.Election);
             outcomeResolver.TryGetOutcomeKey(chosenOutcome, objectManager, out string outcomeKey);
             KingdomDecision.SupportStatus supportStatus = GetSupportStatusOfDecisionOutcome(chosenOutcome);
@@ -1085,7 +1094,9 @@ namespace GameInterface.Services.Kingdoms
                 outcomeKey,
                 notificationText));
 
-            if (!TryApplyDeclareWarOutcome(state.Decision, outcomeIndex))
+            // A refused call to war on a player kingdom applies nothing, but native OnShowDecision would still offer it to them.
+            if (!TryApplyDeclareWarOutcome(state.Decision, outcomeIndex)
+                && !CoopKingdomElection.IsPlayerTargetedCallToWarProposal(state.Decision))
             {
                 state.Election.ApplyChosenOutcomeCoop();
             }

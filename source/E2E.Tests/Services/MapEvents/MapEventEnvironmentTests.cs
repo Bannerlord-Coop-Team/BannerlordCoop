@@ -380,6 +380,26 @@ public class MapEventEnvironmentTests : MapEventTestBase
         }
     }
 
+    [Theory]
+    [InlineData(true, 43)]
+    [InlineData(false, 100)]
+    public void MissionEnd_UsesRecordedAuthorityAndIgnoresLateRemoval(bool ownsHealth, int expectedHealth)
+    {
+        var client = Clients.First();
+        client.Resolve<IControllerIdProvider>().SetControllerId("owner");
+        var (heroId, _) = CreatePlayerHeroParty("owner");
+        Server.Call(() => Server.GetRegisteredObject<Hero>(heroId).HitPoints = 100);
+        client.Call(() =>
+        {
+            var hero = client.GetRegisteredObject<Hero>(heroId);
+            var origin = new CoopAgentOrigin(hero.CharacterObject, null, -1, null, new UniqueTroopDescriptor(1));
+            origin.OnMissionEnded(42.6f, ownsHealth);
+            origin.OnAgentRemoved(90f);
+        });
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() => Assert.Equal(expectedHealth, instance.GetRegisteredObject<Hero>(heroId).HitPoints));
+    }
+
     [Fact]
     public void ReleasedHero_StaysWounded_SyncAllClients()
     {

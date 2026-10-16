@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;

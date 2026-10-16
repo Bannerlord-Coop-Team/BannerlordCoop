@@ -14,7 +14,6 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Patches
 {
@@ -73,7 +72,6 @@ namespace GameInterface.Services.Heroes.Patches
             yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringsToDeliver));
             yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringToDeliver));
             yield return AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero));
-            yield return AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring));
         }
 
         [HarmonyTranspiler]
@@ -148,80 +146,6 @@ namespace GameInterface.Services.Heroes.Patches
             MessageBroker.Instance.Publish(instance, new CharacterObjectChanged(newCharacterObject, instance));
 
             instance._characterObject = newCharacterObject;
-        }
-
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> FirstNameTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var firstNameField = AccessTools.Field(typeof(Hero), nameof(Hero._firstName));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(FirstNameIntercept));
-
-            foreach (var instruction in instructions)
-            {
-                if (instruction.StoresField(firstNameField))
-                {
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
-        public static void FirstNameIntercept(Hero instance, TextObject newName)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._firstName = newName;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client updated managed {var}", nameof(Hero._firstName));
-                instance._firstName = newName;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName.Value, instance));
-
-            instance._firstName = newName;
-        }
-
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> NameTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var nameField = AccessTools.Field(typeof(Hero), nameof(Hero._name));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(NameIntercept));
-
-            foreach (var instruction in instructions)
-            {
-                if (instruction.StoresField(nameField))
-                {
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
-        public static void NameIntercept(Hero instance, TextObject newName)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._name = newName;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client updated managed {var}", nameof(Hero._name));
-                instance._name = newName;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new NameChanged(newName.Value, instance));
-
-            instance._name = newName;
         }
 
         [HarmonyTranspiler]

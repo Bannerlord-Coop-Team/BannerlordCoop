@@ -28,6 +28,7 @@ using SandBox.GauntletUI.Map;
 using System.Collections.Concurrent;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -189,24 +190,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
     {
         var battle = SetupInteraction(MapEvent.BattleTypes.None, isSiegeAmbush: true,
             includeAiParties: false);
-        Server.Call(() =>
-        {
-            var handler = Server.Resolve<BattleMissionStartHandler>();
-            var snapshotsField = AccessTools.Field(typeof(BattleMissionStartHandler),
-                "siegeMissionSnapshots");
-            Assert.NotNull(snapshotsField);
-            var snapshots = Assert.IsType<ConcurrentDictionary<string, NetworkStartSiegeMission>>(
-                snapshotsField.GetValue(handler));
-            snapshots[battle.MapEventId] = new NetworkStartSiegeMission(
-                battle.MapEventId,
-                2,
-                new[] { 1f, 1f, 1f },
-                Array.Empty<SiegeEngineState>(),
-                Array.Empty<SiegeEngineState>(),
-                initiatingPartyId: null,
-                settlementId: "e2e-siege-settlement",
-                isSallyOut: true);
-        });
+        SeedSiegeMissionSnapshot(battle.MapEventId, isSallyOut: true);
 
         var clients = Clients.ToArray();
         var attackerClient = clients[0];
@@ -236,6 +220,59 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             start => start.MapEventId == battle.MapEventId);
         Assert.DoesNotContain(clients[2].InternalMessages.GetMessages<NetworkStartSiegeMission>(),
             start => start.MapEventId == battle.MapEventId);
+    }
+
+    // Relief parties joining or leaving the defenders flip a live battle between Siege and SiegeOutside.
+    [Theory]
+    [InlineData(MapEvent.BattleTypes.SiegeOutside, true)]
+    [InlineData(MapEvent.BattleTypes.Siege, false)]
+    public void FlippedSiegeType_StartRequestReusesOpenMissionKind(
+        MapEvent.BattleTypes liveType,
+        bool openedAsSiege)
+    {
+        var battle = SetupInteraction(liveType, isSiegeAmbush: false, includeAiParties: false);
+        if (openedAsSiege)
+            SeedSiegeMissionSnapshot(battle.MapEventId, isSallyOut: false);
+        else
+            Server.Call(() => Server.Resolve<BattleMissionStartHandler>().GetOrCreateMissionInitializerSnapshot(
+                battle.MapEventId, () => new MissionInitializerRecord("e2e_land_battle")));
+        Server.NetworkSentMessages.Clear();
+
+        var attackerClient = Clients.First();
+        attackerClient.Call(() => attackerClient.Resolve<INetwork>().SendAll(
+            new NetworkBattleStartRequest(
+                Guid.NewGuid().ToString(),
+                (int)BattleStartMode.Mission,
+                battle.MapEventId,
+                battle.AttackerPlayerPartyId)), MapEventDisabledMethods);
+
+        var siegeStarts = Server.NetworkSentMessages.GetMessages<NetworkStartSiegeMission>().ToArray();
+        var attackStarts = Server.NetworkSentMessages.GetMessages<NetworkStartAttackMission>().ToArray();
+        Assert.Equal(openedAsSiege ? 2 : 0, siegeStarts.Length);
+        Assert.Equal(openedAsSiege ? 0 : 2, attackStarts.Length);
+        Assert.All(attackStarts, start => Assert.Equal("e2e_land_battle", start.MissionInitializer.SceneName));
+    }
+
+    private void SeedSiegeMissionSnapshot(string mapEventId, bool isSallyOut)
+    {
+        Server.Call(() =>
+        {
+            var handler = Server.Resolve<BattleMissionStartHandler>();
+            var snapshotsField = AccessTools.Field(typeof(BattleMissionStartHandler),
+                "siegeMissionSnapshots");
+            Assert.NotNull(snapshotsField);
+            var snapshots = Assert.IsType<ConcurrentDictionary<string, NetworkStartSiegeMission>>(
+                snapshotsField.GetValue(handler));
+            snapshots[mapEventId] = new NetworkStartSiegeMission(
+                mapEventId,
+                2,
+                new[] { 1f, 1f, 1f },
+                Array.Empty<SiegeEngineState>(),
+                Array.Empty<SiegeEngineState>(),
+                initiatingPartyId: null,
+                settlementId: "e2e-siege-settlement",
+                isSallyOut: isSallyOut);
+        });
     }
 
     [Theory]
@@ -431,7 +468,9 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(battle.AttackerPlayerPartyId, out var mainParty));
             var previousMainParty = Campaign.Current.MainParty;
             var previousSettlement = mapEvent.MapEventSettlement;
+            var previousMilitaryPowerModel = Campaign.Current.Models.MilitaryPowerModel;
             Campaign.Current.MainParty = mainParty;
+            Campaign.Current.Models.MilitaryPowerModel = Mock.Of<MilitaryPowerModel>();
             var missionSettlement = CreateSettlementWithCenterScenes();
             if (!client.ObjectManager.TryGetId(missionSettlement, out var missionSettlementId))
                 Assert.True(client.ObjectManager.AddNewObject(missionSettlement, out missionSettlementId));
@@ -486,6 +525,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             finally
             {
                 Campaign.Current.MainParty = previousMainParty;
+                Campaign.Current.Models.MilitaryPowerModel = previousMilitaryPowerModel;
                 mapEvent.MapEventSettlement = previousSettlement;
                 ContainerProvider.SetContainer(client.Container);
                 BattleSpawnGate.EndBattle();

@@ -1,4 +1,4 @@
-using HarmonyLib;
+﻿using HarmonyLib;
 using ProtoBuf;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;

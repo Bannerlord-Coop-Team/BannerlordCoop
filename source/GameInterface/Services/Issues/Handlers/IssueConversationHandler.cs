@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
@@ -25,6 +26,8 @@ internal class IssueConversationHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IIssueGenerationRegistry generationRegistry;
     private readonly IIssueConversationTracker conversationTracker;
+    private readonly ILordWantsRivalCapturedQuestService rivalQuests;
+    private readonly IQuestTypeRegistry questTypes;
 
     public IssueConversationHandler(
         IMessageBroker messageBroker,
@@ -32,7 +35,9 @@ internal class IssueConversationHandler : IHandler
         INetwork network,
         IPlayerManager playerManager,
         IIssueGenerationRegistry generationRegistry,
-        IIssueConversationTracker conversationTracker)
+        IIssueConversationTracker conversationTracker,
+        ILordWantsRivalCapturedQuestService rivalQuests,
+        IQuestTypeRegistry questTypes)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -40,6 +45,8 @@ internal class IssueConversationHandler : IHandler
         this.playerManager = playerManager;
         this.generationRegistry = generationRegistry;
         this.conversationTracker = conversationTracker;
+        this.rivalQuests = rivalQuests;
+        this.questTypes = questTypes;
 
         messageBroker.Subscribe<IssueConversationOpenedLocally>(Handle_IssueConversationOpenedLocally);
         messageBroker.Subscribe<RequestIssueConversationOpened>(Handle_RequestIssueConversationOpened);
@@ -60,6 +67,7 @@ internal class IssueConversationHandler : IHandler
         var issueGiver = payload.What.IssueGiver;
         if (issueGiver == null || !objectManager.TryGetIdWithLogging(issueGiver, out var issueGiverId)) return;
         if (!IsMirrorEligible(issueGiver.Issue)) return;
+        rivalQuests.PrepareAcceptance(issueGiver);
 
         if (ModInformation.IsServer)
         {
@@ -145,11 +153,10 @@ internal class IssueConversationHandler : IHandler
         return party.CurrentSettlement == issueGiver.CurrentSettlement;
     }
 
-    private static bool IsMirrorEligible(TaleWorlds.CampaignSystem.Issues.IssueBase issue)
+    private bool IsMirrorEligible(TaleWorlds.CampaignSystem.Issues.IssueBase issue)
     {
-        if (issue == null) return false;
+        if (issue == null || !questTypes.TryGet(issue.GetType(), out var descriptor)) return false;
 
-        var descriptor = QuestTypeRegistry.Get(issue);
-        return descriptor != null && (descriptor.SupportsQuestSolutionAccept || descriptor.SupportsAlternativeAccept);
+        return descriptor.QuestSolutionAcceptStrategy != null || descriptor.AlternativeSolutionAcceptStrategy != null;
     }
 }

@@ -1,4 +1,4 @@
-namespace GameInterface.Services.Issues.Generic.CreationCapture;
+﻿namespace GameInterface.Services.Issues.Generic.CreationCapture;
 
 public interface ICreationCaptureStrategy<TIssue, TFields>
 {

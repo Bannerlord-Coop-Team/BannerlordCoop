@@ -1,6 +1,6 @@
 using Common.Messaging;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Issues.Generic;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Messages;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -25,8 +25,9 @@ internal class IssueConversationOpenedPatch
     {
         var issueGiver = Hero.OneToOneConversationHero;
         if (issueGiver?.Issue == null) return;
-        var descriptor = QuestTypeRegistry.Get(issueGiver.Issue);
-        if (descriptor?.SupportsQuestSolutionAccept != true && descriptor?.SupportsAlternativeAccept != true) return;
+        if (!ContainerProvider.TryResolve<IQuestTypeRegistry>(out var registry) ||
+            !registry.TryGet(issueGiver.Issue.GetType(), out var descriptor) ||
+            (descriptor.QuestSolutionAcceptStrategy == null && descriptor.AlternativeSolutionAcceptStrategy == null)) return;
 
         ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider);
         MessageBroker.Instance.Publish(issueGiver, new IssueConversationOpenedLocally(issueGiver, controllerIdProvider?.ControllerId));

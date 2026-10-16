@@ -1,4 +1,4 @@
-using TaleWorlds.CampaignSystem;
+﻿using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Issues.Generic.AcceptMirror;
 

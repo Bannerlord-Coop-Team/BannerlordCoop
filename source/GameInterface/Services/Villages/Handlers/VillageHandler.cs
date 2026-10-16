@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Messages;
@@ -104,12 +105,11 @@ public class VillageHandler : IHandler
     {
         var obj = payload.What;
 
-        if(objectManager.TryGetObject<Village>(obj.VillageId, out var village) == false)
+        GameThread.RunSafe(() =>
         {
-            Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
-            return;
-        }
+            if (!objectManager.TryGetObjectWithLogging<Village>(obj.VillageId, out var village)) return;
 
-        VillagePatches.RunVillageStateChange(village, (Village.VillageStates)obj.State);
+            VillagePatches.RunVillageStateChange(village, (Village.VillageStates)obj.State);
+        });
     }
 }
