@@ -80,7 +80,13 @@ internal sealed class AwaitingAlternativeSolutionTroopsRegistry : IAwaitingAlter
 
     public void Restore(string ownerControllerId, TroopRoster troops)
     {
-        if (string.IsNullOrEmpty(ownerControllerId) || troops == null || troops.Count == 0) return;
+        if (string.IsNullOrEmpty(ownerControllerId)) return;
+        if (troops == null || troops.Count == 0)
+        {
+            troopsByOwnerControllerId.Remove(ownerControllerId);
+            return;
+        }
+
         troopsByOwnerControllerId[ownerControllerId] = troops;
     }
 

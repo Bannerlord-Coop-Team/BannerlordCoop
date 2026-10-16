@@ -88,4 +88,29 @@ public class AwaitingAlternativeSolutionTroopsRegistryTests
 
         Assert.False(registry.TryGet("player-A", out _));
     }
+
+    [Fact]
+    public void Restore_ReplacesTheSpeculativeDepositInsteadOfAddingItAgain()
+    {
+        var registry = new AwaitingAlternativeSolutionTroopsRegistry();
+        var x = NewCharacter();
+
+        registry.Deposit("player-A", Roster((x, 2)));
+        registry.Restore("player-A", Roster((x, 2)));
+
+        Assert.True(registry.TryGet("player-A", out var restored));
+        Assert.Equal(2, restored.GetTroopCount(x));
+    }
+
+    [Fact]
+    public void Restore_EmptyRoster_ClearsTheSpeculativeDeposit()
+    {
+        var registry = new AwaitingAlternativeSolutionTroopsRegistry();
+        var x = NewCharacter();
+
+        registry.Deposit("player-A", Roster((x, 2)));
+        registry.Restore("player-A", Roster());
+
+        Assert.False(registry.TryGet("player-A", out _));
+    }
 }
