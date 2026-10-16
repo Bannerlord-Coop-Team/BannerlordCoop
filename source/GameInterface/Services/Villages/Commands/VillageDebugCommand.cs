@@ -5,6 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using SandBox.GauntletUI.Map;
+using SandBox.View.Map;
+using TaleWorlds.MountAndBlade;
 using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.Villages.Commands;
 
@@ -104,6 +107,12 @@ internal class VillageDebugCommand
             sb.AppendFormat("Name: '{0}'\n", village.Name);
             sb.AppendFormat("Owner: '{0}'\n", village.Owner.Name);
             sb.AppendFormat("State: '{0}'\n", village.VillageState.ToString());
+            var nameplate = MapScreen.Instance?.GetMapView<GauntletMapSettlementNameplateView>()?
+                ._dataSource?.GetNameplateOfSettlement(village.Settlement);
+            sb.AppendFormat("Bookmarked: '{0}'\n", Campaign.Current.VisualTrackerManager.CheckTracked(village.Settlement));
+            sb.AppendFormat("NameplateAvailable: '{0}'\n", nameplate != null);
+            sb.AppendFormat("ManuallyTracked: '{0}'\n", nameplate?._isTrackedManually);
+            sb.AppendFormat("AutoTrackAttackedSettlements: '{0}'\n", BannerlordConfig.AutoTrackAttackedSettlements);
             sb.AppendFormat("Hearth: '{0}'\n", village.Hearth);
             sb.AppendFormat("TradeTaxAccumulated: '{0}'\n", village.TradeTaxAccumulated);
             sb.AppendFormat("LastDemandStatisifiedTime: '{0}'\n", village.LastDemandSatisfiedTime);

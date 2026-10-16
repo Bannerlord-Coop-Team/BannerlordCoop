@@ -1,4 +1,9 @@
-using System.Linq;
+﻿using System.Linq;
+using Common.Messaging;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.TroopSupply;
+using TaleWorlds.CampaignSystem;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.MockEngine;
 using TaleWorlds.Core;
@@ -16,6 +21,36 @@ namespace E2E.Tests.Services.Missions;
 public class BattleSpawnMirrorTests : MissionTestEnvironment
 {
     public BattleSpawnMirrorTests(ITestOutputHelper output) : base(output) { }
+
+    [Fact]
+    public void RejoiningAgent_RestoresHealthBeforeSpawnBroadcast()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        client.Call(() =>
+        {
+            fixture.CreateMission(client);
+            var character = (CharacterObject)Game.Current.PlayerTroop;
+            var origin = new CoopAgentOrigin(character, null, 0, null, new UniqueTroopDescriptor(1), initialHealth: 37f);
+            var broker = client.Resolve<IMessageBroker>();
+            float? broadcastHealth = null;
+            void Capture(MessagePayload<AgentSpawnedInBattle> payload) => broadcastHealth = payload.What.Agent.Health;
+            broker.Subscribe<AgentSpawnedInBattle>(Capture);
+            BattleSpawnGate.BeginBattle("retreat-health-test");
+            try
+            {
+                var agent = Mission.Current.SpawnAgent(new AgentBuildData(character)
+                    .Controller(AgentControllerType.AI).TroopOrigin(origin));
+                Assert.Equal(37f, agent.Health);
+                Assert.Equal(37f, broadcastHealth);
+            }
+            finally
+            {
+                BattleSpawnGate.EndBattle();
+                broker.Unsubscribe<AgentSpawnedInBattle>(Capture);
+            }
+        });
+    }
 
     [Fact]
     public void SpawnAgent_PopulatesMirror_AndAgentMembersWork()
