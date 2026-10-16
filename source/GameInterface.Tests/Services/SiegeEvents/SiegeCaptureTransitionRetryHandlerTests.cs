@@ -97,7 +97,6 @@ public sealed class SiegeCaptureTransitionRetryHandlerTests : IDisposable
         {
             siegeEventInterface.PromptLocalAftermathChoice(leaderParty, settlement, defeatedClan);
 
-            Assert.Same(defeatedClan, siegeEventInterface.GetAftermathPreviousOwnerClan(settlement));
             mapState.EndBattleSimulation();
             Assert.True(SiegeCaptureTransitionRetryHandler.TryTakeReady(out _, out _, out var retriedOwnerClan));
             Assert.Same(defeatedClan, retriedOwnerClan);

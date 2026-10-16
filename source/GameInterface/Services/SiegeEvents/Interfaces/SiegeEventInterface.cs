@@ -190,8 +190,8 @@ public interface ISiegeEventInterface : IGameAbstraction
     void PromptLocalAftermathChoice(MobileParty leaderParty, Settlement settlement, Clan previousOwnerClan);
 
     /// <summary>
-    /// Backstop that routes a stale post-capture siege-assault encounter (a host attacker whose gated aftermath
-    /// transition missed) into the settlement-taken menu. Driven off the encounter menu, not the prompt.
+    /// Backstop that routes the capturing leader's stale post-capture siege-assault encounter (when the aftermath
+    /// prompt transition missed) into the settlement-taken menu. Driven off the encounter menu, not the prompt.
     /// </summary>
     void RouteCapturedSettlementToAftermathMenu(Settlement settlement);
 
@@ -820,14 +820,13 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         var currentMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
         if (currentMenu != null && (currentMenu.StartsWith("menu_settlement_taken") || currentMenu == "siege_aftermath_contextual_summary")) return;
 
-        SwitchLocalPartyToSettlementTaken(settlement);
+        SwitchLocalPartyToSettlementTaken(settlement, previousOwnerClan);
     }
 
     // Client-local capture-aftermath transition: finish the stale pre-mission siege encounter and open the
     // settlement-taken menu. Shared by the aftermath-choice prompt and the encounter-menu backstop that catches
-    // a host attacker whose gated retry missed. The local player is the capturing leader (its clan now owns the
-    // settlement), so besiegerParty is MainParty.
-    private void SwitchLocalPartyToSettlementTaken(Settlement settlement)
+    // a missed prompt transition. The local player is the capturing leader, so besiegerParty is MainParty.
+    private void SwitchLocalPartyToSettlementTaken(Settlement settlement, Clan previousOwnerClan)
     {
         Logger.Information("Opening the capture aftermath menu for {Settlement}", settlement.StringId);
 
@@ -837,7 +836,9 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         if (aftermathBehavior != null)
         {
             aftermathBehavior._besiegerParty = MobileParty.MainParty;
-            aftermathBehavior._prevSettlementOwnerClan = GetAftermathPreviousOwnerClan(settlement);
+            // A vassal's capture already belongs to the ruler, so without the server's owner keep the defeated one
+            // OnMapEventEnded snapshotted. OwnerClan is only the last resort, vanilla's consequence text reads its Leader.
+            aftermathBehavior._prevSettlementOwnerClan = previousOwnerClan ?? aftermathBehavior._prevSettlementOwnerClan ?? settlement.OwnerClan;
             aftermathBehavior._wasPlayerArmyMember = false;
         }
 
@@ -875,20 +876,13 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     {
         if (settlement == null) return;
 
-        // Backstop for a HOST attacker: the aftermath-prompt transition parks in the gated retry (the host is
-        // still in its own mission when the prompt arrives) and can miss. This runs off the observable stuck
-        // encounter menu instead, so it lands regardless of why the prompt path failed.
-        if (localAftermathChoiceSettlement != settlement) localAftermathPreviousOwnerClan = null;
+        // Backstop for a capturing leader whose prompt transition missed, e.g. the map rebuilding the stale encounter
+        // menu after the loot screen. Runs off that observable stuck menu, whatever made the prompt path fail.
+        var previousOwnerClan = localAftermathChoiceSettlement == settlement ? localAftermathPreviousOwnerClan : null;
         localAftermathChoiceSettlement = settlement;
+        localAftermathPreviousOwnerClan = previousOwnerClan;
         SiegeCaptureMenuHoldPatch.HoldFor(settlement);
-        SwitchLocalPartyToSettlementTaken(settlement);
-    }
-
-    // A vassal's capture already belongs to the ruler by now, but the relation penalty is with the defeated owner.
-    internal Clan GetAftermathPreviousOwnerClan(Settlement settlement)
-    {
-        if (localAftermathChoiceSettlement == settlement && localAftermathPreviousOwnerClan != null) return localAftermathPreviousOwnerClan;
-        return settlement.OwnerClan;
+        SwitchLocalPartyToSettlementTaken(settlement, previousOwnerClan);
     }
 
     public void SetLocalAftermathNarration(Settlement settlement, int aftermathType)

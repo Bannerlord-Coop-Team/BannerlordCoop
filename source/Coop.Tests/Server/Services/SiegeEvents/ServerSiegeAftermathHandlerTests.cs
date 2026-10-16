@@ -32,7 +32,7 @@ public sealed class ServerSiegeAftermathHandlerTests
         string previousOwnerClanId = "previous-owner-clan-1";
         objectManager.Setup(manager => manager.TryGetIdWithLogging(settlement, out settlementId)).Returns(true);
         objectManager.Setup(manager => manager.TryGetIdWithLogging(leaderParty, out leaderPartyId)).Returns(true);
-        objectManager.Setup(manager => manager.TryGetIdWithLogging(previousOwnerClan, out previousOwnerClanId)).Returns(true);
+        objectManager.Setup(manager => manager.TryGetId(previousOwnerClan, out previousOwnerClanId)).Returns(true);
         siegeEventInterface.Setup(service => service.GetPendingSiegeAftermathPrompts())
             .Returns(new[] { new PendingSiegeAftermathPrompt(leaderParty, settlement, previousOwnerClan) });
         using var handler = new ServerSiegeAftermathHandler(
@@ -44,6 +44,32 @@ public sealed class ServerSiegeAftermathHandlerTests
         Assert.Equal(settlementId, prompt.SettlementId);
         Assert.Equal(leaderPartyId, prompt.LeaderPartyId);
         Assert.Equal(previousOwnerClanId, prompt.PreviousOwnerClanId);
+    }
+
+    [Fact]
+    public void EnteringPeer_UnregisteredPreviousOwner_StillReceivesPrompt()
+    {
+        var broker = new TestMessageBroker();
+        var network = new TestNetwork();
+        var peer = network.CreatePeer();
+        var settlement = CreateUninitialized<Settlement>();
+        var leaderParty = CreateUninitialized<MobileParty>();
+        var objectManager = new Mock<IObjectManager>();
+        var siegeEventInterface = new Mock<ISiegeEventInterface>();
+        string settlementId = "settlement-1";
+        string leaderPartyId = "leader-party-1";
+        objectManager.Setup(manager => manager.TryGetIdWithLogging(settlement, out settlementId)).Returns(true);
+        objectManager.Setup(manager => manager.TryGetIdWithLogging(leaderParty, out leaderPartyId)).Returns(true);
+        siegeEventInterface.Setup(service => service.GetPendingSiegeAftermathPrompts())
+            .Returns(new[] { new PendingSiegeAftermathPrompt(leaderParty, settlement, CreateUninitialized<Clan>()) });
+        using var handler = new ServerSiegeAftermathHandler(
+            broker, network, objectManager.Object, siegeEventInterface.Object);
+
+        handler.SendPendingAftermathPrompts(peer);
+
+        var prompt = Assert.Single(network.GetPeerMessages(peer).OfType<NetworkPromptSiegeAftermathChoice>());
+        Assert.Equal(settlementId, prompt.SettlementId);
+        Assert.Null(prompt.PreviousOwnerClanId);
     }
 
 #pragma warning disable SYSLIB0050 // Identity-only test doubles; no native constructors are invoked.
