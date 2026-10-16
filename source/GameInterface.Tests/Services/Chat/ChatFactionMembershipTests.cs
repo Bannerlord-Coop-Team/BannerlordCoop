@@ -10,17 +10,16 @@ namespace GameInterface.Tests.Services.Chat;
 public class ChatFactionMembershipTests
 {
     [Fact]
-    public void TryGetClan_EmptyHeroId_ReturnsFalse()
+    public void GetClan_EmptyHeroId_ReturnsNull()
     {
         var membership = new ChatFactionMembership(Mock.Of<IObjectManager>());
         var player = new Player("controller", string.Empty, "party", "clan-1", "character");
 
-        Assert.False(membership.TryGetClan(player, out var clan));
-        Assert.Null(clan);
+        Assert.Null(membership.GetClan(player));
     }
 
     [Fact]
-    public void TryGetClan_MissingHero_ReturnsFalse()
+    public void GetClan_MissingHero_ReturnsNull()
     {
         var objectManager = new Mock<IObjectManager>();
         Hero hero = null;
@@ -30,12 +29,11 @@ public class ChatFactionMembershipTests
         var membership = new ChatFactionMembership(objectManager.Object);
         var player = new Player("controller", "hero-1", "party", "stale-clan", "character");
 
-        Assert.False(membership.TryGetClan(player, out var clan));
-        Assert.Null(clan);
+        Assert.Null(membership.GetClan(player));
     }
 
     [Fact]
-    public void TryGetKingdom_MissingHero_ReturnsFalse()
+    public void GetKingdom_MissingHero_ReturnsNull()
     {
         var objectManager = new Mock<IObjectManager>();
         Hero hero = null;
@@ -45,7 +43,6 @@ public class ChatFactionMembershipTests
         var membership = new ChatFactionMembership(objectManager.Object);
         var player = new Player("controller", "hero-1", "party", "stale-clan", "character");
 
-        Assert.False(membership.TryGetKingdom(player, out var kingdom));
-        Assert.Null(kingdom);
+        Assert.Null(membership.GetKingdom(player));
     }
 }

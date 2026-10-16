@@ -136,8 +136,8 @@ public sealed class ChatService : IChatService, IDisposable
         bool inKingdom = false;
         if (playerManager.TryGetPlayer(controllerIdProvider.ControllerId, out var player))
         {
-            inClan = factionMembership.TryGetClan(player, out _);
-            inKingdom = factionMembership.TryGetKingdom(player, out _);
+            inClan = factionMembership.GetClan(player) != null;
+            inKingdom = factionMembership.GetKingdom(player) != null;
         }
 
         viewModel.SetGroupChannelMembership(inClan, inKingdom);

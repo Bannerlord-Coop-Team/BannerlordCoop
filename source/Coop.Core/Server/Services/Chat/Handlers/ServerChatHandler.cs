@@ -13,6 +13,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 
 namespace Coop.Core.Server.Services.Chat.Handlers;
 
@@ -140,7 +141,7 @@ internal sealed class ServerChatHandler : IHandler
                     sender,
                     text,
                     ChatChannel.Clan,
-                    player => factionMembership.TryGetClan(player, out var clan) ? clan : null,
+                    factionMembership.GetClan,
                     "You are not in a clan.");
                 return;
             case ChatChannel.Kingdom:
@@ -149,7 +150,7 @@ internal sealed class ServerChatHandler : IHandler
                     sender,
                     text,
                     ChatChannel.Kingdom,
-                    player => factionMembership.TryGetKingdom(player, out var kingdom) ? kingdom : null,
+                    factionMembership.GetKingdom,
                     "You are not in a kingdom.");
                 return;
             case ChatChannel.Direct:
@@ -166,15 +167,15 @@ internal sealed class ServerChatHandler : IHandler
         RouteToMatchingPlayers(ChatChannel.Global, sender, text, _ => true);
     }
 
-    private void RouteToFactionGroup<T>(
+    private void RouteToFactionGroup(
         NetPeer senderPeer,
         Player sender,
         string text,
         ChatChannel channel,
-        Func<Player, T> tryGetGroup,
-        string notMemberMessage) where T : class
+        Func<Player, IFaction> getGroup,
+        string notMemberMessage)
     {
-        var group = tryGetGroup(sender);
+        var group = getGroup(sender);
         if (group == null)
         {
             SendSystemMessage(senderPeer, string.Empty, notMemberMessage);
@@ -185,7 +186,7 @@ internal sealed class ServerChatHandler : IHandler
             channel,
             sender,
             text,
-            player => ReferenceEquals(tryGetGroup(player), group));
+            player => ReferenceEquals(getGroup(player), group));
     }
 
     private void RouteToMatchingPlayers(
