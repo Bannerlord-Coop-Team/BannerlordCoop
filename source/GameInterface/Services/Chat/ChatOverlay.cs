@@ -47,7 +47,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     private bool ignoreNextOutsideClick;
     private bool playerChatEnabled;
     private bool allowChatOpen;
-    private bool isSettlementMenu;
+    private bool isMapMenu;
     private bool pinFeedToBottom;
     private float pinFeedLastMaxValue = -1f;
     private bool isResizing;
@@ -255,7 +255,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         bool isConversationActive = Campaign.Current?.ConversationManager?.IsConversationInProgress == true;
         bool isCampaignContext = Campaign.Current != null;
         bool isLoading = LoadingWindow.IsLoadingWindowActive;
-        isSettlementMenu = false;
+        isMapMenu = false;
         bool isMenuLayerFocused = false;
 
         if (topScreen is MapScreen mapScreen)
@@ -263,11 +263,13 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             gameplayLayer = mapScreen.SceneLayer;
             var mapState = GameStateManager.Current?.ActiveState as MapState;
             bool atMenu = mapState?.AtMenu == true;
-            // Inventory/party leave MapScreen. MapMenuView only, not escape/encyclopedia.
-            isSettlementMenu = atMenu && MobileParty.MainParty?.CurrentSettlement != null;
-            isMenuLayerFocused = isSettlementMenu &&
+            var party = MobileParty.MainParty;
+            // Settlement menus and army_wait / army_wait_at_settlement (AttachedTo). MapMenuView only.
+            isMapMenu = atMenu &&
+                (party?.CurrentSettlement != null || party?.AttachedTo != null);
+            isMenuLayerFocused = isMapMenu &&
                 ReferenceEquals(ScreenManager.FocusedLayer, mapScreen.FindLayer<GauntletLayer>(MapMenuLayerName));
-            isOpenableScreen = mapState != null && (!atMenu || isSettlementMenu);
+            isOpenableScreen = mapState != null && (!atMenu || isMapMenu);
         }
         else if (topScreen is MissionScreen missionScreen)
         {
@@ -316,8 +318,8 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
     private void ApplyClosedFeedInputRestrictions()
     {
-        // Settlement menus need display-only even when Enter is allowed, otherwise the feed steals clicks
-        if (allowChatOpen && !isSettlementMenu)
+        // Map menus need display-only even when Enter is allowed, otherwise the feed steals clicks
+        if (allowChatOpen && !isMapMenu)
             SetPassiveInputRestrictions(gauntletLayer.InputRestrictions);
         else
             SetDisplayOnlyInputRestrictions(gauntletLayer.InputRestrictions);
