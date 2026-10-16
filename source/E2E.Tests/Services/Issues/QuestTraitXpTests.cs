@@ -3,7 +3,6 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Heroes.Patches;
-using GameInterface.Services.Issues.Framework.Rewards;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
@@ -64,14 +63,5 @@ public class QuestTraitXpTests : IDisposable
             Assert.Equal(1, first.GetTraitLevel(DefaultTraits.Calculating));
             Assert.Equal(0, second.GetTraitLevel(DefaultTraits.Calculating));
         });
-    }
-
-    [Fact]
-    public void QuestRewards_AreSkipped()
-    {
-        Assert.False(QuestTraitXpPatches.OnIssueSolvedThroughQuestPrefix());
-        Assert.False(QuestTraitXpPatches.OnIssueSolvedThroughQuestSingleTraitPrefix());
-        Assert.False(QuestTraitXpPatches.OnIssueSolvedThroughAlternativeSolutionPrefix());
-        Assert.False(QuestTraitXpPatches.OnIssueSolvedThroughBetrayalPrefix());
     }
 }

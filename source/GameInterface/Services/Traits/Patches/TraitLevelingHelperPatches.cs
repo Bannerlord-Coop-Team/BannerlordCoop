@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Traits.Interfaces;
 using HarmonyLib;
@@ -18,7 +19,7 @@ internal class TraitLevelingHelperPatches
 
         // Callers set the player hero through MainHeroSubstitutionScope
         var playerHero = ResolvedMainHeroContext.ResolvedMainHero;
-        if (playerHero == null) return false;
+        if (playerHero == null || !playerHero.IsPlayerHero()) return false;
 
         if (!ContainerProvider.TryResolve<ITraitLevelingHelperInterface>(out var traitLevelingHelperInterface)) return false;
 

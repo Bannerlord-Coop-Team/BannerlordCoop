@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
@@ -14,6 +15,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -365,8 +367,7 @@ internal class SiegeAftermathPatches
 
     // Vanilla's player relation effect is gated on MobileParty.MainParty, which is null on the
     // dedicated host, so a player-led capture would silently lose the relation changes with the lords
-    // who fought alongside. The trait XP branch stays skipped: TraitLevelingHelper works on the local
-    // main hero only.
+    // who fought alongside. The same gate skips the player's mercy trait XP.
     [HarmonyPatch(typeof(SiegeAftermathCampaignBehavior), nameof(SiegeAftermathCampaignBehavior.OnSiegeAftermathApplied))]
     [HarmonyPostfix]
     private static void OnSiegeAftermathAppliedPostfix(SiegeAftermathCampaignBehavior __instance,
@@ -376,6 +377,12 @@ internal class SiegeAftermathPatches
         if (ModInformation.IsClient) return;
         if (attackerParty?.LeaderHero == null || !attackerParty.LeaderHero.IsPlayerHero()) return;
         if (aftermathType == SiegeAftermathAction.SiegeAftermath.Pillage) return;
+
+        using (new MainHeroSubstitutionScope(attackerParty.LeaderHero, attackerParty))
+        {
+            TraitLevelingHelper.OnSiegeAftermathApplied(settlement, aftermathType, new TraitObject[] { DefaultTraits.Mercy });
+        }
+
         if (attackerParty.MapFaction.Culture == settlement.Culture) return;
 
         foreach (var contribution in partyContributions)
