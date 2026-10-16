@@ -65,6 +65,15 @@ public sealed class NavalScenarioPreset
 
     /// <summary>The second player retreats through Tab and Retreat <c>delay</c> seconds after its deployment.</summary>
     public bool RetreatSecondPlayer { get; set; }
+
+    /// <summary>
+    /// The AI fleet is placed at the players and ordered to engage the first one; the campaign AI starts the map event, not
+    /// start_naval's StartBattleAction.
+    /// </summary>
+    public bool CampaignEngage { get; set; }
+
+    /// <summary>An AI lord's siege of a coastal town blockades its port, and the first player attacks the blockade from the sea.</summary>
+    public bool Blockade { get; set; }
 }
 
 /// <summary>DEBUG: the naval scenario presets <c>coop.debug.naval.scenario</c> accepts.</summary>
@@ -170,6 +179,22 @@ public static class NavalScenarioPresets
                 "Run it with three players, so two stay to watch the hulls leave.",
             MinPlayers = 2,
             RetreatSecondPlayer = true,
+        },
+        new NavalScenarioPreset
+        {
+            Name = "encounter",
+            Description = "A hostile AI fleet, a pirate one where there is one, is placed at the players and ordered to engage the " +
+                "first one: the campaign AI starts the battle and the attack goes through the encounter's mission start, " +
+                "no start_naval. The other players join the defending side.",
+            CampaignEngage = true,
+        },
+        new NavalScenarioPreset
+        {
+            Name = "blockade",
+            Description = "An AI lord at war with the players besieges a coastal town with hulls ships, which blockades its port; " +
+                "the players are placed at the port and the first one attacks the blockade through the server's blockade battle " +
+                "path (town=id picks the town).",
+            Blockade = true,
         },
     };
 

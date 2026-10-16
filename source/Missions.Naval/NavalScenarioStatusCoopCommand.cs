@@ -62,6 +62,8 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
                 delay = config.DelaySeconds,
                 reconnect = config.ReconnectSeconds,
                 who = config.DisconnectBattleHost ? config.DisconnectNonHost ? "nonhost" : "host" : null,
+                entry = config.CampaignEngage ? "campaign_engage" : config.Blockade ? "blockade_attack" : "start_battle_action",
+                town = config.Blockade ? config.BlockadeTownId : null,
             },
             pending = state.Steps.Where(step => step.Status == NavalScenarioStepStatus.Pending).Select(step => step.Name).ToArray(),
             steps = state.Steps.Select(step => new { name = step.Name, status = step.Status.ToString(), detail = step.Detail }).ToArray(),
@@ -74,6 +76,9 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
     // The server runs no mission, so its phase follows the map event: claimed for a mission, then finalized.
     private void AdvanceServerPhase(NavalScenarioConfig config)
     {
+        // The encounter preset's map event is still to come from the campaign AI.
+        if (string.IsNullOrEmpty(config.MapEventId)) return;
+
         if (!objectManager.TryGetObject(config.MapEventId, out MapEvent mapEvent) || mapEvent.IsFinalized)
             state.Advance(NavalScenarioPhase.Ended);
         else if (ServerBattleModeArbiter.IsMissionClaimed(config.MapEventId))

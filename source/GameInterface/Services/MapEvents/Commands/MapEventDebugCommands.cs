@@ -938,7 +938,7 @@ public class MapEventDebugCommands
             return true;
         }
 
-        private static bool IsNavalEnemy(MobileParty party, MobileParty playerParty)
+        internal static bool IsNavalEnemy(MobileParty party, MobileParty playerParty)
         {
             return party.IsActive &&
                    !party.IsPlayerParty() &&

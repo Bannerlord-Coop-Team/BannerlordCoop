@@ -29,5 +29,16 @@ public class NavalScenarioStagerTests
     {
         Assert.Equal(expected, NavalScenarioStager.TemplatesMissing(regulars, templates));
     }
+
+    // BlockadeBattleMapEvent.CheckLiftingBlockade lifts the blockade with no battle above 1.2 times the blockade's sea power.
+    [Theory]
+    [InlineData(100f, 100f, false)]
+    [InlineData(120f, 100f, false)]
+    [InlineData(121f, 100f, true)]
+    [InlineData(1f, 0f, true)]
+    public void IsBlockadeLiftedWithoutBattle_MatchesVanillasLiftRatio(float attackers, float blockade, bool lifted)
+    {
+        Assert.Equal(lifted, NavalScenarioStager.IsBlockadeLiftedWithoutBattle(attackers, blockade));
+    }
 }
 #endif

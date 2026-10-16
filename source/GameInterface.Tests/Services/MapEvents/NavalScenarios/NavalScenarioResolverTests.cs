@@ -27,7 +27,8 @@ public class NavalScenarioResolverTests
     {
         var names = NavalScenarioPresets.All.Select(preset => preset.Name).ToArray();
         Assert.Equal(names.Length, names.Distinct().Count());
-        Assert.Equal(new[] { "solo", "vs_pirates", "boarding", "ramming", "sinking", "migration", "late_join", "fleet", "duel", "allied_npc", "retreat" },
+        Assert.Equal(new[] { "solo", "vs_pirates", "boarding", "ramming", "sinking", "migration", "late_join", "fleet", "duel", "allied_npc", "retreat",
+                "encounter", "blockade" },
             names);
 
         foreach (var name in names)
@@ -104,7 +105,7 @@ public class NavalScenarioResolverTests
     }
 
     [Theory]
-    [InlineData("Unknown preset nope; presets: solo, vs_pirates, boarding, ramming, sinking, migration, late_join, fleet, duel, allied_npc, retreat.", "nope")]
+    [InlineData("Unknown preset nope; presets: solo, vs_pirates, boarding, ramming, sinking, migration, late_join, fleet, duel, allied_npc, retreat, encounter, blockade.", "nope")]
     [InlineData("hulls must be a whole number from 1 to 8.", "vs_pirates", "hulls=9")]
     [InlineData("hulls must be a whole number from 1 to 8.", "vs_pirates", "hulls=x")]
     [InlineData("duel has no AI enemy, so it takes no hulls knob.", "duel", "hulls=2")]
@@ -123,6 +124,32 @@ public class NavalScenarioResolverTests
     public void Resolve_RefusesInvalidRequests(string expected, params string[] args)
     {
         Assert.Equal(expected, Refuse(args));
+    }
+
+    [Fact]
+    public void Resolve_EncounterAndBlockadeKeepTheVanillaDeploymentAndTheirEntryPath()
+    {
+        var encounter = Resolve("encounter");
+        Assert.True(encounter.CampaignEngage);
+        Assert.False(encounter.Blockade);
+        Assert.Equal(NavalScenarioPlacement.Deployment, encounter.Placement);
+        Assert.Equal(Connected, encounter.ControllerIds);
+
+        var blockade = Resolve("blockade", "town=town_EN1", "hulls=4");
+        Assert.True(blockade.Blockade);
+        Assert.False(blockade.CampaignEngage);
+        Assert.Equal("town_EN1", blockade.BlockadeTownId);
+        Assert.Equal(4, blockade.EnemyHulls);
+        Assert.Equal("", Resolve("blockade").BlockadeTownId);
+    }
+
+    [Fact]
+    public void Resolve_OnlyTheBlockadeTakesATown()
+    {
+        Assert.Contains("no town knob", Refuse("encounter", "town=town_EN1"));
+        Assert.Contains("no town knob", Refuse("vs_pirates", "town=town_EN1"));
+        Assert.Contains("coastal town", Refuse("blockade", "town= "));
+        Assert.Contains("no spacing knob", Refuse("encounter", "spacing=10"));
     }
 
     [Fact]

@@ -90,6 +90,20 @@ public class NavalScenarioStateTests
     }
 
     [Fact]
+    public void StepsFor_TheServerWaitsForTheEncounterAndStagesTheBlockade()
+    {
+        var encounter = Config("encounter", "PlayerOne", "PlayerTwo");
+        var blockade = Config("blockade", "PlayerOne", "PlayerTwo");
+
+        Assert.Equal(new[] { NavalScenarioState.EngageStep }, Steps(encounter, null, isServer: true));
+        Assert.Equal(new[] { NavalScenarioState.BlockadeStep }, Steps(blockade, null, isServer: true));
+        // The clients enter both through the same attack and Ready steps as start_naval's presets.
+        Assert.Equal(new[] { NavalScenarioState.AttackStep, NavalScenarioState.ReadyStep }, Steps(encounter, "PlayerOne"));
+        Assert.Equal(new[] { NavalScenarioState.ReadyStep }, Steps(encounter, "PlayerTwo"));
+        Assert.Equal(new[] { NavalScenarioState.AttackStep, NavalScenarioState.ReadyStep }, Steps(blockade, "PlayerOne"));
+    }
+
+    [Fact]
     public void StepsFor_AClientOutsideTheScenarioRunsNothing()
     {
         var config = Config("boarding", "PlayerOne");

@@ -69,6 +69,16 @@ public sealed class NavalScenarioConfig
     [ProtoMember(19)]
     public bool DisconnectNonHost { get; set; }
 
+    [ProtoMember(20)]
+    public bool CampaignEngage { get; set; }
+
+    [ProtoMember(21)]
+    public bool Blockade { get; set; }
+
+    /// <summary>The coastal town the blockade preset uses; empty to let the server pick one.</summary>
+    [ProtoMember(22)]
+    public string BlockadeTownId { get; set; }
+
     public string InitiatorControllerId => ControllerIds.Length == 0 ? null : ControllerIds[0];
 
     /// <summary>The player who joins the running battle, or null.</summary>

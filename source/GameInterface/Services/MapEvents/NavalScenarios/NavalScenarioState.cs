@@ -76,6 +76,10 @@ public class NavalScenarioState : INavalScenarioState
     /// <summary>The player who disconnected presses Ready again in the battle it reconnected into.</summary>
     public const string RejoinStep = "rejoin";
     public const string RetreatStep = "retreat";
+    /// <summary>The server waits for the campaign AI's engage to start the encounter preset's map event.</summary>
+    public const string EngageStep = "engage";
+    /// <summary>The server staged the blockade preset's siege, blockade and blockade battle.</summary>
+    public const string BlockadeStep = "blockade";
 
     private List<NavalScenarioStep> steps = new List<NavalScenarioStep>();
 
@@ -119,6 +123,8 @@ public class NavalScenarioState : INavalScenarioState
         if (isServer)
         {
             if (config.LateJoinerControllerId != null) yield return LateJoinStep;
+            if (config.CampaignEngage) yield return EngageStep;
+            if (config.Blockade) yield return BlockadeStep;
             yield break;
         }
 

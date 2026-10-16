@@ -21,7 +21,7 @@ public interface INavalScenarioResolver
 public class NavalScenarioResolver : INavalScenarioResolver
 {
     internal const string Usage = "Usage: coop.debug.naval.scenario <preset> [hulls=n] [hull=id] [spacing=m] [ships=n] " +
-        "[delay=s] [reconnect=s] [who=host|nonhost] [controllerId...]";
+        "[delay=s] [reconnect=s] [who=host|nonhost] [town=id] [controllerId...]";
 
     public bool TryResolve(IReadOnlyList<string> args, IReadOnlyList<string> connectedControllerIds,
         out NavalScenarioConfig config, out string error)
@@ -75,6 +75,9 @@ public class NavalScenarioResolver : INavalScenarioResolver
         Duel = preset.Duel,
         AlliedNpc = preset.AlliedNpc,
         RetreatSecondPlayer = preset.RetreatSecondPlayer,
+        CampaignEngage = preset.CampaignEngage,
+        Blockade = preset.Blockade,
+        BlockadeTownId = "",
         MapEventId = "",
     };
 
@@ -111,6 +114,11 @@ public class NavalScenarioResolver : INavalScenarioResolver
             case "reconnect":
                 if (!TryParseFloat(value, 5f, 600f, out float reconnect)) return "reconnect must be a number of seconds from 5 to 600.";
                 config.ReconnectSeconds = reconnect;
+                return null;
+            case "town":
+                if (!config.Blockade) return $"{config.Preset} stages no blockade, so it takes no town knob.";
+                if (string.IsNullOrWhiteSpace(value)) return "town must name a coastal town's settlement id.";
+                config.BlockadeTownId = value.Trim();
                 return null;
             case "who":
                 if (!config.DisconnectBattleHost) return $"{config.Preset} disconnects nobody, so it takes no who knob.";
