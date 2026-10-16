@@ -124,6 +124,7 @@ public class CoopNavalBattleBehavior : MissionLogic
 #if DEBUG
         NavalHelmOverride.Clear();
         NavalCopyBodies.Clear();
+        NavalContactProbe.Clear();
 #endif
         NavalForeignHulls.Clear();
         NavalShipDamageGate.Clear();

@@ -122,6 +122,9 @@ internal static class NavalShipDamageGate
         if (!CoopNavalMissionScope.IsActive) return true;
 
         var route = BattleShipDamageRouter.Route(!NavalForeignHulls.Contains(ship), routedApplyDepth > 0, origin);
+#if DEBUG
+        if (kind == BattleShipDamageKind.Collision) NavalContactProbe.CountCollisionRoute(route, isRamDamage);
+#endif
         if (route == BattleShipDamageRoute.Vanilla) return true;
 
         Interlocked.Increment(ref suppressedHits);
@@ -172,6 +175,7 @@ internal static class NavalShipDamageGate
 
         var otherShip = other.GetFirstScriptWithNameHash(MissionShip.MissionShipScriptNameHash) as MissionShip;
         if (otherShip == null || (!NavalForeignHulls.Contains(ship) && !NavalForeignHulls.Contains(otherShip))) return;
+        NavalContactProbe.CountContact(ship, otherShip);
 
         var key = (ship.Index, otherShip.Index);
         int now = Environment.TickCount;

@@ -135,3 +135,16 @@ internal class ShipQueuedCollisionScopePatch
     [HarmonyFinalizer]
     private static void Finalizer() => NavalShipDamageGate.ExitQueuedContact();
 }
+
+#if DEBUG
+// Probe: the ram's raycast picks its target here, on a physics thread, before any contact or damage.
+[HarmonyPatch(typeof(MissionShipRam), nameof(MissionShipRam.RamCollisionCheckTick))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class ShipRamProbePatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(MissionShipRam __instance) =>
+        NavalContactProbe.CountRamCheck(__instance._ownerShip, __instance._ramCollisionData.TargetShip,
+            __instance._ramCollisionData.HasPoint);
+}
+#endif

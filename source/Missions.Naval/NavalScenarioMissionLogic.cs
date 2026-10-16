@@ -36,6 +36,7 @@ public class NavalScenarioMissionLogic : MissionLogic
     private const float SettleSeconds = 2f;
     private const float RopeRetrySeconds = 0.5f;
     private const float RopeGiveUpSeconds = 15f;
+    private const float ApproachLogSeconds = 5f;
 
     private readonly INavalScenarioState state;
     private readonly INavalDebugHulls hulls;
@@ -50,6 +51,8 @@ public class NavalScenarioMissionLogic : MissionLogic
 
     private float sinceDeployment;
     private float sincePlacement;
+    private float sinceApproachLog;
+    private string loggedApproach;
     // This client disconnected out of this mission; its scenario goes on in the mission it reconnects into.
     private bool disconnectedHere;
     private float ropeCooldown;
@@ -149,6 +152,7 @@ public class NavalScenarioMissionLogic : MissionLogic
         }
 
         sincePlacement += dt;
+        if (config.Placement == NavalScenarioPlacement.Ramming) TickApproachLog(dt);
         if (state.IsPending(NavalScenarioState.RopeStep)) TickRope(dt);
         if (state.IsPending(NavalScenarioState.HelmStep) && sincePlacement >= SettleSeconds) DriveHelm();
         if (state.IsPending(NavalScenarioState.SinkStep) && sinceDeployment >= config.DelaySeconds) HitWeakestAiHull();
@@ -337,10 +341,30 @@ public class NavalScenarioMissionLogic : MissionLogic
         Logger.Information("[NavalScenario] {Command} found={Found}: {Output}", command, found, output);
     }
 
+    // R38 saw no contact at 40 m, so the ramming preset logs how close the hulls came and how the copies existed.
+    private void TickApproachLog(float dt)
+    {
+        sinceApproachLog += dt;
+        if (sinceApproachLog < ApproachLogSeconds) return;
+
+        sinceApproachLog = 0f;
+        LogClosestApproach();
+    }
+
+    private void LogClosestApproach()
+    {
+        var closest = NavalContactProbe.DescribeClosest();
+        if (closest == null || closest == loggedApproach) return;
+
+        loggedApproach = closest;
+        Logger.Information("[NavalScenario] Ramming closest approach {Closest}", closest);
+    }
+
     private void End()
     {
         if (config == null || state.Current != config || state.Phase == NavalScenarioPhase.Ended || disconnectedHere) return;
 
+        if (config.Placement == NavalScenarioPlacement.Ramming) LogClosestApproach();
         state.Advance(NavalScenarioPhase.Ended);
         foreach (var step in state.Steps.Where(step => step.Status == NavalScenarioStepStatus.Pending).ToArray())
             Complete(step.Name, false, "the battle ended before this step ran");

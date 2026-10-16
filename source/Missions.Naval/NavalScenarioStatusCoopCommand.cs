@@ -104,6 +104,10 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
             },
             // Each player hull with its owner, adopted by the host or handed back, and this client's pending reclaims.
             handBack = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipReplicator.InspectHandBack(),
+            // How the copies exist here and how close every hull pair came, for the ramming preset above all.
+            copyModes = NavalCopyBodies.Table.Entries.Select(entry => entry.Value.ShipId.ToString("N").Substring(0, 8) + "=" +
+                entry.Value.Mode.ToString().ToLowerInvariant()).ToArray(),
+            closestApproach = NavalContactProbe.InspectApproaches(),
             result = mission.MissionEnded ? CoopNavalBattleEndLogic.DescribeResult(mission.MissionResult) : "running",
         };
     }

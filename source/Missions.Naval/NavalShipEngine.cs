@@ -554,6 +554,9 @@ public class NavalShipEngine : INavalShipEngine
                     ship.DealDamage(damage.Damage, hitter as MissionShip, out _, out _, out _, out _);
                     return;
                 case BattleShipDamageKind.Collision:
+#if DEBUG
+                    NavalContactProbe.CountRoutedCollisionApply();
+#endif
                     ship.DealCollisionDamage(hitter as MissionShip, damage.IsRamDamage, point, damage.Damage);
                     return;
                 case BattleShipDamageKind.Sails:

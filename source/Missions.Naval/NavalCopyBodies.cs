@@ -40,7 +40,10 @@ internal static class NavalCopyBodies
     /// </summary>
     internal static bool ObserveOwnerFrame(MissionShip ship, in MatrixFrame frame)
     {
-        if (!table.Entries.TryGetValue(ship, out var entry) || entry.Mode != CopyBodyMode.Steered) return false;
+        if (!table.Entries.TryGetValue(ship, out var entry)) return false;
+
+        entry.OwnerFrame = frame;
+        if (entry.Mode != CopyBodyMode.Steered) return false;
 
         entry.Steering.ObserveOwner(Mission.Current?.CurrentTime ?? 0f, frame.origin, CopySteering.YawOf(frame.rotation.f));
         return true;
@@ -56,21 +59,24 @@ internal static class NavalCopyBodies
             var ship = entry.Key;
             if (ship.IsRemoved || !ship.GameEntity.IsValid || !ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation()) continue;
 
-            SteerOne(ship, entry.Value.Steering, dt);
+            SteerOne(ship, entry.Value, dt);
         }
     }
 
-    private static void SteerOne(MissionShip ship, CopySteering steering, float dt)
+    private static void SteerOne(MissionShip ship, CopyBodyEntry entry, float dt)
     {
+        var steering = entry.Steering;
         var entity = ship.GameEntity;
         var frame = ship.GlobalFrame;
         var velocity = entity.GetLinearVelocity();
         var angular = entity.GetAngularVelocity();
         var step = steering.Compute(dt, frame.origin, CopySteering.YawOf(frame.rotation.f), velocity, angular.z);
+        float time = Mission.Current?.CurrentTime ?? 0f;
+        entry.Diagnostics.Correction.Add(time, step.DeltaVelocity.Length);
+        entry.Diagnostics.CorrectionAlongHeading.Add(time, step.AlongHeading);
         if (step.Snap)
         {
-            var target = frame;
-            target.origin = steering.TargetOrigin;
+            var target = entry.OwnerFrame ?? frame;
             entity.SetGlobalFrame(in target, isTeleportation: true);
             var ownerVelocity = steering.OwnerVelocity;
             entity.SetLinearVelocity(new Vec3(ownerVelocity.x, ownerVelocity.y, velocity.z));
@@ -103,7 +109,7 @@ internal static class NavalCopyBodies
             blocked = entry.Value.Blocked,
             bodySimulating = entry.Key.GameEntity.IsValid && entry.Key.GameEntity.HasDynamicRigidBodyAndActiveSimulation(),
             staticBody = entry.Key.GameEntity.IsValid && entry.Key.GameEntity.HasStaticPhysicsBody(),
-            snaps = entry.Value.Steering?.Snaps,
+            diagnostics = entry.Value.Diagnostics.Inspect(entry.Value.Steering),
         }).ToArray(),
     };
 

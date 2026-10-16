@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using TaleWorlds.Library;
 
 namespace Missions.Naval;
 
@@ -219,6 +220,11 @@ internal sealed class CopyBodyEntry
 
     /// <summary>The correction while steered; null otherwise.</summary>
     public CopySteering Steering { get; set; }
+
+    /// <summary>The owner's latest frame as the replicator would write it, in every mode; null before the first.</summary>
+    public MatrixFrame? OwnerFrame { get; set; }
+
+    public CopyDiagnostics Diagnostics { get; } = new CopyDiagnostics();
 }
 
 /// <summary>
