@@ -18,9 +18,6 @@ namespace Coop.Core.Client.Services.Towns.Handlers
             this.messageBroker = messageBroker;
             this.network = network;
 
-            messageBroker.Subscribe<NetworkChangeTownLoyalty>(HandleTownLoyalty);
-            messageBroker.Subscribe<NetworkChangeTownProsperity>(HandleTownProsperity);
-            messageBroker.Subscribe<NetworkChangeTownSecurity>(HandleTownSecurity);
             messageBroker.Subscribe<NetworkChangeTownLastCapturedBy>(HandleTownLastCapturedBy);
             messageBroker.Subscribe<NetworkChangeTownInRebelliousState>(HandleTownInRebelliousState);
             messageBroker.Subscribe<NetworkChangeTownGovernor>(HandleTownGovernor);
@@ -81,32 +78,8 @@ namespace Coop.Core.Client.Services.Towns.Handlers
             messageBroker.Publish(this, message);
         }
 
-        private void HandleTownSecurity(MessagePayload<NetworkChangeTownSecurity> payload)
-        {
-            NetworkChangeTownSecurity networkChangeTownSecurity = payload.What;
-            ChangeTownSecurity message = new ChangeTownSecurity(networkChangeTownSecurity.TownId, networkChangeTownSecurity.Security);
-            messageBroker.Publish(this, message);
-        }
-
-        private void HandleTownProsperity(MessagePayload<NetworkChangeTownProsperity> payload)
-        {
-            NetworkChangeTownProsperity networkChangeTownProsperity = payload.What;
-            ChangeTownProsperity message = new ChangeTownProsperity(networkChangeTownProsperity.TownId, networkChangeTownProsperity.Prosperity);
-            messageBroker.Publish(this, message);
-        }
-
-        private void HandleTownLoyalty(MessagePayload<NetworkChangeTownLoyalty> payload)
-        {
-            NetworkChangeTownLoyalty networkChangeTownLoyalty = payload.What;
-            ChangeTownLoyalty message = new ChangeTownLoyalty(networkChangeTownLoyalty.TownId, networkChangeTownLoyalty.Loyalty);
-            messageBroker.Publish(this, message);
-        }
-
         public void Dispose()
         {
-            messageBroker.Unsubscribe<NetworkChangeTownLoyalty>(HandleTownLoyalty);
-            messageBroker.Unsubscribe<NetworkChangeTownProsperity>(HandleTownProsperity);
-            messageBroker.Unsubscribe<NetworkChangeTownSecurity>(HandleTownSecurity);
             messageBroker.Unsubscribe<NetworkChangeTownLastCapturedBy>(HandleTownLastCapturedBy);
             messageBroker.Unsubscribe<NetworkChangeTownInRebelliousState>(HandleTownInRebelliousState);
             messageBroker.Unsubscribe<NetworkChangeTownGovernor>(HandleTownGovernor);

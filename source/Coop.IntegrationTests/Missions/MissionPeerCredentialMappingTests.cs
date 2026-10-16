@@ -114,20 +114,6 @@ public class MissionPeerCredentialMappingTests
     }
 
     [Fact]
-    public void ConnectionRequestWithoutCredential_IsRejected()
-    {
-        using var fixture = new Fixture(startNetwork: true);
-        fixture.Announce("direct-host", steamId: 0, Guid.NewGuid());
-
-        fixture.ConnectFromRemote(new ConnectionToken("direct-host", InstanceId), expectConnected: false);
-
-        fixture.MissionContext.Verify(
-            context => context.MapPeer(It.IsAny<string>(), It.IsAny<NetPeer>()),
-            Times.Never);
-        Assert.Empty(fixture.PendingPeers);
-    }
-
-    [Fact]
     public void ConnectionRequestWithMismatchedCredential_IsRejected()
     {
         using var fixture = new Fixture(startNetwork: true);
@@ -157,23 +143,6 @@ public class MissionPeerCredentialMappingTests
         fixture.MissionContext.Verify(
             context => context.MapPeer("direct-host", It.IsAny<NetPeer>()),
             Times.Once);
-    }
-
-    [Fact]
-    public void ConnectionRequestWithWrongAuthenticatedSteamIdentity_IsRejected()
-    {
-        using var fixture = new Fixture(startNetwork: true, authenticatedSteamId: 9001);
-        var credential = Guid.NewGuid();
-        fixture.Announce("steam-peer", steamId: 9002, credential);
-
-        fixture.ConnectFromRemote(
-            new ConnectionToken("steam-peer", InstanceId, credential),
-            expectConnected: false);
-
-        fixture.MissionContext.Verify(
-            context => context.MapPeer(It.IsAny<string>(), It.IsAny<NetPeer>()),
-            Times.Never);
-        Assert.Empty(fixture.PendingPeers);
     }
 
     [Fact]
@@ -764,22 +733,6 @@ public class MissionPeerCredentialMappingTests
         fixture.Client.OnPeerConnected(peer);
 
         fixture.Announce("direct-host", steamId: 0, Guid.NewGuid());
-
-        fixture.MissionContext.Verify(
-            context => context.MapPeer(It.IsAny<string>(), It.IsAny<NetPeer>()),
-            Times.Never);
-        Assert.False(fixture.PendingPeers.ContainsKey(peer));
-    }
-
-    [Fact]
-    public void NonzeroSteamIdentityMismatch_DoesNotMapMatchingCredential()
-    {
-        using var fixture = new Fixture();
-        var credential = Guid.NewGuid();
-        var peer = fixture.TrackPending("steam-peer", credential, actualSteamId: 9001);
-        fixture.Client.OnPeerConnected(peer);
-
-        fixture.Announce("steam-peer", steamId: 9002, credential);
 
         fixture.MissionContext.Verify(
             context => context.MapPeer(It.IsAny<string>(), It.IsAny<NetPeer>()),

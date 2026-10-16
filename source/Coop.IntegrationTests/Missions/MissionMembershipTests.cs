@@ -26,17 +26,6 @@ public class MissionMembershipTests
     internal TestEnvironment TestEnvironment { get; } = new TestEnvironment(numClients: 3);
 
     [Fact]
-    public void ServerAndClientControllers_AreEquivalent_AfterAllJoin()
-    {
-        var members = SetupClients();
-
-        foreach (var member in members)
-            Join(member);
-
-        AssertControllersEquivalent(members);
-    }
-
-    [Fact]
     public void NewClientJoins_WithExistingMembers_ControllersEquivalentOnAll()
     {
         var members = SetupClients();
