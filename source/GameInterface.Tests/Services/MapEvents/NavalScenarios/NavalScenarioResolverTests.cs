@@ -82,6 +82,9 @@ public class NavalScenarioResolverTests
         Assert.Equal(NavalScenarioPlacement.Ramming, Resolve("ramming").Placement);
         Assert.True(Resolve("sinking").SinkingEnemyHull);
         Assert.True(Resolve("migration").DisconnectBattleHost);
+        Assert.False(Resolve("migration").DisconnectNonHost);
+        Assert.True(Resolve("migration", "who=nonhost").DisconnectNonHost);
+        Assert.False(Resolve("migration", "who=host").DisconnectNonHost);
         Assert.Equal(3, Resolve("fleet").ShipsPerPlayer);
         Assert.True(Resolve("allied_npc").AlliedNpc);
 
@@ -110,6 +113,8 @@ public class NavalScenarioResolverTests
     [InlineData("ships must be a whole number from 1 to 4.", "fleet", "ships=5")]
     [InlineData("delay must be a number of seconds from 1 to 600.", "migration", "delay=NaN")]
     [InlineData("reconnect must be a number of seconds from 5 to 600.", "migration", "reconnect=1")]
+    [InlineData("who must be host or nonhost.", "migration", "who=client")]
+    [InlineData("vs_pirates disconnects nobody, so it takes no who knob.", "vs_pirates", "who=nonhost")]
     [InlineData("hull must name a ship hull id.", "solo", "hull=")]
     [InlineData("Player PlayerFour is not connected; coop.debug.players.list shows the current ids.", "vs_pirates", "PlayerFour")]
     [InlineData("Player PlayerOne is listed twice.", "vs_pirates", "PlayerOne", "PlayerOne")]

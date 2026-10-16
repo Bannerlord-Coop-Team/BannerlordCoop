@@ -48,7 +48,10 @@ public sealed class NavalScenarioPreset
     /// </summary>
     public bool SinkingEnemyHull { get; set; }
 
-    /// <summary>The battle host client disconnects <c>delay</c> seconds after its deployment and reconnects later.</summary>
+    /// <summary>
+    /// The battle host client, or with <c>who=nonhost</c> the first other player, disconnects <c>delay</c> seconds after its
+    /// deployment and reconnects <c>reconnect</c> seconds later.
+    /// </summary>
     public bool DisconnectBattleHost { get; set; }
 
     /// <summary>The second player joins the map event <c>delay</c> seconds after the first one started it.</summary>
@@ -125,7 +128,8 @@ public static class NavalScenarioPresets
         new NavalScenarioPreset
         {
             Name = "migration",
-            Description = "vs_pirates; the battle host client disconnects after deploying and reconnects later.",
+            Description = "vs_pirates; the battle host client, or with who=nonhost the first other player, disconnects after " +
+                "deploying and reconnects later.",
             MinPlayers = 2,
             DisconnectBattleHost = true,
         },

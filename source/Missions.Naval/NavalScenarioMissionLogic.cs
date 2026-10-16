@@ -22,7 +22,7 @@ namespace Missions.Naval;
 /// <summary>
 /// [Game thread] DEBUG: runs this client's steps of the active naval scenario inside its battle: presses Ready on the
 /// naval order of battle, then places the own hull and throws a rope, drives the helm, disconnects or retreats, as the
-/// scenario says.
+/// scenario says; a client that disconnected presses Ready again in the battle it reconnects into.
 /// </summary>
 public class NavalScenarioMissionLogic : MissionLogic
 {
@@ -50,6 +50,8 @@ public class NavalScenarioMissionLogic : MissionLogic
 
     private float sinceDeployment;
     private float sincePlacement;
+    // This client disconnected out of this mission; its scenario goes on in the mission it reconnects into.
+    private bool disconnectedHere;
     private float ropeCooldown;
     private MissionShip placedOwn;
     private MissionShip placedTarget;
@@ -85,6 +87,8 @@ public class NavalScenarioMissionLogic : MissionLogic
         Complete(NavalScenarioState.ReadyStep, true, readyPress.Presses > 0
             ? $"Ready pressed {readyPress.Presses} time(s) on the naval order of battle"
             : "deployment finished without the scenario pressing Ready");
+        if (IsRejoining)
+            Complete(NavalScenarioState.RejoinStep, true, $"reconnected into the battle and pressed Ready {readyPress.Presses} time(s)");
 
         sinceDeployment += dt;
         TickTimeline(dt);
@@ -98,9 +102,15 @@ public class NavalScenarioMissionLogic : MissionLogic
 
     // Ready's FinishDeployment removes two behaviors, which breaks Mission.OnTick's reverse index over them, so the
     // press runs after the tick returns, as a click on the order of battle's UI layer does.
+    // The mission a disconnected client reconnected into, before its deployment there is over.
+    private bool IsRejoining => !disconnectedHere && !state.IsPending(NavalScenarioState.DisconnectStep)
+        && state.IsPending(NavalScenarioState.RejoinStep);
+
+    private bool IsPressingReady => state.IsPending(NavalScenarioState.ReadyStep) || IsRejoining;
+
     private void TickReady(float dt)
     {
-        if (!state.IsPending(NavalScenarioState.ReadyStep)) return;
+        if (!IsPressingReady) return;
 
         readyPress.Tick(dt, () => ReadyOrderOfBattle() != null, PressReady);
     }
@@ -117,7 +127,7 @@ public class NavalScenarioMissionLogic : MissionLogic
     {
         var mission = Mission;
         if (mission == null || Mission.Current != mission || mission.MissionEnded || mission.IsDeploymentFinished) return null;
-        if (state.Current != config || !state.IsPending(NavalScenarioState.ReadyStep)) return null;
+        if (state.Current != config || !IsPressingReady) return null;
 
         var view = mission.GetMissionBehavior<MissionGauntletNavalOrderOfBattleView>();
         var orderOfBattle = view?._dataSource;
@@ -300,14 +310,18 @@ public class NavalScenarioMissionLogic : MissionLogic
 
     private void Disconnect()
     {
-        if (!session.IsLocalHost)
+        var disconnecting = config.DisconnectingControllerId(session.HostControllerId);
+        if (disconnecting == null || !session.IsOwn(disconnecting))
         {
-            Complete(NavalScenarioState.DisconnectStep, true, "not the battle host, so it stays connected");
+            var detail = disconnecting == null ? "no player to disconnect" : $"{disconnecting} disconnects, so this client stays connected";
+            Complete(NavalScenarioState.DisconnectStep, true, detail);
+            Complete(NavalScenarioState.RejoinStep, true, detail);
             return;
         }
 
-        Complete(NavalScenarioState.DisconnectStep, true,
-            $"the battle host disconnects now and reconnects in {config.ReconnectSeconds:0} s");
+        disconnectedHere = true;
+        Complete(NavalScenarioState.DisconnectStep, true, $"{(session.IsLocalHost ? "the battle host" : "a player that is not the host")} " +
+            $"disconnects now and reconnects in {config.ReconnectSeconds:0} s");
         float reconnectSeconds = config.ReconnectSeconds;
 
         // Both run as the console would, off the mission tick (RunSafe would run inline here); the reconnect outlives
@@ -325,7 +339,7 @@ public class NavalScenarioMissionLogic : MissionLogic
 
     private void End()
     {
-        if (config == null || state.Current != config || state.Phase == NavalScenarioPhase.Ended) return;
+        if (config == null || state.Current != config || state.Phase == NavalScenarioPhase.Ended || disconnectedHere) return;
 
         state.Advance(NavalScenarioPhase.Ended);
         foreach (var step in state.Steps.Where(step => step.Status == NavalScenarioStepStatus.Pending).ToArray())

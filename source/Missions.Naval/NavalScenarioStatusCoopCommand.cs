@@ -31,7 +31,8 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
 
     public string Name => "scenario_status";
 
-    public string Description => "Reports the naval scenario's preset, phase, pending steps, hulls per owner, AI hulls and result.";
+    public string Description =>
+        "Reports the naval scenario's preset, phase, pending steps, hulls per owner, AI hulls, adoption and hand-back phases and result.";
 
     public CoopCommandSide Side => CoopCommandSide.Both;
 
@@ -60,6 +61,7 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
                 spacing = config.Spacing,
                 delay = config.DelaySeconds,
                 reconnect = config.ReconnectSeconds,
+                who = config.DisconnectBattleHost ? config.DisconnectNonHost ? "nonhost" : "host" : null,
             },
             pending = state.Steps.Where(step => step.Status == NavalScenarioStepStatus.Pending).Select(step => step.Name).ToArray(),
             steps = state.Steps.Select(step => new { name = step.Name, status = step.Status.ToString(), detail = step.Detail }).ToArray(),
@@ -100,6 +102,8 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
                 sinkingOrSunk = npcHulls.Count(ship => (ship.Hull as MissionShip)?.IsSinking == true),
                 ownedHere = npcHulls.Count(ship => ship.CurrentAuthority == controller.Session.OwnControllerId),
             },
+            // Each player hull with its owner, adopted by the host or handed back, and this client's pending reclaims.
+            handBack = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipReplicator.InspectHandBack(),
             result = mission.MissionEnded ? CoopNavalBattleEndLogic.DescribeResult(mission.MissionResult) : "running",
         };
     }

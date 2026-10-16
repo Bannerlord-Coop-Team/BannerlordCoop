@@ -33,8 +33,25 @@ public class NavalScenarioStateTests
             Steps(Config("boarding", "PlayerOne", "PlayerTwo"), "PlayerTwo"));
         Assert.Equal(new[] { NavalScenarioState.ReadyStep, NavalScenarioState.PlaceStep, NavalScenarioState.HelmStep },
             Steps(Config("ramming", "PlayerOne", "PlayerTwo"), "PlayerTwo"));
-        Assert.Equal(new[] { NavalScenarioState.ReadyStep, NavalScenarioState.DisconnectStep },
+        Assert.Equal(new[] { NavalScenarioState.ReadyStep, NavalScenarioState.DisconnectStep, NavalScenarioState.RejoinStep },
             Steps(Config("migration", "PlayerOne", "PlayerTwo"), "PlayerTwo"));
+    }
+
+    // M8b: the migration preset disconnects the battle host, or with who=nonhost the first player that is not the host.
+    [Fact]
+    public void DisconnectingControllerId_IsTheHost_OrTheFirstOtherPlayerForWhoNonHost()
+    {
+        var host = Config("migration", "PlayerOne", "PlayerTwo", "PlayerThree");
+        var nonHost = new NavalScenarioResolver().TryResolve(
+            new[] { "migration", "who=nonhost", "PlayerOne", "PlayerTwo", "PlayerThree" },
+            new[] { "PlayerOne", "PlayerTwo", "PlayerThree" }, out var config, out var error) ? config : null;
+        Assert.NotNull(nonHost);
+
+        Assert.Equal("PlayerTwo", host.DisconnectingControllerId("PlayerTwo"));
+        Assert.Equal("PlayerTwo", nonHost!.DisconnectingControllerId("PlayerOne"));
+        Assert.Equal("PlayerOne", nonHost.DisconnectingControllerId("PlayerTwo"));
+        Assert.Null(nonHost.DisconnectingControllerId(null));
+        Assert.Null(Config("vs_pirates", "PlayerOne", "PlayerTwo").DisconnectingControllerId("PlayerOne"));
     }
 
     // Every client carries the step; only the battle host hits the pre-damaged AI hull.

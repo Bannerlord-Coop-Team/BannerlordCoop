@@ -65,6 +65,10 @@ public sealed class NavalScenarioConfig
     [ProtoMember(18)]
     public bool RetreatSecondPlayer { get; set; }
 
+    /// <summary>With <see cref="DisconnectBattleHost"/>, the first player that is not the battle host disconnects instead.</summary>
+    [ProtoMember(19)]
+    public bool DisconnectNonHost { get; set; }
+
     public string InitiatorControllerId => ControllerIds.Length == 0 ? null : ControllerIds[0];
 
     /// <summary>The player who joins the running battle, or null.</summary>
@@ -72,6 +76,23 @@ public sealed class NavalScenarioConfig
 
     /// <summary>The player who retreats from the running battle, or null.</summary>
     public string RetreatingControllerId => RetreatSecondPlayer && ControllerIds.Length > 1 ? ControllerIds[1] : null;
+
+    /// <summary>
+    /// The player who disconnects and reconnects, given the battle's host: the host itself, or with
+    /// <see cref="DisconnectNonHost"/> the first other player; null without a disconnect.
+    /// </summary>
+    public string DisconnectingControllerId(string hostControllerId)
+    {
+        if (!DisconnectBattleHost || string.IsNullOrEmpty(hostControllerId)) return null;
+        if (!DisconnectNonHost) return hostControllerId;
+
+        foreach (var controllerId in ControllerIds)
+        {
+            if (controllerId != hostControllerId) return controllerId;
+        }
+
+        return null;
+    }
 }
 
 /// <summary>DEBUG, server to clients: a naval scenario was staged; clients run its automatic steps.</summary>

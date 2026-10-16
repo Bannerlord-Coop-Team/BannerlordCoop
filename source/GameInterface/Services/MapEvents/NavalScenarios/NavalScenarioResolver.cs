@@ -21,7 +21,7 @@ public interface INavalScenarioResolver
 public class NavalScenarioResolver : INavalScenarioResolver
 {
     internal const string Usage = "Usage: coop.debug.naval.scenario <preset> [hulls=n] [hull=id] [spacing=m] [ships=n] " +
-        "[delay=s] [reconnect=s] [controllerId...]";
+        "[delay=s] [reconnect=s] [who=host|nonhost] [controllerId...]";
 
     public bool TryResolve(IReadOnlyList<string> args, IReadOnlyList<string> connectedControllerIds,
         out NavalScenarioConfig config, out string error)
@@ -111,6 +111,11 @@ public class NavalScenarioResolver : INavalScenarioResolver
             case "reconnect":
                 if (!TryParseFloat(value, 5f, 600f, out float reconnect)) return "reconnect must be a number of seconds from 5 to 600.";
                 config.ReconnectSeconds = reconnect;
+                return null;
+            case "who":
+                if (!config.DisconnectBattleHost) return $"{config.Preset} disconnects nobody, so it takes no who knob.";
+                if (value != "host" && value != "nonhost") return "who must be host or nonhost.";
+                config.DisconnectNonHost = value == "nonhost";
                 return null;
             default:
                 return $"Unknown knob {key}. {Usage}";

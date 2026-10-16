@@ -73,6 +73,8 @@ public class NavalScenarioState : INavalScenarioState
     public const string HelmStep = "helm";
     public const string SinkStep = "sink";
     public const string DisconnectStep = "disconnect";
+    /// <summary>The player who disconnected presses Ready again in the battle it reconnected into.</summary>
+    public const string RejoinStep = "rejoin";
     public const string RetreatStep = "retreat";
 
     private List<NavalScenarioStep> steps = new List<NavalScenarioStep>();
@@ -131,7 +133,12 @@ public class NavalScenarioState : INavalScenarioState
         if (config.Placement == NavalScenarioPlacement.Boarding) yield return RopeStep;
         if (config.Placement == NavalScenarioPlacement.Ramming) yield return HelmStep;
         if (config.SinkingEnemyHull) yield return SinkStep;
-        if (config.DisconnectBattleHost) yield return DisconnectStep;
+        if (config.DisconnectBattleHost)
+        {
+            // Who disconnects depends on the elected host, so every client carries both steps and the others complete them.
+            yield return DisconnectStep;
+            yield return RejoinStep;
+        }
         if (localControllerId == config.RetreatingControllerId) yield return RetreatStep;
     }
 }
