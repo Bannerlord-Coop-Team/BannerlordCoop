@@ -62,7 +62,8 @@ internal class UnregisteredIssuePurger : IHandler
         }
 
         var unregistered = issueManager.Issues.Values
-            .Where(issue => !registry.IsRegistered(issue.GetType()))
+            .Where(issue => !registry.IsRegistered(issue.GetType())
+                && !QuestTypeRegistry.IsRegistered(issue.GetType()))
             .ToList();
 
         var removed = 0;

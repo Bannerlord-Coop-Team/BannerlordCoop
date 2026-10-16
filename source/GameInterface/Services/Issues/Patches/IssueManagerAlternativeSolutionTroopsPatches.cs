@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -33,6 +33,8 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
     [HarmonyPrefix]
     private static bool TryToMakeTroopsReturnPrefix(IssueBase issue)
     {
+        if (issue != null && !QuestTypeRegistry.IsRegistered(issue.GetType())) return true;
+
         var troops = issue?.AlternativeSolutionSentTroops;
         if (troops == null || troops.Count == 0) return false;
 

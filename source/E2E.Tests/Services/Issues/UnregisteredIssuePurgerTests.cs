@@ -9,12 +9,17 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using Xunit.Abstractions;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
-using UnregisteredIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue;
+using LegacyAllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue;
 
 namespace E2E.Tests.Services.Issues;
 
 public class UnregisteredIssuePurgerTests : IDisposable
 {
+    private sealed class UnregisteredIssue : LegacyAllowedIssue
+    {
+        public UnregisteredIssue(Hero owner) : base(owner) { }
+    }
+
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
 
@@ -42,20 +47,24 @@ public class UnregisteredIssuePurgerTests : IDisposable
     {
         var unregisteredOwnerId = TestEnvironment.CreateRegisteredObject<Hero>();
         var registeredOwnerId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var legacyRegisteredOwnerId = TestEnvironment.CreateRegisteredObject<Hero>();
 
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(unregisteredOwnerId, out var unregisteredOwner));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(registeredOwnerId, out var registeredOwner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(legacyRegisteredOwnerId, out var legacyRegisteredOwner));
 
             using (new AllowedThread())
             {
                 AddIssue(unregisteredOwner, new UnregisteredIssue(unregisteredOwner));
                 AddIssue(registeredOwner, new AllowedIssue(registeredOwner, null));
+                AddIssue(legacyRegisteredOwner, new LegacyAllowedIssue(legacyRegisteredOwner));
             }
 
             Assert.NotNull(unregisteredOwner.Issue);
             Assert.NotNull(registeredOwner.Issue);
+            Assert.NotNull(legacyRegisteredOwner.Issue);
 
             var purger = new UnregisteredIssuePurger(Server.Container.Resolve<IMessageBroker>(), Server.Container.Resolve<IQuestTypeRegistry>());
             purger.Purge();
@@ -64,6 +73,8 @@ public class UnregisteredIssuePurgerTests : IDisposable
             Assert.Null(unregisteredOwner.Issue);
             Assert.NotNull(registeredOwner.Issue);
             Assert.DoesNotContain(unregisteredOwner, Campaign.Current.IssueManager.Issues.Keys);
+            Assert.NotNull(legacyRegisteredOwner.Issue);
+            Assert.Contains(legacyRegisteredOwner, Campaign.Current.IssueManager.Issues.Keys);
         });
     }
 }

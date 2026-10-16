@@ -48,7 +48,9 @@ internal class QuestScreenIssueFilterPatch
 
     internal static bool IsAnotherPlayersTroopsMission(IssueBase issue)
     {
-        if (!issue.IsSolvingWithAlternative)
+        if (!issue.IsSolvingWithAlternative ||
+            !ContainerProvider.TryResolve<IQuestTypeRegistry>(out var registry) ||
+            !registry.IsRegistered(issue.GetType()))
         {
             return false;
         }

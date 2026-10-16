@@ -1008,6 +1008,30 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
         });
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CompanionMissionAppearsOnlyInTheOwnersQuestScreen(bool isOwner)
+    {
+        var giverId = CreateIssueCopies();
+        var client = environment.Clients.First();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            client.Resolve<IControllerIdProvider>().SetControllerId("weapons-journal-owner");
+            client.Resolve<IIssueOwnershipRegistry>().SetOwner(giver, isOwner ? "weapons-journal-owner" : "another-controller");
+            using (new AllowedThread())
+            {
+                giver.Issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+            }
+
+            var journal = new QuestsVM(() => { });
+            if (isOwner) Assert.Same(giver.Issue, Assert.Single(journal.ActiveQuestsList).Issue);
+            else Assert.Empty(journal.ActiveQuestsList);
+            Assert.True(giver.Issue.IsSolvingWithAlternative);
+        });
+    }
+
     [Fact]
     public void CompanionAcceptRejectsAnIneligibleOwnerBeforeTakingGoldOrTroops()
     {

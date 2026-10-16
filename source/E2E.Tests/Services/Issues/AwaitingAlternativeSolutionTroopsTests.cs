@@ -561,6 +561,36 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
     }
 
     [Fact]
+    public void FrameworkIssue_ReturnsTroopsWithoutLegacyOwnership()
+    {
+        var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        Client.Call(() =>
+        {
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.True(Client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            IssueBase issue;
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = party;
+                party.IsCurrentlyAtSea = false;
+                Hero.MainHero.ChangeState(Hero.CharacterStates.Active);
+                companion.ChangeState(Hero.CharacterStates.Disabled);
+                issue = new GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue(giver, null);
+                issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+            }
+            Assert.False(Client.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(giver, out _));
+
+            Campaign.Current.IssueManager.TryToMakeTroopsReturn(issue);
+
+            Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+            Assert.Equal(Hero.CharacterStates.Active, companion.HeroState);
+        });
+    }
+
+    [Fact]
     public void TryToMakeTroopsReturn_HeadlessServer_NoCrash_TroopsDeposited()
     {
         var controllerId = "player-A-" + Guid.NewGuid();
