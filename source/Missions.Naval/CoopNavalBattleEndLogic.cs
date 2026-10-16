@@ -57,8 +57,9 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     {
         if (Mission.IsDeploymentFinished)
         {
-            // One-shot hold, like the land controller's: a side whose troops arrive later must not read as depleted.
-            if (!endChecksReleased && session.IsLocalHost)
+            // One-shot hold, like the land controller's: a side whose troops arrive later must not read as depleted. Every
+            // client latches it, so a successor that takes over the end checks after a host change starts released.
+            if (!endChecksReleased)
                 endChecksReleased = BothSidesFielded();
 
             CanCheckForEndCondition = ShouldCheckEnd(session.IsLocalHost, endChecksReleased);

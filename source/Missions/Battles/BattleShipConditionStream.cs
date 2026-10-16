@@ -46,6 +46,12 @@ public interface IBattleShipConditionStream
     /// </summary>
     void ForgetReserve(Guid shipId);
 
+    /// <summary>
+    /// The hull's authority moved: its reported reserve is forgotten and the order restarts, since the new authority numbers
+    /// its conditions from its own count. Every client applies it at the same move.
+    /// </summary>
+    void RestartAfterAuthorityMove(Guid shipId);
+
     /// <summary>Drops a hull that left the mission.</summary>
     void Forget(Guid shipId);
 }
@@ -107,7 +113,8 @@ public class BattleShipConditionStream : IBattleShipConditionStream
         var hull = Of(ship.ShipId);
         var rejection = ValidateCondition(ship, session.OwnControllerId, condition, hull.Revision, hull.Epoch,
             fromDepartedHost ? null : missionContext.ControllersInMission);
-        if (rejection == null && !fromDepartedHost && ship.IsNpcParty && hostEpochPolicy.IsStale(condition.HostEpoch, session.HostEpoch))
+        if (rejection == null && !fromDepartedHost && ship.FollowsBattleHost
+            && hostEpochPolicy.IsStale(condition.HostEpoch, session.HostEpoch))
             rejection = "stale_epoch";
         if (rejection != null) return rejection;
 
@@ -116,7 +123,7 @@ public class BattleShipConditionStream : IBattleShipConditionStream
         hull.Condition = condition.Condition;
         hull.Reserve = condition.SpawnableReserve;
         hull.Revision = condition.Revision;
-        if (ship.IsNpcParty) hull.Epoch = condition.HostEpoch;
+        if (ship.FollowsBattleHost) hull.Epoch = condition.HostEpoch;
         return null;
     }
 
@@ -124,9 +131,9 @@ public class BattleShipConditionStream : IBattleShipConditionStream
     internal static string ValidateCondition(NetworkShipInfo ship, string ownControllerId, NetworkShipCondition condition,
         long acceptedRevision, int acceptedEpoch, IReadOnlyCollection<string> controllersInMission)
     {
-        // A new host numbers an AI hull's conditions on from its own count, so a newer epoch restarts the order.
+        // A new host numbers an AI or adopted hull's conditions on from its own count, so a newer epoch restarts the order.
         var rejection = condition.Stamp.Validate(ship.CurrentAuthority, ownControllerId,
-            new AuthorityStamp(ship.CurrentAuthority, acceptedEpoch, acceptedRevision), followsHostEpoch: ship.IsNpcParty,
+            new AuthorityStamp(ship.CurrentAuthority, acceptedEpoch, acceptedRevision), followsHostEpoch: ship.FollowsBattleHost,
             controllersInMission);
         if (rejection != null) return rejection;
         if (condition.Condition == null || !condition.Condition.IsValid) return "invalid_condition";
@@ -137,6 +144,15 @@ public class BattleShipConditionStream : IBattleShipConditionStream
     public void ForgetReserve(Guid shipId)
     {
         if (hulls.TryGetValue(shipId, out var hull)) hull.Reserve = null;
+    }
+
+    public void RestartAfterAuthorityMove(Guid shipId)
+    {
+        if (!hulls.TryGetValue(shipId, out var hull)) return;
+
+        hull.Reserve = null;
+        hull.Revision = 0;
+        hull.Epoch = 0;
     }
 
     public void Forget(Guid shipId) => hulls.Remove(shipId);

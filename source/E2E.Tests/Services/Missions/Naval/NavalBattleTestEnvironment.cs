@@ -217,12 +217,20 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 peer.Instance.Call(() => peer.Broker.Publish(peer, new NetworkMissionPeerEntered(entered.Id, MapEventId)));
         }
 
-        /// <summary>Drops <paramref name="departed"/> off the mesh and hands the battle to <paramref name="newHost"/> at the next epoch.</summary>
-        public void MigrateHost(NavalPeer departed, string newHost)
+        /// <summary>
+        /// <paramref name="departed"/> drops off the mesh without leaving, and the server tells every other member it disconnected.
+        /// </summary>
+        public void Disconnect(NavalPeer departed)
         {
             departed.Instance.Call(departed.Network.Stop);
             foreach (var peer in Peers)
                 peer.Instance.Call(() => peer.Broker.Publish(peer, new MissionPeerDisconnected(departed.Id, MapEventId)));
+        }
+
+        /// <summary>Drops <paramref name="departed"/> off the mesh and hands the battle to <paramref name="newHost"/> at the next epoch.</summary>
+        public void MigrateHost(NavalPeer departed, string newHost)
+        {
+            Disconnect(departed);
 
             HostId = newHost;
             Successors = Successors.Where(id => id != newHost && id != departed.Id).ToArray();

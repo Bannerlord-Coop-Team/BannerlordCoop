@@ -70,7 +70,8 @@ public class NavalShipEngine : INavalShipEngine
             ship.ShipOrigin.HitPoints,
             ship.ShipOrigin.SailHitPoints,
             ship.ShipOrigin.RandomValue,
-            ship.ShipOrigin.CustomSailPatternId);
+            ship.ShipOrigin.CustomSailPatternId,
+            identity.OriginalOwner);
     }
 
     public MissionObject SpawnForeignHull(BattleShipSpawnData data, Team team, out Formation formation)

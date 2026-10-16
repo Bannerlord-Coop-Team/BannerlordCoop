@@ -52,11 +52,12 @@ public enum ShipLifecycle
 /// <summary>One registered hull: who simulates it, who fielded it, and its local mission object and formation.</summary>
 public class NetworkShipInfo
 {
-    public NetworkShipInfo(Guid shipId, string owner, string mapEventPartyId, bool isNpcParty, MissionObject hull, Formation formation)
+    public NetworkShipInfo(Guid shipId, string owner, string mapEventPartyId, bool isNpcParty, MissionObject hull, Formation formation,
+        string originalOwner = null)
     {
         ShipId = shipId;
         CurrentAuthority = owner;
-        OriginalOwner = owner;
+        OriginalOwner = originalOwner ?? owner;
         MapEventPartyId = mapEventPartyId;
         IsNpcParty = isNpcParty;
         Hull = hull;
@@ -68,6 +69,13 @@ public class NetworkShipInfo
     public string OriginalOwner { get; }
     public string MapEventPartyId { get; }
     public bool IsNpcParty { get; }
+
+    /// <summary>A player's hull the battle host simulates because its owner disconnected, until it is handed back.</summary>
+    public bool IsAdopted => !IsNpcParty && CurrentAuthority != OriginalOwner;
+
+    /// <summary>An AI or adopted hull: it moves with every battle host change, and its states follow the host epoch.</summary>
+    public bool FollowsBattleHost => IsNpcParty || IsAdopted;
+
     public MissionObject Hull { get; private set; }
     public Formation Formation { get; }
 

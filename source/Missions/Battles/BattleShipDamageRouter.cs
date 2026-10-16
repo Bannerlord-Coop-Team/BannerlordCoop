@@ -141,9 +141,9 @@ public class BattleShipDamageRouter : IBattleShipDamageRouter
     {
         if (ship.CurrentAuthority != ownControllerId) return "not_authority";
 
-        // An AI hull's owner changes with the host epoch; only the owner of the sender's epoch applies, so a hit sent
-        // across a migration lands at most once.
-        if (ship.IsNpcParty && damage.HostEpoch != 0 && localEpoch != 0 && damage.HostEpoch != localEpoch) return "stale_epoch";
+        // An AI or adopted hull's owner changes with the host epoch; only the owner of the sender's epoch applies, so a hit
+        // sent across a migration lands at most once.
+        if (ship.FollowsBattleHost && damage.HostEpoch != 0 && localEpoch != 0 && damage.HostEpoch != localEpoch) return "stale_epoch";
         if (!damage.IsValid) return "invalid_damage";
         return null;
     }

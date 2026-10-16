@@ -101,7 +101,8 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         SendOwnStates(dt);
     }
 
-    // A hull swap rebinds the ship to a fresh hull, and an authority move flips who simulates, so both restart the stream.
+    // A hull swap rebinds the ship to a fresh hull, and an authority move changes who simulates and numbers the states, so both
+    // restart the stream.
     // A hull without a weapon is looked up again, in case it registered before its weapon was found. Only Tick refreshes, right
     // before the simulation claim, so a stream's IsOwn always matches the weapons this client simulates.
     private void RefreshWeapons()
@@ -114,9 +115,10 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         foreach (var ship in Registry.Ships)
         {
             bool isOwn = IsSimulatedHere(ship);
-            if (!streams.TryGetValue(ship.ShipId, out var stream) || stream.Hull != ship.Hull || stream.IsOwn != isOwn)
+            if (!streams.TryGetValue(ship.ShipId, out var stream) || stream.Hull != ship.Hull || stream.IsOwn != isOwn
+                || stream.Authority != ship.CurrentAuthority)
             {
-                stream = new WeaponStream(ship.Hull, isOwn, stream?.SentRevision ?? 0);
+                stream = new WeaponStream(ship.Hull, isOwn, ship.CurrentAuthority, stream?.SentRevision ?? 0);
                 streams[ship.ShipId] = stream;
             }
 
@@ -220,7 +222,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         }
 
         var rejection = ValidateShot(ship, session.OwnControllerId, shot, missionContext.ControllersInMission);
-        if (rejection == null && ship.IsNpcParty && hostEpochPolicy.IsStale(shot.HostEpoch, session.HostEpoch))
+        if (rejection == null && ship.FollowsBattleHost && hostEpochPolicy.IsStale(shot.HostEpoch, session.HostEpoch))
             rejection = "stale_epoch";
         MissionObject weapon = null;
         if (rejection == null && !TryGetWeaponOf(ship, shot.WeaponKey, out weapon)) rejection = "unknown_weapon";
@@ -300,7 +302,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
 
         var rejection = ValidateState(ship, session.OwnControllerId, state, stream.AppliedRevision, stream.AppliedEpoch,
             missionContext.ControllersInMission);
-        if (rejection == null && ship.IsNpcParty && hostEpochPolicy.IsStale(state.HostEpoch, session.HostEpoch))
+        if (rejection == null && ship.FollowsBattleHost && hostEpochPolicy.IsStale(state.HostEpoch, session.HostEpoch))
             rejection = "stale_epoch";
         if (rejection == null && (stream.Weapon == null || stream.Key != state.WeaponKey)) rejection = "unknown_weapon";
         if (rejection != null)
@@ -312,7 +314,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         engine.ApplyWeaponState(stream.Weapon, state.State, stream.Applied);
         stream.Applied = state.State;
         stream.AppliedRevision = state.Revision;
-        if (ship.IsNpcParty) stream.AppliedEpoch = state.HostEpoch;
+        if (ship.FollowsBattleHost) stream.AppliedEpoch = state.HostEpoch;
         statesApplied++;
     }
 
@@ -326,9 +328,9 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     internal static string ValidateState(NetworkShipInfo ship, string ownControllerId, NetworkShipWeaponState state,
         long appliedRevision, int appliedEpoch, IReadOnlyCollection<string> controllersInMission)
     {
-        // A new host numbers an AI hull's weapon states on from its own count, so a newer epoch restarts the order.
+        // A new host numbers an AI or adopted hull's weapon states on from its own count, so a newer epoch restarts the order.
         var rejection = state.Stamp.Validate(ship.CurrentAuthority, ownControllerId,
-            new AuthorityStamp(ship.CurrentAuthority, appliedEpoch, appliedRevision), followsHostEpoch: ship.IsNpcParty,
+            new AuthorityStamp(ship.CurrentAuthority, appliedEpoch, appliedRevision), followsHostEpoch: ship.FollowsBattleHost,
             controllersInMission);
         if (rejection != null) return rejection;
         if (state.State == null || !state.State.IsValid) return "invalid_state";
@@ -408,16 +410,19 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
 
     private sealed class WeaponStream
     {
-        public WeaponStream(MissionObject hull, bool isOwn, long sentRevision)
+        public WeaponStream(MissionObject hull, bool isOwn, string authority, long sentRevision)
         {
             Hull = hull;
             IsOwn = isOwn;
+            Authority = authority;
             SentRevision = sentRevision;
         }
 
         public MissionObject Hull { get; }
         /// <summary>Whether this client simulates the weapon: the hull is its own and not mid-swap.</summary>
         public bool IsOwn { get; }
+        /// <summary>The hull's authority, whose states this stream orders.</summary>
+        public string Authority { get; }
         public MissionObject Weapon { get; set; }
         public string Key { get; set; }
         /// <summary>The owner's last sent state and its revision, which carries over a restart so peers keep accepting it.</summary>

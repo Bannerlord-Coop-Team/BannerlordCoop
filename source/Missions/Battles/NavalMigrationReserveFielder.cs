@@ -9,16 +9,18 @@ using TaleWorlds.Core;
 namespace Missions.Battles;
 
 /// <summary>
-/// [Game thread, battle host] Puts the AI reserve a promoted naval host recovers onto the AI hulls it now simulates. The old
-/// host's queued crew left with it; <see cref="IReinforcementFielder"/> recovers those troops from the roster, and here they
-/// join each hull's vanilla reserve, which spawns them as its crew falls.
+/// [Game thread, battle host] Puts the reserve a naval host recovers onto the AI and adopted hulls it simulates. A departed
+/// host's or disconnected player's queued crew left with it; <see cref="IReinforcementFielder"/> recovers those troops from the
+/// roster, and here they join each hull's vanilla reserve, which spawns them as its crew falls.
 /// </summary>
 public interface INavalMigrationReserveFielder
 {
-    /// <summary>[Game thread] Takes newly recovered reserve and queues what fits on the AI hulls simulated here.</summary>
+    /// <summary>[Game thread] Takes newly recovered reserve and queues what fits on the AI and adopted hulls simulated here.</summary>
     void Tick();
 
-    /// <summary>[Game thread] Recovered reserve of a side that no hull holds yet, while an afloat AI hull of that side can take it.</summary>
+    /// <summary>
+    /// [Game thread] Recovered reserve of a side that no hull holds yet, while an afloat AI or adopted hull of that side can take it.
+    /// </summary>
     int PendingReserve(BattleSideEnum side);
 
     /// <summary>Recovered, pending and fielded counts (diagnostics).</summary>
@@ -56,7 +58,7 @@ public class NavalMigrationReserveFielder : INavalMigrationReserveFielder
 
         foreach (var side in Sides)
         {
-            var hulls = AfloatAiHulls(side);
+            var hulls = AfloatHostHulls(side);
             if (hulls.Count == 0) continue;
 
             var taken = reinforcementFielder.TakeMigrationReserve(side);
@@ -64,7 +66,8 @@ public class NavalMigrationReserveFielder : INavalMigrationReserveFielder
             {
                 pending[(int)side].AddRange(taken);
                 recovered += taken.Count;
-                Logger.Information("[NavalBattle] Recovered {Count} {Side} AI reserve troop(s) after the host change", taken.Count, side);
+                Logger.Information("[NavalBattle] Recovered {Count} {Side} reserve troop(s) after a host change or disconnect",
+                    taken.Count, side);
             }
 
             FieldPending(side, hulls.Where(ship => !shipReplicator.IsReplacingHull(ship.ShipId)).ToList());
@@ -76,7 +79,7 @@ public class NavalMigrationReserveFielder : INavalMigrationReserveFielder
         if (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender) return 0;
 
         var waiting = pending[(int)side];
-        return waiting.Count > 0 && AfloatAiHulls(side).Count > 0 ? waiting.Count : 0;
+        return waiting.Count > 0 && AfloatHostHulls(side).Count > 0 ? waiting.Count : 0;
     }
 
     // Each hull takes its own party's troops first, then any party's, so one party's hulls do not fill up on another's.
@@ -94,7 +97,7 @@ public class NavalMigrationReserveFielder : INavalMigrationReserveFielder
         if (added == 0) return;
 
         fielded += added;
-        Logger.Information("[NavalBattle] Queued {Count} recovered {Side} AI troop(s) on {Hulls} hull(s); {Pending} still waiting",
+        Logger.Information("[NavalBattle] Queued {Count} recovered {Side} troop(s) on {Hulls} hull(s); {Pending} still waiting",
             added, side, hulls.Count, waiting.Count);
     }
 
@@ -109,8 +112,8 @@ public class NavalMigrationReserveFielder : INavalMigrationReserveFielder
         return added;
     }
 
-    private List<NetworkShipInfo> AfloatAiHulls(BattleSideEnum side) => registry.Ships
-        .Where(ship => ship.IsNpcParty && session.IsOwn(ship.CurrentAuthority) && !engine.IsHullRemoved(ship.Hull)
+    private List<NetworkShipInfo> AfloatHostHulls(BattleSideEnum side) => registry.Ships
+        .Where(ship => ship.FollowsBattleHost && session.IsOwn(ship.CurrentAuthority) && !engine.IsHullRemoved(ship.Hull)
             && !engine.IsSinking(ship.Hull) && engine.SideOf(ship.Hull) == side)
         .ToList();
 

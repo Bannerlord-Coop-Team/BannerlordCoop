@@ -457,12 +457,14 @@ public class ReinforcementFielder : IReinforcementFielder
         var origins = new List<CoopAgentOrigin>();
         foreach (var recovery in parties)
         {
+            recoveryPartyIds.Remove(recovery.PartyId);
+            // As in FieldRecoverySide: a party that left this host's reserve scope (its owner came back) is not fielded here.
+            if (!recovery.Supplier.ContainsParty(recovery.PartyId)) continue;
+
             foreach (var origin in recovery.Origins)
             {
                 if (!HasLivePartySeed(recovery.PartyId, origin.UniqueSeed)) origins.Add(origin);
             }
-
-            recoveryPartyIds.Remove(recovery.PartyId);
         }
 
         parties.Clear();

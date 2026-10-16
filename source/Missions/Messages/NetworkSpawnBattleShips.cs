@@ -43,6 +43,8 @@ public sealed class BattleShipSpawnData
     [ProtoMember(14)] public readonly float SailHitPoints;
     [ProtoMember(15)] public readonly int RandomValue;
     [ProtoMember(16)] public readonly string CustomSailPatternId;
+    /// <summary>The player who fielded an adopted hull; empty when it is the record's owner.</summary>
+    [ProtoMember(17)] public readonly string OriginalOwnerControllerId;
 
     public BattleShipSpawnData(
         Guid shipId,
@@ -60,7 +62,8 @@ public sealed class BattleShipSpawnData
         float hitPoints,
         float sailHitPoints,
         int randomValue,
-        string customSailPatternId)
+        string customSailPatternId,
+        string originalOwnerControllerId = null)
     {
         ShipId = shipId;
         OwnerControllerId = ownerControllerId;
@@ -78,5 +81,9 @@ public sealed class BattleShipSpawnData
         SailHitPoints = sailHitPoints;
         RandomValue = randomValue;
         CustomSailPatternId = customSailPatternId;
+        OriginalOwnerControllerId = originalOwnerControllerId == ownerControllerId ? null : originalOwnerControllerId;
     }
+
+    /// <summary>The player or host that fielded the hull.</summary>
+    public string OriginalOwner => string.IsNullOrEmpty(OriginalOwnerControllerId) ? OwnerControllerId : OriginalOwnerControllerId;
 }
