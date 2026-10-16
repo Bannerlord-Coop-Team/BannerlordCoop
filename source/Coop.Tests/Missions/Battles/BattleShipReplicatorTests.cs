@@ -756,7 +756,7 @@ public class BattleShipReplicatorTests
         var ship = new NetworkShipInfo(Guid.NewGuid(), authority, "MapEventParty_9", isNpcParty, CreateHull(), null);
         var condition = new NetworkShipCondition(ship.ShipId, sender, revision, epoch, Condition(500f));
 
-        Assert.Equal(expected, BattleShipReplicator.ValidateCondition(ship, Own, condition, acceptedRevision, acceptedEpoch));
+        Assert.Equal(expected, BattleShipConditionStream.ValidateCondition(ship, Own, condition, acceptedRevision, acceptedEpoch));
     }
 
     [Fact]
@@ -765,7 +765,7 @@ public class BattleShipReplicatorTests
         var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, null, false, CreateHull(), null);
         var condition = new NetworkShipCondition(ship.ShipId, Peer, 1, 0, Condition(float.NaN));
 
-        Assert.Equal("invalid_condition", BattleShipReplicator.ValidateCondition(ship, Own, condition, 0, 0));
+        Assert.Equal("invalid_condition", BattleShipConditionStream.ValidateCondition(ship, Own, condition, 0, 0));
     }
 
     [Fact]
@@ -1216,9 +1216,12 @@ public class BattleShipReplicatorTests
             var resolvedState = BattleState.DefenderVictory;
             resultCommitter.Setup(c => c.TryGetResolvedState(out resolvedState)).Returns(resultHeld);
 
-            Replicator = new BattleShipReplicator(Network.Object, Broker, session.Object, deployment.Object,
-                component.Object, engine.Object, TeamResolver.Object, Mock.Of<IObjectManager>(), new HostEpochPolicy(),
-                resultCommitter.Object);
+            var epochs = new HostEpochPolicy();
+            var context = new BattleContext(session.Object, deployment.Object, component.Object, epochs, resultCommitter.Object,
+                Mock.Of<IReinforcementFielder>());
+            Replicator = new BattleShipReplicator(Network.Object, Broker, context, engine.Object, TeamResolver.Object,
+                Mock.Of<IObjectManager>(), new NavalHullAuthority(session.Object, component.Object, engine.Object),
+                new BattleShipConditionStream(Network.Object, session.Object, engine.Object, epochs));
         }
 
         // A foreign record resolves a team and spawns one live copy hull.

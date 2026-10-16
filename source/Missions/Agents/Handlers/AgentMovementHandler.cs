@@ -37,11 +37,11 @@ public interface IAgentMovementHandler : IPacketHandler, IDisposable
 
     bool TrySetForcedBulkHz(int? hz, out string error);
 
-    /// <summary>Owned agents the capture places on a hull send hull-local poses; received ones rebase on the resolved local hull.</summary>
-    void ConfigureShipDecks(NavalDeckPoseCapture capture, NavalDeckFrameResolver resolver);
-
-    /// <summary>Owned agents the predicate holds (seated at a ship station) send no world movement.</summary>
-    void ConfigureSeatedMovement(Func<CoopAgentInfo, bool> isSeated);
+    /// <summary>
+    /// Owned agents the seam places on a hull send hull-local poses, received ones rebase on the resolved local hull, and owned
+    /// agents seated at a ship station send no world movement; null turns it off.
+    /// </summary>
+    void ConfigureShipDeck(IShipDeckSeam seam);
 
     /// <summary>[Game thread] Drops the puppet's buffered movement target, so a station or other driver owns its pose.</summary>
     void ForgetMovementTarget(Agent agent);
@@ -518,8 +518,7 @@ public partial class AgentMovementHandler : IAgentMovementHandler
         resolvedMountIdentities.Clear();
         receivedMovementSequences.Clear();
         recipientMovementStates.Clear();
-        ConfigureShipDecks(null, null);
-        ConfigureSeatedMovement(null);
+        ConfigureShipDeck(null);
 
         movementBatchSender.Clear();
         movementRateController.Dispose();

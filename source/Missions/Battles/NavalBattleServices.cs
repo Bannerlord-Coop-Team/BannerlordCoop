@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.ObjectManager;
+using Missions.Agents.Handlers;
 using System;
 
 namespace Missions.Battles;
@@ -14,6 +15,8 @@ public interface INavalBattleServices : IDisposable
 
     IAgentStationUseReplicator StationUseReplicator { get; }
 
+    INavalDeckPoses DeckPoses { get; }
+
     IBattleShipWeaponReplicator ShipWeaponReplicator { get; }
 
     IBattleShipDamageRouter ShipDamageRouter { get; }
@@ -21,7 +24,7 @@ public interface INavalBattleServices : IDisposable
     INavalMigrationReserveFielder MigrationReserveFielder { get; }
 
     /// <summary>
-    /// [Game thread] Ticks the hull, station and weapon streams, then <paramref name="beforeMigrationReserve"/>, then the
+    /// [Game thread] Ticks the hull, deck, station and weapon streams, then <paramref name="beforeMigrationReserve"/>, then the
     /// migration reserve, so AI hulls fielded in between take recovered reserve in the same tick.
     /// </summary>
     void Tick(float dt, Action beforeMigrationReserve = null);
@@ -30,13 +33,18 @@ public interface INavalBattleServices : IDisposable
 /// <inheritdoc cref="INavalBattleServices"/>
 public class NavalBattleServices : INavalBattleServices
 {
+    private readonly INavalHullAuthority hullAuthority;
+
     public NavalBattleServices(IBattleNetwork network, IMessageBroker messageBroker, IBattleTeamResolver teamResolver,
         IObjectManager objectManager, BattleContext context, INavalShipEngine shipEngine)
     {
-        ShipReplicator = new BattleShipReplicator(network, messageBroker, context.Session, context.Deployment,
-            context.MissionComponent, shipEngine, teamResolver, objectManager, context.HostEpochPolicy, context.ResultCommitter);
+        hullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, shipEngine);
+        var conditions = new BattleShipConditionStream(network, context.Session, shipEngine, context.HostEpochPolicy);
+        ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
+            hullAuthority, conditions);
         StationUseReplicator = new AgentStationUseReplicator(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, context.Deployment);
+        DeckPoses = new NavalDeckPoses(context.MissionComponent, shipEngine, StationUseReplicator);
         MigrationReserveFielder = new NavalMigrationReserveFielder(context.Session, context.ReinforcementFielder,
             context.MissionComponent.ShipRegistry, shipEngine, ShipReplicator);
         ShipDamageRouter = new BattleShipDamageRouter(network, messageBroker, context.Session, context.MissionComponent,
@@ -49,6 +57,8 @@ public class NavalBattleServices : INavalBattleServices
 
     public IAgentStationUseReplicator StationUseReplicator { get; }
 
+    public INavalDeckPoses DeckPoses { get; }
+
     public IBattleShipWeaponReplicator ShipWeaponReplicator { get; }
 
     public IBattleShipDamageRouter ShipDamageRouter { get; }
@@ -58,6 +68,7 @@ public class NavalBattleServices : INavalBattleServices
     public void Tick(float dt, Action beforeMigrationReserve = null)
     {
         ShipReplicator.Tick(dt);
+        DeckPoses.Tick(dt);
         StationUseReplicator.Tick(dt);
         ShipWeaponReplicator.Tick(dt);
         beforeMigrationReserve?.Invoke();
@@ -68,8 +79,10 @@ public class NavalBattleServices : INavalBattleServices
     {
         ShipWeaponReplicator.Dispose();
         ShipDamageRouter.Dispose();
+        DeckPoses.Dispose();
         StationUseReplicator.Dispose();
         ShipReplicator.Dispose();
+        hullAuthority.Dispose();
     }
 }
 

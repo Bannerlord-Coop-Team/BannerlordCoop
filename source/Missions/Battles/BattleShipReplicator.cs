@@ -29,9 +29,6 @@ public interface IBattleShipReplicator : IDisposable
     /// <summary>[Game thread] Registry and stream state per hull (diagnostics).</summary>
     object Inspect();
 
-    /// <summary>[Game thread] The registered hull an on-foot agent stands on and its hull-local position.</summary>
-    bool TryGetDeckPose(Agent agent, Vec3 worldPosition, out Guid deckShip, out Vec3 deckLocal);
-
     /// <summary>
     /// [Game thread, host] Registers an AI (NPC) party's hull the host spawned, owned by the host, and announces it
     /// so peers spawn a copy on that party's side.
@@ -87,14 +84,15 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly IBattleSession session;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly ICoopMissionComponent missionComponent;
+    private readonly IHostEpochPolicy hostEpochPolicy;
+    private readonly IBattleResultCommitter resultCommitter;
     private readonly INavalShipEngine engine;
     private readonly IBattleTeamResolver teamResolver;
     private readonly IObjectManager objectManager;
-    private readonly IHostEpochPolicy hostEpochPolicy;
-    private readonly IBattleResultCommitter resultCommitter;
+    private readonly INavalHullAuthority hullAuthority;
+    private readonly IBattleShipConditionStream conditions;
 
     private readonly Dictionary<Guid, ShipStream> streams = new Dictionary<Guid, ShipStream>();
-    private readonly List<HullSwap> hullSwaps = new List<HullSwap>();
     // Everything received for a ship that is not registered here yet, applied in one ordered drain once it is.
     private readonly Dictionary<Guid, HeldShip> heldShips = new Dictionary<Guid, HeldShip>();
     private long recordsHeld;
@@ -103,11 +101,9 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly HashSet<string> departedControllers = new HashSet<string>();
     // The host AI hulls last migrated to, so an AI copy whose record was still waiting registers under it too.
     private string npcHullHost;
-    private bool spawningForeignHull;
     private bool spawnRecordsSent;
     private float sendElapsed;
     private float elapsed;
-    private readonly Dictionary<Guid, DeckSpeedSample> deckSpeeds = new Dictionary<Guid, DeckSpeedSample>();
     private long finalRopesSent, finalRopesAccepted, finalRopesRejected;
 
     private INetworkShipRegistry Registry => missionComponent.ShipRegistry;
@@ -119,27 +115,26 @@ public class BattleShipReplicator : IBattleShipReplicator
     public BattleShipReplicator(
         IBattleNetwork network,
         IMessageBroker messageBroker,
-        IBattleSession session,
-        IBattleDeploymentCoordinator deployment,
-        ICoopMissionComponent missionComponent,
+        BattleContext context,
         INavalShipEngine engine,
         IBattleTeamResolver teamResolver,
         IObjectManager objectManager,
-        IHostEpochPolicy hostEpochPolicy,
-        IBattleResultCommitter resultCommitter)
+        INavalHullAuthority hullAuthority,
+        IBattleShipConditionStream conditions)
     {
         this.network = network;
         this.messageBroker = messageBroker;
-        this.session = session;
-        this.deployment = deployment;
-        this.missionComponent = missionComponent;
+        session = context.Session;
+        deployment = context.Deployment;
+        missionComponent = context.MissionComponent;
+        hostEpochPolicy = context.HostEpochPolicy;
+        resultCommitter = context.ResultCommitter;
         this.engine = engine;
         this.teamResolver = teamResolver;
         this.objectManager = objectManager;
-        this.hostEpochPolicy = hostEpochPolicy;
-        this.resultCommitter = resultCommitter;
+        this.hullAuthority = hullAuthority;
+        this.conditions = conditions;
 
-        missionComponent.AgentMovementHandler.ConfigureShipDecks(CaptureDeck, ResolveDeckFrame);
         messageBroker.Subscribe<ShipSpawnedInBattle>(Handle_ShipSpawned);
         messageBroker.Subscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
         messageBroker.Subscribe<NetworkBattleShipSample>(Handle_NetworkBattleShipSample);
@@ -153,7 +148,6 @@ public class BattleShipReplicator : IBattleShipReplicator
 
     public void Dispose()
     {
-        missionComponent.AgentMovementHandler.ConfigureShipDecks(null, null);
         messageBroker.Unsubscribe<ShipSpawnedInBattle>(Handle_ShipSpawned);
         messageBroker.Unsubscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
         messageBroker.Unsubscribe<NetworkBattleShipSample>(Handle_NetworkBattleShipSample);
@@ -163,7 +157,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Unsubscribe<NetworkShipCondition>(Handle_NetworkShipCondition);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
-        hullSwaps.Clear();
         heldShips.Clear();
         departedControllers.Clear();
     }
@@ -174,7 +167,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         var hull = payload.What.Hull;
         var formation = payload.What.Formation;
-        if (spawningForeignHull || hull == null || formation?.Team == null || formation.Team != Mission.Current?.PlayerTeam)
+        if (hullAuthority.IsSpawnRegistrationSuppressed || hull == null || formation?.Team == null
+            || formation.Team != Mission.Current?.PlayerTeam)
             return;
 
         var ship = new NetworkShipInfo(Guid.NewGuid(), session.OwnControllerId, GetOwnMapEventPartyId(), false, hull, formation);
@@ -225,13 +219,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
     private void TransferNpcHull(NetworkShipInfo ship, string newHost)
     {
-        bool wasOwn = IsOwnHull(ship);
-        ship.CurrentAuthority = newHost;
-        bool isOwn = IsOwnHull(ship);
-        if (isOwn && !wasOwn)
-            ReplaceNpcHull(ship.ShipId);
-        else if (wasOwn && !isOwn)
-            ReleaseNpcHull(ship);
+        bool isOwn = hullAuthority.Transfer(ship, newHost);
 
         // The old owner's interpolation target must not keep writing frames to a hull this client now simulates.
         var stream = GetStream(ship.ShipId);
@@ -244,120 +232,15 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         if (!Registry.TryGet(shipId, out var ship)) return "No registered hull has that ship id.";
         if (!ship.IsNpcParty || !IsOwnHull(ship)) return "The hull is not an AI hull this client simulates.";
-        // A sunk copy is disabled and simulates nothing, so it stays as it is under its new owner.
-        if (engine.ReadCondition(ship.Hull)?.SinkingState == BattleShipCondition.Sunk) return "The hull has sunk.";
-        if (hullSwaps.Any(swap => swap.ShipId == shipId)) return "The hull is already being replaced.";
-
-        hullSwaps.Add(new HullSwap(shipId));
-        return null;
+        return hullAuthority.Replace(shipId);
     }
 
-    public bool IsReplacingHull(Guid shipId) => hullSwaps.Any(swap => swap.ShipId == shipId);
-
-    // A hull handed away mid-swap gets its parked agents back before it turns into a copy.
-    private void ReleaseNpcHull(NetworkShipInfo ship)
-    {
-        var swap = hullSwaps.FirstOrDefault(pending => pending.ShipId == ship.ShipId);
-        if (swap != null)
-        {
-            hullSwaps.Remove(swap);
-            if (swap.Agents != null) engine.BoardHullAgents(ship.Hull, swap.Agents);
-        }
-
-        engine.ReleaseNpcHull(ship.Hull);
-    }
-
-    // [Mission tick] One step per hull per tick: vanilla removes no hull its kept agents stand on, and crews a mid-mission
-    // hull the tick after spawning it (Quest5 CallReinforcement, then InitializeReinforcement).
-    private void AdvanceHullSwaps()
-    {
-        foreach (var swap in hullSwaps.ToArray())
-        {
-            if (!Registry.TryGet(swap.ShipId, out var ship))
-            {
-                hullSwaps.Remove(swap);
-                if (swap.Agents != null) engine.BoardHullAgents(null, swap.Agents);
-                Logger.Error("[NavalSync] Hull swap {ShipId}: the ship went away mid-swap", swap.ShipId);
-                continue;
-            }
-
-            try
-            {
-                AdvanceHullSwap(swap, ship);
-            }
-            catch (Exception exception)
-            {
-                hullSwaps.Remove(swap);
-                Logger.Error(exception, "[NavalSync] Hull swap {ShipId} failed in phase {Phase}", swap.ShipId, swap.Phase);
-                // Boarding is the step that threw in the last phase, so only an earlier failure hands the parked agents back.
-                if (swap.Phase == HullSwapPhase.ReplaceHull && swap.Agents != null) ReturnParkedAgents(swap, ship);
-            }
-        }
-    }
-
-    private void ReturnParkedAgents(HullSwap swap, NetworkShipInfo ship)
-    {
-        try
-        {
-            engine.BoardHullAgents(ship.Hull, swap.Agents);
-        }
-        catch (Exception exception)
-        {
-            Logger.Error(exception, "[NavalSync] Hull swap {ShipId}: could not hand the parked agents back", swap.ShipId);
-        }
-    }
-
-    private void AdvanceHullSwap(HullSwap swap, NetworkShipInfo ship)
-    {
-        switch (swap.Phase)
-        {
-            case HullSwapPhase.ParkAgents:
-                // A hull removed during deployment is pooled and spawning its ship again returns that same kinematic copy.
-                if (engine.IsDeploymentMode) return;
-
-                swap.Agents = engine.ParkHullAgents(ship.Hull);
-                swap.Phase = HullSwapPhase.ReplaceHull;
-                Logger.Information("[NavalSync] Hull swap {ShipId}: parked {Count} agent(s) off the hull", ship.ShipId, swap.Agents.Count);
-                return;
-
-            case HullSwapPhase.ReplaceHull:
-                MissionObject fresh;
-                spawningForeignHull = true;
-                try
-                {
-                    fresh = engine.ReplaceHull(ship.Hull);
-                }
-                finally
-                {
-                    spawningForeignHull = false;
-                }
-
-                if (fresh == null)
-                {
-                    hullSwaps.Remove(swap);
-                    engine.BoardHullAgents(ship.Hull, swap.Agents);
-                    Logger.Error("[NavalSync] Hull swap {ShipId}: the hull could not be replaced; its agents went back aboard", ship.ShipId);
-                    return;
-                }
-
-                if (!Registry.TryRebindHull(ship.ShipId, fresh))
-                    Logger.Error("[NavalSync] Could not rebind AI hull {ShipId} to its replacement", ship.ShipId);
-                swap.Phase = HullSwapPhase.BoardAgents;
-                Logger.Information("[NavalSync] Hull swap {ShipId}: replaced the hull with a simulated one", ship.ShipId);
-                return;
-
-            case HullSwapPhase.BoardAgents:
-                hullSwaps.Remove(swap);
-                engine.BoardHullAgents(ship.Hull, swap.Agents);
-                Logger.Information("[NavalSync] Hull swap {ShipId}: boarded {Count} agent(s) onto the new hull", ship.ShipId, swap.Agents.Count);
-                return;
-        }
-    }
+    public bool IsReplacingHull(Guid shipId) => hullAuthority.IsReplacing(shipId);
 
     public void Tick(float dt)
     {
         elapsed += Math.Max(0f, dt);
-        AdvanceHullSwaps();
+        hullAuthority.Tick();
         PruneRemovedHulls();
         DrainHeldShips();
 
@@ -382,6 +265,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
             Registry.Remove(ship.ShipId);
             streams.Remove(ship.ShipId);
+            conditions.Forget(ship.ShipId);
             Logger.Information("[NavalSync] Hull {ShipId} of {Owner} left the mission (deployment mode {DeploymentMode}); dropped it",
                 ship.ShipId, ship.CurrentAuthority, engine.IsDeploymentMode);
         }
@@ -413,27 +297,14 @@ public class BattleShipReplicator : IBattleShipReplicator
         {
             var stream = GetStream(ship.ShipId);
             // The sunk condition already went out after the hull's last sample; peers keep that frame.
-            if (stream.Condition?.SinkingState == BattleShipCondition.Sunk) continue;
+            if (conditions.ConditionOf(ship.ShipId)?.SinkingState == BattleShipCondition.Sunk) continue;
 
             stream.Sent++;
             network.SendAll(new NetworkBattleShipSample(ship.ShipId, session.OwnControllerId, stream.Sent,
                 NetworkBattleShipSample.FromFrame(engine.GetFrame(ship.Hull)), engine.ReadInput(ship.Hull),
                 engine.CaptureRopes(ship.Hull, ShipIdOf), session.HostEpoch, engine.ReadSpawnableReserve(ship.Hull)));
-            SendConditionIfChanged(ship, stream);
+            conditions.SendIfChanged(ship);
         }
-    }
-
-    // Owners send a hull's damage state when it changes; the first check after the hull was announced sends it once.
-    private void SendConditionIfChanged(NetworkShipInfo ship, ShipStream stream)
-    {
-        var condition = engine.ReadCondition(ship.Hull);
-        if (condition == null || !condition.DiffersFrom(stream.Condition)) return;
-
-        stream.Condition = condition;
-        stream.ConditionRevision++;
-        stream.ConditionEpoch = session.HostEpoch;
-        network.SendAll(new NetworkShipCondition(ship.ShipId, session.OwnControllerId, stream.ConditionRevision, session.HostEpoch,
-            condition));
     }
 
     private void Handle_NetworkShipCondition(MessagePayload<NetworkShipCondition> payload)
@@ -459,36 +330,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         }
 
         var stream = GetStream(condition.ShipId);
-        var rejection = ValidateCondition(ship, session.OwnControllerId, condition, stream.ConditionRevision, stream.ConditionEpoch);
-        if (rejection == null && ship.IsNpcParty && hostEpochPolicy.IsStale(condition.HostEpoch, session.HostEpoch))
-            rejection = "stale_epoch";
-        if (rejection != null)
-        {
-            stream.Reject("condition_" + rejection);
-            return;
-        }
-
-        TakeCondition(ship, stream, condition);
-    }
-
-    private void TakeCondition(NetworkShipInfo ship, ShipStream stream, NetworkShipCondition condition)
-    {
-        engine.ApplyCondition(ship.Hull, condition.Condition);
-        stream.Condition = condition.Condition;
-        stream.ConditionRevision = condition.Revision;
-        if (ship.IsNpcParty) stream.ConditionEpoch = condition.HostEpoch;
-    }
-
-    /// <summary>Why a condition must be dropped, or null to apply it.</summary>
-    internal static string ValidateCondition(NetworkShipInfo ship, string ownControllerId, NetworkShipCondition condition,
-        long acceptedRevision, int acceptedEpoch)
-    {
-        // A new host numbers an AI hull's conditions on from its own count, so a newer epoch restarts the order.
-        var rejection = condition.Stamp.Validate(ship.CurrentAuthority, ownControllerId,
-            new AuthorityStamp(ship.CurrentAuthority, acceptedEpoch, acceptedRevision), followsHostEpoch: ship.IsNpcParty);
-        if (rejection != null) return rejection;
-        if (condition.Condition == null || !condition.Condition.IsValid) return "invalid_condition";
-        return null;
+        var rejection = conditions.Accept(ship, condition, checkHostEpoch: true);
+        if (rejection != null) stream.Reject("condition_" + rejection);
     }
 
     public void SendFinalRopes()
@@ -626,14 +469,9 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         MissionObject hull;
         Formation formation;
-        spawningForeignHull = true;
-        try
+        using (hullAuthority.SuppressSpawnRegistration())
         {
             hull = engine.SpawnForeignHull(data, team, out formation);
-        }
-        finally
-        {
-            spawningForeignHull = false;
         }
 
         if (hull == null) return GiveUpForeignHullSpawn(held, team);
@@ -665,8 +503,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (condition?.OwnerControllerId == departedHost)
         {
             held.Condition = null;
-            if (ValidateCondition(ship, session.OwnControllerId, condition, stream.ConditionRevision, stream.ConditionEpoch) == null)
-                TakeCondition(ship, stream, condition);
+            conditions.Accept(ship, condition, checkHostEpoch: false);
         }
 
         var sample = held.Sample;
@@ -785,7 +622,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         if (!Registry.TryGetByHull(hull, out var ship) || IsOwnHull(ship) || !streams.TryGetValue(ship.ShipId, out var stream))
             return 0;
-        if (!stream.HasReportedReserve || stream.Condition?.SinkingState == BattleShipCondition.Sunk) return 0;
+        if (!stream.HasReportedReserve || conditions.ConditionOf(ship.ShipId)?.SinkingState == BattleShipCondition.Sunk) return 0;
 
         return stream.ReportedReserve;
     }
@@ -867,78 +704,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         }
     }
 
-    // [Game thread] Any owned on-foot agent on a registered hull sends a hull-local pose, so it rides the deck on every peer.
-    internal bool CaptureDeck(CoopAgentInfo info, Vec3 worldPosition, out Guid deckShip, out Vec3 deckLocal, out float deckSpeed)
-    {
-        deckSpeed = 0f;
-        if (!TryGetDeckPose(info?.Agent, worldPosition, out deckShip, out deckLocal)) return false;
-
-        deckSpeed = DeckSpeed(info.AgentId, deckShip, deckLocal);
-        return true;
-    }
-
-    /// <summary>[Game thread] The registered hull an on-foot agent stands on and its hull-local position.</summary>
-    public bool TryGetDeckPose(Agent agent, Vec3 worldPosition, out Guid deckShip, out Vec3 deckLocal)
-    {
-        deckShip = Guid.Empty;
-        deckLocal = Vec3.Zero;
-        var hull = engine.GetSupportHull(agent);
-        if (hull == null || !Registry.TryGetByHull(hull, out var ship)) return false;
-
-        var frame = engine.GetFrame(hull);
-        if (!FrameValidation.IsValid(frame)) return false;
-
-        deckLocal = frame.TransformToLocalNonOrthogonal(worldPosition);
-        if (!deckLocal.IsValid) return false;
-
-        deckShip = ship.ShipId;
-        return true;
-    }
-
-    // Finite difference of hull-local positions, so the puppet's walk throttle never includes hull motion.
-    private float DeckSpeed(Guid agentId, Guid shipId, Vec3 local)
-    {
-        deckSpeeds.TryGetValue(agentId, out var previous);
-        float dt = elapsed - previous.Time;
-        if (previous.Ship != shipId || dt < 0f || dt > 0.5f)
-        {
-            deckSpeeds[agentId] = new DeckSpeedSample(shipId, local, elapsed, 0f);
-            return 0f;
-        }
-
-        if (dt < 0.005f) return previous.Speed;
-
-        float speed = (local - previous.Local).AsVec2.Length / dt;
-        deckSpeeds[agentId] = new DeckSpeedSample(shipId, local, elapsed, speed);
-        return speed;
-    }
-
-    // [Game thread] The local hull, owned or copied, that a received deck pose is relative to.
-    internal bool ResolveDeckFrame(Agent agent, Guid deckShip, out MatrixFrame hullFrame)
-    {
-        hullFrame = default;
-        if (!Registry.TryGet(deckShip, out var ship)) return false;
-
-        hullFrame = engine.GetFrame(ship.Hull);
-        return FrameValidation.IsValid(hullFrame);
-    }
-
-    private readonly struct DeckSpeedSample
-    {
-        public DeckSpeedSample(Guid ship, Vec3 local, float time, float speed)
-        {
-            Ship = ship;
-            Local = local;
-            Time = time;
-            Speed = speed;
-        }
-
-        public Guid Ship { get; }
-        public Vec3 Local { get; }
-        public float Time { get; }
-        public float Speed { get; }
-    }
-
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
     {
         var entered = payload.What;
@@ -1002,13 +767,13 @@ public class BattleShipReplicator : IBattleShipReplicator
                 streaming = stream?.Target != null,
                 epoch = IsOwnHull(ship) ? session.HostEpoch : stream?.AcceptedEpoch ?? 0,
                 helmPilot = engine.HasHelmPilot(ship.Hull),
-                swapPhase = hullSwaps.FirstOrDefault(swap => swap.ShipId == ship.ShipId)?.Phase.ToString(),
+                swapPhase = hullAuthority.SwapPhaseOf(ship.ShipId),
                 hp = condition?.HitPoints,
                 sailHp = condition?.SailHitPoints,
                 fireHp = condition?.FireHitPoints,
                 sinking = condition?.SinkingState,
                 isSunk = condition?.SinkingState == BattleShipCondition.Sunk,
-                conditionRevision = stream?.ConditionRevision ?? 0,
+                conditionRevision = conditions.RevisionOf(ship.ShipId),
                 reserve = HullReserve(ship.Hull),
             };
         }).ToArray(),
@@ -1021,25 +786,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         finalRopesRejected,
         stations = engine.InspectRopes(Registry.Ships.Select(ship => ship.Hull).ToArray(), ShipIdOf),
     };
-
-    private enum HullSwapPhase
-    {
-        ParkAgents,
-        ReplaceHull,
-        BoardAgents,
-    }
-
-    private sealed class HullSwap
-    {
-        public HullSwap(Guid shipId)
-        {
-            ShipId = shipId;
-        }
-
-        public Guid ShipId { get; }
-        public HullSwapPhase Phase { get; set; }
-        public IReadOnlyList<HullSwapAgent> Agents { get; set; }
-    }
 
     /// <summary>
     /// A ship not registered here yet: its waiting spawn record and the owner's latest condition, sample and final ropes,
@@ -1080,10 +826,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         public long Applied;
         public long Rejects;
         public string LastReject;
-        /// <summary>The owner's last sent, or a copy's last applied, damage state, its revision and its host epoch.</summary>
-        public BattleShipCondition Condition;
-        public long ConditionRevision;
-        public int ConditionEpoch;
         /// <summary>The fieldable reserve in the last accepted sample, until the hull's owner leaves or its authority moves.</summary>
         public int ReportedReserve;
         public bool HasReportedReserve;

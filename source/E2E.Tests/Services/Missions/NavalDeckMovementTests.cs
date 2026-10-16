@@ -108,12 +108,11 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
             Assert.True(peer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", receiver.Id, receiver.Puppet));
             if (configureDeck)
             {
-                receiver.Handler.ConfigureShipDecks(null,
-                    (Agent agent, Guid ship, out MatrixFrame frame) =>
-                    {
-                        frame = receiver.Hull;
-                        return receiver.Resolves && ship == receiver.HullId && agent == receiver.Puppet;
-                    });
+                receiver.Handler.ConfigureShipDeck(new FakeShipDeckSeam
+                {
+                    Resolve = (agent, ship) =>
+                        receiver.Resolves && ship == receiver.HullId && agent == receiver.Puppet ? receiver.Hull : null,
+                });
             }
             test(receiver);
         });
@@ -184,7 +183,7 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
         WithReceiver(fixture, receiver =>
         {
             if (condition == "no_resolver")
-                receiver.Handler.ConfigureShipDecks(null, null);
+                receiver.Handler.ConfigureShipDeck(null);
             receiver.Resolves = condition != "unresolved_hull";
             AgentData data = receiver.Data(true, Vec3.Zero);
             if (condition == "non_finite_pose") data.StampDeck(receiver.HullId, 1, new Vec3(float.NaN, 0f, 0f), 1f);
@@ -232,15 +231,10 @@ public sealed class NavalDeckMovementTests : MissionTestEnvironment
             var network = Assert.IsType<MockBattleNetwork>(peer.Resolve<IBattleNetwork>());
             Guid hull = Guid.NewGuid();
             bool captures = true;
-            handler.ConfigureShipDecks(
-                (CoopAgentInfo info, Vec3 world, out Guid ship, out Vec3 local, out float speed) =>
-                {
-                    ship = hull;
-                    local = world - new Vec3(10f, 0f, 0f);
-                    speed = 0.75f;
-                    return captures;
-                },
-                null);
+            handler.ConfigureShipDeck(new FakeShipDeckSeam
+            {
+                Capture = (info, world) => captures ? (hull, world - new Vec3(10f, 0f, 0f), 0.75f) : null,
+            });
 
             mirror.Position = new Vec3(12f, 0f, 0f);
             mirror.RealGlobalVelocity = new Vec3(3f, 0f, 0f);

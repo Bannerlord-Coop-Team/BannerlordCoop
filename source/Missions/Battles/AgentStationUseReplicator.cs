@@ -22,7 +22,7 @@ public interface IAgentStationUseReplicator : IDisposable
     /// <summary>[Game thread] The station an agent uses on a registered hull, or null (diagnostics).</summary>
     string DescribeStation(Agent agent);
 
-    /// <summary>Whether this client seated the agent and withholds its movement and actions (diagnostics).</summary>
+    /// <summary>Whether this client seated the agent, so the ship deck seam withholds its movement and actions.</summary>
     bool IsOwnSeat(Guid agentId);
 
     object Inspect();
@@ -71,8 +71,6 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         this.engine = engine;
         this.deployment = deployment;
 
-        missionComponent.AgentMovementHandler.ConfigureSeatedMovement(IsSeatedByOwner);
-        missionComponent.AgentActionHandler.ConfigureStationOwnedAgents(IsSeatedByOwner);
         messageBroker.Subscribe<AgentStationUseChanged>(Handle_AgentStationUseChanged);
         messageBroker.Subscribe<NetworkAgentStationUse>(Handle_NetworkAgentStationUse);
         messageBroker.Subscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -80,8 +78,6 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
     public void Dispose()
     {
-        missionComponent.AgentMovementHandler.ConfigureSeatedMovement(null);
-        missionComponent.AgentActionHandler.ConfigureStationOwnedAgents(null);
         messageBroker.Unsubscribe<AgentStationUseChanged>(Handle_AgentStationUseChanged);
         messageBroker.Unsubscribe<NetworkAgentStationUse>(Handle_NetworkAgentStationUse);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -121,8 +117,6 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         network.SendAll(use);
         sent++;
     }
-
-    private bool IsSeatedByOwner(CoopAgentInfo info) => info != null && ownSeated.ContainsKey(info.AgentId);
 
     public bool IsOwnSeat(Guid agentId) => ownSeated.ContainsKey(agentId);
 

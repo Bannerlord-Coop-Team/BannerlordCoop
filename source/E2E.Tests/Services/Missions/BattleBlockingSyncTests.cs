@@ -174,7 +174,10 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             var agentId = Guid.NewGuid();
             SpawnRegisteredAgent(context, "owner", agentId, AgentControllerType.Player, out MirrorAgent mirror);
             bool seated = true;
-            context.Component.AgentActionHandler.ConfigureStationOwnedAgents(info => seated && info.AgentId == agentId);
+            context.Component.AgentActionHandler.ConfigureShipDeck(new FakeShipDeckSeam
+            {
+                IsSeated = info => seated && info.AgentId == agentId,
+            });
             context.Component.AgentActionHandler.PollActions();
 
             mirror.MovementFlags = Agent.MovementControlFlag.DefendLeft;

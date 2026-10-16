@@ -105,7 +105,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             if ((ship?.Hull as MissionShip)?.IsSunk == true) ship = null;
             Guid deckShip = Guid.Empty;
             Vec3 deckLocal = Vec3.Zero;
-            bool onDeck = naval != null && naval.ShipReplicator.TryGetDeckPose(agent, agent.Position, out deckShip, out deckLocal);
+            bool onDeck = naval != null && naval.DeckPoses.TryGetDeckPose(agent, agent.Position, out deckShip, out deckLocal);
             return (object)new
             {
                 name = agent.Name,

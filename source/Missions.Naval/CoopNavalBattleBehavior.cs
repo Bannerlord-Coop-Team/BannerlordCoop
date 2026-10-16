@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Missions.Agents.Handlers;
 using Missions.Battles;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
@@ -37,6 +38,8 @@ public class CoopNavalBattleBehavior : MissionLogic
     public IBattleShipReplicator ShipReplicator => services.ShipReplicator;
 
     public IAgentStationUseReplicator StationUseReplicator => services.StationUseReplicator;
+
+    public INavalDeckPoses DeckPoses => services.DeckPoses;
 
     public INavalNpcFleetSpawner NpcFleetSpawner { get; }
 

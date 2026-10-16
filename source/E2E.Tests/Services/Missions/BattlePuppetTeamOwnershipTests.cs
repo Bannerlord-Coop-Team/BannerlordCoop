@@ -478,9 +478,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             Formation noFormation = null!;
             engine.Setup(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out noFormation))
                 .Returns((MissionObject)null!);
-            using var replicator = new BattleShipReplicator(Mock.Of<IBattleNetwork>(), broker, session.Object,
-                deployment.Object, missionComponent, engine.Object, teams.Object, client.ObjectManager,
-                new HostEpochPolicy(), Mock.Of<IBattleResultCommitter>());
+            using var replicator = CreateShipReplicator(broker, session.Object, deployment.Object, missionComponent, engine.Object,
+                teams.Object, client.ObjectManager);
             using var spawner = new PuppetSpawner(
                 broker,
                 client.ObjectManager,
@@ -557,9 +556,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             Formation noFormation = null!;
             engine.Setup(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out noFormation))
                 .Returns(copy);
-            using var replicator = new BattleShipReplicator(Mock.Of<IBattleNetwork>(), broker, session.Object,
-                deployment.Object, missionComponent, engine.Object, teams.Object, client.ObjectManager,
-                new HostEpochPolicy(), Mock.Of<IBattleResultCommitter>());
+            using var replicator = CreateShipReplicator(broker, session.Object, deployment.Object, missionComponent, engine.Object,
+                teams.Object, client.ObjectManager);
 
             broker.Publish(this, new NetworkSpawnBattleShips(new[]
             {
@@ -582,6 +580,18 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             Assert.True(missionComponent.ShipRegistry.TryGet(shipId, out var ship));
             Assert.Same(copy, ship.Hull);
         });
+    }
+
+    private static BattleShipReplicator CreateShipReplicator(IMessageBroker broker, IBattleSession session,
+        IBattleDeploymentCoordinator deployment, ICoopMissionComponent missionComponent, INavalShipEngine engine,
+        IBattleTeamResolver teams, GameInterface.Services.ObjectManager.IObjectManager objectManager)
+    {
+        var epochs = new HostEpochPolicy();
+        var context = new BattleContext(session, deployment, missionComponent, epochs, Mock.Of<IBattleResultCommitter>(),
+            Mock.Of<IReinforcementFielder>());
+        return new BattleShipReplicator(Mock.Of<IBattleNetwork>(), broker, context, engine, teams, objectManager,
+            new NavalHullAuthority(session, missionComponent, engine),
+            new BattleShipConditionStream(Mock.Of<IBattleNetwork>(), session, engine, epochs));
     }
 
     [Fact]
