@@ -7,8 +7,8 @@ namespace GameInterface.Services.Chat;
 
 public interface IChatFactionMembership
 {
-    bool TryGetClan(Player player, out Clan clan);
-    bool TryGetKingdom(Player player, out Kingdom kingdom);
+    IFaction GetClan(Player player);
+    IFaction GetKingdom(Player player);
 }
 
 /// <summary>
@@ -24,23 +24,15 @@ public sealed class ChatFactionMembership : IChatFactionMembership
         this.objectManager = objectManager;
     }
 
-    public bool TryGetClan(Player player, out Clan clan)
+    public IFaction GetClan(Player player)
     {
-        clan = null;
-        if (string.IsNullOrEmpty(player.HeroId)) return false;
-        if (!objectManager.TryGetObject<Hero>(player.HeroId, out var hero) || hero.Clan == null)
-            return false;
-
-        clan = hero.Clan;
-        return true;
+        if (string.IsNullOrEmpty(player.HeroId)) return null;
+        if (!objectManager.TryGetObject<Hero>(player.HeroId, out var hero)) return null;
+        return hero.Clan;
     }
 
-    public bool TryGetKingdom(Player player, out Kingdom kingdom)
+    public IFaction GetKingdom(Player player)
     {
-        kingdom = null;
-        if (!TryGetClan(player, out var clan) || clan.Kingdom == null) return false;
-
-        kingdom = clan.Kingdom;
-        return true;
+        return GetClan(player) is Clan clan ? clan.Kingdom : null;
     }
 }
