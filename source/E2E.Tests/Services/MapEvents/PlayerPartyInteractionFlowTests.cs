@@ -62,6 +62,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Barter;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using TaleWorlds.Core.ImageIdentifiers;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
@@ -1443,7 +1444,7 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         if (proposal == PlayerPartyInteractionProposal.Mercenary)
         {
             expectedText =
-                $"RandomPlayer offers to serve as a mercenary. The kingdom will pay {mercenaryAwardMultiplier} gold per influence point earned, whenever the contract is honored. Do you accept?";
+                $"RandomPlayer offers to serve as a mercenary. The kingdom will pay {mercenaryAwardMultiplier}{new TextObject("{GOLD_ICON}")} gold per influence point earned, whenever the contract is honored. Do you accept?";
         }
 
         PlayerPartyInteractionDialogState.Apply(new NetworkPlayerPartyInteractionState(

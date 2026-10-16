@@ -4,7 +4,6 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
@@ -230,8 +229,6 @@ internal class QuestSolutionAcceptCoordinator : IHandler
                 rejectionStrategy.Reject(issue);
                 return;
             }
-
-            AcceptMirrorSupport.RejectAcceptance(issue.IssueOwner);
 
             var strayQuest = issue.IssueQuest;
             if (strayQuest == null)
