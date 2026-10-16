@@ -402,7 +402,8 @@ public partial class BattleShipReplicator : IBattleShipReplicator
     }
 
     // [Game thread] Every client's half of hulls leaving with their owner. Seats go first, since no machine of a removed hull
-    // may keep a user (R33); then other owners' agents move to their own hull; the rest are parked a tick before removal.
+    // may keep a user (R33); then other owners' agents move to their own hull; the rest are parked a tick before the crew
+    // withdraws and the hulls go, since the owner's removal took that crew out of the battle too.
     private void RemoveHulls(IReadOnlyList<NetworkShipInfo> departing, ShipRemovalReason reason)
     {
         if (departing.Count == 0) return;
@@ -417,7 +418,7 @@ public partial class BattleShipReplicator : IBattleShipReplicator
         foreach (var ship in departing)
             MoveDeckAgents(ship, departingHulls);
 
-        hullAuthority.Remove(departing);
+        hullAuthority.Remove(departing, DepartingCrew.All);
         foreach (var ship in departing)
         {
             // A returning player's duplicate goes while its ship stays in the battle.

@@ -127,7 +127,7 @@ public partial class BattleShipReplicator
         MoveDeckAgents(fresh, new[] { fresh.Hull });
         if (reclaim.FreshAnnounced)
             network.SendAll(new NetworkShipRemoved(fresh.ShipId, session.OwnControllerId, ShipRemovalReason.Reclaimed));
-        hullAuthority.Remove(new[] { fresh }, withdrawCrew: true);
+        hullAuthority.Remove(new[] { fresh }, DepartingCrew.ParkedOwn);
         Prune(fresh.ShipId);
         duplicatesRemoved++;
         Logger.Information("[NavalSync] Adopted hull {ShipId} is not handed back ({Reason}); removed own duplicate {FreshShipId}",

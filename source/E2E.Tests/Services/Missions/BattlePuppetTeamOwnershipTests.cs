@@ -591,9 +591,9 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
         var members = new Mock<IMissionContext>();
         members.SetupGet(m => m.ControllersInMission).Returns(new[] { "host" });
         var context = new BattleContext(session, deployment, missionComponent, epochs, Mock.Of<IBattleResultCommitter>(),
-            Mock.Of<IReinforcementFielder>(), members.Object);
+            Mock.Of<IReinforcementFielder>(), members.Object, Mock.Of<IBattleTroopWithdrawal>());
         return new BattleShipReplicator(Mock.Of<IBattleNetwork>(), broker, context, engine, teams, objectManager,
-            new NavalHullAuthority(session, missionComponent, engine),
+            new NavalHullAuthority(session, missionComponent, engine, context.TroopWithdrawal),
             new BattleShipConditionStream(Mock.Of<IBattleNetwork>(), session, engine, epochs, members.Object),
             Mock.Of<IAgentStationUseReplicator>());
     }

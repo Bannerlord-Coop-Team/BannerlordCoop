@@ -206,7 +206,7 @@ public class CoopBattleController : CoopMissionController
         Deployment = deployment;
         ResultCommitter = resultCommitter;
         Context = new BattleContext(session, deployment, coopMissionComponent, hostEpochPolicy, resultCommitter, reinforcementFielder,
-            missionContext);
+            missionContext, new BattleTroopWithdrawal(coopMissionComponent, lifecycle, casualties));
         SiegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
         messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
         messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);

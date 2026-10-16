@@ -10,4 +10,5 @@ public record BattleContext(
     IHostEpochPolicy HostEpochPolicy,
     IBattleResultCommitter ResultCommitter,
     IReinforcementFielder ReinforcementFielder,
-    IMissionContext MissionContext);
+    IMissionContext MissionContext,
+    IBattleTroopWithdrawal TroopWithdrawal);

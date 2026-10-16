@@ -183,9 +183,11 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         Releases.Add(hull);
     }
 
+    // Like the live engine: everyone aboard is parked, and the hull's crew elsewhere is listed without being moved.
     public IReadOnlyList<HullSwapAgent> ParkHullAgents(MissionObject hull)
     {
         var fake = Of(hull);
+        fake.Parkings++;
         var parked = fake.Seats.Values
             .Select(agent => new HullSwapAgent(agent, isCrew: true, isParked: true, Vec3.Zero, Vec3.Zero))
             .ToList();
@@ -197,8 +199,20 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             decks.Remove(agent);
         }
 
+        foreach (var moved in parked)
+            ParkedAgents.Add(moved.Agent);
+        foreach (var agent in CrewOf(fake).Where(agent => parked.All(moved => moved.Agent != agent)))
+            parked.Add(new HullSwapAgent(agent, isCrew: true, isParked: false, Vec3.Zero, Vec3.Zero));
+
         return parked;
     }
+
+    /// <summary>The active agents that crew <paramref name="fake"/>.</summary>
+    private IEnumerable<Agent> CrewOf(FakeHull fake) =>
+        crews.Where(entry => ReferenceEquals(entry.Value, fake) && entry.Key.IsActive()).Select(entry => entry.Key).ToList();
+
+    /// <summary>The agents a hull's parking lifted clear that nothing has put back or withdrawn yet.</summary>
+    public HashSet<Agent> ParkedAgents { get; } = new(ReferenceEqualityComparer.Instance);
 
     public MissionObject ReplaceHull(MissionObject hull)
     {
@@ -223,7 +237,12 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         return fresh.Hull;
     }
 
-    public void BoardHullAgents(MissionObject hull, IReadOnlyList<HullSwapAgent> agents) => Boardings.Add((hull, agents));
+    public void BoardHullAgents(MissionObject hull, IReadOnlyList<HullSwapAgent> agents)
+    {
+        Boardings.Add((hull, agents));
+        foreach (var moved in agents.Where(moved => moved.IsParked))
+            ParkedAgents.Remove(moved.Agent);
+    }
 
     public bool HasHelmPilot(MissionObject hull) => false;
 
@@ -273,6 +292,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         var fake = Of(hull);
         fake.SeatsAtRemoval = fake.Seats.Count;
         fake.AgentsAboardAtRemoval = AgentsOnDeck(hull).Count;
+        fake.CrewActiveAtRemoval = CrewOf(fake).Count();
+        fake.ParkingsBeforeRemoval = fake.Parkings;
         fake.IsRemoved = true;
     }
 
@@ -354,9 +375,14 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         Boarded.Add(agent);
     }
 
+    // The live engine fades the agent out of the mission, which the mission fixture's FadeOut patch mirrors.
     public void WithdrawAgent(Agent agent)
     {
+        if (!agent.IsActive()) return;
+
         decks.Remove(agent);
+        ParkedAgents.Remove(agent);
+        agent.FadeOut(true, true);
         Withdrawn.Add(agent);
     }
 
@@ -454,6 +480,12 @@ public sealed class FakeHull
     public int SeatsAtRemoval { get; set; }
     /// <summary>How many agents still stood on the hull's deck or sat at its stations when it was removed.</summary>
     public int AgentsAboardAtRemoval { get; set; }
+    /// <summary>How many of the hull's crew were still in the battle when it was removed.</summary>
+    public int CrewActiveAtRemoval { get; set; }
+    /// <summary>How many times <see cref="FakeNavalShipEngine.ParkHullAgents"/> parked the hull's agents.</summary>
+    public int Parkings { get; set; }
+    /// <summary>The value of <see cref="Parkings"/> when the hull was removed.</summary>
+    public int ParkingsBeforeRemoval { get; set; }
     /// <summary>Pooled by deployment: still listed but removed for every station and condition purpose.</summary>
     public bool IsPooled { get; set; }
     public Team? Team { get; set; }

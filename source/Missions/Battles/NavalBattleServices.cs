@@ -40,7 +40,7 @@ public class NavalBattleServices : INavalBattleServices
     {
         // These services exist only in a naval mission and open with it.
         context.Session.MarkNaval();
-        hullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, shipEngine);
+        hullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, shipEngine, context.TroopWithdrawal);
         var conditions = new BattleShipConditionStream(network, context.Session, shipEngine, context.HostEpochPolicy,
             context.MissionContext);
         // A hull leaving with its owner releases the seats on it first, so the stations exist before the hulls.

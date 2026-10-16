@@ -10,9 +10,10 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.Missions.Naval;
 
 /// <summary>
-/// M8a: a player retreats from or leaves a naval battle, and its hulls and crew leave with it on every client. Seats on a
-/// departing hull are released before it goes, an ally standing on its deck ends on its own hull, its own crew is off the
-/// deck when it is removed, nothing the departed owner sent late brings it back, and the battle still concludes once.
+/// M8a, M8c: a player retreats from or leaves a naval battle, and its hulls and crew leave with it on every client. Seats on a
+/// departing hull are released before it goes, an ally standing on its deck ends on its own hull, its deck is parked clear a
+/// tick before the removal and its crew withdraws from the battle before the hull is removed, so none of it is left parked or
+/// active; nothing the departed owner sent late brings it back, and the battle still concludes once.
 /// </summary>
 public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
 {
@@ -41,7 +42,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         foreach (var peer in new[] { a, c })
         {
             AssertRemovedWithClearDeck(peer, hullB, ally[peer], hullA);
-            Assert.Null(peer.Engine.DeckOf(helmsman[peer]));
+            AssertCrewWithdrawn(peer, helmsman[peer]);
             Assert.True(peer.Has(hullA) && peer.Has(hullC));
         }
         Assert.Equal(1, b.Network.NetworkSentMessages.GetMessages<NetworkShipRemoved>()
@@ -88,7 +89,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         foreach (var peer in new[] { a, c })
         {
             AssertRemovedWithClearDeck(peer, hullB, ally[peer], hullA);
-            Assert.Null(peer.Engine.DeckOf(helmsman[peer]));
+            AssertCrewWithdrawn(peer, helmsman[peer]);
             Assert.Equal(0, (int)peer.StationStats()["pending"]!);
             var replicator = JObject.FromObject(peer.Ships.Inspect());
             Assert.Equal(0, (int)replicator["pendingForeignHulls"]!);
@@ -97,10 +98,10 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         Assert.Single(c.Engine.AllHulls, hull => hull.SpawnData?.ShipId == hullB);
     }
 
-    // A per-ship Retreat order: B's hull sails off the map and vanilla removes it on B, which tells the others. B stays in the
-    // battle with its other hull, which keeps streaming.
+    // A per-ship Retreat order: B's hull sails off the map and vanilla removes it on B with the crew aboard, which tells the
+    // others; they withdraw that crew with the hull. B stays in the battle with its other hull, which keeps streaming.
     [Fact]
-    public void HullRetreatedMidBattle_LeavesEveryClient_AndItsOwnersOtherHullStays()
+    public void HullRetreatedMidBattle_LeavesEveryClient_WithItsCrew_AndItsOwnersOtherHullStays()
     {
         using var battle = StartServerBattle(atSea: true, out var concluded, "A", "B", "C");
         var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
@@ -108,10 +109,14 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         var retreating = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
         var staying = battle.FieldPlayerHull(b, new Vec3(60f, 0f, 0f));
         var ally = RegisterEverywhere(battle, Guid.NewGuid(), "A");
+        var retreatingCrew = RegisterEverywhere(battle, Guid.NewGuid(), "B");
         battle.CommitAll();
         battle.TickAll(2);
         foreach (var peer in battle.Peers)
+        {
             peer.Engine.PlaceAgent(ally[peer], peer.Ship(retreating).Hull, peer.Ship(hullA).Hull);
+            peer.Engine.PlaceAgent(retreatingCrew[peer], peer.Ship(retreating).Hull, peer.Ship(retreating).Hull);
+        }
 
         b.Call(() =>
         {
@@ -124,12 +129,138 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         battle.TickAll(2);
 
         foreach (var peer in new[] { a, c })
+        {
             AssertRemovedWithClearDeck(peer, retreating, ally[peer], hullA);
+            AssertCrewWithdrawn(peer, retreatingCrew[peer]);
+        }
         Assert.Same(b.Ship(hullA).Hull, b.Engine.DeckOf(ally[b])!.Hull);
         Assert.All(battle.Peers, peer => Assert.True(peer.Has(staying)));
         Assert.True((long)c.Stream(staying)["accepted"]! > streamedBefore);
         Assert.All(battle.Peers, peer => Assert.Equal(1, peer.Ships.DepartedHulls(BattleSideEnum.Attacker)));
         Assert.Equal(0, concluded());
+    }
+
+    // R40 crash A: vs_pirates fought to the end, the result held on every client, then the battle host leaves through the
+    // results screen. Its removal reaches the others over the mesh well before the server's departure notice, which the
+    // crashed client never got to: the host's crew must already be out of the battle when its hull is removed.
+    [Fact]
+    public void ConcludedBattle_HostLeavesFirst_EverySurvivorWithdrawsItsCrewBeforeRemovingItsHull()
+    {
+        using var battle = StartServerBattle(atSea: true, out _, "A", "B", "C");
+        var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var hullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
+        battle.FieldPlayerHull(c, new Vec3(80f, 0f, 0f));
+        var helmsman = RegisterEverywhere(battle, Guid.NewGuid(), "A");
+        var deckhand = RegisterEverywhere(battle, Guid.NewGuid(), "A");
+        var ally = RegisterEverywhere(battle, Guid.NewGuid(), "B");
+        battle.CommitAll();
+        battle.TickAll(2);
+        SeatAndBoard(battle, a, hullA, helmsman, ally, hullB);
+        foreach (var peer in battle.Peers)
+            peer.Engine.PlaceAgent(deckhand[peer], peer.Ship(hullA).Hull, peer.Ship(hullA).Hull);
+        ConcludeEverywhere(battle, a);
+
+        LeaveConcludedBattle(battle, a, new[] { b, c }, new[] { hullA });
+
+        foreach (var peer in new[] { b, c })
+        {
+            AssertRemovedWithClearDeck(peer, hullA, ally[peer], hullB);
+            AssertCrewWithdrawn(peer, helmsman[peer], deckhand[peer]);
+        }
+    }
+
+    // R40 crash B2: the fleet preset fought to the end, then peer B leaves with its three hulls while the host survives.
+    [Fact]
+    public void ConcludedBattle_PeerWithThreeHullsLeavesFirst_EverySurvivorWithdrawsTheirCrewBeforeRemovingThem()
+    {
+        using var battle = StartServerBattle(atSea: true, out _, "A", "B", "C");
+        var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var fleetB = new[]
+        {
+            battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f)),
+            battle.FieldPlayerHull(b, new Vec3(60f, 0f, 0f)),
+            battle.FieldPlayerHull(b, new Vec3(80f, 0f, 0f)),
+        };
+        battle.FieldPlayerHull(c, new Vec3(120f, 0f, 0f));
+        var crews = fleetB.Select(_ => RegisterEverywhere(battle, Guid.NewGuid(), "B")).ToArray();
+        var helmsman = RegisterEverywhere(battle, Guid.NewGuid(), "B");
+        var ally = RegisterEverywhere(battle, Guid.NewGuid(), "A");
+        battle.CommitAll();
+        battle.TickAll(2);
+        SeatAndBoard(battle, b, fleetB[0], helmsman, ally, hullA);
+        foreach (var peer in battle.Peers)
+            for (int i = 0; i < fleetB.Length; i++)
+                peer.Engine.PlaceAgent(crews[i][peer], peer.Ship(fleetB[i]).Hull, peer.Ship(fleetB[i]).Hull);
+        ConcludeEverywhere(battle, a);
+
+        LeaveConcludedBattle(battle, b, new[] { a, c }, fleetB);
+
+        foreach (var peer in new[] { a, c })
+        {
+            AssertRemovedWithClearDeck(peer, fleetB[0], ally[peer], hullA);
+            foreach (var hull in fleetB.Skip(1))
+                AssertRemovedWithClearDeck(peer, hull);
+            AssertCrewWithdrawn(peer, crews.Select(crew => crew[peer]).Append(helmsman[peer]).ToArray());
+        }
+    }
+
+    // The host's end logic resolves the battle and every client holds the result, as when the results screen shows.
+    private void ConcludeEverywhere(NavalBattle battle, NavalPeer host)
+    {
+        ResolveOnHost(host, BattleState.AttackerVictory);
+        foreach (var peer in battle.Peers)
+            Assert.True(peer.Controller.ResultCommitter.TryGetResolvedState(out _), $"{peer.Id} holds no result");
+    }
+
+    // The live order of R40: the leaver's mission ends and its removals reach the survivors over the mesh, whose next tick
+    // parks the departing decks and the one after withdraws the crew and removes the hulls; only then does the server's
+    // departure notice arrive, and it finds nothing left to withdraw.
+    private static void LeaveConcludedBattle(NavalBattle battle, NavalPeer leaver, NavalPeer[] survivors, Guid[] leaverHulls)
+    {
+        EndMission(leaver, ShipRemovalReason.Leave);
+
+        foreach (var peer in survivors)
+            peer.Tick();
+        foreach (var peer in survivors)
+        {
+            foreach (var shipId in leaverHulls)
+            {
+                var copy = CopyOf(peer, shipId);
+                Assert.Equal(1, copy.Parkings);
+                Assert.False(copy.IsRemoved, $"{peer.Id} removed {shipId} in the tick that parked it");
+            }
+        }
+
+        foreach (var peer in survivors)
+            peer.Tick();
+        foreach (var peer in survivors)
+            foreach (var shipId in leaverHulls)
+                Assert.True(CopyOf(peer, shipId).IsRemoved, $"{peer.Id} kept {shipId} past the tick after its parking");
+
+        battle.Leave(leaver);
+        battle.TickAll(2);
+    }
+
+    private static FakeHull CopyOf(NavalPeer peer, Guid shipId) =>
+        peer.Engine.AllHulls.Single(hull => hull.SpawnData?.ShipId == shipId);
+
+    // A departing hull's crew is out of the battle and its registry, and nothing of it is left parked.
+    private static void AssertCrewWithdrawn(NavalPeer peer, params Agent[] crew)
+    {
+        for (int i = 0; i < crew.Length; i++)
+        {
+            var agent = crew[i];
+            Assert.False(agent.IsActive(), $"{peer.Id} kept departed crew member {i} in the battle");
+            Assert.DoesNotContain(agent, peer.Engine.ParkedAgents);
+            Assert.Null(peer.Engine.DeckOf(agent));
+            bool registered = true;
+            peer.Call(() => registered = peer.Agents.TryGetAgentInfo(agent, out _));
+            Assert.False(registered, $"{peer.Id} kept departed crew member {i} registered");
+        }
+
+        Assert.Empty(peer.Engine.ParkedAgents);
     }
 
     private static Dictionary<NavalPeer, Agent> RegisterEverywhere(NavalBattle battle, Guid agentId, string authority) =>
@@ -149,33 +280,44 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         }
     }
 
-    // Vanilla's retreat on the leaver: OnRetreatMission, then NavalShipsLogic.OnEndMission sends the final ropes and removes
-    // every hull, then the mission leave reaches the server, which tells every other member.
+    // Vanilla's retreat on the leaver: OnRetreatMission, then its mission ends, then the mission leave reaches the server,
+    // which tells every other member.
     private static void Retreat(NavalBattle battle, NavalPeer leaver)
     {
-        leaver.Call(() =>
-        {
-            leaver.Ships.SendFinalRopes();
-            foreach (var ship in leaver.Registry.Ships.ToList())
-            {
-                leaver.Ships.AnnounceRemoval(ship.Hull, ShipRemovalReason.Retreat, missionEnding: true);
-                leaver.Engine.RemoveHull(ship.Hull);
-            }
-        });
+        EndMission(leaver, ShipRemovalReason.Retreat);
         battle.Leave(leaver);
     }
 
-    private static void AssertRemovedWithClearDeck(NavalPeer peer, Guid departed, Agent ally, Guid allyHull)
+    // NavalShipsLogic.OnEndMission on the leaver sends the final ropes and removes every hull, announcing its own.
+    private static void EndMission(NavalPeer leaver, ShipRemovalReason reason) => leaver.Call(() =>
+    {
+        leaver.Ships.SendFinalRopes();
+        foreach (var ship in leaver.Registry.Ships.ToList())
+        {
+            leaver.Ships.AnnounceRemoval(ship.Hull, reason, missionEnding: true);
+            leaver.Engine.RemoveHull(ship.Hull);
+        }
+    });
+
+    // Parked a tick before it went, with nobody aboard or seated and none of its crew still in the battle at the removal.
+    private static void AssertRemovedWithClearDeck(NavalPeer peer, Guid departed)
     {
         ShipLifecycle state = ShipLifecycle.Unknown;
         peer.Call(() => state = peer.Registry.StateOf(departed));
         Assert.Equal(ShipLifecycle.Removed, state);
 
-        var copy = peer.Engine.AllHulls.Single(hull => hull.SpawnData?.ShipId == departed);
+        var copy = CopyOf(peer, departed);
         Assert.True(copy.IsRemoved, $"{peer.Id} kept the copy of {departed}");
+        Assert.Equal(1, copy.ParkingsBeforeRemoval);
         Assert.Equal(0, copy.SeatsAtRemoval);
         Assert.Equal(0, copy.AgentsAboardAtRemoval);
+        Assert.Equal(0, copy.CrewActiveAtRemoval);
         Assert.Empty(copy.Seats);
+    }
+
+    private static void AssertRemovedWithClearDeck(NavalPeer peer, Guid departed, Agent ally, Guid allyHull)
+    {
+        AssertRemovedWithClearDeck(peer, departed);
         Assert.Same(peer.Ship(allyHull).Hull, peer.Engine.DeckOf(ally)!.Hull);
     }
 }
