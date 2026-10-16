@@ -133,7 +133,7 @@ internal sealed class ServerChatHandler : IHandler
         switch (request.Channel)
         {
             case ChatChannel.Global:
-                RouteGlobal(sender, text);
+                RouteToMatchingPlayers(ChatChannel.Global, sender, text, _ => true);
                 return;
             case ChatChannel.Clan:
                 RouteToFactionGroup(
@@ -160,11 +160,6 @@ internal sealed class ServerChatHandler : IHandler
                 SendSystemMessage(senderPeer, request.RecipientControllerId, "That chat channel is not available.");
                 return;
         }
-    }
-
-    private void RouteGlobal(Player sender, string text)
-    {
-        RouteToMatchingPlayers(ChatChannel.Global, sender, text, _ => true);
     }
 
     private void RouteToFactionGroup(
