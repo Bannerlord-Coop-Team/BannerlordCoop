@@ -103,7 +103,6 @@ public sealed class ChatService : IChatService, IDisposable
         viewModel.SetParticipants(participants.OrderBy(
             participant => participant.DisplayName,
             StringComparer.OrdinalIgnoreCase));
-        RefreshGroupChannels();
     }
 
     public void Dispose()
