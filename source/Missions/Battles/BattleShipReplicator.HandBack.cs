@@ -94,6 +94,22 @@ public partial class BattleShipReplicator
         return false;
     }
 
+    // [Game thread, returning player] An adopted ship whose record was pruned left the battle before the hand-back, so its
+    // duplicate goes once deployment is over, as a sunk one's does.
+    private void SettleLeftReclaims()
+    {
+        if (reclaims.Count == 0 || !deployment.IsCommitted || engine.IsDeploymentMode) return;
+
+        foreach (var reclaim in reclaims.Values.Where(reclaim => !heldShips.TryGetValue(reclaim.ShipId, out var held)
+            || held.Record == null).ToArray())
+        {
+            if (Registry.TryGet(reclaim.FreshShipId, out var fresh) && !engine.IsHullRemoved(fresh.Hull))
+                RemoveDuplicate(reclaim, fresh, "left while adopted");
+            else
+                reclaims.Remove(reclaim.ShipId);
+        }
+    }
+
     private NetworkShipInfo FindFreshHull(string campaignShipId)
     {
         if (string.IsNullOrEmpty(campaignShipId)) return null;
@@ -242,11 +258,7 @@ public partial class BattleShipReplicator
             return;
         }
 
-        if (session.IsOwn(handedBack.ReturningControllerId))
-        {
-            CompleteReclaim(handedBack);
-            return;
-        }
+        if (session.IsOwn(handedBack.ReturningControllerId) && CompleteReclaim(handedBack)) return;
 
         if (!Registry.TryGet(handedBack.ShipId, out var ship))
         {
@@ -283,21 +295,22 @@ public partial class BattleShipReplicator
     }
 
     // [Returning player] The host's samples for the ship id stop here: the own hull takes the id, moves to the hull's last frame
-    // and takes its condition and the queued troops that came back.
-    private void CompleteReclaim(NetworkShipHandedBack handedBack)
+    // and takes its condition and the queued troops that came back. False when no own hull waits, so the ship is followed
+    // as a copy this client takes over, since every peer moved it here.
+    private bool CompleteReclaim(NetworkShipHandedBack handedBack)
     {
         if (!reclaims.TryGetValue(handedBack.ShipId, out var reclaim) || !Registry.TryGet(reclaim.FreshShipId, out var fresh))
         {
             reclaims.Remove(handedBack.ShipId);
-            RejectHandBack(handedBack, "no_own_hull_waiting");
-            return;
+            Logger.Warning("[NavalSync] No own hull waits for handed-back hull {ShipId}; taking over its copy", handedBack.ShipId);
+            return false;
         }
 
         heldShips.TryGetValue(handedBack.ShipId, out var held);
         if (!session.IsHostController(handedBack.HostControllerId) && held?.Record?.OwnerControllerId != handedBack.HostControllerId)
         {
             RejectHandBack(handedBack, "not_authority");
-            return;
+            return true;
         }
 
         reclaims.Remove(handedBack.ShipId);
@@ -312,6 +325,8 @@ public partial class BattleShipReplicator
             false, fresh.Hull, fresh.Formation);
         Registry.TryRegister(ship);
         handedBackShips.Add(ship.ShipId);
+        // The own crew's seats were announced under the fresh ship id, which peers never registered.
+        stations.MoveSeatsToShip(fresh.ShipId, ship.ShipId);
 
         // Only the hull's own crew may be aboard when it moves; vanilla's teleport carries them.
         stations.ReleaseSeatsOn(ship.Hull);
@@ -325,6 +340,7 @@ public partial class BattleShipReplicator
         handBacksAccepted++;
         Logger.Information("[NavalSync] Took back hull {ShipId} from {Host} on own hull {FreshShipId}, {Queued} queued troop(s) back",
             ship.ShipId, handedBack.HostControllerId, fresh.ShipId, queued);
+        return true;
     }
 
     // The troops come back as the own supplier's origins would be built, so their removal still counts toward its quota.

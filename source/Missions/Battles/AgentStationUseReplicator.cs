@@ -32,6 +32,12 @@ public interface IAgentStationUseReplicator : IDisposable
     /// </summary>
     int ReleaseSeatsOn(MissionObject hull);
 
+    /// <summary>
+    /// [Game thread] Moves this client's seats from <paramref name="fromShipId"/> to the ship id its hull took over and sends
+    /// them again, since peers never resolve the old id; how many it moved.
+    /// </summary>
+    int MoveSeatsToShip(Guid fromShipId, Guid toShipId);
+
     object Inspect();
 }
 
@@ -234,6 +240,25 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         departedHullReleases += seated.Count;
         return seated.Count;
+    }
+
+    public int MoveSeatsToShip(Guid fromShipId, Guid toShipId)
+    {
+        var moved = ownSeated.Values.Where(use => use.ShipId == fromShipId).ToList();
+        foreach (var seat in moved)
+        {
+            var use = new NetworkAgentStationUse(seat.AgentId, toShipId, seat.StationKey, seat.PointIndex, true,
+                sentRevisions[seat.AgentId] + 1, session.OwnControllerId);
+            sentRevisions[seat.AgentId] = use.Revision;
+            ownSeated[seat.AgentId] = use;
+            // Before the deployment commit, the commit sends them.
+            if (!seatsAnnounced) continue;
+
+            network.SendAll(use);
+            sent++;
+        }
+
+        return moved.Count;
     }
 
     // Safety net for an owner whose crew drowns seated without a release; normally the owner's releases arrive first.

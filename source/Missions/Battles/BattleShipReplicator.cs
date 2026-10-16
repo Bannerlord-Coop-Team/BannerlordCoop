@@ -294,6 +294,7 @@ public partial class BattleShipReplicator : IBattleShipReplicator
         hullAuthority.Tick();
         PruneRemovedHulls();
         DrainHeldShips();
+        SettleLeftReclaims();
         TickHeroBoarding();
 
         if (!spawnRecordsSent && deployment.IsCommitted)
@@ -457,7 +458,7 @@ public partial class BattleShipReplicator : IBattleShipReplicator
         var departing = Registry.Ships.Where(ship => !ship.FollowsBattleHost && ship.CurrentAuthority == controllerId).ToList();
         RemoveHulls(departing, ShipRemovalReason.Leave);
 
-        foreach (var entry in heldShips.Where(entry => entry.Value.Record != null && !entry.Value.Record.IsNpcParty
+        foreach (var entry in heldShips.Where(entry => entry.Value.Record != null && !entry.Value.Record.FollowsBattleHost
             && entry.Value.Record.OwnerControllerId == controllerId).ToArray())
             Prune(entry.Key);
     }
@@ -595,8 +596,8 @@ public partial class BattleShipReplicator : IBattleShipReplicator
     {
         foreach (var record in records.Where(record => record != null))
         {
-            // A player who left takes its hulls; an AI or disconnected player's hull still spawns, and moves to the host once it does.
-            if (!record.IsNpcParty && !disconnectedOwners.Contains(record.OwnerControllerId)
+            // A player who left takes its hulls; an AI, adopted or disconnected player's hull still spawns, then moves to the host.
+            if (!record.FollowsBattleHost && !disconnectedOwners.Contains(record.OwnerControllerId)
                 && AuthorityStamp.ValidateMember(record.OwnerControllerId, missionContext.ControllersInMission) != null)
                 continue;
 

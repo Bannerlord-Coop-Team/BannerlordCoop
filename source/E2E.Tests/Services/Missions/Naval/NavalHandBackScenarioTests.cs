@@ -49,6 +49,10 @@ public class NavalHandBackScenarioTests : NavalBattleTestEnvironment
         returned.Hull(fresh).CrewCapacity = 4;
         var hero = returned.RegisterAgent(Guid.NewGuid(), "B");
         returned.Call(() => returned.Mission.MainAgent = hero);
+        // B's helmsman takes the fresh hull's helm during deployment, so its seat goes out under the fresh ship id.
+        var helmsmanId = Guid.NewGuid();
+        var helmsman = battle.Peers.ToDictionary(peer => peer, peer => peer.RegisterAgent(helmsmanId, "B"));
+        returned.UseStation(helmsman[returned], returned.Hull(fresh).Station("helm"), inUse: true);
         returned.Commit();
         battle.TickAll(3);
         long hostSamplesAtHandBack = a.SentSamples(hullB).Count;
@@ -79,6 +83,8 @@ public class NavalHandBackScenarioTests : NavalBattleTestEnvironment
         Assert.True(a.Hull(hullB).IsCopy);
         Assert.Contains(a.Ship(hullB).Hull, a.Engine.Releases);
         Assert.Equal("B", c.Ship(hullB).CurrentAuthority);
+        Assert.Same(helmsman[a], a.Hull(hullB).SeatedAt("helm"));
+        Assert.Same(helmsman[c], c.Hull(hullB).SeatedAt("helm"));
         own.Frame = new MatrixFrame(Mat3.Identity, new Vec3(130f, 30f, 0f));
         battle.TickAll(3);
         Assert.Equal(hostSamplesAtHandBack, a.SentSamples(hullB).Count);
@@ -132,6 +138,45 @@ public class NavalHandBackScenarioTests : NavalBattleTestEnvironment
         Assert.True(returned.Hull(hullB).IsCopy);
         Assert.Equal(BattleShipCondition.Sunk, returned.Hull(hullB).SinkingState);
         Assert.Equal("A", c.Ship(hullB).CurrentAuthority);
+    }
+
+    // The host retreats the adopted hull while its player is still deploying: the ship left the battle, so the player's
+    // duplicate goes once deployment is over instead of staying hidden from peers.
+    [Fact]
+    public void ReturningPlayer_WhoseAdoptedHullLeftDuringItsDeployment_RemovesItsDuplicate()
+    {
+        using var battle = StartServerBattle(atSea: true, out _, "A", "B", "C");
+        var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
+        var hullB = AdoptHullOfB(battle, a, b, c);
+        var returned = battle.Rejoin(b);
+        var fresh = returned.FieldOwnHull(returned.Side, new Vec3(40f, -80f, 0f), battle.PartyIds["B"], ShipOfB);
+        var duplicate = returned.Hull(fresh);
+        battle.TickAll(2);
+        Assert.Single(Reclaims(returned));
+
+        a.Call(() =>
+        {
+            var hull = a.Ship(hullB).Hull;
+            a.Ships.AnnounceRemoval(hull, ShipRemovalReason.Retreat, missionEnding: false);
+            a.Engine.RemoveHull(hull);
+        });
+        battle.TickAll(2);
+        returned.Commit();
+        battle.TickAll(3);
+
+        Assert.Empty(Reclaims(returned));
+        Assert.True(duplicate.IsRemoved);
+        Assert.False(returned.Has(fresh));
+        Assert.Empty(returned.Network.NetworkSentMessages.GetMessages<NetworkShipReclaim>());
+        Assert.All(battle.Peers, peer => Assert.False(peer.Has(hullB)));
+        Assert.All(new[] { a, c }, peer => Assert.False(peer.Has(fresh)));
+    }
+
+    private static JArray Reclaims(NavalPeer peer)
+    {
+        JObject handBack = null!;
+        peer.Call(() => handBack = JObject.FromObject(peer.Ships.InspectHandBack()));
+        return (JArray)handBack["reclaims"]!;
     }
 
     // A reclaim repeated after the hand-back, or sent by a player who did not field the hull, changes nothing.

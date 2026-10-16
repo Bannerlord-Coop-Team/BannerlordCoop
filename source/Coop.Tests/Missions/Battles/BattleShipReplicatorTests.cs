@@ -427,6 +427,36 @@ public class BattleShipReplicatorTests
             Times.Never);
     }
 
+    // M8b r2: a hull the departing host adopted follows the battle host, so its record still waiting here is kept and spawns
+    // under the next host.
+    [Fact]
+    public void RemoveHullsOf_KeepsAWaitingAdoptedRecordOfTheDepartingHost_AndSpawnsItUnderTheNextHost()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: true);
+        bool deploying = true;
+        harness.Engine.SetupGet(e => e.IsDeploymentMode).Returns(() => deploying);
+        harness.SetupForeignSpawn();
+        var adopted = new BattleShipSpawnData(Guid.NewGuid(), Peer, "MapEventParty_2", false, BattleSideEnum.Defender, 0,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null,
+            100f, 50f, 1, "", originalOwnerControllerId: "player_b");
+        harness.Replicator.AcceptSpawnRecords(new[] { adopted });
+
+        harness.Replicator.RemoveHullsOf(Peer);
+        harness.Members.Remove(Peer);
+        harness.Broker.Publish(this, new BattleHostMigrated(Instance, Peer, Own));
+        GameThread.Run(() => { }, blocking: true);
+        deploying = false;
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+
+        Assert.True(adopted.FollowsBattleHost);
+        Assert.True(harness.Registry.TryGet(adopted.ShipId, out var ship));
+        Assert.Equal(Own, ship.CurrentAuthority);
+        Assert.Equal("player_b", ship.OriginalOwner);
+        Assert.True(ship.IsAdopted);
+    }
+
     // M8a: the owner tells peers once its announced hull leaves; a swap, a hull nobody knows of yet and an AI hull at the
     // mission's end (it moves to the next host) send nothing.
     [Fact]

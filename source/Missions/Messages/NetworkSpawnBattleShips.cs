@@ -90,4 +90,7 @@ public sealed class BattleShipSpawnData
 
     /// <summary>The player or host that fielded the hull.</summary>
     public string OriginalOwner => string.IsNullOrEmpty(OriginalOwnerControllerId) ? OwnerControllerId : OriginalOwnerControllerId;
+
+    /// <summary>An AI hull or a player's hull the battle host adopted, as <c>NetworkShipInfo.FollowsBattleHost</c>.</summary>
+    public bool FollowsBattleHost => IsNpcParty || OriginalOwner != OwnerControllerId;
 }
