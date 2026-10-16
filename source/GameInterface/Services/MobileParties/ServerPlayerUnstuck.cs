@@ -115,7 +115,6 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
                 return $"Removed the party from the army of {army.LeaderParty?.StringId ?? "<unknown leader>"}.";
             });
         }
-
         else if (party.AttachedTo != null)
         {
             TryStep(actions, "army attachment cleanup", () =>
