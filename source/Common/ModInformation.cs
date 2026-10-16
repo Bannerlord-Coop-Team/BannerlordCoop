@@ -11,6 +11,9 @@ public static class ModInformation
     /// <summary>The module id of the War Sails DLC, the only DLC coop supports.</summary>
     public const string NavalDlcModuleId = "NavalDLC";
 
+    /// <summary>Whether a module is the War Sails DLC; a non-DLC module that reuses its id is not.</summary>
+    public static bool IsNavalDlcModule(string moduleId, bool isDlc) => isDlc && moduleId == NavalDlcModuleId;
+
     /// <summary>Whether NavalDLC is an active module in this process. Set once at startup.</summary>
     public static bool IsNavalDlcActive { get; set; }
 

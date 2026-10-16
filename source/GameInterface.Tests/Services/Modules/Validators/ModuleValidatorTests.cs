@@ -205,6 +205,24 @@ public class ModuleValidatorTests
     }
 
     [Fact]
+    public void ValidateNoDlc_AllowsNavalDlc_AndRejectsAnyOtherDlc()
+    {
+        var validator = new ModuleValidator();
+
+        bool navalOnly = validator.ValidateNoDlc(new List<ModuleInfo> { Native(), NavalDlc() }, out var navalOnlyError);
+        bool withOther = validator.ValidateNoDlc(new List<ModuleInfo>
+        {
+            NavalDlc(),
+            new ModuleInfo { Id = "DlcOne", IsOfficial = true, IsDlc = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 352) },
+        }, out var withOtherError);
+
+        Assert.True(navalOnly);
+        Assert.Null(navalOnlyError);
+        Assert.False(withOther);
+        Assert.Equal("DLC is not supported. Please disable the following module(s): 'DlcOne'.", withOtherError);
+    }
+
+    [Fact]
     public void Validate_ReturnsErrorMessage_WhenClientHasExtraModule()
     {
         // Arrange

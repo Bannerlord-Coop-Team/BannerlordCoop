@@ -98,7 +98,7 @@ public class ModuleValidator : IModuleValidator
     public bool ValidateNoDlc(IEnumerable<ModuleInfo> modules, out string error)
     {
         var dlcModules = (modules ?? Enumerable.Empty<ModuleInfo>())
-            .Where(module => module.IsDlc && !IsNavalDlc(module))
+            .Where(module => module.IsDlc && !Common.ModInformation.IsNavalDlcModule(module.Id, module.IsDlc))
             .ToList();
 
         if (dlcModules.Any())
@@ -111,9 +111,6 @@ public class ModuleValidator : IModuleValidator
         error = null;
         return true;
     }
-
-    private static bool IsNavalDlc(ModuleInfo module) =>
-        module.IsDlc && module.Id == Common.ModInformation.NavalDlcModuleId;
 
     /// <summary>
     /// Compares the game version (the version of the official module) of the server and the client.

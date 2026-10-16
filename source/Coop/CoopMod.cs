@@ -128,7 +128,7 @@ namespace Coop
             SetupLogging();
             var moduleInfoProvider = new TaleWorldsModuleInfoProvider();
             ModInformation.IsNavalDlcActive = moduleInfoProvider.GetModuleInfos()
-                .Any(module => module.Id == ModInformation.NavalDlcModuleId && module.IsDlc);
+                .Any(module => ModInformation.IsNavalDlcModule(module.Id, module.IsDlc));
             StartupDiagnosticsSequence.Run(version =>
                 {
                     informationalVersion = version;
