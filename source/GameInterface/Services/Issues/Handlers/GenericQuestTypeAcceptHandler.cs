@@ -442,7 +442,6 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     nameof(NetworkQuestTypeAlternativeAccepted), data.OwnerId);
                 return;
             }
-
         });
     }
 

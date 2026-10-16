@@ -35,6 +35,7 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
     private static bool TryToMakeTroopsReturnPrefix(IssueBase issue)
     {
         if (QuestTypeRegistry.Get(issue)?.SupportsAlternativeAccept != true) return true;
+        if (ModInformation.IsClient) return false;
 
         var troops = issue?.AlternativeSolutionSentTroops;
         if (troops == null || troops.Count == 0) return false;
@@ -53,8 +54,7 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
 
         if (!ContainerProvider.TryResolve<IAwaitingAlternativeSolutionTroopsRegistry>(out var troopsRegistry)) return false;
 
-        if (ModInformation.IsServer &&
-            ContainerProvider.TryResolve<IPlayerManager>(out var players) &&
+        if (ContainerProvider.TryResolve<IPlayerManager>(out var players) &&
             players.TryGetPlayer(ownerControllerId, out var player) &&
             ContainerProvider.TryResolve<IObjectManager>(out var objects) &&
             objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) &&
@@ -65,15 +65,15 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
                 if (Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution())
                 {
                     Campaign.Current.IssueManager.MakeAlternativeTroopsReturn(troops);
+                    troops.Clear();
                     return false;
                 }
             }
         }
 
         troopsRegistry.Deposit(ownerControllerId, troops);
-        MessageBroker.Instance.Publish(issue, new AwaitingAlternativeSolutionTroopsDepositedLocally(issue.IssueOwner, ownerControllerId, troops));
-
         NotifyTrueOwnerOfConfirmedDeposit(issue.IssueOwner, ownerControllerId, troops);
+        troops.Clear();
 
         return false;
     }

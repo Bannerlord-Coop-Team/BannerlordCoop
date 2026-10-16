@@ -48,5 +48,4 @@ public class GameUIDisableTests
             ModInformation.IsServer = originalIsServer;
         }
     }
-
 }

@@ -97,6 +97,5 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
                 troopsRegistry.Restore(entry.OwnerControllerId, entry.Troops);
             }
         }
-
     }
 }
