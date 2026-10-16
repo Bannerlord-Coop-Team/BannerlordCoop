@@ -22,16 +22,14 @@ namespace GameInterface.Tests.Serialization.SerializerTests;
 
 public class MonsterSerializationTest : IDisposable
 {
-    private readonly IContainer container;
+    private readonly ILifetimeScope container;
     private readonly IBinaryPackageFactory factory;
     private readonly IObjectManager objectManager;
 
     public MonsterSerializationTest()
     {
         GameBootStrap.Initialize();
-        var builder = new ContainerBuilder();
-        builder.RegisterModule<SerializationTestModule>();
-        container = builder.Build();
+        container = SerializationTestContainer.BeginScope();
         factory = container.Resolve<IBinaryPackageFactory>();
         objectManager = container.Resolve<IObjectManager>();
     }

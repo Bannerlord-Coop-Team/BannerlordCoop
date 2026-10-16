@@ -1,2 +1,0 @@
-        [HarmonyTranspiler]
-        static IEnumerable<CodeInstruction> TestPropertyQueueChangeTranspiler(IEnumerable<CodeInstruction> instructions) => ListPropertyChangeTranspiler<long, AddQueuePropertyMessage, RemoveQueuePropertyMessage>(instructions, "TestPropertyQueue");

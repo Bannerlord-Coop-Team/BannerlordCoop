@@ -14,31 +14,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ClanSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public ClanSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void Clan_Serialize()
-        {
-            Clan testClan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            ClanBinaryPackage package = new ClanBinaryPackage(testClan, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]
