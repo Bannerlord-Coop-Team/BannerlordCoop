@@ -117,4 +117,3 @@ internal sealed class LegacyIssueOwnershipRegistry : IIssueOwnershipRegistry
             (issueId = issueGiver.Issue.StringId) != null;
     }
 }
-

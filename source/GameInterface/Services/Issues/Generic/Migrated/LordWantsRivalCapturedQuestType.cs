@@ -50,5 +50,3 @@ internal static class LordWantsRivalCapturedQuestType
             .Build());
     }
 }
-
-

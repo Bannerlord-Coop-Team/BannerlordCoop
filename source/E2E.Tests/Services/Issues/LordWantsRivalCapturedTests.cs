@@ -172,7 +172,6 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
                 Assert.Equal(created.IssueId, issue.StringId);
             });
         }
-
     }
 
     [Fact]
