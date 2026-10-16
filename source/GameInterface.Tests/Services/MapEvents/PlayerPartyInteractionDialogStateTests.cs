@@ -2,6 +2,7 @@
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Tests.Services.SiegeEvents;
 using System;
+using TaleWorlds.Localization;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
@@ -9,6 +10,48 @@ namespace GameInterface.Tests.Services.MapEvents;
 [Collection(nameof(CampaignCurrentCollection))]
 public class PlayerPartyInteractionDialogStateTests
 {
+    [Theory]
+    [InlineData(PlayerPartyInteractionProposal.Trade, 0, "I have a proposal that may benefit us both.")]
+    [InlineData(PlayerPartyInteractionProposal.JoinClan, 0, "I wish to offer my services in your clan.")]
+    [InlineData(PlayerPartyInteractionProposal.Vassal, 0, "I wish to swear my allegiance to your majesty.")]
+    [InlineData(PlayerPartyInteractionProposal.Mercenary, 12, null)]
+    public void ProposalPending_DialogText_ShowsInitiatorSelectedLine(
+        PlayerPartyInteractionProposal proposal,
+        int mercenaryAwardMultiplier,
+        string expectedText)
+    {
+        if (proposal == PlayerPartyInteractionProposal.Mercenary)
+        {
+            expectedText =
+                $"RandomPlayer offers to serve as a mercenary. The kingdom will pay {mercenaryAwardMultiplier}{new TextObject("{GOLD_ICON}")} gold per influence point earned, whenever the contract is honored. Do you accept?";
+        }
+
+        try
+        {
+            PlayerPartyInteractionDialogState.Apply(new NetworkPlayerPartyInteractionState(
+                "session-1",
+                "responder-party",
+                "initiator-party",
+                "RandomPlayer",
+                PlayerPartyInteractionPhase.ProposalPending,
+                proposal,
+                new[]
+                {
+                    PlayerPartyInteractionOption.AcceptProposal,
+                    PlayerPartyInteractionOption.DeclineProposal,
+                    PlayerPartyInteractionOption.Leave
+                },
+                isInitiator: false,
+                mercenaryAwardMultiplier: mercenaryAwardMultiplier));
+
+            Assert.Equal(expectedText, PlayerPartyInteractionDialogState.GetDialogText());
+        }
+        finally
+        {
+            PlayerPartyInteractionDialogState.Clear("session-1");
+        }
+    }
+
     [Fact]
     public void WaitingForProposal_UsesStableText()
     {

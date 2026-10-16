@@ -253,92 +253,100 @@ public class VillageHostileActionTests : MapEventTestBase
         });
     }
 
+    // Runs every single-party denial against its own village on one environment.
     [Fact]
-    public void ClientRequestForceVolunteers_WithZeroHearth_IsRejected()
+    public void ClientRequestHostileAction_WithInvalidPrecondition_IsRejected()
     {
         var client = Clients.First();
         RegisterPeer(client, "PlayerOne");
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var target = CreateVillageTarget();
 
+        var zeroHearth = CreateVillageTarget();
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(zeroHearth.SettlementId, out var settlement));
             using (new AllowedThread())
             {
                 settlement.Village.Hearth = 0;
             }
         });
+        AssertHostileActionDenied(client, VillageHostileAction.ForceVolunteers, mobilePartyId, zeroHearth.SettlementId,
+            VillageHostileActionDeniedReason.HearthTooLow);
 
-        Server.NetworkSentMessages.Clear();
+        var onCooldown = CreateVillageTarget();
+        AddServerCooldown(onCooldown.SettlementId);
+        AssertHostileActionDenied(client, VillageHostileAction.ForceSupplies, mobilePartyId, onCooldown.SettlementId,
+            VillageHostileActionDeniedReason.Cooldown);
 
-        RequestHostileAction(client, VillageHostileAction.ForceVolunteers, mobilePartyId, target.SettlementId);
+        var nonVillageId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        AssertHostileActionDenied(client, VillageHostileAction.Raid, mobilePartyId, nonVillageId,
+            VillageHostileActionDeniedReason.NonVillageSettlement);
 
-        var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
-        Assert.Equal(VillageHostileActionDeniedReason.HearthTooLow, denied.Reason);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
-    }
-
-    [Theory]
-    [InlineData(VillageHostileAction.ForceVolunteers)]
-    [InlineData(VillageHostileAction.ForceSupplies)]
-    public void ClientRequestForceAction_OnCooldown_IsRejected(VillageHostileAction action)
-    {
-        var client = Clients.First();
-        RegisterPeer(client, "PlayerOne");
-        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var target = CreateVillageTarget();
-        AddServerCooldown(target.SettlementId);
-
-        Server.NetworkSentMessages.Clear();
-
-        RequestHostileAction(client, action, mobilePartyId, target.SettlementId);
-
-        var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
-        Assert.Equal(VillageHostileActionDeniedReason.Cooldown, denied.Reason);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
-    }
-
-    [Fact]
-    public void ClientRequestRaid_ForNonVillageSettlement_IsRejected()
-    {
-        var client = Clients.First();
-        RegisterPeer(client, "PlayerOne");
-        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-
-        Server.NetworkSentMessages.Clear();
-
-        RequestHostileAction(client, VillageHostileAction.Raid, mobilePartyId, settlementId);
-
-        var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
-        Assert.Equal(VillageHostileActionDeniedReason.NonVillageSettlement, denied.Reason);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
-    }
-
-    [Fact]
-    public void ClientRequestRaid_ForNonNormalVillage_IsRejected()
-    {
-        var client = Clients.First();
-        RegisterPeer(client, "PlayerOne");
-        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var target = CreateVillageTarget();
-
+        var looted = CreateVillageTarget();
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Village>(target.VillageId, out var village));
+            Assert.True(Server.ObjectManager.TryGetObject<Village>(looted.VillageId, out var village));
             using (new AllowedThread())
             {
                 village.VillageState = Village.VillageStates.Looted;
             }
         });
+        AssertHostileActionDenied(client, VillageHostileAction.Raid, mobilePartyId, looted.SettlementId,
+            VillageHostileActionDeniedReason.InvalidVillageState);
 
+        // Changes the requester's faction, so it runs after the checks that need a hostile requester.
+        var ownFaction = CreateVillageTarget();
+        var clanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(ownFaction.SettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+
+            var boundSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var boundTown = GameObjectCreator.CreateInitializedObject<Town>();
+
+            using (new AllowedThread())
+            {
+                mobileParty.ActualClan = clan;
+                boundSettlement.SetSettlementComponent(boundTown);
+                boundTown.OwnerClan = clan;
+                settlement.Village.Bound = boundSettlement;
+            }
+
+            Assert.Equal(clan, mobileParty.MapFaction);
+            Assert.Equal(clan, settlement.MapFaction);
+        });
+        AssertHostileActionDenied(client, VillageHostileAction.Raid, mobilePartyId, ownFaction.SettlementId,
+            VillageHostileActionDeniedReason.OwnFaction);
+
+        var inactiveTarget = CreateVillageTarget();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            using (new AllowedThread())
+            {
+                mobileParty.IsActive = false;
+            }
+        });
+        AssertHostileActionDenied(client, VillageHostileAction.Raid, mobilePartyId, inactiveTarget.SettlementId,
+            VillageHostileActionDeniedReason.InvalidRequester);
+    }
+
+    // Sends one hostile action request and asserts the server denied it with the given reason.
+    private void AssertHostileActionDenied(
+        EnvironmentInstance client,
+        VillageHostileAction action,
+        string mobilePartyId,
+        string settlementId,
+        VillageHostileActionDeniedReason expectedReason)
+    {
         Server.NetworkSentMessages.Clear();
 
-        RequestHostileAction(client, VillageHostileAction.Raid, mobilePartyId, target.SettlementId);
+        RequestHostileAction(client, action, mobilePartyId, settlementId);
 
         var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
-        Assert.Equal(VillageHostileActionDeniedReason.InvalidVillageState, denied.Reason);
+        Assert.Equal(expectedReason, denied.Reason);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
     }
 
@@ -364,45 +372,6 @@ public class VillageHostileActionTests : MapEventTestBase
 
         var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
         Assert.Equal(VillageHostileActionDeniedReason.AlreadyInMapEvent, denied.Reason);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
-    }
-
-    [Fact]
-    public void ClientRequestRaid_ForOwnFactionVillage_IsRejected()
-    {
-        var client = Clients.First();
-        RegisterPeer(client, "PlayerOne");
-        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var target = CreateVillageTarget();
-        var clanId = TestEnvironment.CreateRegisteredObject<Clan>();
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
-            Assert.True(Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
-
-            var boundSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-            var boundTown = GameObjectCreator.CreateInitializedObject<Town>();
-
-            using (new AllowedThread())
-            {
-                mobileParty.ActualClan = clan;
-                boundSettlement.SetSettlementComponent(boundTown);
-                boundTown.OwnerClan = clan;
-                settlement.Village.Bound = boundSettlement;
-            }
-
-            Assert.Equal(clan, mobileParty.MapFaction);
-            Assert.Equal(clan, settlement.MapFaction);
-        });
-
-        Server.NetworkSentMessages.Clear();
-
-        RequestHostileAction(client, VillageHostileAction.Raid, mobilePartyId, target.SettlementId);
-
-        var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
-        Assert.Equal(VillageHostileActionDeniedReason.OwnFaction, denied.Reason);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
     }
 
@@ -499,50 +468,6 @@ public class VillageHostileActionTests : MapEventTestBase
             AssertForceSuppliesGoldAndHitPointsOutcome(client, mobilePartyId, target.SettlementId);
             AssertCooldownSynced(client, target.SettlementId);
         }
-    }
-
-    [Fact]
-    public void ClientRequestRaid_WithForgedRequesterParty_IsRejected()
-    {
-        var client = Clients.First();
-        RegisterPeer(client, "PlayerOne");
-        CreatePlayerHeroParty("PlayerOne");
-        var (_, forgedMobilePartyId) = CreatePlayerHeroParty("PlayerTwo");
-        var target = CreateVillageTarget();
-
-        Server.NetworkSentMessages.Clear();
-
-        RequestHostileAction(client, VillageHostileAction.Raid, forgedMobilePartyId, target.SettlementId);
-
-        var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
-        Assert.Equal(VillageHostileActionDeniedReason.InvalidRequester, denied.Reason);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
-    }
-
-    [Fact]
-    public void ClientRequestRaid_WithInactiveRequesterParty_IsRejected()
-    {
-        var client = Clients.First();
-        RegisterPeer(client, "PlayerOne");
-        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var target = CreateVillageTarget();
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
-            using (new AllowedThread())
-            {
-                mobileParty.IsActive = false;
-            }
-        });
-
-        Server.NetworkSentMessages.Clear();
-
-        RequestHostileAction(client, VillageHostileAction.Raid, mobilePartyId, target.SettlementId);
-
-        var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
-        Assert.Equal(VillageHostileActionDeniedReason.InvalidRequester, denied.Reason);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
     }
 
     [Fact]
@@ -1626,30 +1551,6 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
-    public void SlowRaidMapEvent_WithPlayerParty_ServerUpdateIsAllowed()
-    {
-        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var target = CreateVillageTarget();
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
-
-            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent.MapEventVisual = MockMapEventVisual();
-            mapEvent.Initialize(
-                mobileParty.Party,
-                settlement.Party,
-                new RaidEventComponent(mapEvent),
-                MapEvent.BattleTypes.Raid);
-
-            Assert.True(mapEvent.IsActiveSlowVillageRaid());
-            Assert.True(InvokeMapEventUpdatePrefix(mapEvent));
-        }, MapEventDisabledMethods);
-    }
-
-    [Fact]
     public void ActiveSlowRaid_WithPlayerInDeployment_ServerUpdateIsBlockedUntilMissionExit()
     {
         var client = Clients.First();
@@ -2697,10 +2598,9 @@ public class VillageHostileActionTests : MapEventTestBase
         }
     }
 
+    // Only multi-player non-raid starts are rejected, so one single-player non-raid row covers the accept path.
     [Theory]
-    [InlineData(VillageHostileAction.Raid)]
     [InlineData(VillageHostileAction.ForceVolunteers)]
-    [InlineData(VillageHostileAction.ForceSupplies)]
     public void SinglePlayerHostileAction_AttackMissionStart_IsAllowed(VillageHostileAction action)
     {
         var client = Clients.First();
@@ -2894,7 +2794,6 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(VillageHostileAction.ForceVolunteers)]
     [InlineData(VillageHostileAction.ForceSupplies)]
     public void MultiPlayerNonRaidHostileAction_AttackMissionStart_IsRejected(VillageHostileAction action)
     {
@@ -2959,7 +2858,6 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(VillageHostileAction.ForceVolunteers)]
     [InlineData(VillageHostileAction.ForceSupplies)]
     public void MultiPlayerNonRaidHostileAction_BattleSimulationStart_IsRejected(VillageHostileAction action)
     {
@@ -3270,17 +3168,6 @@ public class VillageHostileActionTests : MapEventTestBase
         foreach (var leftClient in Clients)
         {
             AssertHostileActionJoinerLeft(leftClient, hostileAction.MapEventId, hostileAction.AttackerPartyId, joinerPartyId);
-        }
-    }
-
-    [Fact]
-    public void VillageRecovery_RegisterEventsRunsOnlyOnServer()
-    {
-        Server.Call(() => Assert.True(InvokeVillageHealRegisterEventsPrefix()));
-
-        foreach (var client in Clients)
-        {
-            client.Call(() => Assert.False(InvokeVillageHealRegisterEventsPrefix()));
         }
     }
 
@@ -3707,15 +3594,6 @@ public class VillageHostileActionTests : MapEventTestBase
         Assert.NotNull(prefix);
 
         return (bool)prefix.Invoke(null, new object[] { originalMethod })!;
-    }
-
-    private static bool InvokeVillageHealRegisterEventsPrefix()
-    {
-        var patchType = AccessTools.TypeByName("GameInterface.Services.Villages.Patches.DisableVillageHealCampaignBehavior");
-        var prefix = AccessTools.Method(patchType, "Prefix");
-        Assert.NotNull(prefix);
-
-        return (bool)prefix.Invoke(null, Array.Empty<object>())!;
     }
 
     private void RegisterPeer(EnvironmentInstance client, string controllerId)

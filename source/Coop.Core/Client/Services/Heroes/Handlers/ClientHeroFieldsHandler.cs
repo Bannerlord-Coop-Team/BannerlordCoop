@@ -17,16 +17,10 @@ namespace Coop.Core.Client.Services.Heroes.Handlers
             this.messageBroker = messageBroker;
             messageBroker.Subscribe<NetworkLastTimeStampChanged>(Handle);
             messageBroker.Subscribe<NetworkCharacterObjectChanged>(Handle);
-            messageBroker.Subscribe<NetworkHairTagsChanged>(Handle);
-            messageBroker.Subscribe<NetworkBeardTagsChanged>(Handle);
-            messageBroker.Subscribe<NetworkTattooTagsChanged>(Handle);
             messageBroker.Subscribe<NetworkHeroStateChanged>(Handle);
-            messageBroker.Subscribe<NetworkHeroLevelChanged>(Handle);
-            messageBroker.Subscribe<NetworkSpcDaysInLocationChanged>(Handle);
             messageBroker.Subscribe<NetworkDefaultAgeChanged>(Handle);
             messageBroker.Subscribe<NetworkBirthDayChanged>(Handle);
             messageBroker.Subscribe<NetworkPowerChanged>(Handle);
-            messageBroker.Subscribe<NetworkCultureChanged>(Handle);
             messageBroker.Subscribe<NetworkHomeSettlementChanged>(Handle);
             messageBroker.Subscribe<NetworkPregnantChanged>(Handle);
         }
@@ -41,12 +35,6 @@ namespace Coop.Core.Client.Services.Heroes.Handlers
         {
             var data = payload.What;
             messageBroker.Publish(this, new ChangeHomeSettlement(data.SettlementStringId, data.HeroId));
-        }
-
-        private void Handle(MessagePayload<NetworkCultureChanged> payload)
-        {
-            var data = payload.What;
-            messageBroker.Publish(this, new ChangeCulture(data.CultureStringId, data.HeroId));
         }
 
         private void Handle(MessagePayload<NetworkPowerChanged> payload)
@@ -67,40 +55,10 @@ namespace Coop.Core.Client.Services.Heroes.Handlers
             messageBroker.Publish(this, new ChangeDefaultAge(data.Age, data.HeroId));
         }
 
-        private void Handle(MessagePayload<NetworkSpcDaysInLocationChanged> payload)
-        {
-            var data = payload.What;
-            messageBroker.Publish(this, new ChangeSpcDaysInLocation(data.Days, data.HeroId));
-        }
-
-        private void Handle(MessagePayload<NetworkHeroLevelChanged> payload)
-        {
-            var data = payload.What;
-            messageBroker.Publish(this, new ChangeHeroLevel(data.HeroLevel, data.HeroId));
-        }
-
         private void Handle(MessagePayload<NetworkHeroStateChanged> payload)
         {
             var data = payload.What;
             messageBroker.Publish(this, new ChangeHeroState(data.HeroState, data.HeroId));
-        }
-
-        private void Handle(MessagePayload<NetworkTattooTagsChanged> payload)
-        {
-            var data = payload.What;
-            messageBroker.Publish(this, new ChangeTattooTags(data.TattooTags, data.HeroId));
-        }
-
-        private void Handle(MessagePayload<NetworkBeardTagsChanged> payload)
-        {
-            var data = payload.What;
-            messageBroker.Publish(this, new ChangeBeardTags(data.BeardTags, data.HeroId));
-        }
-
-        private void Handle(MessagePayload<NetworkHairTagsChanged> payload)
-        {
-            var data = payload.What;
-            messageBroker.Publish(this, new ChangeHairTags(data.HairTags, data.HeroId));
         }
 
         private void Handle(MessagePayload<NetworkCharacterObjectChanged> payload)
@@ -119,16 +77,10 @@ namespace Coop.Core.Client.Services.Heroes.Handlers
         {
             messageBroker.Unsubscribe<NetworkLastTimeStampChanged>(Handle);
             messageBroker.Unsubscribe<NetworkCharacterObjectChanged>(Handle);
-            messageBroker.Unsubscribe<NetworkHairTagsChanged>(Handle);
-            messageBroker.Unsubscribe<NetworkBeardTagsChanged>(Handle);
-            messageBroker.Unsubscribe<NetworkTattooTagsChanged>(Handle);
             messageBroker.Unsubscribe<NetworkHeroStateChanged>(Handle);
-            messageBroker.Unsubscribe<NetworkHeroLevelChanged>(Handle);
-            messageBroker.Unsubscribe<NetworkSpcDaysInLocationChanged>(Handle);
             messageBroker.Unsubscribe<NetworkDefaultAgeChanged>(Handle);
             messageBroker.Unsubscribe<NetworkBirthDayChanged>(Handle);
             messageBroker.Unsubscribe<NetworkPowerChanged>(Handle);
-            messageBroker.Unsubscribe<NetworkCultureChanged>(Handle);
             messageBroker.Unsubscribe<NetworkHomeSettlementChanged>(Handle);
             messageBroker.Unsubscribe<NetworkPregnantChanged>(Handle);
         }
