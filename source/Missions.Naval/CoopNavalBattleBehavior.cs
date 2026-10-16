@@ -85,6 +85,10 @@ public class CoopNavalBattleBehavior : MissionLogic
         bool retreatOrdered = ship.IsShipOrderActive && ship.ShipOrder.MovementOrderEnum == ShipOrder.ShipMovementOrderEnum.Retreat;
         var reason = retreated || retreatOrdered ? ShipRemovalReason.Retreat : ShipRemovalReason.Leave;
         ShipReplicator.AnnounceRemoval(ship, reason, shipsLogic.IsMissionEnding);
+#if DEBUG
+        // A pooled or removed hull leaves as the kinematic copy it was spawned as.
+        NavalCopyBodies.OnRemoving(ship);
+#endif
     }
 
     // A removed hull is pooled during deployment and its entity removed later, so no copy reference may outlive it.
@@ -119,6 +123,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         NavalRopes.Clear();
 #if DEBUG
         NavalHelmOverride.Clear();
+        NavalCopyBodies.Clear();
 #endif
         NavalForeignHulls.Clear();
         NavalShipDamageGate.Clear();

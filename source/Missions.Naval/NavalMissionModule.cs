@@ -70,6 +70,9 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalScenarioStatusCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
+        builder.RegisterType<NavalCopyBodyCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
 #endif
     }
 }

@@ -94,8 +94,15 @@ public class NavalShipEngine : INavalShipEngine
 
         // The owner simulates this hull: no local controller, no auto controller, a kinematic body.
         ship.SetController(ShipControllerType.None, autoUpdateController: false);
+#if DEBUG
+        // A copy_body steered copy keeps its dynamic body, which cannot be turned back on later.
+        if (!NavalCopyBodies.SpawnsSteered(data.ShipId))
+#endif
         ship.GameEntity.DisableDynamicBodySimulation();
         NavalForeignHulls.Add(ship);
+#if DEBUG
+        NavalCopyBodies.Track(ship, data.ShipId);
+#endif
         formation = ship.Formation;
         return ship;
     }
@@ -321,6 +328,9 @@ public class NavalShipEngine : INavalShipEngine
     {
         var entity = ((MissionShip)hull).GameEntity;
         if (!entity.IsValid) return;
+#if DEBUG
+        if (NavalCopyBodies.ObserveOwnerFrame((MissionShip)hull, in frame)) return;
+#endif
 
         entity.SetGlobalFrame(frame, isTeleportation: false);
         entity.UpdateAttachedNavigationMeshFaces();
