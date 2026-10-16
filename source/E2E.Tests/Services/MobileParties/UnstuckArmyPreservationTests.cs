@@ -128,9 +128,9 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
     }
 
     [Fact]
-    public void PlayerFollower_AttachedWithoutArmy_UnstuckDetachesOnEveryPeer()
+    public void PlayerFollower_HalfRemovedFromArmy_UnstuckFinishesLeaveOnEveryPeer()
     {
-        // #3892: a leave that stopped partway left the party out of the army but still attached
+        // #3892: a leave that stopped after _parties.Remove left Army and AttachedTo set
         var player = CreateRequester("unstuck-stale-attachment");
         var army = CreateArmy(TestEnvironment.CreateRegisteredObject<MobileParty>(), player.partyId);
         foreach (var instance in Clients.Append(Server))
@@ -141,8 +141,8 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
                 using (new AllowedThread())
                 {
                     army.Replicas[instance]._parties.Remove(party);
-                    party._army = null;
                 }
+                Assert.Same(army.Replicas[instance], party.Army);
                 Assert.NotNull(party.AttachedTo);
             });
         }
@@ -162,7 +162,7 @@ public class UnstuckArmyPreservationTests : MapEventTestBase
             });
         }
         Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkPlayerUnstuckResult>().First().Actions,
-            action => action.StartsWith("Detached the party"));
+            action => action.StartsWith("Removed the party from the army"));
         AssertSuccessfulResults();
     }
     private (string heroId, string partyId) CreateRequester(string controllerId)

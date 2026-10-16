@@ -143,21 +143,89 @@ public class ArmyRemovalReceiveTests : IDisposable
     }
 
     [Fact]
-    public void Removal_PartyNotLinkedToArmy_ChangesNothing()
+    public void Removal_ForOldArmy_LeavesPartyInItsCurrentArmy()
     {
-        var armyId = environment.CreateRegisteredObject<Army>();
-        var otherId = environment.CreateRegisteredObject<MobileParty>();
+        var oldArmyId = environment.CreateRegisteredObject<Army>();
+        var currentArmyId = environment.CreateRegisteredObject<Army>();
+        var memberId = environment.CreateRegisteredObject<MobileParty>();
+        environment.Server.Call(() =>
+        {
+            var currentArmy = environment.Server.GetRegisteredObject<Army>(currentArmyId);
+            var member = environment.Server.GetRegisteredObject<MobileParty>(memberId);
+            member.Army = currentArmy;
+            member.AttachedTo = currentArmy.LeaderParty;
+        });
 
-        environment.Server.SimulateMessage(this, new NetworkRemovePartyInArmy(armyId, otherId, string.Empty), markGameThread: false);
+        // a late removal for an army the party already left must not touch its current one
+        environment.Server.SimulateMessage(this, new NetworkRemovePartyInArmy(oldArmyId, memberId, string.Empty), markGameThread: false);
         environment.Server.PumpGameThread();
+        foreach (var client in environment.Clients)
+            client.PumpGameThread();
+
+        foreach (var instance in environment.Clients.Append(environment.Server))
+        {
+            instance.Call(() =>
+            {
+                var currentArmy = instance.GetRegisteredObject<Army>(currentArmyId);
+                var member = instance.GetRegisteredObject<MobileParty>(memberId);
+                Assert.Same(currentArmy, member.Army);
+                Assert.Same(currentArmy.LeaderParty, member.AttachedTo);
+                Assert.Contains(member, currentArmy.Parties);
+            });
+        }
+    }
+
+    [Fact]
+    public void Disband_WithHalfRemovedParty_ReleasesItOnEveryPeer()
+    {
+        // #3892 review: once the army disbands it is deregistered, so a half removed party has to be
+        // released by the disband itself
+        var armyId = environment.CreateRegisteredObject<Army>();
+        var memberId = environment.CreateRegisteredObject<MobileParty>();
+        var otherId = environment.CreateRegisteredObject<MobileParty>();
+        environment.Server.Call(() =>
+        {
+            var army = environment.Server.GetRegisteredObject<Army>(armyId);
+            foreach (var id in new[] { memberId, otherId })
+            {
+                var party = environment.Server.GetRegisteredObject<MobileParty>(id);
+                party.Army = army;
+                party.AttachedTo = army.LeaderParty;
+            }
+        });
+        var instances = environment.Clients.Append(environment.Server).ToArray();
+        foreach (var instance in instances)
+        {
+            instance.Call(() =>
+            {
+                var army = instance.GetRegisteredObject<Army>(armyId);
+                var member = instance.GetRegisteredObject<MobileParty>(memberId);
+                using (new AllowedThread())
+                    army._parties.Remove(member);
+            });
+        }
 
         environment.Server.Call(() =>
         {
-            var other = environment.Server.GetRegisteredObject<MobileParty>(otherId);
-            Assert.Null(other.Army);
-            Assert.Null(other.AttachedTo);
-            Assert.True(environment.Server.ObjectManager.TryGetObject<Army>(armyId, out _));
+            var army = environment.Server.GetRegisteredObject<Army>(armyId);
+            army.DisperseInternal(Army.ArmyDispersionReason.NotEnoughParty);
         });
+        foreach (var client in environment.Clients)
+            client.PumpGameThread();
+
+        foreach (var instance in instances)
+        {
+            instance.Call(() =>
+            {
+                foreach (var id in new[] { memberId, otherId })
+                {
+                    var party = instance.GetRegisteredObject<MobileParty>(id);
+                    Assert.Null(party.Army);
+                    Assert.Null(party.AttachedTo);
+                }
+            });
+        }
+        Assert.False(environment.Server.ObjectManager.TryGetObject<Army>(armyId, out _));
     }
     private static void RecordAttachmentWrite()
     {

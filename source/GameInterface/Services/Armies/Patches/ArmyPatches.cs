@@ -233,7 +233,11 @@ public class ArmyPatches
     {
         if (!army._parties.Contains(mobileParty))
         {
-            ClearStaleArmyLink(mobileParty, army);
+            if (IsHalfRemoved(mobileParty, army))
+            {
+                Logger.Warning("Finishing the army leave of {PartyId}, left half removed from army {ArmyName}", mobileParty.StringId, army.Name);
+                FinishArmyLeave(mobileParty, army, clientMobileParty);
+            }
             return;
         }
         army.LeaderParty.UpdateVersionNo();
@@ -290,6 +294,18 @@ public class ArmyPatches
                 DisbandArmyAction.ApplyByNotEnoughParty(army);
             }
         }
+        FinishArmyLeave(mobileParty, army, clientMobileParty);
+    }
+
+    // The end of leaving an army, shared by a normal removal, a removal of a party left half removed
+    // (#3892) and a disband that finds one. It runs after the server disband block, so a half removed
+    // party never reruns the disband checks.
+    private static void FinishArmyLeave(MobileParty mobileParty, Army army, MobileParty clientMobileParty)
+    {
+        if (army.LeaderParty != null && mobileParty.AttachedTo == army.LeaderParty)
+        {
+            mobileParty.AttachedTo = null;
+        }
         if (mobileParty == MobileParty.MainParty)
         {
             if (Hero.MainHero.IsPrisoner && Hero.MainHero.PartyBelongedToAsPrisoner != null)
@@ -318,31 +334,40 @@ public class ArmyPatches
         }
         CampaignEventDispatcher.Instance.OnPartyLeftArmy(mobileParty, army);
     }
-    // A removal that stopped partway (#3892) took the party out of _parties but left it attached to
-    // the leader, so the player sat in army_wait and could not move. Finish the unlink here, which
-    // also lets a second leave or unstuck recover the party.
-    private static void ClearStaleArmyLink(MobileParty mobileParty, Army army)
+
+    // A removal that stopped after _parties.Remove (#3892) leaves the party linked to this army but out
+    // of its list, so the normal removal and both disband paths would skip it.
+    private static bool IsHalfRemoved(MobileParty mobileParty, Army army) =>
+        !army._parties.Contains(mobileParty) &&
+        (mobileParty._army == army || (army.LeaderParty != null && mobileParty.AttachedTo == army.LeaderParty));
+
+    /// <summary>
+    /// Finishes the leave of every party left half removed from <paramref name="army"/>. Called when the
+    /// army disbands, on the server before vanilla disperses it and on clients when it is destroyed,
+    /// since afterwards the army is deregistered and nothing can address those parties anymore.
+    /// </summary>
+    internal static void ReleaseHalfRemovedParties(Army army)
     {
-        bool attached = mobileParty.AttachedTo != null && mobileParty.AttachedTo == army.LeaderParty;
-        bool linked = mobileParty._army == army;
-        if (!attached && !linked) return;
+        var parties = Campaign.Current?.CampaignObjectManager?.MobileParties;
+        if (parties == null) return;
 
-        Logger.Warning("Clearing stale army link for {PartyId} (attached={Attached}, linked={Linked})",
-            mobileParty.StringId, attached, linked);
-
-        if (attached)
-            mobileParty.AttachedTo = null;
-
-        if (linked)
+        var clientMobileParty = ModInformation.IsClient ? MobileParty.MainParty : null;
+        foreach (var party in parties.Where(party => party != null && IsHalfRemoved(party, army)).ToList())
         {
-            mobileParty._army = null;
-            if (mobileParty == MobileParty.MainParty && Game.Current.GameStateManager.ActiveState is MapState mapState)
-                mapState.OnLeaveArmy();
+            Logger.Warning("Releasing {PartyId}, left half removed from disbanding army {ArmyName}", party.StringId, army.Name);
+            FinishArmyLeave(party, army, clientMobileParty);
         }
-
-        mobileParty.Party.SetVisualAsDirty();
     }
 
+    [HarmonyPatch(nameof(Army.DisperseInternal))]
+    [HarmonyPrefix]
+    private static void DisperseInternalPrefix(Army __instance)
+    {
+        // clients clean up in ArmyRegistry.OnClientDestroyed instead
+        if (ModInformation.IsClient || __instance._armyIsDispersing) return;
+
+        ReleaseHalfRemovedParties(__instance);
+    }
     public static void SetAiBehaviorObject(Army army, IMapPoint mapPoint)
     {
         using (new AllowedThread())
