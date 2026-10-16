@@ -74,9 +74,16 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
     /// <summary>A two-player battle at sea or on land whose host the server elects from the mission-ready order, every member on the mesh.</summary>
     protected NavalBattle StartServerBattle(bool atSea, out NavalPeer a, out NavalPeer b, out Func<int> concluded)
     {
-        var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Attacker) });
+        var battle = StartServerBattle(atSea, out concluded, "A", "B");
         a = battle["A"];
         b = battle["B"];
+        return battle;
+    }
+
+    /// <summary>A battle at sea or on land of <paramref name="playerIds"/> on one side, elected in that order, every member on the mesh.</summary>
+    protected NavalBattle StartServerBattle(bool atSea, out Func<int> concluded, params string[] playerIds)
+    {
+        var battle = StartNavalBattle(playerIds.Select(id => (id, BattleSideEnum.Attacker)).ToArray());
         Server.Call(() => Server.GetRegisteredObject<MapEvent>(battle.MapEventId).Position =
             new CampaignVec2(Vec2.Zero, isOnLand: !atSea));
 
@@ -87,7 +94,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             EnterBattle(member.Instance, battle.MapEventId);
             Server.SimulateMessage(member.Instance.NetPeer, new NetworkMissionEntered(member.Id, battle.MapEventId));
         }
-        AssertHost(Server, battle.MapEventId, "A", "B");
+        AssertHost(Server, battle.MapEventId, playerIds[0], playerIds.Skip(1).ToArray());
 
         int conclusions = 0;
         Server.Resolve<IMessageBroker>().Subscribe<MapEventConcluded>(_ => conclusions++);
