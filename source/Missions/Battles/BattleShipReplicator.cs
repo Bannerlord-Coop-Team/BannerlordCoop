@@ -595,8 +595,8 @@ public partial class BattleShipReplicator : IBattleShipReplicator
     {
         foreach (var record in records.Where(record => record != null))
         {
-            // A player who left takes its hulls; an AI hull's record still spawns, and moves to the next host once it does.
-            if (!record.IsNpcParty
+            // A player who left takes its hulls; an AI or disconnected player's hull still spawns, and moves to the host once it does.
+            if (!record.IsNpcParty && !disconnectedOwners.Contains(record.OwnerControllerId)
                 && AuthorityStamp.ValidateMember(record.OwnerControllerId, missionContext.ControllersInMission) != null)
                 continue;
 

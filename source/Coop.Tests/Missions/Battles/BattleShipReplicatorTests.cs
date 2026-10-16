@@ -254,6 +254,27 @@ public class BattleShipReplicatorTests
             Times.Never);
     }
 
+    // M8b r1: a disconnect keeps the player's hulls, so its record arriving after the disconnect still spawns, under the host.
+    [Fact]
+    public void AcceptSpawnRecords_FromADisconnectedPlayer_SpawnsTheHullUnderTheBattleHost()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: true);
+        harness.Session.SetupGet(s => s.HostControllerId).Returns("successor");
+        var copy = harness.SetupForeignSpawn();
+        var record = ForeignRecord(Guid.NewGuid());
+
+        harness.Members.Remove(Peer);
+        harness.Broker.Publish(this, new MissionPeerDisconnected(Peer, Instance));
+        GameThread.Run(() => { }, blocking: true);
+        harness.Replicator.AcceptSpawnRecords(new[] { record });
+
+        Assert.True(harness.Registry.TryGet(record.ShipId, out var ship));
+        Assert.Same(copy, ship.Hull);
+        Assert.Equal("successor", ship.CurrentAuthority);
+        Assert.True(ship.IsAdopted);
+    }
+
     [Fact]
     public void ReportedReserveOf_DropsTheReport_OnceTheHullSank()
     {
@@ -1519,6 +1540,7 @@ public class BattleShipReplicatorTests
         public Mock<IBattleTeamResolver> TeamResolver { get; } = new Mock<IBattleTeamResolver>();
         public Mock<IBattleDeploymentCoordinator> Deployment { get; } = new Mock<IBattleDeploymentCoordinator>();
         public Mock<IAgentStationUseReplicator> Stations { get; } = new Mock<IAgentStationUseReplicator>();
+        public Mock<IBattleSession> Session { get; } = new Mock<IBattleSession>();
         /// <summary>The server-announced mission members the membership gate reads.</summary>
         public List<string> Members { get; } = new List<string>(InMission);
         public MessageBroker Broker { get; } = new MessageBroker();
@@ -1537,7 +1559,7 @@ public class BattleShipReplicatorTests
             component.SetupGet(c => c.ShipRegistry).Returns(Registry);
             component.SetupGet(c => c.AgentMovementHandler).Returns(Mock.Of<IAgentMovementHandler>());
 
-            var session = new Mock<IBattleSession>();
+            var session = Session;
             session.SetupGet(s => s.OwnControllerId).Returns(Own);
             session.SetupGet(s => s.HostEpoch).Returns(HostEpoch);
             session.SetupGet(s => s.InstanceId).Returns(Instance);

@@ -100,14 +100,14 @@ public class NavalScenarioMissionLogic : MissionLogic
         base.OnRemoveBehavior();
     }
 
-    // Ready's FinishDeployment removes two behaviors, which breaks Mission.OnTick's reverse index over them, so the
-    // press runs after the tick returns, as a click on the order of battle's UI layer does.
     // The mission a disconnected client reconnected into, before its deployment there is over.
     private bool IsRejoining => !disconnectedHere && !state.IsPending(NavalScenarioState.DisconnectStep)
         && state.IsPending(NavalScenarioState.RejoinStep);
 
     private bool IsPressingReady => state.IsPending(NavalScenarioState.ReadyStep) || IsRejoining;
 
+    // Ready's FinishDeployment removes two behaviors, which breaks Mission.OnTick's reverse index over them, so the
+    // press runs after the tick returns, as a click on the order of battle's UI layer does.
     private void TickReady(float dt)
     {
         if (!IsPressingReady) return;
