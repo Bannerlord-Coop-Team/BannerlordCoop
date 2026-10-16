@@ -208,6 +208,63 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
     }
 
     [Fact]
+    public void GuardEntryStateArrivesAfterGuardTroopsWithoutFlushingOtherParties()
+    {
+        var giverId = CreateIssueCopies(includeServer: true);
+        var guardsId = environment.CreateRegisteredObject<MobileParty>();
+        var otherPartyId = environment.CreateRegisteredObject<MobileParty>();
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        var observedCounts = new List<int>();
+        foreach (var instance in environment.Clients.Append(environment.Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(guardsId, out var guards));
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                using (new AllowedThread()) guards.IsActive = true;
+                instance.Resolve<IIssueGenerationRegistry>().SetGeneration(giver, 6);
+                instance.Resolve<IGangLeaderWeaponsAcceptance>().MirrorQuestAccepted(giver,
+                    new GangLeaderWeaponsQuestFields("weapons_guard_roster", CampaignTime.Days(25), 4700, 0, 21, 0.75f, 200, 17));
+                if (instance == environment.Server) return;
+                instance.Resolve<IMessageBroker>().Subscribe<NetworkGangLeaderWeaponsState>(_ =>
+                    Common.GameThread.RunSafe(() => observedCounts.Add(guards.MemberRoster.GetTroopCount(troop))));
+            });
+        }
+
+        var server = environment.Server;
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(guardsId, out var guards));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var otherParty));
+            Assert.True(server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+            quest._guardsParty = guards;
+            guards.MemberRoster.AddToCounts(troop, 6);
+            otherParty.MemberRoster.AddToCounts(troop, 3);
+            Assert.True(server.Resolve<ISendCoalescer>().HasPending);
+
+            server.Resolve<IMessageBroker>().Publish(this,
+                new GangLeaderWeaponsStateChanged(quest, GangLeaderWeaponsAction.EnterTown));
+
+            Assert.True(server.Resolve<ISendCoalescer>().HasPending);
+        });
+
+        Assert.Equal(environment.Clients.Count(), observedCounts.Count);
+        Assert.All(observedCounts, count => Assert.Equal(6, count));
+        foreach (var client in environment.Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var otherParty));
+                Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                Assert.Equal(0, otherParty.MemberRoster.GetTroopCount(troop));
+            });
+        }
+    }
+
+    [Fact]
     public void CancelReturnsConfiscatedWeaponsOnceWithoutChangingAnotherPlayersInventory()
     {
         var giverId = CreateIssueCopies(includeServer: true);

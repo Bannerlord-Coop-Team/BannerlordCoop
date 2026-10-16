@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
@@ -39,13 +40,14 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IGangLeaderWeaponsAcceptance acceptance;
     private readonly IGangLeaderWeaponsQuestActions actions;
+    private readonly ISendCoalescer sendCoalescer;
     private readonly HashSet<Quest> pendingGuardEntries = new();
     private Quest pendingBattle;
     private string pendingBattleRequestId;
 
     public GangLeaderWeaponsIssueHandler(IMessageBroker broker, INetwork network, IObjectManager objects,
         IPlayerManager players, IIssueGenerationRegistry generations, IIssueOwnershipRegistry ownership,
-        IGangLeaderWeaponsAcceptance acceptance, IGangLeaderWeaponsQuestActions actions)
+        IGangLeaderWeaponsAcceptance acceptance, IGangLeaderWeaponsQuestActions actions, ISendCoalescer sendCoalescer = null)
     {
         this.broker = broker;
         this.network = network;
@@ -55,6 +57,7 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
         this.ownership = ownership;
         this.acceptance = acceptance;
         this.actions = actions;
+        this.sendCoalescer = sendCoalescer;
         broker.Subscribe<GangLeaderWeaponsIssueCreated>(HandleCreated);
         broker.Subscribe<NetworkGangLeaderWeaponsIssueCreated>(HandleNetworkCreated);
         broker.Subscribe<GangLeaderWeaponsActionRequested>(HandleActionRequested);
@@ -231,6 +234,9 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
         string guardsId = null;
         if (quest._guardsParty != null && quest._guardsParty.IsActive &&
             !objects.TryGetIdWithLogging(quest._guardsParty, out guardsId)) return;
+        // The conversation needs the guard troops before its state message opens the tableau.
+        if (guardsId != null && objects.TryGetHandle(quest._guardsParty.MemberRoster, out var rosterId))
+            sendCoalescer?.FlushInstance(rosterId, network);
         var confiscated = quest._weaponsThatGuardTook.Select(pair => new ItemRosterElement(pair.Key, pair.Value)).ToArray();
         network.SendAll(new NetworkGangLeaderWeaponsState(giverId, generation, quest.StringId, guardsId,
             quest._collectedItemAmount, quest._playerDodgedGuards, quest._lowCrimeRatingWillBeApplied,
