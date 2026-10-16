@@ -497,6 +497,74 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
         return (giverId, partyId, guardsId, ownerClient);
     }
 
+    [Theory]
+    [InlineData(false, 360f)]
+    [InlineData(true, 340f)]
+    public void QuestOutcomeReplicatesGiverPowerToOwnerAndObserver(bool timedOut, float expectedPower)
+    {
+        var giverId = CreateIssueCopies(includeServer: true);
+        var ownerId = environment.CreateRegisteredObject<Hero>();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        var clanId = environment.CreateRegisteredObject<Clan>();
+        var itemId = environment.CreateRegisteredObject<ItemObject>();
+        const string controller = "weapons-delivery-owner";
+        var server = environment.Server;
+        var ownerClient = environment.Clients.First();
+        ownerClient.Resolve<IControllerIdProvider>().SetControllerId(controller);
+        foreach (var instance in environment.Clients.Append(server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+                Assert.True(instance.ObjectManager.TryGetObject<ItemObject>(itemId, out var item));
+                instance.Resolve<IIssueOwnershipRegistry>().SetOwner(giver, controller);
+                instance.Resolve<IIssueGenerationRegistry>().SetGeneration(giver, 4);
+                instance.Resolve<IGangLeaderWeaponsAcceptance>().MirrorQuestAccepted(giver,
+                    new GangLeaderWeaponsQuestFields("weapons_delivery_quest", CampaignTime.Days(25), 2448, 0, 4, 0f, 200, 4));
+                var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+                using (new AllowedThread())
+                {
+                    owner.Clan = clan;
+                    giver.CurrentSettlement.Town.OwnerClan = clan;
+                    giver.CurrentSettlement.Town.Security = 53f;
+                    giver._power = 350f;
+                    party.CurrentSettlement = giver.CurrentSettlement;
+                    item.StringId = itemId;
+                    MBObjectManager.Instance.RegisterObject(item);
+                    item.AddWeapon(new WeaponComponentData(null, quest._requestedWeaponClass, default), null);
+                    party.ItemRoster.AddToCounts(item, 4);
+                }
+            });
+        }
+        server.Call(() => Assert.True(server.Resolve<IPlayerManager>().AddPlayer(new Player(controller, ownerId, partyId, "", ""))));
+        environment.ConnectRegisteredPlayer(ownerClient, controller);
+
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+            if (timedOut) quest.CompleteQuestWithTimeOut();
+            else Assert.True(server.Resolve<IGangLeaderWeaponsQuestActions>().Apply(quest, owner, party, GangLeaderWeaponsAction.DeliverWeapons));
+            Assert.Equal(expectedPower, giver.Power);
+            Assert.False(quest.IsOngoing);
+            Assert.False(server.Resolve<IGangLeaderWeaponsQuestActions>().Apply(quest, owner, party, GangLeaderWeaponsAction.DeliverWeapons));
+        });
+
+        foreach (var client in environment.Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                Assert.Equal(expectedPower, giver.Power);
+            });
+        }
+    }
+
     [Fact]
     public void GuardBribeDebitsOnlyTheResolvedOwnerAndRejectsInsufficientGold()
     {

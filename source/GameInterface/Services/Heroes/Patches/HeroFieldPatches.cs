@@ -55,6 +55,8 @@ namespace GameInterface.Services.Heroes.Patches
         }
     }
 
+    // Install field writers before patched callers can inline their original bodies.
+    [HarmonyPatchCategory(GameInterface.HARMONY_STATIC_FIXES_CATEGORY)]
     [HarmonyPatch]
     internal class HeroFieldPatches
     {
