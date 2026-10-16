@@ -42,10 +42,11 @@ public class NavalBattleServices : INavalBattleServices
         context.Session.MarkNaval();
         hullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, shipEngine);
         var conditions = new BattleShipConditionStream(network, context.Session, shipEngine, context.HostEpochPolicy);
-        ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
-            hullAuthority, conditions);
+        // A hull leaving with its owner releases the seats on it first, so the stations exist before the hulls.
         StationUseReplicator = new AgentStationUseReplicator(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, context.Deployment);
+        ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
+            hullAuthority, conditions, StationUseReplicator);
         DeckPoses = new NavalDeckPoses(context.MissionComponent, shipEngine, StationUseReplicator);
         MigrationReserveFielder = new NavalMigrationReserveFielder(context.Session, context.ReinforcementFielder,
             context.MissionComponent.ShipRegistry, shipEngine, ShipReplicator);

@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -19,7 +20,8 @@ namespace Missions.Battles;
 /// the first deployment commit and stream their frame, helm input and ropes at 20 Hz; other owners' hulls are
 /// spawned as kinematic copies once this client's deployment is over and follow those samples. Ropes ride the samples
 /// because each one carries every station's generation-ordered state, so a later sample repairs a rejected one; leaving
-/// sends them once more. Owners also send a hull's damage state when it changes, and copies take it on.
+/// sends them once more. Owners also send a hull's damage state when it changes, and copies take it on. A hull that leaves
+/// with its owner (retreat or leave) is removed on every client, after its seats and deck are cleared.
 /// </summary>
 public interface IBattleShipReplicator : IDisposable
 {
@@ -64,6 +66,16 @@ public interface IBattleShipReplicator : IDisposable
     /// end with the mission, so peers would otherwise keep the last sample.
     /// </summary>
     void SendFinalRopes();
+
+    /// <summary>
+    /// [Game thread] Vanilla is about to remove <paramref name="hull"/> (BeforeShipRemovedEvent). For an own hull peers know,
+    /// tells them it left so they remove their copy; mid-mission it also clears the deck here and sends the hull's last ropes.
+    /// A hull swap, a hull not announced yet and, as the mission ends, an AI hull (it moves to the next host) send nothing.
+    /// </summary>
+    void AnnounceRemoval(MissionObject hull, ShipRemovalReason reason, bool missionEnding);
+
+    /// <summary>[Game thread] How many hulls of a side left the mission with their owner, for the end check's retreat rule.</summary>
+    int DepartedHulls(BattleSideEnum side);
 }
 
 /// <inheritdoc cref="IBattleShipReplicator"/>
@@ -91,8 +103,10 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly IObjectManager objectManager;
     private readonly INavalHullAuthority hullAuthority;
     private readonly IBattleShipConditionStream conditions;
+    private readonly IAgentStationUseReplicator stations;
 
     private readonly Dictionary<Guid, ShipStream> streams = new Dictionary<Guid, ShipStream>();
+    private readonly Dictionary<BattleSideEnum, int> departedHulls = new Dictionary<BattleSideEnum, int>();
     // Everything received for a ship that is not registered here yet, applied in one ordered drain once it is.
     private readonly Dictionary<Guid, HeldShip> heldShips = new Dictionary<Guid, HeldShip>();
     private long recordsHeld;
@@ -105,6 +119,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     private float sendElapsed;
     private float elapsed;
     private long finalRopesSent, finalRopesAccepted, finalRopesRejected;
+    private long removalsSent, removalsAccepted, removalsRejected, agentsMovedOffDepartedHulls;
+    private bool missionEndRopesSent;
 
     private INetworkShipRegistry Registry => missionComponent.ShipRegistry;
 
@@ -120,7 +136,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         IBattleTeamResolver teamResolver,
         IObjectManager objectManager,
         INavalHullAuthority hullAuthority,
-        IBattleShipConditionStream conditions)
+        IBattleShipConditionStream conditions,
+        IAgentStationUseReplicator stations)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -134,6 +151,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         this.objectManager = objectManager;
         this.hullAuthority = hullAuthority;
         this.conditions = conditions;
+        this.stations = stations;
 
         messageBroker.Subscribe<ShipSpawnedInBattle>(Handle_ShipSpawned);
         messageBroker.Subscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
@@ -144,6 +162,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Subscribe<NetworkShipCondition>(Handle_NetworkShipCondition);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Subscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
+        messageBroker.Subscribe<NetworkShipRemoved>(Handle_NetworkShipRemoved);
     }
 
     public void Dispose()
@@ -157,6 +176,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Unsubscribe<NetworkShipCondition>(Handle_NetworkShipCondition);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
+        messageBroker.Unsubscribe<NetworkShipRemoved>(Handle_NetworkShipRemoved);
         heldShips.Clear();
         departedControllers.Clear();
     }
@@ -263,12 +283,148 @@ public class BattleShipReplicator : IBattleShipReplicator
         {
             if (live.Contains(ship.Hull)) continue;
 
-            Registry.Remove(ship.ShipId);
-            streams.Remove(ship.ShipId);
-            conditions.Forget(ship.ShipId);
+            Prune(ship.ShipId);
             Logger.Information("[NavalSync] Hull {ShipId} of {Owner} left the mission (deployment mode {DeploymentMode}); dropped it",
                 ship.ShipId, ship.CurrentAuthority, engine.IsDeploymentMode);
         }
+    }
+
+    // Removed is the one signal every buffer keyed by the ship id drops on.
+    private void Prune(Guid shipId)
+    {
+        if (!Registry.Remove(shipId)) Registry.MarkRemoved(shipId);
+        streams.Remove(shipId);
+        conditions.Forget(shipId);
+        heldShips.Remove(shipId);
+    }
+
+    public void AnnounceRemoval(MissionObject hull, ShipRemovalReason reason, bool missionEnding)
+    {
+        if (!spawnRecordsSent || hullAuthority.IsSpawnRegistrationSuppressed || !Registry.TryGetByHull(hull, out var ship)
+            || !IsOwnHull(ship))
+            return;
+        if (missionEnding && ship.IsNpcParty) return;
+
+        if (!missionEnding)
+        {
+            // Vanilla fades the hull's own crew; puppets seated on it and other owners' agents on its deck are this client's.
+            stations.ReleaseSeatsOn(hull);
+            MoveDeckAgents(ship, new[] { hull });
+            CountDeparted(ship);
+            if (!missionEndRopesSent) SendFinalRopes(ship);
+        }
+
+        network.SendAll(new NetworkShipRemoved(ship.ShipId, session.OwnControllerId, reason));
+        removalsSent++;
+        Logger.Information("[NavalSync] Own hull {ShipId} leaves the mission ({Reason}{Ending}); told peers to remove it",
+            ship.ShipId, reason, missionEnding ? ", mission ending" : "");
+    }
+
+    public int DepartedHulls(BattleSideEnum side) => departedHulls.TryGetValue(side, out int count) ? count : 0;
+
+    private void CountDeparted(NetworkShipInfo ship)
+    {
+        var side = engine.SideOf(ship.Hull);
+        departedHulls[side] = DepartedHulls(side) + 1;
+    }
+
+    private void Handle_NetworkShipRemoved(MessagePayload<NetworkShipRemoved> payload)
+    {
+        var removal = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (Mission.Current == null) return;
+            AcceptRemoval(removal);
+        }, context: nameof(Handle_NetworkShipRemoved));
+    }
+
+    /// <summary>[Game thread] Removes the copy of a hull its owner took out of the mission; one not spawned here never will be.</summary>
+    internal void AcceptRemoval(NetworkShipRemoved removal)
+    {
+        if (removal == null) return;
+
+        if (!Registry.TryGet(removal.ShipId, out var ship))
+        {
+            if (heldShips.TryGetValue(removal.ShipId, out var held) && held.Record != null
+                && held.Record.OwnerControllerId != removal.OwnerControllerId)
+            {
+                removalsRejected++;
+                return;
+            }
+
+            Prune(removal.ShipId);
+            removalsAccepted++;
+            return;
+        }
+
+        if (AuthorityStamp.ValidateSender(removal.OwnerControllerId, ship.CurrentAuthority, session.OwnControllerId) != null)
+        {
+            removalsRejected++;
+            return;
+        }
+
+        RemoveHulls(new[] { ship }, removal.Reason);
+        removalsAccepted++;
+    }
+
+    // [Game thread] Every client's half of hulls leaving with their owner. Seats go first, since no machine of a removed hull
+    // may keep a user (R33); then other owners' agents on the decks move to their own hull; then vanilla removes the hulls.
+    private void RemoveHulls(IReadOnlyList<NetworkShipInfo> departing, ShipRemovalReason reason)
+    {
+        if (departing.Count == 0) return;
+
+        var departingHulls = departing.Select(ship => ship.Hull).ToList();
+        foreach (var ship in departing)
+        {
+            stations.ReleaseSeatsOn(ship.Hull);
+            engine.ReleaseHullStations(ship.Hull);
+        }
+
+        foreach (var ship in departing)
+            MoveDeckAgents(ship, departingHulls);
+
+        foreach (var ship in departing)
+        {
+            CountDeparted(ship);
+            hullAuthority.Remove(ship);
+            Prune(ship.ShipId);
+            Logger.Information("[NavalSync] Hull {ShipId} of {Owner} left with its owner ({Reason}); removed it",
+                ship.ShipId, ship.CurrentAuthority, reason);
+        }
+    }
+
+    // A departing hull's crew leaves with it; anyone else on its deck goes to the hull they crew, or the nearest friendly one.
+    private void MoveDeckAgents(NetworkShipInfo ship, IReadOnlyCollection<MissionObject> departingHulls)
+    {
+        foreach (var agent in engine.AgentsOnDeck(ship.Hull))
+        {
+            var crewHull = engine.CrewHullOf(agent);
+            if (crewHull != null && departingHulls.Contains(crewHull)) continue;
+
+            var target = crewHull != null && !engine.IsHullRemoved(crewHull) && !engine.IsSinking(crewHull)
+                ? crewHull
+                : engine.NearestFriendlyHull(agent, departingHulls);
+            if (target == null)
+            {
+                Logger.Warning("[NavalSync] No friendly hull to move agent {Agent} to off departing hull {ShipId}",
+                    agent.Index, ship.ShipId);
+                continue;
+            }
+
+            engine.MoveAgentToHull(agent, target);
+            agentsMovedOffDepartedHulls++;
+        }
+    }
+
+    /// <summary>[Game thread] Removes every hull a player who left the battle owned, and drops its records still waiting here.</summary>
+    internal void RemoveHullsOf(string controllerId)
+    {
+        var departing = Registry.Ships.Where(ship => !ship.IsNpcParty && ship.CurrentAuthority == controllerId).ToList();
+        RemoveHulls(departing, ShipRemovalReason.Leave);
+
+        foreach (var entry in heldShips.Where(entry => entry.Value.Record != null && !entry.Value.Record.IsNpcParty
+            && entry.Value.Record.OwnerControllerId == controllerId).ToArray())
+            Prune(entry.Key);
     }
 
     // [Game thread] Own hulls only; a joiner that enters after the commit gets the same records directly.
@@ -324,6 +480,8 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         if (!Registry.TryGet(condition.ShipId, out var ship))
         {
+            if (Registry.StateOf(condition.ShipId) == ShipLifecycle.Removed) return;
+
             var held = Held(condition.ShipId);
             if (held.Condition == null || condition.Stamp.IsNewer(held.Condition.Stamp)) held.Condition = condition;
             return;
@@ -338,14 +496,18 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         if (!spawnRecordsSent) return;
 
+        missionEndRopesSent = true;
         foreach (var ship in Registry.Ships.Where(IsOwnHull))
-        {
-            var ropes = engine.CaptureRopes(ship.Hull, ShipIdOf);
-            if (ropes == null || ropes.Length == 0) continue;
+            SendFinalRopes(ship);
+    }
 
-            network.SendAll(new NetworkBattleRopeFinal(ship.ShipId, session.OwnControllerId, ropes));
-            finalRopesSent++;
-        }
+    private void SendFinalRopes(NetworkShipInfo ship)
+    {
+        var ropes = engine.CaptureRopes(ship.Hull, ShipIdOf);
+        if (ropes == null || ropes.Length == 0) return;
+
+        network.SendAll(new NetworkBattleRopeFinal(ship.ShipId, session.OwnControllerId, ropes));
+        finalRopesSent++;
     }
 
     private void Handle_NetworkBattleRopeFinal(MessagePayload<NetworkBattleRopeFinal> payload)
@@ -444,6 +606,13 @@ public class BattleShipReplicator : IBattleShipReplicator
     private bool TrySpawnForeignHull(HeldShip held)
     {
         var data = held.Record;
+        // A hull that left with its owner never spawns here, whatever arrives for it late.
+        if (Registry.StateOf(data.ShipId) == ShipLifecycle.Removed)
+        {
+            heldShips.Remove(data.ShipId);
+            return true;
+        }
+
         if (Mission.Current == null || session.IsOwn(data.OwnerControllerId) || Registry.TryGet(data.ShipId, out _))
         {
             held.SettleRecord();
@@ -632,18 +801,30 @@ public class BattleShipReplicator : IBattleShipReplicator
     public int HullReserve(MissionObject hull) =>
         Registry.TryGetByHull(hull, out var ship) && !IsOwnHull(ship) ? ReportedReserveOf(hull) : engine.ReadSpawnableReserve(hull);
 
-    private void Handle_MissionPeerLeft(MessagePayload<MissionPeerLeft> payload) =>
-        ForgetReportsOfDeparted(payload.What.ControllerId, payload.What.InstanceId);
-
-    private void Handle_MissionPeerDisconnected(MessagePayload<MissionPeerDisconnected> payload) =>
-        ForgetReportsOfDeparted(payload.What.ControllerId, payload.What.InstanceId);
-
-    private void ForgetReportsOfDeparted(string controllerId, string instanceId)
+    // A player who left takes its hulls with it, whether or not its own removal reached this client first.
+    private void Handle_MissionPeerLeft(MessagePayload<MissionPeerLeft> payload)
     {
-        if (string.IsNullOrEmpty(controllerId) || (instanceId != null && instanceId != session.InstanceId)) return;
+        var left = payload.What;
+        if (!IsDepartureOfThisBattle(left.ControllerId, left.InstanceId)) return;
 
-        GameThread.RunSafe(() => ForgetReportedReserveOf(controllerId), context: nameof(ForgetReportsOfDeparted));
+        GameThread.RunSafe(() =>
+        {
+            ForgetReportedReserveOf(left.ControllerId);
+            if (Mission.Current != null) RemoveHullsOf(left.ControllerId);
+        }, context: nameof(Handle_MissionPeerLeft));
     }
+
+    // A disconnected player's hulls stay for the battle host to adopt.
+    private void Handle_MissionPeerDisconnected(MessagePayload<MissionPeerDisconnected> payload)
+    {
+        var disconnected = payload.What;
+        if (!IsDepartureOfThisBattle(disconnected.ControllerId, disconnected.InstanceId)) return;
+
+        GameThread.RunSafe(() => ForgetReportedReserveOf(disconnected.ControllerId), context: nameof(Handle_MissionPeerDisconnected));
+    }
+
+    private bool IsDepartureOfThisBattle(string controllerId, string instanceId) =>
+        !string.IsNullOrEmpty(controllerId) && (instanceId == null || instanceId == session.InstanceId) && !session.IsOwn(controllerId);
 
     /// <summary>[Game thread] Drops the reserve a departed controller reported for the hulls it held, and ignores its late reports.</summary>
     internal void ForgetReportedReserveOf(string controllerId)
@@ -740,6 +921,12 @@ public class BattleShipReplicator : IBattleShipReplicator
     public object Inspect() => new
     {
         spawnRecordsSent,
+        removalsSent,
+        removalsAccepted,
+        removalsRejected,
+        agentsMovedOffDepartedHulls,
+        departedAttackerHulls = DepartedHulls(BattleSideEnum.Attacker),
+        departedDefenderHulls = DepartedHulls(BattleSideEnum.Defender),
         pendingForeignHulls = heldShips.Values.Count(held => held.Record != null),
         heldForDeployment = heldShips.Values.Count(held => held.HeldForDeployment),
         heldSamples = heldShips.Values.Count(held => held.Sample != null),

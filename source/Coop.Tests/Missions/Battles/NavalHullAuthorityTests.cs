@@ -32,6 +32,22 @@ public class NavalHullAuthorityTests
         engine.Verify(e => e.ReleaseNpcHull(hull), Times.Once);
     }
 
+    // M8a: a hull that leaves mid-swap ends the swap before vanilla removes it.
+    [Fact]
+    public void Remove_EndsAPendingReplacement_ThenRemovesTheHull()
+    {
+        var (authority, registry, engine) = Create();
+        var hull = ShipTestHulls.Create();
+        var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_2", false, hull, null);
+        registry.TryRegister(ship);
+        authority.Transfer(ship, Own);
+
+        authority.Remove(ship);
+
+        Assert.False(authority.IsReplacing(ship.ShipId));
+        engine.Verify(e => e.RemoveHull(hull), Times.Once);
+    }
+
     [Fact]
     public void SuppressSpawnRegistration_HoldsUntilEveryScopeCloses()
     {

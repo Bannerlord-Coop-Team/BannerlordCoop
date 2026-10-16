@@ -19,6 +19,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
     public const float FullSailHitPoints = 50f;
 
     private readonly List<FakeHull> hulls = new();
+    private readonly Dictionary<Agent, FakeHull> decks = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<Agent, FakeHull> crews = new(ReferenceEqualityComparer.Instance);
 
     public IReadOnlyList<MissionObject> Hulls => hulls.Where(hull => !hull.IsRemoved).Select(hull => hull.Hull).ToList();
 
@@ -210,6 +212,54 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
 
     public bool HasHelmPilot(MissionObject hull) => false;
 
+    /// <summary>Stands <paramref name="agent"/> on <paramref name="deck"/>'s deck, as crew of <paramref name="crewHull"/> when given.</summary>
+    public void PlaceAgent(Agent agent, MissionObject deck, MissionObject? crewHull = null)
+    {
+        decks[agent] = Of(deck);
+        if (crewHull != null) crews[agent] = Of(crewHull);
+    }
+
+    /// <summary>The hull whose deck the agent stands on, or null.</summary>
+    public FakeHull? DeckOf(Agent agent) => decks.TryGetValue(agent, out var deck) ? deck : null;
+
+    public int MovedAgents { get; private set; }
+
+    public IReadOnlyList<Agent> AgentsOnDeck(MissionObject hull)
+    {
+        var fake = Of(hull);
+        return decks.Where(entry => ReferenceEquals(entry.Value, fake) && entry.Key.IsActive()).Select(entry => entry.Key)
+            .Concat(fake.Seats.Values)
+            .Distinct()
+            .ToList();
+    }
+
+    public MissionObject CrewHullOf(Agent agent) => crews.TryGetValue(agent, out var crew) ? crew.Hull : null!;
+
+    public MissionObject NearestFriendlyHull(Agent agent, IReadOnlyCollection<MissionObject> excluded)
+    {
+        var from = DeckOf(agent);
+        var side = crews.TryGetValue(agent, out var crew) ? crew.Side : from?.Side;
+        return hulls
+            .Where(hull => !hull.IsRemoved && hull.SinkingState == 0 && hull.Side == side && !excluded.Contains(hull.Hull))
+            .OrderBy(hull => from == null ? 0f : hull.Frame.origin.DistanceSquared(from.Frame.origin))
+            .FirstOrDefault()?.Hull!;
+    }
+
+    public void MoveAgentToHull(Agent agent, MissionObject hull)
+    {
+        decks[agent] = Of(hull);
+        MovedAgents++;
+    }
+
+    public void ReleaseHullStations(MissionObject hull) => Of(hull).Seats.Clear();
+
+    public void RemoveHull(MissionObject hull)
+    {
+        var fake = Of(hull);
+        fake.SeatsAtRemoval = fake.Seats.Count;
+        fake.IsRemoved = true;
+    }
+
     public BattleRopeState[] CaptureRopes(MissionObject hull, Func<MissionObject, Guid> shipIdOf) => Of(hull).Ropes;
 
     public void ApplyRopes(MissionObject hull, BattleRopeState[] ropes, Func<Guid, MissionObject> hullOf, bool final)
@@ -338,6 +388,8 @@ public sealed class FakeHull
     public List<IAgentOriginBase> ReservedOrigins { get; } = new();
     /// <summary>Left the mission: no longer one of the engine's hulls.</summary>
     public bool IsRemoved { get; set; }
+    /// <summary>How many agents still sat at the hull's stations when <see cref="FakeNavalShipEngine.RemoveHull"/> removed it.</summary>
+    public int SeatsAtRemoval { get; set; }
     /// <summary>Pooled by deployment: still listed but removed for every station and condition purpose.</summary>
     public bool IsPooled { get; set; }
     public Team? Team { get; set; }

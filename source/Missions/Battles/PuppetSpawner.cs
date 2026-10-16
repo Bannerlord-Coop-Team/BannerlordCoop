@@ -164,7 +164,7 @@ public class PuppetSpawner : IPuppetSpawner
             if (info.AuthorityRevision < pending.Data.AuthorityRevision) continue;
             // Crew joining a hull whose copy has not spawned here yet waits for it, like its spawn record does.
             bool resolved = TryResolveCrewFormation(pending.Data.ShipId, pending.Data.FormationIndex, out int formationIndex);
-            if (!resolved && coopMissionComponent.ShipRegistry.StateOf(pending.Data.ShipId) != ShipLifecycle.SpawnFailed) continue;
+            if (!resolved && !coopMissionComponent.ShipRegistry.IsGone(pending.Data.ShipId)) continue;
             pendingFormations.Remove(id);
             if (!resolved || info.CurrentAuthority != pending.Controller || info.AuthorityRevision != pending.Data.AuthorityRevision
                 || session.IsOwn(info.CurrentAuthority) || info.Agent == null || !info.Agent.IsActive()) continue;
@@ -429,9 +429,9 @@ public class PuppetSpawner : IPuppetSpawner
         NetworkShipInfo crewShip = null;
         if (data.ShipId != Guid.Empty && !coopMissionComponent.ShipRegistry.TryGet(data.ShipId, out crewShip))
         {
-            if (coopMissionComponent.ShipRegistry.StateOf(data.ShipId) != ShipLifecycle.SpawnFailed) return false; // hull not spawned yet — buffer
+            if (!coopMissionComponent.ShipRegistry.IsGone(data.ShipId)) return false; // hull not spawned yet — buffer
 
-            // The ship replicator gave up on this hull and logged it, so its crew is dropped with it.
+            // The ship replicator gave up on this hull or it left the mission, so its crew is dropped with it.
             DiscardPendingFormations(data.AgentId);
             return true;
         }

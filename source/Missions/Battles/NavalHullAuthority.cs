@@ -28,6 +28,12 @@ public interface INavalHullAuthority : IDisposable
     /// <summary>Queues replacing a hull this client simulates with a fresh simulated hull of the same ship. Why it cannot, or null.</summary>
     string Replace(Guid shipId);
 
+    /// <summary>
+    /// Takes a hull out of the mission through vanilla's removal, ending any replacement it was in; agents parked for that
+    /// replacement go back where they stood. Its seats and deck must already be clear.
+    /// </summary>
+    void Remove(NetworkShipInfo ship);
+
     bool IsReplacing(Guid shipId);
 
     /// <summary>The replacement step a hull is at, or null (diagnostics).</summary>
@@ -89,6 +95,18 @@ public class NavalHullAuthority : INavalHullAuthority
 
         hullSwaps.Add(new HullSwap(shipId));
         return null;
+    }
+
+    public void Remove(NetworkShipInfo ship)
+    {
+        var swap = hullSwaps.FirstOrDefault(pending => pending.ShipId == ship.ShipId);
+        if (swap != null)
+        {
+            hullSwaps.Remove(swap);
+            if (swap.Agents != null) engine.BoardHullAgents(null, swap.Agents);
+        }
+
+        engine.RemoveHull(ship.Hull);
     }
 
     public bool IsReplacing(Guid shipId) => hullSwaps.Any(swap => swap.ShipId == shipId);

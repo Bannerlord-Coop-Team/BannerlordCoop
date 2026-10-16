@@ -25,6 +25,12 @@ public interface IAgentStationUseReplicator : IDisposable
     /// <summary>Whether this client seated the agent, so the ship deck seam withholds its movement and actions.</summary>
     bool IsOwnSeat(Guid agentId);
 
+    /// <summary>
+    /// [Game thread] Lets every puppet this client seated on <paramref name="hull"/> go before the hull leaves the mission, so no
+    /// machine of a removed hull keeps a user; how many it released.
+    /// </summary>
+    int ReleaseSeatsOn(MissionObject hull);
+
     object Inspect();
 }
 
@@ -54,7 +60,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private bool seatsAnnounced;
     private bool applyingRemote;
     private long sent, applied, dropped, localPuppetReleases, pinned, ownerReleases, sinkingUseReleases, sinkingSafetyNetReleases,
-        withdrawnReleases, removedHullSeats;
+        withdrawnReleases, removedHullSeats, departedHullReleases;
 
     public AgentStationUseReplicator(
         IBattleNetwork network,
@@ -213,6 +219,19 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
             appliedSeats.Remove(agentId);
     }
 
+    public int ReleaseSeatsOn(MissionObject hull)
+    {
+        var seated = appliedSeats.Where(entry => ReferenceEquals(entry.Value.Hull, hull)).ToList();
+        foreach (var entry in seated)
+        {
+            appliedSeats.Remove(entry.Key);
+            if (engine.IsSeated(entry.Value.Agent, entry.Value.Point)) Apply(entry.Value.Agent, entry.Value.Point, inUse: false);
+        }
+
+        departedHullReleases += seated.Count;
+        return seated.Count;
+    }
+
     // Safety net for an owner whose crew drowns seated without a release; normally the owner's releases arrive first.
     private void ReleaseFromSinkingHull(Guid agentId, AppliedSeat seat)
     {
@@ -239,16 +258,16 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private void DrainPending()
     {
         if (pending.Count == 0) return;
-        pending.RemoveAll(entry => TryApply(entry.Use) || DropForFailedHullSpawn(entry) || Expire(entry));
+        pending.RemoveAll(entry => TryApply(entry.Use) || DropForGoneHull(entry) || Expire(entry));
     }
 
-    // A hull this client gave up spawning never arrives, and its crew is dropped with it.
-    private bool DropForFailedHullSpawn(PendingUse entry)
+    // A hull this client gave up spawning, or one that left the mission, never arrives, and its crew's uses go with it.
+    private bool DropForGoneHull(PendingUse entry)
     {
-        if (missionComponent.ShipRegistry.StateOf(entry.Use.ShipId) != ShipLifecycle.SpawnFailed) return false;
+        if (!missionComponent.ShipRegistry.IsGone(entry.Use.ShipId)) return false;
 
         dropped++;
-        Logger.Warning("[NavalSync] Dropped station use {Revision} of agent {AgentId}: hull {ShipId} could not spawn here",
+        Logger.Warning("[NavalSync] Dropped station use {Revision} of agent {AgentId}: hull {ShipId} could not spawn here or left the mission",
             entry.Use.Revision, entry.Use.AgentId, entry.Use.ShipId);
         return true;
     }
@@ -379,6 +398,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         sinkingSafetyNetReleases,
         withdrawnReleases,
         removedHullSeats,
+        departedHullReleases,
         appliedSeats = appliedSeats.Count,
         pending = pending.Count,
         ownSeated = ownSeated.Count,

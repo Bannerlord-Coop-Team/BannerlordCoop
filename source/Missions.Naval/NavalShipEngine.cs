@@ -227,6 +227,92 @@ public class NavalShipEngine : INavalShipEngine
 
     public bool HasHelmPilot(MissionObject hull) => ((MissionShip)hull).ShipControllerMachine?.PilotAgent != null;
 
+    public IReadOnlyList<Agent> AgentsOnDeck(MissionObject hull)
+    {
+        var ship = (MissionShip)hull;
+        var mission = Mission.Current;
+        if (mission == null || !ship.GameEntity.IsValid) return Array.Empty<Agent>();
+
+        return mission.Agents
+            .Where(agent => agent.IsActive() && agent.IsHuman && (GetSupportHull(agent) == ship || UsesMachineOf(agent, ship)))
+            .ToList();
+    }
+
+    public MissionObject CrewHullOf(Agent agent)
+    {
+        var formation = agent?.Formation;
+        var shipsLogic = ShipsLogic;
+        if (formation == null || shipsLogic == null) return null;
+
+        return shipsLogic.GetShip(formation, out var ship) ? ship : null;
+    }
+
+    public MissionObject NearestFriendlyHull(Agent agent, IReadOnlyCollection<MissionObject> excluded)
+    {
+        var shipsLogic = ShipsLogic;
+        var team = agent?.Team;
+        if (shipsLogic == null || team == null) return null;
+
+        MissionShip nearest = null;
+        float nearestDistance = float.MaxValue;
+        foreach (var ship in shipsLogic.AllShips)
+        {
+            if (excluded.Contains(ship) || ship.IsRemoved || ship.IsSinking || !ship.GameEntity.IsValid || ship.Team == null
+                || !ship.Team.IsFriendOf(team))
+                continue;
+
+            float distance = ship.GlobalFrame.origin.DistanceSquared(agent.Position);
+            if (distance >= nearestDistance) continue;
+
+            nearest = ship;
+            nearestDistance = distance;
+        }
+
+        return nearest;
+    }
+
+    // Vanilla spawns deck crew at the hull's outer and inner deck frames (NavalShipAgents), so a moved agent lands on one too.
+    public void MoveAgentToHull(Agent agent, MissionObject hull)
+    {
+        var ship = (MissionShip)hull;
+        if (!agent.IsActive() || ship.IsRemoved || !ship.GameEntity.IsValid) return;
+
+        Vec3 position;
+        if (ship.DeckFrameCount > 0)
+        {
+            position = ship.GetNextOuterInnerSpawnGlobalFrame().origin;
+        }
+        else
+        {
+            ship.GetWorldPositionOnDeck(out var deck);
+            position = deck.GetGroundVec3();
+        }
+
+        agent.TeleportToPosition(position);
+    }
+
+    public void ReleaseHullStations(MissionObject hull)
+    {
+        var ship = (MissionShip)hull;
+        var mission = Mission.Current;
+        if (mission == null || !ship.GameEntity.IsValid) return;
+
+        foreach (var agent in mission.Agents.Where(agent => agent.IsActive() && UsesMachineOf(agent, ship)).ToList())
+            agent.StopUsingGameObject(isSuccessful: false, Agent.StopUsingGameObjectFlags.None);
+    }
+
+    public void RemoveHull(MissionObject hull)
+    {
+        var ship = (MissionShip)hull;
+        var shipsLogic = ShipsLogic;
+        if (shipsLogic == null || ship.IsRemoved || !ship.GameEntity.IsValid) return;
+
+        // Quest5's RemoveShipInternal: no rope or bridge may keep pointing at a removed hull. A copy stays a copy until the
+        // behavior's ShipRemovedEvent handler drops it, so the copy gates hold for the whole removal.
+        NavalRopes.BreakConnections(ship);
+        shipsLogic.RemoveShip(ship);
+    }
+
     public MatrixFrame GetFrame(MissionObject hull) => ((MissionShip)hull).GlobalFrame;
 
     public void ApplyForeignFrame(MissionObject hull, MatrixFrame frame)

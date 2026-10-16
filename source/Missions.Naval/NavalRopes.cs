@@ -59,6 +59,26 @@ internal static class NavalRopes
         Applying = false;
     }
 
+    /// <summary>
+    /// Breaks every rope and plank that starts or ends on a hull leaving the mission, replicas included, and forgets its
+    /// stations; the owners of the other ends see their rope gone and send its removal.
+    /// </summary>
+    internal static void BreakConnections(MissionShip hull)
+    {
+        Applying = true;
+        try
+        {
+            hull.BreakAllExistingConnections();
+        }
+        finally
+        {
+            Applying = false;
+        }
+
+        foreach (var machine in hull.AttachmentMachines)
+            records.Remove(machine);
+    }
+
     internal static bool IsReplicaMachine(ShipAttachmentMachine machine) => machine != null && NavalForeignHulls.Contains(machine.OwnerShip);
 
     internal static bool IsReplica(Attachment attachment) => IsReplicaMachine(attachment?.AttachmentSource);

@@ -1,6 +1,8 @@
 ﻿using Common.Logging;
 using Missions.Agents.Handlers;
 using Missions.Battles;
+using Missions.Messages;
+using NavalDLC.Missions;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
 using Serilog;
@@ -22,6 +24,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     private readonly NavalShipsLogic shipsLogic;
     private readonly Action tickNpcFleet;
     private int lastAgentCount = -1;
+    private bool retreated;
 
     public CoopNavalBattleBehavior(INavalBattleServices services, INavalNpcFleetSpawner npcFleetSpawner, NavalShipsLogic shipsLogic)
     {
@@ -31,6 +34,8 @@ public class CoopNavalBattleBehavior : MissionLogic
         this.shipsLogic = shipsLogic;
         // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached.
         shipsLogic.MissionEndEvent += ShipReplicator.SendFinalRopes;
+        // Also fires for every hull as NavalShipsLogic.OnEndMission removes them, after the final ropes went out.
+        shipsLogic.BeforeShipRemovedEvent += OnBeforeShipRemoved;
         shipsLogic.ShipRemovedEvent += OnShipRemoved;
         CoopNavalMissionScope.IsActive = true;
     }
@@ -68,6 +73,20 @@ public class CoopNavalBattleBehavior : MissionLogic
             shipsLogic.AllShips.Count, string.Join(", ", hulls), NavalForeignHulls.All.Count(), Mission.Agents.Count);
     }
 
+    // Vanilla's Tab and Retreat runs OnRetreatMission on every logic before it ends the mission and removes the hulls.
+    public override void OnRetreatMission()
+    {
+        base.OnRetreatMission();
+        retreated = true;
+    }
+
+    private void OnBeforeShipRemoved(MissionShip ship)
+    {
+        bool retreatOrdered = ship.IsShipOrderActive && ship.ShipOrder.MovementOrderEnum == ShipOrder.ShipMovementOrderEnum.Retreat;
+        var reason = retreated || retreatOrdered ? ShipRemovalReason.Retreat : ShipRemovalReason.Leave;
+        ShipReplicator.AnnounceRemoval(ship, reason, shipsLogic.IsMissionEnding);
+    }
+
     // A removed hull is pooled during deployment and its entity removed later, so no copy reference may outlive it.
     private void OnShipRemoved(MissionShip ship)
     {
@@ -94,6 +113,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     {
         CoopNavalMissionScope.IsActive = false;
         shipsLogic.MissionEndEvent -= ShipReplicator.SendFinalRopes;
+        shipsLogic.BeforeShipRemovedEvent -= OnBeforeShipRemoved;
         shipsLogic.ShipRemovedEvent -= OnShipRemoved;
         services.Dispose();
         NavalRopes.Clear();

@@ -175,6 +175,7 @@
     <!-- A publicized event backing field makes the event name ambiguous. -->
     <DoNotPublicize Include="NavalDLC:NavalDLC.Missions.MissionLogics.NavalShipsLogic.MissionEndEvent" />
     <DoNotPublicize Include="NavalDLC:NavalDLC.Missions.MissionLogics.NavalShipsLogic.ShipRemovedEvent" />
+    <DoNotPublicize Include="NavalDLC:NavalDLC.Missions.MissionLogics.NavalShipsLogic.BeforeShipRemovedEvent" />
     <Reference Include="NavalDLC.View"><HintPath>../../mb2/Modules/NavalDLC/bin/Win64_Shipping_Client/NavalDLC.View.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="NavalDLC.GauntletUI"><HintPath>../../mb2/Modules/NavalDLC/bin/Win64_Shipping_Client/NavalDLC.GauntletUI.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="NavalDLC.ViewModelCollection"><HintPath>../../mb2/Modules/NavalDLC/bin/Win64_Shipping_Client/NavalDLC.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>

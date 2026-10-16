@@ -121,6 +121,42 @@ public class NetworkShipRegistryTests
         Assert.Equal(ShipLifecycle.SpawnFailed, registry.StateOf(shipId));
     }
 
+    // M8a: a hull that left with its owner stays gone; a late record or a retry must not make it wait or spawn again.
+    [Fact]
+    public void MarkRemoved_SticksOverALaterWaitOrFailure_AndReadsGone()
+    {
+        var registry = new NetworkShipRegistry();
+        var shipId = Guid.NewGuid();
+        registry.MarkAwaiting(shipId);
+        bool goneWhileAwaiting = registry.IsGone(shipId);
+
+        registry.MarkRemoved(shipId);
+        registry.MarkAwaiting(shipId);
+        registry.MarkSpawnFailed(shipId);
+
+        Assert.False(goneWhileAwaiting);
+        Assert.Equal(ShipLifecycle.Removed, registry.StateOf(shipId));
+        Assert.True(registry.IsGone(shipId));
+    }
+
+    [Fact]
+    public void IsGone_HoldsForAGivenUpOrRemovedShip_NotForAWaitingOrRegisteredOne()
+    {
+        var registry = new NetworkShipRegistry();
+        var ship = new NetworkShipInfo(Guid.NewGuid(), "peer", "MapEventParty_2", false, CreateHull(), null);
+        var failed = Guid.NewGuid();
+        registry.MarkSpawnFailed(failed);
+        registry.TryRegister(ship);
+        bool goneWhileRegistered = registry.IsGone(ship.ShipId);
+
+        registry.Remove(ship.ShipId);
+
+        Assert.True(registry.IsGone(failed));
+        Assert.False(goneWhileRegistered);
+        Assert.True(registry.IsGone(ship.ShipId));
+        Assert.False(registry.IsGone(Guid.NewGuid()));
+    }
+
     [Theory]
     [InlineData(1, false)]
     [InlineData(BattleShipReplicator.ForeignHullSpawnAttempts - 1, false)]

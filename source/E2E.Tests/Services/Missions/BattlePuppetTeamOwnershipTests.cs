@@ -591,7 +591,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             Mock.Of<IReinforcementFielder>());
         return new BattleShipReplicator(Mock.Of<IBattleNetwork>(), broker, context, engine, teams, objectManager,
             new NavalHullAuthority(session, missionComponent, engine),
-            new BattleShipConditionStream(Mock.Of<IBattleNetwork>(), session, engine, epochs));
+            new BattleShipConditionStream(Mock.Of<IBattleNetwork>(), session, engine, epochs), Mock.Of<IAgentStationUseReplicator>());
     }
 
     [Fact]

@@ -282,9 +282,9 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
         if (state == null) return;
         if (!Registry.TryGet(state.ShipId, out var ship) || !streams.TryGetValue(state.ShipId, out var stream))
         {
-            if (Registry.StateOf(state.ShipId) == ShipLifecycle.SpawnFailed)
+            if (Registry.IsGone(state.ShipId))
             {
-                DropState("spawn_failed");
+                DropState("hull_gone");
                 return;
             }
             if (!pendingStates.TryGetValue(state.ShipId, out var pending) || state.Stamp.IsNewer(pending.Stamp))
@@ -333,8 +333,8 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
 
         foreach (var shipId in pendingStates.Keys.ToArray())
         {
-            // The ship replicator gave up on a hull that could not spawn, so its state never applies.
-            if (Registry.StateOf(shipId) == ShipLifecycle.SpawnFailed)
+            // A hull that could not spawn or left the mission never takes its state.
+            if (Registry.IsGone(shipId))
             {
                 pendingStates.Remove(shipId);
                 continue;

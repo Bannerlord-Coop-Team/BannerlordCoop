@@ -91,6 +91,30 @@ public class AgentStationUseReplicatorTests
         Assert.Equal(1, (long)JObject.FromObject(replicator.Inspect())["removedHullSeats"]!);
     }
 
+    // M8a, R33: every puppet seated on a departing hull is released before the hull goes, and seats on other hulls stay.
+    [Fact]
+    public void ReleaseSeatsOn_ReleasesOnlyThePuppetsSeatedOnThatHull()
+    {
+        var engine = new Mock<INavalShipEngine>();
+        engine.Setup(e => e.IsSeated(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>())).Returns(true);
+        var departing = ShipTestHulls.Create();
+        var staying = ShipTestHulls.Create();
+        var departingPoint = CreatePoint();
+        var stayingPoint = CreatePoint();
+        using var replicator = CreateReplicator(engine.Object);
+        replicator.RecordAppliedSeat(Guid.NewGuid(), null!, departing, departingPoint);
+        replicator.RecordAppliedSeat(Guid.NewGuid(), null!, staying, stayingPoint);
+
+        int released = replicator.ReleaseSeatsOn(departing);
+
+        Assert.Equal(1, released);
+        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), departingPoint, false), Times.Once);
+        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), stayingPoint, It.IsAny<bool>()), Times.Never);
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.Equal(1, (int)inspected["appliedSeats"]!);
+        Assert.Equal(1, (long)inspected["departedHullReleases"]!);
+    }
+
     [Fact]
     public void TryApply_DropsAUseOnAHullThatLeftTheMission()
     {

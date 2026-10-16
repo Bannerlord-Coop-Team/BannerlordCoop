@@ -90,6 +90,27 @@ public interface INavalShipEngine
     /// <summary>Whether an agent is seated at the hull's helm (diagnostics).</summary>
     bool HasHelmPilot(MissionObject hull);
 
+    /// <summary>[Game thread] The active humans standing on the hull's deck or a plank it threw, or using one of its machines.</summary>
+    IReadOnlyList<Agent> AgentsOnDeck(MissionObject hull);
+
+    /// <summary>The hull the agent crews: the hull of its formation; null when its formation has none.</summary>
+    MissionObject CrewHullOf(Agent agent);
+
+    /// <summary>The nearest afloat hull of a team friendly to the agent's, other than <paramref name="excluded"/>; null when none.</summary>
+    MissionObject NearestFriendlyHull(Agent agent, IReadOnlyCollection<MissionObject> excluded);
+
+    /// <summary>[Game thread] Moves an on-foot agent onto the hull's deck where vanilla places deck crew.</summary>
+    void MoveAgentToHull(Agent agent, MissionObject hull);
+
+    /// <summary>[Game thread] Stops every agent still using one of the hull's machines, so none keeps a user once it goes.</summary>
+    void ReleaseHullStations(MissionObject hull);
+
+    /// <summary>
+    /// [Game thread] Takes a hull out of the mission through vanilla's RemoveShip, after breaking every rope and plank that
+    /// starts or ends on it.
+    /// </summary>
+    void RemoveHull(MissionObject hull);
+
     /// <summary>[Game thread] The ropes this client threw from an own hull, keyed by the registered ids of the hulls they target.</summary>
     BattleRopeState[] CaptureRopes(MissionObject hull, Func<MissionObject, Guid> shipIdOf);
 

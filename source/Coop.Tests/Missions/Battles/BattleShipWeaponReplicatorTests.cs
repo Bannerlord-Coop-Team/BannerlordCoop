@@ -278,7 +278,7 @@ public class BattleShipWeaponReplicatorTests
         Assert.Equal(1, heldBeforeFailure);
         Assert.Equal(0, heldAfterFailure);
         Assert.Equal(0, (int)harness.Inspect()["pendingStates"]!);
-        Assert.Equal("state_spawn_failed", (string)harness.Inspect()["lastDrop"]!);
+        Assert.Equal("state_hull_gone", (string)harness.Inspect()["lastDrop"]!);
     }
 
     [Fact]

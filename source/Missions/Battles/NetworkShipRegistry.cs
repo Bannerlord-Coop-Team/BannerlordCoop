@@ -20,6 +20,9 @@ public interface INetworkShipRegistry
     /// <summary>Drops a hull that left the mission; its ship id reads <see cref="ShipLifecycle.Removed"/> from then on.</summary>
     bool Remove(Guid shipId);
 
+    /// <summary>Records a ship id that left the mission before its hull registered here, so it never spawns or buffers again.</summary>
+    void MarkRemoved(Guid shipId);
+
     /// <summary>Records another owner's hull whose spawn record waits here; registering it, or giving up on it, ends the wait.</summary>
     void MarkAwaiting(Guid shipId);
 
@@ -28,6 +31,12 @@ public interface INetworkShipRegistry
 
     /// <summary>[Game thread] Where a ship id is in its local lifecycle, polled by every buffer that waits for a hull.</summary>
     ShipLifecycle StateOf(Guid shipId);
+
+    /// <summary>
+    /// [Game thread] Whether traffic for a ship id that is not registered can be dropped: its spawn was given up or it left the
+    /// mission. The one check every buffer that waits for a hull uses.
+    /// </summary>
+    bool IsGone(Guid shipId);
 }
 
 /// <summary>A ship id's local lifecycle: its spawn record waits, it is registered, its spawn was given up, or it left the mission.</summary>
@@ -120,14 +129,26 @@ public class NetworkShipRegistry : INetworkShipRegistry
 
     public void MarkSpawnFailed(Guid shipId) => MarkUnregistered(shipId, ShipLifecycle.SpawnFailed);
 
+    public void MarkRemoved(Guid shipId) => MarkUnregistered(shipId, ShipLifecycle.Removed);
+
+    // A ship that left the mission stays Removed: a late record or retry must not bring it back.
     private void MarkUnregistered(Guid shipId, ShipLifecycle state)
     {
-        if (shipId != Guid.Empty && !ships.ContainsKey(shipId)) unregistered[shipId] = state;
+        if (shipId == Guid.Empty || ships.ContainsKey(shipId)) return;
+        if (unregistered.TryGetValue(shipId, out var current) && current == ShipLifecycle.Removed) return;
+
+        unregistered[shipId] = state;
     }
 
     public ShipLifecycle StateOf(Guid shipId)
     {
         if (ships.ContainsKey(shipId)) return ShipLifecycle.Registered;
         return unregistered.TryGetValue(shipId, out var state) ? state : ShipLifecycle.Unknown;
+    }
+
+    public bool IsGone(Guid shipId)
+    {
+        var state = StateOf(shipId);
+        return state == ShipLifecycle.SpawnFailed || state == ShipLifecycle.Removed;
     }
 }

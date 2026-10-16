@@ -96,7 +96,7 @@ public class NavalNaturalEndScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(0, concluded());
     }
 
-    // K4: a peer's reserve stops counting once the peer leaves the battle.
+    // K4, M8a: a peer that leaves the battle takes its hull with it, so its reserve stops counting.
     [Fact]
     public void PeerReserve_StopsCounting_OnceItsOwnerLeaves()
     {
@@ -109,12 +109,10 @@ public class NavalNaturalEndScenarioTests : NavalBattleTestEnvironment
 
         a.Call(() => a.Broker.Publish(a, new MissionPeerLeft(b.Id, battle.MapEventId)));
         a.Ticks(1);
-        long acceptedAtDeparture = (long)a.Stream(hullB)["accepted"]!;
         // B's mission mesh is not ordered with the departure, so its samples can still arrive after it.
         battle.TickAll(2);
 
-        Assert.True((long)a.Stream(hullB)["accepted"]! > acceptedAtDeparture);
-
+        Assert.False(a.Has(hullB));
         Assert.Equal(0, EndTally(a, BattleSideEnum.Attacker, liveHumans: 0).Reserve);
         Assert.True(EndTally(a, BattleSideEnum.Attacker, liveHumans: 0).IsDepleted);
     }
