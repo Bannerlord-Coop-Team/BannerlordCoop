@@ -195,7 +195,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         var migrated = payload.What;
         if (migrated.MapEventId != session.InstanceId) return;
-        if (!BattleAuthorityMigrator.AppliesHostMigration(resultCommitter, isNavalMission: true)) return;
+        if (!BattleAuthorityMigrator.AppliesHostMigration(resultCommitter, session.IsNaval)) return;
 
         GameThread.RunSafe(() => TransferNpcHulls(migrated.NewHostControllerId ?? session.OwnControllerId),
             context: nameof(Handle_BattleHostMigrated));
@@ -449,7 +449,8 @@ public class BattleShipReplicator : IBattleShipReplicator
             held.SettleRecord();
             return true;
         }
-        if (!engine.AreInitialShipsDeployed) return false;
+        // Vanilla's team setup spawns a hull for every set ship assignment, so a copy spawned before it would get a local twin.
+        if (!deployment.IsTeamSetupOver) return false;
 
         // Vanilla's deployment finish runs over every hull and pools removed ones, so a copy spawns once it is over.
         if (engine.IsDeploymentMode)

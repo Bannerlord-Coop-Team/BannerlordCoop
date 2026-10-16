@@ -22,12 +22,6 @@ public interface INavalShipEngine
     /// </summary>
     bool IsDeploymentMode { get; }
 
-    /// <summary>
-    /// Whether vanilla's team setup has fielded this client's initial ships. It spawns a hull for every set ship
-    /// assignment, a copy's included, so a copy spawned before it would get a second, local hull.
-    /// </summary>
-    bool AreInitialShipsDeployed { get; }
-
     /// <summary>The hull's campaign ship description, side, formation and frame under the given identity.</summary>
     BattleShipSpawnData Describe(MissionObject hull, NetworkShipInfo identity);
 

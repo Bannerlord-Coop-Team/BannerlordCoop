@@ -35,6 +35,18 @@ public class BattleSessionTests
     }
 
     [Fact]
+    public void IsNaval_IsFalseUntilTheNavalServicesMarkIt()
+    {
+        session.TryBegin("mapEvent1");
+        bool beforeMark = session.IsNaval;
+
+        session.MarkNaval();
+
+        Assert.False(beforeMark);
+        Assert.True(session.IsNaval);
+    }
+
+    [Fact]
     public void OwnControllerId_TracksTheProvider_NotASnapshot()
     {
         // The controller id can be assigned after the session is constructed (e.g. the E2E harness sets it late).

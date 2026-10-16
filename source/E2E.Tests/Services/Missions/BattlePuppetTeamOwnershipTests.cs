@@ -474,7 +474,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             teams.Setup(t => t.ResolveReplicatedTeam(BattleSideEnum.Defender, false)).Returns(mission.DefenderTeam.Shell);
             var engine = new Mock<INavalShipEngine>();
             engine.SetupGet(e => e.Hulls).Returns(new List<MissionObject>());
-            engine.SetupGet(e => e.AreInitialShipsDeployed).Returns(true);
+            deployment.SetupGet(d => d.IsTeamSetupOver).Returns(true);
             Formation noFormation = null!;
             engine.Setup(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out noFormation))
                 .Returns((MissionObject)null!);
@@ -552,7 +552,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             var copy = MissionTestObjects.CreateHull();
             engine.SetupGet(e => e.Hulls).Returns(new List<MissionObject> { copy });
             bool initialShipsDeployed = false;
-            engine.SetupGet(e => e.AreInitialShipsDeployed).Returns(() => initialShipsDeployed);
+            deployment.SetupGet(d => d.IsTeamSetupOver).Returns(() => initialShipsDeployed);
             Formation noFormation = null!;
             engine.Setup(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out noFormation))
                 .Returns(copy);

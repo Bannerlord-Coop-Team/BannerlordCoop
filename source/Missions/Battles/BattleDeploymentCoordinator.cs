@@ -24,6 +24,12 @@ public interface IBattleDeploymentCoordinator : IDisposable
     /// <summary>True once the local player has committed deployment (the withheld own-party troops were revealed).</summary>
     bool IsCommitted { get; }
 
+    /// <summary>
+    /// [Game thread] Whether vanilla's team setup has fielded the mission's initial troops and ships: its deployment
+    /// controller finished team setup or is gone. False without a mission.
+    /// </summary>
+    bool IsTeamSetupOver { get; }
+
     /// <summary>Whether a freshly-captured owned spawn must be withheld from peers (own-party troop, pre-commit).</summary>
     bool ShouldWithhold(bool isOwnPartyTroop);
 
@@ -131,6 +137,19 @@ public class BattleDeploymentCoordinator : IBattleDeploymentCoordinator
     public bool IsActivated => activator.IsActivated;
 
     public bool IsCommitted => committed;
+
+    public bool IsTeamSetupOver
+    {
+        get
+        {
+            var mission = Mission.Current;
+            if (mission == null) return false;
+
+            // The deployment controller removes itself once deployment finishes, long after its team setup.
+            var controller = mission.GetMissionBehavior<DeploymentMissionController>();
+            return controller == null || controller.TeamSetupOver;
+        }
+    }
 
     // Own-party troops are withheld until the local deployment commit (#4); everything else — the host's
     // NPC/AI — is replicated immediately so it shows frozen on every client during deployment (#1).

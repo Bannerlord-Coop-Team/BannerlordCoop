@@ -24,8 +24,6 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
 
     public bool IsDeploymentMode { get; set; }
 
-    public bool AreInitialShipsDeployed { get; set; } = true;
-
     /// <summary>How many of the next foreign hull spawns return null, as when no free formation exists yet.</summary>
     public int FailingForeignSpawns { get; set; }
 

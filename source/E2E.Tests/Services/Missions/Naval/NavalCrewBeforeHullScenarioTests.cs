@@ -21,7 +21,8 @@ public class NavalCrewBeforeHullScenarioTests : NavalBattleTestEnvironment
         using var battle = StartNavalBattle(new[] { ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Attacker) });
         var a = battle["A"];
         var b = battle["B"];
-        b.Engine.AreInitialShipsDeployed = false;
+        b.Mission.DeploymentInProgress = true;
+        b.Mission.DeploymentController.TeamSetupOver = false;
         var pirate = battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f));
         var crewId = Guid.NewGuid();
         SendCrew(battle, a, pirate, crewId);
@@ -30,7 +31,7 @@ public class NavalCrewBeforeHullScenarioTests : NavalBattleTestEnvironment
         Assert.False(b.Has(pirate));
         Assert.False(b.Agents.TryGetAgentInfo(crewId, out _));
 
-        b.Engine.AreInitialShipsDeployed = true;
+        b.Mission.DeploymentController.TeamSetupOver = true;
         b.Tick();
         b.TickController();
 

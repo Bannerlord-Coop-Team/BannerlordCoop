@@ -537,7 +537,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         if (string.IsNullOrEmpty(newHost))
             newHost = session.OwnControllerId;
 
-        if (!AppliesHostMigration(resultCommitter, IsNavalMission()))
+        if (!AppliesHostMigration(resultCommitter, session.IsNaval))
         {
             withdrawnHosts.Remove(previousHost);
             Logger.Information("[BattleSync] Keeping the agents of {Old} as they are after the host change to {New}: this client already holds the battle's result",
@@ -798,10 +798,6 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     /// </summary>
     internal static bool AppliesHostMigration(IBattleResultCommitter resultCommitter, bool isNavalMission) =>
         !isNavalMission || !resultCommitter.TryGetResolvedState(out _);
-
-    // A naval mission registers every fielded hull, and the map event is already gone after the result is committed.
-    private bool IsNavalMission() =>
-        coopMissionComponent.ShipRegistry != null && coopMissionComponent.ShipRegistry.Ships.Count > 0;
 
     /// <summary>
     /// A land formation needs an explicit Charge to engage. A naval hull's crew must not get one: its ship order drives

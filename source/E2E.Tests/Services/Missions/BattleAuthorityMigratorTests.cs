@@ -69,17 +69,13 @@ public class BattleAuthorityMigratorTests
         session.SetupGet(value => value.InstanceId).Returns(mapEventId);
         session.SetupGet(value => value.OwnControllerId).Returns("peer");
         session.Setup(value => value.IsOwn("peer")).Returns(true);
+        session.SetupGet(value => value.IsNaval).Returns(isNaval);
 
         var registry = new Mock<INetworkAgentRegistry>();
         registry.Setup(value => value.GetAgents(It.IsAny<string>())).Returns(Array.Empty<CoopAgentInfo>());
         registry.Setup(value => value.GetControllerIds()).Returns(Array.Empty<string>());
         var mission = new Mock<ICoopMissionComponent>();
         mission.SetupGet(value => value.AgentRegistry).Returns(registry.Object);
-        var ships = new Mock<INetworkShipRegistry>();
-        ships.SetupGet(value => value.Ships).Returns(isNaval
-            ? new[] { new NetworkShipInfo(Guid.NewGuid(), "host", "party", isNpcParty: true, null!, null!) }
-            : Array.Empty<NetworkShipInfo>());
-        mission.SetupGet(value => value.ShipRegistry).Returns(ships.Object);
         var missionContext = new Mock<IMissionContext>();
         missionContext.SetupGet(value => value.ControllersInMission).Returns(Array.Empty<string>());
 

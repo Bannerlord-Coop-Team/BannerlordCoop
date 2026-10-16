@@ -1038,7 +1038,7 @@ public class BattleShipReplicatorTests
         var harness = new Harness(committed: true);
         bool deployed = false;
         harness.SetupForeignSpawn(initialShipsDeployed: false);
-        harness.Engine.SetupGet(e => e.AreInitialShipsDeployed).Returns(() => deployed);
+        harness.Deployment.SetupGet(d => d.IsTeamSetupOver).Returns(() => deployed);
         var record = ForeignRecord(Guid.NewGuid());
 
         harness.Replicator.AcceptSpawnRecords(new[] { record });
@@ -1178,6 +1178,7 @@ public class BattleShipReplicatorTests
         public Mock<IBattleNetwork> Network { get; } = new Mock<IBattleNetwork>();
         public Mock<INavalShipEngine> Engine { get; } = new Mock<INavalShipEngine>();
         public Mock<IBattleTeamResolver> TeamResolver { get; } = new Mock<IBattleTeamResolver>();
+        public Mock<IBattleDeploymentCoordinator> Deployment { get; } = new Mock<IBattleDeploymentCoordinator>();
         public MessageBroker Broker { get; } = new MessageBroker();
         public NetworkShipRegistry Registry { get; } = new NetworkShipRegistry();
         public MissionObject OwnHull { get; } = CreateHull();
@@ -1199,8 +1200,9 @@ public class BattleShipReplicatorTests
             session.SetupGet(s => s.HostEpoch).Returns(HostEpoch);
             session.SetupGet(s => s.InstanceId).Returns(Instance);
             session.Setup(s => s.IsOwn(It.IsAny<string>())).Returns((string id) => id == Own);
+            session.SetupGet(s => s.IsNaval).Returns(true);
 
-            var deployment = new Mock<IBattleDeploymentCoordinator>();
+            var deployment = Deployment;
             deployment.SetupGet(d => d.IsCommitted).Returns(committed);
 
             var engine = Engine;
@@ -1229,7 +1231,7 @@ public class BattleShipReplicatorTests
         {
             var team = (Team)RuntimeHelpers.GetUninitializedObject(typeof(Team));
             TeamResolver.Setup(r => r.ResolveReplicatedTeam(It.IsAny<BattleSideEnum>(), false)).Returns(team);
-            if (initialShipsDeployed) Engine.SetupGet(e => e.AreInitialShipsDeployed).Returns(true);
+            if (initialShipsDeployed) Deployment.SetupGet(d => d.IsTeamSetupOver).Returns(true);
 
             var copy = CreateHull();
             Formation formation = null!;

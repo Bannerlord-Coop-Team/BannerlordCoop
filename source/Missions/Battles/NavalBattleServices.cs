@@ -38,6 +38,8 @@ public class NavalBattleServices : INavalBattleServices
     public NavalBattleServices(IBattleNetwork network, IMessageBroker messageBroker, IBattleTeamResolver teamResolver,
         IObjectManager objectManager, BattleContext context, INavalShipEngine shipEngine)
     {
+        // These services exist only in a naval mission and open with it.
+        context.Session.MarkNaval();
         hullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, shipEngine);
         var conditions = new BattleShipConditionStream(network, context.Session, shipEngine, context.HostEpochPolicy);
         ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
