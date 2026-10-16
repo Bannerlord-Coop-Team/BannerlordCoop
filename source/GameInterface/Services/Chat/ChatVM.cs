@@ -130,9 +130,9 @@ internal sealed class ChatVM : ViewModel
         }
     }
 
-    /// <summary>False on Events (read-only) or when the panel is closed.</summary>
+    /// <summary>False when closed or the selected channel has no send target.</summary>
     [DataSourceProperty]
-    public bool IsChatInputEnabled => isOpen && selectedChannel?.IsEvents != true;
+    public bool IsChatInputEnabled => isOpen && selectedChannel?.SendChannel != null;
 
     [DataSourceProperty]
     public float ChatBoxSizeX
@@ -327,7 +327,10 @@ internal sealed class ChatVM : ViewModel
             case ChatChannel.System:
                 if (string.IsNullOrEmpty(message.RecipientControllerId))
                 {
-                    channelId = selectedChannel?.ControllerId ?? GlobalChannelId;
+                    // All reuses Events/Global lines and is skipped by Tick, so map to Global
+                    channelId = selectedChannel.IsAll
+                        ? GlobalChannelId
+                        : selectedChannel.ControllerId;
                 }
                 else
                 {

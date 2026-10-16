@@ -250,10 +250,9 @@ public class ServerChatHandlerTests : IDisposable
         var senderPeer = CreatePeer("127.0.0.1");
         var otherPeer = CreatePeer("127.0.0.2");
         ConfigurePlayers((senderPeer, Player("sender")), (otherPeer, Player("other")));
-        Clan clan = null;
         factionMembership
-            .Setup(membership => membership.TryGetClan(It.IsAny<Player>(), out clan))
-            .Returns(false);
+            .Setup(membership => membership.GetClan(It.IsAny<Player>()))
+            .Returns((IFaction)null);
 
         handler.RouteMessage(senderPeer,
             new NetworkSendChatMessage(ChatChannel.Clan, string.Empty, "hello?"));
@@ -302,10 +301,9 @@ public class ServerChatHandlerTests : IDisposable
         var senderPeer = CreatePeer("127.0.0.1");
         var otherPeer = CreatePeer("127.0.0.2");
         ConfigurePlayers((senderPeer, Player("sender")), (otherPeer, Player("other")));
-        Kingdom kingdom = null;
         factionMembership
-            .Setup(membership => membership.TryGetKingdom(It.IsAny<Player>(), out kingdom))
-            .Returns(false);
+            .Setup(membership => membership.GetKingdom(It.IsAny<Player>()))
+            .Returns((IFaction)null);
 
         handler.RouteMessage(senderPeer,
             new NetworkSendChatMessage(ChatChannel.Kingdom, string.Empty, "hello?"));
@@ -363,20 +361,22 @@ public class ServerChatHandlerTests : IDisposable
 
     private void SetupLiveClans(IReadOnlyDictionary<string, Clan> liveClansByControllerId)
     {
-        Clan clan = null;
         factionMembership
-            .Setup(membership => membership.TryGetClan(It.IsAny<Player>(), out clan))
-            .Returns((Player player, out Clan resolved) =>
-                liveClansByControllerId.TryGetValue(player.ControllerId, out resolved));
+            .Setup(membership => membership.GetClan(It.IsAny<Player>()))
+            .Returns((Player player) =>
+                liveClansByControllerId.TryGetValue(player.ControllerId, out var clan)
+                    ? clan
+                    : null);
     }
 
     private void SetupLiveKingdoms(IReadOnlyDictionary<string, Kingdom> liveKingdomsByControllerId)
     {
-        Kingdom kingdom = null;
         factionMembership
-            .Setup(membership => membership.TryGetKingdom(It.IsAny<Player>(), out kingdom))
-            .Returns((Player player, out Kingdom resolved) =>
-                liveKingdomsByControllerId.TryGetValue(player.ControllerId, out resolved));
+            .Setup(membership => membership.GetKingdom(It.IsAny<Player>()))
+            .Returns((Player player) =>
+                liveKingdomsByControllerId.TryGetValue(player.ControllerId, out var kingdom)
+                    ? kingdom
+                    : null);
     }
 
     private static Player Player(string controllerId, string clanId = "")
