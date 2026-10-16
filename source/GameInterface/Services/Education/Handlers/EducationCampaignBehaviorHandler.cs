@@ -12,6 +12,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Messages;
 using LiteNetLib;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -136,7 +137,23 @@ internal class EducationCampaignBehaviorHandler : IHandler
 
         if (!objectManager.TryGetHandleWithLogging(data.Child, out var childHandle)) return;
 
-        network.SendAll(new NetworkEducationStageUpdated(childHandle, data.Target, data.ChosenOptions));
+        var attributeIds = new List<string>();
+        foreach (var attribute in data.Attributes)
+        {
+            if (objectManager.TryGetIdWithLogging(attribute, out var attributeId)) continue;
+
+            attributeIds.Add(attributeId);
+        }
+
+        var skillIds = new List<string>();
+        foreach (var skill in data.Skills)
+        {
+            if (objectManager.TryGetIdWithLogging(skill, out var skillId)) continue;
+
+            skillIds.Add(skillId);
+        }
+
+        network.SendAll(new NetworkEducationStageUpdated(childHandle, data.Target, attributeIds, skillIds));
     }
 
     private void Handle_NetworkEducationStageUpdated(MessagePayload<NetworkEducationStageUpdated> obj)
@@ -147,7 +164,23 @@ internal class EducationCampaignBehaviorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ChildHandle, out var child)) return;
 
-            if (educationInterface.UpdateEducationStage(child, data.Target, data.ChosenOptions)) return;
+            var attributes = new List<CharacterAttribute>();
+            foreach (var attributeId in data.AttributeIds ?? new List<string>())
+            {
+                if (!objectManager.TryGetObjectWithLogging<CharacterAttribute>(attributeId, out var attribute)) continue;
+
+                attributes.Add(attribute);
+            }
+
+            var skills = new List<SkillObject>();
+            foreach (var skillId in data.SkillIds ?? new List<string>())
+            {
+                if (objectManager.TryGetObjectWithLogging<SkillObject>(skillId, out var skill)) continue;
+
+                skills.Add(skill);
+            }
+
+            if (educationInterface.UpdateEducationStage(child, data.Target, attributes, skills)) return;
 
             network.Send((NetPeer)obj.Who, new NetworkEducationStageRejected(data.ChildHandle));
         });

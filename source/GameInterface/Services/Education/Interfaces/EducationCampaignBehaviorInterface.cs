@@ -96,9 +96,9 @@ public interface IEducationCampaignBehaviorInterface : IGameAbstraction
 
     /// <summary>
     /// Server method
-    /// Client finalized education, update stage server-side. Returns false when the stage was no longer pending and nothing was applied
+    /// Client finalized education, applies the attributes and skills its options granted. Returns false when the stage was no longer pending and nothing was applied
     /// </summary>
-    bool UpdateEducationStage(Hero child, short target, List<string> chosenOptions);
+    bool UpdateEducationStage(Hero child, short target, List<CharacterAttribute> attributes, List<SkillObject> skills);
 
     /// <summary>
     /// Server method
@@ -298,7 +298,7 @@ public class EducationCampaignBehaviorInterface : IEducationCampaignBehaviorInte
         CancelPendingNotifications((childKey, controllerId) => childKey.Item1 == victim || controllerId == victimPlayer?.ControllerId);
     }
 
-    public bool UpdateEducationStage(Hero child, short target, List<string> chosenOptions)
+    public bool UpdateEducationStage(Hero child, short target, List<CharacterAttribute> attributes, List<SkillObject> skills)
     {
         if (!TryGetEducationBehavior(out var educationBehavior)) return false;
 
@@ -309,10 +309,18 @@ public class EducationCampaignBehaviorInterface : IEducationCampaignBehaviorInte
             return false;
         }
 
-        // Rebuild the stage on the server that the client sent
-        var stage = educationBehavior.GetStage(child, (EducationCampaignBehavior.ChildAgeState)target);
+        foreach (var attribute in attributes)
+        {
+            child.HeroDeveloper.AddAttribute(attribute, 1, false);
+        }
 
-        OnFinalize(child, target, stage, chosenOptions);
+        foreach (var skill in skills)
+        {
+            child.HeroDeveloper.AddFocus(skill, 1, false);
+            child.HeroDeveloper.ChangeSkillLevel(skill, 15);
+        }
+
+        educationBehavior._previousEducations[child] = target;
         RemovePendingNotification(childKey);
         return true;
     }
@@ -328,7 +336,14 @@ public class EducationCampaignBehaviorInterface : IEducationCampaignBehaviorInte
 
         foreach (string optionKey in chosenOptions ?? new List<string>())
         {
-            stage.GetOption(optionKey)?.OnConsequence(child);
+            var option = stage.GetOption(optionKey);
+            if (option == null)
+            {
+                Logger.Warning($"Education option {optionKey} not found on stage {stage.Target} for {child.StringId}, skipped.");
+                continue;
+            }
+
+            option.OnConsequence(child);
         }
 
         educationBehavior._previousEducations[child] = target;

@@ -66,8 +66,19 @@ internal class EducationCampaignBehaviorPatches
             // Clean up previous educations on client
             __instance._previousEducations.Remove(child);
 
+            var attributes = new List<CharacterAttribute>();
+            var skills = new List<SkillObject>();
+            foreach (string optionKey in chosenOptions)
+            {
+                var option = stage.GetOption(optionKey);
+                if (option == null) continue;
+
+                attributes.AddRange(option.Attributes);
+                skills.AddRange(option.Skills);
+            }
+
             short target = (short)stage.Target;
-            MessageBroker.Instance.Publish(__instance, new EducationStageUpdated(child, target, chosenOptions));
+            MessageBroker.Instance.Publish(__instance, new EducationStageUpdated(child, target, attributes, skills));
 
             __instance._activeStage = null;
             __instance._activeChild = null;

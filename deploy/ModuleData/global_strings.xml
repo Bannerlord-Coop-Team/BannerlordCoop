@@ -105,6 +105,6 @@
     <string id="str_coop_clanless" text="{=str_coop_clanless}Clanless" />
     <string id="str_coop_in_clan" text="{=str_coop_in_clan}In Clan" />
     <string id="str_coop_clan_status" text="{=str_coop_clan_status}Clan Status" />
-    <string id="str_coop_education_stage_rejected" text="{=str_coop_education_stage_rejected}{CHILD}'s education choices were not applied, the stage was already completed automatically." />
+    <string id="str_coop_education_stage_rejected" text="{=str_coop_education_stage_rejected}{CHILD}'s education choices were not applied because this stage is no longer valid." />
     <!-- Add other custom text here in the future-->
 </strings>
