@@ -341,22 +341,6 @@ public abstract class MapEventTestBase : IDisposable
     }
 
     /// <summary>
-    /// Releases the hero with <paramref name="heroId"/> from captivity on the server, syncing the cleared
-    /// state to all clients.
-    /// </summary>
-    protected void EndCaptivity(string heroId)
-    {
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
-
-            hero.PartyBelongedToAsPrisoner = null;
-
-            Assert.Null(hero.PartyBelongedToAsPrisoner);
-        }, MapEventDisabledMethods);
-    }
-
-    /// <summary>
     /// Asserts that the hero with <paramref name="heroId"/> is a prisoner of the party with
     /// <paramref name="captorPartyId"/> (or, when <paramref name="captorPartyId"/> is null, that the hero
     /// is free) on the given <paramref name="instance"/>.
@@ -1008,19 +992,6 @@ public abstract class MapEventTestBase : IDisposable
 
         Assert.NotNull(encounter);
         return encounter!;
-    }
-
-    /// <summary>
-    /// Clears <c>PlayerEncounter.Current</c> on the given <paramref name="instance"/>, simulating the player
-    /// leaving an encounter.
-    /// </summary>
-    protected void ClearPlayerEncounter(EnvironmentInstance instance)
-    {
-        instance.Call(() =>
-        {
-            Campaign.Current.PlayerEncounter = null;
-            Assert.Null(PlayerEncounter.Current);
-        }, MapEventDisabledMethods);
     }
 
     /// <summary>
