@@ -34,7 +34,6 @@ internal sealed class ChatVM : ViewModel
     private ChatChannelVM selectedChannel;
     private string writtenText = string.Empty;
     private bool isOpen;
-    private bool playerChatEnabled = true;
     private float chatBoxSizeX;
     private float chatBoxSizeY;
     // Closed-panel fade feed (Events, Global, Clan, Kingdom, DMs). All stays Events+Global only.
@@ -101,18 +100,6 @@ internal sealed class ChatVM : ViewModel
     [DataSourceProperty]
     public string MuteButtonText => selectedChannel?.IsMuted == true ? "Unmute" : "Mute";
 
-    public bool IsPlayerChatEnabled
-    {
-        get => playerChatEnabled;
-        private set
-        {
-            if (playerChatEnabled == value) return;
-            playerChatEnabled = value;
-            OnPropertyChanged(nameof(IsPlayerChatEnabled));
-            UpdateVisibleLines();
-        }
-    }
-
     [DataSourceProperty]
     public string WrittenText
     {
@@ -177,7 +164,6 @@ internal sealed class ChatVM : ViewModel
 
     public void ActionSend()
     {
-        if (!IsPlayerChatEnabled) return;
         if (selectedChannel == null || selectedChannel.IsEvents) return;
 
         string text = WrittenText.Trim();
@@ -216,17 +202,7 @@ internal sealed class ChatVM : ViewModel
 
     public void SetOpen(bool open)
     {
-        if (open && !IsPlayerChatEnabled) return;
-
         IsOpen = open;
-    }
-
-    public void SetPlayerChatEnabled(bool enabled)
-    {
-        if (!enabled && IsOpen)
-            SetOpen(false);
-
-        IsPlayerChatEnabled = enabled;
     }
 
     public void Tick(float dt)
@@ -516,8 +492,6 @@ internal sealed class ChatVM : ViewModel
 
     private void AppendVisibleLine(ChatLineVM line, ChatLineVM trimmed)
     {
-        if (line.IsPlayerChat && !IsPlayerChatEnabled) return;
-
         if (trimmed != null)
             VisibleLines.Remove(trimmed);
         if (!IsOpen && VisibleLines.Count >= VisibleHistoryLines)
@@ -541,26 +515,12 @@ internal sealed class ChatVM : ViewModel
         else
             history = channelHistory;
 
-        // Closed: filter first, then take the last N eligible passive lines
-        int firstLine = 0;
-        if (!IsOpen)
-        {
-            firstLine = history.Count;
-            int eligible = 0;
-            for (int i = history.Count - 1; i >= 0 && eligible < VisibleHistoryLines; i--)
-            {
-                if (history[i].IsPlayerChat && !IsPlayerChatEnabled) continue;
-                eligible++;
-                firstLine = i;
-            }
-        }
+        int firstLine = !IsOpen
+            ? Math.Max(0, history.Count - VisibleHistoryLines)
+            : 0;
 
         for (int i = firstLine; i < history.Count; i++)
-        {
-            var historyLine = history[i];
-            if (historyLine.IsPlayerChat && !IsPlayerChatEnabled) continue;
-            VisibleLines.Add(historyLine);
-        }
+            VisibleLines.Add(history[i]);
 
         FeedScrolledToBottomRequested?.Invoke();
     }

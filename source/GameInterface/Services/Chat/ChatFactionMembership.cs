@@ -27,8 +27,8 @@ public sealed class ChatFactionMembership : IChatFactionMembership
     public bool TryGetClan(Player player, out Clan clan)
     {
         clan = null;
-        if (string.IsNullOrEmpty(player?.HeroId)) return false;
-        if (!objectManager.TryGetObject<Hero>(player.HeroId, out var hero) || hero?.Clan == null)
+        if (string.IsNullOrEmpty(player.HeroId)) return false;
+        if (!objectManager.TryGetObject<Hero>(player.HeroId, out var hero) || hero.Clan == null)
             return false;
 
         clan = hero.Clan;

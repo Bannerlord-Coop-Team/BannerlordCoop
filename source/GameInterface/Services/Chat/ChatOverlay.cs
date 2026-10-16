@@ -75,7 +75,6 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         this.refreshParticipants = refreshParticipants;
         this.vanillaLogGate = vanillaLogGate;
         this.playerChatEnabled = playerChatEnabled;
-        dataSource.SetPlayerChatEnabled(playerChatEnabled);
         dataSource.FeedScrolledToBottomRequested += OnFeedScrolledToBottomRequested;
     }
 
@@ -104,7 +103,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             // Keep pinning while closed so new lines stay in view
             if (pinFeedToBottom)
                 ContinuePinFeedToBottom();
-            if (allowChatOpen && playerChatEnabled && ShouldOpenInput(
+            if (allowChatOpen && ShouldOpenInput(
                     Input.IsKeyPressed(InputKey.Enter),
                     Input.IsKeyPressed(InputKey.NumpadEnter),
                     Input.IsKeyPressed(InputKey.ControllerLOption)))
@@ -231,14 +230,13 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         if (playerChatEnabled == value) return;
 
         playerChatEnabled = value;
-        dataSource.SetPlayerChatEnabled(value);
         if (!value)
             CloseInput();
     }
 
     private bool CanOpenInput()
     {
-        if (!allowChatOpen || !playerChatEnabled || !gauntletLayer.IsActive || Input.IsOnScreenKeyboardActive)
+        if (!allowChatOpen || !gauntletLayer.IsActive || Input.IsOnScreenKeyboardActive)
             return false;
 
         var focusedLayer = ScreenManager.FocusedLayer;
@@ -258,15 +256,17 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         bool isCampaignContext = Campaign.Current != null;
         bool isLoading = LoadingWindow.IsLoadingWindowActive;
         isSettlementMenu = false;
+        bool isMenuLayerFocused = false;
 
         if (topScreen is MapScreen mapScreen)
         {
             gameplayLayer = mapScreen.SceneLayer;
             var mapState = GameStateManager.Current?.ActiveState as MapState;
             bool atMenu = mapState?.AtMenu == true;
-            bool hasSettlement = MobileParty.MainParty?.CurrentSettlement != null;
-            isSettlementMenu = IsSettlementMapMenu(atMenu, hasSettlement);
-            // Open map or settlement menus (inventory/party leave MapScreen)
+            // Inventory/party leave MapScreen. MapMenuView only, not escape/encyclopedia.
+            isSettlementMenu = atMenu && MobileParty.MainParty?.CurrentSettlement != null;
+            isMenuLayerFocused = isSettlementMenu &&
+                ReferenceEquals(ScreenManager.FocusedLayer, mapScreen.FindLayer<GauntletLayer>(MapMenuLayerName));
             isOpenableScreen = mapState != null && (!atMenu || isSettlementMenu);
         }
         else if (topScreen is MissionScreen missionScreen)
@@ -285,13 +285,8 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         var focusedLayer = ScreenManager.FocusedLayer;
         bool isGameplayLayerFocused = ReferenceEquals(focusedLayer, gameplayLayer);
         bool isChatLayerFocused = ReferenceEquals(focusedLayer, gauntletLayer);
-        // MapMenuView only, not escape/encyclopedia/other MapScreen layers
-        bool isSettlementMenuLayerFocused = isSettlementMenu &&
-            topScreen is MapScreen settlementMapScreen &&
-            ReferenceEquals(focusedLayer, settlementMapScreen.FindLayer<GauntletLayer>(MapMenuLayerName));
 
-        // Don't fall back to vanilla feed when gameplay screens clear the frame
-        // Reverts to vanilla log when coop chat is disabled
+        // Suspend overlay when chat is off so vanilla log shows
         bool shouldShow = playerChatEnabled && ShouldShowPresentation(
             isCampaignContext,
             isConversationActive,
@@ -299,7 +294,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         allowChatOpen = ShouldAllowChatOpen(
             isOpenableScreen && !isLoading,
             isConversationActive,
-            isGameplayLayerFocused || isSettlementMenuLayerFocused,
+            isGameplayLayerFocused || isMenuLayerFocused,
             isChatLayerFocused);
 
         if (!allowChatOpen && dataSource.IsOpen)
@@ -684,12 +679,6 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         return isOpenableScreen &&
                !isConversationActive &&
                (isGameplayLayerFocused || isChatLayerFocused);
-    }
-
-    /// <summary>AtMenu with a current settlement. Inventory/party leave MapScreen.</summary>
-    internal static bool IsSettlementMapMenu(bool atMenu, bool hasCurrentSettlement)
-    {
-        return atMenu && hasCurrentSettlement;
     }
 
     /// <summary>Closed feed on map/mission: mouse mask for hit-testing, widgets stay click-through.</summary>
