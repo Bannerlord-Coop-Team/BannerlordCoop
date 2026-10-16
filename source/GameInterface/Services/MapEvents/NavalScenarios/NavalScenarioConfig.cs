@@ -79,6 +79,13 @@ public sealed class NavalScenarioConfig
     [ProtoMember(22)]
     public string BlockadeTownId { get; set; }
 
+    /// <summary>
+    /// How many of each player's and the AI fleet's ships carry a fore ballista; 0 leaves the ships as they are. The blockade's
+    /// besieger is not armed.
+    /// </summary>
+    [ProtoMember(23)]
+    public int ArmedShipsPerParty { get; set; }
+
     public string InitiatorControllerId => ControllerIds.Length == 0 ? null : ControllerIds[0];
 
     /// <summary>The player who joins the running battle, or null.</summary>

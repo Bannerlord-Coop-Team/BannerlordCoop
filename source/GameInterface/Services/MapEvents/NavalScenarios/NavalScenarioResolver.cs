@@ -21,7 +21,7 @@ public interface INavalScenarioResolver
 public class NavalScenarioResolver : INavalScenarioResolver
 {
     internal const string Usage = "Usage: coop.debug.naval.scenario <preset> [hulls=n] [hull=id] [spacing=m] [ships=n] " +
-        "[delay=s] [reconnect=s] [who=host|nonhost] [town=id] [controllerId...]";
+        "[delay=s] [reconnect=s] [who=host|nonhost] [town=id] [weapons=n] [controllerId...]";
 
     public bool TryResolve(IReadOnlyList<string> args, IReadOnlyList<string> connectedControllerIds,
         out NavalScenarioConfig config, out string error)
@@ -119,6 +119,11 @@ public class NavalScenarioResolver : INavalScenarioResolver
                 if (!config.Blockade) return $"{config.Preset} stages no blockade, so it takes no town knob.";
                 if (string.IsNullOrWhiteSpace(value)) return "town must name a coastal town's settlement id.";
                 config.BlockadeTownId = value.Trim();
+                return null;
+            case "weapons":
+                if (!TryParseInt(value, 0, NavalScenarioPresets.MaxShipsPerPlayer, out int weapons))
+                    return $"weapons must be a whole number from 0 to {NavalScenarioPresets.MaxShipsPerPlayer}.";
+                config.ArmedShipsPerParty = weapons;
                 return null;
             case "who":
                 if (!config.DisconnectBattleHost) return $"{config.Preset} disconnects nobody, so it takes no who knob.";

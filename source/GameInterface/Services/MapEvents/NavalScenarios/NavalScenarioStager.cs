@@ -82,6 +82,8 @@ public class NavalScenarioStager : INavalScenarioStager
         }
         log.Append(" players=").Append(string.Join(",", config.ControllerIds.Zip(players,
             (id, party) => $"{id}(ships={party.Ships.Count},troops={party.MemberRoster.TotalManCount})")));
+        if (config.ArmedShipsPerParty > 0)
+            log.Append(" armedPlayers=").Append(string.Join(",", players.Select(party => ArmShips(party.Party, config.ArmedShipsPerParty))));
 
         MobileParty engagingEnemy = null;
         bool started;
@@ -158,6 +160,7 @@ public class NavalScenarioStager : INavalScenarioStager
 
         int enemyShipsBefore = enemy.Ships.Count;
         SizeFleet(enemy.Party, config.EnemyHulls, hull);
+        if (config.ArmedShipsPerParty > 0) log.Append(" armedEnemy=").Append(ArmShips(enemy.Party, config.ArmedShipsPerParty));
         foreach (var player in players)
             StartNavalCoopCommand.PlaceAtSea(player, enemy.Position);
 
@@ -372,6 +375,7 @@ public class NavalScenarioStager : INavalScenarioStager
         int enemyShipsBefore = enemy.Ships.Count;
         SizeFleet(enemy.Party, config.EnemyHulls, hull);
         log.Append($" enemy={enemy.StringId}(ships={enemyShipsBefore}->{enemy.Ships.Count},troops={enemy.MemberRoster.TotalManCount})");
+        if (config.ArmedShipsPerParty > 0) log.Append(" armedEnemy=").Append(ArmShips(enemy.Party, config.ArmedShipsPerParty));
 
         if (config.SinkingEnemyHull && enemy.Ships.Count > 0)
         {
@@ -532,6 +536,35 @@ public class NavalScenarioStager : INavalScenarioStager
         TopUpShips(party, count, hull);
         while (party.Ships.Count > count)
             DestroyShipAction.Apply(party.Ships[party.Ships.Count - 1]);
+    }
+
+    // weapons=n: vanilla mounts a hull's ShipBallista from the piece in its fore slot (MissionShipFactory keeps only the
+    // equipped slot prefabs). A ship whose hull has no fore slot is swapped for an armed Battle Knarr, so the count stays.
+    private static string ArmShips(PartyBase party, int count)
+    {
+        var piece = MBObjectManager.Instance.GetObject<ShipUpgradePiece>(NavalScenarioPresets.WeaponPieceId);
+        var weaponHull = MBObjectManager.Instance.GetObject<ShipHull>(NavalScenarioPresets.WeaponHullId);
+        if (piece == null || weaponHull == null)
+            return $"{party.Id}(none: no piece {NavalScenarioPresets.WeaponPieceId} or hull {NavalScenarioPresets.WeaponHullId})";
+
+        int equipped = 0, swapped = 0;
+        foreach (var ship in party.Ships.Take(count).ToList())
+        {
+            if (ship.HasSlot(NavalScenarioPresets.WeaponSlotTag))
+            {
+                ship.EquipUpgradePiece(NavalScenarioPresets.WeaponSlotTag, piece);
+                equipped++;
+                continue;
+            }
+
+            var armed = new Ship(weaponHull);
+            ChangeShipOwnerAction.ApplyByProduction(party, armed);
+            armed.EquipUpgradePiece(NavalScenarioPresets.WeaponSlotTag, piece);
+            DestroyShipAction.Apply(ship);
+            swapped++;
+        }
+
+        return $"{party.Id}(equipped={equipped},swapped={swapped},ships={party.Ships.Count})";
     }
 
     private void TopUpTroops(MobileParty party, int templates)

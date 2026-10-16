@@ -100,6 +100,15 @@ public static class NavalScenarioPresets
 
     public const string DefaultHullId = "northern_light_ship";
 
+    /// <summary>The ship slot a hull's siege weapon goes in; northern_light_ship has none.</summary>
+    public const string WeaponSlotTag = "fore";
+
+    /// <summary>The fore slot piece weapons=n equips, which mounts a ShipBallista on the hull.</summary>
+    public const string WeaponPieceId = "fore_ballista";
+
+    /// <summary>The Battle Knarr, a medium hull with a fore slot, which replaces a ship weapons=n must arm that has none.</summary>
+    public const string WeaponHullId = "nord_mediumballista_ship";
+
     public static IReadOnlyList<NavalScenarioPreset> All { get; } = new[]
     {
         new NavalScenarioPreset

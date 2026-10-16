@@ -53,7 +53,7 @@ public class NavalScenarioResolverTests
     public void Resolve_KeepsTheListedPlayersInTheirOrderAndReadsKnobsAnywhere()
     {
         var config = Resolve("boarding", "PlayerThree", "spacing=12.5", "PlayerOne", "hulls=2", "hull=dromon_ship", "ships=2",
-            "delay=7", "reconnect=30");
+            "delay=7", "reconnect=30", "weapons=2");
 
         Assert.Equal(new[] { "PlayerThree", "PlayerOne" }, config.ControllerIds);
         Assert.Equal("PlayerThree", config.InitiatorControllerId);
@@ -64,6 +64,7 @@ public class NavalScenarioResolverTests
         Assert.Equal(2, config.ShipsPerPlayer);
         Assert.Equal(7f, config.DelaySeconds);
         Assert.Equal(30f, config.ReconnectSeconds);
+        Assert.Equal(2, config.ArmedShipsPerParty);
     }
 
     [Fact]
@@ -77,6 +78,8 @@ public class NavalScenarioResolverTests
         Assert.Equal(NavalScenarioPlacement.Deployment, vsPirates.Placement);
         Assert.Equal(NavalScenarioPresets.DefaultDelaySeconds, vsPirates.DelaySeconds);
         Assert.Equal(NavalScenarioPresets.DefaultReconnectSeconds, vsPirates.ReconnectSeconds);
+        Assert.Equal(0, vsPirates.ArmedShipsPerParty);
+        Assert.Equal(1, Resolve("vs_pirates", "weapons=1").ArmedShipsPerParty);
 
         Assert.Equal(1, Resolve("solo").EnemyHulls);
         Assert.Equal(10f, Resolve("boarding").Spacing);
@@ -112,6 +115,8 @@ public class NavalScenarioResolverTests
     [InlineData("vs_pirates keeps the vanilla deployment, so it takes no spacing knob.", "vs_pirates", "spacing=10")]
     [InlineData("spacing must be a number of metres from 1 to 200.", "boarding", "spacing=0")]
     [InlineData("ships must be a whole number from 1 to 4.", "fleet", "ships=5")]
+    [InlineData("weapons must be a whole number from 0 to 4.", "vs_pirates", "weapons=5")]
+    [InlineData("weapons must be a whole number from 0 to 4.", "vs_pirates", "weapons=-1")]
     [InlineData("delay must be a number of seconds from 1 to 600.", "migration", "delay=NaN")]
     [InlineData("reconnect must be a number of seconds from 5 to 600.", "migration", "reconnect=1")]
     [InlineData("who must be host or nonhost.", "migration", "who=client")]

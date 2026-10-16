@@ -64,6 +64,7 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
                 who = config.DisconnectBattleHost ? config.DisconnectNonHost ? "nonhost" : "host" : null,
                 entry = config.CampaignEngage ? "campaign_engage" : config.Blockade ? "blockade_attack" : "start_battle_action",
                 town = config.Blockade ? config.BlockadeTownId : null,
+                weapons = config.ArmedShipsPerParty,
             },
             pending = state.Steps.Where(step => step.Status == NavalScenarioStepStatus.Pending).Select(step => step.Name).ToArray(),
             steps = state.Steps.Select(step => new { name = step.Name, status = step.Status.ToString(), detail = step.Detail }).ToArray(),
@@ -107,6 +108,14 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
                 sinkingOrSunk = npcHulls.Count(ship => (ship.Hull as MissionShip)?.IsSinking == true),
                 ownedHere = npcHulls.Count(ship => ship.CurrentAuthority == controller.Session.OwnControllerId),
             },
+            // Whether each hull mounts a ship siege weapon here, for the M12 weapon gates.
+            hulls = ships.Select(ship => new
+            {
+                ship = NavalContactProbe.Short(ship.ShipId),
+                owner = ship.CurrentAuthority,
+                ai = ship.IsNpcParty,
+                hasWeapon = (ship.Hull as MissionShip)?.ShipSiegeWeapon != null,
+            }).ToArray(),
             // Each player hull with its owner, adopted by the host or handed back, and this client's pending reclaims.
             handBack = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipReplicator.InspectHandBack(),
             // How the copies exist here and how close every hull pair came, for the ramming preset above all.
