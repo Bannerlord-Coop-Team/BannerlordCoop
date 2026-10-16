@@ -164,7 +164,7 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
         var localControllerId = controllerIdProvider.ControllerId;
         if (string.IsNullOrEmpty(localControllerId)) return;
 
-        troopsRegistry.Restore(localControllerId, UnpackToRoster(payload.What.Troops));
+        troopsRegistry.Deposit(localControllerId, UnpackToRoster(payload.What.Troops));
     }
 
     private void Handle_AwaitingAlternativeSolutionTroopsDrainedLocally(MessagePayload<AwaitingAlternativeSolutionTroopsDrainedLocally> payload)

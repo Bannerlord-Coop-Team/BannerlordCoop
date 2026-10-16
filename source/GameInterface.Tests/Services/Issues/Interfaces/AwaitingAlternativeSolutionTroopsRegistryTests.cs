@@ -113,4 +113,31 @@ public class AwaitingAlternativeSolutionTroopsRegistryTests
 
         Assert.False(registry.TryGet("player-A", out _));
     }
+
+    [Fact]
+    public void Deposit_AccumulatesSeparateConfirmedSolutionsForTheSamePlayer()
+    {
+        var registry = new AwaitingAlternativeSolutionTroopsRegistry();
+        var x = NewCharacter();
+
+        registry.Deposit("player-A", Roster((x, 2)));
+        registry.Deposit("player-A", Roster((x, 3)));
+
+        Assert.True(registry.TryGet("player-A", out var combined));
+        Assert.Equal(5, combined.GetTroopCount(x));
+    }
+
+    [Fact]
+    public void Restore_CopiesTheRosterInsteadOfKeepingTheCallerReference()
+    {
+        var registry = new AwaitingAlternativeSolutionTroopsRegistry();
+        var x = NewCharacter();
+        var source = Roster((x, 2));
+
+        registry.Restore("player-A", source);
+        source.AddToCounts(x, 3, false, 0, 0, true);
+
+        Assert.True(registry.TryGet("player-A", out var restored));
+        Assert.Equal(2, restored.GetTroopCount(x));
+    }
 }

@@ -87,7 +87,9 @@ internal sealed class AwaitingAlternativeSolutionTroopsRegistry : IAwaitingAlter
             return;
         }
 
-        troopsByOwnerControllerId[ownerControllerId] = troops;
+        var restored = TroopRoster.CreateDummyTroopRoster();
+        restored.Add(troops);
+        troopsByOwnerControllerId[ownerControllerId] = restored;
     }
 
     public IReadOnlyCollection<(string OwnerControllerId, TroopRoster Troops)> Snapshot()
