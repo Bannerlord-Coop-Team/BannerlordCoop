@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Extensions;
+using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.ObjectManager;
 using Missions.Messages;
 using Missions.Services.Network;
@@ -24,7 +25,8 @@ namespace Missions.Battles;
 /// sends them once more. Owners also send a hull's damage state and fieldable reserve when either changes, and copies take
 /// them on. Every stream drops traffic from a controller not in the mission. A hull that leaves
 /// with its owner (retreat or leave) is removed on every client, after its seats and deck are cleared. A disconnected
-/// player's hulls stay: the battle host adopts them and simulates them like its AI hulls.
+/// player's hulls stay: the battle host adopts them and simulates them like its AI hulls, and hands each back when the
+/// player returns.
 /// </summary>
 public interface IBattleShipReplicator : IDisposable
 {
@@ -79,10 +81,19 @@ public interface IBattleShipReplicator : IDisposable
 
     /// <summary>[Game thread] How many hulls of a side left the mission with their owner, for the end check's retreat rule.</summary>
     int DepartedHulls(BattleSideEnum side);
+
+    /// <summary>
+    /// [Game thread, battle host] Takes the queued troops a handed-back hull held that did not go back with it: other parties'
+    /// troops, and the returning player's beyond what its hull can take.
+    /// </summary>
+    IReadOnlyList<CoopAgentOrigin> TakeReserveKeptOnHandBack(BattleSideEnum side);
+
+    /// <summary>[Game thread] Who holds each player hull, and every hand-back this client asked for or answered (diagnostics).</summary>
+    object InspectHandBack();
 }
 
 /// <inheritdoc cref="IBattleShipReplicator"/>
-public class BattleShipReplicator : IBattleShipReplicator
+public partial class BattleShipReplicator : IBattleShipReplicator
 {
     private static readonly ILogger Logger = LogManager.GetLogger<BattleShipReplicator>();
 
@@ -167,6 +178,9 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Subscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Subscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
         messageBroker.Subscribe<NetworkShipRemoved>(Handle_NetworkShipRemoved);
+        messageBroker.Subscribe<NetworkShipReclaim>(Handle_NetworkShipReclaim);
+        messageBroker.Subscribe<NetworkShipHandedBack>(Handle_NetworkShipHandedBack);
+        messageBroker.Subscribe<NetworkShipReclaimRefused>(Handle_NetworkShipReclaimRefused);
     }
 
     public void Dispose()
@@ -181,7 +195,11 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
         messageBroker.Unsubscribe<NetworkShipRemoved>(Handle_NetworkShipRemoved);
+        messageBroker.Unsubscribe<NetworkShipReclaim>(Handle_NetworkShipReclaim);
+        messageBroker.Unsubscribe<NetworkShipHandedBack>(Handle_NetworkShipHandedBack);
+        messageBroker.Unsubscribe<NetworkShipReclaimRefused>(Handle_NetworkShipReclaimRefused);
         heldShips.Clear();
+        reclaims.Clear();
     }
 
     // [Game thread] Published synchronously by the spawn postfix. Hulls this client fields go on PlayerTeam; the
@@ -276,6 +294,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         hullAuthority.Tick();
         PruneRemovedHulls();
         DrainHeldShips();
+        TickHeroBoarding();
 
         if (!spawnRecordsSent && deployment.IsCommitted)
         {
@@ -314,7 +333,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     public void AnnounceRemoval(MissionObject hull, ShipRemovalReason reason, bool missionEnding)
     {
         if (!spawnRecordsSent || hullAuthority.IsSpawnRegistrationSuppressed || !Registry.TryGetByHull(hull, out var ship)
-            || !IsOwnHull(ship))
+            || !IsAnnouncedOwnHull(ship))
             return;
         if (missionEnding && ship.FollowsBattleHost) return;
 
@@ -400,7 +419,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         hullAuthority.Remove(departing);
         foreach (var ship in departing)
         {
-            CountDeparted(ship);
+            // A returning player's duplicate goes while its ship stays in the battle.
+            if (reason != ShipRemovalReason.Reclaimed) CountDeparted(ship);
             Prune(ship.ShipId);
             Logger.Information("[NavalSync] Hull {ShipId} of {Owner} left with its owner ({Reason}); removed it",
                 ship.ShipId, ship.CurrentAuthority, reason);
@@ -446,7 +466,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     private void SendSpawnRecords(string controllerId)
     {
         var records = Registry.Ships
-            .Where(IsOwnHull)
+            .Where(IsAnnouncedOwnHull)
             .Select(ship => engine.Describe(ship.Hull, ship))
             .ToArray();
         if (records.Length == 0) return;
@@ -464,7 +484,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (sendElapsed < SendIntervalSeconds) return;
         sendElapsed = 0;
 
-        foreach (var ship in Registry.Ships.Where(IsOwnHull))
+        foreach (var ship in Registry.Ships.Where(IsAnnouncedOwnHull))
         {
             var stream = GetStream(ship.ShipId);
             // The sunk condition already went out after the hull's last sample; peers keep that frame.
@@ -512,7 +532,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (!spawnRecordsSent) return;
 
         missionEndRopesSent = true;
-        foreach (var ship in Registry.Ships.Where(IsOwnHull))
+        foreach (var ship in Registry.Ships.Where(IsAnnouncedOwnHull))
             SendFinalRopes(ship);
     }
 
@@ -641,6 +661,10 @@ public class BattleShipReplicator : IBattleShipReplicator
             held.SettleRecord();
             return true;
         }
+
+        // A returning player keeps its launcher's own hull of an adopted ship and asks the host for the ship instead.
+        var reclaimed = AdvanceReclaim(held);
+        if (reclaimed.HasValue) return reclaimed.Value;
         // Vanilla's team setup spawns a hull for every set ship assignment, so a copy spawned before it would get a local twin.
         if (!deployment.IsTeamSetupOver) return false;
 
@@ -688,11 +712,14 @@ public class BattleShipReplicator : IBattleShipReplicator
         return true;
     }
 
-    // Who simulates a hull whose record waited: a host-held hull moves with the host, a disconnected player's goes to it.
+    // Who simulates a hull whose record waited: a host-held hull moves with the host, a handed-back one goes to the player
+    // who fielded it, and a disconnected player's goes to the host.
     private string CurrentAuthorityOf(NetworkShipInfo ship)
     {
-        if (ship.FollowsBattleHost) return npcHullHost ?? ship.CurrentAuthority;
-        return disconnectedOwners.Contains(ship.CurrentAuthority) ? session.HostControllerId : ship.CurrentAuthority;
+        var authority = handedBackShips.Contains(ship.ShipId) ? ship.OriginalOwner
+            : ship.FollowsBattleHost ? npcHullHost ?? ship.CurrentAuthority
+            : ship.CurrentAuthority;
+        return disconnectedOwners.Contains(authority) ? session.HostControllerId : authority;
     }
 
     // The departed owner's last held state goes on before the move, so the new authority takes over from its pose and damage.
@@ -956,7 +983,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
             SendSpawnRecords(entered.ControllerId);
             // A hull's condition and reserve only go out on change, so the entrant gets the last ones too.
-            foreach (var ship in Registry.Ships.Where(IsOwnHull))
+            foreach (var ship in Registry.Ships.Where(IsAnnouncedOwnHull))
                 conditions.SendLastTo(entered.ControllerId, ship);
         }, context: nameof(Handle_PeerEntered));
     }
@@ -988,6 +1015,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         removalsRejected,
         agentsMovedOffDepartedHulls,
         hullsAdopted,
+        handBack = InspectHandBack(),
         departedAttackerHulls = DepartedHulls(BattleSideEnum.Attacker),
         departedDefenderHulls = DepartedHulls(BattleSideEnum.Defender),
         pendingForeignHulls = heldShips.Values.Count(held => held.Record != null),

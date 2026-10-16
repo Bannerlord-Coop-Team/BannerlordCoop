@@ -101,6 +101,25 @@ public class NavalMigrationReserveFielderTests
         Assert.Single(harness.Queued);
     }
 
+    // M8b: a disconnected player's hull the host adopted takes that player's recovered troops first, and troops a handed-back
+    // hull left behind join the host's pending reserve.
+    [Fact]
+    public void Tick_QueuesOnAnAdoptedHull_AndTakesTheReserveAHandBackLeftBehind()
+    {
+        const string PlayerParty = "MapEventParty_player";
+        var harness = new Harness(isHost: true);
+        var pirateHull = harness.AddAiHull(Pirates, capacity: 1);
+        var adoptedHull = harness.AddAiHull(PlayerParty, capacity: 2, originalOwner: "player");
+        harness.Recover(Origin(PlayerParty), Origin(PlayerParty));
+        harness.Kept.Add(Origin(Pirates));
+
+        harness.Fielder.Tick();
+
+        Assert.Equal(new[] { PlayerParty, PlayerParty }, harness.Queued[adoptedHull].Select(origin => origin.MapEventPartyId));
+        Assert.Equal(new[] { Pirates }, harness.Queued[pirateHull].Select(origin => origin.MapEventPartyId));
+        Assert.Empty(harness.Kept);
+    }
+
     // A recovered origin carries only the party it was supplied under for this decision.
     private static CoopAgentOrigin Origin(string mapEventPartyId)
     {
@@ -141,6 +160,14 @@ public class NavalMigrationReserveFielderTests
 
             var replicator = new Mock<IBattleShipReplicator>();
             replicator.Setup(r => r.IsReplacingHull(It.IsAny<Guid>())).Returns((Guid shipId) => Replacing.Contains(shipId));
+            replicator.Setup(r => r.TakeReserveKeptOnHandBack(It.IsAny<BattleSideEnum>())).Returns((BattleSideEnum side) =>
+            {
+                if (side != BattleSideEnum.Defender) return Array.Empty<CoopAgentOrigin>();
+
+                var kept = Kept.ToList();
+                Kept.Clear();
+                return kept;
+            });
 
             Fielder = new NavalMigrationReserveFielder(session.Object, Reinforcements.Object, Registry, engine.Object, replicator.Object);
         }
@@ -151,14 +178,18 @@ public class NavalMigrationReserveFielderTests
         public Dictionary<MissionObject, int> Capacity { get; } = new();
         public HashSet<MissionObject> Sinking { get; } = new();
         public HashSet<Guid> Replacing { get; } = new();
+        /// <summary>Defender troops a handed-back hull left with the host.</summary>
+        public List<CoopAgentOrigin> Kept { get; } = new();
         public NavalMigrationReserveFielder Fielder { get; }
 
-        public MissionObject AddAiHull(string mapEventPartyId, int capacity = 40)
+        /// <summary>A Defender hull this host simulates: an AI party's, or with <paramref name="originalOwner"/> an adopted player's.</summary>
+        public MissionObject AddAiHull(string mapEventPartyId, int capacity = 40, string? originalOwner = null)
         {
             var hull = ShipTestHulls.Create();
             Queued[hull] = new List<CoopAgentOrigin>();
             Capacity[hull] = capacity;
-            Assert.True(Registry.TryRegister(new NetworkShipInfo(Guid.NewGuid(), Host, mapEventPartyId, true, hull, null)));
+            Assert.True(Registry.TryRegister(new NetworkShipInfo(Guid.NewGuid(), Host, mapEventPartyId, originalOwner == null, hull,
+                null, originalOwner)));
             return hull;
         }
 

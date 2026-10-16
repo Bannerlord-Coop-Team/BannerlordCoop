@@ -141,6 +141,30 @@ public interface INavalShipEngine
     /// </summary>
     int AddHullReserve(MissionObject hull, IReadOnlyList<IAgentOriginBase> origins);
 
+    /// <summary>[Game thread] Removes and returns the troops queued on a hull this client simulates.</summary>
+    IReadOnlyList<IAgentOriginBase> TakeHullReserve(MissionObject hull);
+
+    /// <summary>How many more troops an afloat hull this client simulates can hold: its crew capacity less its crew and queue.</summary>
+    int FreeCrewCapacity(MissionObject hull);
+
+    /// <summary>The registry id of the party's campaign ship the hull stands for, or null when it has none.</summary>
+    string CampaignShipIdOf(MissionObject hull);
+
+    /// <summary>
+    /// [Game thread] Moves a hull this client simulates through vanilla's TeleportShip, which snaps it to the water and carries
+    /// the crew its ship tracks.
+    /// </summary>
+    void TeleportHull(MissionObject hull, MatrixFrame frame);
+
+    /// <summary>[Game thread] Makes an on-foot agent crew of a hull this client simulates and moves it onto its deck.</summary>
+    void BoardAgent(Agent agent, MissionObject hull);
+
+    /// <summary>
+    /// [Game thread] Takes an agent out of the battle the way vanilla takes a removed hull's crew: it fades out, which reads as
+    /// a rout, not a casualty.
+    /// </summary>
+    void WithdrawAgent(Agent agent);
+
     /// <summary>Whether the hull is sinking or has sunk.</summary>
     bool IsSinking(MissionObject hull);
 

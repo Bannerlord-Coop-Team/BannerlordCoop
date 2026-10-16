@@ -71,7 +71,8 @@ public class NavalShipEngine : INavalShipEngine
             ship.ShipOrigin.SailHitPoints,
             ship.ShipOrigin.RandomValue,
             ship.ShipOrigin.CustomSailPatternId,
-            identity.OriginalOwner);
+            identity.OriginalOwner,
+            CampaignShipIdOf(hull));
     }
 
     public MissionObject SpawnForeignHull(BattleShipSpawnData data, Team team, out Formation formation)
@@ -599,6 +600,66 @@ public class NavalShipEngine : INavalShipEngine
         }
 
         return added;
+    }
+
+    public IReadOnlyList<IAgentOriginBase> TakeHullReserve(MissionObject hull)
+    {
+        var ship = (MissionShip)hull;
+        var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
+        if (agentsLogic == null || ship.Team == null || NavalForeignHulls.Contains(ship)) return Array.Empty<IAgentOriginBase>();
+
+        var reserved = new MBList<IAgentOriginBase>();
+        agentsLogic.FillReservedTroopsOfShip(ship, reserved);
+        agentsLogic.RemoveAllReservedTroopsFromShip(ship);
+        return reserved;
+    }
+
+    public int FreeCrewCapacity(MissionObject hull)
+    {
+        var ship = (MissionShip)hull;
+        var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
+        if (agentsLogic == null || ship.Team == null || ship.IsSinking || NavalForeignHulls.Contains(ship)) return 0;
+
+        return Math.Max(0, ship.TotalCrewCapacity - agentsLogic.GetTotalTroopCountOfShip(ship));
+    }
+
+    // An own hull's snapshot knows the party's ship it was built from; another owner's carries the id its record gave.
+    public string CampaignShipIdOf(MissionObject hull)
+    {
+        if (!(((MissionShip)hull).ShipOrigin is Ship snapshot)) return null;
+
+        var source = CoopShipSnapshots.SourceOf(snapshot);
+        if (source == null) return CoopShipSnapshots.CampaignShipIdOf(snapshot);
+        return objectManager.TryGetId(source, out var id) ? id : null;
+    }
+
+    public void TeleportHull(MissionObject hull, MatrixFrame frame)
+    {
+        var ship = (MissionShip)hull;
+        var shipsLogic = ShipsLogic;
+        if (shipsLogic == null || ship.IsRemoved || !ship.GameEntity.IsValid) return;
+
+        shipsLogic.TeleportShip(ship, frame, checkFreeArea: false);
+    }
+
+    public void BoardAgent(Agent agent, MissionObject hull)
+    {
+        var ship = (MissionShip)hull;
+        var agentsLogic = Mission.Current?.GetMissionBehavior<NavalAgentsLogic>();
+        if (agentsLogic == null || !agent.IsActive() || ship.IsRemoved || !ship.GameEntity.IsValid) return;
+
+        if (agentsLogic.IsAgentOnAnyShip(agent, out _)) agentsLogic.TransferAgentToShip(agent, ship);
+        else agentsLogic.AddAgentToShip(agent, ship);
+        MoveAgentToHull(agent, ship);
+    }
+
+    // NavalTeamAgents.OnShipRemoved fades a removed hull's crew this way.
+    public void WithdrawAgent(Agent agent)
+    {
+        if (!agent.IsActive()) return;
+
+        agent.SetIsPhysicsForceClosed(false);
+        agent.FadeOut(true, true);
     }
 
     public bool IsSinking(MissionObject hull) => hull is MissionShip ship && ship.IsSinking;

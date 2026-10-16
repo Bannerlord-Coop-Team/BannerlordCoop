@@ -75,6 +75,30 @@ public class NavalHullAuthorityTests
         Assert.Equal(new[] { strayParked }, unparked);
     }
 
+    // M8b: an own duplicate's crew leaves the battle once the hull is gone, the way vanilla's removal withdraws a hull's crew.
+    [Fact]
+    public void Remove_WithdrawingTheCrew_WithdrawsOnlyTheParkedCrewOnceTheHullIsGone()
+    {
+        var (authority, _, engine) = Create();
+        var duplicate = new NetworkShipInfo(Guid.NewGuid(), Own, "MapEventParty_1", false, ShipTestHulls.Create(), null);
+        var crew = CreateAgent();
+        var stray = CreateAgent();
+        engine.Setup(e => e.ParkHullAgents(duplicate.Hull)).Returns(new[]
+        {
+            new HullSwapAgent(crew, isCrew: true, isParked: true, Vec3.Zero, Vec3.Zero),
+            new HullSwapAgent(stray, isCrew: false, isParked: true, Vec3.Zero, Vec3.Zero),
+        });
+
+        authority.Remove(new[] { duplicate }, withdrawCrew: true);
+        authority.Tick();
+        engine.Verify(e => e.WithdrawAgent(It.IsAny<Agent>()), Times.Never);
+        authority.Tick();
+
+        engine.Verify(e => e.RemoveHull(duplicate.Hull), Times.Once);
+        engine.Verify(e => e.WithdrawAgent(crew), Times.Once);
+        engine.Verify(e => e.WithdrawAgent(stray), Times.Never);
+    }
+
     [Fact]
     public void SuppressSpawnRegistration_HoldsUntilEveryScopeCloses()
     {

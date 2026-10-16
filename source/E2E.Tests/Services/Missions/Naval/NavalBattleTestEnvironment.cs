@@ -227,6 +227,22 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 peer.Instance.Call(() => peer.Broker.Publish(peer, new MissionPeerDisconnected(departed.Id, MapEventId)));
         }
 
+        /// <summary>
+        /// A disconnected player comes back into the running battle: its old mission is gone, it opens a fresh one on the mesh
+        /// and the server introduces it to every member.
+        /// </summary>
+        public NavalPeer Rejoin(NavalPeer departed)
+        {
+            departed.Instance.Call(() =>
+            {
+                departed.DisposeShipServices();
+                departed.Controller.Dispose();
+            });
+            var returned = Join(departed.Id);
+            AnnounceEntry(returned);
+            return returned;
+        }
+
         /// <summary>Drops <paramref name="departed"/> off the mesh and hands the battle to <paramref name="newHost"/> at the next epoch.</summary>
         public void MigrateHost(NavalPeer departed, string newHost)
         {
@@ -255,8 +271,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 peer.Commit();
         }
 
-        public Guid FieldPlayerHull(NavalPeer owner, Vec3 position) =>
-            owner.FieldOwnHull(owner.Side, position, PartyIds[owner.Id]);
+        public Guid FieldPlayerHull(NavalPeer owner, Vec3 position, string? campaignShipId = null) =>
+            owner.FieldOwnHull(owner.Side, position, PartyIds[owner.Id], campaignShipId);
 
         public Guid FieldAiHull(NavalPeer host, BattleSideEnum side, Vec3 position, int? formationIndex = null) =>
             host.FieldAiHull(side, position, PirateMapEventPartyId, formationIndex);
@@ -387,13 +403,17 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
 
         public void Commit() => Call(() => Controller.Deployment.OnLocalDeploymentFinished());
 
-        /// <summary>A hull vanilla's team setup fielded for this client, registered as the spawn postfix does.</summary>
-        public Guid FieldOwnHull(BattleSideEnum side, Vec3 position, string mapEventPartyId)
+        /// <summary>
+        /// A hull vanilla's team setup fielded for this client, registered as the spawn postfix does; it stands for the party's
+        /// campaign ship <paramref name="campaignShipId"/> when given.
+        /// </summary>
+        public Guid FieldOwnHull(BattleSideEnum side, Vec3 position, string mapEventPartyId, string? campaignShipId = null)
         {
             var shipId = Guid.NewGuid();
             Call(() =>
             {
                 var hull = Engine.Field(side, position);
+                hull.CampaignShipId = campaignShipId;
                 Assert.True(Registry.TryRegister(new NetworkShipInfo(shipId, Id, mapEventPartyId, false, hull.Hull, null)));
             });
             return shipId;

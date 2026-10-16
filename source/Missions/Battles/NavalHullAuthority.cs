@@ -30,11 +30,12 @@ public interface INavalHullAuthority : IDisposable
     string Replace(Guid shipId);
 
     /// <summary>
-    /// Queues taking other owners' hulls out through vanilla's removal: the next <see cref="Tick"/> parks everyone still
-    /// aboard and the one after removes the hulls. Parked agents that crew none of them then go back where they stood; the
-    /// hulls' own crew stay parked until their owner's rout or departure takes them. Their seats must already be free.
+    /// Queues taking hulls out through vanilla's removal: the next <see cref="Tick"/> parks everyone still aboard and the one
+    /// after removes the hulls. Parked agents that crew none of them then go back where they stood; the hulls' own crew stay
+    /// parked until their owner's rout or departure takes them, or, with <paramref name="withdrawCrew"/> for this client's own
+    /// hull, withdraw from the battle as vanilla's removal withdraws them. Their seats must already be free.
     /// </summary>
-    void Remove(IReadOnlyList<NetworkShipInfo> ships);
+    void Remove(IReadOnlyList<NetworkShipInfo> ships, bool withdrawCrew = false);
 
     bool IsReplacing(Guid shipId);
 
@@ -100,11 +101,11 @@ public class NavalHullAuthority : INavalHullAuthority
         return null;
     }
 
-    public void Remove(IReadOnlyList<NetworkShipInfo> ships)
+    public void Remove(IReadOnlyList<NetworkShipInfo> ships, bool withdrawCrew = false)
     {
         if (ships.Count == 0) return;
 
-        hullRemovals.Add(new HullRemoval(ships.Select(ship => ship.Hull).ToList()));
+        hullRemovals.Add(new HullRemoval(ships.Select(ship => ship.Hull).ToList(), withdrawCrew));
     }
 
     public bool IsReplacing(Guid shipId) => hullSwaps.Any(swap => swap.ShipId == shipId);
@@ -168,6 +169,7 @@ public class NavalHullAuthority : INavalHullAuthority
             hullRemovals.Remove(removal);
             foreach (var hull in removal.Hulls)
                 engine.RemoveHull(hull);
+            if (removal.WithdrawCrew) WithdrawCrew(removal);
         }
         catch (Exception exception)
         {
@@ -176,6 +178,12 @@ public class NavalHullAuthority : INavalHullAuthority
         }
 
         UnparkNonCrew(removal);
+    }
+
+    private void WithdrawCrew(HullRemoval removal)
+    {
+        foreach (var moved in removal.Agents.Where(moved => moved.IsCrew).ToList())
+            engine.WithdrawAgent(moved.Agent);
     }
 
     // An agent is crew when any departing hull's parking counted it as such, so another departing hull's crew stays parked.
@@ -271,12 +279,14 @@ public class NavalHullAuthority : INavalHullAuthority
 
     private sealed class HullRemoval
     {
-        public HullRemoval(IReadOnlyList<MissionObject> hulls)
+        public HullRemoval(IReadOnlyList<MissionObject> hulls, bool withdrawCrew)
         {
             Hulls = hulls;
+            WithdrawCrew = withdrawCrew;
         }
 
         public IReadOnlyList<MissionObject> Hulls { get; }
+        public bool WithdrawCrew { get; }
         /// <summary>Everyone the first step parked off the hulls; null before it ran.</summary>
         public IReadOnlyList<HullSwapAgent> Agents { get; set; }
     }

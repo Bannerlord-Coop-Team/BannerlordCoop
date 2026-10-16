@@ -45,6 +45,8 @@ public sealed class BattleShipSpawnData
     [ProtoMember(16)] public readonly string CustomSailPatternId;
     /// <summary>The player who fielded an adopted hull; empty when it is the record's owner.</summary>
     [ProtoMember(17)] public readonly string OriginalOwnerControllerId;
+    /// <summary>The registry id of the party's campaign ship the hull was built from, so its owner can tell it back on return.</summary>
+    [ProtoMember(18)] public readonly string CampaignShipId;
 
     public BattleShipSpawnData(
         Guid shipId,
@@ -63,7 +65,8 @@ public sealed class BattleShipSpawnData
         float sailHitPoints,
         int randomValue,
         string customSailPatternId,
-        string originalOwnerControllerId = null)
+        string originalOwnerControllerId = null,
+        string campaignShipId = null)
     {
         ShipId = shipId;
         OwnerControllerId = ownerControllerId;
@@ -82,6 +85,7 @@ public sealed class BattleShipSpawnData
         RandomValue = randomValue;
         CustomSailPatternId = customSailPatternId;
         OriginalOwnerControllerId = originalOwnerControllerId == ownerControllerId ? null : originalOwnerControllerId;
+        CampaignShipId = campaignShipId;
     }
 
     /// <summary>The player or host that fielded the hull.</summary>

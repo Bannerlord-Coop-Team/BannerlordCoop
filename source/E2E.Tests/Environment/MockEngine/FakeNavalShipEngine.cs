@@ -84,7 +84,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         var fake = Of(hull);
         return new BattleShipSpawnData(identity.ShipId, identity.CurrentAuthority, identity.MapEventPartyId, identity.IsNpcParty,
             fake.Side, fake.FormationIndex, NetworkBattleShipSample.FromFrame(fake.Frame), HullId, null, null, null, null,
-            fake.HitPoints, fake.SailHitPoints, 1, "", identity.OriginalOwner);
+            fake.HitPoints, fake.SailHitPoints, 1, "", identity.OriginalOwner, fake.CampaignShipId);
     }
 
     public MissionObject SpawnForeignHull(BattleShipSpawnData data, Team team, out Formation formation)
@@ -106,6 +106,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             Team = team,
             Formation = FormationOf(team, formationIndex),
             SpawnData = data,
+            CampaignShipId = data.CampaignShipId,
         };
         hulls.Add(copy);
         formation = copy.Formation!;
@@ -210,6 +211,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             Team = old.Team,
             Formation = old.Formation,
             CrewCapacity = old.CrewCapacity,
+            CampaignShipId = old.CampaignShipId,
         };
         hulls.Add(fresh);
         return fresh.Hull;
@@ -312,6 +314,52 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         return taken;
     }
 
+    public IReadOnlyList<IAgentOriginBase> TakeHullReserve(MissionObject hull)
+    {
+        var fake = Of(hull);
+        if (fake.IsCopy) return Array.Empty<IAgentOriginBase>();
+
+        var taken = fake.ReservedOrigins.ToList();
+        fake.ReservedOrigins.Clear();
+        fake.SpawnableReserve = Math.Max(0, fake.SpawnableReserve - taken.Count);
+        return taken;
+    }
+
+    public int FreeCrewCapacity(MissionObject hull)
+    {
+        var fake = Of(hull);
+        return fake.IsCopy || fake.SinkingState > 0 ? 0 : Math.Max(0, fake.CrewCapacity - fake.SpawnableReserve);
+    }
+
+    public string CampaignShipIdOf(MissionObject hull) => Of(hull).CampaignShipId!;
+
+    public void TeleportHull(MissionObject hull, MatrixFrame frame)
+    {
+        var fake = Of(hull);
+        fake.Frame = frame;
+        fake.Teleports++;
+        fake.AgentsAboardAtTeleport = AgentsOnDeck(hull).Where(agent => !(crews.TryGetValue(agent, out var crew) && crew == fake)).Count();
+    }
+
+    public void BoardAgent(Agent agent, MissionObject hull)
+    {
+        decks[agent] = Of(hull);
+        crews[agent] = Of(hull);
+        Boarded.Add(agent);
+    }
+
+    public void WithdrawAgent(Agent agent)
+    {
+        decks.Remove(agent);
+        Withdrawn.Add(agent);
+    }
+
+    /// <summary>The agents <see cref="BoardAgent"/> put aboard a hull.</summary>
+    public List<Agent> Boarded { get; } = new();
+
+    /// <summary>The agents <see cref="WithdrawAgent"/> took out of the battle.</summary>
+    public List<Agent> Withdrawn { get; } = new();
+
     public bool IsSinking(MissionObject hull) => Of(hull).SinkingState > 0;
 
     public bool IsHullRemoved(MissionObject hull)
@@ -406,6 +454,11 @@ public sealed class FakeHull
     /// <summary>The local formation the hull is assigned to, which differs per client for the same ship.</summary>
     public Formation? Formation { get; set; }
     public BattleShipSpawnData? SpawnData { get; set; }
+    /// <summary>The registry id of the party's campaign ship the hull stands for, or null.</summary>
+    public string? CampaignShipId { get; set; }
+    public int Teleports { get; set; }
+    /// <summary>How many agents other than the hull's own crew stood on it at its last teleport.</summary>
+    public int AgentsAboardAtTeleport { get; set; }
     public BattleRopeState[] Ropes { get; set; } = Array.Empty<BattleRopeState>();
     public int FrameWrites { get; set; }
     public int FinalRopesApplied { get; set; }

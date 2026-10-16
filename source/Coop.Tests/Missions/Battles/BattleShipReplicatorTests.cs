@@ -1009,6 +1009,46 @@ public class BattleShipReplicatorTests
         Assert.Equal(record.CustomSailPatternId, copy.CustomSailPatternId);
     }
 
+    // M8b: an adopted hull's record names the player who fielded it and that player's campaign ship.
+    [Fact]
+    public void SpawnRecord_RoundTripsTheOriginalOwnerAndCampaignShip_AndAnOwnRecordNamesItsOwner()
+    {
+        var adopted = new BattleShipSpawnData(Guid.NewGuid(), "host", "MapEventParty_1", false, BattleSideEnum.Defender, 2,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
+            "", Peer, "MobileParty_peer_0");
+        var own = new BattleShipSpawnData(Guid.NewGuid(), Peer, "MapEventParty_1", false, BattleSideEnum.Defender, 2,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
+            "", Peer);
+
+        var copies = Serializer.DeepClone(new NetworkSpawnBattleShips(new[] { adopted, own })).Ships;
+
+        Assert.Equal(Peer, copies[0].OriginalOwner);
+        Assert.Equal("MobileParty_peer_0", copies[0].CampaignShipId);
+        Assert.Equal(Peer, copies[1].OriginalOwner);
+        Assert.Null(copies[1].OriginalOwnerControllerId);
+    }
+
+    [Fact]
+    public void HandedBack_RoundTripsTheFrameConditionAndReserve_AndAnEmptyReserveArrivesNull()
+    {
+        var handedBack = new NetworkShipHandedBack(Guid.NewGuid(), "host", Peer, HostEpoch, MovedFrame(), Condition(55f),
+            "MapEventParty_1", new[] { new global::GameInterface.Services.MapEvents.TroopSupply.TroopReserveEntry(7, "troop", 0, 0, 30f) });
+        var empty = new NetworkShipHandedBack(Guid.NewGuid(), "host", Peer, HostEpoch, MovedFrame(), Condition(55f),
+            "MapEventParty_1", null);
+
+        var copy = Serializer.DeepClone(handedBack);
+
+        Assert.True(copy.IsValid);
+        Assert.Equal(handedBack.Frame, copy.Frame);
+        Assert.Equal(55f, copy.Condition.HitPoints);
+        var entry = Assert.Single(copy.Reserve);
+        Assert.Equal(7, entry.Seed);
+        Assert.Equal("troop", entry.CharacterId);
+        Assert.Equal(30f, entry.Health);
+        Assert.Null(Serializer.DeepClone(empty).Reserve);
+        Assert.False(new NetworkShipHandedBack(Guid.NewGuid(), Peer, Peer, HostEpoch, MovedFrame(), Condition(55f), null, null).IsValid);
+    }
+
     [Fact]
     public void Tick_SendsTheOwnHullConditionOnceAndThenOnlyWhenItChanges()
     {

@@ -61,6 +61,8 @@ public class NavalMigrationReserveFielder : INavalMigrationReserveFielder
             var hulls = AfloatHostHulls(side);
             if (hulls.Count == 0) continue;
 
+            // A hull handed back to its returning player left the host the queued troops that did not go with it.
+            pending[(int)side].AddRange(shipReplicator.TakeReserveKeptOnHandBack(side));
             var taken = reinforcementFielder.TakeMigrationReserve(side);
             if (taken.Count > 0)
             {
