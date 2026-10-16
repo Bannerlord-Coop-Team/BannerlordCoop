@@ -70,16 +70,22 @@ internal static class NavalContactProbe
     internal static void CountRoutedCollisionApply() => Interlocked.Increment(ref routedCollisionApplies);
 
     /// <summary>[Game thread] Keeps the closest approach seen for a hull pair.</summary>
-    internal static void RecordApproach(Guid first, Guid second, float centerDistance, float gap, float time, string modes)
+    internal static void RecordApproach(Guid first, MissionShip firstHull, Guid second, MissionShip secondHull, float centerDistance,
+        float gap, float time)
     {
-        var key = first.CompareTo(second) <= 0 ? (first, second) : (second, first);
+        bool inOrder = first.CompareTo(second) <= 0;
+        var key = inOrder ? (first, second) : (second, first);
         if (!approaches.TryGetValue(key, out var approach))
         {
             approach = new HullPairApproach();
             approaches.Add(key, approach);
         }
 
-        approach.Take(centerDistance, gap, time, modes);
+        // The modes are only named for a new closest approach, in the pair's order.
+        if (!approach.Take(centerDistance, gap, time)) return;
+        approach.Modes = inOrder
+            ? NavalCopyBodies.ModeName(firstHull) + "/" + NavalCopyBodies.ModeName(secondHull)
+            : NavalCopyBodies.ModeName(secondHull) + "/" + NavalCopyBodies.ModeName(firstHull);
     }
 
     /// <summary>[Game thread] The closest approach of every hull pair, closest first.</summary>
@@ -150,23 +156,24 @@ internal static class NavalContactProbe
         approaches.Clear();
     }
 
-    private static string Short(Guid shipId) => shipId.ToString("N").Substring(0, 8);
+    internal static string Short(Guid shipId) => shipId.ToString("N").Substring(0, 8);
 
     private sealed class HullPairApproach
     {
         public float MinGap { get; private set; } = float.MaxValue;
         public float MinCenter { get; private set; } = float.MaxValue;
         public float AtTime { get; private set; }
-        public string Modes { get; private set; }
+        public string Modes { get; set; }
 
-        public void Take(float centerDistance, float gap, float time, string modes)
+        /// <summary>True when the gap is a new closest approach.</summary>
+        public bool Take(float centerDistance, float gap, float time)
         {
             MinCenter = Math.Min(MinCenter, centerDistance);
-            if (gap >= MinGap) return;
+            if (gap >= MinGap) return false;
 
             MinGap = gap;
             AtTime = time;
-            Modes = modes;
+            return true;
         }
     }
 }

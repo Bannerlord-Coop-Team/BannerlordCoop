@@ -93,6 +93,26 @@ public class NavalCopySteeringTests
     }
 
     [Fact]
+    public void Compute_DropsTheOwnerVelocityOnceTheOwnerFramesStop()
+    {
+        var steering = Sailing(Knobs("gain=1", "window=1", "clamp=10", "tau=0.01", "deadzone=0"), 5f);
+        var behind = steering.TargetOrigin - new Vec3(1f, 0f, 0f);
+
+        // Within MinVelocitySpan of the last owner frame the owner's 5 m/s is still added to the 1 m/s correction.
+        Assert.Equal(6f, steering.Compute(0.05f, behind, 0f, Vec3.Zero, 0f).DeltaVelocity.x, 3);
+        Assert.False(steering.IsOwnerStale);
+
+        var stale = steering.Compute(0.06f, behind, 0f, Vec3.Zero, 0f);
+
+        Assert.True(steering.IsOwnerStale);
+        Assert.Equal(1f, stale.DeltaVelocity.x, 3);
+        Assert.Equal(0f, steering.FeedForwardVelocity.Length);
+
+        steering.ObserveOwner(1.2f, steering.TargetOrigin + new Vec3(1f, 0f, 0f), 0f);
+        Assert.False(steering.IsOwnerStale);
+    }
+
+    [Fact]
     public void Compute_ClampsTheYawCorrection()
     {
         var steering = Sailing(Knobs("yawclamp=5", "tau=0.01", "yawdeadzone=0"), 0f, yaw: 0.5f);

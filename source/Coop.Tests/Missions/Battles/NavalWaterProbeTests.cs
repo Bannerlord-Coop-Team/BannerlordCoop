@@ -1,6 +1,7 @@
 ﻿#if DEBUG
 using Missions.Naval;
 using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.Library;
 using Xunit;
@@ -12,7 +13,7 @@ public class NavalWaterProbeTests
     [Fact]
     public void TryParse_DefaultsToTheProbeSpec()
     {
-        Assert.Null(NavalWaterProbeSettings.TryParse(new string[0], out var settings));
+        Assert.Null(NavalWaterProbeSettings.TryParse(Array.Empty<string>(), out var settings));
 
         Assert.Equal(5, settings.Grid);
         Assert.Equal(40f, settings.Spacing);

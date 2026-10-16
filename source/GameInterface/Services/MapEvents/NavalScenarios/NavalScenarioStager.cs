@@ -163,7 +163,8 @@ public class NavalScenarioStager : INavalScenarioStager
 
         enemy.SetMoveEngageParty(players[0], MobileParty.NavigationType.Naval);
         enemy.Ai.DoNotMakeNewDecisions = true;
-        MessageBroker.Instance.Publish(this, new PartyBehaviorChangeAttempted(enemy, forcePosition: true));
+        // Unforced, so the change keeps the fleet's sea state; a forced one would carry isCurrentlyAtSea false to every machine.
+        MessageBroker.Instance.Publish(this, new PartyBehaviorChangeAttempted(enemy));
 
         log.Append($" enemy={enemy.StringId}(bandit={enemy.IsBandit},ships={enemyShipsBefore}->{enemy.Ships.Count}," +
             $"troops={enemy.MemberRoster.TotalManCount}) engages={config.ControllerIds[0]}");
@@ -202,7 +203,10 @@ public class NavalScenarioStager : INavalScenarioStager
 
         if (!objectManager.TryGetId(mapEvent, out string mapEventId))
         {
-            state.Complete(NavalScenarioState.EngageStep, false, "the encounter's map event is not registered");
+            const string unregistered = "the encounter's map event is not registered";
+            state.Complete(NavalScenarioState.EngageStep, false, unregistered);
+            state.Advance(NavalScenarioPhase.Ended);
+            Logger.Error("[NavalScenario] Encounter {ScenarioId}: {Detail}", config.ScenarioId, unregistered);
             return;
         }
 
@@ -227,10 +231,7 @@ public class NavalScenarioStager : INavalScenarioStager
         out string error)
     {
         var player = players[0];
-        if (!TryFindBlockade(config, player, hull, log, out var town, out var besieger, out error)) return false;
-
-        foreach (var party in players)
-            StartNavalCoopCommand.PlaceAtSea(party, town.PortPosition);
+        if (!TryFindBlockade(config, player, hull, log, out var town, out var besieger, out bool isNewSiege, out error)) return false;
 
         // BlockadeBattleMapEvent.OnInitialize lifts the blockade with no battle when the attackers are this much stronger.
         float attackerPower = players.Sum(party =>
@@ -241,9 +242,13 @@ public class NavalScenarioStager : INavalScenarioStager
         if (IsBlockadeLiftedWithoutBattle(attackerPower, blockadePower))
         {
             error = $"the players' sea power {attackerPower:0} is over {LiftBlockadePowerRatio} x the blockade's {blockadePower:0}, so " +
-                "BlockadeBattleMapEvent.CheckLiftingBlockade would lift the blockade with no battle; raise hulls=n";
+                "BlockadeBattleMapEvent.CheckLiftingBlockade would lift the blockade with no battle; " +
+                (isNewSiege ? "raise hulls=n" : $"hulls=n cannot grow {town.StringId}'s existing blockade, pick town=<id> without one");
             return false;
         }
+
+        foreach (var party in players)
+            StartNavalCoopCommand.PlaceAtSea(party, town.PortPosition);
 
         var flags = new BattleCreationFlags(forceRaid: false, forceSallyOut: false, forceVolunteers: false, forceSupplies: false,
             isSallyOutAmbush: false, forceBlockadeAttack: true, forceBlockadeSallyOutAttack: false, forceHideoutSendTroops: false);
@@ -282,10 +287,11 @@ public class NavalScenarioStager : INavalScenarioStager
     // An AI siege already blockading a port, or a new one: the lord at war with the town and the players nearest to a coastal
     // town gets its hulls and besieges it, which activates the blockade since a besieger has ships (SiegeEvent's constructor).
     private bool TryFindBlockade(NavalScenarioConfig config, MobileParty player, ShipHull hull, StringBuilder log,
-        out Settlement town, out MobileParty besieger, out string error)
+        out Settlement town, out MobileParty besieger, out bool isNewSiege, out string error)
     {
         town = null;
         besieger = null;
+        isNewSiege = false;
         var position = player.Position.ToVec2();
         var towns = Settlement.All
             .Where(settlement => settlement.IsTown && settlement.HasPort)
@@ -332,6 +338,7 @@ public class NavalScenarioStager : INavalScenarioStager
 
             town = candidate;
             besieger = lord;
+            isNewSiege = true;
             log.Append($" blockade={town.StringId}(new siege, besieger={besieger.StringId},ships={besieger.Ships.Count}," +
                 $"troops={besieger.MemberRoster.TotalManCount})");
             error = null;

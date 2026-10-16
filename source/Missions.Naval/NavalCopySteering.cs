@@ -46,6 +46,7 @@ internal sealed class CopySteering
 
     private readonly List<(float Time, Vec3 Origin, float Yaw)> owner = new List<(float, Vec3, float)>();
     private int lastSign;
+    private float sinceOwnerFrame;
 
     public CopySteering(CopySteeringKnobs knobs)
     {
@@ -64,9 +65,19 @@ internal sealed class CopySteering
 
     public long Snaps { get; private set; }
 
+    /// <summary>Physics time stepped since the newest owner frame.</summary>
+    public float SecondsSinceOwnerFrame => sinceOwnerFrame;
+
+    /// <summary>The owner's frames stopped coming, so their last velocity no longer describes the target.</summary>
+    public bool IsOwnerStale => sinceOwnerFrame > MinVelocitySpan;
+
+    /// <summary>The owner velocity the correction adds, zero once the owner's frames are stale.</summary>
+    public Vec3 FeedForwardVelocity => IsOwnerStale ? Vec3.Zero : OwnerVelocity;
+
     /// <summary>Takes the owner's frame this client would have written, at this client's mission time.</summary>
     public void ObserveOwner(float time, Vec3 origin, float yaw)
     {
+        sinceOwnerFrame = 0f;
         owner.Add((time, origin, yaw));
         while (owner.Count > 2 && time - owner[0].Time > OwnerHistorySeconds)
             owner.RemoveAt(0);
@@ -112,6 +123,8 @@ internal sealed class CopySteering
     {
         if (!HasTarget || dt <= 0f || float.IsNaN(dt)) return default;
 
+        sinceOwnerFrame += dt;
+        bool ownerStale = IsOwnerStale;
         var knobs = Knobs;
         var target = TargetOrigin;
         var error = new Vec3(target.x - origin.x, target.y - origin.y, 0f);
@@ -128,7 +141,7 @@ internal sealed class CopySteering
         if (distance > knobs.DeadZoneMetres)
         {
             var correction = ClampLength(error * (knobs.Gain / knobs.WindowSeconds), knobs.ClampMetresPerSecond);
-            var targetVelocity = OwnerVelocity + correction;
+            var targetVelocity = (ownerStale ? Vec3.Zero : OwnerVelocity) + correction;
             deltaVelocity = new Vec3(targetVelocity.x - velocity.x, targetVelocity.y - velocity.y, 0f) * blend;
         }
 
@@ -138,7 +151,7 @@ internal sealed class CopySteering
         {
             float yawClamp = knobs.YawClampDegreesPerSecond * DegToRad;
             float correction = Clamp(yawError * (knobs.Gain / knobs.WindowSeconds), -yawClamp, yawClamp);
-            deltaYawRate = (OwnerYawRate + correction - yawRate) * blend;
+            deltaYawRate = ((ownerStale ? 0f : OwnerYawRate) + correction - yawRate) * blend;
         }
 
         float along = (deltaVelocity.x * (float)Math.Cos(yaw)) + (deltaVelocity.y * (float)Math.Sin(yaw));

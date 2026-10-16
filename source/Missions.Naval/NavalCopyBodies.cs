@@ -3,6 +3,7 @@ using Common.Logging;
 using NavalDLC.Missions.Objects;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
@@ -25,6 +26,13 @@ internal static class NavalCopyBodies
 
     /// <summary>Whether a copy of <paramref name="shipId"/> spawning now keeps its dynamic body to be steered.</summary>
     internal static bool SpawnsSteered(Guid shipId) => table.ModeFor(shipId) == CopyBodyMode.Steered;
+
+    /// <summary>"own", or a copy's mode in lower case for the diagnostics.</summary>
+    internal static string ModeName(MissionShip hull)
+    {
+        if (!NavalForeignHulls.Contains(hull)) return "own";
+        return table.Entries.TryGetValue(hull, out var entry) ? entry.Mode.ToString().ToLowerInvariant() : "kinematic";
+    }
 
     /// <summary>Tracks a copy the engine just spawned or released, in the mode its body is in.</summary>
     internal static void Track(MissionShip ship, Guid shipId)
@@ -78,7 +86,8 @@ internal static class NavalCopyBodies
         {
             var target = entry.OwnerFrame ?? frame;
             entity.SetGlobalFrame(in target, isTeleportation: true);
-            var ownerVelocity = steering.OwnerVelocity;
+            entity.UpdateAttachedNavigationMeshFaces();
+            var ownerVelocity = steering.FeedForwardVelocity;
             entity.SetLinearVelocity(new Vec3(ownerVelocity.x, ownerVelocity.y, velocity.z));
             return;
         }
@@ -121,8 +130,7 @@ internal static class NavalCopyBodies
     {
         private const int NoCollisionGroup = -1;
 
-        private readonly System.Collections.Generic.Dictionary<MissionShip, SavedBody> saved =
-            new System.Collections.Generic.Dictionary<MissionShip, SavedBody>();
+        private readonly Dictionary<MissionShip, SavedBody> saved = new Dictionary<MissionShip, SavedBody>();
 
         public bool IsSimulating(MissionShip hull) =>
             hull.GameEntity.IsValid && hull.GameEntity.HasDynamicRigidBodyAndActiveSimulation();

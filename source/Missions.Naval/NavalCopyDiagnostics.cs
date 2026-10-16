@@ -86,6 +86,7 @@ internal sealed class CopyDiagnostics
             oscillations10s = CorrectionAlongHeading.SignChanges(CopySteering.OscillationEpsilon),
             oscillationsTotal = steering?.Oscillations,
             snaps = steering?.Snaps,
+            ownerFrameAgeS = steering == null ? (float?)null : Round(steering.SecondsSinceOwnerFrame),
         },
     };
 

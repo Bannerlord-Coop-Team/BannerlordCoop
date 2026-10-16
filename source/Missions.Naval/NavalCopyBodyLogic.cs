@@ -108,16 +108,10 @@ public class NavalCopyBodyLogic : MissionLogic
                 var b = Outline(hulls[second].Hull);
                 var measured = MeasureApproach(a.Center, a.Forward, a.HalfLength, a.HalfBeam, b.Center, b.Forward, b.HalfLength,
                     b.HalfBeam);
-                NavalContactProbe.RecordApproach(hulls[first].ShipId, hulls[second].ShipId, measured.CenterDistance, measured.Gap,
-                    time, ModeOf(hulls[first].Hull) + "/" + ModeOf(hulls[second].Hull));
+                NavalContactProbe.RecordApproach(hulls[first].ShipId, hulls[first].Hull, hulls[second].ShipId, hulls[second].Hull,
+                    measured.CenterDistance, measured.Gap, time);
             }
         }
-    }
-
-    private static string ModeOf(MissionShip hull)
-    {
-        if (!NavalForeignHulls.Contains(hull)) return "own";
-        return NavalCopyBodies.Table.Entries.TryGetValue(hull, out var entry) ? entry.Mode.ToString().ToLowerInvariant() : "kinematic";
     }
 
     // The local physics box is fixed per hull: x across the beam, y along the keel, as MissionShipRam reads it.
