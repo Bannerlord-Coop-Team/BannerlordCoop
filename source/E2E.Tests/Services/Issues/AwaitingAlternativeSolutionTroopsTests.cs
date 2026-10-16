@@ -228,24 +228,11 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.Equal(controllerId, ownerControllerId);
         });
 
-        Client.Call(() =>
+        Server.Call(() =>
         {
-            Assert.True(Client.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
-
-            var previousState = Hero.MainHero.HeroState;
-            Hero.MainHero.ChangeState(Hero.CharacterStates.Prisoner);
-            Assert.True(Hero.MainHero.IsPrisoner);
-            try
-            {
-                var exception = Record.Exception(() => Campaign.Current.IssueManager.TryToMakeTroopsReturn(owner.Issue));
-                Assert.Null(exception);
-            }
-            finally
-            {
-                Hero.MainHero.ChangeState(previousState);
-            }
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(fixture.HeroId, out var owner));
+            Campaign.Current.IssueManager.TryToMakeTroopsReturn(owner.Issue);
         });
-
         Client.Call(() =>
         {
             Assert.True(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var deposited));
@@ -253,7 +240,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             Assert.True(deposited.TotalHeroes >= 1);
         });
 
-        Assert.Single(Client.NetworkSentMessages.GetMessages<RequestAwaitingAlternativeSolutionTroopsDeposit>());
+        Assert.Empty(Client.NetworkSentMessages.GetMessages<RequestAwaitingAlternativeSolutionTroopsDeposit>());
         Server.Call(() =>
         {
             Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var serverDeposited));
@@ -439,7 +426,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
     }
 
     [Fact]
-    public void TryToMakeTroopsReturn_OwnerLocallyPresentAndAvailable_StillGoesThroughServerValidatedDepositNotAnInstantLocalAdd()
+    public void TryToMakeTroopsReturn_ClientCallback_DoesNotQueueOrAwardTroops()
     {
         var controllerId = "player-A-" + Guid.NewGuid();
 
@@ -507,15 +494,13 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
         });
         Client.Call(() =>
         {
-            Assert.True(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var deposited));
-            Assert.True(deposited.TotalManCount >= 1);
+            Assert.False(Client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
 
-        Assert.Single(Client.NetworkSentMessages.GetMessages<RequestAwaitingAlternativeSolutionTroopsDeposit>());
+        Assert.Empty(Client.NetworkSentMessages.GetMessages<RequestAwaitingAlternativeSolutionTroopsDeposit>());
         Server.Call(() =>
         {
-            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var serverDeposited));
-            Assert.True(serverDeposited.TotalManCount >= 1);
+            Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
     }
 
@@ -758,7 +743,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
     }
 
     [Fact]
-    public void RequestAwaitingAlternativeSolutionTroopsDeposit_ClaimedRosterExceedsSentTroops_ClampedToWhatWasActuallySent()
+    public void RequestAwaitingAlternativeSolutionTroopsDeposit_ActiveMission_RejectsClientRosterWithoutQueueingReturns()
     {
         var controllerId = "player-A-" + Guid.NewGuid();
 
@@ -809,18 +794,17 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
             network.SendAll(new RequestAwaitingAlternativeSolutionTroopsDeposit(ownerId, fabricatedPacked));
         });
 
-        Assert.Empty(Server.NetworkSentMessages.OfType<NetworkAwaitingAlternativeSolutionTroopsDepositRejected>());
-        Assert.Single(Server.NetworkSentMessages.OfType<NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed>());
+        Assert.Single(Server.NetworkSentMessages.OfType<NetworkAwaitingAlternativeSolutionTroopsDepositRejected>());
+        Assert.Empty(Server.NetworkSentMessages.OfType<NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed>());
 
         Server.Call(() =>
         {
-            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var deposited));
-            Assert.Equal(1, deposited.TotalManCount);
+            Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
     }
 
     [Fact]
-    public void RequestAwaitingAlternativeSolutionTroopsDeposit_ReplayedForSameGeneration_NotAccumulated()
+    public void RequestAwaitingAlternativeSolutionTroopsDeposit_RepeatedRequests_DoNotCreateReturnEntitlement()
     {
         var controllerId = "player-A-" + Guid.NewGuid();
 
@@ -873,8 +857,7 @@ public class AwaitingAlternativeSolutionTroopsTests : IDisposable
 
         Server.Call(() =>
         {
-            Assert.True(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out var deposited));
-            Assert.Equal(1, deposited.TotalManCount);
+            Assert.False(Server.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controllerId, out _));
         });
     }
 

@@ -22,9 +22,10 @@ internal interface IGangLeaderWeaponsQuestActions
     bool CompleteBattle(Quest quest, Hero owner, MobileParty party, MapEvent battle);
     bool StartApprovedBattle(Quest quest);
     Settlement GetApprovedBattleSettlement(string controllerId, PartyBase attacker, PartyBase defender);
+    GangLeaderWeaponsPersuasionState GetPersuasionState(Quest quest);
 }
 
-internal sealed class GangLeaderWeaponsQuestActions : IGangLeaderWeaponsQuestActions
+internal sealed partial class GangLeaderWeaponsQuestActions : IGangLeaderWeaponsQuestActions
 {
     private readonly IIssueOwnershipRegistry ownership;
 
@@ -97,6 +98,7 @@ internal sealed class GangLeaderWeaponsQuestActions : IGangLeaderWeaponsQuestAct
                     return true;
                 case GangLeaderWeaponsAction.LeaveTown:
                     if (party.CurrentSettlement == quest.QuestGiver.CurrentSettlement) return false;
+                    persuasions.Remove(quest);
                     quest.OnSettlementLeft(party, quest.QuestGiver.CurrentSettlement);
                     return true;
                 case GangLeaderWeaponsAction.DeliverWeapons:
@@ -117,7 +119,7 @@ internal sealed class GangLeaderWeaponsQuestActions : IGangLeaderWeaponsQuestAct
             party.CurrentSettlement == quest.QuestGiver.CurrentSettlement && party.Army == null;
     }
 
-    private static bool ApplyGuardChoice(Quest quest, Hero owner, GangLeaderWeaponsAction action)
+    private bool ApplyGuardChoice(Quest quest, Hero owner, GangLeaderWeaponsAction action)
     {
         switch (action)
         {
@@ -134,11 +136,14 @@ internal sealed class GangLeaderWeaponsQuestActions : IGangLeaderWeaponsQuestAct
                 quest.PlayerDodgeGuardsLowCrimeRating();
                 return true;
             case GangLeaderWeaponsAction.BeginPersuasion:
-                if (quest._persuasionTriedOnce) return false;
-                quest._persuasionTriedOnce = true;
-                return true;
+                return BeginPersuasion(quest, owner);
+            case GangLeaderWeaponsAction.PersuasionOption1:
+            case GangLeaderWeaponsAction.PersuasionOption2:
+            case GangLeaderWeaponsAction.PersuasionOption3:
+                return ChoosePersuasionOption(quest, owner, (int)action - (int)GangLeaderWeaponsAction.PersuasionOption1);
             case GangLeaderWeaponsAction.PersuasionSucceeded:
-                if (!quest._persuasionTriedOnce) return false;
+                if (!PersuasionSucceeded(quest, owner)) return false;
+                persuasions.Remove(quest);
                 quest.PlayerDodgedGuards();
                 return true;
             case GangLeaderWeaponsAction.BeginBattle:

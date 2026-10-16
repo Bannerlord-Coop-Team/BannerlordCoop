@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
@@ -29,6 +30,7 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
     private static bool TryToMakeTroopsReturnPrefix(IssueBase issue)
     {
         if (issue != null && !QuestTypeRegistry.IsRegistered(issue.GetType())) return true;
+        if (ModInformation.IsClient) return false;
 
         var troops = issue?.AlternativeSolutionSentTroops;
         if (troops == null || troops.Count == 0) return false;
@@ -46,6 +48,7 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
         }
 
         MessageBroker.Instance.Publish(issue, new AwaitingAlternativeSolutionTroopsDepositedLocally(issue.IssueOwner, ownerControllerId, troops));
+        troops.Clear();
 
         return false;
     }

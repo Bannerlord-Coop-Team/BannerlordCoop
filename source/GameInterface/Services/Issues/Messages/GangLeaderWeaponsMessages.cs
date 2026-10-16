@@ -1,6 +1,8 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
 using ProtoBuf;
+using TaleWorlds.CampaignSystem.Conversation;
+using TaleWorlds.CampaignSystem.Conversation.Persuasion;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
 
@@ -24,6 +26,40 @@ internal enum GangLeaderWeaponsAction
     DeliverWeapons,
     RefreshProgress,
     CancelBattleStart,
+    PersuasionOption1,
+    PersuasionOption2,
+    PersuasionOption3,
+}
+
+internal readonly struct GangLeaderWeaponsPersuasionOptionRequested : IEvent
+{
+    public readonly Quest Quest;
+    public readonly ConversationManager Conversation;
+    public readonly int OptionIndex;
+
+    public GangLeaderWeaponsPersuasionOptionRequested(Quest quest, ConversationManager conversation, int optionIndex)
+    {
+        Quest = quest;
+        Conversation = conversation;
+        OptionIndex = optionIndex;
+    }
+}
+
+[ProtoContract]
+internal sealed class GangLeaderWeaponsPersuasionState
+{
+    [ProtoMember(1)] public readonly float Progress;
+    [ProtoMember(2)] public readonly PersuasionOptionResult Result;
+    [ProtoMember(3)] public readonly bool[] BlockedOptions;
+
+    public GangLeaderWeaponsPersuasionState(float progress, PersuasionOptionResult result, bool[] blockedOptions)
+    {
+        Progress = progress;
+        Result = result;
+        BlockedOptions = blockedOptions;
+    }
+
+    private GangLeaderWeaponsPersuasionState() { }
 }
 
 internal readonly struct GangLeaderWeaponsIssueCreated : IEvent
@@ -92,10 +128,12 @@ internal readonly struct NetworkGangLeaderWeaponsState : IServerToClientCommand
     [ProtoMember(10)] public readonly ItemRosterElement[] ConfiscatedWeapons;
     [ProtoMember(11)] public readonly GangLeaderWeaponsAction Action;
     [ProtoMember(12)] public readonly bool ActionAccepted;
+    [ProtoMember(13)] public readonly GangLeaderWeaponsPersuasionState Persuasion;
 
     public NetworkGangLeaderWeaponsState(string giverId, int generation, string questId, string guardsPartyId,
         int collectedAmount, bool dodgedGuards, bool lowCrime, bool highCrime, bool persuasionTried,
-        ItemRosterElement[] confiscatedWeapons, GangLeaderWeaponsAction action, bool actionAccepted)
+        ItemRosterElement[] confiscatedWeapons, GangLeaderWeaponsAction action, bool actionAccepted,
+        GangLeaderWeaponsPersuasionState persuasion = null)
     {
         GiverId = giverId;
         Generation = generation;
@@ -109,5 +147,6 @@ internal readonly struct NetworkGangLeaderWeaponsState : IServerToClientCommand
         ConfiscatedWeapons = confiscatedWeapons;
         Action = action;
         ActionAccepted = actionAccepted;
+        Persuasion = persuasion;
     }
 }

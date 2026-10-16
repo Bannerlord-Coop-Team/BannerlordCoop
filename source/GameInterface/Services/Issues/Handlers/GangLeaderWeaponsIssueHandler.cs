@@ -30,7 +30,7 @@ namespace GameInterface.Services.Issues.Handlers;
 using Issue = GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue;
 using Quest = GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssueQuest;
 
-internal sealed class GangLeaderWeaponsIssueHandler : IHandler
+internal sealed partial class GangLeaderWeaponsIssueHandler : IHandler
 {
     private readonly IMessageBroker broker;
     private readonly INetwork network;
@@ -61,6 +61,7 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
         broker.Subscribe<GangLeaderWeaponsIssueCreated>(HandleCreated);
         broker.Subscribe<NetworkGangLeaderWeaponsIssueCreated>(HandleNetworkCreated);
         broker.Subscribe<GangLeaderWeaponsActionRequested>(HandleActionRequested);
+        broker.Subscribe<GangLeaderWeaponsPersuasionOptionRequested>(HandlePersuasionOption);
         broker.Subscribe<RequestGangLeaderWeaponsAction>(HandleNetworkAction);
         broker.Subscribe<NetworkGangLeaderWeaponsState>(HandleState);
         broker.Subscribe<ConversationRestartApproved>(HandleEncounterApproved);
@@ -82,6 +83,7 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
         broker.Unsubscribe<GangLeaderWeaponsIssueCreated>(HandleCreated);
         broker.Unsubscribe<NetworkGangLeaderWeaponsIssueCreated>(HandleNetworkCreated);
         broker.Unsubscribe<GangLeaderWeaponsActionRequested>(HandleActionRequested);
+        broker.Unsubscribe<GangLeaderWeaponsPersuasionOptionRequested>(HandlePersuasionOption);
         broker.Unsubscribe<RequestGangLeaderWeaponsAction>(HandleNetworkAction);
         broker.Unsubscribe<NetworkGangLeaderWeaponsState>(HandleState);
         broker.Unsubscribe<ConversationRestartApproved>(HandleEncounterApproved);
@@ -240,7 +242,8 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
         var confiscated = quest._weaponsThatGuardTook.Select(pair => new ItemRosterElement(pair.Key, pair.Value)).ToArray();
         network.SendAll(new NetworkGangLeaderWeaponsState(giverId, generation, quest.StringId, guardsId,
             quest._collectedItemAmount, quest._playerDodgedGuards, quest._lowCrimeRatingWillBeApplied,
-            quest._highCrimeRatingWillBeApplied, quest._persuasionTriedOnce, confiscated, action, accepted));
+            quest._highCrimeRatingWillBeApplied, quest._persuasionTriedOnce, confiscated, action, accepted,
+            actions.GetPersuasionState(quest)));
     }
 
     private void HandleState(MessagePayload<NetworkGangLeaderWeaponsState> payload)
@@ -273,6 +276,7 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
                     quest.OnSettlementEnter(MobileParty.MainParty, quest.QuestGiver.CurrentSettlement, Hero.MainHero);
                 }
             }
+            ApplyPersuasionState(quest, data);
             if (data.Action == GangLeaderWeaponsAction.BeginBattle && pendingBattle == quest && pendingBattleRequestId == null)
             {
                 if (!data.ActionAccepted || !ownership.IsLocalPeerOwner(quest.QuestGiver) || guards == null ||
