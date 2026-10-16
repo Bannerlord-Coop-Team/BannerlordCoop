@@ -48,6 +48,7 @@ internal class SettlementSync : IAutoSync
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.SiegeStrategy)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NumberOfTroopsKilledOnSide)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.GatePosition)));
+        AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.SettlementHitPoints)));
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.LocationComplex))); // Might not be needed
 
         AutoSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyLandThreatIntensity)), coalesce: true);

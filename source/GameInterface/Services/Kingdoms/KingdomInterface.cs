@@ -56,8 +56,10 @@ internal class KingdomInterface : IKingdomInterface
     }
     public bool RemoveDecisionPrefix(Kingdom kingdom, KingdomDecision kingdomDecision)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        // The server removes by index, so a client's own removal (a replayed owner change runs the claimant
+        // behavior under AllowedThread) would shift the list and make that remove drop the next decision.
         if (ModInformation.IsClient) return false;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         KingdomRegistry.EnsureRuntimeCollections(kingdom);
         var index = kingdom._unresolvedDecisions?.FindIndex(decision => decision == kingdomDecision) ?? -1;
         if (index >= 0)
@@ -127,10 +129,7 @@ internal class KingdomInterface : IKingdomInterface
     {
         RunKingdomMutation(() =>
         {
-            using (new AllowedThread())
-            {
-                kingdom.RemoveDecision(kingdomDecision);
-            }
+            kingdom._unresolvedDecisions.Remove(kingdomDecision);
         });
     }
     public void ChangeKingdomPolicy(Kingdom kingdom, PolicyObject policy, bool isAdd)

@@ -8,6 +8,7 @@ using GameInterface.Configuration;
 using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Kingdoms;
+using GameInterface.Services.MapTracking;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MobileParties.Extensions;
@@ -68,6 +69,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private readonly IClanJoinRules clanJoinRules;
     private readonly IClanLeaveRules clanLeaveRules;
     private readonly IPlayerMarriageRules playerMarriageRules;
+    private readonly IPlayerMapTracking mapTracking;
     private readonly PlayerPartyInteractionOutcomeHandler outcomeHandler;
 
     private readonly ConcurrentDictionary<string, PlayerPartyInteractionSession> sessionsById = new ConcurrentDictionary<string, PlayerPartyInteractionSession>();
@@ -89,7 +91,8 @@ internal class PlayerPartyInteractionHandler : IHandler
         IKingdomMembershipState kingdomMembershipState,
         IClanJoinRules clanJoinRules,
         IClanLeaveRules clanLeaveRules,
-        IPlayerMarriageRules playerMarriageRules)
+        IPlayerMarriageRules playerMarriageRules,
+        IPlayerMapTracking mapTracking)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -100,12 +103,14 @@ internal class PlayerPartyInteractionHandler : IHandler
         this.clanJoinRules = clanJoinRules;
         this.clanLeaveRules = clanLeaveRules;
         this.playerMarriageRules = playerMarriageRules;
+        this.mapTracking = mapTracking;
         outcomeHandler = new PlayerPartyInteractionOutcomeHandler(
             objectManager,
             kingdomMembershipState,
             clanJoinRules,
             clanLeaveRules,
-            playerMarriageRules);
+            playerMarriageRules,
+            mapTracking);
 
         messageBroker.Subscribe<NetworkPlayerPartyInteractionStarted>(Handle_NetworkPlayerPartyInteractionStarted);
         messageBroker.Subscribe<NetworkPlayerPartyInteractionState>(Handle_NetworkPlayerPartyInteractionState);
@@ -508,6 +513,7 @@ internal class PlayerPartyInteractionHandler : IHandler
     private void HandleInitiatorOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
     {
         if (TryHandleInitiatorLeaveOption(session, option)) return;
+        if (TryHandleStopMapTrackingOption(session, option)) return;
         if (option == PlayerPartyInteractionOption.OfferServices) return;
         if (TryHandleInitiatorHostileDemandOption(session, option)) return;
         if (TryHandleInitiatorMercenaryOption(session, option)) return;
@@ -524,6 +530,15 @@ internal class PlayerPartyInteractionHandler : IHandler
             ? PlayerPartyInteractionOutcomeType.ClanLeft
             : PlayerPartyInteractionOutcomeType.ClanMemberRemoved,
             partyId);
+        return true;
+    }
+
+    private bool TryHandleStopMapTrackingOption(PlayerPartyInteractionSession session, PlayerPartyInteractionOption option)
+    {
+        if (option != PlayerPartyInteractionOption.StopMapTracking) return false;
+        if (!session.InitiatorEnabledOptions.Contains(option)) return true;
+
+        EndSession(session, PlayerPartyInteractionOutcomeType.MapTrackingStopped);
         return true;
     }
 
@@ -949,6 +964,9 @@ internal class PlayerPartyInteractionHandler : IHandler
         session.ResponderClanOptions = GetClanDepartureOptions(responderParty.LeaderHero, initiatorParty.LeaderHero).ToArray();
 
         AddInitiatorOption(session, PlayerPartyInteractionOption.TradeProposal, enabled: true);
+        AddInitiatorOption(session, mapTracking.AreTracking(initiatorParty.MobileParty, responderParty.MobileParty)
+            ? PlayerPartyInteractionOption.StopMapTracking
+            : PlayerPartyInteractionOption.RequestMapTracking, enabled: true);
         if (ModConfigProvider.ModOptions.CoopClansEnabled &&
             playerMarriageRules.CanMarry(initiatorParty.LeaderHero, responderParty.LeaderHero))
         {
@@ -1155,6 +1173,8 @@ internal class PlayerPartyInteractionHandler : IHandler
                 return PlayerPartyInteractionProposal.PatrilinealMarriage;
             case PlayerPartyInteractionOption.MatrilinealMarriage:
                 return PlayerPartyInteractionProposal.MatrilinealMarriage;
+            case PlayerPartyInteractionOption.RequestMapTracking:
+                return PlayerPartyInteractionProposal.MapTracking;
             default:
                 return PlayerPartyInteractionProposal.None;
         }
@@ -1170,6 +1190,8 @@ internal class PlayerPartyInteractionHandler : IHandler
                 return PlayerPartyInteractionOutcomeType.VassalAccepted;
             case PlayerPartyInteractionProposal.Mercenary:
                 return PlayerPartyInteractionOutcomeType.MercenaryAccepted;
+            case PlayerPartyInteractionProposal.MapTracking:
+                return PlayerPartyInteractionOutcomeType.MapTrackingAccepted;
             default:
                 return PlayerPartyInteractionOutcomeType.None;
         }
@@ -1190,6 +1212,8 @@ internal class PlayerPartyInteractionHandler : IHandler
                 return PlayerPartyInteractionOutcomeType.MarriageDeclined;
             case PlayerPartyInteractionProposal.Mercenary:
                 return PlayerPartyInteractionOutcomeType.MercenaryDeclined;
+            case PlayerPartyInteractionProposal.MapTracking:
+                return PlayerPartyInteractionOutcomeType.MapTrackingDeclined;
             default:
                 return PlayerPartyInteractionOutcomeType.None;
         }

@@ -17,7 +17,6 @@ internal class ClientSettlementHandler : IHandler
         this.network = network;
 
         messageBroker.Subscribe<NetworkChangeSettlementBribePaid>(HandleBribePaid);
-        messageBroker.Subscribe<NetworkChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Subscribe<NetworkChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Subscribe<NetworkChangeSettlementLastThreatTime>(HandleLastThreatTime);
         messageBroker.Subscribe<NetworkChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
@@ -147,15 +146,6 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Publish(this, message);
     }
 
-    private void HandleHitPoints(MessagePayload<NetworkChangeSettlementHitPoints> payload)
-    {
-        var obj = payload.What;
-
-        var message = new ChangeSettlementHitPoints(obj.SettlementId, obj.SettlementHitPoints);
-
-        messageBroker.Publish(this, message);
-    }
-
     private void HandleBribePaid(MessagePayload<NetworkChangeSettlementBribePaid> payload)
     {
         var obj = payload.What;
@@ -168,7 +158,6 @@ internal class ClientSettlementHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkChangeSettlementBribePaid>(HandleBribePaid);
-        messageBroker.Unsubscribe<NetworkChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Unsubscribe<NetworkChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Unsubscribe<NetworkChangeSettlementLastThreatTime>(HandleLastThreatTime);
         messageBroker.Unsubscribe<NetworkChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
