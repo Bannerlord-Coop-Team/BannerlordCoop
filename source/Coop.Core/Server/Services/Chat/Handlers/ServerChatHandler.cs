@@ -135,10 +135,22 @@ internal sealed class ServerChatHandler : IHandler
                 RouteGlobal(sender, text);
                 return;
             case ChatChannel.Clan:
-                RouteClan(senderPeer, sender, text);
+                RouteToFactionGroup(
+                    senderPeer,
+                    sender,
+                    text,
+                    ChatChannel.Clan,
+                    player => factionMembership.TryGetClan(player, out var clan) ? clan : null,
+                    "You are not in a clan.");
                 return;
             case ChatChannel.Kingdom:
-                RouteKingdom(senderPeer, sender, text);
+                RouteToFactionGroup(
+                    senderPeer,
+                    sender,
+                    text,
+                    ChatChannel.Kingdom,
+                    player => factionMembership.TryGetKingdom(player, out var kingdom) ? kingdom : null,
+                    "You are not in a kingdom.");
                 return;
             case ChatChannel.Direct:
                 RouteDirect(senderPeer, sender, request.RecipientControllerId, text);
@@ -154,37 +166,26 @@ internal sealed class ServerChatHandler : IHandler
         RouteToMatchingPlayers(ChatChannel.Global, sender, text, _ => true);
     }
 
-    private void RouteClan(NetPeer senderPeer, Player sender, string text)
+    private void RouteToFactionGroup<T>(
+        NetPeer senderPeer,
+        Player sender,
+        string text,
+        ChatChannel channel,
+        Func<Player, T> tryGetGroup,
+        string notMemberMessage) where T : class
     {
-        // Match live Hero.Clan references. Player.ClanId is join-time and goes stale after JoinClan.
-        if (!factionMembership.TryGetClan(sender, out var clan))
+        var group = tryGetGroup(sender);
+        if (group == null)
         {
-            SendSystemMessage(senderPeer, string.Empty, "You are not in a clan.");
+            SendSystemMessage(senderPeer, string.Empty, notMemberMessage);
             return;
         }
 
         RouteToMatchingPlayers(
-            ChatChannel.Clan,
+            channel,
             sender,
             text,
-            player => factionMembership.TryGetClan(player, out var otherClan) &&
-                      ReferenceEquals(otherClan, clan));
-    }
-
-    private void RouteKingdom(NetPeer senderPeer, Player sender, string text)
-    {
-        if (!factionMembership.TryGetKingdom(sender, out var kingdom))
-        {
-            SendSystemMessage(senderPeer, string.Empty, "You are not in a kingdom.");
-            return;
-        }
-
-        RouteToMatchingPlayers(
-            ChatChannel.Kingdom,
-            sender,
-            text,
-            player => factionMembership.TryGetKingdom(player, out var otherKingdom) &&
-                      ReferenceEquals(otherKingdom, kingdom));
+            player => ReferenceEquals(tryGetGroup(player), group));
     }
 
     private void RouteToMatchingPlayers(

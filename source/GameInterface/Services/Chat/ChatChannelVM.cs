@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GameInterface.Services.Chat.Messages;
+using System;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.Chat;
@@ -32,6 +33,7 @@ internal sealed class ChatChannelVM : ViewModel
 
         ControllerId = controllerId ?? string.Empty;
         Kind = kind;
+        SendChannel = SendChannelForKind(kind);
         this.displayName = string.IsNullOrWhiteSpace(displayName) ? ControllerId : displayName;
         this.select = select;
     }
@@ -39,6 +41,9 @@ internal sealed class ChatChannelVM : ViewModel
     public string ControllerId { get; }
 
     public ChatChannelKind Kind { get; }
+
+    /// <summary>Null for Events (read-only). All sends on Global.</summary>
+    public ChatChannel? SendChannel { get; }
 
     public bool IsAll => Kind == ChatChannelKind.All;
 
@@ -117,5 +122,23 @@ internal sealed class ChatChannelVM : ViewModel
 
         displayName = name;
         OnPropertyChanged(nameof(Name));
+    }
+
+    private static ChatChannel? SendChannelForKind(ChatChannelKind kind)
+    {
+        switch (kind)
+        {
+            case ChatChannelKind.All:
+            case ChatChannelKind.Global:
+                return ChatChannel.Global;
+            case ChatChannelKind.Clan:
+                return ChatChannel.Clan;
+            case ChatChannelKind.Kingdom:
+                return ChatChannel.Kingdom;
+            case ChatChannelKind.Direct:
+                return ChatChannel.Direct;
+            default:
+                return null;
+        }
     }
 }

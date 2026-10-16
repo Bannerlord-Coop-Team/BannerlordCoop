@@ -260,6 +260,27 @@ public class ChatVMTests
     }
 
     [Fact]
+    public void Receive_SystemWithEmptyRecipient_GoesToSelectedChannel()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.SetOpen(true);
+        vm.SetGroupChannelMembership(inClan: false, inKingdom: true);
+        vm.Channels.Single(channel => channel.IsKingdom).ExecuteSelection();
+
+        vm.Receive(new NetworkChatMessage(
+            ChatChannel.System,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            "You are not in a kingdom."));
+
+        Assert.Contains(vm.VisibleLines, line => line.Text == "[Chat] You are not in a kingdom.");
+        vm.Channels.Single(channel => channel.IsGlobal).ExecuteSelection();
+        Assert.DoesNotContain(vm.VisibleLines, line => line.Text.Contains("You are not in a kingdom."));
+    }
+
+    [Fact]
     public void ReceiveEvent_AppendsToEventsAndAll_NotGlobal()
     {
         var vm = new ChatVM(_ => { }, () => "local");

@@ -164,12 +164,10 @@ internal sealed class ChatVM : ViewModel
 
     public void ActionSend()
     {
-        if (selectedChannel == null || selectedChannel.IsEvents) return;
+        if (selectedChannel?.SendChannel is not ChatChannel channel) return;
 
         string text = WrittenText.Trim();
         if (text.Length == 0) return;
-
-        if (!TryGetSendChannel(selectedChannel, out var channel)) return;
 
         string recipientControllerId = channel == ChatChannel.Direct
             ? selectedChannel.ControllerId
@@ -207,15 +205,10 @@ internal sealed class ChatVM : ViewModel
 
     public void Tick(float dt)
     {
-        // All reuses Events/Global line instances
-        // Only tick the source lists
-        TickHistory(EventsChannelId, dt);
-        TickHistory(GlobalChannelId, dt);
-        TickHistory(ClanChannelId, dt);
-        TickHistory(KingdomChannelId, dt);
+        // Skip All: it reuses Events/Global line instances
         foreach (var pair in histories)
         {
-            if (IsFixedChannelId(pair.Key)) continue;
+            if (string.Equals(pair.Key, AllChannelId, StringComparison.Ordinal)) continue;
             for (int i = 0; i < pair.Value.Count; i++)
                 pair.Value[i].HandleFading(dt);
         }
@@ -231,8 +224,8 @@ internal sealed class ChatVM : ViewModel
     public void AddParticipant(string controllerId, string displayName)
     {
         if (string.IsNullOrWhiteSpace(controllerId) ||
-            IsFixedChannelId(controllerId) ||
-            string.Equals(controllerId, getLocalControllerId(), StringComparison.Ordinal))
+            string.Equals(controllerId, getLocalControllerId(), StringComparison.Ordinal) ||
+            IsReservedChannelId(controllerId))
         {
             return;
         }
@@ -249,8 +242,8 @@ internal sealed class ChatVM : ViewModel
         foreach (var participant in participants)
         {
             if (string.IsNullOrWhiteSpace(participant.ControllerId) ||
-                IsFixedChannelId(participant.ControllerId) ||
                 string.Equals(participant.ControllerId, getLocalControllerId(), StringComparison.Ordinal) ||
+                IsReservedChannelId(participant.ControllerId) ||
                 !availableIds.Add(participant.ControllerId))
             {
                 continue;
@@ -327,13 +320,15 @@ internal sealed class ChatVM : ViewModel
                     : $"[From {otherName}] {otherName}: {message.Text}";
                 break;
             case ChatChannel.System:
-                channelId = string.IsNullOrEmpty(message.RecipientControllerId)
-                    ? selectedChannel?.IsDirect == true
-                        ? selectedChannel.ControllerId
-                        : GlobalChannelId
-                    : message.RecipientControllerId;
-                if (channelId != GlobalChannelId)
+                if (string.IsNullOrEmpty(message.RecipientControllerId))
+                {
+                    channelId = selectedChannel?.ControllerId ?? GlobalChannelId;
+                }
+                else
+                {
+                    channelId = message.RecipientControllerId;
                     EnsureDirectChannel(channelId, DisplayName(message.RecipientName, channelId));
+                }
                 line = $"[Chat] {message.Text}";
                 break;
             default:
@@ -375,40 +370,14 @@ internal sealed class ChatVM : ViewModel
 
     private int IndexForGroupChannel(ChatChannelKind kind)
     {
-        // After Global (and after Clan when inserting Kingdom), before the first DM
-        for (int i = 0; i < Channels.Count; i++)
-        {
-            var existing = Channels[i];
-            if (existing.IsDirect) return i;
-            if (kind == ChatChannelKind.Clan && existing.IsKingdom) return i;
-        }
-
-        return Channels.Count;
+        // All/Events/Global are always 0..2
+        if (kind == ChatChannelKind.Clan) return 3;
+        return Channels.Contains(channelsById[ClanChannelId]) ? 4 : 3;
     }
 
-    private static bool TryGetSendChannel(ChatChannelVM selected, out ChatChannel channel)
+    private bool IsReservedChannelId(string controllerId)
     {
-        if (selected.IsDirect)
-        {
-            channel = ChatChannel.Direct;
-            return true;
-        }
-
-        if (selected.IsClan)
-        {
-            channel = ChatChannel.Clan;
-            return true;
-        }
-
-        if (selected.IsKingdom)
-        {
-            channel = ChatChannel.Kingdom;
-            return true;
-        }
-
-        // All and Global both send on Global. Events is blocked before this.
-        channel = ChatChannel.Global;
-        return selected.IsAll || selected.IsGlobal;
+        return channelsById.TryGetValue(controllerId, out var channel) && !channel.IsDirect;
     }
 
     private ChatChannelVM EnsureDirectChannel(string controllerId, string displayName)
@@ -525,41 +494,15 @@ internal sealed class ChatVM : ViewModel
         FeedScrolledToBottomRequested?.Invoke();
     }
 
-    private void TickHistory(string channelId, float dt)
-    {
-        if (!histories.TryGetValue(channelId, out var history)) return;
-        for (int i = 0; i < history.Count; i++)
-            history[i].HandleFading(dt);
-    }
-
     private void RefreshForceVisible()
     {
-        TickHistoryForceVisible(EventsChannelId);
-        TickHistoryForceVisible(GlobalChannelId);
-        TickHistoryForceVisible(ClanChannelId);
-        TickHistoryForceVisible(KingdomChannelId);
+        // Skip All: it reuses Events/Global line instances
         foreach (var pair in histories)
         {
-            if (IsFixedChannelId(pair.Key)) continue;
+            if (string.Equals(pair.Key, AllChannelId, StringComparison.Ordinal)) continue;
             for (int i = 0; i < pair.Value.Count; i++)
                 pair.Value[i].ToggleForceVisible(IsOpen);
         }
-    }
-
-    private void TickHistoryForceVisible(string channelId)
-    {
-        if (!histories.TryGetValue(channelId, out var history)) return;
-        for (int i = 0; i < history.Count; i++)
-            history[i].ToggleForceVisible(IsOpen);
-    }
-
-    private static bool IsFixedChannelId(string channelId)
-    {
-        return string.Equals(channelId, AllChannelId, StringComparison.Ordinal) ||
-               string.Equals(channelId, EventsChannelId, StringComparison.Ordinal) ||
-               string.Equals(channelId, GlobalChannelId, StringComparison.Ordinal) ||
-               string.Equals(channelId, ClanChannelId, StringComparison.Ordinal) ||
-               string.Equals(channelId, KingdomChannelId, StringComparison.Ordinal);
     }
 
     private static string DisplayName(string name, string controllerId)

@@ -582,8 +582,6 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             return;
         }
 
-        // Keyboard only, UpdateOpenPanelCursorAndCapture adds mouse over the panel
-        SetOpenPanelTypingRestrictions(gauntletLayer.InputRestrictions);
         gauntletLayer.IsFocusLayer = true;
         ScreenManager.TrySetFocus(gauntletLayer);
         if (!ReferenceEquals(ScreenManager.FocusedLayer, gauntletLayer))
