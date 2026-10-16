@@ -891,7 +891,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (hull == null || !Registry.TryGetByHull(hull, out var ship)) return false;
 
         var frame = engine.GetFrame(hull);
-        if (!NetworkBattleShipSample.IsValidFrame(NetworkBattleShipSample.FromFrame(frame))) return false;
+        if (!FrameValidation.IsValid(frame)) return false;
 
         deckLocal = frame.TransformToLocalNonOrthogonal(worldPosition);
         if (!deckLocal.IsValid) return false;
@@ -925,7 +925,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (!Registry.TryGet(deckShip, out var ship)) return false;
 
         hullFrame = engine.GetFrame(ship.Hull);
-        return NetworkBattleShipSample.IsValidFrame(NetworkBattleShipSample.FromFrame(hullFrame));
+        return FrameValidation.IsValid(hullFrame);
     }
 
     private readonly struct DeckSpeedSample

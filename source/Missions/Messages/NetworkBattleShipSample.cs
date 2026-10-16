@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 using System;
-using System.Linq;
 using TaleWorlds.Library;
 
 namespace Missions.Messages;
@@ -53,16 +52,6 @@ public sealed class NetworkBattleShipSample : IEvent
             new Vec3(values[6], values[7], values[8])),
         new Vec3(values[9], values[10], values[11]));
 
-    // Finite, scene-bounded and an orthonormal right-handed rotation.
-    public static bool IsValidFrame(float[] frame)
-    {
-        if (frame == null || frame.Length != FrameLength ||
-            frame.Any(value => float.IsNaN(value) || float.IsInfinity(value) || Math.Abs(value) > 10000f))
-            return false;
-
-        var rotation = ToFrame(frame).rotation;
-        return Math.Abs(rotation.s.LengthSquared - 1) < 0.02f && Math.Abs(rotation.f.LengthSquared - 1) < 0.02f
-            && Math.Abs(rotation.u.LengthSquared - 1) < 0.02f && Math.Abs(Vec3.DotProduct(rotation.s, rotation.f)) < 0.02f
-            && Vec3.DotProduct(Vec3.CrossProduct(rotation.s, rotation.f), rotation.u) > 0.98f;
-    }
+    public static bool IsValidFrame(float[] frame) =>
+        frame != null && frame.Length == FrameLength && FrameValidation.IsValid(ToFrame(frame));
 }
