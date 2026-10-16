@@ -97,6 +97,68 @@ public class ArmyRemovalReceiveTests : IDisposable
         }
     }
 
+    [Fact]
+    public void Removal_PartyAlreadyOutOfArmyButStillAttached_FinishesUnlinkOnEveryPeer()
+    {
+        // #3892: an earlier removal stopped after _parties.Remove, before AttachedTo and _army were cleared
+        var armyId = environment.CreateRegisteredObject<Army>();
+        var memberId = environment.CreateRegisteredObject<MobileParty>();
+        environment.Server.Call(() =>
+        {
+            var army = environment.Server.GetRegisteredObject<Army>(armyId);
+            var member = environment.Server.GetRegisteredObject<MobileParty>(memberId);
+            member.Army = army;
+            member.AttachedTo = army.LeaderParty;
+        });
+        var instances = environment.Clients.Append(environment.Server).ToArray();
+        foreach (var instance in instances)
+        {
+            instance.Call(() =>
+            {
+                var army = instance.GetRegisteredObject<Army>(armyId);
+                var member = instance.GetRegisteredObject<MobileParty>(memberId);
+                using (new AllowedThread())
+                    army._parties.Remove(member);
+                Assert.Same(army, member.Army);
+                Assert.Same(army.LeaderParty, member.AttachedTo);
+            });
+        }
+
+        environment.Server.SimulateMessage(this, new NetworkRemovePartyInArmy(armyId, memberId, string.Empty), markGameThread: false);
+        environment.Server.PumpGameThread();
+        foreach (var client in environment.Clients)
+            client.PumpGameThread();
+
+        foreach (var instance in instances)
+        {
+            instance.Call(() =>
+            {
+                var army = instance.GetRegisteredObject<Army>(armyId);
+                var member = instance.GetRegisteredObject<MobileParty>(memberId);
+                Assert.Null(member.Army);
+                Assert.Null(member.AttachedTo);
+                Assert.DoesNotContain(member, army.LeaderParty.AttachedParties);
+            });
+        }
+    }
+
+    [Fact]
+    public void Removal_PartyNotLinkedToArmy_ChangesNothing()
+    {
+        var armyId = environment.CreateRegisteredObject<Army>();
+        var otherId = environment.CreateRegisteredObject<MobileParty>();
+
+        environment.Server.SimulateMessage(this, new NetworkRemovePartyInArmy(armyId, otherId, string.Empty), markGameThread: false);
+        environment.Server.PumpGameThread();
+
+        environment.Server.Call(() =>
+        {
+            var other = environment.Server.GetRegisteredObject<MobileParty>(otherId);
+            Assert.Null(other.Army);
+            Assert.Null(other.AttachedTo);
+            Assert.True(environment.Server.ObjectManager.TryGetObject<Army>(armyId, out _));
+        });
+    }
     private static void RecordAttachmentWrite()
     {
         attachmentWrites?.Add((ModInformation.IsServer, AllowedThread.IsThisThreadAllowed()));

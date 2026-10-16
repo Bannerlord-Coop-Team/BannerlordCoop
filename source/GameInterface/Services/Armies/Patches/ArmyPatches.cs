@@ -231,7 +231,11 @@ public class ArmyPatches
         Army army,
         MobileParty clientMobileParty)
     {
-        if (!army._parties.Contains(mobileParty)) return;
+        if (!army._parties.Contains(mobileParty))
+        {
+            ClearStaleArmyLink(mobileParty, army);
+            return;
+        }
         army.LeaderParty.UpdateVersionNo();
         mobileParty.Ai.SetInitiative(1f, 1f, 24f);
         army._parties.Remove(mobileParty);
@@ -314,6 +318,31 @@ public class ArmyPatches
         }
         CampaignEventDispatcher.Instance.OnPartyLeftArmy(mobileParty, army);
     }
+    // A removal that stopped partway (#3892) took the party out of _parties but left it attached to
+    // the leader, so the player sat in army_wait and could not move. Finish the unlink here, which
+    // also lets a second leave or unstuck recover the party.
+    private static void ClearStaleArmyLink(MobileParty mobileParty, Army army)
+    {
+        bool attached = mobileParty.AttachedTo != null && mobileParty.AttachedTo == army.LeaderParty;
+        bool linked = mobileParty._army == army;
+        if (!attached && !linked) return;
+
+        Logger.Warning("Clearing stale army link for {PartyId} (attached={Attached}, linked={Linked})",
+            mobileParty.StringId, attached, linked);
+
+        if (attached)
+            mobileParty.AttachedTo = null;
+
+        if (linked)
+        {
+            mobileParty._army = null;
+            if (mobileParty == MobileParty.MainParty && Game.Current.GameStateManager.ActiveState is MapState mapState)
+                mapState.OnLeaveArmy();
+        }
+
+        mobileParty.Party.SetVisualAsDirty();
+    }
+
     public static void SetAiBehaviorObject(Army army, IMapPoint mapPoint)
     {
         using (new AllowedThread())

@@ -116,6 +116,18 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
             });
         }
 
+        else if (party.AttachedTo != null)
+        {
+            TryStep(actions, "army attachment cleanup", () =>
+            {
+                // Not in an army but still following one (#3892). Patches live so the cleared
+                // AttachedTo replicates; vanilla OnAttachedToRemoved puts the party on hold.
+                var leader = party.AttachedTo;
+                party.AttachedTo = null;
+                return $"Detached the party from {leader.StringId}, which it followed without being in its army.";
+            });
+        }
+
         if (party.BesiegerCamp != null)
         {
             TryStep(actions, "siege camp removal", () =>
