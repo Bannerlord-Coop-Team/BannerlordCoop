@@ -1,6 +1,7 @@
-using GameInterface.Services.Issues.Framework.Interface;
+﻿using GameInterface.Services.Issues.Framework.Interface;
 using System;
 using System.IO;
+using Common;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -62,5 +63,14 @@ internal sealed class TheConquestOfSettlementQuestSolutionAcceptStrategy : IQues
         }
 
         service.RecordQuest(quest);
+        if (ModInformation.IsServer)
+        {
+            if (!service.TryOpenOwnerScope(issue, out var owner))
+                throw new InvalidOperationException("Cannot start the conquest quest without its owning player.");
+            using (owner)
+            {
+                quest.QuestAcceptedConsequences();
+            }
+        }
     }
 }

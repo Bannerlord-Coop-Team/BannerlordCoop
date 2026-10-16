@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
@@ -38,12 +38,13 @@ internal static class TheConquestOfSettlementEventPatches
         __state = (null, IsApplying, TriggeringHero);
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         var issue = IssueManager.GetIssueOfQuest(__instance);
+        var triggeringHero = ResolvedMainHeroContext.ResolvedMainHero;
         if (ModInformation.IsClient || !__instance.IsOngoing ||
             !ContainerProvider.TryResolve<ITheConquestOfSettlementService>(out var service) ||
             !service.TryOpenOwnerScope(issue, out var scope)) return false;
 
         IsApplying = true;
-        TriggeringHero = ResolvedMainHeroContext.ResolvedMainHero;
+        TriggeringHero = triggeringHero;
         __state = (scope, __state.WasApplying, __state.PreviousTrigger);
         return true;
     }

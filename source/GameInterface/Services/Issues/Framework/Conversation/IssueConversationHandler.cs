@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -82,8 +82,7 @@ internal sealed class IssueConversationHandler : IHandler
         {
             if (peer == null || !playerManager.TryGetPlayer(peer, out var player) ||
                 !objectManager.TryGetObjectWithLogging<Hero>(payload.What.IssueOwnerId, out var giver) ||
-                !TryRegister(payload.What.IssueOwnerId, player.ControllerId, giver) ||
-                !objectManager.TryGetId(giver.Issue, out _))
+                !TryRegister(payload.What.IssueOwnerId, player.ControllerId, giver))
             {
                 if (peer != null) network.Send(peer, new NetworkIssueConversationDenied(payload.What.IssueOwnerId));
                 return;
@@ -108,6 +107,7 @@ internal sealed class IssueConversationHandler : IHandler
     private bool TryRegister(string issueOwnerId, string controllerId, Hero giver)
     {
         if (string.IsNullOrEmpty(controllerId) || !IsEligible(giver.Issue) ||
+            string.IsNullOrEmpty(giver.Issue.StringId) ||
             !IsRequesterPresent(controllerId, giver)) return false;
 
         tracker.Register(issueOwnerId, controllerId, giver.Issue.StringId);
