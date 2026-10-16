@@ -21,6 +21,7 @@ using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Settlements.Interfaces;
 using Helpers;
@@ -35,6 +36,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Quests;
@@ -335,6 +337,164 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
             Assert.True(activeGiver.Issue.IssueQuest.IsOngoing);
             Assert.True(offeredGiver.Issue.IsOngoingWithoutQuest);
         });
+    }
+
+    [Fact]
+    public void ApprovedGuardBattleCreatesOneRegisteredEventForTheOwnerInsideTown()
+    {
+        var (giverId, partyId, guardsId, ownerClient) = PrepareGuardBattle();
+        string? battleId = null;
+        var server = environment.Server;
+        var visualMethods = new[] { HarmonyLib.AccessTools.Method(typeof(SandBox.GauntletUI.Map.GauntletMapEventVisual), "Initialize") };
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(guardsId, out var guards));
+            Assert.False(MapEventBattleFactory.CanCreateMapEvent(party.Party, guards.Party, default));
+        });
+
+        ownerClient.Call(() =>
+        {
+            Assert.True(ownerClient.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(ownerClient.ObjectManager.TryGetObject<MobileParty>(guardsId, out var guards));
+            Assert.True(ownerClient.ObjectManager.TryGetId(party.Party, out var attackerId));
+            Assert.True(ownerClient.ObjectManager.TryGetId(guards.Party, out var defenderId));
+            ownerClient.Resolve<INetwork>().SendAll(new NetworkRequestCreateMapEvent("guard-battle", attackerId, defenderId, default, null));
+        }, visualMethods);
+
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(guardsId, out var guards));
+            Assert.NotNull(party.MapEvent);
+            Assert.Same(party.MapEvent, guards.MapEvent);
+            Assert.True(server.ObjectManager.TryGetId(party.MapEvent, out battleId));
+            Assert.Same(party.Party, party.MapEvent.AttackerSide.LeaderParty);
+            Assert.Same(guards.Party, party.MapEvent.DefenderSide.LeaderParty);
+            Assert.Equal(2, party.MapEvent.InvolvedParties.Count());
+        });
+        foreach (var client in environment.Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(battleId, out var battle));
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(guardsId, out var guards));
+                Assert.Same(battle, party.MapEvent);
+                Assert.Same(battle, guards.MapEvent);
+                Assert.Contains(battle, Campaign.Current.MapEventManager.MapEvents);
+                Assert.Null(PlayerEncounter.Current);
+            });
+        }
+        var count = 0;
+        server.Call(() => count = Campaign.Current.MapEventManager.MapEvents.Count);
+        ownerClient.Call(() =>
+        {
+            Assert.True(ownerClient.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(ownerClient.ObjectManager.TryGetObject<MobileParty>(guardsId, out var guards));
+            Assert.True(ownerClient.ObjectManager.TryGetId(party.Party, out var attackerId));
+            Assert.True(ownerClient.ObjectManager.TryGetId(guards.Party, out var defenderId));
+            ownerClient.Resolve<INetwork>().SendAll(new NetworkRequestCreateMapEvent("guard-battle-duplicate", attackerId, defenderId, default, battleId));
+        }, visualMethods);
+        server.Call(() => Assert.Equal(count, Campaign.Current.MapEventManager.MapEvents.Count));
+        var replies = server.NetworkSentMessages.GetMessages<NetworkMapEventCreated>();
+        Assert.Equal(2, replies.Count());
+        Assert.All(replies, reply =>
+        {
+            Assert.Equal(MapEventCreationOutcome.Created, reply.Outcome);
+            Assert.Equal(battleId, reply.MapEventId);
+        });
+    }
+
+    [Theory]
+    [InlineData("not-approved")]
+    [InlineData("other-owner")]
+    [InlineData("other-guards")]
+    [InlineData("cancelled-start")]
+    [InlineData("left-town")]
+    [InlineData("inactive-guards")]
+    [InlineData("forced-raid")]
+    public void GuardBattleRequestRejectsUnapprovedOrChangedQuestState(string change)
+    {
+        var (giverId, partyId, guardsId, ownerClient) = PrepareGuardBattle(approve: change != "not-approved");
+        var server = environment.Server;
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(guardsId, out var guards));
+            var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+            if (change == "other-owner") server.Resolve<IIssueOwnershipRegistry>().SetOwner(giver, "observer");
+            if (change == "other-guards") quest._guardsParty = null;
+            if (change == "cancelled-start")
+            {
+                Assert.True(server.Resolve<IPlayerManager>().TryGetPlayer("guard-battle-owner", out var player));
+                Assert.True(server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
+                Assert.True(server.Resolve<IGangLeaderWeaponsQuestActions>().Apply(quest, hero, party, GangLeaderWeaponsAction.CancelBattleStart));
+            }
+            using (new AllowedThread())
+            {
+                if (change == "left-town") party.CurrentSettlement = null;
+                if (change == "inactive-guards") guards.IsActive = false;
+            }
+        });
+        ownerClient.Call(() =>
+        {
+            Assert.True(ownerClient.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(ownerClient.ObjectManager.TryGetObject<MobileParty>(guardsId, out var guards));
+            Assert.True(ownerClient.ObjectManager.TryGetId(party.Party, out var attackerId));
+            Assert.True(ownerClient.ObjectManager.TryGetId(guards.Party, out var defenderId));
+            var flags = new BattleCreationFlags(change == "forced-raid", false, false, false, false, false, false, false);
+            ownerClient.Resolve<INetwork>().SendAll(new NetworkRequestCreateMapEvent("guard-battle-rejected", attackerId, defenderId, flags, null));
+        });
+        var reply = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkMapEventCreated>());
+        Assert.Equal(MapEventCreationOutcome.Rejected, reply.Outcome);
+        foreach (var instance in environment.Clients.Append(server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(guardsId, out var guards));
+                Assert.Null(party.MapEvent);
+                Assert.Null(guards.MapEvent);
+            });
+        }
+    }
+
+    private (string GiverId, string PartyId, string GuardsId, E2E.Tests.Environment.Instance.EnvironmentInstance Owner) PrepareGuardBattle(bool approve = true)
+    {
+        const string controller = "guard-battle-owner";
+        var giverId = CreateIssueCopies(includeServer: true);
+        var heroId = environment.CreateRegisteredObject<Hero>();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        var guardsId = environment.CreateRegisteredObject<MobileParty>();
+        var server = environment.Server;
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(guardsId, out var guards));
+            server.Resolve<IIssueOwnershipRegistry>().SetOwner(giver, controller);
+            server.Resolve<IGangLeaderWeaponsAcceptance>().MirrorQuestAccepted(giver,
+                new GangLeaderWeaponsQuestFields("weapons_guard_battle", CampaignTime.Days(25), 4700, 0, 4, 0f, 200, 4));
+            var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+            using (new AllowedThread())
+            {
+                hero.HitPoints = 100;
+                party.IsActive = guards.IsActive = true;
+                party.CurrentSettlement = guards.CurrentSettlement = giver.CurrentSettlement;
+                party.MemberRoster.Clear();
+                party.MemberRoster.AddToCounts(hero.CharacterObject, 1);
+                quest._guardsParty = guards;
+            }
+            if (approve) Assert.True(server.Resolve<IGangLeaderWeaponsQuestActions>().Apply(quest, hero, party, GangLeaderWeaponsAction.BeginBattle));
+            Assert.True(server.Resolve<IPlayerManager>().AddPlayer(new Player(controller, heroId, partyId, "", "")));
+        });
+        var ownerClient = environment.Clients.First();
+        environment.ConnectRegisteredPlayer(ownerClient, controller);
+        server.NetworkSentMessages.Clear();
+        return (giverId, partyId, guardsId, ownerClient);
     }
 
     [Fact]

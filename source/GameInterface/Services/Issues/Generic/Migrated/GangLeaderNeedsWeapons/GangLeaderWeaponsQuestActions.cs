@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
@@ -20,10 +21,36 @@ internal interface IGangLeaderWeaponsQuestActions
     bool Apply(Quest quest, Hero owner, MobileParty party, GangLeaderWeaponsAction action);
     bool CompleteBattle(Quest quest, Hero owner, MobileParty party, MapEvent battle);
     bool StartApprovedBattle(Quest quest);
+    Settlement GetApprovedBattleSettlement(string controllerId, PartyBase attacker, PartyBase defender);
 }
 
 internal sealed class GangLeaderWeaponsQuestActions : IGangLeaderWeaponsQuestActions
 {
+    private readonly IIssueOwnershipRegistry ownership;
+
+    public GangLeaderWeaponsQuestActions(IIssueOwnershipRegistry ownership)
+    {
+        this.ownership = ownership;
+    }
+
+    public Settlement GetApprovedBattleSettlement(string controllerId, PartyBase attacker, PartyBase defender)
+    {
+        if (ModInformation.IsClient || string.IsNullOrEmpty(controllerId) || attacker?.MobileParty == null || defender == null)
+            return null;
+
+        foreach (var entry in ownership.Snapshot())
+        {
+            if (entry.Value != controllerId || entry.Key.Issue?.IssueQuest is not Quest quest ||
+                !quest.IsOngoing || !quest._checkForBattleResult || !quest._highCrimeRatingWillBeApplied ||
+                quest._guardsParty?.Party != defender || !CanMeetGuards(quest, attacker.MobileParty)) continue;
+
+            var settlement = quest.QuestGiver.CurrentSettlement;
+            if (settlement != null && quest._guardsParty.CurrentSettlement == settlement)
+                return settlement;
+        }
+        return null;
+    }
+
     public bool StartApprovedBattle(Quest quest)
     {
         if (ModInformation.IsServer || !quest.IsOngoing || !quest._highCrimeRatingWillBeApplied ||
