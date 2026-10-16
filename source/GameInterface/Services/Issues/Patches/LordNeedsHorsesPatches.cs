@@ -533,3 +533,21 @@ internal class LordNeedsHorsesFailurePatch
         __state.Player?.Dispose();
     }
 }
+
+[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithAiLord))]
+internal class LordNeedsHorsesAiCompletionPatch
+{
+    [HarmonyPrefix]
+    internal static bool Prefix(IssueBase __instance, out IssueFinalizeAuthorityGuard __state)
+    {
+        __state = null;
+        if (__instance is not Issue) return true;
+        if (CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
+        if (ModInformation.IsClient) return false;
+        __state = new IssueFinalizeAuthorityGuard();
+        return true;
+    }
+
+    [HarmonyFinalizer]
+    private static void Finalizer(IssueFinalizeAuthorityGuard __state) => __state?.Dispose();
+}

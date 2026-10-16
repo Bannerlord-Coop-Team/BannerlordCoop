@@ -20,6 +20,7 @@ using Quest = LordNeedsHorsesIssueBehavior.LordNeedsHorsesIssueQuest;
 [QuestTypeModule]
 internal static class LordNeedsHorsesQuestType
 {
+    internal static readonly PendingRegistry<PropertyOwner<PropertyObject>> OwnerTraitXpProgress = new();
     internal static readonly ConditionalWeakTable<PartyScreenLogic, Issue> TroopSelections = new();
     internal static readonly ConditionalWeakTable<ConversationManager, Hero> PendingAcceptances = new();
 

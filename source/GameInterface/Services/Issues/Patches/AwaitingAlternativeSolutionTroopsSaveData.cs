@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Interfaces;
@@ -59,9 +59,6 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
 
     private const string SaveKey = "_coop_awaiting_alternative_solution_troops";
 
-    private static readonly System.Reflection.FieldInfo LegacyAwaitingTroopsField =
-        AccessTools.Field(typeof(IssueManager), "_awaitingAlternativeSolutionTroops");
-
     [HarmonyPatch(nameof(IssuesCampaignBehavior.SyncData))]
     [HarmonyPostfix]
     private static void SyncDataPostfix(IDataStore dataStore)
@@ -101,34 +98,5 @@ internal class AwaitingAlternativeSolutionTroopsPersistencePatches
             }
         }
 
-        MigrateLegacyField(troopsRegistry);
-    }
-
-    private static void MigrateLegacyField(IAwaitingAlternativeSolutionTroopsRegistry troopsRegistry)
-    {
-        if (ModInformation.IsClient) return;
-        if (Campaign.Current?.IssueManager == null) return;
-
-        var legacyRoster = (TroopRoster)LegacyAwaitingTroopsField.GetValue(Campaign.Current.IssueManager);
-        if (legacyRoster == null || legacyRoster.Count == 0) return;
-
-        if (ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)
-            && !string.IsNullOrEmpty(controllerIdProvider.ControllerId))
-        {
-            Logger.Warning(
-                "Migrating {Count} legacy IssueManager._awaitingAlternativeSolutionTroops troop stack(s) " +
-                "(no per-owner attribution - likely a single-player-imported or pre-fix save) onto the " +
-                "server's own ControllerId {ControllerId}.", legacyRoster.Count, controllerIdProvider.ControllerId);
-
-            troopsRegistry.Deposit(controllerIdProvider.ControllerId, legacyRoster);
-        }
-        else
-        {
-            Logger.Error(
-                "Dropping {Count} legacy IssueManager._awaitingAlternativeSolutionTroops troop stack(s) - no " +
-                "local ControllerId available to attribute them to.", legacyRoster.Count);
-        }
-
-        LegacyAwaitingTroopsField.SetValue(Campaign.Current.IssueManager, TroopRoster.CreateDummyTroopRoster());
     }
 }

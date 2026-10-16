@@ -8,7 +8,6 @@ using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Generic.Dispatch;
-using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadStolenGoods;
 using GameInterface.Services.Issues.Generic.Migrated.LordNeedsHorses;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.ObjectManager;
@@ -247,7 +246,7 @@ internal sealed class LordNeedsHorsesQuest : ILordNeedsHorsesQuest
     {
         if (ModInformation.IsServer || !playerManager.TryGetPlayer(controller.ControllerId, out var player) ||
             !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) ||
-            !GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress.TryGet(hero, out var traits) ||
+            !LordNeedsHorsesQuestType.OwnerTraitXpProgress.TryGet(hero, out var traits) ||
             !traits.GetProperties().Contains(DefaultTraits.Honor)) return;
         Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, traits.GetPropertyValue(DefaultTraits.Honor));
     }
@@ -261,7 +260,7 @@ internal sealed class LordNeedsHorsesQuest : ILordNeedsHorsesQuest
 
     public void ApplyTraitProgress(Hero hero, int progress)
     {
-        var registry = GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress;
+        var registry = LordNeedsHorsesQuestType.OwnerTraitXpProgress;
         if (!registry.TryGet(hero, out var traits)) traits = new PropertyOwner<PropertyObject>();
         traits.SetPropertyValue(DefaultTraits.Honor, progress);
         registry.Set(hero, traits);
@@ -283,7 +282,7 @@ internal sealed class LordNeedsHorsesQuest : ILordNeedsHorsesQuest
             this.hero = hero;
             this.broker = broker;
             previous = Campaign.Current.PlayerTraitDeveloper;
-            var registry = GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress;
+            var registry = LordNeedsHorsesQuestType.OwnerTraitXpProgress;
             if (!registry.TryGet(hero, out var stored)) stored = new PropertyOwner<PropertyObject>();
             progress = stored;
             if (!progress.GetProperties().Contains(DefaultTraits.Honor))

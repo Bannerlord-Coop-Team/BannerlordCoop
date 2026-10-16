@@ -34,6 +34,8 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
     [HarmonyPrefix]
     private static bool TryToMakeTroopsReturnPrefix(IssueBase issue)
     {
+        if (QuestTypeRegistry.Get(issue)?.SupportsAlternativeAccept != true) return true;
+
         var troops = issue?.AlternativeSolutionSentTroops;
         if (troops == null || troops.Count == 0) return false;
 
@@ -94,11 +96,10 @@ internal class IssueManagerAlternativeSolutionTroopsPatches
     }
 
     [HarmonyPatch(typeof(IssueManager), "CheckIfTroopsCanReturnToMainParty")]
-    [HarmonyPrefix]
-    private static bool CheckIfTroopsCanReturnToMainPartyPrefix()
+    [HarmonyPostfix]
+    private static void CheckIfTroopsCanReturnToMainPartyPostfix()
     {
         TryCheckIfTroopsCanReturnToMainParty();
-        return false;
     }
 
     internal static void TryCheckIfTroopsCanReturnToMainParty()

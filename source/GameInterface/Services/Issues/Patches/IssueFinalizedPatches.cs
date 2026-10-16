@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Generic;
@@ -22,7 +22,7 @@ internal class IssueManagerQuestCompletedReasonCapture
     private static void Prefix(QuestBase quest, QuestBase.QuestCompleteDetails detail)
     {
         if (quest?.QuestGiver == null) return;
-        if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(quest.QuestGiver.Issue)) return;
+        if (QuestTypeRegistry.Get(quest.QuestGiver.Issue) == null) return;
 
         PendingReasons[quest.QuestGiver] = detail switch
         {
@@ -42,7 +42,7 @@ internal class IssueFinalizedOwnershipGatePatch
     [HarmonyPrefix]
     internal static bool Prefix(IssueBase __instance)
     {
-        if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return true;
+        if (QuestTypeRegistry.Get(__instance) == null) return true;
 
         return IssueFinalizeAuthorityGuard.IsActive || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate();
     }
@@ -53,9 +53,9 @@ internal class IssueExpiryFinalizeAuthorityPatch
 {
     [HarmonyPatch(nameof(IssueBase.CompleteIssueWithTimedOut))]
     [HarmonyPrefix]
-    private static void TimedOutPrefix(out IssueFinalizeAuthorityGuard __state)
+    private static void TimedOutPrefix(IssueBase __instance, out IssueFinalizeAuthorityGuard __state)
     {
-        __state = OpenGuardIfAuthoritative();
+        __state = OpenGuardIfAuthoritative(__instance);
     }
 
     [HarmonyPatch(nameof(IssueBase.CompleteIssueWithTimedOut))]
@@ -67,9 +67,9 @@ internal class IssueExpiryFinalizeAuthorityPatch
 
     [HarmonyPatch(nameof(IssueBase.CompleteIssueWithStayAliveConditionsFailed))]
     [HarmonyPrefix]
-    private static void StayAliveFailedPrefix(out IssueFinalizeAuthorityGuard __state)
+    private static void StayAliveFailedPrefix(IssueBase __instance, out IssueFinalizeAuthorityGuard __state)
     {
-        __state = OpenGuardIfAuthoritative();
+        __state = OpenGuardIfAuthoritative(__instance);
     }
 
     [HarmonyPatch(nameof(IssueBase.CompleteIssueWithStayAliveConditionsFailed))]
@@ -79,8 +79,9 @@ internal class IssueExpiryFinalizeAuthorityPatch
         __state?.Dispose();
     }
 
-    private static IssueFinalizeAuthorityGuard OpenGuardIfAuthoritative()
+    private static IssueFinalizeAuthorityGuard OpenGuardIfAuthoritative(IssueBase issue)
     {
+        if (QuestTypeRegistry.Get(issue) == null) return null;
         return CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer
             ? new IssueFinalizeAuthorityGuard()
             : null;
@@ -93,6 +94,8 @@ internal class IssueFinalizedPatches
     [HarmonyPostfix]
     private static void Postfix(IssueBase __instance)
     {
+        if (QuestTypeRegistry.Get(__instance) == null) return;
+
         var owner = __instance.IssueOwner;
         var reason = IssueFinalizeReason.IssueOnly;
         if (owner != null && IssueManagerQuestCompletedReasonCapture.PendingReasons.TryGetValue(owner, out var pending))
@@ -101,7 +104,7 @@ internal class IssueFinalizedPatches
             IssueManagerQuestCompletedReasonCapture.PendingReasons.Remove(owner);
         }
 
-        var wasGenuinelyFinalized = !DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance) || IssueFinalizeAuthorityGuard.IsActive;
+        var wasGenuinelyFinalized = IssueFinalizeAuthorityGuard.IsActive;
         if (wasGenuinelyFinalized)
         {
             if (ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownershipRegistry)) ownershipRegistry.Clear(owner);
@@ -116,7 +119,6 @@ internal class IssueFinalizedPatches
         }
 
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
-        if (!DisableAllIssueBehaviorsExceptAllowlist.IsAllowlisted(__instance)) return;
 
         MessageBroker.Instance.Publish(__instance, new IssueFinalizedTriggered(owner, reason));
     }
