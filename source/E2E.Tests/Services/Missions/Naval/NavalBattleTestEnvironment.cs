@@ -253,14 +253,6 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             Engine = engine;
             Network = instance.Resolve<MockBattleNetwork>();
             Broker = instance.Resolve<IMessageBroker>();
-            Ships = new BattleShipReplicator(Network, Broker, controller.Session, controller.Deployment, controller.MissionComponent,
-                engine, instance.Resolve<IBattleTeamResolver>(), instance.ObjectManager, controller.HostEpochPolicy,
-                controller.ResultCommitter);
-            Stations = new AgentStationUseReplicator(Network, Broker, controller.Session, controller.MissionComponent, engine,
-                controller.Deployment);
-            Damage = new BattleShipDamageRouter(Network, Broker, controller.Session, controller.MissionComponent, engine);
-            Weapons = new BattleShipWeaponReplicator(Network, Broker, controller.Session, controller.MissionComponent, engine, Ships,
-                controller.HostEpochPolicy);
             var reinforcements = new Mock<IReinforcementFielder>();
             reinforcements.Setup(fielder => fielder.TakeMigrationReserve(It.IsAny<BattleSideEnum>())).Returns(() =>
             {
@@ -268,8 +260,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 RecoveredReserve.Clear();
                 return recovered;
             });
-            MigrationReserve = new NavalMigrationReserveFielder(controller.Session, reinforcements.Object,
-                controller.MissionComponent.ShipRegistry, engine, Ships);
+            Services = instance.Resolve<INavalBattleServicesFactory>().Create(
+                controller.Context with { ReinforcementFielder = reinforcements.Object }, engine);
         }
 
         public string Id { get; }
@@ -280,11 +272,13 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         public FakeNavalShipEngine Engine { get; }
         public MockBattleNetwork Network { get; }
         public IMessageBroker Broker { get; }
-        public BattleShipReplicator Ships { get; }
-        public AgentStationUseReplicator Stations { get; }
-        public BattleShipDamageRouter Damage { get; }
-        public BattleShipWeaponReplicator Weapons { get; }
-        public NavalMigrationReserveFielder MigrationReserve { get; }
+        /// <summary>The production naval services over the fake engine, with a reinforcement fielder that hands over <see cref="RecoveredReserve"/>.</summary>
+        public INavalBattleServices Services { get; }
+        public IBattleShipReplicator Ships => Services.ShipReplicator;
+        public IAgentStationUseReplicator Stations => Services.StationUseReplicator;
+        public IBattleShipDamageRouter Damage => Services.ShipDamageRouter;
+        public IBattleShipWeaponReplicator Weapons => Services.ShipWeaponReplicator;
+        public INavalMigrationReserveFielder MigrationReserve => Services.MigrationReserveFielder;
         /// <summary>The AI reserve the reinforcement fielder's roster recovery hands over at the next tick, as after a promotion.</summary>
         public List<CoopAgentOrigin> RecoveredReserve { get; } = new();
         public INetworkShipRegistry Registry => Controller.MissionComponent.ShipRegistry;
@@ -292,14 +286,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
 
         public void Call(Action action, IEnumerable<MethodBase>? disabledMethods = null) => Instance.Call(action, disabledMethods);
 
-        /// <summary>One naval services tick in the live order: the ship replicator, station use, weapons, then the migration reserve.</summary>
-        public void Tick(float dt = TickSeconds) => Call(() =>
-        {
-            Ships.Tick(dt);
-            Stations.Tick(dt);
-            Weapons.Tick(dt);
-            MigrationReserve.Tick();
-        });
+        /// <summary>One naval services tick in the live order; this harness fields no NPC fleet.</summary>
+        public void Tick(float dt = TickSeconds) => Call(() => Services.Tick(dt));
 
         public void Ticks(int count)
         {
@@ -428,12 +416,6 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         public IReadOnlyList<NetworkBattleShipSample> SentSamples(Guid shipId) =>
             Network.NetworkSentMessages.GetMessages<NetworkBattleShipSample>().Where(sample => sample.ShipId == shipId).ToList();
 
-        internal void DisposeShipServices()
-        {
-            Weapons.Dispose();
-            Damage.Dispose();
-            Stations.Dispose();
-            Ships.Dispose();
-        }
+        internal void DisposeShipServices() => Services.Dispose();
     }
 }

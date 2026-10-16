@@ -3,6 +3,7 @@ using Missions.Battles;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
 using Serilog;
+using System;
 using System.Linq;
 using TaleWorlds.MountAndBlade;
 
@@ -16,19 +17,16 @@ public class CoopNavalBattleBehavior : MissionLogic
     // Fewer agents than this leaving in one tick is ordinary combat; more is worth a line in the log.
     internal const int AgentDropThreshold = 10;
 
+    private readonly INavalBattleServices services;
     private readonly NavalShipsLogic shipsLogic;
+    private readonly Action tickNpcFleet;
     private int lastAgentCount = -1;
 
-    public CoopNavalBattleBehavior(IBattleShipReplicator shipReplicator, IAgentStationUseReplicator stationUseReplicator,
-        INavalNpcFleetSpawner npcFleetSpawner, INavalMigrationReserveFielder migrationReserveFielder,
-        IBattleShipDamageRouter shipDamageRouter, IBattleShipWeaponReplicator shipWeaponReplicator, NavalShipsLogic shipsLogic)
+    public CoopNavalBattleBehavior(INavalBattleServices services, INavalNpcFleetSpawner npcFleetSpawner, NavalShipsLogic shipsLogic)
     {
-        ShipWeaponReplicator = shipWeaponReplicator;
-        MigrationReserveFielder = migrationReserveFielder;
-        ShipReplicator = shipReplicator;
-        StationUseReplicator = stationUseReplicator;
+        this.services = services;
         NpcFleetSpawner = npcFleetSpawner;
-        ShipDamageRouter = shipDamageRouter;
+        tickNpcFleet = npcFleetSpawner.Tick;
         this.shipsLogic = shipsLogic;
         // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached.
         shipsLogic.MissionEndEvent += ShipReplicator.SendFinalRopes;
@@ -36,26 +34,22 @@ public class CoopNavalBattleBehavior : MissionLogic
         CoopNavalMissionScope.IsActive = true;
     }
 
-    public IBattleShipReplicator ShipReplicator { get; }
+    public IBattleShipReplicator ShipReplicator => services.ShipReplicator;
 
-    public IAgentStationUseReplicator StationUseReplicator { get; }
+    public IAgentStationUseReplicator StationUseReplicator => services.StationUseReplicator;
 
     public INavalNpcFleetSpawner NpcFleetSpawner { get; }
 
-    public INavalMigrationReserveFielder MigrationReserveFielder { get; }
+    public INavalMigrationReserveFielder MigrationReserveFielder => services.MigrationReserveFielder;
 
-    public IBattleShipDamageRouter ShipDamageRouter { get; }
+    public IBattleShipDamageRouter ShipDamageRouter => services.ShipDamageRouter;
 
-    public IBattleShipWeaponReplicator ShipWeaponReplicator { get; }
+    public IBattleShipWeaponReplicator ShipWeaponReplicator => services.ShipWeaponReplicator;
 
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);
-        ShipReplicator.Tick(dt);
-        StationUseReplicator.Tick(dt);
-        ShipWeaponReplicator.Tick(dt);
-        NpcFleetSpawner.Tick();
-        MigrationReserveFielder.Tick();
+        services.Tick(dt, tickNpcFleet);
         LogAgentCountDrop();
     }
 
@@ -98,10 +92,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         CoopNavalMissionScope.IsActive = false;
         shipsLogic.MissionEndEvent -= ShipReplicator.SendFinalRopes;
         shipsLogic.ShipRemovedEvent -= OnShipRemoved;
-        ShipWeaponReplicator.Dispose();
-        ShipDamageRouter.Dispose();
-        StationUseReplicator.Dispose();
-        ShipReplicator.Dispose();
+        services.Dispose();
         NavalRopes.Clear();
 #if DEBUG
         NavalHelmOverride.Clear();

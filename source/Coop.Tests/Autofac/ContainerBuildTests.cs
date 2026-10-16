@@ -99,6 +99,7 @@ namespace Coop.Tests.Autofac
 
             Assert.IsType<CoopNavalBattleLauncher>(container.Resolve<ICoopNavalBattleLauncher>());
             Assert.IsType<NavalShipEngine>(container.Resolve<INavalShipEngine>());
+            Assert.IsType<NavalBattleServicesFactory>(container.Resolve<INavalBattleServicesFactory>());
             Assert.IsType<CoopShipSnapshotBuilder>(container.Resolve<ICoopShipSnapshotBuilder>());
             Assert.IsType<NavalAgentFormationAssigner>(container.Resolve<IAgentFormationAssigner>());
             Assert.IsType<NavalDebugHulls>(container.Resolve<INavalDebugHulls>());

@@ -63,11 +63,8 @@ public class CoopBattleController : CoopMissionController
     /// <summary>Reports final siege engine state before the shared result is applied.</summary>
     public ISiegeEngineStateReporter SiegeEngineStateReporter { get; }
 
-    /// <summary>BR-102: the battle's shared host-epoch receiver policy for host-authority messages.</summary>
-    public IHostEpochPolicy HostEpochPolicy { get; }
-
-    /// <summary>Recovers a promoted host's newly owned reserve; a naval battle takes it to field on its hulls.</summary>
-    public IReinforcementFielder ReinforcementFielder => reinforcementFielder;
+    /// <summary>The per-battle parts a naval battle builds its ship services on.</summary>
+    public BattleContext Context { get; }
 
     private readonly IBattleInstanceLifecycle lifecycle;
     private readonly IOwnedAgentReplicator replicator;
@@ -205,10 +202,10 @@ public class CoopBattleController : CoopMissionController
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         hostRegistryRef = hostRegistry;
-        HostEpochPolicy = hostEpochPolicy;
         Session = session;
         Deployment = deployment;
         ResultCommitter = resultCommitter;
+        Context = new BattleContext(session, deployment, coopMissionComponent, hostEpochPolicy, resultCommitter, reinforcementFielder);
         SiegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
         messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
         messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);

@@ -48,9 +48,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
     private readonly ICoopShipSnapshotBuilder shipSnapshotBuilder;
-    private readonly IBattleNetwork network;
     private readonly INavalShipEngine shipEngine;
-    private readonly IBattleTeamResolver teamResolver;
+    private readonly INavalBattleServicesFactory servicesFactory;
     private readonly IPlayerManager playerManager;
 #if DEBUG
     private readonly INavalScenarioState scenarioState;
@@ -63,9 +62,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         ICoopBattleBehaviorAttacher behaviorAttacher,
         IBattleAgentBudget agentBudget,
         ICoopShipSnapshotBuilder shipSnapshotBuilder,
-        IBattleNetwork network,
         INavalShipEngine shipEngine,
-        IBattleTeamResolver teamResolver,
+        INavalBattleServicesFactory servicesFactory,
         IPlayerManager playerManager
 #if DEBUG
         , INavalScenarioState scenarioState,
@@ -78,9 +76,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         this.debugHulls = debugHulls;
 #endif
         this.playerManager = playerManager;
-        this.network = network;
         this.shipEngine = shipEngine;
-        this.teamResolver = teamResolver;
+        this.servicesFactory = servicesFactory;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
@@ -222,23 +219,13 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     // The ship services share the attached controller's per-battle session, deployment and mission component.
     private void AttachNavalServices(Mission mission, BattleSideEnum enemySide)
     {
-        var controller = mission.GetMissionBehavior<CoopBattleController>();
-        var shipReplicator = new BattleShipReplicator(network, messageBroker, controller.Session, controller.Deployment,
-            controller.MissionComponent, shipEngine, teamResolver, objectManager, controller.HostEpochPolicy, controller.ResultCommitter);
-        var stationUseReplicator = new AgentStationUseReplicator(network, messageBroker, controller.Session,
-            controller.MissionComponent, shipEngine, controller.Deployment);
-        var npcFleetSpawner = new NavalNpcFleetSpawner(controller.Session, shipReplicator, controller.MissionComponent.ShipRegistry,
+        var context = mission.GetMissionBehavior<CoopBattleController>().Context;
+        var services = servicesFactory.Create(context, shipEngine);
+        var npcFleetSpawner = new NavalNpcFleetSpawner(context.Session, services.ShipReplicator, context.MissionComponent.ShipRegistry,
             shipSnapshotBuilder, objectManager, playerManager, enemySide);
-        var migrationReserveFielder = new NavalMigrationReserveFielder(controller.Session, controller.ReinforcementFielder,
-            controller.MissionComponent.ShipRegistry, shipEngine, shipReplicator);
-        var shipDamageRouter = new BattleShipDamageRouter(network, messageBroker, controller.Session, controller.MissionComponent,
-            shipEngine);
-        var shipWeaponReplicator = new BattleShipWeaponReplicator(network, messageBroker, controller.Session,
-            controller.MissionComponent, shipEngine, shipReplicator, controller.HostEpochPolicy);
-        mission.AddMissionBehavior(new CoopNavalBattleBehavior(shipReplicator, stationUseReplicator, npcFleetSpawner,
-            migrationReserveFielder, shipDamageRouter, shipWeaponReplicator, mission.GetMissionBehavior<NavalShipsLogic>()));
-        mission.AddMissionBehavior(new CoopNavalBattleEndLogic(controller.Session, controller.Deployment, controller.ResultCommitter,
-            npcFleetSpawner, shipReplicator, shipEngine, migrationReserveFielder));
+        mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, npcFleetSpawner, mission.GetMissionBehavior<NavalShipsLogic>()));
+        mission.AddMissionBehavior(new CoopNavalBattleEndLogic(context.Session, context.Deployment, context.ResultCommitter,
+            npcFleetSpawner, services.ShipReplicator, shipEngine, services.MigrationReserveFielder));
     }
 
 #if DEBUG
