@@ -4,6 +4,10 @@ using E2E.Tests.Util;
 using Common.Tests.Utils;
 using Common.Network;
 using Common.Network.Coalescing;
+using Common.Messaging;
+using Coop.Core.Client.Services.MobileParties.Handlers;
+using Coop.Core.Client.Services.MobileParties.Messages;
+using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Policies;
@@ -16,6 +20,9 @@ using GameInterface.Services.Issues.Generic.AcceptMirror;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.Settlements.Interfaces;
 using Helpers;
 using TaleWorlds.CampaignSystem.Roster;
 using GameInterface.Services.Issues.Generic.CreationCapture;
@@ -117,6 +124,87 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
                 Assert.Empty(MobileParty.MainParty.ItemRoster);
             });
         }
+    }
+
+    [Theory]
+    [InlineData(true, false, false, true)]
+    [InlineData(false, false, false, true)]
+    [InlineData(true, true, false, true)]
+    [InlineData(true, false, true, true)]
+    [InlineData(true, false, false, false)]
+    public void ApprovedSettlementEntryRequestsGuardsOnceAfterEncounterInitialization(
+        bool isOwner, bool dodgedGuards, bool existingEncounter, bool canStart)
+    {
+        var giverId = CreateIssueCopies();
+        var client = environment.Clients.First();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            var party = MobileParty.MainParty;
+            var settlement = giver.CurrentSettlement;
+            client.Resolve<IControllerIdProvider>().SetControllerId("weapons-entry-owner");
+            client.Resolve<IIssueOwnershipRegistry>().SetOwner(giver,
+                isOwner ? "weapons-entry-owner" : "weapons-entry-observer");
+            client.Resolve<IIssueGenerationRegistry>().SetGeneration(giver, 5);
+            client.Resolve<IGangLeaderWeaponsAcceptance>().MirrorQuestAccepted(giver,
+                new GangLeaderWeaponsQuestFields("weapons_entry_quest", CampaignTime.Days(25), 4700, 0, 21, 0.75f, 200, 17));
+            var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+            quest._playerDodgedGuards = dodgedGuards;
+            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+            Game.Current.GameStateManager._gameStates.Add(mapState);
+            GameStateManager._current = Game.Current.GameStateManager;
+            Campaign.Current.PlayerEncounter = null;
+            using (new AllowedThread())
+            {
+                party.CurrentSettlement = settlement;
+                quest.OnSettlementEnter(party, settlement, Hero.MainHero);
+            }
+            Assert.Empty(client.NetworkSentMessages.GetMessages<RequestGangLeaderWeaponsAction>());
+
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter.EncounterSettlementAux = settlement;
+            if (existingEncounter) Campaign.Current.PlayerEncounter = encounter;
+            var settlements = new Mock<ISettlementInterface>();
+            settlements.Setup(s => s.StartSettlementEncounter(party, settlement)).Callback(() =>
+            {
+                Assert.True(AllowedThread.IsThisThreadAllowed());
+                if (canStart && PlayerEncounter.Current == null) Campaign.Current.PlayerEncounter = encounter;
+            });
+            var broker = client.Resolve<IMessageBroker>();
+            int starts = 0;
+            broker.Subscribe<SettlementEncounterStarted>(message =>
+            {
+                Assert.False(AllowedThread.IsThisThreadAllowed());
+                Assert.Same(encounter, PlayerEncounter.Current);
+                starts++;
+            });
+            client.Resolve<ClientSettlementExitEnterHandler>().Dispose();
+            using var handler = new ClientSettlementExitEnterHandler(broker, Mock.Of<INetwork>(),
+                client.ObjectManager, settlements.Object, Mock.Of<IHideoutResultEncounter>());
+            Assert.True(client.ObjectManager.TryGetHandle(party, out var partyHandle));
+            Assert.True(client.ObjectManager.TryGetHandle(settlement, out var settlementHandle));
+            for (int attempt = 0; attempt < 2; attempt++)
+            {
+                client.SimulateMessage(this, new StartSettlementEncounterAttempted(party, settlement));
+                client.SimulateMessage(environment.Server.NetPeer,
+                    new NetworkStartSettlementEncounter(new NetworkRequestStartSettlementEncounter(partyHandle, settlementHandle)));
+            }
+
+            Assert.Equal(canStart && !existingEncounter ? 1 : 0, starts);
+            var requests = client.NetworkSentMessages.GetMessages<RequestGangLeaderWeaponsAction>().ToArray();
+            if (isOwner && !dodgedGuards && canStart && !existingEncounter)
+            {
+                var request = Assert.Single(requests);
+                Assert.Equal(GangLeaderWeaponsAction.EnterTown, request.Action);
+                Assert.Equal(giverId, request.GiverId);
+                Assert.Equal(5, request.Generation);
+                Assert.Equal(quest.StringId, request.QuestId);
+            }
+            else Assert.Empty(requests);
+            Assert.Null(quest._guardsParty);
+            Campaign.Current.PlayerEncounter = null;
+            Game.Current.GameStateManager._gameStates.Remove(mapState);
+        });
     }
 
     [Fact]

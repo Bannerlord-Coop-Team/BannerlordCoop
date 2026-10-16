@@ -10,6 +10,7 @@ using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -70,6 +71,7 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
         broker.Subscribe<NetworkGangLeaderWeaponsAlternative>(HandleNetworkAlternative);
         broker.Subscribe<NetworkPlayerCharacterChangedAfterHeirSelection>(HandlePlayerChanged);
         broker.Subscribe<NetworkUpdateTradeData>(HandleInventoryCompleted);
+        broker.Subscribe<SettlementEncounterStarted>(HandleSettlementEncounterStarted);
     }
 
     public void Dispose()
@@ -90,6 +92,7 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
         broker.Unsubscribe<NetworkGangLeaderWeaponsAlternative>(HandleNetworkAlternative);
         broker.Unsubscribe<NetworkPlayerCharacterChangedAfterHeirSelection>(HandlePlayerChanged);
         broker.Unsubscribe<NetworkUpdateTradeData>(HandleInventoryCompleted);
+        broker.Unsubscribe<SettlementEncounterStarted>(HandleSettlementEncounterStarted);
         pendingGuardEntries.Clear();
         pendingBattle = null;
         pendingBattleRequestId = null;
@@ -159,6 +162,17 @@ internal sealed class GangLeaderWeaponsIssueHandler : IHandler
             runner.ConstructAndRegisterReplicated(giver, data.Fields);
             generations.SetGeneration(giver, data.Generation);
         });
+    }
+
+    private void HandleSettlementEncounterStarted(MessagePayload<SettlementEncounterStarted> payload)
+    {
+        if (ModInformation.IsServer || payload.What.Party != MobileParty.MainParty ||
+            payload.What.Party.CurrentSettlement != payload.What.Settlement) return;
+        foreach (var quest in Campaign.Current.QuestManager.Quests.OfType<Quest>())
+        {
+            if (quest.IsOngoing && ownership.IsLocalPeerOwner(quest.QuestGiver))
+                quest.OnSettlementEnter(payload.What.Party, payload.What.Settlement, Hero.MainHero);
+        }
     }
 
     private void HandleActionRequested(MessagePayload<GangLeaderWeaponsActionRequested> payload)
