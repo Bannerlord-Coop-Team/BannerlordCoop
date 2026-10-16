@@ -215,6 +215,7 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
         var otherPartyId = environment.CreateRegisteredObject<MobileParty>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
         var observedCounts = new List<int>();
+        var observers = new List<Action<MessagePayload<NetworkGangLeaderWeaponsState>>>();
         foreach (var instance in environment.Clients.Append(environment.Server))
         {
             instance.Call(() =>
@@ -227,8 +228,10 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
                 instance.Resolve<IGangLeaderWeaponsAcceptance>().MirrorQuestAccepted(giver,
                     new GangLeaderWeaponsQuestFields("weapons_guard_roster", CampaignTime.Days(25), 4700, 0, 21, 0.75f, 200, 17));
                 if (instance == environment.Server) return;
-                instance.Resolve<IMessageBroker>().Subscribe<NetworkGangLeaderWeaponsState>(_ =>
-                    Common.GameThread.RunSafe(() => observedCounts.Add(guards.MemberRoster.GetTroopCount(troop))));
+                Action<MessagePayload<NetworkGangLeaderWeaponsState>> observer = _ =>
+                    Common.GameThread.RunSafe(() => observedCounts.Add(guards.MemberRoster.GetTroopCount(troop)));
+                observers.Add(observer);
+                instance.Resolve<IMessageBroker>().Subscribe(observer);
             });
         }
 
@@ -262,6 +265,7 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
                 Assert.Equal(0, otherParty.MemberRoster.GetTroopCount(troop));
             });
         }
+        GC.KeepAlive(observers);
     }
 
     [Fact]
