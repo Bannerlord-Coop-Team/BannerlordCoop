@@ -1,15 +1,17 @@
-using GameInterface.Services.Entity;
+﻿using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.SaveSystem;
 
 namespace GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 
@@ -28,11 +30,12 @@ internal interface ITheConquestOfSettlementService
 
 internal sealed class TheConquestOfSettlementService : ITheConquestOfSettlementService
 {
+    private const string SaveKey = "_coop_the_conquest_of_settlement_quest_owners";
     private readonly IObjectManager objectManager;
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controllerIdProvider;
-    private readonly ConcurrentDictionary<string, string> questOwners = new();
+    private static readonly ConcurrentDictionary<string, string> questOwners = new();
 
     public TheConquestOfSettlementService(
         IObjectManager objectManager,
@@ -121,6 +124,42 @@ internal sealed class TheConquestOfSettlementService : ITheConquestOfSettlementS
         if (ownership.TryGetOwner(issueOwnerId, IssueManager.GetIssueOfQuest(quest)?.StringId, out var owner))
         {
             questOwners[quest.StringId] = owner;
+        }
+    }
+
+    internal static void ResetQuestOwners()
+    {
+        questOwners.Clear();
+    }
+
+    internal static void SyncQuestOwners(IDataStore dataStore)
+    {
+        List<TheConquestOfSettlementQuestOwnerSaveData> saveData = null;
+        if (dataStore.IsSaving)
+        {
+            saveData = questOwners
+                .Select(pair => new TheConquestOfSettlementQuestOwnerSaveData(pair.Key, pair.Value))
+                .ToList();
+        }
+
+        dataStore.SyncData(SaveKey, ref saveData);
+        if (!dataStore.IsLoading)
+        {
+            return;
+        }
+
+        questOwners.Clear();
+        if (saveData == null)
+        {
+            return;
+        }
+
+        foreach (var entry in saveData)
+        {
+            if (!string.IsNullOrEmpty(entry?.QuestId) && !string.IsNullOrEmpty(entry.ControllerId))
+            {
+                questOwners[entry.QuestId] = entry.ControllerId;
+            }
         }
     }
 
