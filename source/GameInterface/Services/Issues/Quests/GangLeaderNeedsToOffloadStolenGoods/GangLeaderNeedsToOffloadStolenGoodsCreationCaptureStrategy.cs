@@ -62,6 +62,11 @@ internal class GangLeaderNeedsToOffloadStolenGoodsCreationCaptureStrategy : ICre
     {
         captured = null;
 
+        if (!issueOwner.IsNotable)
+        {
+            return false;
+        }
+
         var settlement = issueOwner.CurrentSettlement;
         if (settlement == null || !settlement.IsTown)
         {

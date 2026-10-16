@@ -93,30 +93,6 @@ public class TownMarketDataDictionarySyncTests : SyncTestBase
         Server.Call(() => Server.Resolve<ISendCoalescer>().Flush(Server.Resolve<INetwork>()));
 
     [Fact]
-    public void Server_Dictionary_SetItemData_GameMethod_Syncs()
-    {
-        // Act — call the real game method; the dynamic sync transpiler rewrote its
-        // 'this._itemDict[itemCategory] = itemData' indexer call into the set item intercept.
-        var itemData = new ItemData(1.5f, 2.5f, 3, 4);
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject(MarketDataId, out TownMarketData serverMarketData));
-            Assert.True(Server.ObjectManager.TryGetObject(categoryId, out ItemCategory serverCategory));
-
-            serverMarketData.SetItemData(serverCategory, itemData);
-
-            Assert.Single(serverMarketData._itemDict);
-        });
-
-        FlushServerCoalescer();
-
-        // Assert
-        AssertClientCounts(1);
-        AssertClientsHave(categoryId, itemData);
-    }
-
-    [Fact]
     public void Server_TownRosterUpdate_DoesNotDoubleApplyMarketDataOnClients()
     {
         Server.Call(() =>

@@ -1,4 +1,5 @@
 ﻿using Common.Commands;
+using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using System;
@@ -43,19 +44,14 @@ public sealed class IssuesGiveCoopCommand : ICoopCommand
             return Failed($"Quest type '{args[1]}' is not registered");
         }
 
-        if (!hero.IsNotable)
+        if (hero.IsPlayerHero())
         {
-            return Failed($"{hero.Name} is not a notable, only notables can offer issues");
+            return Failed($"{hero.Name} is a player hero, players cannot offer issues");
         }
 
         if (hero.Issue != null)
         {
             return Failed($"{hero.Name} already has the issue {hero.Issue.GetType().Name}");
-        }
-
-        if (hero.CurrentSettlement == null)
-        {
-            return Failed($"{hero.Name} is not in a settlement");
         }
 
         var strategy = descriptor.CreationCaptureStrategy;
