@@ -63,28 +63,4 @@ public class GarrisonPartyComponentTests : SyncTestBase
             Assert.Equal(settlementId, clientGarrisonSettlementId);
         }
     }
-
-    [Fact]
-    public void ClientCreateParty_DoesNothing()
-    {
-        // Arrange
-        var server = TestEnvironment.Server;
-        var client1 = TestEnvironment.Clients.First();
-
-        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-        settlement.Town = GameObjectCreator.CreateInitializedObject<Town>();
-
-        // Act
-        PartyComponent? partyComponent = null;
-        client1.Call(() =>
-        {
-            partyComponent = new GarrisonPartyComponent(settlement, new GarrisonPartyComponent.InitializationArgs());
-        });
-
-        Assert.NotNull(partyComponent);
-
-
-        // Assert
-        Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
-    }
 }

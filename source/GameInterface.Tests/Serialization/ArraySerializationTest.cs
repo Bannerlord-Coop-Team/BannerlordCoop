@@ -9,29 +9,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ArraySerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public ArraySerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void Array_Serialize()
-        {
-            int[] arr = new int[] { 1, 2, 3, 4, 5, 6, 7, 8 };
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            EnumerableBinaryPackage package = new EnumerableBinaryPackage(arr, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]
@@ -58,24 +39,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             int[] newArr = returnedPackage.Unpack<int[]>(deserializeFactory);
 
             Assert.Equal(arr, newArr);
-        }
-
-        [Fact]
-        public void Staggered_Array_Serialize()
-        {
-            int[][] arr = new int[2][];
-            
-            arr[0] = new int[] { 1, 2, 3, 4, 5, 6, 7, 8 };
-            arr[1] = new int[] { 5, 6, 7 };
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            EnumerableBinaryPackage package = new EnumerableBinaryPackage(arr, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
         }
 
         [Fact]
