@@ -1,10 +1,7 @@
-﻿using Common.Logging;
-using Coop.Naval.PortScreen.Data;
-using Coop.Naval.PortScreen.Handlers;
+﻿using Coop.Naval.PortScreen.Data;
 using GameInterface.Services;
 using GameInterface.Services.Players.Interfaces;
 using NavalDLC.CampaignBehaviors;
-using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
@@ -64,11 +61,15 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
         }
         foreach (Ship ship in changes.ShipsToRepair)
         {
+            if (ship.Owner != changes.RightOwner) continue;
+
             RepairShipAction.Apply(ship, changes.MainHero.CurrentSettlement);
         }
-        RenameShips(changes);
+        RenameShips(changes, changes.RightOwner);
         foreach (ShipUpgradePieceInfo shipUpgradePieceInfo in changes.SelectedShipPieces)
         {
+            if (shipUpgradePieceInfo.Ship.Owner != changes.RightOwner) continue;
+
             int cost = 0;
             if (shipUpgradePieceInfo.Piece != null)
             {
@@ -86,9 +87,11 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
         }
         foreach (ShipFigureheadInfo shipFigureheadInfo in changes.SelectedFigureheads)
         {
+            if (shipFigureheadInfo.Ship.Owner != changes.RightOwner) continue;
+
             shipFigureheadInfo.Ship.ChangeFigurehead(shipFigureheadInfo.Figurehead);
         }
-        SendShipsToClan(changes);
+        SendShipsToClan(changes, changes.RightOwner);
         ResetAnchorIfNoShips(changes.MainParty);
         if (changes.MainParty.Ships.Count > 0 && !changes.MainParty.Anchor.IsValid && changes.LeftOwner.IsSettlement)
         {
@@ -144,19 +147,25 @@ internal class PortScreenHandlerInterface : IPortScreenHandlerInterface
         RenameShips(changes);
     }
 
-    private static void RenameShips(PortScreenChanges changes)
+    private static void RenameShips(PortScreenChanges changes, PartyBase owner = null)
     {
         foreach (ShipRenameInfo shipRenameInfo in changes.ShipsToRename)
         {
+            // Renaming ships without an owner is legitimate
+            if (owner != null && shipRenameInfo.Ship.Owner != owner) continue;
+
             shipRenameInfo.Ship.SetName(new TextObject("{=!}" + shipRenameInfo.NewName, null));
         }
     }
 
-    private static void SendShipsToClan(PortScreenChanges changes)
+    private static void SendShipsToClan(PortScreenChanges changes, PartyBase owner = null)
     {
         IFleetManagementCampaignBehavior campaignBehavior = Campaign.Current.GetCampaignBehavior<IFleetManagementCampaignBehavior>();
         foreach (Ship shipToSend in changes.ShipsToSend)
         {
+            // Renaming ships without an owner is legitimate
+            if (owner != null && shipToSend.Owner != owner) continue;
+
             campaignBehavior.SendShipToClan(shipToSend, changes.PlayerClan);
         }
     }

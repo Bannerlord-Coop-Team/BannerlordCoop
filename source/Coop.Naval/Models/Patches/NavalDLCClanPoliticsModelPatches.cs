@@ -17,7 +17,7 @@ internal class NavalDLCClanPoliticsModelPatches
         // AI led clans tick normally, player led clans use the same gate as the gold tick
         if (clan.Leader == null) return true;
 
-        ContainerProvider.TryResolve<IClanFinance>(out var finance);
+        if (!ContainerProvider.TryResolve<IClanFinance>(out var finance)) return true;
 
         if (finance.CanChangeGold(clan.Leader)) return true;
 

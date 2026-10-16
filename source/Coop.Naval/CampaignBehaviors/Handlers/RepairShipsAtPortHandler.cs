@@ -4,6 +4,7 @@ using Common.Network;
 using Coop.Naval.CampaignBehaviors.Messages;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
@@ -55,6 +56,9 @@ internal class RepairShipsAtPortHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyHandle, out var mainParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.CurrentSettlementHandle, out var currentSettlement)) return;
+
+            // Reject repair if client no longer has enough gold
+            if (mainParty.Ships.Sum(ship => ship.HitPoints < ship.MaxHitPoints ? Campaign.Current.Models.ShipCostModel.GetShipRepairCost(ship, mainParty.Party) : 0f) > mainParty.LeaderHero?.Gold) return;
 
             foreach (Ship ship in mainParty.Ships)
             {

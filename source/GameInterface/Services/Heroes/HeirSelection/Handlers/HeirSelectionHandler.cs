@@ -11,6 +11,7 @@ using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
@@ -451,10 +452,11 @@ internal class HeirSelectionHandler : IHandler
             applyHeirSelectionActionInterface.TransferFleetToHeir(originalParty, heirParty);
         }
 
-        // Same as ChangePlayerCharacterAction.Apply, which only runs on the client
+        // Same as ChangePlayerCharacterAction.Apply, which only runs on the owning client, so the other clients get the cancel too
         if (originalParty != null && originalParty.IsTransitionInProgress)
         {
             originalParty.CancelNavigationTransition();
+            messageBroker.Publish(this, new PartyBehaviorChangeAttempted(originalParty, forcePosition: true, isCurrentlyAtSea: originalParty.IsCurrentlyAtSea));
         }
 
         Logger.Information($"Transferred controller {registeredPlayer.ControllerId} from hero {originalHeroId} to heir {heirId}");
