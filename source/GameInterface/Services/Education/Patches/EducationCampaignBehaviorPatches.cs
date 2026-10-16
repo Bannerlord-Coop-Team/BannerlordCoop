@@ -3,9 +3,12 @@ using Common.Messaging;
 using GameInterface.Services.Education.Interfaces;
 using GameInterface.Services.Education.Messages;
 using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Education;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Education.Patches;
 
@@ -77,5 +80,50 @@ internal class EducationCampaignBehaviorPatches
         }
 
         return false;
+    }
+
+    [HarmonyPatch(nameof(EducationCampaignBehavior.GetStage), new[] { typeof(Hero) })]
+    [HarmonyPrefix]
+    public static bool GetStagePrefix(Hero child, ref EducationCampaignBehavior.EducationStage __result)
+    {
+        if (ModInformation.IsServer) return true;
+
+        if (!ContainerProvider.TryResolve<IEducationCampaignBehaviorInterface>(out var educationInterface)) return true;
+        if (!educationInterface.TryGetLockedStage(child, out var lockedStage)) return true;
+
+        __result = lockedStage;
+        return false;
+    }
+}
+
+[HarmonyPatch(typeof(EducationVM))]
+internal class EducationVMPatches
+{
+    [HarmonyPatch(MethodType.Constructor, new[]
+    {
+        typeof(Hero),
+        typeof(Action<bool>),
+        typeof(Action<EducationCampaignBehavior.EducationCharacterProperties[]>),
+        typeof(Action<List<BasicCharacterObject>, List<Equipment>>)
+    })]
+    [HarmonyPrefix]
+    public static void ConstructorPrefix(Hero child)
+    {
+        if (ModInformation.IsServer) return;
+
+        if (!ContainerProvider.TryResolve<IEducationCampaignBehaviorInterface>(out var educationInterface)) return;
+
+        educationInterface.LockEducationStage(child);
+    }
+
+    [HarmonyPatch(nameof(EducationVM.OnFinalize))]
+    [HarmonyPostfix]
+    public static void OnFinalizePostfix()
+    {
+        if (ModInformation.IsServer) return;
+
+        if (!ContainerProvider.TryResolve<IEducationCampaignBehaviorInterface>(out var educationInterface)) return;
+
+        educationInterface.UnlockEducationStage();
     }
 }

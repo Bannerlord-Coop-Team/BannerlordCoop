@@ -10,8 +10,11 @@ using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Messages;
+using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Education.Handlers;
 
@@ -48,6 +51,7 @@ internal class EducationCampaignBehaviorHandler : IHandler
 
         messageBroker.Subscribe<EducationStageUpdated>(Handle_EducationStageUpdated);
         messageBroker.Subscribe<NetworkEducationStageUpdated>(Handle_NetworkEducationStageUpdated);
+        messageBroker.Subscribe<NetworkEducationStageRejected>(Handle_NetworkEducationStageRejected);
 
         messageBroker.Subscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Subscribe<PlayerDeletionStarted>(Handle_PlayerDeletionStarted);
@@ -66,6 +70,7 @@ internal class EducationCampaignBehaviorHandler : IHandler
 
         messageBroker.Unsubscribe<EducationStageUpdated>(Handle_EducationStageUpdated);
         messageBroker.Unsubscribe<NetworkEducationStageUpdated>(Handle_NetworkEducationStageUpdated);
+        messageBroker.Unsubscribe<NetworkEducationStageRejected>(Handle_NetworkEducationStageRejected);
 
         messageBroker.Unsubscribe<PlayerDisconnected>(Handle_PlayerDisconnected);
         messageBroker.Unsubscribe<PlayerDeletionStarted>(Handle_PlayerDeletionStarted);
@@ -142,7 +147,22 @@ internal class EducationCampaignBehaviorHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ChildHandle, out var child)) return;
 
-            educationInterface.UpdateEducationStage(child, data.Target, data.ChosenOptions);
+            if (educationInterface.UpdateEducationStage(child, data.Target, data.ChosenOptions)) return;
+
+            network.Send((NetPeer)obj.Who, new NetworkEducationStageRejected(data.ChildHandle));
+        });
+    }
+
+    private void Handle_NetworkEducationStageRejected(MessagePayload<NetworkEducationStageRejected> obj)
+    {
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.ChildHandle, out var child)) return;
+
+            var text = GameTexts.FindText("str_coop_education_stage_rejected").SetTextVariable("CHILD", child.Name);
+            InformationManager.DisplayMessage(new InformationMessage(text.ToString()));
         });
     }
 

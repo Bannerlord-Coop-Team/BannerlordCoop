@@ -59,6 +59,24 @@ public interface IEducationCampaignBehaviorInterface : IGameAbstraction
     void RemoveEducationNotification(Hero childToEducate, int age);
 
     /// <summary>
+    /// Client method
+    /// Locks the child's current stage while the education screen is open, so a notification arriving mid-screen doesn't change the stage being finalized
+    /// </summary>
+    void LockEducationStage(Hero child);
+
+    /// <summary>
+    /// Client method
+    /// Releases the stage locked when the education screen opened
+    /// </summary>
+    void UnlockEducationStage();
+
+    /// <summary>
+    /// Client method
+    /// Gets the stage locked for this child while its education screen is open
+    /// </summary>
+    bool TryGetLockedStage(Hero child, out EducationCampaignBehavior.EducationStage stage);
+
+    /// <summary>
     /// Server method
     /// Replacement for EducationCampaignBehavior.OnDailyTick to work for multiple player clans
     /// </summary>
@@ -78,9 +96,9 @@ public interface IEducationCampaignBehaviorInterface : IGameAbstraction
 
     /// <summary>
     /// Server method
-    /// Client finalized education, update stage server-side
+    /// Client finalized education, update stage server-side. Returns false when the stage was no longer pending and nothing was applied
     /// </summary>
-    void UpdateEducationStage(Hero child, short target, List<string> chosenOptions);
+    bool UpdateEducationStage(Hero child, short target, List<string> chosenOptions);
 
     /// <summary>
     /// Server method
@@ -98,6 +116,10 @@ public class EducationCampaignBehaviorInterface : IEducationCampaignBehaviorInte
 
     // Controller ids whose client has finished loading into the campaign
     private readonly HashSet<string> playersInCampaign = new();
+
+    // Client: the stage the open education screen was built for
+    private Hero lockedChild;
+    private EducationCampaignBehavior.EducationStage lockedStage;
 
     private readonly IPlayerManager playerManager;
     private readonly IMessageBroker messageBroker;
@@ -157,6 +179,28 @@ public class EducationCampaignBehaviorInterface : IEducationCampaignBehaviorInte
 
         if (!TryGetEducationBehavior(out var educationBehavior)) return;
         educationBehavior._previousEducations.Remove(childToEducate);
+    }
+
+    public void LockEducationStage(Hero child)
+    {
+        if (!TryGetEducationBehavior(out var educationBehavior)) return;
+
+        // Unlock first so GetStage resolves the current stage instead of an earlier lock
+        UnlockEducationStage();
+        lockedStage = educationBehavior.GetStage(child);
+        lockedChild = child;
+    }
+
+    public void UnlockEducationStage()
+    {
+        lockedChild = null;
+        lockedStage = null;
+    }
+
+    public bool TryGetLockedStage(Hero child, out EducationCampaignBehavior.EducationStage stage)
+    {
+        stage = lockedStage;
+        return stage != null && lockedChild == child;
     }
 
     public void OnDailyTick()
@@ -254,15 +298,15 @@ public class EducationCampaignBehaviorInterface : IEducationCampaignBehaviorInte
         CancelPendingNotifications((childKey, controllerId) => childKey.Item1 == victim || controllerId == victimPlayer?.ControllerId);
     }
 
-    public void UpdateEducationStage(Hero child, short target, List<string> chosenOptions)
+    public bool UpdateEducationStage(Hero child, short target, List<string> chosenOptions)
     {
-        if (!TryGetEducationBehavior(out var educationBehavior)) return;
+        if (!TryGetEducationBehavior(out var educationBehavior)) return false;
 
         var childKey = (child, EducationCampaignBehavior.ChildStateToAge((EducationCampaignBehavior.ChildAgeState)target));
         if (!pendingNotifications.ContainsKey(childKey))
         {
             Logger.Warning($"Education stage for key ({childKey.child.StringId}, {childKey.Item2}) was updated after pending notification was removed. Education changes not applied.");
-            return;
+            return false;
         }
 
         // Rebuild the stage on the server that the client sent
@@ -270,6 +314,7 @@ public class EducationCampaignBehaviorInterface : IEducationCampaignBehaviorInte
 
         OnFinalize(child, target, stage, chosenOptions);
         RemovePendingNotification(childKey);
+        return true;
     }
 
     private void RemovePendingNotification((Hero, int) childKey)
