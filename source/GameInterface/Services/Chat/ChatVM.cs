@@ -83,7 +83,6 @@ internal sealed class ChatVM : ViewModel
     {
         get
         {
-            if (selectedChannel == null) return "All";
             if (selectedChannel.IsDirect)
                 return $"Direct message: {selectedChannel.Name.TrimEnd(' ', '*')}";
             if (selectedChannel.IsEvents) return "Events";
@@ -95,10 +94,10 @@ internal sealed class ChatVM : ViewModel
     }
 
     [DataSourceProperty]
-    public bool IsMuteButtonVisible => selectedChannel?.IsDirect == true;
+    public bool IsMuteButtonVisible => selectedChannel.IsDirect;
 
     [DataSourceProperty]
-    public string MuteButtonText => selectedChannel?.IsMuted == true ? "Unmute" : "Mute";
+    public string MuteButtonText => selectedChannel.IsMuted ? "Unmute" : "Mute";
 
     [DataSourceProperty]
     public string WrittenText
@@ -132,7 +131,7 @@ internal sealed class ChatVM : ViewModel
 
     /// <summary>False when closed or the selected channel has no send target.</summary>
     [DataSourceProperty]
-    public bool IsChatInputEnabled => isOpen && selectedChannel?.SendChannel != null;
+    public bool IsChatInputEnabled => isOpen && selectedChannel.SendChannel != null;
 
     [DataSourceProperty]
     public float ChatBoxSizeX
@@ -164,7 +163,7 @@ internal sealed class ChatVM : ViewModel
 
     public void ActionSend()
     {
-        if (selectedChannel?.SendChannel is not ChatChannel channel) return;
+        if (selectedChannel.SendChannel is not ChatChannel channel) return;
 
         string text = WrittenText.Trim();
         if (text.Length == 0) return;
@@ -322,8 +321,8 @@ internal sealed class ChatVM : ViewModel
             case ChatChannel.System:
                 if (string.IsNullOrEmpty(message.RecipientControllerId))
                 {
-                    // All reuses Events/Global lines and is skipped by Tick, so map to Global
-                    channelId = selectedChannel.IsAll
+                    // All is skipped by Tick. Events is read-only. Both map to Global.
+                    channelId = selectedChannel.IsAll || selectedChannel.SendChannel == null
                         ? GlobalChannelId
                         : selectedChannel.ControllerId;
                 }
