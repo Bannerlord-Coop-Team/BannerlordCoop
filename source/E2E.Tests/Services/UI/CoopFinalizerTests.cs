@@ -246,7 +246,8 @@ public class CoopFinalizerTests
                 Mock.Of<IControllerIdProvider>(),
                 Finalizer,
                 Mock.Of<IGameStateInterface>(),
-                Mock.Of<IModuleInfoProvider>());
+                Mock.Of<IModuleInfoProvider>(),
+                Mock.Of<IModuleNameProvider>());
             logic.SetupGet(value => value.State).Returns(state);
             logic.Setup(value => value.Disconnect()).Callback(() => state.Disconnect());
             LoadingScreen.ShowLoadingScreen("Joining", "Validating modules...");
