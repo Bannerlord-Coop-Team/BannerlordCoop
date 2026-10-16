@@ -198,7 +198,9 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         behaviorAttacher.Attach(mission);
         AttachNavalServices(mission, playerSide.GetOppositeSide());
 #if DEBUG
-        mission.AddMissionBehavior(new NavalCopyBodyLogic(mission.GetMissionBehavior<CoopBattleController>().MissionComponent.ShipRegistry));
+        var debugController = mission.GetMissionBehavior<CoopBattleController>();
+        mission.AddMissionBehavior(new NavalCopyBodyLogic(debugController.MissionComponent.ShipRegistry));
+        mission.AddMissionBehavior(new NavalWaterProbeLogic(debugController.Session, debugController.MissionComponent.ShipRegistry));
         AttachScenario(mission, mapEventId);
 #endif
         mission.SetPlayerCanTakeControlOfAnotherAgentWhenDead();

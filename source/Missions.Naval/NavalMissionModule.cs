@@ -73,6 +73,9 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalCopyBodyCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
+        builder.RegisterType<NavalWaterProbeCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
 #endif
     }
 }
