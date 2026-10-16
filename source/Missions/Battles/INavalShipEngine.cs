@@ -63,6 +63,9 @@ public interface INavalShipEngine
     /// <summary>Whether the agent is still an active mission agent.</summary>
     bool IsAlive(Agent agent);
 
+    /// <summary>Whether the agent is this client's main agent, the player's hero.</summary>
+    bool IsMainAgent(Agent agent);
+
     /// <summary>[Game thread] Re-targets a seated puppet at its station's user frame on the current hull frame.</summary>
     void PinToStation(Agent agent, UsableMissionObject point);
 

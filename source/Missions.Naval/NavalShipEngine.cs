@@ -507,6 +507,8 @@ public class NavalShipEngine : INavalShipEngine
 
     public bool IsAlive(Agent agent) => agent != null && agent.IsActive();
 
+    public bool IsMainAgent(Agent agent) => agent != null && agent == Mission.Current?.MainAgent;
+
     public bool IsSeated(Agent agent, UsableMissionObject point) =>
         agent != null && point != null && agent.IsActive() && point.UserAgent == agent && agent.CurrentlyUsedGameObject == point;
 

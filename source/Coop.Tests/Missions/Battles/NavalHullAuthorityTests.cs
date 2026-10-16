@@ -99,6 +99,39 @@ public class NavalHullAuthorityTests
         engine.Verify(e => e.WithdrawAgent(stray), Times.Never);
     }
 
+    // M8b r1: crew is a formation match, so the returned hero in the duplicate's formation, or crew off its deck, stay.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Remove_WithdrawingTheCrew_KeepsTheHeroInTheDuplicatesFormation_AndCrewNotAboard(bool heroAboard)
+    {
+        var (authority, _, engine) = Create();
+        var duplicate = new NetworkShipInfo(Guid.NewGuid(), Own, "MapEventParty_1", false, ShipTestHulls.Create(), null);
+        var crew = CreateAgent();
+        var crewInTheWater = CreateAgent();
+        var hero = CreateAgent();
+        var heroMoved = new HullSwapAgent(hero, isCrew: true, isParked: heroAboard, Vec3.Zero, Vec3.Zero);
+        engine.Setup(e => e.IsMainAgent(hero)).Returns(true);
+        engine.Setup(e => e.ParkHullAgents(duplicate.Hull)).Returns(new[]
+        {
+            new HullSwapAgent(crew, isCrew: true, isParked: true, Vec3.Zero, Vec3.Zero),
+            new HullSwapAgent(crewInTheWater, isCrew: true, isParked: false, Vec3.Zero, Vec3.Zero),
+            heroMoved,
+        });
+        IReadOnlyList<HullSwapAgent>? unparked = null;
+        engine.Setup(e => e.BoardHullAgents(null!, It.IsAny<IReadOnlyList<HullSwapAgent>>()))
+            .Callback<MissionObject, IReadOnlyList<HullSwapAgent>>((_, agents) => unparked = agents);
+
+        authority.Remove(new[] { duplicate }, withdrawCrew: true);
+        authority.Tick();
+        authority.Tick();
+
+        engine.Verify(e => e.WithdrawAgent(crew), Times.Once);
+        engine.Verify(e => e.WithdrawAgent(crewInTheWater), Times.Never);
+        engine.Verify(e => e.WithdrawAgent(hero), Times.Never);
+        Assert.Equal(heroAboard ? new[] { heroMoved } : Array.Empty<HullSwapAgent>(), unparked ?? Array.Empty<HullSwapAgent>());
+    }
+
     [Fact]
     public void SuppressSpawnRegistration_HoldsUntilEveryScopeCloses()
     {

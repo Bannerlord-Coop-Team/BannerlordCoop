@@ -109,6 +109,13 @@ public class NavalHandBackScenarioTests : NavalBattleTestEnvironment
         var fresh = returned.FieldOwnHull(returned.Side, new Vec3(40f, -80f, 0f), battle.PartyIds["B"], ShipOfB);
         var freshCrew = returned.RegisterAgent(Guid.NewGuid(), "B");
         returned.Call(() => returned.Engine.PlaceAgent(freshCrew, returned.Ship(fresh).Hull, returned.Ship(fresh).Hull));
+        // The returned hero keeps its formation, which can be the duplicate's; it stays in the battle.
+        var hero = returned.RegisterAgent(Guid.NewGuid(), "B");
+        returned.Call(() =>
+        {
+            returned.Engine.PlaceAgent(hero, returned.Ship(fresh).Hull, returned.Ship(fresh).Hull);
+            returned.Mission.MainAgent = hero;
+        });
         var duplicate = returned.Hull(fresh);
         returned.Commit();
         battle.TickAll(4);
@@ -117,6 +124,9 @@ public class NavalHandBackScenarioTests : NavalBattleTestEnvironment
         Assert.True(duplicate.IsRemoved);
         Assert.Equal(0, duplicate.AgentsAboardAtRemoval);
         Assert.Contains(freshCrew, returned.Engine.Withdrawn);
+        Assert.DoesNotContain(hero, returned.Engine.Withdrawn);
+        Assert.Contains(returned.Engine.Boardings, boarding =>
+            boarding.Hull == null && boarding.Agents.Any(moved => moved.Agent == hero && moved.IsParked));
         Assert.False(returned.Has(fresh));
         Assert.Equal("A", returned.Ship(hullB).CurrentAuthority);
         Assert.True(returned.Hull(hullB).IsCopy);

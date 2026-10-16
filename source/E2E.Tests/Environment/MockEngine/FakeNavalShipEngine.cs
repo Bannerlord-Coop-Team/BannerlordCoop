@@ -173,6 +173,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
 
     public bool IsAlive(Agent agent) => agent != null && agent.IsActive();
 
+    public bool IsMainAgent(Agent agent) => agent != null && agent == Mission.Current?.MainAgent;
+
     public void PinToStation(Agent agent, UsableMissionObject point) => HullOfStation(point).Pins++;
 
     public void ReleaseNpcHull(MissionObject hull)

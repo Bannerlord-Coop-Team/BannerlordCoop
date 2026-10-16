@@ -33,7 +33,8 @@ public interface INavalHullAuthority : IDisposable
     /// Queues taking hulls out through vanilla's removal: the next <see cref="Tick"/> parks everyone still aboard and the one
     /// after removes the hulls. Parked agents that crew none of them then go back where they stood; the hulls' own crew stay
     /// parked until their owner's rout or departure takes them, or, with <paramref name="withdrawCrew"/> for this client's own
-    /// hull, withdraw from the battle as vanilla's removal withdraws them. Their seats must already be free.
+    /// hull, the crew parked off it withdraw from the battle as vanilla's removal withdraws them, while the main agent stays.
+    /// Their seats must already be free.
     /// </summary>
     void Remove(IReadOnlyList<NetworkShipInfo> ships, bool withdrawCrew = false);
 
@@ -182,16 +183,22 @@ public class NavalHullAuthority : INavalHullAuthority
 
     private void WithdrawCrew(HullRemoval removal)
     {
-        foreach (var moved in removal.Agents.Where(moved => moved.IsCrew).ToList())
+        foreach (var moved in removal.Agents.Where(moved => IsWithdrawn(removal, moved)).ToList())
             engine.WithdrawAgent(moved.Agent);
     }
+
+    // Crew is a formation match, so only the crew parked off the hull leave; the player's hero can share that formation.
+    private bool IsWithdrawn(HullRemoval removal, HullSwapAgent moved) =>
+        removal.WithdrawCrew && moved.IsCrew && moved.IsParked && !engine.IsMainAgent(moved.Agent);
 
     // An agent is crew when any departing hull's parking counted it as such, so another departing hull's crew stays parked.
     private void UnparkNonCrew(HullRemoval removal)
     {
         if (removal.Agents == null) return;
 
-        var crew = new HashSet<Agent>(removal.Agents.Where(moved => moved.IsCrew).Select(moved => moved.Agent));
+        var crew = new HashSet<Agent>(removal.Agents
+            .Where(moved => removal.WithdrawCrew ? IsWithdrawn(removal, moved) : moved.IsCrew)
+            .Select(moved => moved.Agent));
         var others = removal.Agents.Where(moved => moved.IsParked && !crew.Contains(moved.Agent)).ToList();
         if (others.Count > 0) engine.BoardHullAgents(null, others);
     }
