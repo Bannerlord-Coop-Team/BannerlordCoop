@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -429,19 +429,69 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
         OtherClient.Call(() => Assert.Null(Get<Hero>(OtherClient, giverId).Issue));
     }
 
-    [Fact]
-    public void TheSamePlayerCannotTakeAnotherRivalQuestButAnotherPlayerCan()
+    [Theory]
+    [InlineData(2, 50, true)]
+    [InlineData(1, 50, false)]
+    [InlineData(2, 49, false)]
+    public void RivalPreconditionsScopeDuplicatesToThePlayerAndKeepNativeRequirements(int tier, int troops, bool eligible)
     {
         Accept();
+        var otherGiverId = environment.CreateRegisteredObject<Hero>();
+        var otherPlayerId = environment.CreateRegisteredObject<Hero>();
+        var otherPartyId = environment.CreateRegisteredObject<MobileParty>();
+        var otherTroopId = environment.CreateRegisteredObject<CharacterObject>();
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                var giver = Get<Hero>(instance, otherGiverId);
+                var player = Get<Hero>(instance, otherPlayerId);
+                var party = Get<MobileParty>(instance, otherPartyId);
+                using (new AllowedThread())
+                {
+                    giver.Clan._kingdom = Get<Hero>(instance, giverId).Clan.Kingdom;
+                    player.Clan._kingdom = giver.Clan.Kingdom;
+                    player.Clan._tier = tier;
+                    player.PartyBelongedTo = party;
+                    party.ActualClan = player.Clan;
+                    party.MemberRoster.Clear();
+                    party.MemberRoster.AddToCounts(Get<CharacterObject>(instance, otherTroopId), troops);
+                }
+                Assert.Equal(troops, party.MemberRoster.TotalHealthyCount);
+                Assert.True(instance.Resolve<IPlayerManager>().AddPlayer(
+                    new Player("other-rival-player", otherPlayerId, otherPartyId, "", "")));
+            });
+        }
         Server.Call(() =>
         {
-            var otherIssue = new Issue(Get<Hero>(Server, targetId), Get<Hero>(Server, giverId));
-            var service = Server.Resolve<ILordWantsRivalCapturedQuestService>();
-            using (new MainHeroSubstitutionScope(Get<Hero>(Server, playerId), Get<MobileParty>(Server, partyId)))
-                Assert.True(service.HasOtherPersonalQuest(otherIssue));
+            var target = Get<Hero>(Server, targetId);
+            var data = new PotentialIssueData((in PotentialIssueData _, Hero giver) => new Issue(giver, target),
+                typeof(Issue), IssueBase.IssueFrequency.Rare);
+            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in data, Get<Hero>(Server, otherGiverId)));
         });
-        OtherClient.Call(() => Assert.False(OtherClient.Resolve<ILordWantsRivalCapturedQuestService>()
-            .HasOtherPersonalQuest(new Issue(Get<Hero>(OtherClient, targetId), Get<Hero>(OtherClient, giverId)))));
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                var giver = Get<Hero>(instance, otherGiverId);
+                var issue = Assert.IsType<Issue>(giver.Issue);
+                var isOtherPlayer = instance == OtherClient;
+                using (new MainHeroSubstitutionScope(Get<Hero>(instance, isOtherPlayer ? otherPlayerId : playerId),
+                    Get<MobileParty>(instance, isOtherPlayer ? otherPartyId : partyId)))
+                    Assert.Equal(isOtherPlayer && eligible, issue.CheckPreconditions(giver, out _));
+            });
+        }
+        Server.Call(() =>
+        {
+            var giver = Get<Hero>(Server, otherGiverId);
+            using (new MainHeroSubstitutionScope(Get<Hero>(Server, otherPlayerId), Get<MobileParty>(Server, otherPartyId)))
+            {
+                Assert.Equal(eligible, giver.Issue.CheckPreconditions(giver, out _));
+                using (CallOriginalPolicy.AllowOriginalsForCurrentOperation())
+                    Assert.False(giver.Issue.CheckPreconditions(giver, out _));
+            }
+        });
     }
 
     [Fact]

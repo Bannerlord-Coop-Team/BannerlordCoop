@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -403,12 +404,25 @@ internal class RivalCapturedPlayerRemovedPatch
 [HarmonyPatch(typeof(IssueBase))]
 internal class RivalCapturedEligibilityPatches
 {
-    [HarmonyPatch("IssueQuestCanBeDuplicated", MethodType.Getter)]
-    [HarmonyPostfix]
-    private static void DuplicateTypePostfix(IssueBase __instance, ref bool __result)
+    [HarmonyPatch("CheckPreconditions")]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> PreconditionsTranspiler(IEnumerable<CodeInstruction> instructions)
     {
-        if (__instance is Issue && !CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) __result = true;
+        var getter = AccessTools.PropertyGetter(typeof(IssueBase), "IssueQuestCanBeDuplicated");
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(getter))
+            {
+                instruction.opcode = OpCodes.Call;
+                instruction.operand = AccessTools.Method(typeof(RivalCapturedEligibilityPatches), nameof(CanDuplicateType));
+            }
+            yield return instruction;
+        }
     }
+
+    // Patch the caller because the native getter can be inlined before its detour is installed.
+    private static bool CanDuplicateType(IssueBase issue) =>
+        (issue is Issue && !CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) || issue.IssueQuestCanBeDuplicated;
 
     [HarmonyPatch("CheckPreconditions")]
     [HarmonyPostfix]
