@@ -12,6 +12,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.TroopRosters.Data;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -45,6 +46,10 @@ internal interface ILordWantsRivalCapturedQuestService
     bool IsPresentWithGiver(string controllerId, Hero giver);
     void RequestChoice(Quest quest, RivalCapturedChoice choice);
     void ApplyChoice(Player player, RequestRivalCapturedChoice request);
+    void RecordPendingCaptures(Player player, TroopRosterData prisoners);
+    void ClearPendingCapture(Hero giver);
+    void ClearTargetPendingCaptures(Hero target);
+    void ClearPlayerPendingCaptures(string controllerId);
     void SendProgress(Quest quest);
     void MirrorProgress(NetworkRivalCapturedProgress data);
     void MirrorTraitProgress(NetworkRivalCapturedTraitProgress data);
@@ -67,6 +72,7 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IIssueGenerationRegistry generations;
     private readonly ConversationPartyTracker conversations;
+    private readonly PendingRegistry<(Quest Quest, Hero Target, Player Owner, int Generation)> pendingCaptures = new();
 
     public LordWantsRivalCapturedQuestService(IObjectManager objectManager, INetwork network,
         IPlayerManager playerManager, IControllerIdProvider controllerIdProvider,
@@ -315,11 +321,15 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
         {
             if (request.Choice == RivalCapturedChoice.HearCounterOffer && !quest._firstCounterOfferMade &&
                 !quest._targetHero.IsPrisoner)
+            {
+                if (!TryConsumePendingCapture(quest, player, generation)) return;
                 TakePrisonerAction.Apply(PartyBase.MainParty, quest._targetHero);
+            }
 
-            if (quest._targetHero.PartyBelongedToAsPrisoner != PartyBase.MainParty ||
+            if (!quest._targetHero.IsPrisoner || quest._targetHero.PartyBelongedToAsPrisoner != PartyBase.MainParty ||
                 !PartyBase.MainParty.PrisonRoster.Contains(quest._targetHero.CharacterObject)) return;
 
+            ClearPendingCapture(giver);
             switch (request.Choice)
             {
                 case RivalCapturedChoice.HearCounterOffer:
@@ -339,6 +349,53 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
                     Deliver(quest, settlement.Party);
                     break;
             }
+        }
+    }
+
+    public void RecordPendingCaptures(Player player, TroopRosterData prisoners)
+    {
+        if (ModInformation.IsClient) return;
+        ClearPlayerPendingCaptures(player.ControllerId);
+        if (prisoners.Data == null) return;
+
+        foreach (var quest in Campaign.Current.QuestManager.Quests.OfType<Quest>())
+        {
+            if (!quest.IsOngoing || !ownership.TryGetOwnerControllerId(quest.QuestGiver, out var owner) ||
+                owner != player.ControllerId || !generations.TryGetGeneration(quest.QuestGiver, out var generation) ||
+                !objectManager.TryGetHandleWithLogging(quest._targetHero.CharacterObject, out var targetHandle) ||
+                !prisoners.Data.Any(troop => troop.CharacterId == targetHandle && troop.Number > 0)) continue;
+
+            // The server has allocated this captive; the dialogue outlives the MapEvent.
+            pendingCaptures.Set(quest.QuestGiver, (quest, quest._targetHero, player, generation));
+        }
+    }
+
+    private bool TryConsumePendingCapture(Quest quest, Player player, int generation)
+    {
+        if (!pendingCaptures.TryGet(quest.QuestGiver, out var pending) || pending.Quest != quest ||
+            pending.Target != quest._targetHero || pending.Generation != generation ||
+            pending.Owner.ControllerId != player.ControllerId || pending.Owner.HeroId != player.HeroId ||
+            pending.Owner.MobilePartyId != player.MobilePartyId) return false;
+
+        ClearPendingCapture(quest.QuestGiver);
+        return true;
+    }
+
+    public void ClearPendingCapture(Hero giver) => pendingCaptures.Clear(giver);
+
+    public void ClearTargetPendingCaptures(Hero target)
+    {
+        foreach (var pending in pendingCaptures.Snapshot())
+        {
+            if (pending.Value.Target == target) pendingCaptures.Clear(pending.Key);
+        }
+    }
+
+    public void ClearPlayerPendingCaptures(string controllerId)
+    {
+        foreach (var pending in pendingCaptures.Snapshot())
+        {
+            if (pending.Value.Owner.ControllerId == controllerId) pendingCaptures.Clear(pending.Key);
         }
     }
 
@@ -511,6 +568,7 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
 
     public void CancelPlayerQuests(string controllerId)
     {
+        ClearPlayerPendingCaptures(controllerId);
         if (Campaign.Current?.QuestManager == null) return;
 
         // Cancellation has no player reward and must also clean up a registration whose hero is gone.

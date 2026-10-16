@@ -15,6 +15,7 @@ using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.TroopRosters.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -144,6 +145,17 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
             }
         });
         Server.Call(() => Assert.True(GetQuest(Server).IsOngoing));
+    }
+
+    private void AllocateTargetPrisonerLoot()
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(Controller, out var player));
+            Assert.True(Server.ObjectManager.TryGetHandle(Get<Hero>(Server, targetId).CharacterObject, out var handle));
+            Server.Resolve<ILordWantsRivalCapturedQuestService>().RecordPendingCaptures(player,
+                new TroopRosterData(new[] { new TroopRosterElementData(handle, 1, 0, 0) }));
+        });
     }
 
     [Fact]
@@ -292,6 +304,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
     public void FirstCounterOfferCapturesThePendingHeroOnceThroughTheServerAction()
     {
         Accept();
+        AllocateTargetPrisonerLoot();
         Server.Call(() => Assert.False(Get<Hero>(Server, targetId).IsPrisoner));
         Client.Call(() => GetQuest(Client).FirstCounterOfferFinished());
         Client.Call(() => GetQuest(Client).FirstCounterOfferFinished());
@@ -320,6 +333,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
     {
         var otherCaptorId = environment.CreateRegisteredObject<Settlement>();
         Accept();
+        AllocateTargetPrisonerLoot();
         Client.Call(() => GetQuest(Client).FirstCounterOfferFinished());
         environment.FlushCoalescer();
         Client.Call(() => Assert.True(GetQuest(Client)._firstCounterOfferMade));
@@ -386,11 +400,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
         {
             var target = Get<Hero>(Server, targetId);
             var party = Get<MobileParty>(Server, partyId);
-            using (new AllowedThread())
-            {
-                target.PartyBelongedToAsPrisoner = party.Party;
-                party.PrisonRoster.AddToCounts(target.CharacterObject, 1);
-            }
+            TakePrisonerAction.Apply(party.Party, target);
             Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(Get<Hero>(Server, giverId), out generation));
         });
         Server.SimulateMessage(Client.NetPeer, new RequestRivalCapturedChoice(giverId, generation - 1, RivalCapturedChoice.HearCounterOffer));
@@ -403,6 +413,215 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
             Assert.Equal(1, Get<MobileParty>(Server, partyId).PrisonRoster.GetTroopCount(Get<Hero>(Server, targetId).CharacterObject));
         });
         Client.Call(() => Assert.True(GetQuest(Client)._firstCounterOfferMade));
+    }
+
+    [Fact]
+    public void ValidOwnerCannotHearCounterOfferWhileTargetIsFreeWithoutAllocatedCapture()
+    {
+        Accept();
+        var generation = 0;
+        var gold = 0;
+        var honorXp = 0;
+        MobileParty targetParty = null;
+        string[] journal = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IIssueGenerationRegistry>().TryGetGeneration(Get<Hero>(Server, giverId), out generation));
+            gold = Get<Hero>(Server, playerId).Gold;
+            honorXp = GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress
+                .TryGet(Get<Hero>(Server, playerId), out var progress) ? progress.GetPropertyValue(DefaultTraits.Honor) : 0;
+            targetParty = Get<Hero>(Server, targetId).PartyBelongedTo;
+            journal = GetQuest(Server).JournalEntries.Select(log => log.LogText.ToString()).ToArray();
+        });
+        var messages = Server.NetworkSentMessages.GetMessages<NetworkRivalCapturedProgress>().Count();
+
+        Server.SimulateMessage(Client.NetPeer,
+            new RequestRivalCapturedChoice(giverId, generation, RivalCapturedChoice.HearCounterOffer));
+        environment.FlushCoalescer();
+
+        Server.Call(() =>
+        {
+            var target = Get<Hero>(Server, targetId);
+            Assert.Same(targetParty, target.PartyBelongedTo);
+            Assert.Equal(1, targetParty.MemberRoster.GetTroopCount(target.CharacterObject));
+            Assert.Equal(gold, Get<Hero>(Server, playerId).Gold);
+            Assert.True(GangLeaderNeedsToOffloadStolenGoodsQuestType.OwnerTraitXpProgress
+                .TryGet(Get<Hero>(Server, playerId), out var progress));
+            Assert.Equal(honorXp, progress.GetPropertyValue(DefaultTraits.Honor));
+        });
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                var target = Get<Hero>(instance, targetId);
+                Assert.False(target.IsPrisoner);
+                Assert.Null(target.PartyBelongedToAsPrisoner);
+                Assert.Empty(Get<MobileParty>(instance, partyId).PrisonRoster.GetTroopRoster());
+                if (instance == OtherClient)
+                {
+                    Assert.Null(Get<Hero>(instance, giverId).Issue.IssueQuest);
+                    return;
+                }
+                var quest = GetQuest(instance);
+                Assert.True(quest.IsOngoing);
+                Assert.False(quest._firstCounterOfferMade);
+                Assert.Equal(0, quest.RelationshipChangeWithQuestGiver);
+                Assert.Equal(journal, quest.JournalEntries.Select(log => log.LogText.ToString()).ToArray());
+            });
+        }
+        Assert.Equal(messages, Server.NetworkSentMessages.GetMessages<NetworkRivalCapturedProgress>().Count());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    [Theory]
+    [InlineData(true, 1)]
+    [InlineData(false, 0)]
+    public void UnallocatedTargetCannotBeCaptured(bool differentTarget, int count)
+    {
+        Accept();
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(Controller, out var player));
+            var character = Get<Hero>(Server, differentTarget ? giverId : targetId).CharacterObject;
+            Assert.True(Server.ObjectManager.TryGetHandle(character, out var handle));
+            Server.Resolve<ILordWantsRivalCapturedQuestService>().RecordPendingCaptures(player,
+                new TroopRosterData(new[] { new TroopRosterElementData(handle, count, 0, 0) }));
+        });
+        Client.Call(() => GetQuest(Client).FirstCounterOfferFinished());
+        Server.Call(() =>
+        {
+            Assert.False(Get<Hero>(Server, targetId).IsPrisoner);
+            Assert.False(GetQuest(Server)._firstCounterOfferMade);
+            Assert.Single(GetQuest(Server).JournalEntries);
+        });
+    }
+
+    [Fact]
+    public void StaleRequestDoesNotConsumeCurrentCaptureAllocation()
+    {
+        Accept();
+        AllocateTargetPrisonerLoot();
+        var generation = 0;
+        Server.Call(() => Assert.True(Server.Resolve<IIssueGenerationRegistry>()
+            .TryGetGeneration(Get<Hero>(Server, giverId), out generation)));
+        Server.SimulateMessage(Client.NetPeer,
+            new RequestRivalCapturedChoice(giverId, generation - 1, RivalCapturedChoice.HearCounterOffer));
+        Server.Call(() => Assert.False(Get<Hero>(Server, targetId).IsPrisoner));
+        Client.Call(() => GetQuest(Client).FirstCounterOfferFinished());
+        Server.Call(() => Assert.True(Get<Hero>(Server, targetId).IsPrisoner));
+    }
+
+    [Fact]
+    public void CaptureAllocationCannotCrossIssueGenerations()
+    {
+        Accept();
+        AllocateTargetPrisonerLoot();
+        var generation = 0;
+        Server.Call(() => generation = Server.Resolve<IIssueGenerationRegistry>().Bump(Get<Hero>(Server, giverId)));
+        Server.SimulateMessage(Client.NetPeer,
+            new RequestRivalCapturedChoice(giverId, generation, RivalCapturedChoice.HearCounterOffer));
+        Server.Call(() => Assert.False(Get<Hero>(Server, targetId).IsPrisoner));
+    }
+
+    [Theory]
+    [InlineData("controller")]
+    [InlineData("hero")]
+    [InlineData("party")]
+    public void CaptureAllocationBelongsToTheAllocatedPlayerIdentity(string changedIdentity)
+    {
+        Accept();
+        Server.Call(() =>
+        {
+            var allocatedPlayer = new Player(changedIdentity == "controller" ? "other-rival-player" : Controller,
+                changedIdentity == "hero" ? giverId : playerId,
+                changedIdentity == "party" ? giverPartyId : partyId, "", "");
+            Assert.True(Server.ObjectManager.TryGetHandle(Get<Hero>(Server, targetId).CharacterObject, out var handle));
+            Server.Resolve<ILordWantsRivalCapturedQuestService>().RecordPendingCaptures(allocatedPlayer,
+                new TroopRosterData(new[] { new TroopRosterElementData(handle, 1, 0, 0) }));
+        });
+        Client.Call(() => GetQuest(Client).FirstCounterOfferFinished());
+        Server.Call(() =>
+        {
+            Assert.False(Get<Hero>(Server, targetId).IsPrisoner);
+            Assert.False(GetQuest(Server)._firstCounterOfferMade);
+        });
+    }
+
+    [Fact]
+    public void NewBattleResultsDiscardThePreviousCaptureAllocation()
+    {
+        Accept();
+        AllocateTargetPrisonerLoot();
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(Controller, out var player));
+            Server.Resolve<ILordWantsRivalCapturedQuestService>().RecordPendingCaptures(player, default);
+        });
+        Client.Call(() => GetQuest(Client).FirstCounterOfferFinished());
+        Server.Call(() => Assert.False(Get<Hero>(Server, targetId).IsPrisoner));
+    }
+
+    [Fact]
+    public void ChangingTheOwnersPartyDiscardsTheCaptureAllocation()
+    {
+        Accept();
+        AllocateTargetPrisonerLoot();
+        Server.Call(() =>
+        {
+            var players = Server.Resolve<IPlayerManager>();
+            Assert.True(players.TryGetPlayer(Controller, out var original));
+            var replacement = new Player(Controller, playerId, giverPartyId, "", "");
+            Assert.True(players.ReplacePlayer(original, replacement));
+            Assert.True(players.ReplacePlayer(replacement, original));
+        });
+        Client.Call(() => GetQuest(Client).FirstCounterOfferFinished());
+        Server.Call(() => Assert.False(Get<Hero>(Server, targetId).IsPrisoner));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReleasingAnAllocatedTargetPreventsLaterCapture(bool takePrisonerFirst)
+    {
+        Accept();
+        AllocateTargetPrisonerLoot();
+        Server.Call(() =>
+        {
+            var target = Get<Hero>(Server, targetId);
+            if (takePrisonerFirst)
+            {
+                TakePrisonerAction.Apply(Get<MobileParty>(Server, partyId).Party, target);
+                EndCaptivityAction.ApplyByEscape(target);
+            }
+            else MakeHeroFugitiveAction.Apply(target);
+            Assert.False(target.IsPrisoner);
+        });
+        Client.Call(() => GetQuest(Client).FirstCounterOfferFinished());
+        Server.Call(() =>
+        {
+            Assert.False(Get<Hero>(Server, targetId).IsPrisoner);
+            Assert.False(GetQuest(Server)._firstCounterOfferMade);
+        });
+    }
+
+    [Fact]
+    public void ConsumedCaptureCannotBeUsedAgainAfterRelease()
+    {
+        Accept();
+        AllocateTargetPrisonerLoot();
+        Client.Call(() => GetQuest(Client).FirstCounterOfferFinished());
+        Server.Call(() =>
+        {
+            EndCaptivityAction.ApplyByEscape(Get<Hero>(Server, targetId));
+            GetQuest(Server)._firstCounterOfferMade = false;
+        });
+        Client.Call(() => GetQuest(Client).FirstCounterOfferFinished());
+        Server.Call(() =>
+        {
+            Assert.False(Get<Hero>(Server, targetId).IsPrisoner);
+            Assert.False(GetQuest(Server)._firstCounterOfferMade);
+            Assert.Empty(Get<MobileParty>(Server, partyId).PrisonRoster.GetTroopRoster());
+        });
     }
 
     [Fact]

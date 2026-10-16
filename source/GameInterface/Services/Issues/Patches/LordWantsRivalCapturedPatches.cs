@@ -13,6 +13,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Issues;
@@ -289,7 +290,12 @@ internal class RivalCapturedIssueCancellationPatch
 [HarmonyPatch(typeof(Quest), "OnHeroPrisonerReleased")]
 internal class RivalCapturedPrisonerReleasedPatch
 {
-    private static void Prefix(Quest __instance, out bool __state) => __state = __instance._firstCounterOfferMade;
+    private static void Prefix(Quest __instance, Hero prisoner, out bool __state)
+    {
+        __state = __instance._firstCounterOfferMade;
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests))
+            quests.ClearTargetPendingCaptures(prisoner);
+    }
 
     private static void Postfix(Quest __instance, bool __state)
     {
@@ -297,6 +303,26 @@ internal class RivalCapturedPrisonerReleasedPatch
         if (ModInformation.IsServer && __state && !__instance._firstCounterOfferMade &&
             ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests))
             quests.SendProgress(__instance);
+    }
+}
+
+[HarmonyPatch(typeof(Quest), "OnPrisonerTaken")]
+internal class RivalCapturedPrisonerTakenPatch
+{
+    private static void Prefix(Hero prisoner)
+    {
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests))
+            quests.ClearTargetPendingCaptures(prisoner);
+    }
+}
+
+[HarmonyPatch(typeof(MakeHeroFugitiveAction), nameof(MakeHeroFugitiveAction.Apply))]
+internal class RivalCapturedFugitivePatch
+{
+    private static void Prefix(Hero fugitive)
+    {
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests))
+            quests.ClearTargetPendingCaptures(fugitive);
     }
 }
 
@@ -318,7 +344,10 @@ internal class RivalCapturedJournalPatches
     {
         if (ModInformation.IsServer && __instance is Quest quest &&
             ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests))
+        {
+            quests.ClearPendingCapture(quest.QuestGiver);
             quests.SendProgress(quest);
+        }
     }
 }
 
@@ -379,9 +408,13 @@ internal class RivalCapturedPlayerReplacedPatch
 {
     private static void Postfix(Player registeredPlayer, Player replacementPlayer, bool __result)
     {
-        if (__result && ModInformation.IsServer && registeredPlayer.HeroId != replacementPlayer.HeroId &&
-            ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests))
+        if (!__result || ModInformation.IsClient ||
+            !ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests)) return;
+
+        if (registeredPlayer.HeroId != replacementPlayer.HeroId)
             quests.CancelPlayerQuests(registeredPlayer.ControllerId);
+        else if (registeredPlayer.MobilePartyId != replacementPlayer.MobilePartyId)
+            quests.ClearPlayerPendingCaptures(registeredPlayer.ControllerId);
     }
 }
 
