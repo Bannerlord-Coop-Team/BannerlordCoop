@@ -49,7 +49,7 @@ public class DisconnectHandlerEndGameTests
     public void DisconnectWhoseEndGameTimesOutWhileItRuns_LeavesTheCampaignOnceThenEndsCoop()
     {
         using var fixture = new Fixture();
-        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), ShortTimeout);
         Disconnect? disconnect = null;
         bool pollerReturnedDuringEndGame = false;
         fixture.DuringEndGame = () => pollerReturnedDuringEndGame = disconnect!.TryJoin(LongTimeout);
@@ -95,7 +95,7 @@ public class DisconnectHandlerEndGameTests
     public void DisconnectWhoseTimedOutEndGameEndsTheSessionWhenItRuns_ShowsTheReasonOnceWithoutAFinalize()
     {
         using var fixture = new Fixture();
-        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
+        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), ShortTimeout);
         Disconnect? disconnect = null;
         bool pollerReturnedDuringEndGame = false;
         fixture.DuringEndGame = () =>
