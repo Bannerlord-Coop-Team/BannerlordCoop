@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Missions.Battles;
 using ProtoBuf;
 using System;
 using TaleWorlds.Library;
@@ -36,6 +37,8 @@ public sealed class NetworkBattleShipSample : IEvent
         Frame = frame;
         Input = input;
     }
+
+    public AuthorityStamp Stamp => new AuthorityStamp(OwnerControllerId, HostEpoch, Sequence);
 
     public bool HasValidFrame => IsValidFrame(Frame);
 

@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Missions.Battles;
 using ProtoBuf;
 using System;
 
@@ -34,4 +35,7 @@ public sealed class NetworkAgentStationUse : IEvent
         Revision = revision;
         SenderControllerId = senderControllerId;
     }
+
+    /// <summary>Station uses carry no host epoch; each sender orders its own.</summary>
+    public AuthorityStamp Stamp => new AuthorityStamp(SenderControllerId, 0, Revision);
 }

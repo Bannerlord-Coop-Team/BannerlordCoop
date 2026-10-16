@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Missions.Battles;
 using ProtoBuf;
 using System;
 
@@ -31,4 +32,6 @@ public sealed class NetworkShipWeaponState : IEvent
         HostEpoch = hostEpoch;
         State = state;
     }
+
+    public AuthorityStamp Stamp => new AuthorityStamp(OwnerControllerId, HostEpoch, Revision);
 }

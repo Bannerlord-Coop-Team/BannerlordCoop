@@ -1151,21 +1151,6 @@ public class BattleShipReplicatorTests
         Assert.Equal(0, (int)inspected["heldSamples"]!);
     }
 
-    [Theory]
-    [InlineData(1, 5, 1, 4, true)]
-    [InlineData(1, 4, 1, 4, false)]
-    [InlineData(1, 3, 1, 4, false)]
-    [InlineData(2, 1, 1, 9, true)]
-    [InlineData(1, 9, 2, 1, false)]
-    public void IsNewerSample_OrdersByHostEpochThenSequence(int epoch, long sequence, int thanEpoch, long thanSequence, bool expected)
-    {
-        var frame = NetworkBattleShipSample.FromFrame(MatrixFrame.Identity);
-        var sample = new NetworkBattleShipSample(Guid.Empty, Peer, sequence, frame, hostEpoch: epoch);
-        var than = new NetworkBattleShipSample(Guid.Empty, Peer, thanSequence, frame, hostEpoch: thanEpoch);
-
-        Assert.Equal(expected, BattleShipReplicator.IsNewerSample(sample, than));
-    }
-
     private static BattleShipSpawnData ForeignRecord(Guid shipId) =>
         new BattleShipSpawnData(shipId, Peer, "MapEventParty_2", false, BattleSideEnum.Defender, 0,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null,

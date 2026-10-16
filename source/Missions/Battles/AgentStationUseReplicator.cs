@@ -45,7 +45,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
     private readonly Dictionary<Guid, long> sentRevisions = new Dictionary<Guid, long>();
     private readonly Dictionary<Guid, NetworkAgentStationUse> ownSeated = new Dictionary<Guid, NetworkAgentStationUse>();
-    private readonly Dictionary<Guid, AppliedRevision> appliedRevisions = new Dictionary<Guid, AppliedRevision>();
+    private readonly Dictionary<Guid, AuthorityStamp> appliedStamps = new Dictionary<Guid, AuthorityStamp>();
     private readonly List<PendingUse> pending = new List<PendingUse>();
     private readonly Dictionary<Guid, AppliedSeat> appliedSeats = new Dictionary<Guid, AppliedSeat>();
     private float elapsed;
@@ -289,8 +289,9 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         if (info.CurrentAuthority != use.SenderControllerId) return false;
 
-        appliedRevisions.TryGetValue(use.AgentId, out var last);
-        if (!IsNewer(last.Sender, last.Revision, use.SenderControllerId, use.Revision))
+        // Each owner numbers its own uses, so a use from a different sender than the last applied one starts a fresh order.
+        appliedStamps.TryGetValue(use.AgentId, out var last);
+        if (!use.Stamp.IsNewer(last))
         {
             dropped++;
             return true;
@@ -317,7 +318,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         bool inUse = use.InUse && !engine.IsSinking(ship.Hull);
         if (!use.InUse) ownerReleases++;
         else if (!inUse) sinkingUseReleases++;
-        appliedRevisions[use.AgentId] = new AppliedRevision(use.SenderControllerId, use.Revision);
+        appliedStamps[use.AgentId] = use.Stamp;
         Apply(info.Agent, point, inUse);
         RecordAppliedSeat(use.AgentId, info.Agent, ship.Hull, inUse ? point : null);
         return true;
@@ -345,13 +346,6 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         applied++;
     }
-
-    /// <summary>
-    /// Whether a received revision supersedes the last one applied for the agent. Each owner numbers its own uses, so a
-    /// use from a different sender than the last applied one starts a fresh sequence.
-    /// </summary>
-    internal static bool IsNewer(string appliedSender, long appliedRevision, string sender, long receivedRevision) =>
-        sender != appliedSender || receivedRevision > appliedRevision;
 
     // A joiner gets this client's current seats after the hull and crew records that precede them.
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
@@ -410,18 +404,6 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         public UsableMissionObject Point { get; }
         // Set once a local release was re-seated; the next owner revision gives the seat a fresh attempt.
         public bool Reseated { get; set; }
-    }
-
-    private readonly struct AppliedRevision
-    {
-        public AppliedRevision(string sender, long revision)
-        {
-            Sender = sender;
-            Revision = revision;
-        }
-
-        public string Sender { get; }
-        public long Revision { get; }
     }
 
     private readonly struct PendingUse

@@ -281,18 +281,6 @@ public class AgentStationUseReplicatorTests
     // A distinct point identity; the engine mock never touches it.
     private static UsableMissionObject CreatePoint() => ShipTestHulls.CreatePoint();
 
-    [Theory]
-    [InlineData(null, 0, "old", 1, true)]
-    [InlineData("old", 3, "old", 4, true)]
-    [InlineData("old", 3, "old", 3, false)]
-    [InlineData("old", 3, "old", 2, false)]
-    [InlineData("old", 3, "new", 1, true)]
-    public void IsNewer_AcceptsRevisionsAfterTheLastAppliedOrFromANewSender(string? appliedSender, long applied,
-        string sender, long received, bool expected)
-    {
-        Assert.Equal(expected, AgentStationUseReplicator.IsNewer(appliedSender!, applied, sender, received));
-    }
-
     [Fact]
     public void TryApply_AcceptsTheNewOwnersRestartedRevisionsAfterAMigration()
     {

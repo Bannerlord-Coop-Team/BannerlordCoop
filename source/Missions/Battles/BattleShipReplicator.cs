@@ -454,7 +454,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (!Registry.TryGet(condition.ShipId, out var ship))
         {
             var held = Held(condition.ShipId);
-            if (held.Condition == null || IsNewerCondition(condition, held.Condition)) held.Condition = condition;
+            if (held.Condition == null || condition.Stamp.IsNewer(held.Condition.Stamp)) held.Condition = condition;
             return;
         }
 
@@ -479,20 +479,14 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (ship.IsNpcParty) stream.ConditionEpoch = condition.HostEpoch;
     }
 
-    private static bool IsNewerCondition(NetworkShipCondition condition, NetworkShipCondition than) =>
-        condition.HostEpoch > than.HostEpoch || (condition.HostEpoch == than.HostEpoch && condition.Revision > than.Revision);
-
     /// <summary>Why a condition must be dropped, or null to apply it.</summary>
     internal static string ValidateCondition(NetworkShipInfo ship, string ownControllerId, NetworkShipCondition condition,
         long acceptedRevision, int acceptedEpoch)
     {
-        if (ship.CurrentAuthority == ownControllerId) return "own_hull";
-        if (condition.OwnerControllerId != ship.CurrentAuthority) return "not_authority";
-
         // A new host numbers an AI hull's conditions on from its own count, so a newer epoch restarts the order.
-        if (ship.IsNpcParty && condition.HostEpoch < acceptedEpoch) return "stale_epoch";
-        bool newEpoch = ship.IsNpcParty && condition.HostEpoch > acceptedEpoch;
-        if (!newEpoch && condition.Revision <= acceptedRevision) return "stale";
+        var rejection = condition.Stamp.Validate(ship.CurrentAuthority, ownControllerId,
+            new AuthorityStamp(ship.CurrentAuthority, acceptedEpoch, acceptedRevision), followsHostEpoch: ship.IsNpcParty);
+        if (rejection != null) return rejection;
         if (condition.Condition == null || !condition.Condition.IsValid) return "invalid_condition";
         return null;
     }
@@ -541,8 +535,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     /// <summary>Why a final rope state must be dropped, or null to apply it.</summary>
     internal static string ValidateFinalRopes(NetworkShipInfo ship, string ownControllerId, NetworkBattleRopeFinal final)
     {
-        if (ship.CurrentAuthority == ownControllerId) return "own_hull";
-        if (final.OwnerControllerId != ship.CurrentAuthority) return "not_authority";
+        var rejection = AuthorityStamp.ValidateSender(final.OwnerControllerId, ship.CurrentAuthority, ownControllerId);
+        if (rejection != null) return rejection;
         if (final.Ropes == null || !BattleRopeState.AreValid(final.Ropes)) return "invalid_ropes";
         return null;
     }
@@ -827,23 +821,17 @@ public class BattleShipReplicator : IBattleShipReplicator
     private void HoldSample(NetworkBattleShipSample sample)
     {
         var held = Held(sample.ShipId);
-        if (held.Sample == null || IsNewerSample(sample, held.Sample)) held.Sample = sample;
+        if (held.Sample == null || sample.Stamp.IsNewer(held.Sample.Stamp)) held.Sample = sample;
     }
-
-    internal static bool IsNewerSample(NetworkBattleShipSample sample, NetworkBattleShipSample than) =>
-        sample.HostEpoch > than.HostEpoch || (sample.HostEpoch == than.HostEpoch && sample.Sequence > than.Sequence);
 
     /// <summary>Why a sample must be dropped, or null to accept it.</summary>
     internal static string ValidateSample(NetworkShipInfo ship, string ownControllerId, NetworkBattleShipSample sample,
         long acceptedSequence, int acceptedEpoch)
     {
-        if (ship.CurrentAuthority == ownControllerId) return "own_hull";
-        if (sample.OwnerControllerId != ship.CurrentAuthority) return "not_authority";
-
         // A new host numbers an AI hull's samples from its own stream, so a newer epoch restarts the sequence.
-        if (ship.IsNpcParty && sample.HostEpoch < acceptedEpoch) return "stale_epoch";
-        bool newEpoch = ship.IsNpcParty && sample.HostEpoch > acceptedEpoch;
-        if (!newEpoch && sample.Sequence <= acceptedSequence) return "stale";
+        var rejection = sample.Stamp.Validate(ship.CurrentAuthority, ownControllerId,
+            new AuthorityStamp(ship.CurrentAuthority, acceptedEpoch, acceptedSequence), followsHostEpoch: ship.IsNpcParty);
+        if (rejection != null) return rejection;
         if (!sample.HasValidFrame) return "invalid_frame";
         if (!sample.Input.IsValid) return "invalid_input";
         if (sample.SpawnableReserve < 0) return "invalid_reserve";

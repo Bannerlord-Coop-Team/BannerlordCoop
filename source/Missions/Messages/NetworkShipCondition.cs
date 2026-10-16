@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Missions.Battles;
 using ProtoBuf;
 using System;
 
@@ -27,4 +28,6 @@ public sealed class NetworkShipCondition : IEvent
         HostEpoch = hostEpoch;
         Condition = condition;
     }
+
+    public AuthorityStamp Stamp => new AuthorityStamp(OwnerControllerId, HostEpoch, Revision);
 }

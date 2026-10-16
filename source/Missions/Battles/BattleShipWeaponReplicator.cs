@@ -242,8 +242,8 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     /// <summary>Why a shot must be dropped, or null to replay it.</summary>
     internal static string ValidateShot(NetworkShipInfo ship, string ownControllerId, NetworkShipWeaponShot shot)
     {
-        if (ship.CurrentAuthority == ownControllerId) return "own_hull";
-        if (shot.OwnerControllerId != ship.CurrentAuthority) return "not_authority";
+        var rejection = AuthorityStamp.ValidateSender(shot.OwnerControllerId, ship.CurrentAuthority, ownControllerId);
+        if (rejection != null) return rejection;
         if (!shot.IsValid) return "invalid_shot";
         return null;
     }
@@ -287,7 +287,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
                 DropState("spawn_failed");
                 return;
             }
-            if (!pendingStates.TryGetValue(state.ShipId, out var pending) || IsNewerState(state, pending))
+            if (!pendingStates.TryGetValue(state.ShipId, out var pending) || state.Stamp.IsNewer(pending.Stamp))
                 pendingStates[state.ShipId] = state;
             return;
         }
@@ -319,19 +319,13 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     internal static string ValidateState(NetworkShipInfo ship, string ownControllerId, NetworkShipWeaponState state,
         long appliedRevision, int appliedEpoch)
     {
-        if (ship.CurrentAuthority == ownControllerId) return "own_hull";
-        if (state.OwnerControllerId != ship.CurrentAuthority) return "not_authority";
-
         // A new host numbers an AI hull's weapon states on from its own count, so a newer epoch restarts the order.
-        if (ship.IsNpcParty && state.HostEpoch < appliedEpoch) return "stale_epoch";
-        bool newEpoch = ship.IsNpcParty && state.HostEpoch > appliedEpoch;
-        if (!newEpoch && state.Revision <= appliedRevision) return "stale";
+        var rejection = state.Stamp.Validate(ship.CurrentAuthority, ownControllerId,
+            new AuthorityStamp(ship.CurrentAuthority, appliedEpoch, appliedRevision), followsHostEpoch: ship.IsNpcParty);
+        if (rejection != null) return rejection;
         if (state.State == null || !state.State.IsValid) return "invalid_state";
         return null;
     }
-
-    private static bool IsNewerState(NetworkShipWeaponState state, NetworkShipWeaponState than) =>
-        state.HostEpoch > than.HostEpoch || (state.HostEpoch == than.HostEpoch && state.Revision > than.Revision);
 
     private void DrainPendingStates()
     {
