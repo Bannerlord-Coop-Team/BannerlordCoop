@@ -126,7 +126,8 @@ public partial class BattleShipReplicator
         engine.ReleaseHullStations(fresh.Hull);
         MoveDeckAgents(fresh, new[] { fresh.Hull });
         if (reclaim.FreshAnnounced)
-            network.SendAll(new NetworkShipRemoved(fresh.ShipId, session.OwnControllerId, ShipRemovalReason.Reclaimed));
+            network.SendAll(new NetworkShipRemoved(fresh.ShipId, session.OwnControllerId, ShipRemovalReason.Reclaimed,
+                missionEnding: false));
         hullAuthority.Remove(new[] { fresh }, DepartingCrew.ParkedOwn);
         Prune(fresh.ShipId);
         duplicatesRemoved++;
@@ -319,7 +320,8 @@ public partial class BattleShipReplicator
         streams.Remove(fresh.ShipId);
         conditions.Forget(fresh.ShipId);
         if (reclaim.FreshAnnounced)
-            network.SendAll(new NetworkShipRemoved(fresh.ShipId, session.OwnControllerId, ShipRemovalReason.Reclaimed));
+            network.SendAll(new NetworkShipRemoved(fresh.ShipId, session.OwnControllerId, ShipRemovalReason.Reclaimed,
+                missionEnding: false));
 
         var ship = new NetworkShipInfo(handedBack.ShipId, session.OwnControllerId, held?.Record?.MapEventPartyId ?? fresh.MapEventPartyId,
             false, fresh.Hull, fresh.Formation);

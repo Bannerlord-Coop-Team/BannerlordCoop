@@ -98,10 +98,11 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         Assert.Single(c.Engine.AllHulls, hull => hull.SpawnData?.ShipId == hullB);
     }
 
-    // A per-ship Retreat order: B's hull sails off the map and vanilla removes it on B with the crew aboard, which tells the
-    // others; they withdraw that crew with the hull. B stays in the battle with its other hull, which keeps streaming.
+    // A per-ship Retreat order: B's hull sails off the map and vanilla's ShipRetreatLogic on B keeps the crew off its deck,
+    // then removes it, fading the crew aboard, which reaches the others as routs. They withdraw nobody with the hull, so the
+    // crew aboard goes through its rout and the crew off the deck stays. B stays in the battle with its other hull.
     [Fact]
-    public void HullRetreatedMidBattle_LeavesEveryClient_WithItsCrew_AndItsOwnersOtherHullStays()
+    public void HullRetreatedMidBattle_LeavesEveryClient_ItsCrewAboardRouts_AndItsCrewOffTheDeckAndOtherHullStay()
     {
         using var battle = StartServerBattle(atSea: true, out var concluded, "A", "B", "C");
         var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
@@ -109,13 +110,16 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         var retreating = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
         var staying = battle.FieldPlayerHull(b, new Vec3(60f, 0f, 0f));
         var ally = RegisterEverywhere(battle, Guid.NewGuid(), "A");
-        var retreatingCrew = RegisterEverywhere(battle, Guid.NewGuid(), "B");
+        var retreatingCrewId = Guid.NewGuid();
+        var retreatingCrew = RegisterEverywhere(battle, retreatingCrewId, "B");
+        var boarder = RegisterEverywhere(battle, Guid.NewGuid(), "B");
         battle.CommitAll();
         battle.TickAll(2);
         foreach (var peer in battle.Peers)
         {
             peer.Engine.PlaceAgent(ally[peer], peer.Ship(retreating).Hull, peer.Ship(hullA).Hull);
             peer.Engine.PlaceAgent(retreatingCrew[peer], peer.Ship(retreating).Hull, peer.Ship(retreating).Hull);
+            peer.Engine.PlaceAgent(boarder[peer], peer.Ship(staying).Hull, peer.Ship(retreating).Hull);
         }
 
         b.Call(() =>
@@ -124,14 +128,22 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
             b.Ships.AnnounceRemoval(hull, ShipRemovalReason.Retreat, missionEnding: false);
             b.Engine.RemoveHull(hull);
         });
+        foreach (var peer in new[] { a, c })
+            peer.Call(() => peer.Broker.Publish(peer, new NetworkBattleAgentRouted(retreatingCrewId)));
         battle.TickAll(2);
         long streamedBefore = (long)c.Stream(staying)["accepted"]!;
         battle.TickAll(2);
 
         foreach (var peer in new[] { a, c })
         {
-            AssertRemovedWithClearDeck(peer, retreating, ally[peer], hullA);
+            AssertRemovedWithClearDeck(peer, retreating, ally[peer], hullA, crewKept: 1);
             AssertCrewWithdrawn(peer, retreatingCrew[peer]);
+            Assert.True(boarder[peer].IsActive(), $"{peer.Id} took the crew off the retreating hull's deck out of the battle");
+            Assert.Same(peer.Ship(staying).Hull, peer.Engine.DeckOf(boarder[peer])!.Hull);
+            bool registered = false;
+            peer.Call(() => registered = peer.Agents.TryGetAgentInfo(boarder[peer], out _));
+            Assert.True(registered, $"{peer.Id} dropped the crew off the retreating hull's deck from the registry");
+            Assert.Empty(peer.Engine.Withdrawn);
         }
         Assert.Same(b.Ship(hullA).Hull, b.Engine.DeckOf(ally[b])!.Hull);
         Assert.All(battle.Peers, peer => Assert.True(peer.Has(staying)));
@@ -299,8 +311,9 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         }
     });
 
-    // Parked a tick before it went, with nobody aboard or seated and none of its crew still in the battle at the removal.
-    private static void AssertRemovedWithClearDeck(NavalPeer peer, Guid departed)
+    // Parked a tick before it went, with nobody aboard or seated and none of its crew but the kept ones in the battle at the
+    // removal.
+    private static void AssertRemovedWithClearDeck(NavalPeer peer, Guid departed, int crewKept = 0)
     {
         ShipLifecycle state = ShipLifecycle.Unknown;
         peer.Call(() => state = peer.Registry.StateOf(departed));
@@ -311,13 +324,13 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(1, copy.ParkingsBeforeRemoval);
         Assert.Equal(0, copy.SeatsAtRemoval);
         Assert.Equal(0, copy.AgentsAboardAtRemoval);
-        Assert.Equal(0, copy.CrewActiveAtRemoval);
+        Assert.Equal(crewKept, copy.CrewActiveAtRemoval);
         Assert.Empty(copy.Seats);
     }
 
-    private static void AssertRemovedWithClearDeck(NavalPeer peer, Guid departed, Agent ally, Guid allyHull)
+    private static void AssertRemovedWithClearDeck(NavalPeer peer, Guid departed, Agent ally, Guid allyHull, int crewKept = 0)
     {
-        AssertRemovedWithClearDeck(peer, departed);
+        AssertRemovedWithClearDeck(peer, departed, crewKept);
         Assert.Same(peer.Ship(allyHull).Hull, peer.Engine.DeckOf(ally)!.Hull);
     }
 }

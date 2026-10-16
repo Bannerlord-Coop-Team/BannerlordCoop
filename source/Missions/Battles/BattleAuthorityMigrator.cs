@@ -467,10 +467,12 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             foreach (var holderId in controllers)
                 CleanUpDepartedMounts(holderId, despawnedRiders, allMounts: holderId == controllerId);
 
+            // A naval departure already withdrew the hulls' crew, so a miss only matters while agents are still keyed to the leaver.
+            int stillKeyed = registry.GetAgents(controllerId).Count(info => info.Agent != null && !info.Agent.IsMount);
             if (despawned > 0)
                 Logger.Information("[BattleSync] Despawned {Count} withdrawn troop(s) of {Controller}", despawned, controllerId);
-            else if (candidates > 0)
-                Logger.Warning("[BattleSync] Withdrawal of {Controller} matched 0 of its {Count} registered troop(s) — selection found no own-party agents; anything left is keyed to a controller that no longer answers", controllerId, candidates);
+            else if (candidates > 0 && stillKeyed > 0)
+                Logger.Warning("[BattleSync] Withdrawal of {Controller} matched 0 of its {Count} registered troop(s) — selection found no own-party agents; anything left is keyed to a controller that no longer answers", controllerId, stillKeyed);
         });
     }
 

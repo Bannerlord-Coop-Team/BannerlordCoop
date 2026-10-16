@@ -347,7 +347,7 @@ public partial class BattleShipReplicator : IBattleShipReplicator
             if (!missionEndRopesSent) SendFinalRopes(ship);
         }
 
-        network.SendAll(new NetworkShipRemoved(ship.ShipId, session.OwnControllerId, reason));
+        network.SendAll(new NetworkShipRemoved(ship.ShipId, session.OwnControllerId, reason, missionEnding));
         removalsSent++;
         Logger.Information("[NavalSync] Own hull {ShipId} leaves the mission ({Reason}{Ending}); told peers to remove it",
             ship.ShipId, reason, missionEnding ? ", mission ending" : "");
@@ -397,14 +397,15 @@ public partial class BattleShipReplicator : IBattleShipReplicator
             return;
         }
 
-        RemoveHulls(new[] { ship }, removal.Reason);
+        // An owner still in the battle keeps the crew its removal left alive, and the crew it fades reaches peers as routs.
+        RemoveHulls(new[] { ship }, removal.Reason, removal.MissionEnding ? DepartingCrew.All : DepartingCrew.None);
         removalsAccepted++;
     }
 
     // [Game thread] Every client's half of hulls leaving with their owner. Seats go first, since no machine of a removed hull
-    // may keep a user (R33); then other owners' agents move to their own hull; the rest are parked a tick before the crew
-    // withdraws and the hulls go, since the owner's removal took that crew out of the battle too.
-    private void RemoveHulls(IReadOnlyList<NetworkShipInfo> departing, ShipRemovalReason reason)
+    // may keep a user (R33); then other owners' agents move to their own hull; the rest are parked a tick before the
+    // departing crew withdraws and the hulls go.
+    private void RemoveHulls(IReadOnlyList<NetworkShipInfo> departing, ShipRemovalReason reason, DepartingCrew crew)
     {
         if (departing.Count == 0) return;
 
@@ -418,7 +419,7 @@ public partial class BattleShipReplicator : IBattleShipReplicator
         foreach (var ship in departing)
             MoveDeckAgents(ship, departingHulls);
 
-        hullAuthority.Remove(departing, DepartingCrew.All);
+        hullAuthority.Remove(departing, crew);
         foreach (var ship in departing)
         {
             // A returning player's duplicate goes while its ship stays in the battle.
@@ -432,14 +433,17 @@ public partial class BattleShipReplicator : IBattleShipReplicator
     // A departing hull's crew leaves with it; anyone else on its deck goes to the hull they crew, or the nearest friendly one.
     private void MoveDeckAgents(NetworkShipInfo ship, IReadOnlyCollection<MissionObject> departingHulls)
     {
+        // A hull queued in an earlier frame is removed with whoever stands on it then, so it takes nobody in either.
+        var excluded = departingHulls.Concat(hullAuthority.HullsBeingRemoved).ToList();
         foreach (var agent in engine.AgentsOnDeck(ship.Hull))
         {
             var crewHull = engine.CrewHullOf(agent);
             if (crewHull != null && departingHulls.Contains(crewHull)) continue;
 
-            var target = crewHull != null && !engine.IsHullRemoved(crewHull) && !engine.IsSinking(crewHull)
+            var target = crewHull != null && !excluded.Contains(crewHull) && !engine.IsHullRemoved(crewHull)
+                && !engine.IsSinking(crewHull)
                 ? crewHull
-                : engine.NearestFriendlyHull(agent, departingHulls);
+                : engine.NearestFriendlyHull(agent, excluded);
             if (target == null)
             {
                 Logger.Warning("[NavalSync] No friendly hull to move agent {Agent} to off departing hull {ShipId}",
@@ -457,7 +461,7 @@ public partial class BattleShipReplicator : IBattleShipReplicator
     {
         // The hulls a departing host simulates for others stay and move to the next host.
         var departing = Registry.Ships.Where(ship => !ship.FollowsBattleHost && ship.CurrentAuthority == controllerId).ToList();
-        RemoveHulls(departing, ShipRemovalReason.Leave);
+        RemoveHulls(departing, ShipRemovalReason.Leave, DepartingCrew.All);
 
         foreach (var entry in heldShips.Where(entry => entry.Value.Record != null && !entry.Value.Record.FollowsBattleHost
             && entry.Value.Record.OwnerControllerId == controllerId).ToArray())

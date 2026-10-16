@@ -116,6 +116,37 @@ public class NavalHullAuthorityTests
         Assert.Equal(new[] { heroMoved }, unparked);
     }
 
+    // M8c r1: an owner still in the battle (a per-ship retreat, a reclaimed duplicate) keeps the crew its removal left alive and
+    // sends the ones it fades as routs, so nobody withdraws here and everyone parked goes back once the hull is removed.
+    [Fact]
+    public void Remove_HullsWhoseOwnerStays_WithdrawNobody_AndPutEveryoneParkedBack()
+    {
+        var (authority, _, engine, withdrawal) = Create();
+        var departing = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_2", false, ShipTestHulls.Create(), null);
+        var crewAboard = CreateAgent();
+        var crewInTheWater = CreateAgent();
+        var crewAboardMoved = new HullSwapAgent(crewAboard, isCrew: true, isParked: true, Vec3.Zero, Vec3.Zero);
+        engine.Setup(e => e.ParkHullAgents(departing.Hull)).Returns(new[]
+        {
+            crewAboardMoved,
+            new HullSwapAgent(crewInTheWater, isCrew: true, isParked: false, Vec3.Zero, Vec3.Zero),
+        });
+        var steps = new List<string>();
+        engine.Setup(e => e.RemoveHull(It.IsAny<MissionObject>())).Callback(() => steps.Add("remove"));
+        engine.Setup(e => e.BoardHullAgents(null!, It.IsAny<IReadOnlyList<HullSwapAgent>>()))
+            .Callback<MissionObject, IReadOnlyList<HullSwapAgent>>((_, agents) => steps.Add($"unpark {agents.Count}"));
+
+        authority.Remove(new[] { departing }, DepartingCrew.None);
+        authority.Tick();
+        authority.Tick();
+
+        withdrawal.Verify(w => w.Deregister(It.IsAny<Agent>()), Times.Never);
+        engine.Verify(e => e.WithdrawAgent(It.IsAny<Agent>()), Times.Never);
+        Assert.Equal(new[] { "remove", "unpark 1" }, steps);
+        engine.Verify(e => e.BoardHullAgents(null!, It.Is<IReadOnlyList<HullSwapAgent>>(agents => agents[0] == crewAboardMoved)),
+            Times.Once);
+    }
+
     // M8b: an own duplicate's crew leaves the battle with the hull, the way vanilla's removal withdraws a hull's crew. Own
     // agents stay registered, so their own removal reaches the peers.
     [Fact]

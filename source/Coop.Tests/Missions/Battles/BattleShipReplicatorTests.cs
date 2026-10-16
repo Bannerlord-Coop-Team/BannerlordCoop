@@ -339,7 +339,7 @@ public class BattleShipReplicatorTests
         harness.Engine.Setup(e => e.RemoveHull(copy)).Callback(() => order.Add("remove"));
         harness.Engine.Setup(e => e.SideOf(copy)).Returns(BattleSideEnum.Attacker);
 
-        harness.Replicator.AcceptRemoval(new NetworkShipRemoved(ship.ShipId, Peer, ShipRemovalReason.Retreat));
+        harness.Replicator.AcceptRemoval(new NetworkShipRemoved(ship.ShipId, Peer, ShipRemovalReason.Retreat, missionEnding: true));
         harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 1,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity)));
         harness.Replicator.AcceptSpawnRecords(new[] { ForeignRecord(ship.ShipId) });
@@ -365,8 +365,8 @@ public class BattleShipReplicatorTests
         var harness = new Harness(committed: false);
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
 
-        harness.Replicator.AcceptRemoval(new NetworkShipRemoved(ship.ShipId, "someone_else", ShipRemovalReason.Leave));
-        harness.Replicator.AcceptRemoval(new NetworkShipRemoved(harness.OwnShipId, Own, ShipRemovalReason.Leave));
+        harness.Replicator.AcceptRemoval(new NetworkShipRemoved(ship.ShipId, "someone_else", ShipRemovalReason.Leave, missionEnding: true));
+        harness.Replicator.AcceptRemoval(new NetworkShipRemoved(harness.OwnShipId, Own, ShipRemovalReason.Leave, missionEnding: true));
 
         Assert.Equal(ShipLifecycle.Registered, harness.Registry.StateOf(ship.ShipId));
         Assert.Equal(ShipLifecycle.Registered, harness.Registry.StateOf(harness.OwnShipId));
@@ -389,12 +389,37 @@ public class BattleShipReplicatorTests
         harness.Engine.Setup(e => e.CrewHullOf(crew)).Returns(copy);
         harness.Engine.Setup(e => e.NearestFriendlyHull(stray, It.IsAny<IReadOnlyCollection<MissionObject>>())).Returns(nearest);
 
-        harness.Replicator.AcceptRemoval(new NetworkShipRemoved(ship.ShipId, Peer, ShipRemovalReason.Retreat));
+        harness.Replicator.AcceptRemoval(new NetworkShipRemoved(ship.ShipId, Peer, ShipRemovalReason.Retreat, missionEnding: true));
 
         harness.Engine.Verify(e => e.MoveAgentToHull(ally, harness.OwnHull), Times.Once);
         harness.Engine.Verify(e => e.MoveAgentToHull(stray, nearest), Times.Once);
         harness.Engine.Verify(e => e.MoveAgentToHull(crew, It.IsAny<MissionObject>()), Times.Never);
         Assert.Equal(2, (long)JObject.FromObject(harness.Replicator.Inspect())["agentsMovedOffDepartedHulls"]!);
+    }
+
+    // M8c r1: a hull already queued for removal goes with whoever stands on it then, so an agent on a later departing deck
+    // whose crew hull is queued goes to the nearest friendly hull, and that one is never a queued hull either.
+    [Fact]
+    public void AcceptRemoval_MovesNobodyOntoAHullAlreadyQueuedForRemoval()
+    {
+        var harness = new Harness(committed: false);
+        var (first, firstShip) = RegisterPeerCopy(harness, isNpcParty: false);
+        var (second, secondShip) = RegisterPeerCopy(harness, isNpcParty: false);
+        var ally = CreateAgent();
+        harness.Engine.Setup(e => e.AgentsOnDeck(second)).Returns(new[] { ally });
+        harness.Engine.Setup(e => e.CrewHullOf(ally)).Returns(first);
+        IReadOnlyCollection<MissionObject>? excluded = null;
+        harness.Engine.Setup(e => e.NearestFriendlyHull(ally, It.IsAny<IReadOnlyCollection<MissionObject>>()))
+            .Callback<Agent, IReadOnlyCollection<MissionObject>>((_, hulls) => excluded = hulls)
+            .Returns(harness.OwnHull);
+
+        harness.Replicator.AcceptRemoval(new NetworkShipRemoved(firstShip.ShipId, Peer, ShipRemovalReason.Retreat, missionEnding: false));
+        harness.Replicator.AcceptRemoval(new NetworkShipRemoved(secondShip.ShipId, Peer, ShipRemovalReason.Leave, missionEnding: true));
+
+        harness.Engine.Verify(e => e.MoveAgentToHull(ally, first), Times.Never);
+        harness.Engine.Verify(e => e.MoveAgentToHull(ally, harness.OwnHull), Times.Once);
+        Assert.Contains(first, excluded!);
+        Assert.Contains(second, excluded!);
     }
 
     // M8a: a player who left takes its hulls and its records still waiting here; AI hulls it held move with the host instead.
@@ -531,6 +556,20 @@ public class BattleShipReplicatorTests
         harness.Registry.TryRegister(ship);
         harness.LiveHulls.Add(copy);
         return (copy, ship);
+    }
+
+    [Fact]
+    public void Removal_KeepsWhetherTheOwnersMissionEndedOverTheWire()
+    {
+        var shipId = Guid.NewGuid();
+
+        var ending = Serializer.DeepClone(new NetworkShipRemoved(shipId, Peer, ShipRemovalReason.Leave, missionEnding: true));
+        var staying = Serializer.DeepClone(new NetworkShipRemoved(shipId, Peer, ShipRemovalReason.Retreat, missionEnding: false));
+
+        Assert.True(ending.MissionEnding);
+        Assert.Equal(ShipRemovalReason.Leave, ending.Reason);
+        Assert.False(staying.MissionEnding);
+        Assert.Equal(shipId, staying.ShipId);
     }
 
     [Fact]

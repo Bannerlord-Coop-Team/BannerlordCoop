@@ -99,6 +99,71 @@ public class NavalHandBackScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(1, concluded());
     }
 
+    // M8c r1: the host's records reach B only after B committed, so the others spawn a copy of B's fresh hull before its
+    // adopted ship is matched, and the hand-back tells them to drop that copy. B keeps the hull and its whole crew under the
+    // adopted ship id, so the crew and hero they had on the copy stay registered and in the battle.
+    [Fact]
+    public void ReturningPlayer_WhoseFreshHullWasAnnounced_KeepsItsCrewAndHeroOnEveryClient()
+    {
+        using var battle = StartServerBattle(atSea: true, out _, "A", "B", "C");
+        var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
+        var hullB = AdoptHullOfB(battle, a, b, c);
+
+        b.Call(() =>
+        {
+            b.DisposeShipServices();
+            b.Controller.Dispose();
+        });
+        var returned = battle.Join(b.Id);
+        var fresh = returned.FieldOwnHull(returned.Side, new Vec3(40f, -80f, 0f), battle.PartyIds["B"], ShipOfB);
+        a.Network.RouteMessages = false;
+        battle.AnnounceEntry(returned);
+        a.Network.RouteMessages = true;
+        var hostRecords = a.Network.NetworkSentMessages.GetMessages<NetworkSpawnBattleShips>().Last();
+        Assert.Contains(hostRecords.Ships, record => record.ShipId == hullB);
+        returned.Commit();
+        returned.Tick();
+        a.Tick();
+        c.Tick();
+        Assert.All(new[] { a, c }, peer => Assert.True(peer.Has(fresh), $"{peer.Id} spawned no copy of the fresh hull"));
+        Assert.All(new[] { a, c }, peer => Assert.Equal("B", peer.Ship(fresh).CurrentAuthority));
+
+        var crewId = Guid.NewGuid();
+        var heroId = Guid.NewGuid();
+        var crew = battle.Peers.ToDictionary(peer => peer, peer => peer.RegisterAgent(crewId, "B"));
+        var hero = battle.Peers.ToDictionary(peer => peer, peer => peer.RegisterAgent(heroId, "B"));
+        returned.Call(() => returned.Mission.MainAgent = hero[returned]);
+        foreach (var peer in battle.Peers)
+        {
+            var freshHull = peer.Ship(fresh).Hull;
+            peer.Engine.PlaceAgent(crew[peer], freshHull, freshHull);
+            peer.Engine.PlaceAgent(hero[peer], freshHull, freshHull);
+        }
+
+        returned.Call(() => returned.Broker.Publish(returned, hostRecords));
+        battle.TickAll(4);
+
+        Assert.Equal("B", returned.Ship(hullB).CurrentAuthority);
+        Assert.Contains(returned.Network.NetworkSentMessages.GetMessages<NetworkShipRemoved>(),
+            removal => removal.ShipId == fresh && removal.Reason == ShipRemovalReason.Reclaimed && !removal.MissionEnding);
+        foreach (var peer in new[] { a, c })
+        {
+            Assert.False(peer.Has(fresh), $"{peer.Id} kept the copy of the fresh hull");
+            Assert.True(peer.Engine.AllHulls.Single(hull => hull.SpawnData?.ShipId == fresh).IsRemoved);
+            Assert.Equal("B", peer.Ship(hullB).CurrentAuthority);
+            foreach (var agent in new[] { crew[peer], hero[peer] })
+            {
+                Assert.True(agent.IsActive(), $"{peer.Id} took the returning player's agent out of the battle");
+                bool registered = false;
+                peer.Call(() => registered = peer.Agents.TryGetAgentInfo(agent, out _));
+                Assert.True(registered, $"{peer.Id} dropped the returning player's agent from the registry");
+            }
+
+            Assert.Empty(peer.Engine.Withdrawn);
+            Assert.Empty(peer.Engine.ParkedAgents);
+        }
+    }
+
     // The adopted hull sank before its player came back: the player's launcher fielded it again, but that duplicate goes and
     // its fresh crew withdraws, and the player follows the host's wreck like everyone else.
     [Fact]

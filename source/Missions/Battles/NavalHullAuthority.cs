@@ -12,7 +12,7 @@ namespace Missions.Battles;
 /// [Game thread] Moves a registered hull to a new authority. A hull this client takes over is replaced by a freshly
 /// simulated hull of the same ship, one step per mission tick (park its agents, replace the hull, board them again), keeping
 /// its ship id; a hull it hands away goes back to following samples. A departing hull is parked clear one tick and removed
-/// with its crew the next. Every path that spawns a hull itself opens
+/// the next, after its departing crew withdrew. Every path that spawns a hull itself opens
 /// <see cref="SuppressSpawnRegistration"/>, so the spawn event registers no own hull.
 /// </summary>
 public interface INavalHullAuthority : IDisposable
@@ -36,6 +36,9 @@ public interface INavalHullAuthority : IDisposable
     /// </summary>
     void Remove(IReadOnlyList<NetworkShipInfo> ships, DepartingCrew crew);
 
+    /// <summary>The hulls <see cref="Remove"/> queued and not yet removed; nobody may move onto them, as they go with whoever stands there.</summary>
+    IReadOnlyCollection<MissionObject> HullsBeingRemoved { get; }
+
     bool IsReplacing(Guid shipId);
 
     /// <summary>The replacement step a hull is at, or null (diagnostics).</summary>
@@ -49,10 +52,16 @@ public interface INavalHullAuthority : IDisposable
 public enum DepartingCrew
 {
     /// <summary>
-    /// Hulls that left with their owner: every crew member but this client's main agent withdraws and leaves the agent
-    /// registry, as the owner's own removal took its crew out of the battle.
+    /// Hulls whose owner's mission ended with them: every crew member but this client's main agent withdraws and leaves the
+    /// agent registry, as the owner's own removal took its crew out of the battle.
     /// </summary>
     All,
+
+    /// <summary>
+    /// Hulls whose owner stays in the battle (a per-ship retreat, a returning player's duplicate): nobody withdraws here,
+    /// since the owner keeps whoever its removal left alive and the crew it fades reaches peers as routs.
+    /// </summary>
+    None,
 
     /// <summary>This client's own duplicate of a handed-back hull: only the crew parked off it withdraw, never the main agent.</summary>
     ParkedOwn,
@@ -125,6 +134,8 @@ public class NavalHullAuthority : INavalHullAuthority
     }
 
     public bool IsReplacing(Guid shipId) => hullSwaps.Any(swap => swap.ShipId == shipId);
+
+    public IReadOnlyCollection<MissionObject> HullsBeingRemoved => hullRemovals.SelectMany(removal => removal.Hulls).ToList();
 
     public string SwapPhaseOf(Guid shipId) => hullSwaps.FirstOrDefault(swap => swap.ShipId == shipId)?.Phase.ToString();
 
@@ -217,7 +228,8 @@ public class NavalHullAuthority : INavalHullAuthority
     // Crew is a formation match, so an own duplicate withdraws only the crew parked off it; the player's hero can share that
     // formation. An agent is crew when any departing hull's parking counted it as such.
     private bool IsWithdrawn(HullRemoval removal, HullSwapAgent moved) =>
-        moved.IsCrew && !engine.IsMainAgent(moved.Agent) && (removal.Crew == DepartingCrew.All || moved.IsParked);
+        removal.Crew != DepartingCrew.None && moved.IsCrew && !engine.IsMainAgent(moved.Agent)
+        && (removal.Crew == DepartingCrew.All || moved.IsParked);
 
     private void UnparkTheRest(HullRemoval removal, HashSet<Agent> withdrawn)
     {
