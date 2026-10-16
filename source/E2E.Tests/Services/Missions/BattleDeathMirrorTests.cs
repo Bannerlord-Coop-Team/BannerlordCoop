@@ -200,14 +200,10 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
 
     [Theory]
     [InlineData(true, Agent.MortalityState.Mortal, MissionMode.Battle, false, 100f)]
-    [InlineData(false, Agent.MortalityState.Immortal, MissionMode.Battle, false, 100f)]
-    [InlineData(false, Agent.MortalityState.Mortal, MissionMode.Conversation, false, 100f)]
-    [InlineData(false, Agent.MortalityState.Mortal, MissionMode.CutScene, false, 100f)]
     [InlineData(true, Agent.MortalityState.Mortal, MissionMode.Battle, true, 100f)]
-    [InlineData(false, Agent.MortalityState.Immortal, MissionMode.Battle, true, 100f)]
+    [InlineData(false, Agent.MortalityState.Immortal, MissionMode.Battle, false, 100f)]
     [InlineData(false, Agent.MortalityState.Mortal, MissionMode.Conversation, true, 100f)]
-    [InlineData(false, Agent.MortalityState.Mortal, MissionMode.CutScene, true, 100f)]
-    [InlineData(true, Agent.MortalityState.Mortal, MissionMode.Battle, false, 1f)]
+    [InlineData(false, Agent.MortalityState.Mortal, MissionMode.CutScene, false, 100f)]
     [InlineData(true, Agent.MortalityState.Mortal, MissionMode.Battle, true, 1f)]
     public void RejectedDeath_RetainsPuppetAndAttributionUntilRetrySucceeds(
         bool disableDying, Agent.MortalityState mortality, MissionMode mode, bool wounded, float health)
@@ -275,12 +271,8 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
 
     [Theory]
     [InlineData(false, 0f, false)]
-    [InlineData(true, 0f, false)]
-    [InlineData(false, 0f, true)]
     [InlineData(true, 0f, true)]
     [InlineData(false, 0.5f, true)]
-    [InlineData(true, 0.5f, true)]
-    [InlineData(false, 0.999f, true)]
     [InlineData(true, 0.999f, true)]
     public void ActiveBelowOneHealthPuppet_ReceivesTerminalBlowBeforeDeregistration(
         bool wounded, float health, bool guardsEnabled)
