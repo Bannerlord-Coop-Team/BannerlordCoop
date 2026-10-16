@@ -174,6 +174,10 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         /// <summary>Opens the player's mission on the mesh with the battle's current host assignment.</summary>
         public NavalPeer Join(string id)
         {
+            // A rejoin drops the player's old client, so its removal invariant is checked one last time first.
+            if (peers.TryGetValue(id, out var replaced))
+                replaced.Call(replaced.Engine.AssertRemovalInvariant);
+
             var (instance, side) = Players[id];
             NavalPeer peer = null!;
             instance.Call(() =>
@@ -279,7 +283,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
 
         /// <summary>
         /// Tears the battle down after a last removal invariant check on every client, which fails the scenario. Skipped once a
-        /// tick failed it, since throwing here would hide that failure.
+        /// tick failed it, since throwing here would hide that failure. A violation found here still replaces an ordinary assert
+        /// failure the test body threw.
         /// </summary>
         public void Dispose()
         {
@@ -370,6 +375,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             Controller = controller;
             Engine = engine;
             engine.AgentName = agent => agentNames.TryGetValue(agent, out var name) ? name : null;
+            engine.RegisteredShipId = hull => Registry.TryGetByHull(hull, out var ship) ? ship.ShipId : null;
             Network = instance.Resolve<MockBattleNetwork>();
             Broker = instance.Resolve<IMessageBroker>();
             var reinforcements = new Mock<IReinforcementFielder>();
@@ -443,7 +449,6 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             {
                 var hull = Engine.Field(side, position);
                 hull.CampaignShipId = campaignShipId;
-                hull.ShipId = shipId;
                 Assert.True(Registry.TryRegister(new NetworkShipInfo(shipId, Id, mapEventPartyId, false, hull.Hull, null)));
             });
             return shipId;
@@ -462,7 +467,6 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                     : side == BattleSideEnum.Attacker ? Mission.AttackerTeam.Shell : Mission.DefenderTeam.Shell;
                 var hull = Engine.Field(side, position, formationIndex ?? 0, team);
                 shipId = Ships.RegisterNpcHull(hull.Hull, hull.Formation!, mapEventPartyId);
-                hull.ShipId = shipId;
             });
             Assert.NotEqual(Guid.Empty, shipId);
             return shipId;

@@ -193,7 +193,6 @@ public class NavalHandBackScenarioTests : NavalBattleTestEnvironment
 
         Assert.Empty(returned.Network.NetworkSentMessages.GetMessages<NetworkShipReclaim>());
         Assert.True(duplicate.IsRemoved);
-        Assert.Equal(0, duplicate.AgentsAboardAtRemoval);
         Assert.Contains(freshCrew, returned.Engine.Withdrawn);
         Assert.DoesNotContain(hero, returned.Engine.Withdrawn);
         Assert.Contains(returned.Engine.Boardings, boarding =>

@@ -54,8 +54,8 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 
 - The mission never spawns the party's campaign `Ship`. `CoopShipSnapshotBuilder` builds a detached copy (same owner, hull,
   pieces and damage) and the mission damages that (`Missions.Naval/CoopShipSnapshotBuilder.cs`).
-- `CoopShipSnapshotPatches` keeps snapshot HP writes out of Jordan's campaign ship sync, stops a snapshot at 0 HP from
-  destroying a campaign ship, and grants no Boatswain XP for snapshot damage.
+- `CoopShipSnapshotPatches` keeps snapshot HP writes out of Jordan's campaign ship sync, keeps `DestroyShipAction` from
+  running on a snapshot at 0 HP, and grants no Boatswain XP for snapshot damage.
 - So nothing that happens to a hull in the mission reaches the campaign ship today; see section 3.
 
 ## 2. Lifecycles
@@ -65,7 +65,7 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 - Own hulls are announced at the first deployment commit, not at spawn.
 - A copy is held until this client's team setup is over and `NavalShipsLogic.IsDeploymentMode` is false
   (`BattleShipReplicator`, log `Holding foreign hull ... until local deployment ends`). Vanilla's deployment finish pools
-  removed hulls and runs over every hull; copies spawned during deployment are the leading cause of the R38 crash (M4d).
+  removed hulls and runs over every hull; copies spawned during deployment are the leading suspect for the R38 crash.
 - Held records keep the latest state, so a copy spawns at its current frame and condition.
 - A hull can't be swapped during deployment either: the swap waits in its first phase until deployment mode is off.
 
@@ -118,23 +118,23 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 When a client removes or replaces a hull:
 
 - nobody stands on its deck or sits at one of its stations;
-- afterwards nobody is left parked (physics force-closed) from the removed hull, parked while crew of it, or still crew
-  of a replaced hull.
+- afterwards nobody is left parked (physics force-closed) from the removed hull or parked while crew of it, and nobody
+  stands on it.
 
 Agents may be parked during the removal itself. The swap holds them for the fresh hull, and a removal unparks the ones
 it doesn't withdraw in the same step.
 
-Why it matters: every native crash since R33 broke it.
+Why it matters: the R33 and R40 native crashes both broke it.
 
 - R33: seated crew were faded on a departing hull.
-- R37/R38: deployment pooling ran over copies spawned too early (the M4d hypothesis).
 - R40: the leaver's crew survived the removal of its copy, parked and force-closed.
 
-None of these leave a managed exception. The game dies in native code.
+Neither leaves a managed exception. The game dies in native code. The R38 crash (deployment pooling over copies spawned
+too early) is not a removal; the deployment hold covers it (`NavalDeploymentHoldScenarioTests`), not this check.
 
 The E2E harness enforces it on every client of every naval scenario (`FakeNavalShipEngine.AssertRemovalInvariant`,
-called after each `NavalPeer.Tick` and at battle dispose). A test that stands in for vanilla removing an owner's own hull
-calls `VanillaOwnerRemoveShipForTest` instead, which is exempt.
+called after each `NavalPeer.Tick`, before a rejoin replaces a client, and at battle dispose). A test that stands in for
+vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` instead, which is exempt and refuses a copy.
 
 ## 3. End of battle
 
@@ -209,7 +209,7 @@ calls `VanillaOwnerRemoveShipForTest` instead, which is exempt.
 | R31 | `4f45f316b` | Stopped twice (GPU out of memory, then on request); no gates. |
 | R32 | `965c12969` | Battle end and sink pass; no contact at 9 m; no scoreboard after the win; client2 crashed natively leaving. |
 | R33 | `2d01d6e75` | Native crash on the peer when the host left a concluded battle: seated crew faded on the hull copy. |
-| R34 | `cec737670` | Pass with low findings (K10 to K13): sink, win and lose, migration at epoch 2 with 3 swaps, about 60 fps at 110 to 127 agents. |
+| R34 | `cec737670` | Pass with low findings: sink, win and lose, migration at epoch 2 with 3 swaps, about 60 fps at 110 to 127 agents. |
 | R35 | `4dbb0d6ef` | M1 merge. Ship damage replicates; mission HP not written back, no ship loot, the leaver's hull stays a frozen copy. |
 | R36 | `7aaebcaef` | Scenario auto-Ready froze a client (behaviours removed inside `Mission.OnTick`). |
 | R37 | `1b83a54f6` | Client NRE on mission open, puppet NRE in a formation without a hull, host crash on a half-spawned puppet, peer ram did no damage. |
@@ -222,7 +222,7 @@ calls `VanillaOwnerRemoveShipForTest` instead, which is exempt.
 - **D3, contact model.** Ramming between owners needs contact with a copy. Option A keeps the copy kinematic and only
   routes ram damage. Option B (`copy_body steered`) keeps the copy's dynamic body and steers it toward the owner's
   samples. Option C (`copy_body static`) gives it a moveable static collider. The pick waits on the R41 `copy_body`
-  probe data; helm capture (K17) is part of D3.
+  probe data; helm capture is part of D3.
 - **D2.** A failed AI fleet counts as a players' victory (the land precedent); an aborted battle would need a new
   result state.
 - **Water is not shared.** The water clock is native and can't be set from managed code, and `WaterQuality` and
@@ -242,7 +242,7 @@ calls `VanillaOwnerRemoveShipForTest` instead, which is exempt.
 - **Boarding.** Ropes and bridges replicate, but plank crossing and melee on a foreign deck were never seen live, and a
   rope cut from the target side isn't replicated.
 - **Sea raids** still open the land raid scene.
-- **CI** has no NavalDLC, so release builds ship without `Missions.Naval.dll` (K28, maintainer).
+- **CI** has no NavalDLC, so release builds ship without `Missions.Naval.dll` (maintainer decision).
 
 ## 7. Debug surface
 
@@ -288,8 +288,8 @@ Knobs (`NavalScenarioResolver.Usage`):
    (`ModName=Coop`). Record the module and documents snapshot and the assembly MVIDs in the case dir.
 2. Start the server and 2 clients through the MCP with the `naval` profile (`doc/automated-testing/mcp-setup.md`). Wait
    for `readyForCampaignTests` on both clients.
-3. On the server, run `coop.debug.naval.scenario <preset> [knobs]`. Check every gate with `inspect`, `scenario_status`
-   and the `[NavalSync]` log lines on each client.
+3. On the server, run the scenario under test, for example `coop.debug.naval.scenario vs_pirates hulls=3 weapons=1`.
+   Check every gate with `inspect`, `scenario_status` and the `[NavalSync]` log lines on each client.
 4. After each battle, exit in the order the gate asks, then move on.
 5. `stop_run`, restore the module and documents from the snapshot and verify them, then write the report with each gate's
    evidence lines.
@@ -301,20 +301,3 @@ Knobs (`NavalScenarioResolver.Usage`):
 - `-e` is refused while the TaleWorlds watchdog is attached. The watchdog takes its own crash dump.
 - On a freeze, take `procdump64 -accepteula -ma <pid>` by hand, ideally twice a few seconds apart.
 - `dotnet-dump` only shows managed frames. A native crash needs cdb: `cdb -z <dmp> -c "!analyze -v; ~0k; q"`.
-
-## 8. Where the evidence lives
-
-- **Case dirs:** `G:/.pi-tmp/naval-validation-current/`.
-  - R33 to R40 are `prod-r33-*` to `prod-r40-*`, with `logs/`, `dumps/`, `backup/` and `source-before.txt`.
-  - R23 to R32 are named by slice: `prod-manual2-*`, `prod-auto-*`, `prod-s4-*` to `prod-s6a-*`.
-  - Each case keeps the previous run's report as `prior-report-*.md`.
-- **Run reports:** R39 and R40 are `r34-live-validation.md` and `r34-live-validation.32841b51.md` under the run outputs
-  `C:/Users/PC/.pi/agent/sessions/--E--Mod Development-BannerlordCoop--/subagent-artifacts/outputs/632f0c2e-b8f1-4eb0-a477-8361a9695c81/naval/`.
-- **Milestone, plan and design reports:** the same outputs folder, one run id per report, each under `naval/`:
-  - `m1-jordan-merge-reconcile.md`, `m2-impl.md` to `m12-impl.md`, `m8a-impl.md` to `m8c-impl.md`, `wp4-impl.md`, `refactor-a-impl.md`, `refactor-b-impl.md`;
-  - `plan-revision-goals.md` and the other plan revisions (goal and decision numbers);
-  - `gap-analysis-battles.md` (K numbers);
-  - `water-determinism-go-no-go.md`;
-  - `opus-production-naval-design.md`.
-- **Review diffs:** `G:/.pi-tmp/naval-review/<milestone>/`.
-- **Decompiled NavalDLC:** `G:/.pi-tmp/naval-validation-current/opus-next-playable-slice/dlc/`.

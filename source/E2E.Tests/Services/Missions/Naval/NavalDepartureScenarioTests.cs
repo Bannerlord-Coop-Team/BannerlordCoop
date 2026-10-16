@@ -301,11 +301,12 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         battle.Leave(leaver);
     }
 
-    // NavalShipsLogic.OnEndMission on the leaver sends the final ropes and removes every hull, announcing its own.
+    // NavalShipsLogic.OnEndMission on the leaver sends the final ropes and removes and announces its own hulls. Its copies are
+    // left out: they go with its mission, which nothing reads again, and announcing one sends nothing.
     private static void EndMission(NavalPeer leaver, ShipRemovalReason reason) => leaver.Call(() =>
     {
         leaver.Ships.SendFinalRopes();
-        foreach (var ship in leaver.Registry.Ships.ToList())
+        foreach (var ship in leaver.Registry.Ships.Where(ship => ship.CurrentAuthority == leaver.Id).ToList())
         {
             leaver.Ships.AnnounceRemoval(ship.Hull, reason, missionEnding: true);
             // Stands for vanilla NavalShipsLogic.OnEndMission removing the leaver's own hull.
@@ -324,8 +325,6 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         var copy = CopyOf(peer, departed);
         Assert.True(copy.IsRemoved, $"{peer.Id} kept the copy of {departed}");
         Assert.Equal(1, copy.ParkingsBeforeRemoval);
-        Assert.Equal(0, copy.SeatsAtRemoval);
-        Assert.Equal(0, copy.AgentsAboardAtRemoval);
         Assert.Equal(crewKept, copy.CrewActiveAtRemoval);
         Assert.Empty(copy.Seats);
     }
