@@ -358,6 +358,26 @@ public class ChatVMTests
     }
 
     [Fact]
+    public void Receive_SystemWithEmptyRecipient_OnEvents_GoesToGlobal()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.SetOpen(true);
+        vm.Channels.Single(channel => channel.IsEvents).ExecuteSelection();
+
+        vm.Receive(new NetworkChatMessage(
+            ChatChannel.System,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            "You are not in a clan."));
+
+        Assert.DoesNotContain(vm.VisibleLines, line => line.Text.Contains("You are not in a clan."));
+        vm.Channels.Single(channel => channel.IsGlobal).ExecuteSelection();
+        Assert.Contains(vm.VisibleLines, line => line.Text == "[Chat] You are not in a clan.");
+    }
+
+    [Fact]
     public void ReceiveEvent_AppendsToEventsAndAll_NotGlobal()
     {
         var vm = new ChatVM(_ => { }, () => "local");
