@@ -9,6 +9,18 @@ internal static class SerializedTypeResolver
 {
     private const int MaxTokens = 64;
     private const string GenericCodes = "lhdkvrm";
+    // Core assembly identities differ between the dedicated server and game clients.
+    private static readonly Dictionary<string, Type> PortableTypes = new Dictionary<string, Type>
+    {
+        ["Boolean"] = typeof(bool), ["Byte"] = typeof(byte), ["SByte"] = typeof(sbyte),
+        ["Int16"] = typeof(short), ["UInt16"] = typeof(ushort), ["Int32"] = typeof(int),
+        ["UInt32"] = typeof(uint), ["Int64"] = typeof(long), ["UInt64"] = typeof(ulong),
+        ["Single"] = typeof(float), ["Double"] = typeof(double), ["Decimal"] = typeof(decimal),
+        ["Char"] = typeof(char), ["String"] = typeof(string), ["Object"] = typeof(object),
+        ["DateTime"] = typeof(DateTime), ["DateTimeOffset"] = typeof(DateTimeOffset),
+        ["TimeSpan"] = typeof(TimeSpan), ["Guid"] = typeof(Guid),
+        ["UInt32FloatTuple"] = typeof(Tuple<uint, float>),
+    };
     private static readonly Type[] GenericDefinitions =
     {
         typeof(List<>), typeof(HashSet<>), typeof(Dictionary<,>), typeof(KeyValuePair<,>),
@@ -41,17 +53,21 @@ internal static class SerializedTypeResolver
     public static bool IsAllowedExactType(Type type)
     {
         if (type == null) return false;
-        TypeCode code = Type.GetTypeCode(type);
         string assemblyName = type.Assembly.GetName().Name;
-        return type == typeof(object) || type == typeof(Guid) || type == typeof(DateTimeOffset) ||
-               type == typeof(TimeSpan) || type == typeof(Tuple<uint, float>) ||
-               (!type.IsEnum && code != TypeCode.Empty && code != TypeCode.Object && code != TypeCode.DBNull) ||
+        return PortableTypes.ContainsValue(type) ||
                type.Assembly == typeof(IBinaryPackage).Assembly || assemblyName == "Common" ||
                assemblyName.StartsWith("TaleWorlds.", StringComparison.Ordinal);
     }
 
     private static void AddTokens(Type type, List<string> tokens)
     {
+        string portableName = PortableTypes.FirstOrDefault(entry => entry.Value == type).Key;
+        if (portableName != null)
+        {
+            tokens.Add("p");
+            tokens.Add(portableName);
+            return;
+        }
         if (IsAllowedExactType(type))
         {
             tokens.Add("e");
@@ -80,6 +96,12 @@ internal static class SerializedTypeResolver
         if (index >= tokens.Length) throw new SerializationException("Serialized type descriptor was incomplete");
 
         string code = tokens[index++];
+        if (code == "p")
+        {
+            if (index >= tokens.Length || !PortableTypes.TryGetValue(tokens[index++], out Type portableType))
+                throw new SerializationException("Serialized portable type is not part of the binary package contract");
+            return portableType;
+        }
         if (code == "e") return ResolveExactType(tokens, ref index);
         if (code == "a") return ReadType(tokens, ref index).MakeArrayType();
 
