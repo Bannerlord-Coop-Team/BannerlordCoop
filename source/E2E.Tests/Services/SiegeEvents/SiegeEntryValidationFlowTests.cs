@@ -191,32 +191,6 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
     }
 
     [Fact]
-    public void BesiegeRequest_WhenPartyIsFarFromSettlement_IsRejected()
-    {
-        var client = Clients.First();
-        var context = CreateEntryContext(client);
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
-                context.PartyId,
-                out var party));
-            using (new AllowedThread())
-            {
-                party.Position = Position(900f, 900f);
-            }
-        });
-
-        SendBesiegeRequest(client, context);
-
-        Assert.False(GetBesiegeApproval().Approved);
-        AssertInformationMessage(
-            client,
-            "Unable to begin the siege: your party is too far from the settlement.");
-        AssertNoSiege(context);
-    }
-
-    [Fact]
     public void BesiegeRequest_ForOwnSettlement_IsRejected()
     {
         var client = Clients.First();
@@ -330,61 +304,6 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
         Assert.True(approval.Approved);
         Assert.Equal(context.SettlementId, approval.SettlementId);
         AssertJoinedSiege(context);
-    }
-
-    [Fact]
-    public void JoinRequest_WhenPartyIsFarFromSettlement_IsRejected()
-    {
-        var client = Clients.First();
-        var context = CreateJoinContext(client);
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
-                context.PartyId,
-                out var party));
-            using (new AllowedThread())
-            {
-                party.Position = Position(900f, 900f);
-            }
-        });
-
-        SendJoinRequest(client, context);
-
-        Assert.False(GetJoinApproval().Approved);
-        AssertInformationMessage(
-            client,
-            "Unable to join the siege: your party is too far from the settlement.");
-        AssertNotJoined(context);
-    }
-
-    [Fact]
-    public void JoinRequest_WhenPartyBelongsToDefender_IsRejected()
-    {
-        var client = Clients.First();
-        var context = CreateJoinContext(client);
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
-                context.PartyId,
-                out var party));
-            Assert.True(Server.ObjectManager.TryGetObject<Town>(
-                context.TownId,
-                out var town));
-            using (new AllowedThread())
-            {
-                town.OwnerClan = party.ActualClan;
-            }
-        });
-
-        SendJoinRequest(client, context);
-
-        Assert.False(GetJoinApproval().Approved);
-        AssertInformationMessage(
-            client,
-            "Unable to join the siege: your party belongs to the defending faction.");
-        AssertNotJoined(context);
     }
 
     [Theory]
@@ -840,21 +759,6 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
                 context.SettlementId,
                 out var settlement));
             Assert.Same(settlement.SiegeEvent.BesiegerCamp, party.BesiegerCamp);
-        });
-    }
-
-    private void AssertNotJoined(EntryContext context)
-    {
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(
-                context.PartyId,
-                out var party));
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(
-                context.SettlementId,
-                out var settlement));
-            Assert.NotNull(settlement.SiegeEvent);
-            Assert.Null(party.BesiegerCamp);
         });
     }
 

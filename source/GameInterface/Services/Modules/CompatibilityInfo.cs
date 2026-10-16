@@ -16,6 +16,11 @@ public struct ModuleInfo
     /// </summary>
     public bool IsDlc { get; set; }
     public ApplicationVersion Version { get; set; }
+    /// <summary>
+    /// Display name from SubModule.xml, used only to make join refusals readable. Can be null
+    /// when the peer runs a Coop build that does not send it.
+    /// </summary>
+    public string Name { get; set; }
 
     public ModuleInfo(string id, bool isOfficial, bool isDlc, ApplicationVersion version)
     {
@@ -23,6 +28,7 @@ public struct ModuleInfo
         IsOfficial = isOfficial;
         IsDlc = isDlc;
         Version = version;
+        Name = null;
     }
 }
 
@@ -40,7 +46,7 @@ public class TaleWorldsModuleInfoProvider : IModuleInfoProvider
         foreach (TaleWorlds.ModuleManager.ModuleInfo moduleInfo in modules)
         {
             bool isDlc = moduleInfo.Type == TaleWorlds.ModuleManager.ModuleType.OfficialOptional;
-            yield return new ModuleInfo(moduleInfo.Id, moduleInfo.IsOfficial, isDlc, moduleInfo.Version);
+            yield return new ModuleInfo(moduleInfo.Id, moduleInfo.IsOfficial, isDlc, moduleInfo.Version) { Name = moduleInfo.Name };
         }
     }
 }

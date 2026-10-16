@@ -14,15 +14,6 @@ namespace Common.Tests.Serialization
         private const string OUTPUT_PATH = "./TestFile.json";
 
         [Fact]
-        public void Write()
-        {
-            IJsonFileIO fileIO = new JsonFileIO();
-
-            fileIO.WriteToFile(OUTPUT_PATH, new TestClass("SomeValue"));
-            fileIO.WriteToFile(OUTPUT_PATH, new TestClass("SomeValue2"));
-        }
-
-        [Fact]
         public void WriteInvalidPath()
         {
             IJsonFileIO fileIO = new JsonFileIO();

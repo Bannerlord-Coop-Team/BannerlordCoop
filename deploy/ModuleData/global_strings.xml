@@ -62,6 +62,11 @@
     <string id="str_coop_marriage_accept" text="{=str_coop_marriage_accept}Accept proposal" />
     <string id="str_coop_marriage_accepted" text="{=str_coop_marriage_accepted}Marriage proposal accepted." />
     <string id="str_coop_marriage_declined" text="{=str_coop_marriage_declined}Marriage proposal declined." />
+    <string id="str_coop_map_tracking_request" text="{=str_coop_map_tracking_request}We should keep track of each other." />
+    <string id="str_coop_map_tracking_stop" text="{=str_coop_map_tracking_stop}I no longer wish to keep track of each other." />
+    <string id="str_coop_map_tracking_accepted" text="{=str_coop_map_tracking_accepted}You are now tracking each other on the map." />
+    <string id="str_coop_map_tracking_declined" text="{=str_coop_map_tracking_declined}Map tracking request declined." />
+    <string id="str_coop_map_tracking_stopped" text="{=str_coop_map_tracking_stopped}You are no longer tracking each other on the map." />
     <string id="str_coop_marriage_proposal_title" text="{=str_coop_marriage_proposal_title}Propose marriage to {LEADER_NAME}?" />
     <string id="str_coop_marriage_proposal_description" text="{=str_coop_marriage_proposal_description}You are proposing marriage to {LEADER_NAME}. If they accept, you will join {CLAN_NAME}. They will remain clan leader and manage its shared assets." />
     <string id="str_coop_marriage_acceptance_title" text="{=str_coop_marriage_acceptance_title}Accept marriage proposal?" />

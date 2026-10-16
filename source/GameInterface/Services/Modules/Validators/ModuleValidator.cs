@@ -47,37 +47,51 @@ public class ModuleValidator : IModuleValidator
         serverModules = serverModules.Where(ShouldValidateModule).ToList();
         clientModules = clientModules.Where(ShouldValidateModule).ToList();
 
+        // Every mismatch is reported at once, otherwise a joiner fixes one module per attempt.
+        var errors = new List<string>();
+
         foreach (var serverModule in serverModules)
         {
             var clientModule = clientModules.FirstOrDefault(module => module.Id == serverModule.Id);
 
             if (clientModule.Id == null)
             {
-                error = $"To join the server the module '{serverModule.Id}' with version '{serverModule.Version.ToString()}' is required.";
-                return false;
+                errors.Add($"To join the server the module {Describe(serverModule)} with version '{serverModule.Version.ToString()}' is required.");
             }
             else if (!serverModule.Version.IsSame(clientModule.Version, true))
             {
-                error = $"Wrong version of module '{serverModule.Id}' detected. Server uses '{serverModule.Version.ToString()}', client uses '{clientModule.Version.ToString()}'.";
-                return false;
-                    
+                errors.Add($"Wrong version of module {Describe(serverModule)} detected. Server uses '{serverModule.Version.ToString()}', client uses '{clientModule.Version.ToString()}'.");
             }
         }
 
         var modulesOnlyClientSide = clientModules.Where(clientModule =>
-            serverModules.All(serverModule => serverModule.Id != clientModule.Id)).ToList();
+            serverModules.All(serverModule => serverModule.Id != clientModule.Id));
 
-        if (modulesOnlyClientSide.Any())
+        errors.AddRange(modulesOnlyClientSide.Select(clientModule =>
+            $"Server does not support module {Describe(clientModule)}."));
+
+        if (errors.Any())
         {
-            error = string.Join(Environment.NewLine,
-                modulesOnlyClientSide.Select(clientModule =>
-                    $"Server does not support module '{clientModule.Id}'."));
-
+            error = string.Join(Environment.NewLine, errors);
             return false;
         }
 
         error = null;
         return true;
+    }
+
+    // 'Calradia Expanded' (CalradiaExpanded): players know the name, the id is what the files use.
+    // The Coop line stays exact because the server matches on UnsupportedCoopModuleReason.
+    private static string Describe(ModuleInfo module)
+    {
+        if (string.IsNullOrWhiteSpace(module.Name) ||
+            string.Equals(module.Name, module.Id, StringComparison.Ordinal) ||
+            string.Equals(module.Id, "Coop", StringComparison.Ordinal))
+        {
+            return $"'{module.Id}'";
+        }
+
+        return $"'{module.Name}' ({module.Id})";
     }
 
     private static bool ShouldValidateModule(ModuleInfo module)
@@ -102,7 +116,7 @@ public class ModuleValidator : IModuleValidator
         if (dlcModules.Any())
         {
             error = "DLC is not supported. Please disable the following module(s): " +
-                string.Join(", ", dlcModules.Select(module => $"'{module.Id}'")) + ".";
+                string.Join(", ", dlcModules.Select(Describe)) + ".";
             return false;
         }
 

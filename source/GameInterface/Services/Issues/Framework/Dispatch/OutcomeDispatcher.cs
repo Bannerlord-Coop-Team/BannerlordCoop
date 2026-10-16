@@ -7,6 +7,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using Serilog;
 using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -66,9 +67,15 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
             return true;
         }
 
-        // An issue with a quest ends as a consequence of the quest outcome, which is handled on its own
+        // A finished quest was announced by BeforeQuestOutcome, vanilla then ends its issue here through IssueManager.OnQuestCompleted
+        // The server only announces an issue that ends while its quest is still running
         if (issue.IssueQuest != null)
         {
+            if (ModInformation.IsServer && issue.IssueQuest.IsOngoing)
+            {
+                observed = issue;
+            }
+
             return true;
         }
 
@@ -153,5 +160,38 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         }
 
         messageBroker.Publish(issue, new IssueOutcomeObserved(issue, IssueOutcome.AlternativeSolution));
+    }
+
+    public void RunAsOwners<TQuest>(Action<TQuest> listener) where TQuest : QuestBase
+    {
+        if (ModInformation.IsClient)
+        {
+            return;
+        }
+
+        var issues = Campaign.Current.IssueManager.Issues.Values
+            .Where(issue => issue.IssueQuest is TQuest quest && quest.IsOngoing)
+            .ToList();
+
+        foreach (var issue in issues)
+        {
+            try
+            {
+                if (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero))
+                {
+                    Logger.Warning("{issue} has a running quest but no owning player", issue.StringId);
+                    continue;
+                }
+
+                using (new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo))
+                {
+                    listener((TQuest)issue.IssueQuest);
+                }
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Running a {quest} listener as the owner of {issue} failed", typeof(TQuest).Name, issue.StringId);
+            }
+        }
     }
 }

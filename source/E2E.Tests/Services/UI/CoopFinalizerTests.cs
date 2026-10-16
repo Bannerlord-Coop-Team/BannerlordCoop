@@ -63,7 +63,7 @@ public class CoopFinalizerTests
         try
         {
             using var fixture = new Fixture();
-            using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
+            using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), ShortTimeout);
             Rejection rejection = fixture.RejectOnWorker();
             fixture.WaitUntilQueued();
 
@@ -181,7 +181,7 @@ public class CoopFinalizerTests
     public void RejectionWithACloseTextWhoseHideTimesOutWhileRunning_ShowsTheCloseTextOnce()
     {
         using var fixture = new Fixture();
-        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
+        using var shortTimeout = GameThread.Instance.LimitFrameDrain(TimeSpan.FromSeconds(1), ShortTimeout);
         fixture.Finalizer.SetCloseText(CloseText);
         Rejection rejection = fixture.RejectOnWorker();
         fixture.WaitUntilQueued();
