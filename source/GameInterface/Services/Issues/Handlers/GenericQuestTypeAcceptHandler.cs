@@ -259,7 +259,6 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     nameof(NetworkQuestTypeQuestAccepted), data.OwnerId);
                 return;
             }
-
         });
     }
 
@@ -468,7 +467,6 @@ internal class GenericQuestTypeAcceptHandler : IHandler
                     nameof(NetworkQuestTypeAlternativeAccepted), data.OwnerId);
                 return;
             }
-
         });
     }
 
