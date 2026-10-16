@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Actions.Patches;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.MobileParties.Extensions;
@@ -30,11 +31,16 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
 {
     private readonly IMessageBroker messageBroker;
     private readonly ISessionWorkshopPlayerDataInterface workshopData;
+    private readonly ILeaderlessClanResolver leaderlessClanResolver;
 
-    public ApplyHeirSelectionActionInterface(IMessageBroker messageBroker, ISessionWorkshopPlayerDataInterface workshopData)
+    public ApplyHeirSelectionActionInterface(
+        IMessageBroker messageBroker,
+        ISessionWorkshopPlayerDataInterface workshopData,
+        ILeaderlessClanResolver leaderlessClanResolver)
     {
         this.messageBroker = messageBroker;
         this.workshopData = workshopData;
+        this.leaderlessClanResolver = leaderlessClanResolver;
     }
 
     public void ApplyByDeath(Hero originalHero, Hero heir, MobileParty originalParty)
@@ -70,6 +76,9 @@ public class ApplyHeirSelectionActionInterface : IApplyHeirSelectionActionInterf
 
         DisableHeroAction.Apply(originalHero);
         RecordRetirement(originalHero);
+
+        // a kingdom clan must not stay without a leader (#4166)
+        leaderlessClanResolver.Resolve(clan);
     }
 
     public void AppointClanLeader(Hero originalHero, Hero successor)

@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.UI.PlayerList;
+﻿using GameInterface.Services.Clans;
+using GameInterface.Services.UI.PlayerList;
 using Autofac;
 using Common.Messaging;
 using Common.Network;
@@ -114,6 +115,7 @@ internal abstract class TestComponentBase
         RegisterMock<IModuleInfoProvider>(builder);
         RegisterMock<IRegistryManager>(builder);
         RegisterMock<IMapEventLoadCleaner>(builder);
+        RegisterMock<ILeaderlessClanResolver>(builder);
         RegisterMock<IHideoutResultEncounter>(builder);
         RegisterPlayerManagerMock(builder);
         RegisterMock<IPlayerPartyRestorer>(builder);
