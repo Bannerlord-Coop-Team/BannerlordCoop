@@ -22,6 +22,17 @@ public class CoopNavalBattleEndLogicTests
         Assert.Equal(expected, CoopNavalBattleEndLogic.OutcomeOf(state, playerSide));
     }
 
+    // M8a: vanilla reads a side with no hull as retreated; in coop that stands only once that side's hulls left with their
+    // owners and none is left, never before its hulls spawn.
+    [Theory]
+    [InlineData(0, 0, false)]
+    [InlineData(1, 1, false)]
+    [InlineData(2, 0, true)]
+    public void KeepsRetreat_OnlyOnceEveryHullLeftWithItsOwner(int departedHulls, int hullsLeft, bool expected)
+    {
+        Assert.Equal(expected, CoopNavalBattleEndLogic.KeepsRetreat(departedHulls, hullsLeft));
+    }
+
     [Fact]
     public void ReplicatedOutcome_LeavesTheHostToItsOwnDetectionUntilAResultIsResolved()
     {

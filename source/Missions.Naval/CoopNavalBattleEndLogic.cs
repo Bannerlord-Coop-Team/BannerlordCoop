@@ -20,7 +20,8 @@ internal enum NavalBattleOutcome
 
 /// <summary>
 /// Vanilla <see cref="NavalBattleEndLogic"/> where only the battle host detects the end, since crew tracking and reserves
-/// live on each hull's owner; other clients end with the host's replicated result. Retreat and ship capture stay off.
+/// live on each hull's owner; other clients end with the host's replicated result. A side retreats only once its players'
+/// hulls left with them and none is left; ship capture stays off.
 /// </summary>
 public class CoopNavalBattleEndLogic : NavalBattleEndLogic
 {
@@ -187,11 +188,26 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
         return "none";
     }
 
-    // Retreat is disabled in coop naval, and vanilla reads a side with no hull left as one that retreated.
+    /// <summary>
+    /// Whether vanilla's retreat of a side stands: it reads any side with no hull left as retreated, which in coop also holds
+    /// before a side's hulls spawn here; so it counts only once hulls left that side with their owner and none is left.
+    /// </summary>
+    internal static bool KeepsRetreat(int departedHulls, int hullsLeft) => departedHulls > 0 && hullsLeft == 0;
+
     private void ClearRetreat()
     {
-        IsEnemySideRetreating = false;
-        _isPlayerSideRetreating = false;
+        var playerSide = Mission.PlayerTeam?.Side ?? BattleSideEnum.None;
+        var enemySide = playerSide == BattleSideEnum.None ? BattleSideEnum.None : playerSide.GetOppositeSide();
+        if (!IsRetreatedSide(enemySide)) IsEnemySideRetreating = false;
+        if (!IsRetreatedSide(playerSide)) _isPlayerSideRetreating = false;
+    }
+
+    private bool IsRetreatedSide(BattleSideEnum side)
+    {
+        if (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender) return false;
+
+        int hullsLeft = _navalShipsLogic.AllShips.Count(ship => ship.Team != null && ship.Team.Side == side);
+        return KeepsRetreat(shipReplicator.DepartedHulls(side), hullsLeft);
     }
 
     private bool BothSidesFielded()

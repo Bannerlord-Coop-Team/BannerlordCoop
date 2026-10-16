@@ -38,6 +38,15 @@ internal class ForeignShipOrderTickPatch
     private static bool Prefix(ShipOrder __instance) => !NavalForeignHulls.Contains(__instance._ownerShip);
 }
 
+// ShipRetreatLogic removes a hull whose order is Retreat once it reaches the map edge; only the owner may retreat its hull.
+[HarmonyPatch(typeof(ShipOrder), nameof(ShipOrder.SetShipRetreatOrder))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class ForeignShipRetreatOrderPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(ShipOrder __instance) => !NavalForeignHulls.Contains(__instance._ownerShip);
+}
+
 // Detachments move crew onto machines; on a foreign copy that is the owner's decision.
 [HarmonyPatch(typeof(ShipOrder), nameof(ShipOrder.ManageShipDetachments))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
