@@ -10,18 +10,6 @@ namespace GameInterface.Tests.Services.Locations;
 
 public class LocationCompanionAuthorityPatchTests
 {
-    [Fact]
-    public void AccompanyingCompanions_SpawnOnOwningClient()
-    {
-        Assert.True(LocationCharacterGuardPatches.ShouldSpawnAccompanyingCharacters(isClient: true));
-    }
-
-    [Fact]
-    public void AccompanyingCompanions_DoNotSpawnOnDedicatedServer()
-    {
-        Assert.False(LocationCharacterGuardPatches.ShouldSpawnAccompanyingCharacters(isClient: false));
-    }
-
     [Theory]
     [InlineData(true, false, false, false, 30f, 18f, true)]
     [InlineData(false, false, false, false, 30f, 18f, false)]

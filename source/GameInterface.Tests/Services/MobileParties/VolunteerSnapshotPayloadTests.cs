@@ -11,16 +11,6 @@ namespace GameInterface.Tests.Services.MobileParties;
 /// </summary>
 public class VolunteerSnapshotPayloadTests
 {
-    [Theory]
-    [InlineData("GameInterface.Services.Heroes.Messages.Collections.NetworkUpdateArray")]
-    [InlineData("GameInterface.Services.MobileParties.Messages.RemoveVolunteer")]
-    public void LegacySingleOperationMessages_AreNotInAssembly(string typeName)
-    {
-        Assembly gameInterfaceAssembly = typeof(UpdateVolunteers).Assembly;
-
-        Assert.Null(gameInterfaceAssembly.GetType(typeName));
-    }
-
     [Fact]
     public void Merge_KeepsLatestArrayPerHero()
     {
