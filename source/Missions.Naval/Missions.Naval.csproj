@@ -180,6 +180,7 @@
     <Reference Include="NavalDLC.ViewModelCollection"><HintPath>../../mb2/Modules/NavalDLC/bin/Win64_Shipping_Client/NavalDLC.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
     <Publicize Include="NavalDLC.View" />
     <Publicize Include="NavalDLC.GauntletUI" />
+    <Publicize Include="NavalDLC.ViewModelCollection" />
     <Publicize Include="TaleWorlds.ScreenSystem" />
     <Publicize Include="TaleWorlds.MountAndBlade.View" />
     <Publicize Include="TaleWorlds.MountAndBlade.GauntletUI" />

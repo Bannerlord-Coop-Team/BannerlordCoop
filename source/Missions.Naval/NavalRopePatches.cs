@@ -9,6 +9,7 @@ using System.Reflection.Emit;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Attachment = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachment;
+using Joint = NavalDLC.Missions.Objects.UsableMachines.ShipAttachmentMachine.ShipAttachmentJoint;
 using ForceMode = TaleWorlds.Engine.GameEntityPhysicsExtensions.ForceMode;
 
 namespace Missions.Naval;
@@ -49,7 +50,7 @@ internal class RopePlankEligibilityPatch
     private static bool Prefix(Attachment __instance) => NavalRopes.AllowOwnerDecision(__instance);
 }
 
-[HarmonyPatch(typeof(Attachment), "CheckAndBreakAttachment")]
+[HarmonyPatch(typeof(Attachment), nameof(Attachment.CheckAndBreakAttachment))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopeBreakCheckPatch
 {
@@ -57,7 +58,7 @@ internal class RopeBreakCheckPatch
     private static bool Prefix(Attachment __instance) => NavalRopes.AllowOwnerDecision(__instance);
 }
 
-[HarmonyPatch(typeof(Attachment), "TickThrownBridge")]
+[HarmonyPatch(typeof(Attachment), nameof(Attachment.TickThrownBridge))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopeReplicaPlankFlightPatch
 {
@@ -74,7 +75,7 @@ internal class RopeReplicaTickPatch
 }
 
 // Retargeting destroys and recreates a rope; on a copied hull that is the owner's decision.
-[HarmonyPatch(typeof(ShipAttachmentMachineConnectionLogic), "OnTick")]
+[HarmonyPatch(typeof(ShipAttachmentMachineConnectionLogic), nameof(ShipAttachmentMachineConnectionLogic.OnTick))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopeRetargetPatch
 {
@@ -83,7 +84,7 @@ internal class RopeRetargetPatch
         NavalRopes.AllowConnectionRetarget(__instance._ownerShip);
 }
 
-[HarmonyPatch(typeof(Attachment), "UpdateRopeMeshVisualAccordingToTargetPoint")]
+[HarmonyPatch(typeof(Attachment), nameof(Attachment.UpdateRopeMeshVisualAccordingToTargetPoint))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RopeThrowCurvePatch
 {
@@ -100,8 +101,9 @@ internal class RopeForcePatch
 {
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        foreach (var name in new[] { "StabilizeShipUps", "AlignShips", "ApplyConstraintImpulse", "ReduceRelativeDrift" })
-            yield return AccessTools.DeclaredMethod(typeof(ShipAttachmentMachine.ShipAttachmentJoint), name);
+        foreach (var name in new[]
+            { nameof(Joint.StabilizeShipUps), nameof(Joint.AlignShips), nameof(Joint.ApplyConstraintImpulse), nameof(Joint.ReduceRelativeDrift) })
+            yield return AccessTools.DeclaredMethod(typeof(Joint), name);
         yield return AccessTools.DeclaredMethod(typeof(Attachment), nameof(Attachment.OnFixedTick));
     }
 
@@ -158,7 +160,7 @@ internal class RopePlankCosmeticsPatch
 
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        foreach (var name in new[] { "SpawnPlankEntities", "ConnectBridge", "AddRopesToBridge" })
+        foreach (var name in new[] { nameof(Attachment.SpawnPlankEntities), nameof(Attachment.ConnectBridge), nameof(Attachment.AddRopesToBridge) })
             yield return AccessTools.DeclaredMethod(typeof(Attachment), name);
     }
 

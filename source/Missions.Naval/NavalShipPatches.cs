@@ -92,7 +92,7 @@ internal class PlayerFleetDeploymentSlotPatch
 
 // The order of battle restores its saved ship layout by Ship reference; a coop battle fields fresh snapshots that never
 // match, so it would empty every formation whose ship can move and remove all own hulls but the flagship at Ready.
-[HarmonyPatch(typeof(NavalOrderOfBattleVM), "LoadConfigurationShips")]
+[HarmonyPatch(typeof(NavalOrderOfBattleVM), nameof(NavalOrderOfBattleVM.LoadConfigurationShips))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class CoopOrderOfBattleShipLayoutPatch
 {
