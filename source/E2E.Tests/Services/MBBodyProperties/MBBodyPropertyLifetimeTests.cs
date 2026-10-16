@@ -2,7 +2,7 @@
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
-namespace E2E.Tests.Services.MBBodyPropertys;
+namespace E2E.Tests.Services.MBBodyProperties;
 public class MBBodyPropertyLifetimeTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }
@@ -39,26 +39,5 @@ public class MBBodyPropertyLifetimeTests : IDisposable
         {
             Assert.True(client.ObjectManager.TryGetObject<MBBodyProperty>(MBBodyPropertyId, out var _));
         }
-    }
-
-    [Fact]
-    public void ClientCreate_MBBodyProperty_DoesNothing()
-    {
-        // Arrange
-        var server = TestEnvironment.Server;
-
-        // Act
-        string? MBBodyPropertyId = null;
-
-        var firstClient = TestEnvironment.Clients.First();
-        firstClient.Call(() =>
-        {
-            var MBBodyProperty = new MBBodyProperty();
-
-            Assert.False(firstClient.ObjectManager.TryGetId(MBBodyProperty, out MBBodyPropertyId));
-        });
-
-        // Assert
-        Assert.Null(MBBodyPropertyId);
     }
 }

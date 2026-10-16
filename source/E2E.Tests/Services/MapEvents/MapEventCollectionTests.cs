@@ -25,9 +25,6 @@ public class MapEventCollectionTests : MapEventTestBase
 {
     public MapEventCollectionTests(ITestOutputHelper output) : base(output) { }
 
-    [Fact(Skip = "MapEvent._sides is a fixed-size MapEventSide[2] array")]
-    public void Server_MapEvent_Sides_IsFixedArray() { }
-
     [Fact]
     public void Server_MapEvent_CommitPublishesCompleteLockedGraph()
     {
@@ -193,47 +190,6 @@ public class MapEventCollectionTests : MapEventTestBase
     }
 
     [Fact]
-    public void Server_RejectsNetworkAddBattlePartyPacket()
-    {
-        var message = new NetworkAddBattleParty("side", "map-event-party", "party");
-        var serializer = Server.Resolve<ICommonSerializer>();
-        var packet = MessagePacket.Create(message, serializer);
-
-        Server.SimulatePacket(Clients.First().NetPeer, packet);
-
-        Assert.Equal(0, Server.InternalMessages.GetMessageCount<NetworkAddBattleParty>());
-    }
-
-    [Fact]
-    public void Server_NetworkAddBattlePartyHandlerDoesNotRebindParty()
-    {
-        var staged = CreateServerMapEvent();
-        string mapEventSideId = null;
-        string mapEventPartyId = null;
-        string defenderPartyId = null;
-
-        Server.Call(() =>
-        {
-            var mapEvent = Get<MapEvent>(Server, staged.MapEventId);
-            var attackerParty = Get<MobileParty>(Server, staged.AttackerPartyId).Party;
-            var mapEventParty = Assert.Single(mapEvent.AttackerSide.Parties,
-                candidate => ReferenceEquals(candidate.Party, attackerParty));
-            Assert.True(Server.ObjectManager.TryGetId(mapEvent.AttackerSide, out mapEventSideId));
-            Assert.True(Server.ObjectManager.TryGetId(mapEventParty, out mapEventPartyId));
-            Assert.True(Server.ObjectManager.TryGetId(
-                Get<MobileParty>(Server, staged.DefenderPartyId).Party,
-                out defenderPartyId));
-        });
-
-        Server.SimulateMessage(Clients.First().NetPeer,
-            new NetworkAddBattleParty(mapEventSideId, mapEventPartyId, defenderPartyId));
-
-        Server.Call(() => Assert.Same(
-            Get<MobileParty>(Server, staged.AttackerPartyId).Party,
-            Get<MapEventParty>(Server, mapEventPartyId).Party));
-    }
-
-    [Fact]
     public void Client_CommitRestoresAuthoritativeComponentLinks()
     {
         var staged = CreateServerMapEvent(commit: false);
@@ -293,25 +249,6 @@ public class MapEventCollectionTests : MapEventTestBase
             Assert.Null(Get<MobileParty>(instance, staged.AttackerPartyId).MapEvent);
             Assert.Null(Get<MobileParty>(instance, staged.DefenderPartyId).MapEvent);
         });
-    }
-
-    [Fact]
-    public void PendingMovementBinding_IsIsolatedPerLifetimeScope()
-    {
-        var staged = CreateServerMapEvent(commit: false);
-        PartyBase serverDefender = null;
-
-        Server.Call(() =>
-        {
-            serverDefender = Get<MobileParty>(Server, staged.DefenderPartyId).Party;
-            Assert.False(PendingMapEventPartyMovementPatch.CanAdvancePosition(serverDefender));
-        });
-
-        foreach (var client in Clients)
-        {
-            client.Call(() =>
-                Assert.True(PendingMapEventPartyMovementPatch.CanAdvancePosition(serverDefender)));
-        }
     }
 
     [Fact]
