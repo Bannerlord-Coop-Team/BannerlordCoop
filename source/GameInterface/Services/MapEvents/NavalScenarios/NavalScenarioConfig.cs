@@ -62,10 +62,16 @@ public sealed class NavalScenarioConfig
     [ProtoMember(17)]
     public string MapEventId { get; set; }
 
+    [ProtoMember(18)]
+    public bool RetreatSecondPlayer { get; set; }
+
     public string InitiatorControllerId => ControllerIds.Length == 0 ? null : ControllerIds[0];
 
     /// <summary>The player who joins the running battle, or null.</summary>
     public string LateJoinerControllerId => LateJoin && ControllerIds.Length > 1 ? ControllerIds[1] : null;
+
+    /// <summary>The player who retreats from the running battle, or null.</summary>
+    public string RetreatingControllerId => RetreatSecondPlayer && ControllerIds.Length > 1 ? ControllerIds[1] : null;
 }
 
 /// <summary>DEBUG, server to clients: a naval scenario was staged; clients run its automatic steps.</summary>

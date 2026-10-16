@@ -27,7 +27,7 @@ public class NavalScenarioResolverTests
     {
         var names = NavalScenarioPresets.All.Select(preset => preset.Name).ToArray();
         Assert.Equal(names.Length, names.Distinct().Count());
-        Assert.Equal(new[] { "solo", "vs_pirates", "boarding", "ramming", "sinking", "migration", "late_join", "fleet", "duel", "allied_npc" },
+        Assert.Equal(new[] { "solo", "vs_pirates", "boarding", "ramming", "sinking", "migration", "late_join", "fleet", "duel", "allied_npc", "retreat" },
             names);
 
         foreach (var name in names)
@@ -93,10 +93,15 @@ public class NavalScenarioResolverTests
         Assert.True(lateJoin.LateJoin);
         Assert.Equal("PlayerTwo", lateJoin.LateJoinerControllerId);
         Assert.Null(Resolve("vs_pirates").LateJoinerControllerId);
+
+        var retreat = Resolve("retreat");
+        Assert.True(retreat.RetreatSecondPlayer);
+        Assert.Equal("PlayerTwo", retreat.RetreatingControllerId);
+        Assert.Null(Resolve("vs_pirates").RetreatingControllerId);
     }
 
     [Theory]
-    [InlineData("Unknown preset nope; presets: solo, vs_pirates, boarding, ramming, sinking, migration, late_join, fleet, duel, allied_npc.", "nope")]
+    [InlineData("Unknown preset nope; presets: solo, vs_pirates, boarding, ramming, sinking, migration, late_join, fleet, duel, allied_npc, retreat.", "nope")]
     [InlineData("hulls must be a whole number from 1 to 8.", "vs_pirates", "hulls=9")]
     [InlineData("hulls must be a whole number from 1 to 8.", "vs_pirates", "hulls=x")]
     [InlineData("duel has no AI enemy, so it takes no hulls knob.", "duel", "hulls=2")]

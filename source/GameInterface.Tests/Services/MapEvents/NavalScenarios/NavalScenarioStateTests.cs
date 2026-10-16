@@ -49,6 +49,18 @@ public class NavalScenarioStateTests
         Assert.DoesNotContain(NavalScenarioState.SinkStep, Steps(Config("vs_pirates", "PlayerOne"), "PlayerOne"));
     }
 
+    // M8a: only the second player retreats; the others stay in the battle to watch its hulls leave.
+    [Fact]
+    public void StepsFor_TheRetreatPresetRetreatsOnlyTheSecondPlayer()
+    {
+        var config = Config("retreat", "PlayerOne", "PlayerTwo", "PlayerThree");
+
+        Assert.Equal(new[] { NavalScenarioState.AttackStep, NavalScenarioState.ReadyStep }, Steps(config, "PlayerOne"));
+        Assert.Equal(new[] { NavalScenarioState.ReadyStep, NavalScenarioState.RetreatStep }, Steps(config, "PlayerTwo"));
+        Assert.Equal(new[] { NavalScenarioState.ReadyStep }, Steps(config, "PlayerThree"));
+        Assert.Empty(Steps(config, null, isServer: true));
+    }
+
     [Fact]
     public void StepsFor_TheServerJoinsTheLateJoinerWhoThenEntersOnItsOwn()
     {

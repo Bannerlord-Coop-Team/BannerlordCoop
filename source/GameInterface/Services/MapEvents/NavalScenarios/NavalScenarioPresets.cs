@@ -59,6 +59,9 @@ public sealed class NavalScenarioPreset
 
     /// <summary>The nearest friendly AI lord party joins the players' side with a ship.</summary>
     public bool AlliedNpc { get; set; }
+
+    /// <summary>The second player retreats through Tab and Retreat <c>delay</c> seconds after its deployment.</summary>
+    public bool RetreatSecondPlayer { get; set; }
 }
 
 /// <summary>DEBUG: the naval scenario presets <c>coop.debug.naval.scenario</c> accepts.</summary>
@@ -155,6 +158,14 @@ public static class NavalScenarioPresets
             Name = "allied_npc",
             Description = "vs_pirates plus a friendly AI lord party with a ship on the players' side.",
             AlliedNpc = true,
+        },
+        new NavalScenarioPreset
+        {
+            Name = "retreat",
+            Description = "vs_pirates; the second player retreats through Tab and Retreat delay seconds after deploying. " +
+                "Run it with three players, so two stay to watch the hulls leave.",
+            MinPlayers = 2,
+            RetreatSecondPlayer = true,
         },
     };
 

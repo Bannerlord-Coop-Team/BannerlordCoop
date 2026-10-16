@@ -74,6 +74,7 @@ public class NavalScenarioResolver : INavalScenarioResolver
         LateJoin = preset.LateJoin,
         Duel = preset.Duel,
         AlliedNpc = preset.AlliedNpc,
+        RetreatSecondPlayer = preset.RetreatSecondPlayer,
         MapEventId = "",
     };
 

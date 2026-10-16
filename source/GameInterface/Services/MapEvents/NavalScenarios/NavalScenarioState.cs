@@ -73,6 +73,7 @@ public class NavalScenarioState : INavalScenarioState
     public const string HelmStep = "helm";
     public const string SinkStep = "sink";
     public const string DisconnectStep = "disconnect";
+    public const string RetreatStep = "retreat";
 
     private List<NavalScenarioStep> steps = new List<NavalScenarioStep>();
 
@@ -131,6 +132,7 @@ public class NavalScenarioState : INavalScenarioState
         if (config.Placement == NavalScenarioPlacement.Ramming) yield return HelmStep;
         if (config.SinkingEnemyHull) yield return SinkStep;
         if (config.DisconnectBattleHost) yield return DisconnectStep;
+        if (localControllerId == config.RetreatingControllerId) yield return RetreatStep;
     }
 }
 #endif

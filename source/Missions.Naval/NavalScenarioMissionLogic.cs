@@ -14,12 +14,15 @@ using System.Linq;
 using System.Threading.Tasks;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.GauntletUI.Mission.Singleplayer;
+using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
 
 namespace Missions.Naval;
 
 /// <summary>
 /// [Game thread] DEBUG: runs this client's steps of the active naval scenario inside its battle: presses Ready on the
-/// naval order of battle, then places the own hull and throws a rope, drives the helm or disconnects, as the scenario says.
+/// naval order of battle, then places the own hull and throws a rope, drives the helm, disconnects or retreats, as the
+/// scenario says.
 /// </summary>
 public class NavalScenarioMissionLogic : MissionLogic
 {
@@ -41,6 +44,9 @@ public class NavalScenarioMissionLogic : MissionLogic
     private readonly NavalScenarioConfig config;
     private readonly INavalScenarioReadyPress readyPress = new NavalScenarioReadyPress(
         press => GameThread.EnqueueSafe(press, context: "NavalScenarioMissionLogic.PressReady"));
+    // The retreat confirmation's OK ends the mission, so its presses run off the mission tick as Ready's do.
+    private readonly INavalScenarioReadyPress retreatPress = new NavalScenarioReadyPress(
+        press => GameThread.EnqueueSafe(press, context: "NavalScenarioMissionLogic.PressRetreat"));
 
     private float sinceDeployment;
     private float sincePlacement;
@@ -137,6 +143,40 @@ public class NavalScenarioMissionLogic : MissionLogic
         if (state.IsPending(NavalScenarioState.HelmStep) && sincePlacement >= SettleSeconds) DriveHelm();
         if (state.IsPending(NavalScenarioState.SinkStep) && sinceDeployment >= config.DelaySeconds) HitWeakestAiHull();
         if (state.IsPending(NavalScenarioState.DisconnectStep) && sinceDeployment >= config.DelaySeconds) Disconnect();
+        if (state.IsPending(NavalScenarioState.RetreatStep) && sinceDeployment >= config.DelaySeconds)
+            retreatPress.Tick(dt, () => RetreatHandler() != null, PressRetreat);
+    }
+
+    // Tab's scoreboard Retreat button (SPScoreboardVM.OnExitBattle) asks BasicMissionHandler for the confirmation; a later
+    // press clicks its OK, which runs OnBattleEnded and Mission.RetreatMission as the player's click does.
+    private void PressRetreat()
+    {
+        var handler = RetreatHandler();
+        if (!handler.IsWarningWidgetOpened)
+        {
+            Mission.GetMissionBehavior<MissionGauntletBattleScore>().DataSource.ExecuteQuitAction();
+            if (handler.IsWarningWidgetOpened)
+                Logger.Information("[NavalScenario] Pressed Retreat for {MapEventId}; the retreat confirmation is open", config.MapEventId);
+            else
+                Complete(NavalScenarioState.RetreatStep, false, "Tab's Retreat opened no retreat confirmation");
+            return;
+        }
+
+        Complete(NavalScenarioState.RetreatStep, true, $"Tab's Retreat opened vanilla's retreat confirmation {sinceDeployment:0} s " +
+            "after deploying; accepted it");
+        InformationManager.HideInquiry();
+        handler.OnEventAcceptSelectionWidget();
+    }
+
+    // The retreat handler while this mission runs, its scoreboard exists and the retreat step is pending; null otherwise.
+    private BasicMissionHandler RetreatHandler()
+    {
+        var mission = Mission;
+        if (mission == null || Mission.Current != mission || mission.MissionEnded) return null;
+        if (state.Current != config || !state.IsPending(NavalScenarioState.RetreatStep)) return null;
+        if (mission.GetMissionBehavior<MissionGauntletBattleScore>()?.DataSource == null) return null;
+
+        return mission.GetMissionBehavior<BasicMissionHandler>();
     }
 
     private void TryPlace()
