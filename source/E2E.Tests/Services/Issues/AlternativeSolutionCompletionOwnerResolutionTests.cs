@@ -1,4 +1,4 @@
-using Common.Util;
+﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Issues.Generic;
@@ -26,6 +26,7 @@ public class AlternativeSolutionCompletionOwnerResolutionTests : IDisposable
 
     public AlternativeSolutionCompletionOwnerResolutionTests(ITestOutputHelper output)
     {
+        TestQuestTypeFixture.EnsureVillageNeedsToolsRegistered();
         TestEnvironment = new E2ETestEnvironment(output);
     }
 
@@ -93,6 +94,7 @@ public class AlternativeSolutionCompletionOwnerResolutionTests : IDisposable
             }
 
             Server.Resolve<IIssueOwnershipRegistry>().SetOwner(owner, controllerId);
+            Server.Resolve<IIssueGenerationRegistry>().Bump(owner);
         });
 
         Server.Call(() =>
