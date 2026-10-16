@@ -126,7 +126,8 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         {
             var hull = b.Ship(retreating).Hull;
             b.Ships.AnnounceRemoval(hull, ShipRemovalReason.Retreat, missionEnding: false);
-            b.Engine.RemoveHull(hull);
+            // Stands for vanilla ShipRetreatLogic removing B's own hull.
+            b.Engine.VanillaOwnerRemoveShipForTest(hull);
         });
         foreach (var peer in new[] { a, c })
             peer.Call(() => peer.Broker.Publish(peer, new NetworkBattleAgentRouted(retreatingCrewId)));
@@ -307,7 +308,8 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         foreach (var ship in leaver.Registry.Ships.ToList())
         {
             leaver.Ships.AnnounceRemoval(ship.Hull, reason, missionEnding: true);
-            leaver.Engine.RemoveHull(ship.Hull);
+            // Stands for vanilla NavalShipsLogic.OnEndMission removing the leaver's own hull.
+            leaver.Engine.VanillaOwnerRemoveShipForTest(ship.Hull);
         }
     });
 

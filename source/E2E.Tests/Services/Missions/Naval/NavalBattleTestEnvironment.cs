@@ -189,7 +189,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 controller.Session.TryBegin(MapEventId);
                 instance.Resolve<IBattleHostRegistry>().Set(MapEventId, new BattleHostAssignment(HostId, Successors, HostEpoch));
                 var members = new NavalMissionMembers(instance.Resolve<IMessageBroker>(), Peers.Select(other => other.Id));
-                peer = new NavalPeer(id, side, instance, mission, controller, new FakeNavalShipEngine(), members);
+                peer = new NavalPeer(id, side, instance, mission, controller, new FakeNavalShipEngine(id), members);
             });
 
             // The server introduces an entrant and every member to each other.
@@ -277,12 +277,31 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         public Guid FieldAiHull(NavalPeer host, BattleSideEnum side, Vec3 position, int? formationIndex = null) =>
             host.FieldAiHull(side, position, PirateMapEventPartyId, formationIndex);
 
+        /// <summary>
+        /// Tears the battle down after a last removal invariant check on every client, which fails the scenario. Skipped once a
+        /// tick failed it, since throwing here would hide that failure.
+        /// </summary>
         public void Dispose()
         {
+            var violations = new List<Exception>();
+            bool alreadyFailed = peers.Values.Any(peer => peer.Engine.HasFailedRemovalInvariant);
+            foreach (var peer in alreadyFailed ? Enumerable.Empty<NavalPeer>() : peers.Values)
+            {
+                try
+                {
+                    peer.Call(peer.Engine.AssertRemovalInvariant);
+                }
+                catch (Exception exception)
+                {
+                    violations.Add(exception);
+                }
+            }
+
             foreach (var peer in peers.Values)
                 peer.Instance.Call(peer.DisposeShipServices);
             BattleSpawnGate.EndBattle();
             fixture.Dispose();
+            if (violations.Count > 0) throw new AggregateException(violations);
         }
     }
 
@@ -338,6 +357,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
     /// <summary>One client in a naval battle: its mission, controller, fake ship engine and the ship services under test.</summary>
     protected sealed class NavalPeer
     {
+        private readonly Dictionary<Agent, string> agentNames = new(ReferenceEqualityComparer.Instance);
+
         public NavalPeer(string id, BattleSideEnum side, EnvironmentInstance instance, MockMission mission,
             CoopBattleController controller, FakeNavalShipEngine engine, NavalMissionMembers members)
         {
@@ -348,6 +369,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             Mission = mission;
             Controller = controller;
             Engine = engine;
+            engine.AgentName = agent => agentNames.TryGetValue(agent, out var name) ? name : null;
             Network = instance.Resolve<MockBattleNetwork>();
             Broker = instance.Resolve<IMessageBroker>();
             var reinforcements = new Mock<IReinforcementFielder>();
@@ -386,8 +408,15 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
 
         public void Call(Action action, IEnumerable<MethodBase>? disabledMethods = null) => Instance.Call(action, disabledMethods);
 
-        /// <summary>One naval services tick in the live order; this harness fields no NPC fleet.</summary>
-        public void Tick(float dt = TickSeconds) => Call(() => Services.Tick(dt));
+        /// <summary>
+        /// One naval services tick in the live order, then the removal invariant check on this client; this harness fields no
+        /// NPC fleet.
+        /// </summary>
+        public void Tick(float dt = TickSeconds) => Call(() =>
+        {
+            Services.Tick(dt);
+            Engine.AssertRemovalInvariant();
+        });
 
         public void Ticks(int count)
         {
@@ -414,6 +443,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             {
                 var hull = Engine.Field(side, position);
                 hull.CampaignShipId = campaignShipId;
+                hull.ShipId = shipId;
                 Assert.True(Registry.TryRegister(new NetworkShipInfo(shipId, Id, mapEventPartyId, false, hull.Hull, null)));
             });
             return shipId;
@@ -432,6 +462,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                     : side == BattleSideEnum.Attacker ? Mission.AttackerTeam.Shell : Mission.DefenderTeam.Shell;
                 var hull = Engine.Field(side, position, formationIndex ?? 0, team);
                 shipId = Ships.RegisterNpcHull(hull.Hull, hull.Formation!, mapEventPartyId);
+                hull.ShipId = shipId;
             });
             Assert.NotEqual(Guid.Empty, shipId);
             return shipId;
@@ -500,6 +531,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                     .Controller(authority == Id ? AgentControllerType.AI : AgentControllerType.None);
                 agent = Mission.SpawnAgent(team == null ? build : build.Team(team.Shell));
                 Assert.True(Agents.TryRegisterAgent(authority, agentId, agent));
+                agentNames[agent] = $"agent {agentId} of {authority}";
             });
             return agent;
         }

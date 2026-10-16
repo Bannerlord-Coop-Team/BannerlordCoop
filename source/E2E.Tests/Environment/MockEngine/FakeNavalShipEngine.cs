@@ -11,6 +11,8 @@ namespace E2E.Tests.Environment.MockEngine;
 /// <summary>
 /// One client's NavalDLC boundary for naval battle E2E tests. Hulls are plain <see cref="FakeHull"/> records keyed by a
 /// constructor-skipped <see cref="MissionObject"/>, so the DLC-free replicators run headless over the mission mesh.
+/// It also checks the removal invariant on every hull the code under test removes or replaces; see
+/// <see cref="AssertRemovalInvariant"/>.
 /// </summary>
 public sealed class FakeNavalShipEngine : INavalShipEngine
 {
@@ -21,6 +23,20 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
     private readonly List<FakeHull> hulls = new();
     private readonly Dictionary<Agent, FakeHull> decks = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<Agent, FakeHull> crews = new(ReferenceEqualityComparer.Instance);
+    // Parking lifts an agent clear with its physics force-closed (NavalShipEngine.ParkHullAgents), so one entry is both.
+    private readonly Dictionary<Agent, FakeHull> parkedFrom = new(ReferenceEqualityComparer.Instance);
+    private readonly List<string> removalViolations = new();
+
+    public FakeNavalShipEngine(string clientId)
+    {
+        ClientId = clientId;
+    }
+
+    /// <summary>The client this engine belongs to, named in removal invariant failures.</summary>
+    public string ClientId { get; }
+
+    /// <summary>Names an agent in removal invariant failures; its mission index when unset or null.</summary>
+    public Func<Agent, string?>? AgentName { get; set; }
 
     public IReadOnlyList<MissionObject> Hulls => hulls.Where(hull => !hull.IsRemoved).Select(hull => hull.Hull).ToList();
 
@@ -110,6 +126,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             Formation = FormationOf(team, formationIndex),
             SpawnData = data,
             CampaignShipId = data.CampaignShipId,
+            ShipId = data.ShipId,
         };
         if (ArmsCopies) copy.ArmWeapon();
         hulls.Add(copy);
@@ -200,7 +217,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         }
 
         foreach (var moved in parked)
-            ParkedAgents.Add(moved.Agent);
+            parkedFrom[moved.Agent] = fake;
         foreach (var agent in CrewOf(fake).Where(agent => parked.All(moved => moved.Agent != agent)))
             parked.Add(new HullSwapAgent(agent, isCrew: true, isParked: false, Vec3.Zero, Vec3.Zero));
 
@@ -212,7 +229,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         crews.Where(entry => ReferenceEquals(entry.Value, fake) && entry.Key.IsActive()).Select(entry => entry.Key).ToList();
 
     /// <summary>The agents a hull's parking lifted clear that nothing has put back or withdrawn yet.</summary>
-    public HashSet<Agent> ParkedAgents { get; } = new(ReferenceEqualityComparer.Instance);
+    public IReadOnlyCollection<Agent> ParkedAgents => parkedFrom.Keys;
 
     public MissionObject ReplaceHull(MissionObject hull)
     {
@@ -220,6 +237,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         if (ReplaceHullFails) return null!;
 
         var old = Of(hull);
+        CheckClearForRemoval(old, "replaced");
         old.IsRemoved = true;
         var fresh = new FakeHull(MissionTestObjects.CreateHull(), old.Side, old.FormationIndex, isCopy: false)
         {
@@ -232,16 +250,35 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             Formation = old.Formation,
             CrewCapacity = old.CrewCapacity,
             CampaignShipId = old.CampaignShipId,
+            ShipId = old.ShipId,
         };
         hulls.Add(fresh);
+        old.ReplacedBy = fresh;
+        // The replacement takes the old hull's formation, so its crew and the agents parked for boarding it carry over.
+        foreach (var agent in crews.Where(entry => entry.Value == old).Select(entry => entry.Key).ToList())
+            crews[agent] = fresh;
+        foreach (var agent in parkedFrom.Where(entry => entry.Value == old).Select(entry => entry.Key).ToList())
+            parkedFrom[agent] = fresh;
         return fresh.Hull;
     }
 
     public void BoardHullAgents(MissionObject hull, IReadOnlyList<HullSwapAgent> agents)
     {
         Boardings.Add((hull, agents));
+        var boarded = hull == null ? null : Of(hull);
         foreach (var moved in agents.Where(moved => moved.IsParked))
-            ParkedAgents.Remove(moved.Agent);
+        {
+            // A swap's re-attribution must not leave an agent counted both parked for the fresh hull and aboard it.
+            if (boarded != null && parkedFrom.ContainsKey(moved.Agent) && moved.Agent.IsActive()
+                && (DeckOf(moved.Agent) == boarded || boarded.Seats.Values.Contains(moved.Agent)))
+                removalViolations.Add($"{NameOf(moved.Agent)} was both parked for and aboard {Describe(boarded)} when boarded");
+            parkedFrom.Remove(moved.Agent);
+        }
+
+        if (boarded == null || boarded.IsRemoved) return;
+
+        foreach (var agent in parkedFrom.Where(entry => entry.Value == boarded && entry.Key.IsActive()).Select(entry => entry.Key))
+            removalViolations.Add($"{NameOf(agent)} stayed parked for {Describe(boarded)} after its agents boarded it");
     }
 
     public bool HasHelmPilot(MissionObject hull) => false;
@@ -290,6 +327,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
     public void RemoveHull(MissionObject hull)
     {
         var fake = Of(hull);
+        CheckClearForRemoval(fake, "removed");
         fake.SeatsAtRemoval = fake.Seats.Count;
         fake.AgentsAboardAtRemoval = AgentsOnDeck(hull).Count;
         fake.CrewActiveAtRemoval = CrewOf(fake).Count();
@@ -381,10 +419,78 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         if (!agent.IsActive()) return;
 
         decks.Remove(agent);
-        ParkedAgents.Remove(agent);
+        parkedFrom.Remove(agent);
         agent.FadeOut(true, true);
         Withdrawn.Add(agent);
     }
+
+    /// <summary>
+    /// Test stand-in for vanilla removing a hull of the owner's own (NavalShipsLogic.OnEndMission, ShipRetreatLogic), which
+    /// fades its tracked crew inside the removal, so the removal invariant does not apply to it. Not on the engine interface.
+    /// </summary>
+    public void VanillaOwnerRemoveShipForTest(MissionObject hull)
+    {
+        var fake = Of(hull);
+        fake.IsRemoved = true;
+        fake.RemovedByVanillaForTest = true;
+    }
+
+    /// <summary>
+    /// The removal invariant every crash since R33 broke: when the code under test removes or replaces a hull, nobody stands
+    /// on its deck or sits at its stations (checked inside <see cref="RemoveHull"/> and <see cref="ReplaceHull"/>), and
+    /// afterwards nobody is left parked (force-closed) from a removed hull, parked while crew of one, or crew of a replaced
+    /// one, and nobody stands on one. Fails with every violation recorded since the last call.
+    /// </summary>
+    public void AssertRemovalInvariant()
+    {
+        CheckRemovedHullsLeftNobody();
+        if (removalViolations.Count == 0) return;
+
+        var violations = removalViolations.Distinct().ToList();
+        removalViolations.Clear();
+        HasFailedRemovalInvariant = true;
+        Assert.Fail($"Naval removal invariant broken on {ClientId}:\n" + string.Join("\n", violations));
+    }
+
+    /// <summary>Whether <see cref="AssertRemovalInvariant"/> already failed the scenario.</summary>
+    public bool HasFailedRemovalInvariant { get; private set; }
+
+    private void CheckClearForRemoval(FakeHull fake, string removal)
+    {
+        foreach (var seat in fake.Seats)
+        {
+            var station = fake.Stations.First(entry => ReferenceEquals(entry.Value, seat.Key)).Key;
+            removalViolations.Add($"{Describe(fake)} was {removal} while {NameOf(seat.Value)} sat at its station {station.Key}/{station.Index}");
+        }
+
+        foreach (var agent in decks.Where(entry => entry.Value == fake && entry.Key.IsActive()).Select(entry => entry.Key))
+            removalViolations.Add($"{Describe(fake)} was {removal} while {NameOf(agent)} stood on its deck");
+    }
+
+    private void CheckRemovedHullsLeftNobody()
+    {
+        foreach (var parked in parkedFrom.Where(entry => entry.Key.IsActive()))
+        {
+            if (IsInvariantRemoved(parked.Value))
+                removalViolations.Add($"{NameOf(parked.Key)} is still parked (physics force-closed) from removed {Describe(parked.Value)}");
+            else if (crews.TryGetValue(parked.Key, out var crew) && IsInvariantRemoved(crew))
+                removalViolations.Add($"{NameOf(parked.Key)} is parked from {Describe(parked.Value)} while crew of removed {Describe(crew)}");
+        }
+
+        foreach (var crew in crews.Where(entry => entry.Value.ReplacedBy != null && entry.Key.IsActive()))
+            removalViolations.Add($"{NameOf(crew.Key)} is still crew of replaced {Describe(crew.Value)}");
+
+        foreach (var deck in decks.Where(entry => IsInvariantRemoved(entry.Value) && entry.Key.IsActive()))
+            removalViolations.Add($"{NameOf(deck.Key)} still stands on removed {Describe(deck.Value)}");
+    }
+
+    private static bool IsInvariantRemoved(FakeHull fake) => fake.IsRemoved && !fake.RemovedByVanillaForTest;
+
+    private string NameOf(Agent agent) => AgentName?.Invoke(agent) ?? $"agent #{agent.Index}";
+
+    private static string Describe(FakeHull fake) =>
+        $"hull {(fake.ShipId == Guid.Empty ? "(unregistered)" : fake.ShipId.ToString())} ({(fake.IsCopy ? "copy" : "simulated")}, "
+        + $"{fake.Side} formation {fake.FormationIndex})";
 
     /// <summary>The agents <see cref="BoardAgent"/> put aboard a hull.</summary>
     public List<Agent> Boarded { get; } = new();
@@ -474,8 +580,14 @@ public sealed class FakeHull
     public int CrewCapacity { get; set; } = 40;
     /// <summary>The troops <see cref="FakeNavalShipEngine.AddHullReserve"/> queued on the hull.</summary>
     public List<IAgentOriginBase> ReservedOrigins { get; } = new();
+    /// <summary>The registered ship id the hull stands for; empty until the harness registers it.</summary>
+    public Guid ShipId { get; set; }
     /// <summary>Left the mission: no longer one of the engine's hulls.</summary>
     public bool IsRemoved { get; set; }
+    /// <summary>Removed by <see cref="FakeNavalShipEngine.VanillaOwnerRemoveShipForTest"/>, which the removal invariant exempts.</summary>
+    public bool RemovedByVanillaForTest { get; set; }
+    /// <summary>The hull <see cref="FakeNavalShipEngine.ReplaceHull"/> swapped in for this one, or null.</summary>
+    public FakeHull? ReplacedBy { get; set; }
     /// <summary>How many agents still sat at the hull's stations when <see cref="FakeNavalShipEngine.RemoveHull"/> removed it.</summary>
     public int SeatsAtRemoval { get; set; }
     /// <summary>How many agents still stood on the hull's deck or sat at its stations when it was removed.</summary>

@@ -223,7 +223,8 @@ public class NavalHandBackScenarioTests : NavalBattleTestEnvironment
         {
             var hull = a.Ship(hullB).Hull;
             a.Ships.AnnounceRemoval(hull, ShipRemovalReason.Retreat, missionEnding: false);
-            a.Engine.RemoveHull(hull);
+            // Stands for vanilla ShipRetreatLogic removing the hull A simulates.
+            a.Engine.VanillaOwnerRemoveShipForTest(hull);
         });
         battle.TickAll(2);
         returned.Commit();
