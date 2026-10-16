@@ -7,6 +7,7 @@ using GameInterface.Services.MapEvents;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
+using Missions.Services.Network;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.Players;
@@ -180,11 +181,26 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 var controller = instance.Resolve<CoopBattleController>();
                 controller.Session.TryBegin(MapEventId);
                 instance.Resolve<IBattleHostRegistry>().Set(MapEventId, new BattleHostAssignment(HostId, Successors, HostEpoch));
-                peer = new NavalPeer(id, side, instance, mission, controller, new FakeNavalShipEngine());
+                var members = new NavalMissionMembers(instance.Resolve<IMessageBroker>(), Peers.Select(other => other.Id));
+                peer = new NavalPeer(id, side, instance, mission, controller, new FakeNavalShipEngine(), members);
             });
 
+            // The server introduces an entrant and every member to each other.
+            foreach (var other in Peers)
+                other.Members.Enter(id);
             peers[id] = peer;
             return peer;
+        }
+
+        /// <summary>
+        /// <paramref name="departed"/> leaves the battle gracefully: its mission ends and the server tells every other member, as
+        /// after a retreat. Its last mesh traffic can still arrive later.
+        /// </summary>
+        public void Leave(NavalPeer departed)
+        {
+            departed.Instance.Call(departed.Network.Stop);
+            foreach (var peer in Peers)
+                peer.Instance.Call(() => peer.Broker.Publish(peer, new MissionPeerLeft(departed.Id, MapEventId)));
         }
 
         /// <summary>Tells every other client on the mesh that <paramref name="entered"/> joined, as the mission lifecycle does.</summary>
@@ -239,12 +255,62 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         }
     }
 
+    /// <summary>
+    /// One client's server-announced mission membership, as <see cref="MissionContext"/> mirrors it: the members on the mesh
+    /// when it joined and later entrants, less departures. Kept apart from the instance's own mirror so seeding it publishes no
+    /// entry to the battle handlers.
+    /// </summary>
+    protected sealed class NavalMissionMembers : IMissionContext
+    {
+        private readonly IMessageBroker broker;
+        private readonly HashSet<string> members;
+
+        public NavalMissionMembers(IMessageBroker broker, IEnumerable<string> members)
+        {
+            this.broker = broker;
+            this.members = new HashSet<string>(members);
+            broker.Subscribe<NetworkMissionPeerEntered>(Handle_Entered);
+            broker.Subscribe<MissionPeerLeft>(Handle_Left);
+            broker.Subscribe<MissionPeerDisconnected>(Handle_Disconnected);
+        }
+
+        public IReadOnlyCollection<string> ControllersInMission => members.ToArray();
+
+        public void Enter(string controllerId) => members.Add(controllerId);
+
+        private void Handle_Entered(MessagePayload<NetworkMissionPeerEntered> payload) => members.Add(payload.What.ControllerId);
+
+        private void Handle_Left(MessagePayload<MissionPeerLeft> payload) => members.Remove(payload.What.ControllerId);
+
+        private void Handle_Disconnected(MessagePayload<MissionPeerDisconnected> payload) => members.Remove(payload.What.ControllerId);
+
+        public void MapPeer(string controllerId, LiteNetLib.NetPeer peer) { }
+
+        public void RemovePeer(LiteNetLib.NetPeer peer) { }
+
+        public bool TryGetPeer(string controllerId, out LiteNetLib.NetPeer netPeer)
+        {
+            netPeer = null!;
+            return false;
+        }
+
+        public void EndInstance() => members.Clear();
+
+        public void Dispose()
+        {
+            broker.Unsubscribe<NetworkMissionPeerEntered>(Handle_Entered);
+            broker.Unsubscribe<MissionPeerLeft>(Handle_Left);
+            broker.Unsubscribe<MissionPeerDisconnected>(Handle_Disconnected);
+        }
+    }
+
     /// <summary>One client in a naval battle: its mission, controller, fake ship engine and the ship services under test.</summary>
     protected sealed class NavalPeer
     {
         public NavalPeer(string id, BattleSideEnum side, EnvironmentInstance instance, MockMission mission,
-            CoopBattleController controller, FakeNavalShipEngine engine)
+            CoopBattleController controller, FakeNavalShipEngine engine, NavalMissionMembers members)
         {
+            Members = members;
             Id = id;
             Side = side;
             Instance = instance;
@@ -261,8 +327,11 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 return recovered;
             });
             Services = instance.Resolve<INavalBattleServicesFactory>().Create(
-                controller.Context with { ReinforcementFielder = reinforcements.Object }, engine);
+                controller.Context with { ReinforcementFielder = reinforcements.Object, MissionContext = members }, engine);
         }
+
+        /// <summary>The membership the ship services' gate reads.</summary>
+        public NavalMissionMembers Members { get; }
 
         public string Id { get; }
         public BattleSideEnum Side { get; }
@@ -416,6 +485,10 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         public IReadOnlyList<NetworkBattleShipSample> SentSamples(Guid shipId) =>
             Network.NetworkSentMessages.GetMessages<NetworkBattleShipSample>().Where(sample => sample.ShipId == shipId).ToList();
 
-        internal void DisposeShipServices() => Services.Dispose();
+        internal void DisposeShipServices()
+        {
+            Services.Dispose();
+            Members.Dispose();
+        }
     }
 }

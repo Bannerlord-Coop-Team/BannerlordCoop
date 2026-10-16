@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages;
 using Missions.Messages;
+using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -43,6 +44,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     private readonly INavalShipEngine engine;
     private readonly IBattleShipReplicator ships;
     private readonly IHostEpochPolicy hostEpochPolicy;
+    private readonly IMissionContext missionContext;
 
     private readonly Dictionary<Guid, WeaponStream> streams = new Dictionary<Guid, WeaponStream>();
     // The latest state of a hull that is not spawned here yet, applied once it registers.
@@ -55,8 +57,10 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     private string lastDrop;
 
     public BattleShipWeaponReplicator(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session,
-        ICoopMissionComponent missionComponent, INavalShipEngine engine, IBattleShipReplicator ships, IHostEpochPolicy hostEpochPolicy)
+        ICoopMissionComponent missionComponent, INavalShipEngine engine, IBattleShipReplicator ships, IHostEpochPolicy hostEpochPolicy,
+        IMissionContext missionContext)
     {
+        this.missionContext = missionContext;
         this.network = network;
         this.messageBroker = messageBroker;
         this.session = session;
@@ -215,7 +219,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
             return;
         }
 
-        var rejection = ValidateShot(ship, session.OwnControllerId, shot);
+        var rejection = ValidateShot(ship, session.OwnControllerId, shot, missionContext.ControllersInMission);
         if (rejection == null && ship.IsNpcParty && hostEpochPolicy.IsStale(shot.HostEpoch, session.HostEpoch))
             rejection = "stale_epoch";
         MissionObject weapon = null;
@@ -240,9 +244,11 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     }
 
     /// <summary>Why a shot must be dropped, or null to replay it.</summary>
-    internal static string ValidateShot(NetworkShipInfo ship, string ownControllerId, NetworkShipWeaponShot shot)
+    internal static string ValidateShot(NetworkShipInfo ship, string ownControllerId, NetworkShipWeaponShot shot,
+        IReadOnlyCollection<string> controllersInMission)
     {
-        var rejection = AuthorityStamp.ValidateSender(shot.OwnerControllerId, ship.CurrentAuthority, ownControllerId);
+        var rejection = AuthorityStamp.ValidateSender(shot.OwnerControllerId, ship.CurrentAuthority, ownControllerId,
+            controllersInMission);
         if (rejection != null) return rejection;
         if (!shot.IsValid) return "invalid_shot";
         return null;
@@ -292,7 +298,8 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
             return;
         }
 
-        var rejection = ValidateState(ship, session.OwnControllerId, state, stream.AppliedRevision, stream.AppliedEpoch);
+        var rejection = ValidateState(ship, session.OwnControllerId, state, stream.AppliedRevision, stream.AppliedEpoch,
+            missionContext.ControllersInMission);
         if (rejection == null && ship.IsNpcParty && hostEpochPolicy.IsStale(state.HostEpoch, session.HostEpoch))
             rejection = "stale_epoch";
         if (rejection == null && (stream.Weapon == null || stream.Key != state.WeaponKey)) rejection = "unknown_weapon";
@@ -317,11 +324,12 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
 
     /// <summary>Why a weapon state must be dropped, or null to apply it.</summary>
     internal static string ValidateState(NetworkShipInfo ship, string ownControllerId, NetworkShipWeaponState state,
-        long appliedRevision, int appliedEpoch)
+        long appliedRevision, int appliedEpoch, IReadOnlyCollection<string> controllersInMission)
     {
         // A new host numbers an AI hull's weapon states on from its own count, so a newer epoch restarts the order.
         var rejection = state.Stamp.Validate(ship.CurrentAuthority, ownControllerId,
-            new AuthorityStamp(ship.CurrentAuthority, appliedEpoch, appliedRevision), followsHostEpoch: ship.IsNpcParty);
+            new AuthorityStamp(ship.CurrentAuthority, appliedEpoch, appliedRevision), followsHostEpoch: ship.IsNpcParty,
+            controllersInMission);
         if (rejection != null) return rejection;
         if (state.State == null || !state.State.IsValid) return "invalid_state";
         return null;

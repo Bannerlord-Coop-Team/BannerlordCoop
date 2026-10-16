@@ -3,6 +3,7 @@ using Missions;
 using Missions.Agents.Handlers;
 using Missions.Battles;
 using Missions.Messages;
+using Missions.Services.Network;
 using Moq;
 using Newtonsoft.Json.Linq;
 using System;
@@ -28,7 +29,7 @@ public class AgentStationUseReplicatorTests
         component.SetupGet(c => c.AgentActionHandler).Returns(Mock.Of<IAgentActionHandler>());
 
         using var replicator = new AgentStationUseReplicator(Mock.Of<IBattleNetwork>(), new MessageBroker(),
-            Mock.Of<IBattleSession>(), component.Object, engine.Object, Mock.Of<IBattleDeploymentCoordinator>());
+            Mock.Of<IBattleSession>(), component.Object, engine.Object, Mock.Of<IBattleDeploymentCoordinator>(), Members("owner"));
         replicator.Apply(null!, null!, inUse: true);
 
         Assert.Equal(new[] { "forget", "use" }, calls);
@@ -113,6 +114,20 @@ public class AgentStationUseReplicatorTests
         var inspected = JObject.FromObject(replicator.Inspect());
         Assert.Equal(1, (int)inspected["appliedSeats"]!);
         Assert.Equal(1, (long)inspected["departedHullReleases"]!);
+    }
+
+    // R7: a use its owner sent before leaving can arrive after the departure; it is dropped, not retried.
+    [Fact]
+    public void TryApply_DropsAUseFromASenderNoLongerInTheMission()
+    {
+        var engine = new Mock<INavalShipEngine>();
+        using var replicator = CreateReplicator(engine.Object, members: Members("someone_else"));
+
+        bool settled = replicator.TryApply(Use(Guid.NewGuid(), Guid.NewGuid(), inUse: true, revision: 1, "owner"));
+
+        Assert.True(settled);
+        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), It.IsAny<bool>()), Times.Never);
+        Assert.Equal(1, (long)JObject.FromObject(replicator.Inspect())["dropped"]!);
     }
 
     [Fact]
@@ -291,7 +306,8 @@ public class AgentStationUseReplicatorTests
     }
 
     private static AgentStationUseReplicator CreateReplicator(INavalShipEngine engine,
-        INetworkAgentRegistry? registry = null, INetworkShipRegistry? ships = null, MessageBroker? broker = null)
+        INetworkAgentRegistry? registry = null, INetworkShipRegistry? ships = null, MessageBroker? broker = null,
+        IMissionContext? members = null)
     {
         var component = new Mock<ICoopMissionComponent>();
         component.SetupGet(c => c.AgentMovementHandler).Returns(Mock.Of<IAgentMovementHandler>());
@@ -299,7 +315,15 @@ public class AgentStationUseReplicatorTests
         component.SetupGet(c => c.AgentRegistry).Returns(registry ?? RemoteOwnerRegistry());
         component.SetupGet(c => c.ShipRegistry).Returns(ships ?? Mock.Of<INetworkShipRegistry>());
         return new AgentStationUseReplicator(Mock.Of<IBattleNetwork>(), broker ?? new MessageBroker(), Mock.Of<IBattleSession>(),
-            component.Object, engine, Mock.Of<IBattleDeploymentCoordinator>());
+            component.Object, engine, Mock.Of<IBattleDeploymentCoordinator>(), members ?? Members("owner", "old", "new"));
+    }
+
+    // The server-announced mission members the membership gate reads.
+    private static IMissionContext Members(params string[] controllerIds)
+    {
+        var members = new Mock<IMissionContext>();
+        members.SetupGet(m => m.ControllersInMission).Returns(controllerIds);
+        return members.Object;
     }
 
     // A distinct point identity; the engine mock never touches it.

@@ -41,10 +41,11 @@ public class NavalBattleServices : INavalBattleServices
         // These services exist only in a naval mission and open with it.
         context.Session.MarkNaval();
         hullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, shipEngine);
-        var conditions = new BattleShipConditionStream(network, context.Session, shipEngine, context.HostEpochPolicy);
+        var conditions = new BattleShipConditionStream(network, context.Session, shipEngine, context.HostEpochPolicy,
+            context.MissionContext);
         // A hull leaving with its owner releases the seats on it first, so the stations exist before the hulls.
         StationUseReplicator = new AgentStationUseReplicator(network, messageBroker, context.Session, context.MissionComponent,
-            shipEngine, context.Deployment);
+            shipEngine, context.Deployment, context.MissionContext);
         ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
             hullAuthority, conditions, StationUseReplicator);
         DeckPoses = new NavalDeckPoses(context.MissionComponent, shipEngine, StationUseReplicator);
@@ -53,7 +54,7 @@ public class NavalBattleServices : INavalBattleServices
         ShipDamageRouter = new BattleShipDamageRouter(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine);
         ShipWeaponReplicator = new BattleShipWeaponReplicator(network, messageBroker, context.Session, context.MissionComponent,
-            shipEngine, ShipReplicator, context.HostEpochPolicy);
+            shipEngine, ShipReplicator, context.HostEpochPolicy, context.MissionContext);
     }
 
     public IBattleShipReplicator ShipReplicator { get; }

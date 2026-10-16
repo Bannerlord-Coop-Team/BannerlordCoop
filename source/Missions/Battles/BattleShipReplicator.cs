@@ -4,6 +4,7 @@ using Common.Messaging;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.ObjectManager;
 using Missions.Messages;
+using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -20,7 +21,8 @@ namespace Missions.Battles;
 /// the first deployment commit and stream their frame, helm input and ropes at 20 Hz; other owners' hulls are
 /// spawned as kinematic copies once this client's deployment is over and follow those samples. Ropes ride the samples
 /// because each one carries every station's generation-ordered state, so a later sample repairs a rejected one; leaving
-/// sends them once more. Owners also send a hull's damage state when it changes, and copies take it on. A hull that leaves
+/// sends them once more. Owners also send a hull's damage state and fieldable reserve when either changes, and copies take
+/// them on. Every stream drops traffic from a controller not in the mission. A hull that leaves
 /// with its owner (retreat or leave) is removed on every client, after its seats and deck are cleared.
 /// </summary>
 public interface IBattleShipReplicator : IDisposable
@@ -96,6 +98,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly IBattleSession session;
     private readonly IBattleDeploymentCoordinator deployment;
     private readonly ICoopMissionComponent missionComponent;
+    private readonly IMissionContext missionContext;
     private readonly IHostEpochPolicy hostEpochPolicy;
     private readonly IBattleResultCommitter resultCommitter;
     private readonly INavalShipEngine engine;
@@ -110,9 +113,6 @@ public class BattleShipReplicator : IBattleShipReplicator
     // Everything received for a ship that is not registered here yet, applied in one ordered drain once it is.
     private readonly Dictionary<Guid, HeldShip> heldShips = new Dictionary<Guid, HeldShip>();
     private long recordsHeld;
-    // Departures come over the campaign connection and samples over the mission mesh, so a departed owner's late sample is not
-    // ordered behind its departure; its reserve stays dropped until the controller enters again.
-    private readonly HashSet<string> departedControllers = new HashSet<string>();
     // The host AI hulls last migrated to, so an AI copy whose record was still waiting registers under it too.
     private string npcHullHost;
     private bool spawnRecordsSent;
@@ -144,6 +144,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         session = context.Session;
         deployment = context.Deployment;
         missionComponent = context.MissionComponent;
+        missionContext = context.MissionContext;
         hostEpochPolicy = context.HostEpochPolicy;
         resultCommitter = context.ResultCommitter;
         this.engine = engine;
@@ -178,7 +179,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
         messageBroker.Unsubscribe<NetworkShipRemoved>(Handle_NetworkShipRemoved);
         heldShips.Clear();
-        departedControllers.Clear();
     }
 
     // [Game thread] Published synchronously by the spawn postfix. Hulls this client fields go on PlayerTeam; the
@@ -242,9 +242,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         bool isOwn = hullAuthority.Transfer(ship, newHost);
 
         // The old owner's interpolation target must not keep writing frames to a hull this client now simulates.
-        var stream = GetStream(ship.ShipId);
-        stream.Target = null;
-        stream.ForgetReportedReserve();
+        GetStream(ship.ShipId).Target = null;
+        conditions.ForgetReserve(ship.ShipId);
         Logger.Information("[NavalSync] AI hull {ShipId} moved to host {Host}{Local}", ship.ShipId, newHost, isOwn ? " (this client)" : "");
     }
 
@@ -357,7 +356,8 @@ public class BattleShipReplicator : IBattleShipReplicator
             return;
         }
 
-        if (AuthorityStamp.ValidateSender(removal.OwnerControllerId, ship.CurrentAuthority, session.OwnControllerId) != null)
+        if (AuthorityStamp.ValidateSender(removal.OwnerControllerId, ship.CurrentAuthority, session.OwnControllerId,
+            missionContext.ControllersInMission) != null)
         {
             removalsRejected++;
             return;
@@ -458,7 +458,7 @@ public class BattleShipReplicator : IBattleShipReplicator
             stream.Sent++;
             network.SendAll(new NetworkBattleShipSample(ship.ShipId, session.OwnControllerId, stream.Sent,
                 NetworkBattleShipSample.FromFrame(engine.GetFrame(ship.Hull)), engine.ReadInput(ship.Hull),
-                engine.CaptureRopes(ship.Hull, ShipIdOf), session.HostEpoch, engine.ReadSpawnableReserve(ship.Hull)));
+                engine.CaptureRopes(ship.Hull, ShipIdOf), session.HostEpoch));
             conditions.SendIfChanged(ship);
         }
     }
@@ -488,7 +488,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         }
 
         var stream = GetStream(condition.ShipId);
-        var rejection = conditions.Accept(ship, condition, checkHostEpoch: true);
+        var rejection = conditions.Accept(ship, condition, fromDepartedHost: false);
         if (rejection != null) stream.Reject("condition_" + rejection);
     }
 
@@ -516,7 +516,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         GameThread.RunSafe(() => AcceptFinalRopes(final), context: nameof(Handle_NetworkBattleRopeFinal));
     }
 
-    private void AcceptFinalRopes(NetworkBattleRopeFinal final)
+    // A departed host's held final ropes are replayed on purpose before its AI hulls move, so they skip the membership gate.
+    private void AcceptFinalRopes(NetworkBattleRopeFinal final, bool fromDepartedHost = false)
     {
         if (Mission.Current == null || final == null) return;
 
@@ -527,7 +528,7 @@ public class BattleShipReplicator : IBattleShipReplicator
             return;
         }
 
-        if (ValidateFinalRopes(ship, session.OwnControllerId, final) != null)
+        if (ValidateFinalRopes(ship, session.OwnControllerId, final, fromDepartedHost ? null : missionContext.ControllersInMission) != null)
         {
             finalRopesRejected++;
             return;
@@ -538,9 +539,11 @@ public class BattleShipReplicator : IBattleShipReplicator
     }
 
     /// <summary>Why a final rope state must be dropped, or null to apply it.</summary>
-    internal static string ValidateFinalRopes(NetworkShipInfo ship, string ownControllerId, NetworkBattleRopeFinal final)
+    internal static string ValidateFinalRopes(NetworkShipInfo ship, string ownControllerId, NetworkBattleRopeFinal final,
+        IReadOnlyCollection<string> controllersInMission)
     {
-        var rejection = AuthorityStamp.ValidateSender(final.OwnerControllerId, ship.CurrentAuthority, ownControllerId);
+        var rejection = AuthorityStamp.ValidateSender(final.OwnerControllerId, ship.CurrentAuthority, ownControllerId,
+            controllersInMission);
         if (rejection != null) return rejection;
         if (final.Ropes == null || !BattleRopeState.AreValid(final.Ropes)) return "invalid_ropes";
         return null;
@@ -557,6 +560,11 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         foreach (var record in records.Where(record => record != null))
         {
+            // A player who left takes its hulls; an AI hull's record still spawns, and moves to the next host once it does.
+            if (!record.IsNpcParty
+                && AuthorityStamp.ValidateMember(record.OwnerControllerId, missionContext.ControllersInMission) != null)
+                continue;
+
             // A repeated record (the host announces its AI hulls again at its commit) keeps the first one's place.
             var held = Held(record.ShipId);
             if (held.Record != null) continue;
@@ -664,7 +672,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     }
 
     // The departed host's last held state goes on before the move, so the new host takes over from its pose and damage.
-    // Its epoch is behind by now, so only the authority, order and validity checks apply.
+    // Its epoch is behind and its sender out of the mission by now, so only the authority, order and validity checks apply.
     private void ApplyDepartedHostState(NetworkShipInfo ship, HeldShip held)
     {
         var departedHost = ship.CurrentAuthority;
@@ -673,14 +681,14 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (condition?.OwnerControllerId == departedHost)
         {
             held.Condition = null;
-            conditions.Accept(ship, condition, checkHostEpoch: false);
+            conditions.Accept(ship, condition, fromDepartedHost: true);
         }
 
         var sample = held.Sample;
         if (sample?.OwnerControllerId == departedHost)
         {
             held.Sample = null;
-            if (ValidateSample(ship, session.OwnControllerId, sample, stream.Accepted, stream.AcceptedEpoch) == null)
+            if (ValidateSample(ship, session.OwnControllerId, sample, stream.Accepted, stream.AcceptedEpoch, null) == null)
             {
                 TakeSample(ship, stream, sample);
                 // The move clears the interpolation target, so the frame is written now.
@@ -696,7 +704,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (final?.OwnerControllerId == departedHost)
         {
             held.FinalRopes = null;
-            AcceptFinalRopes(final);
+            AcceptFinalRopes(final, fromDepartedHost: true);
         }
     }
 
@@ -756,7 +764,8 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         var stream = GetStream(sample.ShipId);
 
-        var rejection = ValidateSample(ship, session.OwnControllerId, sample, stream.Accepted, stream.AcceptedEpoch);
+        var rejection = ValidateSample(ship, session.OwnControllerId, sample, stream.Accepted, stream.AcceptedEpoch,
+            missionContext.ControllersInMission);
         // BR-102: an AI hull follows the host, so a superseded hosting generation is dropped like siege state.
         if (rejection == null && ship.IsNpcParty && hostEpochPolicy.IsStale(sample.HostEpoch, session.HostEpoch))
             rejection = "stale_epoch";
@@ -780,21 +789,16 @@ public class BattleShipReplicator : IBattleShipReplicator
         stream.TargetReceivedAt = elapsed;
         stream.Accepted = sample.Sequence;
         stream.Elapsed = 0;
-        if (departedControllers.Contains(sample.OwnerControllerId)) return;
-
-        stream.ReportedReserve = sample.SpawnableReserve;
-        stream.HasReportedReserve = true;
     }
 
-    // Kept past the sample lifetime: vanilla latches a depleted side the first frame it reads one, so one long frame must not
-    // end the battle. Sinking, the owner leaving or an authority move drop it instead.
+    // The owner reports it with the hull's condition, on change, so no frame length expires it: vanilla latches a depleted
+    // side the first frame it reads one. Sinking, the owner leaving or an authority move drop it instead.
     public int ReportedReserveOf(MissionObject hull)
     {
-        if (!Registry.TryGetByHull(hull, out var ship) || IsOwnHull(ship) || !streams.TryGetValue(ship.ShipId, out var stream))
-            return 0;
-        if (!stream.HasReportedReserve || conditions.ConditionOf(ship.ShipId)?.SinkingState == BattleShipCondition.Sunk) return 0;
+        if (!Registry.TryGetByHull(hull, out var ship) || IsOwnHull(ship)) return 0;
+        if (conditions.ConditionOf(ship.ShipId)?.SinkingState == BattleShipCondition.Sunk) return 0;
 
-        return stream.ReportedReserve;
+        return conditions.ReportedReserveOf(ship.ShipId) ?? 0;
     }
 
     // A copy reads 0 from the engine and an own hull 0 from the reports, so a hull mid-swap counts 0 either way.
@@ -826,15 +830,14 @@ public class BattleShipReplicator : IBattleShipReplicator
     private bool IsDepartureOfThisBattle(string controllerId, string instanceId) =>
         !string.IsNullOrEmpty(controllerId) && (instanceId == null || instanceId == session.InstanceId) && !session.IsOwn(controllerId);
 
-    /// <summary>[Game thread] Drops the reserve a departed controller reported for the hulls it held, and ignores its late reports.</summary>
+    /// <summary>
+    /// [Game thread] Drops the reserve a departed controller reported for the hulls it held; the membership gate drops its late
+    /// reports until it enters again.
+    /// </summary>
     internal void ForgetReportedReserveOf(string controllerId)
     {
-        departedControllers.Add(controllerId);
-        foreach (var ship in Registry.Ships)
-        {
-            if (ship.CurrentAuthority == controllerId && streams.TryGetValue(ship.ShipId, out var stream))
-                stream.ForgetReportedReserve();
-        }
+        foreach (var ship in Registry.Ships.Where(ship => ship.CurrentAuthority == controllerId))
+            conditions.ForgetReserve(ship.ShipId);
     }
 
     private void HoldSample(NetworkBattleShipSample sample)
@@ -845,15 +848,15 @@ public class BattleShipReplicator : IBattleShipReplicator
 
     /// <summary>Why a sample must be dropped, or null to accept it.</summary>
     internal static string ValidateSample(NetworkShipInfo ship, string ownControllerId, NetworkBattleShipSample sample,
-        long acceptedSequence, int acceptedEpoch)
+        long acceptedSequence, int acceptedEpoch, IReadOnlyCollection<string> controllersInMission)
     {
         // A new host numbers an AI hull's samples from its own stream, so a newer epoch restarts the sequence.
         var rejection = sample.Stamp.Validate(ship.CurrentAuthority, ownControllerId,
-            new AuthorityStamp(ship.CurrentAuthority, acceptedEpoch, acceptedSequence), followsHostEpoch: ship.IsNpcParty);
+            new AuthorityStamp(ship.CurrentAuthority, acceptedEpoch, acceptedSequence), followsHostEpoch: ship.IsNpcParty,
+            controllersInMission);
         if (rejection != null) return rejection;
         if (!sample.HasValidFrame) return "invalid_frame";
         if (!sample.Input.IsValid) return "invalid_input";
-        if (sample.SpawnableReserve < 0) return "invalid_reserve";
         if (!BattleRopeState.AreValid(sample.Ropes)) return "invalid_ropes";
         return null;
     }
@@ -893,7 +896,6 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         GameThread.RunSafe(() =>
         {
-            departedControllers.Remove(entered.ControllerId);
             if (spawnRecordsSent && !session.IsOwn(entered.ControllerId))
                 SendSpawnRecords(entered.ControllerId);
         }, context: nameof(Handle_PeerEntered));
@@ -1014,15 +1016,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         public long Applied;
         public long Rejects;
         public string LastReject;
-        /// <summary>The fieldable reserve in the last accepted sample, until the hull's owner leaves or its authority moves.</summary>
-        public int ReportedReserve;
-        public bool HasReportedReserve;
-
-        public void ForgetReportedReserve()
-        {
-            ReportedReserve = 0;
-            HasReportedReserve = false;
-        }
 
         public void Reject(string reason)
         {

@@ -6,7 +6,7 @@ using TaleWorlds.Library;
 
 namespace Missions.Messages;
 
-/// <summary>Owner to peers over the mission mesh, 20 Hz: one owned hull's world frame, helm input, ropes and fieldable reserve.</summary>
+/// <summary>Owner to peers over the mission mesh, 20 Hz: one owned hull's world frame, helm input and ropes.</summary>
 [ProtoContract(SkipConstructor = true)]
 public sealed class NetworkBattleShipSample : IEvent
 {
@@ -22,13 +22,10 @@ public sealed class NetworkBattleShipSample : IEvent
     [ProtoMember(7)] public readonly BattleRopeState[] Ropes;
     /// <summary>The sender's battle host epoch; AI-hull samples from a superseded host generation are dropped.</summary>
     [ProtoMember(8)] public readonly int HostEpoch;
-    /// <summary>The troops queued on the hull that can still field, which only its owner tracks; the battle host's end check counts them.</summary>
-    [ProtoMember(9)] public readonly int SpawnableReserve;
 
     public NetworkBattleShipSample(Guid shipId, string ownerControllerId, long sequence, float[] frame,
-        BattleShipInput input = default, BattleRopeState[] ropes = null, int hostEpoch = 0, int spawnableReserve = 0)
+        BattleShipInput input = default, BattleRopeState[] ropes = null, int hostEpoch = 0)
     {
-        SpawnableReserve = spawnableReserve;
         Ropes = ropes;
         HostEpoch = hostEpoch;
         ShipId = shipId;

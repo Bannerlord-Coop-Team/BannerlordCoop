@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Missions.Messages;
+using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -48,6 +49,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private readonly ICoopMissionComponent missionComponent;
     private readonly INavalShipEngine engine;
     private readonly IBattleDeploymentCoordinator deployment;
+    private readonly IMissionContext missionContext;
 
     private readonly Dictionary<Guid, long> sentRevisions = new Dictionary<Guid, long>();
     private readonly Dictionary<Guid, NetworkAgentStationUse> ownSeated = new Dictionary<Guid, NetworkAgentStationUse>();
@@ -68,7 +70,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         IBattleSession session,
         ICoopMissionComponent missionComponent,
         INavalShipEngine engine,
-        IBattleDeploymentCoordinator deployment)
+        IBattleDeploymentCoordinator deployment,
+        IMissionContext missionContext)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -76,6 +79,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         this.missionComponent = missionComponent;
         this.engine = engine;
         this.deployment = deployment;
+        this.missionContext = missionContext;
 
         messageBroker.Subscribe<AgentStationUseChanged>(Handle_AgentStationUseChanged);
         messageBroker.Subscribe<NetworkAgentStationUse>(Handle_NetworkAgentStationUse);
@@ -289,6 +293,12 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     // this client has not yet moved the agent's authority to the sender (a new owner's uses can beat the local migration).
     internal bool TryApply(NetworkAgentStationUse use)
     {
+        if (AuthorityStamp.ValidateMember(use.SenderControllerId, missionContext.ControllersInMission) != null)
+        {
+            dropped++;
+            return true;
+        }
+
         var agents = missionComponent.AgentRegistry;
         if (!agents.TryGetAgentInfo(use.AgentId, out var info) || info.Agent == null
             || !missionComponent.ShipRegistry.TryGet(use.ShipId, out var ship))

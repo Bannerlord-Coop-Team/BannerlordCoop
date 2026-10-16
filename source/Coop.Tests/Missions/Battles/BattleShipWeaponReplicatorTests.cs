@@ -4,6 +4,7 @@ using GameInterface.Surrogates;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
+using Missions.Services.Network;
 using Moq;
 using Newtonsoft.Json.Linq;
 using ProtoBuf;
@@ -25,6 +26,7 @@ public class BattleShipWeaponReplicatorTests
     private const string Instance = "MapEvent_1";
     private const string WeaponKey = "3:ballista_holder/0:ship_ballista";
     private const int HostEpoch = 3;
+    private static readonly string[] InMission = { Peer, "someone_else" };
 
     // M12: only the hull's owner simulates its weapon, so a copy's local AI never aims, loads or fires it.
     [Fact]
@@ -147,7 +149,7 @@ public class BattleShipWeaponReplicatorTests
     {
         var ship = new NetworkShipInfo(Guid.NewGuid(), authority, null, false, ShipTestHulls.Create(), null);
 
-        Assert.Equal(expected, BattleShipWeaponReplicator.ValidateShot(ship, Own, Shot(ship.ShipId, sender, missileItemId: valid ? "ballista_projectile" : null)));
+        Assert.Equal(expected, BattleShipWeaponReplicator.ValidateShot(ship, Own, Shot(ship.ShipId, sender, missileItemId: valid ? "ballista_projectile" : null), InMission));
     }
 
     // M12 no double damage: the replayed bolt is the shooter's puppet's, never an agent this client drives, so the agent blow
@@ -230,7 +232,7 @@ public class BattleShipWeaponReplicatorTests
         var ship = new NetworkShipInfo(Guid.NewGuid(), authority, null, isNpcParty, ShipTestHulls.Create(), null);
         var state = new NetworkShipWeaponState(ship.ShipId, WeaponKey, sender, revision, epoch, new BattleShipWeaponState(0f, 0f, 0, 3));
 
-        Assert.Equal(expected, BattleShipWeaponReplicator.ValidateState(ship, Own, state, appliedRevision, appliedEpoch));
+        Assert.Equal(expected, BattleShipWeaponReplicator.ValidateState(ship, Own, state, appliedRevision, appliedEpoch, InMission));
     }
 
     [Fact]
@@ -239,7 +241,7 @@ public class BattleShipWeaponReplicatorTests
         var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, null, false, ShipTestHulls.Create(), null);
         var state = new NetworkShipWeaponState(ship.ShipId, WeaponKey, Peer, 1, 0, new BattleShipWeaponState(float.NaN, 0f, 0, 3));
 
-        Assert.Equal("invalid_state", BattleShipWeaponReplicator.ValidateState(ship, Own, state, 0, 0));
+        Assert.Equal("invalid_state", BattleShipWeaponReplicator.ValidateState(ship, Own, state, 0, 0, InMission));
     }
 
     [Fact]
@@ -279,6 +281,23 @@ public class BattleShipWeaponReplicatorTests
         Assert.Equal(0, heldAfterFailure);
         Assert.Equal(0, (int)harness.Inspect()["pendingStates"]!);
         Assert.Equal("state_hull_gone", (string)harness.Inspect()["lastDrop"]!);
+    }
+
+    // R7: the departure arrives over the campaign connection, so a weapon state the owner sent before leaving can come after it.
+    [Fact]
+    public void AcceptState_FromAnOwnerNoLongerInTheMission_IsDropped()
+    {
+        var harness = new Harness();
+        var copy = harness.Register(Peer, isNpcParty: false);
+        harness.Replicator.Tick(0.01f);
+
+        harness.Members.Remove(Peer);
+        harness.Replicator.AcceptState(new NetworkShipWeaponState(copy.Ship.ShipId, WeaponKey, Peer, 1, 0,
+            new BattleShipWeaponState(0.3f, 0.1f, 0, 5)));
+
+        harness.Engine.Verify(e => e.ApplyWeaponState(It.IsAny<MissionObject>(), It.IsAny<BattleShipWeaponState>(),
+            It.IsAny<BattleShipWeaponState>()), Times.Never);
+        Assert.Equal("state_not_in_mission", (string)harness.Inspect()["lastDrop"]!);
     }
 
     [Fact]
@@ -330,6 +349,8 @@ public class BattleShipWeaponReplicatorTests
         public Mock<IBattleShipReplicator> Ships { get; } = new Mock<IBattleShipReplicator>();
         public MessageBroker Broker { get; } = new MessageBroker();
         public NetworkShipRegistry Registry { get; } = new NetworkShipRegistry();
+        /// <summary>The server-announced mission members the membership gate reads.</summary>
+        public List<string> Members { get; } = new List<string>(InMission);
         public BattleShipWeaponReplicator Replicator { get; }
 
         public Harness()
@@ -344,8 +365,11 @@ public class BattleShipWeaponReplicatorTests
             session.SetupGet(s => s.InstanceId).Returns(Instance);
             session.Setup(s => s.IsOwn(It.IsAny<string>())).Returns((string id) => id == Own);
 
+            var members = new Mock<IMissionContext>();
+            members.SetupGet(m => m.ControllersInMission).Returns(() => Members.ToArray());
+
             Replicator = new BattleShipWeaponReplicator(Network.Object, Broker, session.Object, component.Object, Engine.Object,
-                Ships.Object, new HostEpochPolicy());
+                Ships.Object, new HostEpochPolicy(), members.Object);
         }
 
         /// <summary>A registered hull carrying a ship siege weapon at <see cref="WeaponKey"/>.</summary>

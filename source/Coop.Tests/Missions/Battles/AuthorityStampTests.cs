@@ -7,6 +7,7 @@ public class AuthorityStampTests
 {
     private const string Own = "local";
     private const string Peer = "peer";
+    private static readonly string[] InMission = { Peer, "someone_else" };
 
     // The hull streams' held-latest order: host epoch first, then the sender's revision.
     [Theory]
@@ -59,7 +60,7 @@ public class AuthorityStampTests
         var stamp = new AuthorityStamp(sender, epoch, revision);
 
         Assert.Equal(expected, stamp.Validate(authority, Own, new AuthorityStamp(authority, acceptedEpoch, acceptedRevision),
-            followsHostEpoch));
+            followsHostEpoch, InMission));
     }
 
     [Theory]
@@ -69,6 +70,18 @@ public class AuthorityStampTests
     [InlineData(Own, Peer, "own_hull")]
     public void ValidateSender_DropsOwnHullsAndSendersOtherThanTheAuthority(string authority, string sender, string? expected)
     {
-        Assert.Equal(expected, AuthorityStamp.ValidateSender(sender, authority, Own));
+        Assert.Equal(expected, AuthorityStamp.ValidateSender(sender, authority, Own, InMission));
+    }
+
+    // R7: one gate for every hull, condition, station and weapon stream: a sender not in the mission is dropped, and only a
+    // departed host's held state, replayed on purpose, skips it.
+    [Fact]
+    public void ValidateSender_DropsTheAuthorityOnceItIsNotInTheMission_AndNoMembersSkipTheGate()
+    {
+        Assert.Equal("not_in_mission", AuthorityStamp.ValidateSender("departed", "departed", Own, InMission));
+        Assert.Equal("not_in_mission", new AuthorityStamp("departed", 0, 1).Validate("departed", Own,
+            new AuthorityStamp("departed", 0, 0), followsHostEpoch: false, InMission));
+        Assert.Null(AuthorityStamp.ValidateSender("departed", "departed", Own, null!));
+        Assert.Null(AuthorityStamp.ValidateMember(Peer, InMission));
     }
 }
