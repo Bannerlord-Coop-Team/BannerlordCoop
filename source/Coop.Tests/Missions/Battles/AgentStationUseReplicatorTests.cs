@@ -152,6 +152,26 @@ public class AgentStationUseReplicatorTests
     }
 
     [Fact]
+    public void Tick_DropsAPendingUseOnceItsHullsSpawnFailed()
+    {
+        var shipId = Guid.NewGuid();
+        var ships = new NetworkShipRegistry();
+        using var replicator = CreateReplicator(Mock.Of<INavalShipEngine>(), Mock.Of<INetworkAgentRegistry>(), ships);
+        replicator.AcceptUse(Use(Guid.NewGuid(), shipId, inUse: true, revision: 1, "owner"));
+        ships.MarkAwaiting(shipId);
+        replicator.Tick(0.1f);
+        long droppedWhileAwaiting = (long)JObject.FromObject(replicator.Inspect())["dropped"]!;
+
+        ships.MarkSpawnFailed(shipId);
+        replicator.Tick(0.1f);
+
+        var inspected = JObject.FromObject(replicator.Inspect());
+        Assert.Equal(0, droppedWhileAwaiting);
+        Assert.Equal(1, (long)inspected["dropped"]!);
+        Assert.Equal(0, (int)inspected["pending"]!);
+    }
+
+    [Fact]
     public void RefreshAppliedSeats_ForgetsAPuppetThatIsNoLongerActive()
     {
         var engine = new Mock<INavalShipEngine>();

@@ -79,12 +79,46 @@ public class NetworkShipRegistryTests
         var ship = new NetworkShipInfo(Guid.NewGuid(), "host", "MapEventParty_9", true, CreateHull(), null);
 
         registry.MarkSpawnFailed(ship.ShipId);
-        bool failedBeforeRegister = registry.HasSpawnFailed(ship.ShipId);
+        bool failedBeforeRegister = registry.StateOf(ship.ShipId) == ShipLifecycle.SpawnFailed;
         registry.TryRegister(ship);
         registry.MarkSpawnFailed(ship.ShipId);
 
         Assert.True(failedBeforeRegister);
-        Assert.False(registry.HasSpawnFailed(ship.ShipId));
+        Assert.False(registry.StateOf(ship.ShipId) == ShipLifecycle.SpawnFailed);
+    }
+
+    [Fact]
+    public void StateOf_FollowsAForeignHullFromItsWaitingRecordToRegisteredAndRemoved()
+    {
+        var registry = new NetworkShipRegistry();
+        var ship = new NetworkShipInfo(Guid.NewGuid(), "peer", "MapEventParty_2", false, CreateHull(), null);
+        var unknown = registry.StateOf(ship.ShipId);
+
+        registry.MarkAwaiting(ship.ShipId);
+        var awaiting = registry.StateOf(ship.ShipId);
+        registry.TryRegister(ship);
+        registry.MarkAwaiting(ship.ShipId);
+        var registered = registry.StateOf(ship.ShipId);
+        registry.Remove(ship.ShipId);
+
+        Assert.Equal(ShipLifecycle.Unknown, unknown);
+        Assert.Equal(ShipLifecycle.Awaiting, awaiting);
+        Assert.Equal(ShipLifecycle.Registered, registered);
+        Assert.Equal(ShipLifecycle.Removed, registry.StateOf(ship.ShipId));
+    }
+
+    [Fact]
+    public void StateOf_AWaitingRecordGivenUpOnReadsSpawnFailed_AndRemovingAnUnknownShipChangesNothing()
+    {
+        var registry = new NetworkShipRegistry();
+        var shipId = Guid.NewGuid();
+        registry.MarkAwaiting(shipId);
+
+        registry.MarkSpawnFailed(shipId);
+
+        Assert.Equal(ShipLifecycle.SpawnFailed, registry.StateOf(shipId));
+        Assert.False(registry.Remove(shipId));
+        Assert.Equal(ShipLifecycle.SpawnFailed, registry.StateOf(shipId));
     }
 
     [Theory]

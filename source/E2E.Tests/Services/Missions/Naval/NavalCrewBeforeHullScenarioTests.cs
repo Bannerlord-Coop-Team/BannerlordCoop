@@ -54,11 +54,11 @@ public class NavalCrewBeforeHullScenarioTests : NavalBattleTestEnvironment
         Assert.False(b.Agents.TryGetAgentInfo(crewId, out _));
         for (int retry = 1; retry < BattleShipReplicator.ForeignHullSpawnAttempts; retry++)
         {
-            Assert.False(b.Registry.HasSpawnFailed(pirate));
+            Assert.False(b.Registry.StateOf(pirate) == ShipLifecycle.SpawnFailed);
             b.Tick(BattleShipReplicator.ForeignHullRetrySeconds + 0.1f);
         }
 
-        Assert.True(b.Registry.HasSpawnFailed(pirate));
+        Assert.True(b.Registry.StateOf(pirate) == ShipLifecycle.SpawnFailed);
         Assert.Equal(BattleShipReplicator.ForeignHullSpawnAttempts, b.Engine.ForeignSpawnAttempts);
 
         b.TickController();

@@ -1052,6 +1052,72 @@ public class BattleShipReplicatorTests
     }
 
     [Fact]
+    public void AcceptSpawnRecords_MarksAWaitingRecordAwaitingInTheRegistryUntilItsCopySpawns()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: true);
+        bool deploying = true;
+        harness.Engine.SetupGet(e => e.IsDeploymentMode).Returns(() => deploying);
+        harness.SetupForeignSpawn();
+        var record = ForeignRecord(Guid.NewGuid());
+
+        harness.Replicator.AcceptSpawnRecords(new[] { record });
+        var whileHeld = harness.Registry.StateOf(record.ShipId);
+        deploying = false;
+        harness.Replicator.Tick(0.016f);
+
+        Assert.Equal(ShipLifecycle.Awaiting, whileHeld);
+        Assert.Equal(ShipLifecycle.Registered, harness.Registry.StateOf(record.ShipId));
+    }
+
+    [Fact]
+    public void AcceptSpawnRecords_ARecordThatNeverSpawns_EndsSpawnFailedAndDropsItsHeldSample()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: true);
+        harness.SetupForeignSpawn();
+        Formation formation = null!;
+        harness.Engine.Setup(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out formation))
+            .Returns((MissionObject)null!);
+        var record = ForeignRecord(Guid.NewGuid());
+        harness.Replicator.AcceptSpawnRecords(new[] { record });
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(record.ShipId, Peer, 1,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity)));
+
+        for (int attempt = 0; attempt < BattleShipReplicator.ForeignHullSpawnAttempts; attempt++)
+            harness.Replicator.Tick(BattleShipReplicator.ForeignHullRetrySeconds);
+
+        var inspected = JObject.FromObject(harness.Replicator.Inspect());
+        Assert.Equal(ShipLifecycle.SpawnFailed, harness.Registry.StateOf(record.ShipId));
+        Assert.Equal(0, (int)inspected["pendingForeignHulls"]!);
+        Assert.Equal(0, (int)inspected["heldSamples"]!);
+        harness.Engine.Verify(e => e.SpawnForeignHull(record, It.IsAny<Team>(), out It.Ref<Formation>.IsAny),
+            Times.Exactly(BattleShipReplicator.ForeignHullSpawnAttempts));
+    }
+
+    [Fact]
+    public void AcceptSpawnRecords_ARepeatedRecordWhileTheFirstWaits_SpawnsOneCopy()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: true);
+        bool deploying = true;
+        harness.Engine.SetupGet(e => e.IsDeploymentMode).Returns(() => deploying);
+        harness.SetupForeignSpawn();
+        var record = ForeignRecord(Guid.NewGuid());
+        harness.Replicator.AcceptSpawnRecords(new[] { record });
+        harness.Replicator.AcceptSpawnRecords(new[] { ForeignRecord(record.ShipId) });
+        int waiting = (int)JObject.FromObject(harness.Replicator.Inspect())["pendingForeignHulls"]!;
+
+        deploying = false;
+        harness.Replicator.Tick(0.016f);
+
+        Assert.Equal(1, waiting);
+        harness.Engine.Verify(e => e.SpawnForeignHull(record, It.IsAny<Team>(), out It.Ref<Formation>.IsAny), Times.Once);
+        harness.Engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out It.Ref<Formation>.IsAny),
+            Times.Once);
+    }
+
+    [Fact]
     public void AcceptSample_ForAShipWithNoWaitingRecord_RejectsItAsUnknown()
     {
         var harness = new Harness(committed: true);

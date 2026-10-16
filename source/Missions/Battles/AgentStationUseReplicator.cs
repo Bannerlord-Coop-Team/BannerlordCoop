@@ -245,7 +245,18 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private void DrainPending()
     {
         if (pending.Count == 0) return;
-        pending.RemoveAll(entry => TryApply(entry.Use) || Expire(entry));
+        pending.RemoveAll(entry => TryApply(entry.Use) || DropForFailedHullSpawn(entry) || Expire(entry));
+    }
+
+    // A hull this client gave up spawning never arrives, and its crew is dropped with it.
+    private bool DropForFailedHullSpawn(PendingUse entry)
+    {
+        if (missionComponent.ShipRegistry.StateOf(entry.Use.ShipId) != ShipLifecycle.SpawnFailed) return false;
+
+        dropped++;
+        Logger.Warning("[NavalSync] Dropped station use {Revision} of agent {AgentId}: hull {ShipId} could not spawn here",
+            entry.Use.Revision, entry.Use.AgentId, entry.Use.ShipId);
+        return true;
     }
 
     internal static bool IsPendingExpired(float elapsed, float receivedAt, float deploymentHeldAt) =>

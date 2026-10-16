@@ -505,11 +505,11 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             broker.Publish(this, new NetworkSpawnBattleAgents(new[] { record }));
             for (int tick = 1; tick < BattleShipReplicator.ForeignHullSpawnAttempts; tick++)
             {
-                Assert.False(missionComponent.ShipRegistry.HasSpawnFailed(shipId));
+                Assert.False(missionComponent.ShipRegistry.StateOf(shipId) == ShipLifecycle.SpawnFailed);
                 replicator.Tick(BattleShipReplicator.ForeignHullRetrySeconds + 0.1f);
             }
 
-            Assert.True(missionComponent.ShipRegistry.HasSpawnFailed(shipId));
+            Assert.True(missionComponent.ShipRegistry.StateOf(shipId) == ShipLifecycle.SpawnFailed);
             engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out noFormation),
                 Times.Exactly(BattleShipReplicator.ForeignHullSpawnAttempts));
             spawner.DrainPendingPuppets();
@@ -572,7 +572,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
 
             engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out noFormation), Times.Never);
             Assert.False(missionComponent.ShipRegistry.TryGet(shipId, out _));
-            Assert.False(missionComponent.ShipRegistry.HasSpawnFailed(shipId));
+            Assert.False(missionComponent.ShipRegistry.StateOf(shipId) == ShipLifecycle.SpawnFailed);
 
             initialShipsDeployed = true;
             replicator.Tick(0.1f);
