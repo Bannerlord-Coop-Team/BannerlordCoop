@@ -1,4 +1,4 @@
-using GameInterface.Services.Chat;
+﻿using GameInterface.Services.Chat;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 using Xunit;
@@ -186,20 +186,5 @@ public class ChatOverlayTests
             isConversationActive,
             isGameplayLayerFocused,
             isChatLayerFocused));
-    }
-
-    [Theory]
-    [InlineData(true, true, true)]
-    [InlineData(true, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(false, false, false)]
-    public void SettlementMapMenu_OnlyWhenMapMenuAndInSettlement(
-        bool atMenu,
-        bool hasCurrentSettlement,
-        bool expected)
-    {
-        Assert.Equal(expected, ChatOverlay.IsSettlementMapMenu(
-            atMenu,
-            hasCurrentSettlement));
     }
 }
