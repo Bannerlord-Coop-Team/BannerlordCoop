@@ -140,6 +140,24 @@ public class BattleShipReplicatorTests
         Assert.Equal(0, harness.Replicator.ReportedReserveOf(harness.OwnHull));
     }
 
+    // M9: the end tally counts a copy's reserve as its owner reports it and every other hull's from the engine.
+    [Fact]
+    public void HullReserve_ReadsAnotherOwnersHullFromItsReport_AndEveryOtherHullFromTheEngine()
+    {
+        var harness = new Harness(committed: false);
+        var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
+        var unregistered = CreateHull();
+        harness.Engine.Setup(e => e.ReadSpawnableReserve(harness.OwnHull)).Returns(7);
+        harness.Engine.Setup(e => e.ReadSpawnableReserve(unregistered)).Returns(4);
+        harness.Engine.Setup(e => e.ReadSpawnableReserve(copy)).Returns(5);
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 1,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), spawnableReserve: 12));
+
+        Assert.Equal(7, harness.Replicator.HullReserve(harness.OwnHull));
+        Assert.Equal(12, harness.Replicator.HullReserve(copy));
+        Assert.Equal(4, harness.Replicator.HullReserve(unregistered));
+    }
+
     [Fact]
     public void ReportedReserveOf_DropsTheReport_WhenItsOwnerLeaves()
     {

@@ -53,6 +53,12 @@ public interface IBattleShipReplicator : IDisposable
     /// </summary>
     int ReportedReserveOf(MissionObject hull);
 
+    /// <summary>
+    /// [Game thread] A hull's fieldable reserve for the end tally: another owner's hull as last reported, any other hull
+    /// read from the engine.
+    /// </summary>
+    int HullReserve(MissionObject hull);
+
     /// <summary>[Game thread] Whether an AI hull this client took over is still being replaced by a simulated one.</summary>
     bool IsReplacingHull(Guid shipId);
 
@@ -783,6 +789,10 @@ public class BattleShipReplicator : IBattleShipReplicator
         return stream.ReportedReserve;
     }
 
+    // A copy reads 0 from the engine and an own hull 0 from the reports, so a hull mid-swap counts 0 either way.
+    public int HullReserve(MissionObject hull) =>
+        Registry.TryGetByHull(hull, out var ship) && !IsOwnHull(ship) ? ReportedReserveOf(hull) : engine.ReadSpawnableReserve(hull);
+
     private void Handle_MissionPeerLeft(MessagePayload<MissionPeerLeft> payload) =>
         ForgetReportsOfDeparted(payload.What.ControllerId, payload.What.InstanceId);
 
@@ -1016,7 +1026,7 @@ public class BattleShipReplicator : IBattleShipReplicator
                 sinking = condition?.SinkingState,
                 isSunk = condition?.SinkingState == BattleShipCondition.Sunk,
                 conditionRevision = stream?.ConditionRevision ?? 0,
-                reserve = IsOwnHull(ship) ? engine.ReadSpawnableReserve(ship.Hull) : ReportedReserveOf(ship.Hull),
+                reserve = HullReserve(ship.Hull),
             };
         }).ToArray(),
     };

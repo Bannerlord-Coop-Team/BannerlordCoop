@@ -105,8 +105,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         Server.Call(() => Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _)));
 
     /// <summary>
-    /// A client's naval end tally for a side, counted over its hulls the way <c>CoopNavalBattleEndLogic</c> counts them (a
-    /// copy's reserve as its owner reports it); <paramref name="crew"/> holds the live crew per hull and defaults to none.
+    /// A client's naval end tally for a side, counted over its hulls the way <c>CoopNavalBattleEndLogic</c> counts them, with
+    /// the replicator's <see cref="IBattleShipReplicator.HullReserve"/>; <paramref name="crew"/> holds the live crew per hull and defaults to none.
     /// </summary>
     protected static NavalSideTally EndTally(NavalPeer peer, BattleSideEnum side, int liveHumans,
         IReadOnlyDictionary<Guid, int>? crew = null)
@@ -118,8 +118,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             {
                 var hull = peer.Engine.Of(ship.Hull);
                 int crewAboard = crew != null && crew.TryGetValue(ship.ShipId, out int count) ? count : 0;
-                int reserve = hull.IsCopy ? peer.Ships.ReportedReserveOf(ship.Hull) : peer.Engine.ReadSpawnableReserve(ship.Hull);
-                return new NavalHullCount(hull.Side, hull.SinkingState == BattleShipCondition.Sunk, crewAboard, reserve);
+                return new NavalHullCount(hull.Side, hull.SinkingState == BattleShipCondition.Sunk, crewAboard,
+                    peer.Ships.HullReserve(ship.Hull));
             }).ToList();
             tally = NavalSideTally.Count(side, liveHumans, hulls, peer.MigrationReserve.PendingReserve(side));
         });

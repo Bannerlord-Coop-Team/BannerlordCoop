@@ -31,21 +31,18 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
     private readonly IBattleResultCommitter resultCommitter;
     private readonly INavalNpcFleetSpawner npcFleet;
     private readonly IBattleShipReplicator shipReplicator;
-    private readonly INavalShipEngine shipEngine;
     private readonly INavalMigrationReserveFielder migrationReserve;
 
     private bool endChecksReleased;
 
     public CoopNavalBattleEndLogic(IBattleSession session, IBattleDeploymentCoordinator deployment, IBattleResultCommitter resultCommitter,
-        INavalNpcFleetSpawner npcFleet, IBattleShipReplicator shipReplicator, INavalShipEngine shipEngine,
-        INavalMigrationReserveFielder migrationReserve)
+        INavalNpcFleetSpawner npcFleet, IBattleShipReplicator shipReplicator, INavalMigrationReserveFielder migrationReserve)
     {
         this.session = session;
         this.deployment = deployment;
         this.resultCommitter = resultCommitter;
         this.npcFleet = npcFleet;
         this.shipReplicator = shipReplicator;
-        this.shipEngine = shipEngine;
         this.migrationReserve = migrationReserve;
     }
 
@@ -250,9 +247,7 @@ public class CoopNavalBattleEndLogic : NavalBattleEndLogic
             if (ship.Team == null) continue;
 
             int crew = ship.Formation != null && crewByFormation.TryGetValue(ship.Formation, out int count) ? count : 0;
-            // A copy's reserve is queued on its owner, which reports it with the hull's samples.
-            int reserve = NavalForeignHulls.Contains(ship) ? shipReplicator.ReportedReserveOf(ship) : shipEngine.ReadSpawnableReserve(ship);
-            yield return new NavalHullCount(ship.Team.Side, ship.IsSunk, crew, reserve);
+            yield return new NavalHullCount(ship.Team.Side, ship.IsSunk, crew, shipReplicator.HullReserve(ship));
         }
     }
 }
