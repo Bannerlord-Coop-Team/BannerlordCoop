@@ -157,6 +157,11 @@ if [ -z "$shard_filter" ]; then
     exit 1
 fi
 
+# Runner hardware varies, so a shard far off its estimate may just be on a slower CPU.
+if [ -r /proc/cpuinfo ]; then
+    echo "runner cpu: $(awk -F ': ' '/^model name/ { print $2; exit }' /proc/cpuinfo), $(grep -c '^processor' /proc/cpuinfo) cores"
+fi
+
 estimated_seconds=$(printf '%s\n' "$assignment" | cut -f2)
 assigned_case_count=$(printf '%s\n' "$assignment" | cut -f3)
 echo "running E2E shard $shard_index/$shard_count with $assigned_case_count discovered test cases (~${estimated_seconds}s estimated)"
