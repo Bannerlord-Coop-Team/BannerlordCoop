@@ -62,7 +62,7 @@ public class BattleHeroDamageSyncTests : MissionTestEnvironment
             Assert.True(AgentMirror.TryGet(agent, out var mirror));
             Assert.Equal(70f, mirror.Health);
 
-            // ...and the hero's campaign HitPoints should reflect it so it can sync to the server. BUG: it doesn't.
+            // ...and the hero's campaign HitPoints reflect it so it can sync to the server.
             Assert.Equal(70, hero.HitPoints);
 
             GC.KeepAlive(controller);

@@ -1,2 +1,0 @@
-        [HarmonyTranspiler]
-        static IEnumerable<CodeInstruction> TestPropertyArrayChangeTranspiler(IEnumerable<CodeInstruction> instructions) => ListPropertyChangeTranspiler<string, , >(instructions, "TestPropertyArray");

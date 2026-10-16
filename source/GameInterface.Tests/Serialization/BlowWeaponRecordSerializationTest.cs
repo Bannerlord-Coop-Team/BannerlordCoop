@@ -13,31 +13,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     /// </summary>
     public class BlowWeaponRecordSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public BlowWeaponRecordSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
+            container = SerializationTestContainer.BeginScope();
         }
 
-        [Fact]
-        public void BlowWeaponRecord_Serialize()
-        {
-            BlowWeaponRecord blowWeaponRecord = new BlowWeaponRecord();
-
-            blowWeaponRecord.CurrentPosition = new TaleWorlds.Library.Vec3(1, 1, 1);
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            BlowWeaponRecordBinaryPackage package = new BlowWeaponRecordBinaryPackage(blowWeaponRecord, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
-        }
         [Fact]
         public void BlowWeaponRecord_Full_Serialize()
         {
