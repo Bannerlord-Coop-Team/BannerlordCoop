@@ -35,6 +35,9 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
 
     public int ForeignSpawnAttempts { get; private set; }
 
+    /// <summary>Copies spawn with their prefab's ship weapon, as every hull of a ballista ship does.</summary>
+    public bool ArmsCopies { get; set; }
+
     public IReadOnlyList<FakeHull> AllHulls => hulls;
 
     public IReadOnlyList<FakeHull> Copies => hulls.Where(hull => hull.IsCopy && !hull.IsRemoved).ToList();
@@ -108,6 +111,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             SpawnData = data,
             CampaignShipId = data.CampaignShipId,
         };
+        if (ArmsCopies) copy.ArmWeapon();
         hulls.Add(copy);
         formation = copy.Formation!;
         return copy.Hull;
