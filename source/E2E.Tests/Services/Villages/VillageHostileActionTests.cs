@@ -3412,11 +3412,14 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(instance.ObjectManager.TryGetObject<ItemObject>(itemId, out var item));
 
             var raidComponent = Assert.IsType<RaidEventComponent>(component);
+            var role = ModInformation.IsServer ? "server" : "client";
             Assert.Same(component, mapEvent.Component);
             Assert.True(mapEvent.WasEverInLootingPhase);
             Assert.True(raidComponent.RaidDamage > 0);
-            Assert.True(settlement.SettlementHitPoints < 1f);
-            Assert.True(village.Hearth < 100f);
+            Assert.True(settlement.SettlementHitPoints < 1f,
+                $"{role} SettlementHitPoints={settlement.SettlementHitPoints}, RaidDamage={raidComponent.RaidDamage}, " +
+                $"MapEventSettlement is target={ReferenceEquals(mapEvent.MapEventSettlement, settlement)}");
+            Assert.True(village.Hearth < 100f, $"{role} Hearth={village.Hearth}");
             Assert.NotNull(raidComponent._raidProductionRewards);
             Assert.True(GetItemAmount(raidComponent._raidProductionRewards, item) > 0);
             Assert.True(GetItemAmount(mobileParty.Party, item) > 0);
