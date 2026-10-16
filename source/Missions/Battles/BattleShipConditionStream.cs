@@ -30,6 +30,9 @@ public interface IBattleShipConditionStream
     /// </summary>
     void SendIfChanged(NetworkShipInfo ship);
 
+    /// <summary>[Owner] Sends a peer that entered late the hull's last sent condition and reserve, with the same stamp.</summary>
+    void SendLastTo(string controllerId, NetworkShipInfo ship);
+
     /// <summary>
     /// Applies an owner's condition to its registered copy; why it was dropped, or null. A departed host's held condition is
     /// behind on the host epoch and from a controller no longer in the mission by design, so it is taken
@@ -89,6 +92,14 @@ public class BattleShipConditionStream : IBattleShipConditionStream
         hull.Epoch = session.HostEpoch;
         network.SendAll(new NetworkShipCondition(ship.ShipId, session.OwnControllerId, hull.Revision, session.HostEpoch, condition,
             reserve));
+    }
+
+    public void SendLastTo(string controllerId, NetworkShipInfo ship)
+    {
+        if (!hulls.TryGetValue(ship.ShipId, out var hull) || hull.Condition == null || hull.Reserve == null) return;
+
+        network.Send(controllerId, new NetworkShipCondition(ship.ShipId, session.OwnControllerId, hull.Revision, hull.Epoch,
+            hull.Condition, hull.Reserve.Value));
     }
 
     public string Accept(NetworkShipInfo ship, NetworkShipCondition condition, bool fromDepartedHost)

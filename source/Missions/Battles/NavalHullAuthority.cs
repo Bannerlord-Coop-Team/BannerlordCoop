@@ -11,7 +11,8 @@ namespace Missions.Battles;
 /// <summary>
 /// [Game thread] Moves a registered hull to a new authority. A hull this client takes over is replaced by a freshly
 /// simulated hull of the same ship, one step per mission tick (park its agents, replace the hull, board them again), keeping
-/// its ship id; a hull it hands away goes back to following samples. Every path that spawns a hull itself opens
+/// its ship id; a hull it hands away goes back to following samples. A hull leaving with another owner is parked clear one
+/// tick and removed the next. Every path that spawns a hull itself opens
 /// <see cref="SuppressSpawnRegistration"/>, so the spawn event registers no own hull.
 /// </summary>
 public interface INavalHullAuthority : IDisposable
@@ -29,17 +30,18 @@ public interface INavalHullAuthority : IDisposable
     string Replace(Guid shipId);
 
     /// <summary>
-    /// Takes a hull out of the mission through vanilla's removal, ending any replacement it was in; agents parked for that
-    /// replacement go back where they stood. Its seats and deck must already be clear.
+    /// Queues taking other owners' hulls out through vanilla's removal: the next <see cref="Tick"/> parks everyone still
+    /// aboard and the one after removes the hulls. Parked agents that crew none of them then go back where they stood; the
+    /// hulls' own crew stay parked until their owner's rout or departure takes them. Their seats must already be free.
     /// </summary>
-    void Remove(NetworkShipInfo ship);
+    void Remove(IReadOnlyList<NetworkShipInfo> ships);
 
     bool IsReplacing(Guid shipId);
 
     /// <summary>The replacement step a hull is at, or null (diagnostics).</summary>
     string SwapPhaseOf(Guid shipId);
 
-    /// <summary>[Mission tick] Advances every queued replacement by one step.</summary>
+    /// <summary>[Mission tick] Advances every queued replacement and removal by one step.</summary>
     void Tick();
 }
 
@@ -53,6 +55,7 @@ public class NavalHullAuthority : INavalHullAuthority
     private readonly INavalShipEngine engine;
 
     private readonly List<HullSwap> hullSwaps = new List<HullSwap>();
+    private readonly List<HullRemoval> hullRemovals = new List<HullRemoval>();
     private int spawnScopes;
 
     public NavalHullAuthority(IBattleSession session, ICoopMissionComponent missionComponent, INavalShipEngine engine)
@@ -97,16 +100,11 @@ public class NavalHullAuthority : INavalHullAuthority
         return null;
     }
 
-    public void Remove(NetworkShipInfo ship)
+    public void Remove(IReadOnlyList<NetworkShipInfo> ships)
     {
-        var swap = hullSwaps.FirstOrDefault(pending => pending.ShipId == ship.ShipId);
-        if (swap != null)
-        {
-            hullSwaps.Remove(swap);
-            if (swap.Agents != null) engine.BoardHullAgents(null, swap.Agents);
-        }
+        if (ships.Count == 0) return;
 
-        engine.RemoveHull(ship.Hull);
+        hullRemovals.Add(new HullRemoval(ships.Select(ship => ship.Hull).ToList()));
     }
 
     public bool IsReplacing(Guid shipId) => hullSwaps.Any(swap => swap.ShipId == shipId);
@@ -130,6 +128,9 @@ public class NavalHullAuthority : INavalHullAuthority
     // after spawning it (Quest5 CallReinforcement, then InitializeReinforcement).
     public void Tick()
     {
+        foreach (var removal in hullRemovals.ToArray())
+            AdvanceHullRemoval(removal);
+
         foreach (var swap in hullSwaps.ToArray())
         {
             if (!Registry.TryGet(swap.ShipId, out var ship))
@@ -152,6 +153,39 @@ public class NavalHullAuthority : INavalHullAuthority
                 if (swap.Phase == HullSwapPhase.ReplaceHull && swap.Agents != null) ReturnParkedAgents(swap, ship);
             }
         }
+    }
+
+    private void AdvanceHullRemoval(HullRemoval removal)
+    {
+        try
+        {
+            if (removal.Agents == null)
+            {
+                removal.Agents = removal.Hulls.SelectMany(hull => engine.ParkHullAgents(hull)).ToList();
+                return;
+            }
+
+            hullRemovals.Remove(removal);
+            foreach (var hull in removal.Hulls)
+                engine.RemoveHull(hull);
+        }
+        catch (Exception exception)
+        {
+            hullRemovals.Remove(removal);
+            Logger.Error(exception, "[NavalSync] Removing {Count} departed hull(s) failed", removal.Hulls.Count);
+        }
+
+        UnparkNonCrew(removal);
+    }
+
+    // An agent is crew when any departing hull's parking counted it as such, so another departing hull's crew stays parked.
+    private void UnparkNonCrew(HullRemoval removal)
+    {
+        if (removal.Agents == null) return;
+
+        var crew = new HashSet<Agent>(removal.Agents.Where(moved => moved.IsCrew).Select(moved => moved.Agent));
+        var others = removal.Agents.Where(moved => moved.IsParked && !crew.Contains(moved.Agent)).ToList();
+        if (others.Count > 0) engine.BoardHullAgents(null, others);
     }
 
     private void ReturnParkedAgents(HullSwap swap, NetworkShipInfo ship)
@@ -210,7 +244,11 @@ public class NavalHullAuthority : INavalHullAuthority
 
     private bool IsOwn(NetworkShipInfo ship) => ship.CurrentAuthority == session.OwnControllerId;
 
-    public void Dispose() => hullSwaps.Clear();
+    public void Dispose()
+    {
+        hullSwaps.Clear();
+        hullRemovals.Clear();
+    }
 
     private enum HullSwapPhase
     {
@@ -228,6 +266,18 @@ public class NavalHullAuthority : INavalHullAuthority
 
         public Guid ShipId { get; }
         public HullSwapPhase Phase { get; set; }
+        public IReadOnlyList<HullSwapAgent> Agents { get; set; }
+    }
+
+    private sealed class HullRemoval
+    {
+        public HullRemoval(IReadOnlyList<MissionObject> hulls)
+        {
+            Hulls = hulls;
+        }
+
+        public IReadOnlyList<MissionObject> Hulls { get; }
+        /// <summary>Everyone the first step parked off the hulls; null before it ran.</summary>
         public IReadOnlyList<HullSwapAgent> Agents { get; set; }
     }
 

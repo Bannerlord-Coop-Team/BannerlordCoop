@@ -302,10 +302,10 @@ public class BattleShipReplicatorTests
     private static NetworkShipCondition PeerCondition(NetworkShipInfo ship, long revision, int reserve) =>
         new NetworkShipCondition(ship.ShipId, Peer, revision, 0, Condition(100f), reserve);
 
-    // M8a: an owner's removal takes the copy out in vanilla's order (seats, then stations, then the hull), and the ship id
-    // stays Removed, so a late sample is dropped and a late record never spawns it again.
+    // M8a: an owner's removal frees the copy's seats and stations, parks whoever is still aboard a tick later and removes the
+    // hull the tick after (R33), and the ship id stays Removed, so a late sample is dropped and a late record never spawns it.
     [Fact]
-    public void AcceptRemoval_ReleasesSeatsBeforeRemovingTheCopy_AndTheShipNeverComesBack()
+    public void AcceptRemoval_ReleasesSeatsThenParksTheDeckBeforeRemovingTheCopy_AndTheShipNeverComesBack()
     {
         using var mission = new MissionCurrentScope();
         var harness = new Harness(committed: false);
@@ -314,6 +314,7 @@ public class BattleShipReplicatorTests
         var order = new List<string>();
         harness.Stations.Setup(s => s.ReleaseSeatsOn(copy)).Callback(() => order.Add("seats")).Returns(0);
         harness.Engine.Setup(e => e.ReleaseHullStations(copy)).Callback(() => order.Add("stations"));
+        harness.Engine.Setup(e => e.ParkHullAgents(copy)).Callback(() => order.Add("park")).Returns(Array.Empty<HullSwapAgent>());
         harness.Engine.Setup(e => e.RemoveHull(copy)).Callback(() => order.Add("remove"));
         harness.Engine.Setup(e => e.SideOf(copy)).Returns(BattleSideEnum.Attacker);
 
@@ -322,8 +323,11 @@ public class BattleShipReplicatorTests
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity)));
         harness.Replicator.AcceptSpawnRecords(new[] { ForeignRecord(ship.ShipId) });
         harness.Replicator.Tick(0.1f);
+        var afterFirstTick = order.ToArray();
+        harness.Replicator.Tick(0.1f);
 
-        Assert.Equal(new[] { "seats", "stations", "remove" }, order);
+        Assert.Equal(new[] { "seats", "stations", "park" }, afterFirstTick);
+        Assert.Equal(new[] { "seats", "stations", "park", "remove" }, order);
         Assert.Equal(ShipLifecycle.Removed, harness.Registry.StateOf(ship.ShipId));
         Assert.Equal(1, harness.Replicator.DepartedHulls(BattleSideEnum.Attacker));
         Assert.Equal(0, harness.Replicator.DepartedHulls(BattleSideEnum.Defender));
@@ -390,6 +394,7 @@ public class BattleShipReplicatorTests
         harness.Replicator.RemoveHullsOf(Peer);
         deploying = false;
         harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
 
         Assert.True(waitingBefore);
         Assert.Equal(ShipLifecycle.Removed, harness.Registry.StateOf(player.ShipId));
@@ -440,6 +445,30 @@ public class BattleShipReplicatorTests
         Assert.IsType<NetworkBattleRopeFinal>(sent[0]);
         Assert.IsType<NetworkShipRemoved>(sent[1]);
         Assert.Equal(1, harness.Replicator.DepartedHulls(BattleSideEnum.Defender));
+    }
+
+    // M8a r1: a hull's reserve rides its on-change condition, so a peer entering after the commit gets the last one with the
+    // hull's record, otherwise it would count no reserve for the hull if it became battle host.
+    [Fact]
+    public void PeerEntered_AfterTheCommit_SendsTheEntrantTheOwnHullsRecordThenItsLastConditionAndReserve()
+    {
+        var harness = new Harness(committed: true);
+        harness.Engine.Setup(e => e.ReadCondition(harness.OwnHull)).Returns(Condition(100f));
+        harness.Engine.Setup(e => e.ReadSpawnableReserve(harness.OwnHull)).Returns(7);
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+        var sent = new List<IMessage>();
+        harness.Network.Setup(n => n.Send("joiner", It.IsAny<IMessage>())).Callback<string, IMessage>((_, message) => sent.Add(message));
+
+        harness.Broker.Publish(this, new NetworkMissionPeerEntered("joiner", Instance));
+        GameThread.Run(() => { }, blocking: true);
+
+        Assert.Equal(2, sent.Count);
+        Assert.IsType<NetworkSpawnBattleShips>(sent[0]);
+        var condition = Assert.IsType<NetworkShipCondition>(sent[1]);
+        Assert.Equal(harness.OwnShipId, condition.ShipId);
+        Assert.Equal(1, condition.Revision);
+        Assert.Equal(7, condition.SpawnableReserve);
     }
 
     private static Agent CreateAgent() => (Agent)RuntimeHelpers.GetUninitializedObject(typeof(Agent));
@@ -1430,6 +1459,7 @@ public class BattleShipReplicatorTests
             LiveHulls.Add(hull);
             engine.SetupGet(e => e.Hulls).Returns(() => LiveHulls);
             engine.Setup(e => e.AgentsOnDeck(It.IsAny<MissionObject>())).Returns(Array.Empty<Agent>());
+            engine.Setup(e => e.ParkHullAgents(It.IsAny<MissionObject>())).Returns(Array.Empty<HullSwapAgent>());
             engine.Setup(e => e.GetFrame(It.IsAny<MissionObject>())).Returns(MatrixFrame.Identity);
             engine.Setup(e => e.Describe(It.IsAny<MissionObject>(), It.IsAny<NetworkShipInfo>())).Returns((MissionObject _, NetworkShipInfo info) =>
                 new BattleShipSpawnData(info.ShipId, info.CurrentAuthority, info.MapEventPartyId, false, BattleSideEnum.Defender,

@@ -368,7 +368,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     }
 
     // [Game thread] Every client's half of hulls leaving with their owner. Seats go first, since no machine of a removed hull
-    // may keep a user (R33); then other owners' agents on the decks move to their own hull; then vanilla removes the hulls.
+    // may keep a user (R33); then other owners' agents move to their own hull; the rest are parked a tick before removal.
     private void RemoveHulls(IReadOnlyList<NetworkShipInfo> departing, ShipRemovalReason reason)
     {
         if (departing.Count == 0) return;
@@ -383,10 +383,10 @@ public class BattleShipReplicator : IBattleShipReplicator
         foreach (var ship in departing)
             MoveDeckAgents(ship, departingHulls);
 
+        hullAuthority.Remove(departing);
         foreach (var ship in departing)
         {
             CountDeparted(ship);
-            hullAuthority.Remove(ship);
             Prune(ship.ShipId);
             Logger.Information("[NavalSync] Hull {ShipId} of {Owner} left with its owner ({Reason}); removed it",
                 ship.ShipId, ship.CurrentAuthority, reason);
@@ -896,8 +896,12 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         GameThread.RunSafe(() =>
         {
-            if (spawnRecordsSent && !session.IsOwn(entered.ControllerId))
-                SendSpawnRecords(entered.ControllerId);
+            if (!spawnRecordsSent || session.IsOwn(entered.ControllerId)) return;
+
+            SendSpawnRecords(entered.ControllerId);
+            // A hull's condition and reserve only go out on change, so the entrant gets the last ones too.
+            foreach (var ship in Registry.Ships.Where(IsOwnHull))
+                conditions.SendLastTo(entered.ControllerId, ship);
         }, context: nameof(Handle_PeerEntered));
     }
 

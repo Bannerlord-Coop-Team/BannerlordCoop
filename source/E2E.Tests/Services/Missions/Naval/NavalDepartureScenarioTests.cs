@@ -11,8 +11,8 @@ namespace E2E.Tests.Services.Missions.Naval;
 
 /// <summary>
 /// M8a: a player retreats from or leaves a naval battle, and its hulls and crew leave with it on every client. Seats on a
-/// departing hull are released before it goes, an ally standing on its deck ends on its own hull, nothing the departed owner
-/// sent late brings it back, and the battle still concludes once.
+/// departing hull are released before it goes, an ally standing on its deck ends on its own hull, its own crew is off the
+/// deck when it is removed, nothing the departed owner sent late brings it back, and the battle still concludes once.
 /// </summary>
 public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
 {
@@ -41,6 +41,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         foreach (var peer in new[] { a, c })
         {
             AssertRemovedWithClearDeck(peer, hullB, ally[peer], hullA);
+            Assert.Null(peer.Engine.DeckOf(helmsman[peer]));
             Assert.True(peer.Has(hullA) && peer.Has(hullC));
         }
         Assert.Equal(1, b.Network.NetworkSentMessages.GetMessages<NetworkShipRemoved>()
@@ -87,6 +88,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         foreach (var peer in new[] { a, c })
         {
             AssertRemovedWithClearDeck(peer, hullB, ally[peer], hullA);
+            Assert.Null(peer.Engine.DeckOf(helmsman[peer]));
             Assert.Equal(0, (int)peer.StationStats()["pending"]!);
             var replicator = JObject.FromObject(peer.Ships.Inspect());
             Assert.Equal(0, (int)replicator["pendingForeignHulls"]!);
@@ -133,13 +135,15 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
     private static Dictionary<NavalPeer, Agent> RegisterEverywhere(NavalBattle battle, Guid agentId, string authority) =>
         battle.Peers.ToDictionary(peer => peer, peer => peer.RegisterAgent(agentId, authority));
 
-    // B's helmsman takes the helm, which seats its puppet on A and C, and A's ally boards B's deck on every client.
+    // B's helmsman, crew of B's hull, takes the helm, which seats its puppet on A and C, and A's ally boards B's deck on every
+    // client.
     private static void SeatAndBoard(NavalBattle battle, NavalPeer owner, Guid hull, Dictionary<NavalPeer, Agent> helmsman,
         Dictionary<NavalPeer, Agent> ally, Guid allyHull)
     {
         owner.UseStation(helmsman[owner], owner.Hull(hull).Station("helm"), inUse: true);
         foreach (var peer in battle.Peers)
         {
+            peer.Engine.PlaceAgent(helmsman[peer], peer.Ship(hull).Hull, peer.Ship(hull).Hull);
             peer.Engine.PlaceAgent(ally[peer], peer.Ship(hull).Hull, peer.Ship(allyHull).Hull);
             if (peer != owner) Assert.Same(helmsman[peer], peer.Hull(hull).SeatedAt("helm"));
         }
@@ -170,6 +174,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         var copy = peer.Engine.AllHulls.Single(hull => hull.SpawnData?.ShipId == departed);
         Assert.True(copy.IsRemoved, $"{peer.Id} kept the copy of {departed}");
         Assert.Equal(0, copy.SeatsAtRemoval);
+        Assert.Equal(0, copy.AgentsAboardAtRemoval);
         Assert.Empty(copy.Seats);
         Assert.Same(peer.Ship(allyHull).Hull, peer.Engine.DeckOf(ally)!.Hull);
     }

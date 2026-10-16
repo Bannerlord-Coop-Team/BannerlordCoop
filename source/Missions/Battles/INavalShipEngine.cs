@@ -70,7 +70,7 @@ public interface INavalShipEngine
     void ReleaseNpcHull(MissionObject hull);
 
     /// <summary>
-    /// [Mission tick] First step of replacing a hull: stops every agent aboard using its machines and parks it off
+    /// [Mission tick] First step of replacing or removing a hull: stops every agent aboard using its machines and parks it off
     /// every hull, and stops tracking the hull's crew, so nobody stands on or is tracked by the hull when it goes.
     /// </summary>
     IReadOnlyList<HullSwapAgent> ParkHullAgents(MissionObject hull);

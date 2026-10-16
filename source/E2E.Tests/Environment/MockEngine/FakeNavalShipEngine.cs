@@ -183,6 +183,13 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             .Select(agent => new HullSwapAgent(agent, isCrew: true, isParked: true, Vec3.Zero, Vec3.Zero))
             .ToList();
         fake.Seats.Clear();
+        foreach (var agent in decks.Where(entry => ReferenceEquals(entry.Value, fake)).Select(entry => entry.Key).ToList())
+        {
+            bool isCrew = crews.TryGetValue(agent, out var crew) && ReferenceEquals(crew, fake);
+            parked.Add(new HullSwapAgent(agent, isCrew, isParked: true, Vec3.Zero, Vec3.Zero));
+            decks.Remove(agent);
+        }
+
         return parked;
     }
 
@@ -257,6 +264,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
     {
         var fake = Of(hull);
         fake.SeatsAtRemoval = fake.Seats.Count;
+        fake.AgentsAboardAtRemoval = AgentsOnDeck(hull).Count;
         fake.IsRemoved = true;
     }
 
@@ -390,6 +398,8 @@ public sealed class FakeHull
     public bool IsRemoved { get; set; }
     /// <summary>How many agents still sat at the hull's stations when <see cref="FakeNavalShipEngine.RemoveHull"/> removed it.</summary>
     public int SeatsAtRemoval { get; set; }
+    /// <summary>How many agents still stood on the hull's deck or sat at its stations when it was removed.</summary>
+    public int AgentsAboardAtRemoval { get; set; }
     /// <summary>Pooled by deployment: still listed but removed for every station and condition purpose.</summary>
     public bool IsPooled { get; set; }
     public Team? Team { get; set; }
