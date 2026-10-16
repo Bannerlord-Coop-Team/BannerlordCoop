@@ -78,8 +78,15 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
 
     private void Handle_AwaitingAlternativeSolutionTroopsDepositedLocally(MessagePayload<AwaitingAlternativeSolutionTroopsDepositedLocally> payload)
     {
-        if (ModInformation.IsServer) return;
         if (!objectManager.TryGetIdWithLogging(payload.What.IssueOwner, out var ownerId)) return;
+
+        if (ModInformation.IsServer)
+        {
+            if (!generationRegistry.TryGetGeneration(payload.What.IssueOwner, out var generation)) return;
+            playerManager.TryGetPeer(payload.What.OwnerControllerId, out var peer);
+            ConfirmDeposit(ownerId, payload.What.OwnerControllerId, generation, payload.What.Troops, peer);
+            return;
+        }
 
         var packed = troopRosterInterface.PackTroopRosterData(payload.What.Troops);
         network.SendAll(new RequestAwaitingAlternativeSolutionTroopsDeposit(ownerId, packed));
@@ -89,6 +96,11 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
     {
         if (ModInformation.IsClient) return;
 
+        GameThread.RunSafe(() => ApplyDepositRequest(payload));
+    }
+
+    private void ApplyDepositRequest(MessagePayload<RequestAwaitingAlternativeSolutionTroopsDeposit> payload)
+    {
         var requester = payload.Who as NetPeer;
         if (requester == null || !playerManager.TryGetPlayer(requester, out var player))
         {
@@ -136,35 +148,41 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
 
         var claimedRoster = UnpackToRoster(payload.What.Troops);
         var validatedRoster = troopValidator.Validate(claimedRoster, issue.AlternativeSolutionSentTroops, preserveTroopXp: true);
-        depositedGenerationByOwnerId[payload.What.OwnerId] = currentGeneration;
-        troopsRegistry.Deposit(player.ControllerId, validatedRoster);
+        ConfirmDeposit(payload.What.OwnerId, player.ControllerId, currentGeneration, validatedRoster, requester);
+    }
 
-        var confirmedPacked = troopRosterInterface.PackTroopRosterData(validatedRoster);
-        network.Send(requester, new NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(payload.What.OwnerId, confirmedPacked));
+    private void ConfirmDeposit(string ownerId, string controllerId, int generation, TroopRoster troops, NetPeer peer)
+    {
+        if (depositedGenerationByOwnerId.TryGetValue(ownerId, out var depositedGeneration) &&
+            depositedGeneration == generation) return;
+
+        troopsRegistry.Deposit(controllerId, troops);
+        depositedGenerationByOwnerId[ownerId] = generation;
+        if (peer == null) return;
+
+        var packed = troopRosterInterface.PackTroopRosterData(troops);
+        network.Send(peer, new NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(ownerId, packed));
     }
 
     private void Handle_NetworkAwaitingAlternativeSolutionTroopsDepositRejected(MessagePayload<NetworkAwaitingAlternativeSolutionTroopsDepositRejected> payload)
     {
         if (ModInformation.IsServer) return;
-        if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
-
-        var localControllerId = controllerIdProvider.ControllerId;
-        if (string.IsNullOrEmpty(localControllerId)) return;
-
-        Logger.Error("Server rejected {Message} for owner {OwnerId} - rolling back the local speculative deposit",
+        Logger.Error("Server rejected {Message} for owner {OwnerId}",
             nameof(RequestAwaitingAlternativeSolutionTroopsDeposit), payload.What.OwnerId);
-        troopsRegistry.Clear(localControllerId);
     }
 
     private void Handle_NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed(MessagePayload<NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed> payload)
     {
         if (ModInformation.IsServer) return;
-        if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
+        GameThread.RunSafe(() =>
+        {
+            if (!ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider)) return;
 
-        var localControllerId = controllerIdProvider.ControllerId;
-        if (string.IsNullOrEmpty(localControllerId)) return;
+            var localControllerId = controllerIdProvider.ControllerId;
+            if (string.IsNullOrEmpty(localControllerId)) return;
 
-        troopsRegistry.Deposit(localControllerId, UnpackToRoster(payload.What.Troops));
+            troopsRegistry.Deposit(localControllerId, UnpackToRoster(payload.What.Troops));
+        });
     }
 
     private void Handle_AwaitingAlternativeSolutionTroopsDrainedLocally(MessagePayload<AwaitingAlternativeSolutionTroopsDrainedLocally> payload)
@@ -185,7 +203,7 @@ internal class AwaitingAlternativeSolutionTroopsHandler : IHandler
             return;
         }
 
-        troopsRegistry.Withdraw(player.ControllerId, UnpackToRoster(payload.What.Troops));
+        GameThread.RunSafe(() => troopsRegistry.Withdraw(player.ControllerId, UnpackToRoster(payload.What.Troops)));
     }
 
     private TroopRoster UnpackToRoster(TroopRosterData troops)

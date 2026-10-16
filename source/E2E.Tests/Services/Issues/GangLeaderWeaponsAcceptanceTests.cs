@@ -283,6 +283,7 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
         var server = environment.Server;
         var ownerClient = environment.Clients.Last();
         ownerClient.Resolve<IControllerIdProvider>().SetControllerId(controller);
+        environment.Clients.First().Resolve<IControllerIdProvider>().SetControllerId("weapons-companion-observer");
         var state = new AlternativeSolutionVanillaState(CampaignTime.Zero, CampaignTime.Zero, 0f, 0, 120f, "trade");
 
         foreach (var instance in environment.Clients.Append(server))
@@ -368,12 +369,30 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
                     Assert.True(client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controller, out var returned));
                     Assert.Equal(1, returned.TotalManCount);
                 }
-                else Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs((JournalLogEntry log) => log.RelatedHero == giver));
+                else
+                {
+                    Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs((JournalLogEntry log) => log.RelatedHero == giver));
+                    Assert.Empty(client.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().Snapshot());
+                }
             });
+            Assert.Empty(client.NetworkSentMessages.GetMessages<RequestAwaitingAlternativeSolutionTroopsDeposit>());
         }
+        var confirmation = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkAwaitingAlternativeSolutionTroopsDepositConfirmed>());
+        Assert.Equal(giverId, confirmation.OwnerId);
         var removal = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
         Assert.Equal(outcome == 0 ? IssueFinalizeReason.AlternativeSolutionSuccess :
             outcome == 1 ? IssueFinalizeReason.AlternativeSolutionFail : IssueFinalizeReason.IssueOnly, removal.Reason);
+
+        ownerClient.Call(() => ownerClient.Resolve<INetwork>().SendAll(
+            new RequestAwaitingAlternativeSolutionTroopsDeposit(giverId, default)));
+        Assert.Single(server.NetworkSentMessages.GetMessages<NetworkAwaitingAlternativeSolutionTroopsDepositRejected>());
+        ownerClient.Call(() =>
+        {
+            Assert.True(ownerClient.Resolve<IAwaitingAlternativeSolutionTroopsRegistry>().TryGet(controller, out var returned));
+            Assert.True(ownerClient.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.Equal(1, returned.GetTroopCount(companion.CharacterObject));
+            Assert.Equal(1, returned.TotalManCount);
+        });
     }
 
     [Theory]
