@@ -56,11 +56,11 @@ public class ModuleValidator : IModuleValidator
 
             if (clientModule.Id == null)
             {
-                errors.Add($"To join the server the module '{serverModule.Id}' with version '{serverModule.Version.ToString()}' is required.");
+                errors.Add($"To join the server the module {Describe(serverModule)} with version '{serverModule.Version.ToString()}' is required.");
             }
             else if (!serverModule.Version.IsSame(clientModule.Version, true))
             {
-                errors.Add($"Wrong version of module '{serverModule.Id}' detected. Server uses '{serverModule.Version.ToString()}', client uses '{clientModule.Version.ToString()}'.");
+                errors.Add($"Wrong version of module {Describe(serverModule)} detected. Server uses '{serverModule.Version.ToString()}', client uses '{clientModule.Version.ToString()}'.");
             }
         }
 
@@ -68,7 +68,7 @@ public class ModuleValidator : IModuleValidator
             serverModules.All(serverModule => serverModule.Id != clientModule.Id));
 
         errors.AddRange(modulesOnlyClientSide.Select(clientModule =>
-            $"Server does not support module '{clientModule.Id}'."));
+            $"Server does not support module {Describe(clientModule)}."));
 
         if (errors.Any())
         {
@@ -78,6 +78,20 @@ public class ModuleValidator : IModuleValidator
 
         error = null;
         return true;
+    }
+
+    // 'Calradia Expanded' (CalradiaExpanded): players know the name, the id is what the files use.
+    // The Coop line stays exact because the server matches on UnsupportedCoopModuleReason.
+    private static string Describe(ModuleInfo module)
+    {
+        if (string.IsNullOrWhiteSpace(module.Name) ||
+            string.Equals(module.Name, module.Id, StringComparison.Ordinal) ||
+            string.Equals(module.Id, "Coop", StringComparison.Ordinal))
+        {
+            return $"'{module.Id}'";
+        }
+
+        return $"'{module.Name}' ({module.Id})";
     }
 
     private static bool ShouldValidateModule(ModuleInfo module)
@@ -102,7 +116,7 @@ public class ModuleValidator : IModuleValidator
         if (dlcModules.Any())
         {
             error = "DLC is not supported. Please disable the following module(s): " +
-                string.Join(", ", dlcModules.Select(module => $"'{module.Id}'")) + ".";
+                string.Join(", ", dlcModules.Select(Describe)) + ".";
             return false;
         }
 

@@ -17,24 +17,6 @@ public class HostMigrationTests : MissionTestEnvironment
     public HostMigrationTests(ITestOutputHelper output) : base(output, numClients: 3) { }
 
     [Fact]
-    public void HostDeparts_PromotesFirstSuccessor_OnAllInstances()
-    {
-        var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
-        var clients = Clients.ToArray();
-        EnterBattle(clients[0], mapEventId); // ctrl-A joins first -> host
-        EnterBattle(clients[1], mapEventId); // ctrl-B -> successor
-        EnterBattle(clients[2], mapEventId); // ctrl-C -> successor
-        AssertHost(Server, mapEventId, "ctrl-A", "ctrl-B", "ctrl-C");
-
-        DepartBattle("ctrl-A", mapEventId); // the host leaves
-
-        // The earliest-joined successor is promoted; the rest stay in the line.
-        AssertHost(Server, mapEventId, "ctrl-B", "ctrl-C");
-        foreach (var client in Clients)
-            AssertHost(client, mapEventId, "ctrl-B", "ctrl-C");
-    }
-
-    [Fact]
     public void SuccessorDeparts_DropsFromLine_WithoutChangingHost()
     {
         var (mapEventId, _) = SetupCoopBattle("ctrl-A", "ctrl-B", "ctrl-C");
@@ -58,9 +40,13 @@ public class HostMigrationTests : MissionTestEnvironment
         EnterBattle(clients[0], mapEventId);
         EnterBattle(clients[1], mapEventId);
         EnterBattle(clients[2], mapEventId);
+        AssertHost(Server, mapEventId, "ctrl-A", "ctrl-B", "ctrl-C");
 
-        DepartBattle("ctrl-A", mapEventId); // host -> promote ctrl-B
+        // The earliest-joined successor is promoted; the rest stay in the line.
+        DepartBattle("ctrl-A", mapEventId);
         AssertHost(Server, mapEventId, "ctrl-B", "ctrl-C");
+        foreach (var client in Clients)
+            AssertHost(client, mapEventId, "ctrl-B", "ctrl-C");
 
         DepartBattle("ctrl-B", mapEventId); // new host -> promote ctrl-C (last one standing)
         AssertHost(Server, mapEventId, "ctrl-C");

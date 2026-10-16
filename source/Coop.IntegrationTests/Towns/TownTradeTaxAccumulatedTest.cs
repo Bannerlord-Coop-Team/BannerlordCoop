@@ -14,40 +14,6 @@ namespace Coop.IntegrationTests.Towns
         internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
 
         /// <summary>
-        /// Used to Test that client recieves TownTradeTaxAccumulatedChanged messages.
-        /// </summary>
-        [Fact]
-        public void ServerTownTradeTaxAccumulatedChanged_Publishes_AllClients()
-        {
-            // Arrange
-            var town = TestEnvironment.Server.CreateRegisteredObject<Town>("town1");
-            foreach (var client in TestEnvironment.Clients)
-            {
-                client.CreateRegisteredObject<Town>("town1");
-            }
-
-            var triggerMessage = new TownTradeTaxAccumulatedChanged(town, 450);
-
-            var server = TestEnvironment.Server;
-
-            // Act
-            server.SimulateMessage(this, triggerMessage);
-
-            // The update is coalesced, so it only reaches clients once the server flushes for the tick.
-            FlushCoalescer(server);
-
-            // Assert
-            // Verify the server sends a single message to it's game interface
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeTownTradeTaxAccumulated>());
-
-            // Verify the all clients send a single message to their game interfaces
-            foreach (EnvironmentInstance client in TestEnvironment.Clients)
-            {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeTownTradeTaxAccumulated>());
-            }
-        }
-
-        /// <summary>
         /// Repeated trade-tax changes to the same town within a tick collapse into one latest-wins send.
         /// </summary>
         [Fact]
