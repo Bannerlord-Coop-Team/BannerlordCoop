@@ -1,0 +1,44 @@
+﻿using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.Modules;
+using ProtoBuf;
+using System.IO;
+using TaleWorlds.Library;
+using Xunit;
+
+namespace Coop.Tests.Server.Connections.Messages;
+
+public class NetworkModuleInfoTests
+{
+    [Fact]
+    public void Serialize_WithName_RoundTripsName()
+    {
+        var module = new ModuleInfo("CalradiaExpanded", false, false, new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 0, 0)) { Name = "Calradia Expanded" };
+        var message = new NetworkModuleVersionsValidate(new[] { module }, null);
+
+        var copy = RoundTrip(message);
+
+        Assert.Equal("Calradia Expanded", Assert.Single(copy.Modules).Name);
+    }
+
+    [Fact]
+    public void Serialize_WithoutName_LeavesNameNull()
+    {
+        // a client on an older coop build never sends field 5
+        var module = new ModuleInfo("CalradiaExpanded", false, false, new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 0, 0));
+        var message = new NetworkModuleVersionsValidate(new[] { module }, null);
+
+        var copy = RoundTrip(message);
+
+        var copied = Assert.Single(copy.Modules);
+        Assert.Equal("CalradiaExpanded", copied.Id);
+        Assert.Null(copied.Name);
+    }
+
+    private static NetworkModuleVersionsValidate RoundTrip(NetworkModuleVersionsValidate message)
+    {
+        using var stream = new MemoryStream();
+        Serializer.Serialize(stream, message);
+        stream.Position = 0;
+        return Serializer.Deserialize<NetworkModuleVersionsValidate>(stream);
+    }
+}

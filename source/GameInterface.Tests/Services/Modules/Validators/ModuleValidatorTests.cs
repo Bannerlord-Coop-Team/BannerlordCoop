@@ -1,3 +1,4 @@
+using System;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using System.Collections.Generic;
@@ -387,5 +388,71 @@ public class ModuleValidatorTests
 
         Assert.True(result);
         Assert.Null(error);
+    }
+
+    [Fact]
+    public void Validate_NamesModules_WhenDisplayNamesAreKnown()
+    {
+        var serverModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "CalradiaExpanded", Name = "Calradia Expanded", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 0, 0) },
+            new ModuleInfo { Id = "RBM", Name = "Realistic Battle Mod", Version = new ApplicationVersion(ApplicationVersionType.Release, 3, 0, 0, 0) }
+        };
+
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "CalradiaExpanded", Name = "Calradia Expanded", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 1, 0, 0) },
+            new ModuleInfo { Id = "ExtraMod", Name = "Extra Mod", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 0) }
+        };
+
+        var result = new ModuleValidator().Validate(serverModules, clientModules, out var error);
+
+        Assert.False(result);
+        Assert.Equal(string.Join(Environment.NewLine,
+            "Wrong version of module 'Calradia Expanded' (CalradiaExpanded) detected. Server uses 'v1.2.0.0', client uses 'v1.1.0.0'.",
+            "To join the server the module 'Realistic Battle Mod' (RBM) with version 'v3.0.0.0' is required.",
+            "Server does not support module 'Extra Mod' (ExtraMod)."), error);
+    }
+
+    [Fact]
+    public void Validate_UsesIdOnly_WhenNameMatchesId()
+    {
+        var serverModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "ModuleA", Name = "ModuleA", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 0) }
+        };
+
+        var result = new ModuleValidator().Validate(serverModules, new List<ModuleInfo>(), out var error);
+
+        Assert.False(result);
+        Assert.Equal("To join the server the module 'ModuleA' with version 'v1.0.0.0' is required.", error);
+    }
+
+    [Fact]
+    public void Validate_KeepsUnsupportedCoopReasonExact_WhenCoopHasDisplayName()
+    {
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Coop", Name = "Bannerlord Coop", Version = new ApplicationVersion(ApplicationVersionType.Release, 0, 1, 6, 0) }
+        };
+
+        var result = new ModuleValidator().Validate(new List<ModuleInfo>(), clientModules, out var error);
+
+        Assert.False(result);
+        Assert.Equal("Server does not support module 'Coop'.", error);
+    }
+
+    [Fact]
+    public void ValidateNoDlc_NamesDlc_WhenDisplayNameIsKnown()
+    {
+        var modules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "NavalDLC", Name = "War Sails", IsOfficial = true, IsDlc = true }
+        };
+
+        var result = new ModuleValidator().ValidateNoDlc(modules, out var error);
+
+        Assert.False(result);
+        Assert.Equal("DLC is not supported. Please disable the following module(s): 'War Sails' (NavalDLC).", error);
     }
 }
