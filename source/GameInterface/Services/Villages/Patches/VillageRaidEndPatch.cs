@@ -1,9 +1,7 @@
 using Common;
 using Common.Messaging;
-using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Armies.Messages;
-using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -42,17 +40,18 @@ internal class VillageRaidEndPatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsServer) return true;
 
+        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
         var mapEvent = PlayerEncounter.Battle ?? MapEvent.PlayerMapEvent;
         if (mapEvent != null)
         {
             MessageBroker.Instance.Publish(mapEvent, new MapEventFinalizeAttempted(mapEvent));
+            MessageBroker.Instance.Publish(mapEvent, message);
             return false;
         }
 
         CloseLocalRaidMenu();
 
-        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
-        MessageBroker.Instance.Publish(null, message);
+        MessageBroker.Instance.Publish(mapEvent, message);
         return false;
     }
     [HarmonyPatch(typeof(VillageHostileActionCampaignBehavior), nameof(VillageHostileActionCampaignBehavior.wait_menu_end_raiding_at_army_by_abandoning_on_consequence))]
@@ -66,17 +65,18 @@ internal class VillageRaidEndPatch
             new ChangeClanInfluence(Clan.PlayerClan,
             (int)(float)Campaign.Current.Models.DiplomacyModel.GetInfluenceCostOfAbandoningArmy()));
 
+        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
         var mapEvent = PlayerEncounter.Battle ?? MapEvent.PlayerMapEvent;
         if (mapEvent != null)
         {
             MessageBroker.Instance.Publish(mapEvent, new MapEventFinalizeAttempted(mapEvent));
+            MessageBroker.Instance.Publish(mapEvent, message);
             return false;
         }
 
         CloseLocalRaidMenu();
 
-        var message = new MobilePartyInArmyRemoved(MobileParty.MainParty.Army, MobileParty.MainParty, MobileParty.MainParty);
-        MessageBroker.Instance.Publish(null, message);
+        MessageBroker.Instance.Publish(mapEvent, message);
         return false;
     }
 
