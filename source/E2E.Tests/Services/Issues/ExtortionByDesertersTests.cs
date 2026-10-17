@@ -13,6 +13,9 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Conversation;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Actions;
 using SandBox.GauntletUI.Map;
@@ -416,6 +419,77 @@ public class ExtortionByDesertersTests : IDisposable
         Assert.Equal(1, encounter.CountFor(Owner));
         Assert.Equal(0, encounter.CountFor(Other));
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Ambush);
+    }
+
+    [Fact]
+    public void AmbushHandoff_PreservesAnEncounterAlreadyAttachedToTheReplicatedRaid()
+    {
+        Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        var ownerQuest = (Quest)scenario.QuestOf(Owner);
+        string raidId = null!, ownerPartyId = null!, ownerHeroId = null!;
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var owner));
+            ownerPartyId = owner.MobilePartyId;
+            ownerHeroId = owner.HeroId;
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var defenders = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            quest._deserterMobileParty = deserters;
+            quest._defenderMobileParty = defenders;
+            ownerParty.CurrentSettlement = quest.QuestSettlement;
+            var raid = CreateBattle(deserters, quest.QuestSettlement.Party, true);
+            raid.MapEventSettlement = quest.QuestSettlement;
+            defenders.MapEventSide = raid.DefenderSide;
+            ownerParty.MapEventSide = raid.DefenderSide;
+            Assert.True(Server.ObjectManager.TryGetId(raid, out raidId));
+            Server.Resolve<ExtortionByDesertersSync>().Send(quest);
+        }, TextLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
+        using var finish = new MethodCallRecorder(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish)));
+        using var menus = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)));
+        using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
+        Owner.Call(() =>
+        {
+            Assert.True(Owner.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            Assert.True(Owner.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            using var playerScope = new MainHeroSubstitutionScope(ownerHero, ownerParty);
+            Assert.True(Owner.ObjectManager.TryGetObject<MapEvent>(raidId, out var raid));
+            // Seed the already-applied raid graph at the client handoff boundary.
+            using (new AllowedThread())
+            {
+                raid._mapEventType = MapEvent.BattleTypes.Raid;
+                raid.MapEventSettlement = ownerQuest.QuestSettlement;
+                ownerQuest._deserterMobileParty.MapEventSide = raid.AttackerSide;
+                ownerQuest._defenderMobileParty.MapEventSide = raid.DefenderSide;
+                ownerParty.MapEventSide = raid.DefenderSide;
+            }
+            Assert.Same(raid, MobileParty.MainParty.MapEvent);
+            PlayerEncounter.Start();
+            var existing = PlayerEncounter.Current;
+            existing._mapEvent = raid;
+            existing.FirstInit = false;
+            var participants = raid.InvolvedParties.ToArray();
+            Assert.Contains(participants, party => party.MobileParty == ownerQuest._defenderMobileParty);
+            try
+            {
+                ownerQuest.StartAmbushEncounter();
+                Assert.Equal(0, finish.CountFor(Owner));
+                Assert.Same(existing, PlayerEncounter.Current);
+                Assert.Same(raid, PlayerEncounter.Battle);
+                Assert.False(existing.FirstInit);
+                Assert.False(raid.IsFinalized);
+                Assert.Equal(participants, raid.InvolvedParties.ToArray());
+                Assert.Same(raid.DefenderSide, MobileParty.MainParty.MapEventSide);
+            }
+            finally
+            {
+                Campaign.Current.PlayerEncounter = null;
+            }
+        });
+        Assert.Equal(new[] { "encounter_meeting" }, menus.MenusFor(Owner));
+        Assert.Equal(1, conversations.CountFor(Owner));
+        Assert.Equal(0, conversations.CountFor(Other));
     }
 
     [Fact]

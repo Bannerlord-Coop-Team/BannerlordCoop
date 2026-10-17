@@ -31,14 +31,23 @@ internal class ExtortionByDesertersPartyPatches
     [HarmonyPrefix]
     private static bool StartAmbushEncounterPrefix(Quest __instance)
     {
-        if (ModInformation.IsServer || __instance._deserterMobileParty == null ||
-            __instance._defenderMobileParty == null || MobileParty.MainParty.MapEvent == null) return false;
+        var raid = __instance._deserterMobileParty?.MapEvent;
+        if (ModInformation.IsServer || raid == null || __instance._defenderMobileParty == null ||
+            MobileParty.MainParty.MapEvent != raid) return false;
 
         // Adopt the server's raid; vanilla's full ambush method would add client-created battle parties.
         using (new AllowedThread())
         {
-            if (PlayerEncounter.Current != null) PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
-            PlayerEncounter.Start();
+            // Finishing an encounter already using this raid would finalize its battle locally.
+            if (PlayerEncounter.Battle != raid)
+            {
+                if (PlayerEncounter.Current != null)
+                {
+                    PlayerEncounter.Current._mapEvent = null;
+                    PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+                }
+                PlayerEncounter.Start();
+            }
             PlayerEncounter.Init();
             var leader = ConversationHelper.GetConversationCharacterPartyLeader(__instance._deserterMobileParty.Party);
             var player = new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty, noHorse: true);
