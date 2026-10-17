@@ -23,7 +23,7 @@ public interface ILeaderlessClanResolver
     Hero FindSuccessor(Clan clan, Hero excluded = null);
 
     /// <summary>
-    /// Destroys a clan nobody can lead, after moving its children to a relative's clan and taking its
+    /// Destroys a clan nobody can lead, after moving its children to a relative's or another lord clan and taking its
     /// disabled (retired) heroes out, since the game's clan destruction kills every living member.
     /// </summary>
     void CloseClan(Clan clan);
@@ -110,7 +110,13 @@ internal sealed class LeaderlessClanResolver : ILeaderlessClanResolver
             }
 
             var home = FindHomeClan(hero, clan);
-            if (home == null) continue;
+            if (home == null)
+            {
+                // no other lord clan is left, so the hero is kept alive outside the clan like a retired one
+                logger.Warning("No clan can take {HeroId}, leaving them without a clan before closing clan {ClanId}", hero.StringId, clan.StringId);
+                hero.Clan = null;
+                continue;
+            }
 
             logger.Information("Moving {HeroId} to clan {HomeClanId} before closing clan {ClanId}", hero.StringId, home.StringId, clan.StringId);
             hero.Clan = home;
@@ -161,6 +167,16 @@ internal sealed class LeaderlessClanResolver : ILeaderlessClanResolver
         if (Usable(hero.Spouse?.Clan)) return hero.Spouse.Clan;
 
         var rulingClan = closing.Kingdom?.RulingClan;
-        return Usable(rulingClan) ? rulingClan : null;
+        if (Usable(rulingClan)) return rulingClan;
+
+        // the closing clan can be the ruling clan and its only relatives inside it, so fall back to the
+        // strongest other lord clan, one of the same kingdom and with a leader first
+        return (closing.Kingdom?.Clans ?? Enumerable.Empty<Clan>())
+            .Concat(Clan.NonBanditFactions)
+            .Where(candidate => Usable(candidate) && !candidate.IsMinorFaction)
+            .OrderByDescending(candidate => candidate.Kingdom == closing.Kingdom)
+            .ThenByDescending(candidate => candidate.Leader is { IsAlive: true, IsDisabled: false })
+            .ThenByDescending(candidate => candidate.Tier)
+            .FirstOrDefault();
     }
 }

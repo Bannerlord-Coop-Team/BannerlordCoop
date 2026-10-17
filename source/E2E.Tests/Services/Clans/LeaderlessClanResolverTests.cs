@@ -125,6 +125,33 @@ public class LeaderlessClanResolverTests : IDisposable
 
         Assert.False(environment.Server.ObjectManager.TryGetObject<Clan>(clanId, out _));
     }
+
+    [Fact]
+    public void RetirementWithoutHeir_RulingClanWithOnlyAChild_MovesTheChildToAnotherKingdomClan()
+    {
+        // #3928 review: the child's only relative was the retired leader and the ruling clan was the one closing
+        var clanId = CreateKingdomClan(out var kingdomId);
+        var leaderId = AddMember(clanId, age: 40);
+        var childId = AddMember(clanId, age: 8);
+        var otherClanId = CreateKingdomClan(out _, kingdomId);
+
+        environment.Server.Call(() =>
+        {
+            var clan = environment.Server.GetRegisteredObject<Clan>(clanId);
+            var leader = environment.Server.GetRegisteredObject<Hero>(leaderId);
+            var child = environment.Server.GetRegisteredObject<Hero>(childId);
+            clan.SetLeader(leader);
+            clan.Kingdom.RulingClan = clan;
+            child.Father = leader;
+
+            environment.Server.Resolve<IApplyHeirSelectionActionInterface>().ApplyByRetirementWithoutHeir(leader);
+
+            Assert.True(child.IsAlive);
+            Assert.Same(environment.Server.GetRegisteredObject<Clan>(otherClanId), child.Clan);
+            Assert.False(child.Clan.IsEliminated);
+        }, TextMethods);
+    }
+
     [Fact]
     public void RepairLoadedClans_LeavesClansWithALeaderOrNoKingdomAlone()
     {
@@ -172,16 +199,19 @@ public class LeaderlessClanResolverTests : IDisposable
         });
     }
 
-    private string CreateKingdomClan(out string kingdomId)
+    private string CreateKingdomClan(out string kingdomId, string existingKingdomId = null)
     {
         string clanId = null;
         string kId = null;
         environment.Server.Call(() =>
         {
-            var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
+            var kingdom = existingKingdomId == null
+                ? GameObjectCreator.CreateInitializedObject<Kingdom>()
+                : environment.Server.GetRegisteredObject<Kingdom>(existingKingdomId);
             var clan = Clan.CreateClan("LeaderlessClan");
             clan._defaultPartyTemplate = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
             clan._kingdom = kingdom;
+            kingdom._clans.Add(clan);
             Assert.True(environment.Server.ObjectManager.TryGetId(clan, out clanId));
             Assert.True(environment.Server.ObjectManager.TryGetId(kingdom, out kId));
         });
