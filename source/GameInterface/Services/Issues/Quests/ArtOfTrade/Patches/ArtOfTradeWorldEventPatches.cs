@@ -45,11 +45,20 @@ internal class ArtOfTradeWorldEventPatches
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnWarDeclared))]
+    [HarmonyPrefix]
+    private static bool WarListener() => ModInformation.IsServer;
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnClanChangedKingdom))]
+    [HarmonyPrefix]
+    private static bool KingdomListener() => ModInformation.IsServer;
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnVillageRaided))]
+    [HarmonyPrefix]
+    private static bool RaidListener() => ModInformation.IsServer;
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventStarted))]
     [HarmonyPrefix]
-    private static bool ServerListener() => ModInformation.IsServer;
+    private static bool MapEventListener() => ModInformation.IsServer;
 
     private static void RunAsOwners(Action<Quest> listener)
     {

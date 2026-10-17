@@ -80,12 +80,17 @@ internal class ArtOfTradeBranchPatches
     private static bool HourlyTick() => ModInformation.IsClient;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnPlayerInventoryExchange))]
+    [HarmonyPostfix]
+    private static void SaleProgress(Quest __instance) => Progress(__instance);
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.HourlyTick))]
     [HarmonyPostfix]
-    private static void Progress(Quest __instance)
+    private static void LostGoodsProgress(Quest __instance) => Progress(__instance);
+
+    private static void Progress(Quest quest)
     {
-        if (ModInformation.IsClient && __instance.IsOngoing && __instance._soldItemAmountLog != null)
-            MessageBroker.Instance.Publish(__instance, new ArtOfTradeProgressChanged(__instance));
+        if (ModInformation.IsClient && quest.IsOngoing && quest._soldItemAmountLog != null)
+            MessageBroker.Instance.Publish(quest, new ArtOfTradeProgressChanged(quest));
     }
 
     [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.FinalizeQuest))]

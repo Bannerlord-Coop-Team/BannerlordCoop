@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssueQuest;
 
@@ -16,6 +17,38 @@ internal sealed class ArtOfTradeJournalFinalizing : IEvent
 {
     public Quest Quest { get; }
     public ArtOfTradeJournalFinalizing(Quest quest) { Quest = quest; }
+}
+
+internal sealed class ArtOfTradeIssueJournalChanged : IEvent
+{
+    public IssueBase Issue { get; }
+    public IssueBase.IssueUpdateDetails Details { get; }
+    public ArtOfTradeIssueJournalChanged(IssueBase issue, IssueBase.IssueUpdateDetails details)
+    {
+        Issue = issue;
+        Details = details;
+    }
+}
+
+internal sealed class ArtOfTradePurchaseRejected : IEvent
+{
+    public Quest Quest { get; }
+    public ArtOfTradePurchaseRejected(Quest quest) { Quest = quest; }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public sealed class NetworkArtOfTradePurchaseRejected : IServerToClientCommand
+{
+    [ProtoMember(1)] public string IssueOwnerId { get; }
+    [ProtoMember(2)] public string IssueId { get; }
+    [ProtoMember(3)] public string ControllerId { get; }
+
+    public NetworkArtOfTradePurchaseRejected(string issueOwnerId, string issueId, string controllerId)
+    {
+        IssueOwnerId = issueOwnerId;
+        IssueId = issueId;
+        ControllerId = controllerId;
+    }
 }
 
 [ProtoContract(SkipConstructor = true)]
@@ -67,12 +100,19 @@ public sealed class NetworkArtOfTradeJournal : IServerToClientCommand
     [ProtoMember(2)] public string IssueId { get; }
     [ProtoMember(3)] public string ControllerId { get; }
     [ProtoMember(4)] public ArtOfTradeJournalEntry[] Entries { get; }
+    [ProtoMember(5)] public bool IsIssueJournal { get; }
+    [ProtoMember(6)] public IssueBase.IssueUpdateDetails Details { get; }
+    [ProtoMember(7)] public bool EffectsResolved { get; }
 
-    public NetworkArtOfTradeJournal(string issueOwnerId, string issueId, string controllerId, ArtOfTradeJournalEntry[] entries)
+    public NetworkArtOfTradeJournal(string issueOwnerId, string issueId, string controllerId, ArtOfTradeJournalEntry[] entries,
+        bool isIssueJournal = false, IssueBase.IssueUpdateDetails details = IssueBase.IssueUpdateDetails.None, bool effectsResolved = false)
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
         ControllerId = controllerId;
         Entries = entries;
+        IsIssueJournal = isIssueJournal;
+        Details = details;
+        EffectsResolved = effectsResolved;
     }
 }

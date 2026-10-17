@@ -3,6 +3,7 @@ using GameInterface.Surrogates;
 using ProtoBuf;
 using System.IO;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Xunit;
@@ -45,6 +46,16 @@ public class ArtOfTradeMessageTests
         Assert.Equal(9, restored.CurrentProgress);
         Assert.Equal(14, restored.Range);
         Assert.Equal(LogType.Discreate, restored.Type);
+    }
+
+    [Fact]
+    public void CompanionJournalRetainsTheCompletionStatusAndResolvedEffects()
+    {
+        var copy = RoundTrip(new NetworkArtOfTradeJournal("giver", "issue_7", "owner",
+            System.Array.Empty<ArtOfTradeJournalEntry>(), true, IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest, true));
+        Assert.True(copy.IsIssueJournal);
+        Assert.True(copy.EffectsResolved);
+        Assert.Equal(IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest, copy.Details);
     }
 
     private static T RoundTrip<T>(T value)

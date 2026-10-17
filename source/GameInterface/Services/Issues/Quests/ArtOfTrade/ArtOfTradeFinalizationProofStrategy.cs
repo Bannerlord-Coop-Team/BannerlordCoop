@@ -1,11 +1,19 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
+using Common.Messaging;
 using Quest = TaleWorlds.CampaignSystem.Issues.LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.ArtOfTrade;
 
 internal class ArtOfTradeFinalizationProofStrategy : IFinalizationProofStrategy
 {
+    private readonly IMessageBroker broker;
+
+    public ArtOfTradeFinalizationProofStrategy(IMessageBroker broker)
+    {
+        this.broker = broker;
+    }
+
     public bool TryRunBranch(QuestBase quest, byte proof)
     {
         if (!(quest is Quest trade) || !trade.IsOngoing) return false;
@@ -17,10 +25,12 @@ internal class ArtOfTradeFinalizationProofStrategy : IFinalizationProofStrategy
                 if (!commissioned) trade.QuestAcceptedConsequences();
                 return true;
             case ArtOfTradeBranch.BuyGoods:
-                if (!commissioned && trade.PlayerBuyClickableOptionCondition(out _)) trade.QuestFinishedPlayerBoughtTheGoods();
+                if (commissioned) return true;
+                if (trade.PlayerBuyClickableOptionCondition(out _)) trade.QuestFinishedPlayerBoughtTheGoods();
+                else broker.Publish(trade, new ArtOfTradePurchaseRejected(trade));
                 return true;
             case ArtOfTradeBranch.PaySaleProceeds:
-                if (commissioned && !trade._productsUndersold && trade.PlayerPayAgreedDenarsClickableCondition(out _))
+                if (commissioned && !trade._productsUndersold)
                     trade.QuestSuccessPlayerSoldTheProducts();
                 return true;
             case ArtOfTradeBranch.PayAgreedSum:

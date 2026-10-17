@@ -16,6 +16,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
@@ -30,6 +31,7 @@ public class ArtOfTradeTests : IDisposable
     {
         AccessTools.Method(typeof(Quest), nameof(Quest.SetDialogs)),
         AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)),
+        AccessTools.PropertyGetter(typeof(Settlement), nameof(Settlement.EncyclopediaLink)),
         AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)),
         AccessTools.Method(typeof(Town), nameof(Town.GetItemPrice), new[] { typeof(ItemObject), typeof(MobileParty), typeof(bool) }),
     };
@@ -38,6 +40,8 @@ public class ArtOfTradeTests : IDisposable
     private readonly QuestScenario scenario;
     private readonly string settlementId;
     private readonly string villageId;
+    private readonly string boundSettlementId;
+    private readonly string boundTownId;
     private readonly string itemId;
     private readonly string giverClanId;
     private readonly string kingdomId;
@@ -53,6 +57,8 @@ public class ArtOfTradeTests : IDisposable
         scenario = new QuestScenario(environment);
         settlementId = environment.CreateRegisteredObject<Settlement>();
         villageId = environment.CreateRegisteredObject<Village>();
+        boundSettlementId = environment.CreateRegisteredObject<Settlement>();
+        boundTownId = environment.CreateRegisteredObject<Town>();
         itemId = environment.CreateRegisteredObject<ItemObject>();
         giverClanId = environment.CreateRegisteredObject<Clan>();
         kingdomId = environment.CreateRegisteredObject<Kingdom>();
@@ -95,6 +101,7 @@ public class ArtOfTradeTests : IDisposable
         Commission();
         var amount = QuestOf(Owner)._selectedItemObjectCount;
         WithPlayer(Server, () => Assert.Equal(amount, MobileParty.MainParty.ItemRoster.GetItemNumber(Item(Server))));
+        environment.FlushCoalescer();
         WithPlayer(Owner, () => Assert.Equal(amount, MobileParty.MainParty.ItemRoster.GetItemNumber(Item(Owner))));
         Assert.Equal(1, start.CountFor(Owner));
         Assert.Equal(0, start.CountFor(Server));
@@ -119,6 +126,78 @@ public class ArtOfTradeTests : IDisposable
         Assert.Equal(completes ? 1 : 0, Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>().Count());
         WithPlayer(Server, () => Assert.Equal(canPay ? 10 : price - 1, Hero.MainHero.Gold));
         if (completes) AssertFinished(IssueOutcome.QuestSuccess);
+        else foreach (var instance in Instances) instance.Call(() => Assert.True(IssueOf(instance).IsOngoingWithoutQuest));
+    }
+
+    [Fact]
+    public void PurchaseRefusedForChangedServerGoldRestoresAnOfferThatCanBeTakenOnCommission()
+    {
+        Accept();
+        var quest = QuestOf(Owner);
+        var price = quest._targetDenarsToAchieve;
+        WithPlayer(Owner, () => Hero.MainHero.Gold = price + 50);
+        WithPlayer(Server, () => Hero.MainHero.Gold = price - 1);
+        WithPlayer(Owner, () =>
+        {
+            quest.StartQuest();
+            quest.QuestFinishedPlayerBoughtTheGoods();
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkArtOfTradePurchaseRejected>());
+        Assert.True(quest.IsFinalized);
+        foreach (var instance in Instances) instance.Call(() =>
+        {
+            Assert.True(IssueOf(instance).IsOngoingWithoutQuest);
+            Assert.Null(IssueOf(instance).IssueQuest);
+        });
+        Accept();
+        Commission();
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+        WithPlayer(Server, () => Assert.Equal(QuestOf(Server)._selectedItemObjectCount,
+            MobileParty.MainParty.ItemRoster.GetItemNumber(Item(Server))));
+    }
+
+    [Fact]
+    public void ProfitableReturnKeepsVanillasCappedPaymentAfterTheOwnerSpendsProceeds()
+    {
+        Accept();
+        Commission();
+        var quest = QuestOf(Owner);
+        WithPlayer(Owner, () => quest.OnPlayerInventoryExchange(new(), new()
+        {
+            (new ItemRosterElement(Item(Owner), 1), quest._targetDenarsToAchieve),
+        }, true));
+        Assert.True(quest.ItemCountLeftToSell > 0);
+        SetGold(10);
+        WithPlayer(Owner, () => quest.QuestSuccessPlayerSoldTheProducts());
+        AssertFinished(IssueOutcome.QuestSuccess);
+        WithPlayer(Server, () => Assert.Equal(0, Hero.MainHero.Gold));
+    }
+
+    [Fact]
+    public void ZeroProceedsCanBreakTheAgreementWithoutAPayment()
+    {
+        Accept();
+        Commission();
+        Sell(0);
+        SetGold(0);
+        WithPlayer(Owner, () => QuestOf(Owner).QuestFailedPlayerBrokeTheAgreement());
+        AssertFinished(IssueOutcome.QuestFail);
+        WithPlayer(Server, () => Assert.Equal(0, Hero.MainHero.Gold));
+    }
+
+    [Fact]
+    public void CompensationCanBeRetriedAfterTheOwnerRaisesEnoughGold()
+    {
+        Accept();
+        Commission();
+        Sell(10);
+        SetGold(0);
+        WithPlayer(Owner, () => QuestOf(Owner).PlayerPaidAgreedDenarsQuestSuccess());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        SetGold(QuestOf(Owner)._targetDenarsToAchieve);
+        WithPlayer(Owner, () => QuestOf(Owner).PlayerPaidAgreedDenarsQuestSuccess());
+        AssertFinished(IssueOutcome.QuestSuccess);
     }
 
     [Theory]
@@ -174,7 +253,7 @@ public class ArtOfTradeTests : IDisposable
         SetGold(quest._targetDenarsToAchieve);
         WithPlayer(Owner, () => quest.PlayerPaidAgreedDenarsQuestSuccess());
         AssertFinished(IssueOutcome.QuestSuccess);
-        Assert.Contains(quest.JournalEntries, log => log.LogText.Value.StartsWith("{=IfPnl0B6}"));
+        Assert.Contains(quest.JournalEntries, log => log.LogText?.Value?.StartsWith("{=IfPnl0B6}") == true);
     }
 
     [Fact]
@@ -198,7 +277,7 @@ public class ArtOfTradeTests : IDisposable
         var quest = QuestOf(Owner);
         WithPlayer(Owner, () => quest.CompleteQuestWithTimeOut());
         AssertFinished(IssueOutcome.QuestTimeOut);
-        Assert.Contains(quest.JournalEntries, log => log.LogText.Value.StartsWith("{=PQt8lfTX}"));
+        Assert.Contains(quest.JournalEntries, log => log.LogText?.Value?.StartsWith("{=PQt8lfTX}") == true);
     }
 
     [Fact]
@@ -264,7 +343,7 @@ public class ArtOfTradeTests : IDisposable
         Server.Call(() =>
         {
             using var allowed = new AllowedThread();
-            Get<Village>(Server, villageId).VillageState = Village.VillageStates.BeingRaided;
+            Get<Village>(Server, villageId).VillageState = Village.VillageStates.Looted;
         });
         Accept();
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
@@ -281,6 +360,132 @@ public class ArtOfTradeTests : IDisposable
         Server.Call(() => DeclareWarAction.ApplyInternal(Get<Kingdom>(Server, kingdomId), Get<Clan>(Server, playerClanId), detail), NativePresentation);
         AssertFinished(expected);
         Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+    }
+
+    [Fact]
+    public void KingdomChangeIntoWarCancelsTheOwnersQuest()
+    {
+        Accept();
+        Commission();
+        Server.Call(() =>
+        {
+            var kingdom = Get<Kingdom>(Server, kingdomId);
+            var clan = Get<Clan>(Server, playerClanId);
+            using (new AllowedThread()) FactionManager.DeclareWar(kingdom, clan);
+            CampaignEventDispatcher.Instance.OnClanChangedKingdom(clan, null, kingdom,
+                ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+        }, NativePresentation);
+        AssertFinished(IssueOutcome.QuestCancel);
+    }
+
+    [Theory]
+    [InlineData(MapEvent.BattleTypes.IsForcingSupplies, true)]
+    [InlineData(MapEvent.BattleTypes.IsForcingVolunteers, true)]
+    [InlineData(MapEvent.BattleTypes.IsForcingSupplies, false)]
+    public void CoercionOfTheGiversVillageFailsOnlyForTheQuestOwner(MapEvent.BattleTypes kind, bool ownerAttacks)
+    {
+        Accept();
+        Commission();
+        var battleId = environment.CreateRegisteredObject<MapEvent>();
+        Server.Call(() =>
+        {
+            var village = Get<Settlement>(Server, settlementId);
+            var battle = Get<MapEvent>(Server, battleId);
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(ownerAttacks ? QuestScenario.ControllerA : QuestScenario.ControllerB, out var attacker));
+            var party = Get<MobileParty>(Server, attacker.MobilePartyId).Party;
+            using (new AllowedThread())
+            {
+                village._notablesCache.Add(Giver(Server));
+                village.Village.Bound.Town._ownerClan = Get<Clan>(Server, giverClanId);
+                battle._mapEventType = kind;
+                battle.MapEventSettlement = village;
+            }
+            CampaignEventDispatcher.Instance.OnMapEventStarted(battle, party, village.Party);
+        }, NativePresentation);
+        if (ownerAttacks) AssertFinished(IssueOutcome.QuestFail);
+        else
+        {
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+            Assert.True(QuestOf(Owner).IsOngoing);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void CompanionDispatchAndInheritedCompletionKeepTheRewardWithTheOwner(bool fails, bool cancels)
+    {
+        var companionId = environment.CreateRegisteredObject<Hero>();
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                using var allowed = new AllowedThread();
+                Get<CharacterObject>(instance, troopId).Level = 16;
+                Get<Hero>(instance, companionId).SetSkillValue(DefaultSkills.Trade, 120);
+            });
+        }
+
+        WithPlayer(Owner, () =>
+        {
+            var issue = IssueOf(Owner);
+            using (new AllowedThread())
+            {
+                issue.AlternativeSolutionSentTroops.AddToCounts(Get<Hero>(Owner, companionId).CharacterObject, 1);
+                issue.AlternativeSolutionSentTroops.AddToCounts(Get<CharacterObject>(Owner, troopId), 10);
+            }
+            Owner.Resolve<Common.Messaging.IMessageBroker>().Publish(this, new AlternativeSolutionAcceptRequested(issue));
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+        var serverIssue = IssueOf(Server);
+        var ownerIssue = IssueOf(Owner);
+        Server.Call(() => Campaign.Current.IssueManager.DailyTick(), NativePresentation);
+        Assert.Equal(serverIssue.JournalEntries[0].CurrentProgress, ownerIssue.JournalEntries[0].CurrentProgress);
+        Assert.True(ownerIssue.JournalEntries[0].CurrentProgress > 0);
+        int reward = 0;
+        int otherGold = 0;
+        WithPlayer(Server, () =>
+        {
+            Hero.MainHero.Gold = 0;
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerB, out var other));
+            otherGold = Get<Hero>(Server, other.HeroId).Gold;
+            reward = serverIssue.RewardGold;
+            serverIssue._failureChance = fails ? 1f : -1f;
+            if (cancels) serverIssue.CompleteIssueWithCancel();
+            else serverIssue.CompleteIssueWithAlternativeSolution();
+        });
+
+        AssertFinished(IssueOutcome.AlternativeSolution);
+        Assert.Equal(fails || cancels ? 0 : 5, serverIssue.RelationshipChangeWithIssueOwner);
+        Assert.Empty(serverIssue.AlternativeSolutionSentTroops.GetTroopRoster());
+        Assert.Equal(serverIssue.JournalEntries.Last().LogText.Value, ownerIssue.JournalEntries.Last().LogText.Value);
+        WithPlayer(Server, () =>
+        {
+            Assert.Equal(fails || cancels ? 0 : reward, Hero.MainHero.Gold);
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerB, out var other));
+            Assert.Equal(otherGold, Get<Hero>(Server, other.HeroId).Gold);
+        });
+    }
+
+    [Fact]
+    public void AiLordResolutionClearsAnUnacceptedOfferOnBothClients()
+    {
+        var lordId = environment.CreateRegisteredObject<Hero>();
+        Server.Call(() => IssueOf(Server).CompleteIssueWithAiLord(Get<Hero>(Server, lordId)));
+        AssertFinished(IssueOutcome.QuestCancel);
+    }
+
+    [Fact]
+    public void ServerIssueCancellationEndsTheOwnersQuestExactlyOnce()
+    {
+        Accept();
+        Commission();
+        Server.Call(() => IssueOf(Server).CompleteIssueWithCancel(), NativePresentation);
+        AssertFinished(IssueOutcome.QuestCancel);
     }
 
     private void Accept() => WithPlayer(Owner, () => IssueOf(Owner).StartIssueWithQuest());
@@ -329,8 +534,10 @@ public class ArtOfTradeTests : IDisposable
             var settlement = Get<Settlement>(instance, settlementId);
             var village = Get<Village>(instance, villageId);
             settlement.SetSettlementComponent(village);
-            village.Bound = settlement;
-            settlement.Town = new Town();
+            var bound = Get<Settlement>(instance, boundSettlementId);
+            var town = Get<Town>(instance, boundTownId);
+            bound.SetSettlementComponent(town);
+            village.Bound = bound;
             var production = (VillageType)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(VillageType));
             production._productions = new() { (Item(instance), 1f) };
             village.VillageType = production;
@@ -338,10 +545,13 @@ public class ArtOfTradeTests : IDisposable
             giver.StayingInSettlement = settlement;
             giver.Occupation = Occupation.RuralNotable;
             var clan = Get<Clan>(instance, giverClanId);
+            town._ownerClan = clan;
+            town.IsOwnerUnassigned = false;
             clan._kingdom = Get<Kingdom>(instance, kingdomId);
             giver.Clan = clan;
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var owner));
             Get<Hero>(instance, owner.HeroId).Clan = Get<Clan>(instance, playerClanId);
+            Get<Hero>(instance, owner.HeroId).PartyBelongedTo = Get<MobileParty>(instance, owner.MobilePartyId);
             var issue = new Issue(giver, Item(instance)) { StringId = QuestScenario.IssueId };
             issue._issueState = IssueBase.IssueState.Ongoing;
             Campaign.Current.IssueManager._issues[giver] = issue;
