@@ -29,7 +29,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.LordsNeedsTutorIssueBehavior.Lord
 
 namespace E2E.Tests.Services.Issues;
 
-public sealed class LordsNeedsTutorTests : IDisposable
+public sealed partial class LordsNeedsTutorTests : IDisposable
 {
     private readonly E2ETestEnvironment environment;
     private readonly string giverId;
@@ -259,24 +259,8 @@ public sealed class LordsNeedsTutorTests : IDisposable
     public void FrameworkAllowsConcurrentPlayersAndRefusesTheSamePlayersSecondQuest(bool anotherPlayer)
     {
         Accept();
-        var secondGiver = environment.CreateRegisteredObject<Hero>();
-        var secondPupil = environment.CreateRegisteredObject<Hero>();
-        foreach (var instance in Instances)
-            instance.Call(() =>
-            {
-                using (new AllowedThread())
-                {
-                    var giver = Get<Hero>(instance, secondGiver);
-                    var pupil = Get<Hero>(instance, secondPupil);
-                    giver.Clan.SetLeader(giver);
-                    pupil.Clan = giver.Clan;
-                    pupil.SetBirthDay(CampaignTime.YearsFromNow(-18));
-                    pupil.StayingInSettlement = Get<Settlement>(instance, settlementId);
-                    giver.StayingInSettlement = pupil.StayingInSettlement;
-                }
-            });
-        CreateIssue(secondGiver, secondPupil);
-        var second = new QuestScenario(environment, secondGiver);
+        var second = CreateAnotherQuest();
+        var secondGiver = second.NotableId;
         var accepter = anotherPlayer ? Observer : Owner;
         second.Accept(accepter);
         if (anotherPlayer)
@@ -364,8 +348,7 @@ public sealed class LordsNeedsTutorTests : IDisposable
     public void PupilDeathFailsTheQuestWithoutAReward()
     {
         Accept();
-        Server.Call(() => CampaignEventDispatcher.Instance.OnHeroKilled(Get<Hero>(Server, pupilId), null,
-            KillCharacterAction.KillCharacterActionDetail.Murdered, false));
+        KillPupil();
         Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Owner.Call(() => Assert.Empty(Campaign.Current.QuestManager.Quests));
     }
