@@ -375,6 +375,17 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
             });
         }
 
+        // Vanilla's daily tick reads the first journal entry of every issue solved by an alternative
+        ClientB.Call(() =>
+        {
+            Assert.True(ClientB.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            Assert.Single(notable.Issue.JournalEntries);
+
+            Campaign.Current.IssueManager.DailyTick();
+
+            Assert.True(notable.Issue.IsSolvingWithAlternative);
+        }, AlternativeSolutionLogTexts);
+
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));

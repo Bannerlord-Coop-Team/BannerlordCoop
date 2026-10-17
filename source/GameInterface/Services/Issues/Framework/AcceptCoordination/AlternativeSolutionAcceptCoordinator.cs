@@ -15,6 +15,7 @@ using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
@@ -205,6 +206,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             {
                 issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
                 ApplyState(issue, data.State);
+                AddReturnDaysLog(issue);
                 return;
             }
 
@@ -242,6 +244,18 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
             troopValidator.ReturnToMainParty(issue);
         }, context: nameof(AlternativeSolutionAcceptCoordinator));
+    }
+
+    // Vanilla's daily tick advances the first journal entry of every issue solved by an alternative, which only
+    // the start adds. Added without the log event so nothing is announced to a player who does not own the issue.
+    private static void AddReturnDaysLog(IssueBase issue)
+    {
+        if (issue.JournalEntries.Count > 0)
+        {
+            return;
+        }
+
+        issue._journalEntries.Add(new JournalLog(CampaignTime.Now, issue.Title, new TextObject("{=VFO7rMzK}Return Days"), 0, issue.AlternativeSolutionBaseDurationInDaysInternal));
     }
 
     private static AlternativeSolutionVanillaState CaptureState(IssueBase issue)
