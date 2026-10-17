@@ -32,6 +32,9 @@ public class CapturedByBountyHuntersTests : IDisposable
     private const int RewardGold = 3000;
     private const float InitialPower = 100;
     private const float PowerChange = 10;
+    private const int BattleDay = 10;
+
+    private static readonly CampaignTime BattleStartTime = CampaignTime.Days(BattleDay);
 
     private static readonly FieldInfo SideMapEventField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapEvent));
 
@@ -246,7 +249,7 @@ public class CapturedByBountyHuntersTests : IDisposable
         PutBanditsInTheHideout();
         var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
-        EndBattleOnTheServer(BattleState.DefenderVictory, Array.Empty<string>(), captorPartyId: captorPartyId);
+        EndBattleOnTheServer(BattleState.DefenderVictory, Array.Empty<string>(), capture: new OwnerCapture(captorPartyId));
 
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
@@ -254,6 +257,81 @@ public class CapturedByBountyHuntersTests : IDisposable
         Assert.Equal(ownerGold, GoldOnServer(ownerHeroId));
         AssertGiverPowerChangedOnceBy(-PowerChange);
         AssertTheIssueIsGoneEverywhere();
+    }
+
+    // The owner is another player's prisoner and that player clears the hideout, which is someone else clearing it
+    [Fact]
+    public void AnOwnerHeldByThePlayerWhoClearsTheHideoutFailsWithoutConsequences()
+    {
+        GiveTheGangLeaderTheIssue();
+        AcceptOnClientA();
+
+        EndBattleOnTheServer(
+            BattleState.AttackerVictory,
+            Array.Empty<string>(),
+            capture: new OwnerCapture(otherPartyId, BattleSideEnum.Attacker));
+
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
+        AssertGiverPowerChangedOnceBy(0);
+    }
+
+    [Fact]
+    public void AnOwnerCapturedBeforeTheBattleKeepsTheQuestWhenAnotherAssaultFails()
+    {
+        GiveTheGangLeaderTheIssue();
+        AcceptOnClientA();
+        PutBanditsInTheHideout();
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        EndBattleOnTheServer(
+            BattleState.DefenderVictory,
+            new[] { otherPartyId },
+            capture: new OwnerCapture(captorPartyId, BeforeBattle: true));
+
+        AssertTheQuestIsStillRunning();
+    }
+
+    [Fact]
+    public void AnOwnerHeldByTheDefeatedSideKeepsTheQuestWhileBanditsHoldTheHideout()
+    {
+        GiveTheGangLeaderTheIssue();
+        AcceptOnClientA();
+        PutBanditsInTheHideout();
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        EndBattleOnTheServer(BattleState.AttackerVictory, Array.Empty<string>(), capture: new OwnerCapture(captorPartyId));
+
+        AssertTheQuestIsStillRunning();
+    }
+
+    [Fact]
+    public void AnOwnerCapturedInABattleElsewhereKeepsTheQuest()
+    {
+        GiveTheGangLeaderTheIssue();
+        AcceptOnClientA();
+        PutBanditsInTheHideout();
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        EndBattleOnTheServer(
+            BattleState.DefenderVictory,
+            Array.Empty<string>(),
+            capture: new OwnerCapture(captorPartyId),
+            battleSettlementId: townId);
+
+        AssertTheQuestIsStillRunning();
+    }
+
+    private void AssertTheQuestIsStillRunning()
+    {
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        AssertGiverPowerChangedOnceBy(0);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(gangLeaderId, out var gangLeader));
+            Assert.True(gangLeader.Issue.IsSolvingWithQuest);
+        });
     }
 
     [Fact]
@@ -426,11 +504,12 @@ public class CapturedByBountyHuntersTests : IDisposable
         string[] attackerPartyIds,
         string? finalizingHeroId = null,
         string? finalizingPartyId = null,
-        string? captorPartyId = null)
+        OwnerCapture? capture = null,
+        string? battleSettlementId = null)
     {
         Server.Call(() =>
         {
-            var mapEvent = HideoutBattle(Server, result);
+            var mapEvent = HideoutBattle(Server, result, battleSettlementId);
             var attackerSide = SideOf(mapEvent, BattleSideEnum.Attacker);
 
             var attackers = attackerPartyIds.Select(partyId =>
@@ -444,19 +523,20 @@ public class CapturedByBountyHuntersTests : IDisposable
                 party.Party._mapEventSide = attackerSide;
             }
 
-            // A defending party that took the owner prisoner during the battle
+            // A party in the battle that holds the owner prisoner
             MobileParty? captor = null;
-            if (captorPartyId != null)
+            if (capture != null)
             {
-                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out captor));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(capture.CaptorPartyId, out captor));
                 Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
-                captor.Party._mapEventSide = SideOf(mapEvent, BattleSideEnum.Defender);
+                captor.Party._mapEventSide = SideOf(mapEvent, capture.CaptorSide);
 
                 using (new AllowedThread())
                 {
                     owner._partyBelongedTo = null;
                     owner._heroState = Hero.CharacterStates.Prisoner;
                     owner.PartyBelongedToAsPrisoner = captor.Party;
+                    owner.CaptivityStartTime = capture.BeforeBattle ? CampaignTime.Days(BattleDay - 1) : BattleStartTime;
                 }
             }
 
@@ -493,6 +573,8 @@ public class CapturedByBountyHuntersTests : IDisposable
         }, OutcomeLogTexts);
     }
 
+    private sealed record OwnerCapture(string CaptorPartyId, BattleSideEnum CaptorSide = BattleSideEnum.Defender, bool BeforeBattle = false);
+
     private static MapEventSide SideOf(MapEvent mapEvent, BattleSideEnum side)
     {
         var mapEventSide = (MapEventSide)RuntimeHelpers.GetUninitializedObject(typeof(MapEventSide));
@@ -502,13 +584,14 @@ public class CapturedByBountyHuntersTests : IDisposable
     }
 
     // The hideout has no parties left, as after the bounty hunters were beaten
-    private MapEvent HideoutBattle(EnvironmentInstance instance, BattleState result)
+    private MapEvent HideoutBattle(EnvironmentInstance instance, BattleState result, string? settlementId = null)
     {
-        Assert.True(instance.ObjectManager.TryGetObject<Settlement>(hideoutId, out var hideout));
+        Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId ?? hideoutId, out var settlement));
 
         var mapEvent = (MapEvent)RuntimeHelpers.GetUninitializedObject(typeof(MapEvent));
-        mapEvent.MapEventSettlement = hideout;
+        mapEvent.MapEventSettlement = settlement;
         mapEvent._battleState = result;
+        mapEvent._mapEventStartTime = BattleStartTime;
 
         return mapEvent;
     }
