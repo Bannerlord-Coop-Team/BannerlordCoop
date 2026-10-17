@@ -282,7 +282,8 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
         Assert.Single(Server.NetworkSentMessages.GetMessages<SendInformationMessage>());
         Server.Call(() => Assert.True(Get<Hero>(Server, scenario.NotableId).Issue.IsOngoingWithoutQuest));
-        Assert.Null(scenario.OwnerOnServer());
+        Server.Call(() => Assert.False(Server.Resolve<IIssueOwnershipRegistry>()
+            .TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _)));
     }
 
     [Fact]
