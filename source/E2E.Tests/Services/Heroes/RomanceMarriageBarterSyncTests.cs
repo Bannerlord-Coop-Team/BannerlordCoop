@@ -105,6 +105,14 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
                 prefix: new HarmonyMethod(
                     typeof(RomanceMarriageBarterSyncTests),
                     nameof(CaptureMarriageScene)));
+            // The log entry builds encyclopedia links, which need an EncyclopediaManager this environment doesn't have
+            harmony.Patch(
+                AccessTools.Method(
+                    typeof(DefaultLogsCampaignBehavior),
+                    nameof(DefaultLogsCampaignBehavior.OnHeroesMarried)),
+                prefix: new HarmonyMethod(
+                    typeof(RomanceMarriageBarterSyncTests),
+                    nameof(SkipMarriageLogEntry)));
         });
 
         try
@@ -181,6 +189,8 @@ public class RomanceMarriageBarterSyncTests : MapEventTestBase
         shownMarriageScene = data;
         return false;
     }
+
+    private static bool SkipMarriageLogEntry() => false;
 
     [Fact]
     public void LordBarterConclusion_OnServer_DoesNotRunConversationPresentation()

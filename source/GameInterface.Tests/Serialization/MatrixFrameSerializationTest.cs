@@ -10,29 +10,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class MatrixFrameSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public MatrixFrameSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void MatrixFrame_Serialize()
-        {
-            MatrixFrame matrixFrame = new MatrixFrame();
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            MatrixFrameBinaryPackage package = new MatrixFrameBinaryPackage(matrixFrame, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

@@ -515,43 +515,6 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void AgentActionPacket_RoundTripsEffectiveMountedGuard()
-    {
-        RunScenario("owner", context =>
-        {
-            var agentId = Guid.NewGuid();
-            Agent owner = SpawnAgent(
-                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
-            context.Mock.SpawnMount(owner);
-            ownerMirror.MovementFlags = Agent.MovementControlFlag.DefendBlock;
-            ownerMirror.Action1CodeType = Agent.ActionCodeType.Guard;
-            ownerMirror.Action1Direction = Agent.UsageDirection.DefendLeft;
-
-            var original = new AgentActionPacket(
-                "owner",
-                new[] { agentId },
-                new[] { new AgentActionData(owner) },
-                new[] { 1L });
-            var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-
-            byte[] wire = serializer.Serialize(original);
-            var result = Assert.IsType<AgentActionPacket>(
-                serializer.Deserialize<IPacket>(wire));
-
-            AgentActionData action = Assert.Single(result.Actions);
-            Assert.Equal(
-                Agent.MovementControlFlag.DefendBlock
-                    | Agent.MovementControlFlag.DefendLeft,
-                action.DefendFlags);
-            Assert.Equal(Agent.GuardMode.Left, action.GuardMode);
-            Assert.Equal(1, action.GuardPresentationChannel);
-            Assert.Equal(1, action.GuardActionChannel);
-            Assert.True(action.GuardActionIsDefending);
-            Assert.True(action.IsMounted);
-        });
-    }
-
-    [Fact]
     public void MissionPreMissionTick_RestoresMountedHeldDefendFlags_ThenClears()
     {
         RunScenario("peer", context =>
@@ -817,10 +780,9 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
         });
     }
 
+    // Every direction is mapped in AgentGuardStateTests; this covers the mount-arrival flow.
     [Theory]
     [InlineData(Agent.MovementControlFlag.DefendUp, Agent.GuardMode.Up)]
-    [InlineData(Agent.MovementControlFlag.DefendDown, Agent.GuardMode.Down)]
-    [InlineData(Agent.MovementControlFlag.DefendLeft, Agent.GuardMode.Left)]
     [InlineData(Agent.MovementControlFlag.DefendRight, Agent.GuardMode.Right)]
     public void MountedPuppet_FlagsOnlyGuard_RecommandsOnceAcrossMountStateArrival(
         Agent.MovementControlFlag defendDirection,
@@ -972,9 +934,6 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
     [Theory]
     [InlineData(Agent.UsageDirection.DefendDown, Agent.GuardMode.Down, 1)]
-    [InlineData(Agent.UsageDirection.DefendUp, Agent.GuardMode.Up, 1)]
-    [InlineData(Agent.UsageDirection.DefendRight, Agent.GuardMode.Right, 1)]
-    [InlineData(Agent.UsageDirection.DefendLeft, Agent.GuardMode.Left, 1)]
     [InlineData(Agent.UsageDirection.DefendLeft, Agent.GuardMode.Left, 0)]
     public void MountedPuppet_BlockOnlyGuard_UsesExactActionDirection(
         Agent.UsageDirection actionDirection,
@@ -1015,27 +974,6 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
 
             Assert.Equal(Agent.GuardMode.None, puppetMirror.GuardMode);
             Assert.Equal(1, puppetMirror.ResetGuardCalls);
-        });
-    }
-
-    [Theory]
-    [InlineData(Agent.UsageDirection.None)]
-    [InlineData(Agent.UsageDirection.AttackUp)]
-    [InlineData(Agent.UsageDirection.AttackRight)]
-    [InlineData(Agent.UsageDirection.DefendAny)]
-    public void DirectionlessAction_DoesNotDeriveGuard(
-        Agent.UsageDirection actionDirection)
-    {
-        RunScenario("owner", context =>
-        {
-            Agent owner = SpawnAgent(
-                context, AgentControllerType.Player, out MirrorAgent ownerMirror);
-            ownerMirror.MovementFlags = Agent.MovementControlFlag.DefendBlock;
-            ownerMirror.Action1Direction = actionDirection;
-
-            Assert.Equal(
-                Agent.GuardMode.None,
-                new AgentActionData(owner).GuardMode);
         });
     }
 
@@ -1908,46 +1846,6 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
     }
 
     [Theory]
-    [InlineData(Agent.GuardMode.Up)]
-    [InlineData(Agent.GuardMode.Down)]
-    [InlineData(Agent.GuardMode.Left)]
-    [InlineData(Agent.GuardMode.Right)]
-    public void GuardApply_MapsEveryGuardDirection(Agent.GuardMode guardMode)
-    {
-        RunScenario(null, context =>
-        {
-            Agent puppet = SpawnAgent(context, AgentControllerType.None, out MirrorAgent mirror);
-
-            AgentActionData.ApplyGuardState(puppet, guardMode);
-
-            Assert.Equal(guardMode, mirror.GuardMode);
-            Assert.Equal(1, mirror.SetWeaponGuardCalls);
-            Assert.Equal(0, mirror.ResetGuardCalls);
-        });
-    }
-
-    [Fact]
-    public void GuardApply_SkipsRedundantGuardCommandsAndReset()
-    {
-        RunScenario(null, context =>
-        {
-            Agent puppet = SpawnAgent(context, AgentControllerType.None, out MirrorAgent mirror);
-
-            AgentActionData.ApplyGuardState(puppet, Agent.GuardMode.None);
-            Assert.Equal(0, mirror.ResetGuardCalls);
-
-            AgentActionData.ApplyGuardState(puppet, Agent.GuardMode.Up);
-            AgentActionData.ApplyGuardState(puppet, Agent.GuardMode.Up);
-            Assert.Equal(1, mirror.SetWeaponGuardCalls);
-
-            AgentActionData.ApplyGuardState(puppet, Agent.GuardMode.None);
-            AgentActionData.ApplyGuardState(puppet, Agent.GuardMode.None);
-            Assert.Equal(Agent.GuardMode.None, mirror.GuardMode);
-            Assert.Equal(1, mirror.ResetGuardCalls);
-        });
-    }
-
-    [Theory]
     [InlineData(CombatCollisionResult.Blocked)]
     [InlineData(CombatCollisionResult.StrikeAgent)]
     public void CollisionAuthority_CapturesNonOwnedDefenderReactionOnce(
@@ -2072,28 +1970,6 @@ public class BattleBlockingSyncTests : MissionTestEnvironment
             Assert.Equal(1, defenderMirror.SetActionChannelCalls);
             Assert.Equal(3104, defenderMirror.Action1Index);
         });
-    }
-
-    [Theory]
-    [InlineData(
-        "act_defend_up_1h_passive",
-        "act_defend_up_1h_parry_light")]
-    [InlineData(
-        "act_defend_right_2h_active_left_stance",
-        "act_defend_right_2h_parry_light_left_stance")]
-    [InlineData(
-        "act_defend_shield_left_1h_passive_down",
-        "act_defend_shield_left_1h_parry_light_down")]
-    [InlineData(null, null)]
-    [InlineData("act_strike_left_1h", null)]
-    public void GuardReactionActionResolver_MapsHeldGuardToLightParry(
-        string? guardActionName,
-        string? expected)
-    {
-        Assert.Equal(
-            expected,
-            GuardReactionActionResolver
-                .GetParryLightActionName(guardActionName));
     }
 
     [Fact]

@@ -66,7 +66,7 @@ public class RetainedPlayerHeroRecoveryTests : MissionTestEnvironment
             var deployment = Mock.Of<IBattleDeploymentCoordinator>();
             using var migrator = new BattleAuthorityMigrator(relay.Object, broker, successor.ObjectManager,
                 players, component, session, casualties, deployment, Mock.Of<IAgentFormationAssigner>(),
-                context.Object, Mock.Of<IReinforcementFielder>());
+                context.Object, Mock.Of<IReinforcementFielder>(), Mock.Of<IBattleInstanceLifecycle>());
             using var replicator = new OwnedAgentReplicator(Mock.Of<IBattleNetwork>(), broker,
                 successor.ObjectManager, component, session, casualties, deployment,
                 new BattleAgentSpawnBatchCodec(), successor.Resolve<IMissionWeaponDataMapper>(), migrator);

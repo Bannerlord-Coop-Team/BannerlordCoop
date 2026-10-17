@@ -592,6 +592,12 @@ internal static class PlayerPartyTradeContext
                 return "Mercenary offer accepted.";
             case PlayerPartyInteractionOutcomeType.MercenaryDeclined:
                 return "Mercenary offer declined.";
+            case PlayerPartyInteractionOutcomeType.MapTrackingAccepted:
+                return GameTexts.FindText("str_coop_map_tracking_accepted").ToString();
+            case PlayerPartyInteractionOutcomeType.MapTrackingDeclined:
+                return GameTexts.FindText("str_coop_map_tracking_declined").ToString();
+            case PlayerPartyInteractionOutcomeType.MapTrackingStopped:
+                return GameTexts.FindText("str_coop_map_tracking_stopped").ToString();
             default:
                 return null;
         }
