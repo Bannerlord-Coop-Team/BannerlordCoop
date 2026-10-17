@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Util;
 using GameInterface.Services.Issues.Quests.ArtisanProducts;
 using HarmonyLib;

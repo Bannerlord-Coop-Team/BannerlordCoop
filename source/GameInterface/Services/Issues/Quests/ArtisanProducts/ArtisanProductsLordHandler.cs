@@ -103,9 +103,9 @@ internal class ArtisanProductsLordHandler : IHandler
                 !objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) || hero.PartyBelongedTo == null) return;
             using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
             {
-                if (hero.PartyBelongedTo.CurrentSettlement != issue.IssueOwner.CurrentSettlement) return;
                 if (data.Action == ArtisanProductsLordAction.Start)
                 {
+                    if (hero.PartyBelongedTo.CurrentSettlement != issue.IssueOwner.CurrentSettlement) return;
                     issue._issueDifficultyMultiplier = Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier();
                     if (!issue.IsOngoingWithoutQuest || !preconditions.CanTake(issue, hero, player.ControllerId) ||
                         !issue.LordSolutionCondition(out _) || Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution ||

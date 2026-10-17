@@ -56,6 +56,7 @@ internal class ArtisanProductsInheritanceHandler : IHandler
         if (!objects.TryGetIdWithLogging(payload.What.Previous, out var previousId) ||
             !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId)) return;
         ownership.TryGetOwner(previousId, issue.StringId, out var controllerId);
+        if (issue.IssueQuest != null) issue.IssueQuest.QuestGiver = issue.IssueOwner;
         Move(previousId, ownerId, issue.StringId, controllerId);
         network.SendAll(new NetworkArtisanProductsOwnerChanged(previousId, ownerId, issue.StringId, controllerId));
     }
@@ -69,7 +70,11 @@ internal class ArtisanProductsInheritanceHandler : IHandler
             if (!objects.TryGetObjectWithLogging<Hero>(data.PreviousId, out var previous) ||
                 !objects.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner) ||
                 !(previous.Issue is Issue issue) || issue.StringId != data.IssueId || owner.Issue != null) return;
-            using (new AllowedThread()) Campaign.Current.IssueManager.ChangeIssueOwner(issue, owner);
+            using (new AllowedThread())
+            {
+                Campaign.Current.IssueManager.ChangeIssueOwner(issue, owner);
+                if (issue.IssueQuest != null) issue.IssueQuest.QuestGiver = owner;
+            }
             Move(data.PreviousId, data.OwnerId, data.IssueId, data.ControllerId);
         }, context: nameof(ArtisanProductsInheritanceHandler));
     }

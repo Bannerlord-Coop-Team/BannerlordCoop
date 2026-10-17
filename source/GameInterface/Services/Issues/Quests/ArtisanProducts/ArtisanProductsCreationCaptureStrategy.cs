@@ -15,6 +15,7 @@ namespace GameInterface.Services.Issues.Quests.ArtisanProducts;
 internal class ArtisanProductsCreationCaptureStrategy : ICreationCaptureStrategy
 {
     private readonly IObjectManager objects;
+    private (Hero Owner, Settlement Target, Hero Merchant)? creating;
 
     public ArtisanProductsCreationCaptureStrategy(IObjectManager objects)
     {
@@ -29,7 +30,6 @@ internal class ArtisanProductsCreationCaptureStrategy : ICreationCaptureStrategy
 
     public IssueBase CreateIssue(Hero issueOwner, byte[] captured)
     {
-        var issue = new Issue(issueOwner);
         using (var reader = new BinaryReader(new MemoryStream(captured)))
         {
             if (!objects.TryGetObjectWithLogging<Settlement>(reader.ReadString(), out var settlement) ||
@@ -38,12 +38,27 @@ internal class ArtisanProductsCreationCaptureStrategy : ICreationCaptureStrategy
                 !objects.TryGetObjectWithLogging<Hero>(reader.ReadString(), out var merchant))
                 throw new InvalidDataException("Artisan issue references an unknown object");
 
-            issue._targetSettlement = settlement;
-            issue._targetHero = target;
-            issue._rawMaterialsToBeDelivered = item;
-            issue.CounterOfferHero = merchant;
+            var previous = creating;
+            creating = (issueOwner, settlement, merchant);
+            try
+            {
+                // An existing local quest can hide a target from vanilla's constructor selection.
+                var issue = new Issue(issueOwner);
+                issue._targetSettlement = settlement;
+                issue._targetHero = target;
+                issue._rawMaterialsToBeDelivered = item;
+                issue.CounterOfferHero = merchant;
+                return issue;
+            }
+            finally { creating = previous; }
         }
-        return issue;
+    }
+
+    internal bool TryGetCreation(Hero owner, out Settlement target, out Hero merchant)
+    {
+        target = creating?.Target;
+        merchant = creating?.Merchant;
+        return creating?.Owner == owner && target != null;
     }
 
     public void ApplyAfterCreation(IssueBase issue, byte[] captured) { }

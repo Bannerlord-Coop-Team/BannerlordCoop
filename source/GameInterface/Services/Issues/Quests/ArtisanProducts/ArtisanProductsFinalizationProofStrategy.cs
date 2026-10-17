@@ -30,8 +30,7 @@ internal class ArtisanProductsFinalizationProofStrategy : IFinalizationProofStra
         if (party == null || !artisan.IsOngoing) return true;
         var branch = (ArtisanProductsBranch)proof;
         var delivery = branch >= ArtisanProductsBranch.PartialDelivery && branch <= ArtisanProductsBranch.RefuseDelivery;
-        var origin = TaleWorlds.CampaignSystem.Issues.IssueManager.GetIssueOfQuest(quest)?.IssueOwner.CurrentSettlement;
-        if (party.CurrentSettlement != (delivery ? artisan._targetSettlement : origin)) return true;
+        if (delivery && party.CurrentSettlement != artisan._targetSettlement) return true;
         var carried = party.ItemRoster.GetItemNumber(artisan._rawMaterialsToBeDelivered);
         var remaining = artisan._amountOfRawGoodsToBeDelivered - artisan._deliveredRawGoods;
 

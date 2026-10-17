@@ -25,8 +25,24 @@ internal class ArtisanProductsWorldEventPatches
     [HarmonyPrefix]
     private static bool Target(Hero issueGiver, ref Settlement __result)
     {
+        if (ContainerProvider.TryResolve<ArtisanProductsCreationCaptureStrategy>(out var creation) &&
+            creation.TryGetCreation(issueGiver, out var target, out _))
+        {
+            __result = target;
+            return false;
+        }
         // Vanilla searches from MainParty, which the dedicated server does not have.
         __result = ArtisanProductsCreationCaptureStrategy.SelectTargetSettlement(issueGiver);
+        return false;
+    }
+
+    [HarmonyPatch(typeof(Behavior), nameof(Behavior.SelectCounterOfferHero))]
+    [HarmonyPrefix]
+    private static bool Merchant(Hero issueGiver, ref Hero __result)
+    {
+        if (!ContainerProvider.TryResolve<ArtisanProductsCreationCaptureStrategy>(out var creation) ||
+            !creation.TryGetCreation(issueGiver, out _, out var merchant)) return true;
+        __result = merchant;
         return false;
     }
 
@@ -45,6 +61,16 @@ internal class ArtisanProductsWorldEventPatches
     [HarmonyPostfix]
     private static void Death(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification)
         => Run(quest => quest.OnHeroKilled(victim, killer, detail, showNotification));
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnIssueUpdated))]
+    [HarmonyPrefix]
+    private static void CompanionJournal(IssueBase issue, IssueBase.IssueUpdateDetails details)
+    {
+        if (ModInformation.IsServer && issue is Behavior.ArtisanCantSellProductsAtAFairPriceIssue && issue.IsSolvingWithAlternative &&
+            (details == IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest || details == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest ||
+             details == IssueBase.IssueUpdateDetails.IssueCancel) && ContainerProvider.TryResolve<IArtisanProductsProgress>(out var progress))
+            progress.SendIssue(issue, details);
+    }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.BeforeGameMenuOpened))]
     [HarmonyPrefix]
