@@ -2,6 +2,7 @@
 using E2E.Tests.Environment;
 using Common.Messaging;
 using Common.Network.Messages;
+using GameInterface.Registry.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Heroes.Patches;
@@ -18,6 +19,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encyclopedia;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -283,6 +285,58 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     }
 
     [Fact]
+    public void StartupDismissal_UsesSavedOriginalPartyWithoutOwnership_AndKeepsSurplus()
+    {
+        Accept(ClientA);
+        var data = new CleanupDataStore();
+        Server.Call(() =>
+        {
+            var cleanup = Server.Resolve<IHeadmanHerdCleanup>();
+            cleanup.SyncData(data);
+            cleanup.SyncData(new CleanupDataStore { IsLoading = true });
+            data.IsLoading = true;
+            cleanup.SyncData(data);
+            Server.Resolve<IIssueOwnershipRegistry>().Remove(scenario.NotableId);
+            Party(Server, QuestScenario.ControllerA).ItemRoster.AddToCounts(Object<ItemObject>(Server, livestockId), 3);
+            Party(Server, QuestScenario.ControllerB).ItemRoster.AddToCounts(Object<ItemObject>(Server, livestockId), 7);
+            Server.Resolve<IMessageBroker>().Publish(this, new AllGameObjectsRegistered());
+        });
+        environment.FlushCoalescer();
+        Server.Call(() =>
+        {
+            Assert.Null(Object<Hero>(Server, scenario.NotableId).Issue);
+            Assert.Equal(3, Party(Server, QuestScenario.ControllerA).ItemRoster.GetItemNumber(Object<ItemObject>(Server, livestockId)));
+            Assert.Equal(7, Party(Server, QuestScenario.ControllerB).ItemRoster.GetItemNumber(Object<ItemObject>(Server, livestockId)));
+        });
+    }
+
+    [Fact]
+    public void JournalReplay_LeavesALateJoinersUnstartedMirrorAndUnreadMarkersAlone()
+    {
+        Accept(ClientA);
+        Quest mirror = null!;
+        var tracker = new ViewDataTrackerCampaignBehavior();
+        ClientB.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                mirror = new Quest("herd_late_join", Object<Hero>(ClientB, scenario.NotableId), CampaignTime.Never,
+                    accepted[Server]._animalCountToDeliver, Object<ItemObject>(ClientB, livestockId), Object<Settlement>(ClientB, townId),
+                    accepted[Server]._rewardGold, Object<Hero>(ClientB, targetId));
+                Object<Hero>(ClientB, scenario.NotableId).Issue.IssueQuest = mirror;
+            }
+            CampaignEvents.QuestLogAddedEvent.AddNonSerializedListener(tracker, tracker.OnQuestLogAdded);
+        });
+        Server.Call(() => accepted[Server].AddLog(new TextObject("{=herd_owner_reason}owner's quest changed")));
+        ClientA.Call(() => Assert.Single(accepted[ClientA].JournalEntries, log => log.LogText.GetID() == "herd_owner_reason"));
+        ClientB.Call(() =>
+        {
+            Assert.Empty(mirror.JournalEntries);
+            Assert.Empty(tracker._unExaminedQuestLogs);
+        });
+    }
+
+    [Fact]
     public void RealPreconditions_RejectAnInactiveTarget()
     {
         Server.Call(() =>
@@ -513,5 +567,19 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     {
         Assert.True(instance.ObjectManager.TryGetObject<T>(id, out var value));
         return value;
+    }
+
+    private sealed class CleanupDataStore : IDataStore
+    {
+        private Dictionary<string, MobileParty>? saved;
+        public bool IsLoading { get; set; }
+        public bool IsSaving => !IsLoading;
+
+        public bool SyncData<T>(string key, ref T data)
+        {
+            if (IsLoading) data = (T)(object)(saved ?? new Dictionary<string, MobileParty>());
+            else saved = new Dictionary<string, MobileParty>((Dictionary<string, MobileParty>)(object)data!);
+            return true;
+        }
     }
 }

@@ -40,14 +40,16 @@ internal class HeadmanHerdJournalHandler : IHandler
     private readonly IObjectManager objects;
     private readonly IIssueResolver issues;
     private readonly IControllerIdProvider controllerId;
+    private readonly IIssueOwnershipRegistry ownership;
 
-    public HeadmanHerdJournalHandler(IMessageBroker broker, INetwork network, IObjectManager objects, IIssueResolver issues, IControllerIdProvider controllerId)
+    public HeadmanHerdJournalHandler(IMessageBroker broker, INetwork network, IObjectManager objects, IIssueResolver issues, IControllerIdProvider controllerId, IIssueOwnershipRegistry ownership)
     {
         this.broker = broker;
         this.network = network;
         this.objects = objects;
         this.issues = issues;
         this.controllerId = controllerId;
+        this.ownership = ownership;
         broker.Subscribe<HeadmanHerdLogAdded>(Send);
         broker.Subscribe<NetworkHeadmanHerdLog>(Receive);
         broker.Subscribe<NetworkQuestSolutionAccepted>(ShowGrant);
@@ -88,7 +90,9 @@ internal class HeadmanHerdJournalHandler : IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (!issues.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) || !(issue.IssueQuest is Quest quest)) return;
+            if (!ownership.TryGetOwner(data.GiverId, data.IssueId, out var owner) || owner != controllerId.ControllerId ||
+                !issues.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) || !(issue.IssueQuest is Quest quest) ||
+                !Campaign.Current.QuestManager.Quests.Contains(quest)) return;
             using (new AllowedThread()) quest.AddLog(data.Text);
         }, context: nameof(HeadmanHerdJournalHandler));
     }

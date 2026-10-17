@@ -124,7 +124,7 @@ internal sealed class QuestScenario
             using (new AllowedThread())
             {
                 var issue = createIssue(instance, notable);
-                issue.StringId = IssueId;
+                issue.StringId = notableId == NotableId ? IssueId : $"issue_scenario_{notableId}";
                 issue._issueState = IssueBase.IssueState.Ongoing;
 
                 Campaign.Current.IssueManager._issues.Add(notable, issue);

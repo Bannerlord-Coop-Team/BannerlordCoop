@@ -39,12 +39,8 @@ internal class HeadmanHerdDismissalPatch
     [HarmonyPrefix]
     private static void Prefix(IssueBase __instance)
     {
-        if (ModInformation.IsClient || !(__instance is Issue) ||
-            !(__instance.IssueQuest is Quest quest) || !quest.IsOngoing) return;
-        if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) ||
-            !owners.TryResolveOwnerHero(__instance, out var owner)) return;
-
-        // The framework dismisses disconnected owners without running their quest's cancellation.
-        using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo)) quest.RemoveRemainingHorses();
+        if (ModInformation.IsClient || !(__instance is Issue)) return;
+        // Startup dismissal has no ownership registry, so the saved original party owns this cleanup.
+        if (ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var cleanup)) cleanup.Finalize(__instance);
     }
 }

@@ -10,10 +10,12 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
 internal class HeadmanNeedsToDeliverAHerdQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
 {
     private readonly IIssueOwnerResolver owners;
+    private readonly IHeadmanHerdCleanup cleanup;
 
-    public HeadmanNeedsToDeliverAHerdQuestSolutionAcceptStrategy(IIssueOwnerResolver owners)
+    public HeadmanNeedsToDeliverAHerdQuestSolutionAcceptStrategy(IIssueOwnerResolver owners, IHeadmanHerdCleanup cleanup)
     {
         this.owners = owners;
+        this.cleanup = cleanup;
     }
 
     public byte[] Capture(IssueBase issue) => Array.Empty<byte>();
@@ -26,6 +28,7 @@ internal class HeadmanNeedsToDeliverAHerdQuestSolutionAcceptStrategy : IQuestSol
 
         using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
         {
+            cleanup.Remember(issue, owner.PartyBelongedTo);
             quest.AddHerdAndShepherdsToMainParty();
         }
     }
