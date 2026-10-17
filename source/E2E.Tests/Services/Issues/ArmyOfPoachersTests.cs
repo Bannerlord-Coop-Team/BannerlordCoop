@@ -14,10 +14,13 @@ using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -108,6 +111,17 @@ public class ArmyOfPoachersTests : IDisposable
         Server.Call(() => Assert.DoesNotContain(QuestOf(Server), Campaign.Current.QuestManager.Quests));
         Other.Call(() => Assert.Null(IssueOf(Other).IssueQuest));
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TheOwnerCanLeaveTheVillageWhileThePartyIsUnavailable(bool partyAnnounced)
+    {
+        Accept();
+        if (partyAnnounced) AttachParty();
+        Owner.Call(() => Assert.Equal(!partyAnnounced,
+            new MerchantArmyOfPoachersIssueBehavior().poachers_menu_back_condition(null)));
     }
 
     [Fact]
@@ -208,7 +222,7 @@ public class ArmyOfPoachersTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void VillageBattleAllowsTheOwnerOnEitherSide(bool reversed)
+    public void VillageBattleAllowsPlayersOnEitherSideButRequiresTheQuestVillage(bool reversed)
     {
         Accept();
         AttachParty();
@@ -218,7 +232,10 @@ public class ArmyOfPoachersTests : IDisposable
             var poachers = Get<MobileParty>(Server, poachersId);
             Assert.True(reversed ? MapEventBattleFactory.CanCreateMapEvent(player.Party, poachers.Party, default) :
                 MapEventBattleFactory.CanCreateMapEvent(poachers.Party, player.Party, default));
-            Assert.False(MapEventBattleFactory.CanCreateMapEvent(Get<MobileParty>(Server, playerB.MobilePartyId).Party, poachers.Party, default));
+            var otherPlayer = Get<MobileParty>(Server, playerB.MobilePartyId);
+            Assert.True(MapEventBattleFactory.CanCreateMapEvent(otherPlayer.Party, poachers.Party, default));
+            otherPlayer.CurrentSettlement = null;
+            Assert.False(MapEventBattleFactory.CanCreateMapEvent(otherPlayer.Party, poachers.Party, default));
         });
     }
 
@@ -235,8 +252,6 @@ public class ArmyOfPoachersTests : IDisposable
         {
             var player = Get<MobileParty>(Server, ownerInBattle ? playerA.MobilePartyId : playerB.MobilePartyId);
             var poachers = Get<MobileParty>(Server, poachersId);
-            // Both parties are in the village for the quest battle, another player's ordinary battle is outside.
-            if (!ownerInBattle) player.CurrentSettlement = poachers.CurrentSettlement = null;
             var battle = MapEventBattleFactory.CreateMapEvent(player.Party, poachers.Party, default);
             Assert.NotNull(battle);
             battle.BattleState = poachersLose ? BattleState.AttackerVictory : BattleState.DefenderVictory;
@@ -304,9 +319,53 @@ public class ArmyOfPoachersTests : IDisposable
     }
 
     [Theory]
+    [InlineData(DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility, IssueOutcome.QuestFail)]
+    [InlineData(DeclareWarAction.DeclareWarDetail.CausedByRebellion, IssueOutcome.QuestCancel)]
+    public void WarUsesTheOwnersFactionAndVanillaReason(DeclareWarAction.DeclareWarDetail detail, IssueOutcome expected)
+    {
+        Accept();
+        var enemyClanId = environment.CreateRegisteredObject<Clan>();
+        Server.Call(() =>
+        {
+            var enemyClan = Get<Clan>(Server, enemyClanId);
+            using (new AllowedThread())
+            {
+                Get<Hero>(Server, scenario.NotableId).Clan = enemyClan;
+                Get<Settlement>(Server, townId).Town.OwnerClan = enemyClan;
+            }
+            DeclareWarAction.ApplyInternal(enemyClan, Get<Hero>(Server, playerA.HeroId).MapFaction, detail);
+        });
+
+        Assert.Equal(expected, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+    }
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void CompanionSolutionUsesTheFrameworkAndAppliesTheOwnersOutcome(bool success)
+    public void OnlyARaidAtTheSelectedVillageFailsTheQuest(bool selectedVillage)
+    {
+        Accept();
+        Server.Call(() =>
+        {
+            var raid = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            raid._mapEventType = MapEvent.BattleTypes.Raid;
+            raid.MapEventSettlement = Get<Settlement>(Server, selectedVillage ? villageId : townId);
+            CampaignEventDispatcher.Instance.OnMapEventStarted(raid, Get<MobileParty>(Server, playerB.MobilePartyId).Party, raid.MapEventSettlement.Party);
+        });
+
+        if (selectedVillage)
+            Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        else
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    [Theory]
+    [InlineData(true, 0)]
+    [InlineData(false, 0)]
+    [InlineData(true, 3)]
+    [InlineData(false, 3)]
+    public void CompanionSolutionUsesTheFrameworkAndAppliesTheOwnersOutcome(bool success, int casualties)
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
@@ -339,17 +398,32 @@ public class ArmyOfPoachersTests : IDisposable
         });
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+        IssueBase clientIssue = null!;
+        Owner.Call(() => clientIssue = IssueOf(Owner));
         Server.Call(() =>
         {
             var issue = IssueOf(Server);
             Assert.True(issue.IsSolvingWithAlternative);
             issue._failureChance = success ? -1 : 1;
-            issue._alternativeSolutionCasualtyCount = 0;
+            issue._alternativeSolutionCasualtyCount = casualties;
             issue.CompleteIssueWithAlternativeSolution();
+            var roster = Get<MobileParty>(Server, playerA.MobilePartyId).MemberRoster;
+            Assert.Equal(40 - casualties, roster.GetTroopCount(Get<CharacterObject>(Server, troopId)));
+            Assert.Contains(roster.GetTroopRoster(), troop => troop.Character == Get<Hero>(Server, companionId).CharacterObject);
+            Assert.DoesNotContain(Get<MobileParty>(Server, playerB.MobilePartyId).MemberRoster.GetTroopRoster(),
+                troop => troop.Character == Get<Hero>(Server, companionId).CharacterObject);
         });
 
         AssertOutcome(success, success ? 0 : -5, success ? 50 : -30);
         Assert.Equal(IssueOutcome.AlternativeSolution, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Owner.Call(() =>
+        {
+            var history = Campaign.Current.LogEntryHistory.GetGameActionLogs((JournalLogEntry entry) => entry.IsRelatedTo(clientIssue));
+            var journal = Assert.Single(history);
+            Assert.True(journal.GetEntries().Count() > 1);
+            Assert.True(journal.IsEnded());
+            Assert.Equal(!success, journal.IsEndedUnsuccessfully());
+        });
     }
 
     private IssueBase CreateIssue(EnvironmentInstance instance, Hero giver)
@@ -375,9 +449,21 @@ public class ArmyOfPoachersTests : IDisposable
 
     private void Accept()
     {
-        Owner.Call(() => Game.Current.PlayerTroop = Get<Hero>(Owner, playerA.HeroId).CharacterObject);
-        scenario.Accept(Owner);
-        Owner.Call(() => QuestOf(Owner).QuestAcceptedConsequences());
+        Owner.Call(() =>
+        {
+            Game.Current.PlayerTroop = Get<Hero>(Owner, playerA.HeroId).CharacterObject;
+            var giver = Get<Hero>(Owner, scenario.NotableId);
+            var agent = new Mock<IAgent>();
+            agent.SetupGet(candidate => candidate.Character).Returns(giver.CharacterObject);
+            Campaign.Current.ConversationManager._conversationAgents.Clear();
+            Campaign.Current.ConversationManager._conversationAgents.Add(agent.Object);
+            Assert.Same(giver, Hero.OneToOneConversationHero);
+            giver.Issue.StartIssueWithQuest();
+            Assert.False(Owner.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _));
+            var quest = (Quest)giver.Issue.IssueQuest;
+            Assert.True(quest.DialogCondition());
+            quest.QuestAcceptedConsequences();
+        });
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
     }
 

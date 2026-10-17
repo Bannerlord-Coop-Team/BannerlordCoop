@@ -8,6 +8,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Start;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
@@ -64,9 +65,8 @@ internal class PoachersEncounterHandler : IHandler
     {
         return Campaign.Current.IssueManager.Issues.Values.Any(issue =>
             issue.IssueQuest is Quest quest && quest.IsOngoing && !quest._isReadyToBeFinalized &&
-            owners.TryResolveOwnerHero(issue, out var hero) && !hero.IsWounded &&
-            ((quest._poachersParty == defender && hero.PartyBelongedTo == attacker) ||
-             (quest._poachersParty == attacker && hero.PartyBelongedTo == defender)) &&
+            ((quest._poachersParty == defender && attacker.IsPlayerParty()) ||
+             (quest._poachersParty == attacker && defender.IsPlayerParty())) &&
             attacker.CurrentSettlement == quest._questVillage.Settlement && defender.CurrentSettlement == attacker.CurrentSettlement);
     }
 

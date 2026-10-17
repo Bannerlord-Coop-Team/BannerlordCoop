@@ -69,6 +69,14 @@ internal class PoachersMenuPatches
         args.IsEnabled = false;
         args.Tooltip = new TextObject("{=CoopPoachersPreparing}Waiting for the poachers party.");
     }
+
+    [HarmonyPatch("poachers_menu_back_condition")]
+    [HarmonyPostfix]
+    private static void BackWhileWaitingPostfix(ref bool __result)
+    {
+        if (Behavior.Instance is Quest quest && quest._poachersParty == null)
+            __result = true;
+    }
 }
 
 [HarmonyPatch(typeof(Quest))]
@@ -121,17 +129,13 @@ internal class PoachersEncounterPatches
     [HarmonyPrefix]
     private static bool GameMenuOpenedPrefix(Quest __instance) => IsLocalOwner(__instance);
 
-    [HarmonyPatch("DialogCondition")]
+    [HarmonyPatch("SetStartDialogOnCondition")]
     [HarmonyPrefix]
-    private static bool DialogPrefix(Quest __instance, ref bool __result)
+    private static bool StartDialogPrefix(Quest __instance, ref bool __result)
     {
         __result = false;
         return IsLocalOwner(__instance);
     }
-
-    [HarmonyPatch("SetStartDialogOnCondition")]
-    [HarmonyPrefix]
-    private static bool StartDialogPrefix(Quest __instance, ref bool __result) => DialogPrefix(__instance, ref __result);
 
     private static bool IsLocalOwner(Quest quest) => ModInformation.IsClient && quest.IsOngoing &&
         ContainerProvider.TryResolve<PoachersEncounterHandler>(out var encounters) && encounters.IsLocalOwner(quest);
