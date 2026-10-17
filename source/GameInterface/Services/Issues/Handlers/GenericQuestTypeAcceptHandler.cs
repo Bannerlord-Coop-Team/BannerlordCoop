@@ -23,6 +23,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using IIssueAcceptPreconditions = GameInterface.Services.Issues.Framework.Interface.IIssueAcceptPreconditions;
 
 namespace GameInterface.Services.Issues.Handlers;
 
@@ -40,6 +41,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
     private readonly IIssueGenerationRegistry generationRegistry;
     private readonly IIssueConversationTracker conversationTracker;
     private readonly IGangLeaderWeaponsAcceptance weaponsAcceptance;
+    private readonly IIssueAcceptPreconditions acceptPreconditions;
 
     public GenericQuestTypeAcceptHandler(
         IMessageBroker messageBroker,
@@ -51,8 +53,10 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         IIssueOwnershipRegistry ownershipRegistry,
         IIssueGenerationRegistry generationRegistry,
         IIssueConversationTracker conversationTracker,
-        IGangLeaderWeaponsAcceptance weaponsAcceptance)
+        IGangLeaderWeaponsAcceptance weaponsAcceptance,
+        IIssueAcceptPreconditions acceptPreconditions)
     {
+        this.acceptPreconditions = acceptPreconditions;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
@@ -132,6 +136,13 @@ internal class GenericQuestTypeAcceptHandler : IHandler
         }
     }
 
+    // The same server-side check the framework's accept coordinators make before they accept
+    private bool CanTake(Hero owner, Player player)
+    {
+        return objectManager.TryGetObject<Hero>(player.HeroId, out var playerHero) &&
+            acceptPreconditions.CanTake(owner.Issue, playerHero, player.ControllerId);
+    }
+
     private bool TryValidateAcceptRequest(
         NetPeer requester, string ownerId, Hero owner, int requestedGeneration, bool isAlternative, string messageName,
         out Player player, out QuestTypeDescriptor descriptor)
@@ -167,7 +178,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
 
         descriptor = QuestTypeRegistry.Get(owner.Issue);
         var supports = isAlternative ? descriptor?.SupportsAlternativeAccept == true : descriptor?.SupportsQuestSolutionAccept == true;
-        var canAccept = supports && owner.Issue.IsOngoingWithoutQuest && owner.Issue.IssueStayAliveConditions();
+        var canAccept = supports && owner.Issue.IsOngoingWithoutQuest && CanTake(owner, player);
         if (!canAccept)
         {
             network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative));
@@ -352,7 +363,7 @@ internal class GenericQuestTypeAcceptHandler : IHandler
 
             var descriptor = QuestTypeRegistry.Get(owner.Issue);
             var canAccept = descriptor?.SupportsAlternativeAccept == true &&
-                owner.Issue.IsOngoingWithoutQuest && owner.Issue.IssueStayAliveConditions();
+                owner.Issue.IsOngoingWithoutQuest && CanTake(owner, player);
             if (!canAccept)
             {
                 network.Send(requester, new NetworkQuestTypeAcceptRejected(ownerId, isAlternative: true));

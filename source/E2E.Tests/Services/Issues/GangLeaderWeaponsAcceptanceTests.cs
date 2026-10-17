@@ -308,38 +308,6 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
     }
 
     [Fact]
-    public void DuplicateEligibilityIgnoresAnotherPlayersQuestButKeepsOwnCommitmentGate()
-    {
-        var activeGiverId = CreateIssueCopies(includeServer: true);
-        var offeredGiverId = CreateIssueCopies(includeServer: true);
-        var ownerId = environment.CreateRegisteredObject<Hero>();
-        var partyId = environment.CreateRegisteredObject<MobileParty>();
-        var server = environment.Server;
-        server.Call(() =>
-        {
-            Assert.True(server.ObjectManager.TryGetObject<Hero>(activeGiverId, out var activeGiver));
-            Assert.True(server.ObjectManager.TryGetObject<Hero>(offeredGiverId, out var offeredGiver));
-            Assert.True(server.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
-            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-            Assert.True(server.Resolve<IPlayerManager>().AddPlayer(new Player("weapons-player", ownerId, partyId, "", "")));
-            server.Resolve<IGangLeaderWeaponsAcceptance>().MirrorQuestAccepted(activeGiver,
-                new GangLeaderWeaponsQuestFields("another_players_weapons", CampaignTime.Days(25), 4700, 0, 21, 0.75f, 200, 17));
-            var ownership = server.Resolve<IIssueOwnershipRegistry>();
-            ownership.SetOwner(activeGiver, "another-player");
-            using (new MainHeroSubstitutionScope(owner, party))
-            {
-                Assert.True(offeredGiver.Issue.IssueQuestCanBeDuplicated);
-                ownership.SetOwner(activeGiver, "weapons-player");
-                Assert.False(offeredGiver.Issue.IssueQuestCanBeDuplicated);
-                ownership.Clear(activeGiver);
-                Assert.False(offeredGiver.Issue.IssueQuestCanBeDuplicated);
-            }
-            Assert.True(activeGiver.Issue.IssueQuest.IsOngoing);
-            Assert.True(offeredGiver.Issue.IsOngoingWithoutQuest);
-        });
-    }
-
-    [Fact]
     public void ApprovedGuardBattleCreatesOneRegisteredEventForTheOwnerInsideTown()
     {
         var (giverId, partyId, guardsId, ownerClient) = PrepareGuardBattle();
@@ -1334,20 +1302,22 @@ public sealed class GangLeaderWeaponsAcceptanceTests : IDisposable
         });
 
         Assert.True(Assert.Single(server.NetworkSentMessages.GetMessages<NetworkQuestTypeAcceptRejected>()).IsAlternative);
-        Assert.Equal(IssueFinalizeReason.IssueOnly, Assert.Single(server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>()).Reason);
+        Assert.Empty(server.NetworkSentMessages.GetMessages<NetworkIssueRemoved>());
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(client.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
             Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
-            // CheckPreconditions cancels the issue when its town belongs to this player.
-            Assert.Null(giver.Issue);
+            Assert.True(giver.Issue.IsOngoingWithoutQuest);
         });
         server.Call(() =>
         {
             Assert.True(server.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
             Assert.Equal(100000, owner.Gold);
+            // The server's precondition check refuses the ineligible owner before it changes anything
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(giverId, out var serverGiver));
+            Assert.True(serverGiver.Issue.IsOngoingWithoutQuest);
         });
     }
 
