@@ -73,10 +73,9 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             AssertInteraction(client, battle, eventType, isSiegeAmbush);
     }
 
+    // The reserve builder only branches on siege ambush, so one non-ambush siege type is enough.
     [Theory]
     [InlineData(MapEvent.BattleTypes.Siege, false)]
-    [InlineData(MapEvent.BattleTypes.SallyOut, false)]
-    [InlineData(MapEvent.BattleTypes.SiegeOutside, false)]
     [InlineData(MapEvent.BattleTypes.None, true)]
     public void Interaction_ReservesCountEveryEligibleTroopOnceAndPreserveOwnership(
         MapEvent.BattleTypes eventType,
@@ -273,20 +272,6 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 settlementId: "e2e-siege-settlement",
                 isSallyOut: isSallyOut);
         });
-    }
-
-    [Theory]
-    [InlineData(BattleSideEnum.Defender, true, false)]
-    [InlineData(BattleSideEnum.Attacker, false, true)]
-    public void SiegeAmbush_ReturnToCastleResultUsesNoVictoryCompletionSignal(
-        BattleSideEnum playerSide, bool playerVictory, bool playerDefeated)
-    {
-        var result = SiegeMissionEndPatches.CreateSiegeAmbushResult(playerSide);
-
-        Assert.Equal(BattleState.DefenderPullBack, result.BattleState);
-        Assert.Equal(playerVictory, result.PlayerVictory);
-        Assert.Equal(playerDefeated, result.PlayerDefeated);
-        Assert.True(result.BattleResolved);
     }
 
     [Fact]
@@ -541,10 +526,9 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
         AssertAttackMissionLauncher(eventType, expectedScene: "e2e_land_battle");
     }
 
+    // The reserve builder only branches on siege ambush, so one non-ambush siege type is enough.
     [Theory]
     [InlineData(MapEvent.BattleTypes.Siege, false)]
-    [InlineData(MapEvent.BattleTypes.SallyOut, false)]
-    [InlineData(MapEvent.BattleTypes.SiegeOutside, false)]
     [InlineData(MapEvent.BattleTypes.None, true)]
     public void Interaction_LateAiPartiesExpandHostReservesExactlyOnce(
         MapEvent.BattleTypes eventType,
@@ -901,4 +885,22 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
         string DefenderPlayerPartyId,
         string? AttackerAiPartyId,
         string? DefenderAiPartyId);
+}
+
+/// <summary>Siege ambush result construction; a static factory, so no game instances.</summary>
+public class SiegeAmbushResultTests
+{
+    [Theory]
+    [InlineData(BattleSideEnum.Defender, true, false)]
+    [InlineData(BattleSideEnum.Attacker, false, true)]
+    public void SiegeAmbush_ReturnToCastleResultUsesNoVictoryCompletionSignal(
+        BattleSideEnum playerSide, bool playerVictory, bool playerDefeated)
+    {
+        var result = SiegeMissionEndPatches.CreateSiegeAmbushResult(playerSide);
+
+        Assert.Equal(BattleState.DefenderPullBack, result.BattleState);
+        Assert.Equal(playerVictory, result.PlayerVictory);
+        Assert.Equal(playerDefeated, result.PlayerDefeated);
+        Assert.True(result.BattleResolved);
+    }
 }

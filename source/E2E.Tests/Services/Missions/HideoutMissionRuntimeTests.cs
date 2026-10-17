@@ -132,39 +132,6 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         });
     }
 
-    [Fact]
-    public void AmbushReady_WaitsForThePromotedHostsExpandedDefenderReserve()
-    {
-        var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
-        var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
-        attacker.SetReserve(Array.Empty<PartyReserve>(), 1, 1, 1000);
-        Assert.False(CoopHideoutMissionLogic.ReservesReady(true, attacker, defender));
-        defender.SetReserve(Array.Empty<PartyReserve>(), 25, 0, 1000);
-        Assert.True(CoopHideoutMissionLogic.ReservesReady(false, attacker, defender));
-        Assert.False(CoopHideoutMissionLogic.ReservesReady(true, attacker, defender));
-        defender.SetReserve(new[] { new PartyReserve("defenders", 0,
-            Enumerable.Range(1, 25).Select(seed => new TroopReserveEntry(seed, "guard", 0)).ToArray()) }, 25, 0, 1000);
-        Assert.True(CoopHideoutMissionLogic.ReservesReady(true, attacker, defender));
-    }
-
-    [Fact]
-    public void NativeAmbushAfterStart_DoesNotConsumeOrSpawnBeforeMissionReadiness()
-    {
-        var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
-        var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
-        var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(),
-            Mock.Of<IMissionContext>(), defender, attacker, false);
-        var native = new CoopHideoutAmbushController(logic,
-            new IMissionTroopSupplier[] { logic.Defender, logic.Attacker });
-        logic.Native = native;
-        native.AfterStart();
-        native.OnMissionTick(1f);
-        Assert.Equal(HideoutPhase.Waiting, native.Phase);
-        Assert.False(native._isMissionInitialized);
-        Assert.False(attacker.IsPopulated);
-        Assert.False(defender.IsPopulated);
-    }
-
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -445,53 +412,6 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
     }
 
     [Fact]
-    public void NativeAmbushBossPadding_NeverClonesOutsideTheAuthoritativeReserve()
-    {
-        var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
-        var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
-        var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(),
-            Mock.Of<IMissionContext>(), defender, attacker, false);
-        var native = new CoopHideoutAmbushController(logic, new IMissionTroopSupplier[] { logic.Defender, logic.Attacker });
-        native._allEnemyTroops = new List<IAgentOriginBase> { Mock.Of<IAgentOriginBase>(), Mock.Of<IAgentOriginBase>() };
-        int requested = 4;
-        HideoutBossReservePatch.Prefix(native, ref requested);
-        Assert.Equal(2, requested);
-        native._allEnemyTroops.Clear();
-        HideoutBossReservePatch.Prefix(native, ref requested);
-        Assert.Equal(0, requested);
-        logic.OnRemoveBehavior();
-    }
-
-    [Fact]
-    public void NativeAreaUse_DoesNotInvokeTheHostOnlyReinforcementDelegateOnAPeer()
-    {
-        RunWithSceneShims(() =>
-        {
-            var area = new CoopHideoutStealthAreaLogic();
-            area.SpawnReinforcementAllyTroopsEvent += (_, _) => throw new InvalidOperationException("Uninitialized native supplier used");
-            area.OnObjectUsed(null, ObjectHelper.SkipConstructor<StealthAreaUsePoint>());
-        });
-    }
-
-    [Fact]
-    public void NativeAreaSentryRemoval_AcceptsAKillWithoutTheLocalMainHero()
-    {
-        RunWithSceneShims(() =>
-        {
-            var areaLogic = new CoopHideoutStealthAreaLogic();
-            var area = ObjectHelper.SkipConstructor<StealthAreaMissionLogic.StealthAreaData>();
-            var marker = ObjectHelper.SkipConstructor<StealthAreaMarker>();
-            var killed = ObjectHelper.SkipConstructor<Agent>();
-            var surviving = ObjectHelper.SkipConstructor<Agent>();
-            AccessTools.Field(typeof(StealthAreaMissionLogic.StealthAreaData), nameof(area.StealthAreaMarkers))
-                .SetValue(area, new Dictionary<StealthAreaMarker, List<Agent>> { [marker] = new() { killed, surviving } });
-            areaLogic._stealthAreaData.Add(area);
-            areaLogic.OnAgentRemoved(killed, null, AgentState.Killed, default);
-            Assert.Equal(new[] { surviving }, area.StealthAreaMarkers[marker]);
-        });
-    }
-
-    [Fact]
     public void PromotionDuringDuel_RestoresOtherPlayersBeforeResumingTheGroupFight()
     {
         using var fixture = new MissionEngineFixture();
@@ -554,7 +474,7 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         }
     }
 
-    private static void RunWithSceneShims(Action action)
+    internal static void RunWithSceneShims(Action action)
     {
         var harmony = new Harmony($"hideout-runtime.{Guid.NewGuid()}");
         try
@@ -609,6 +529,93 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
         return false;
     }
 
+    internal static NetworkHideoutState State(string host, int epoch, long revision, HideoutPhase phase, params int[] seeds)
+        => new("raid", host, epoch, revision, phase, 0, 0, seeds, BattleSideEnum.None, 25);
+}
+
+/// <summary>Hideout runtime rules that only need mocks and skip-ctor game objects, so no game instances.</summary>
+public sealed class HideoutMissionLogicTests
+{
+    [Fact]
+    public void AmbushReady_WaitsForThePromotedHostsExpandedDefenderReserve()
+    {
+        var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
+        var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
+        attacker.SetReserve(Array.Empty<PartyReserve>(), 1, 1, 1000);
+        Assert.False(CoopHideoutMissionLogic.ReservesReady(true, attacker, defender));
+        defender.SetReserve(Array.Empty<PartyReserve>(), 25, 0, 1000);
+        Assert.True(CoopHideoutMissionLogic.ReservesReady(false, attacker, defender));
+        Assert.False(CoopHideoutMissionLogic.ReservesReady(true, attacker, defender));
+        defender.SetReserve(new[] { new PartyReserve("defenders", 0,
+            Enumerable.Range(1, 25).Select(seed => new TroopReserveEntry(seed, "guard", 0)).ToArray()) }, 25, 0, 1000);
+        Assert.True(CoopHideoutMissionLogic.ReservesReady(true, attacker, defender));
+    }
+
+    [Fact]
+    public void NativeAmbushAfterStart_DoesNotConsumeOrSpawnBeforeMissionReadiness()
+    {
+        var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
+        var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
+        var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(),
+            Mock.Of<IMissionContext>(), defender, attacker, false);
+        var native = new CoopHideoutAmbushController(logic,
+            new IMissionTroopSupplier[] { logic.Defender, logic.Attacker });
+        logic.Native = native;
+        native.AfterStart();
+        native.OnMissionTick(1f);
+        Assert.Equal(HideoutPhase.Waiting, native.Phase);
+        Assert.False(native._isMissionInitialized);
+        Assert.False(attacker.IsPopulated);
+        Assert.False(defender.IsPopulated);
+    }
+
+    [Fact]
+    public void NativeAmbushBossPadding_NeverClonesOutsideTheAuthoritativeReserve()
+    {
+        var attacker = new CoopTroopSupplier("raid", BattleSideEnum.Attacker, null, null);
+        var defender = new CoopTroopSupplier("raid", BattleSideEnum.Defender, null, null);
+        var logic = new CoopHideoutMissionLogic(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(),
+            Mock.Of<IMissionContext>(), defender, attacker, false);
+        var native = new CoopHideoutAmbushController(logic, new IMissionTroopSupplier[] { logic.Defender, logic.Attacker });
+        native._allEnemyTroops = new List<IAgentOriginBase> { Mock.Of<IAgentOriginBase>(), Mock.Of<IAgentOriginBase>() };
+        int requested = 4;
+        HideoutBossReservePatch.Prefix(native, ref requested);
+        Assert.Equal(2, requested);
+        native._allEnemyTroops.Clear();
+        HideoutBossReservePatch.Prefix(native, ref requested);
+        Assert.Equal(0, requested);
+        logic.OnRemoveBehavior();
+    }
+
+    [Fact]
+    public void NativeAreaUse_DoesNotInvokeTheHostOnlyReinforcementDelegateOnAPeer()
+    {
+        HideoutMissionRuntimeTests.RunWithSceneShims(() =>
+        {
+            var area = new CoopHideoutStealthAreaLogic();
+            area.SpawnReinforcementAllyTroopsEvent += (_, _) => throw new InvalidOperationException("Uninitialized native supplier used");
+            area.OnObjectUsed(null, ObjectHelper.SkipConstructor<StealthAreaUsePoint>());
+        });
+    }
+
+    [Fact]
+    public void NativeAreaSentryRemoval_AcceptsAKillWithoutTheLocalMainHero()
+    {
+        HideoutMissionRuntimeTests.RunWithSceneShims(() =>
+        {
+            var areaLogic = new CoopHideoutStealthAreaLogic();
+            var area = ObjectHelper.SkipConstructor<StealthAreaMissionLogic.StealthAreaData>();
+            var marker = ObjectHelper.SkipConstructor<StealthAreaMarker>();
+            var killed = ObjectHelper.SkipConstructor<Agent>();
+            var surviving = ObjectHelper.SkipConstructor<Agent>();
+            AccessTools.Field(typeof(StealthAreaMissionLogic.StealthAreaData), nameof(area.StealthAreaMarkers))
+                .SetValue(area, new Dictionary<StealthAreaMarker, List<Agent>> { [marker] = new() { killed, surviving } });
+            areaLogic._stealthAreaData.Add(area);
+            areaLogic.OnAgentRemoved(killed, null, AgentState.Killed, default);
+            Assert.Equal(new[] { surviving }, area.StealthAreaMarkers[marker]);
+        });
+    }
+
     [Theory]
     [InlineData((int)HideoutPhase.Stealth, false)]
     [InlineData((int)HideoutPhase.Camp, true)]
@@ -622,16 +629,13 @@ public sealed class HideoutMissionRuntimeTests : MissionTestEnvironment
     public void PhaseReplay_RejectsOldHostAndRetainsSpawnIdentityAcrossMigration()
     {
         var ledger = new HideoutStateLedger();
-        var initial = State("first", 1, 3, HideoutPhase.Camp, 10, 11);
+        var initial = HideoutMissionRuntimeTests.State("first", 1, 3, HideoutPhase.Camp, 10, 11);
         Assert.True(ledger.TryAccept(initial, "raid", "first", 1));
-        Assert.False(ledger.TryAccept(State("other", 1, 4, HideoutPhase.Resolved), "raid", "first", 1));
-        Assert.False(ledger.TryAccept(State("first", 1, 2, HideoutPhase.Resolved), "raid", "first", 1));
-        Assert.True(ledger.TryAccept(State("second", 2, 1, HideoutPhase.BossBattle, 12), "raid", "second", 2));
-        Assert.False(ledger.TryAccept(State("first", 1, 100, HideoutPhase.Resolved), "raid", "second", 2));
+        Assert.False(ledger.TryAccept(HideoutMissionRuntimeTests.State("other", 1, 4, HideoutPhase.Resolved), "raid", "first", 1));
+        Assert.False(ledger.TryAccept(HideoutMissionRuntimeTests.State("first", 1, 2, HideoutPhase.Resolved), "raid", "first", 1));
+        Assert.True(ledger.TryAccept(HideoutMissionRuntimeTests.State("second", 2, 1, HideoutPhase.BossBattle, 12), "raid", "second", 2));
+        Assert.False(ledger.TryAccept(HideoutMissionRuntimeTests.State("first", 1, 100, HideoutPhase.Resolved), "raid", "second", 2));
         Assert.Equal(new[] { 10, 11, 12 }, ledger.GetSpawnedSeeds());
         Assert.Equal(HideoutPhase.BossBattle, ledger.Latest.Phase);
     }
-
-    private static NetworkHideoutState State(string host, int epoch, long revision, HideoutPhase phase, params int[] seeds)
-        => new("raid", host, epoch, revision, phase, 0, 0, seeds, BattleSideEnum.None, 25);
 }

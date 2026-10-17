@@ -29,6 +29,7 @@ public abstract class CommonModule : Module
         builder.RegisterType<VoiceJitterBuffer>().As<IVoiceJitterBuffer>().InstancePerDependency();
         builder.RegisterType<VoiceRoutingState>().As<IVoiceRoutingState>().InstancePerDependency();
         builder.RegisterType<TaleWorldsModuleInfoProvider>().As<IModuleInfoProvider>().SingleInstance();
+        builder.RegisterType<TaleWorldsModuleNameProvider>().As<IModuleNameProvider>().SingleInstance();
         builder.RegisterInstance(new CoopLogFile(null)).As<ICoopLogFile>().SingleInstance();
 
         #region Serialization

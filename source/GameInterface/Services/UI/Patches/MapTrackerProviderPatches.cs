@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.MapTracking;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.UI.Messages;
 using HarmonyLib;
@@ -24,6 +25,10 @@ internal class MapTrackerProviderUpdatePatches
     [HarmonyPostfix]
     public static void CanAddMobilePartyPostfix(MobileParty party, ref bool __result)
     {
+        if (!__result && ModInformation.IsClient && party.IsPlayerParty() &&
+            ContainerProvider.TryResolve<IPlayerMapTracking>(out var mapTracking) && mapTracking.IsTrackedByLocalPlayer(party))
+            __result = true;
+
         // Defeated player parties are retained for release, even after their leader is removed.
         if (__result && party.IsPlayerParty() && (party.LeaderHero == null || party.LeaderHero.IsPrisoner))
             __result = false;

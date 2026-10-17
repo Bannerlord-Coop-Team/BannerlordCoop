@@ -30,9 +30,6 @@ namespace Coop.Core.Server.Services.Towns.Handlers
             // This handles an internal message
             messageBroker.Subscribe<TownGovernorChanged>(HandleTownGovernor);
             messageBroker.Subscribe<TownTradeTaxAccumulatedChanged>(HandleTownTradeTaxAccumulated);
-            messageBroker.Subscribe<TownLoyaltyChanged>(HandleTownLoyalty);
-            messageBroker.Subscribe<TownProsperityChanged>(HandleTownProsperity);
-            messageBroker.Subscribe<TownSecurityChanged>(HandleTownSecurity);
             messageBroker.Subscribe<TownInRebelliousStateChanged>(HandleTownInRebelliousState);
             messageBroker.Subscribe<TownLastCapturedByChanged>(HandleTownLastCapturedBy);
             messageBroker.Subscribe<TownGarrisonAutoRecruitmentIsEnabledChanged>(HandleTownGarrisonAutoRecruitmentIsEnabled);
@@ -95,36 +92,6 @@ namespace Coop.Core.Server.Services.Towns.Handlers
             network.SendAll(networkChangeTownInRebelliousState);
         }
 
-        private void HandleTownSecurity(MessagePayload<TownSecurityChanged> obj)
-        {
-            var payload = obj.What;
-
-            if (!objectManager.TryGetIdWithLogging(payload.Town, out var townId)) return;
-
-            var networkChangeTownSecurity = new NetworkChangeTownSecurity(townId, payload.Security);
-            network.SendAll(networkChangeTownSecurity);
-        }
-
-        private void HandleTownProsperity(MessagePayload<TownProsperityChanged> obj)
-        {
-            var payload = obj.What;
-
-            if (!objectManager.TryGetIdWithLogging(payload.Town, out var townId)) return;
-
-            var networkChangeTownProsperity = new NetworkChangeTownProsperity(townId, payload.Prosperity);
-            network.SendAll(networkChangeTownProsperity);
-        }
-
-        private void HandleTownLoyalty(MessagePayload<TownLoyaltyChanged> obj)
-        {
-            var payload = obj.What;
-
-            if (!objectManager.TryGetIdWithLogging(payload.Town, out var townId)) return;
-
-            var networkChangeTownLoyalty = new NetworkChangeTownLoyalty(townId, payload.Loyalty);
-            network.SendAll(networkChangeTownLoyalty);
-        }
-
         private void HandleTownTradeTaxAccumulated(MessagePayload<TownTradeTaxAccumulatedChanged> obj)
         {
             var payload = obj.What;
@@ -160,9 +127,6 @@ namespace Coop.Core.Server.Services.Towns.Handlers
         {
             messageBroker.Unsubscribe<TownGovernorChanged>(HandleTownGovernor);
             messageBroker.Unsubscribe<TownTradeTaxAccumulatedChanged>(HandleTownTradeTaxAccumulated);
-            messageBroker.Unsubscribe<TownLoyaltyChanged>(HandleTownLoyalty);
-            messageBroker.Unsubscribe<TownProsperityChanged>(HandleTownProsperity);
-            messageBroker.Unsubscribe<TownSecurityChanged>(HandleTownSecurity);
             messageBroker.Unsubscribe<TownInRebelliousStateChanged>(HandleTownInRebelliousState);
             messageBroker.Unsubscribe<TownLastCapturedByChanged>(HandleTownLastCapturedBy);
             messageBroker.Unsubscribe<TownGarrisonAutoRecruitmentIsEnabledChanged>(HandleTownGarrisonAutoRecruitmentIsEnabled);

@@ -25,7 +25,6 @@ public class VillageHandler : IHandler
  
         messageBroker.Subscribe<ChangeVillageState>(HandleVillageState);
         messageBroker.Subscribe<ChangeVillageTradeBound>(HandleTradeBound);
-        messageBroker.Subscribe<ChangeVillageHearth>(HandleHearth);
         messageBroker.Subscribe<ChangeVillageTradeTaxAccumulated>(HandleTradeTax);
         messageBroker.Subscribe<ChangeVillageLastDemandTime>(HandleLastDemandTime);
     }
@@ -34,7 +33,6 @@ public class VillageHandler : IHandler
     {
         messageBroker.Unsubscribe<ChangeVillageState>(HandleVillageState);
         messageBroker.Unsubscribe<ChangeVillageTradeBound>(HandleTradeBound);
-        messageBroker.Unsubscribe<ChangeVillageHearth>(HandleHearth);
         messageBroker.Unsubscribe<ChangeVillageTradeTaxAccumulated>(HandleTradeTax);
         messageBroker.Unsubscribe<ChangeVillageLastDemandTime>(HandleLastDemandTime);
     }
@@ -66,19 +64,6 @@ public class VillageHandler : IHandler
 
         VillagePatches.RunTradeTaxChange(village, obj.TradeTaxAccumulated);
 
-    }
-
-    private void HandleHearth(MessagePayload<ChangeVillageHearth> payload)
-    {
-        var obj = payload.What;
-
-        if (objectManager.TryGetObject<Village>(obj.VillageId, out var village) == false)
-        {
-            Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
-            return;
-        }
-
-        VillagePatches.ChangeHearth(village, obj.Hearth);
     }
 
     private void HandleTradeBound(MessagePayload<ChangeVillageTradeBound> payload)

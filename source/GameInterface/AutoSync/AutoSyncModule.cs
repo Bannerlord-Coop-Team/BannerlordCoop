@@ -16,7 +16,7 @@ internal class AutoSyncModule : Module
         builder.RegisterType<AutoSyncPatchCollector>().As<IAutoSyncPatchCollector>().SingleInstance();
 
         builder.RegisterType<AutoSyncRegistry>().SingleInstance();
-        builder.RegisterType<AutoSyncPatcher>().SingleInstance();
+        builder.RegisterType<AutoSyncPatcher>().AsSelf().As<IAutoSyncPatcher>().SingleInstance();
         builder.RegisterType<AutoSyncBuilder>().SingleInstance();
         builder.RegisterType<AutoSyncAssemblyInfoBuilder>().SingleInstance();
         builder.RegisterType<AutoSyncPatchBuilder>().SingleInstance();

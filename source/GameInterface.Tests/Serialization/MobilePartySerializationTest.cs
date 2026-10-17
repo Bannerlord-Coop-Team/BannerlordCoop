@@ -20,7 +20,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class MobilePartySerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         ITestOutputHelper outputHelper;
         public MobilePartySerializationTest(ITestOutputHelper outputHelper)
         {
@@ -28,11 +28,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
+            container = SerializationTestContainer.BeginScope();
         }
 
         private void EnsureAllMemberCoverage<T>(T obj, HashSet<string> excludes)
