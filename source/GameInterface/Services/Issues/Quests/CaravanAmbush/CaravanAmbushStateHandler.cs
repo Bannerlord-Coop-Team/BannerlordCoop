@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameState;
 using Helpers;
 using Quest = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.CaravanAmbushIssueQuest;
 
@@ -23,6 +24,7 @@ internal class CaravanAmbushStateHandler : IHandler
     private readonly IIssueResolver issues;
     private readonly IControllerIdProvider controller;
     private readonly ICaravanAmbushEvents events;
+    private NetworkCaravanAmbushConversation pendingConversation;
 
     public CaravanAmbushStateHandler(IMessageBroker broker, IObjectManager objects, IIssueResolver issues,
         IControllerIdProvider controller, ICaravanAmbushEvents events)
@@ -42,23 +44,55 @@ internal class CaravanAmbushStateHandler : IHandler
         broker.Unsubscribe<NetworkCaravanAmbushState>(Handle);
         broker.Unsubscribe<NetworkCaravanAmbushConversation>(Conversation);
         broker.Unsubscribe<BanditPartyRecruitedByPlayer>(Recruited);
+        ClearPendingConversation();
     }
 
     private void Conversation(MessagePayload<NetworkCaravanAmbushConversation> payload)
     {
         if (ModInformation.IsServer || payload.What.ControllerId != controller.ControllerId) return;
-        var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (!issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
-                !(issue.IssueQuest is Quest quest) || !quest._isCaravanSaved ||
-                !objects.TryGetObjectWithLogging<MobileParty>(data.CaravanId, out var caravan)) return;
+            if (pendingConversation == null)
+                CampaignEvents.TickEvent.AddNonSerializedListener(this, _ => TryOpenConversation());
+            pendingConversation = payload.What;
+            TryOpenConversation();
+        }, context: nameof(CaravanAmbushStateHandler));
+    }
+
+    private void TryOpenConversation()
+    {
+        GameThread.RunSafe(() =>
+        {
+            var data = pendingConversation;
+            if (data == null) return;
+            if (data.ControllerId != controller.ControllerId ||
+                !issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
+                !(issue.IssueQuest is Quest quest) || !quest.IsOngoing || !quest._isCaravanSaved)
+            {
+                ClearPendingConversation();
+                return;
+            }
+            // Battle results can arrive before the owner leaves the mission and loot screens.
+            if (!(GameStateManager.Current?.ActiveState is MapState map) || map.AtMenu || map.IsSimulationActive ||
+                Campaign.Current.ConversationManager.IsConversationInProgress) return;
+            if (!objects.TryGetObjectWithLogging<MobileParty>(data.CaravanId, out var caravan) || !caravan.IsActive)
+            {
+                ClearPendingConversation();
+                return;
+            }
             var leader = ConversationHelper.GetConversationCharacterPartyLeader(caravan.Party);
             if (leader == null) return;
             CampaignMapConversation.OpenConversation(
                 new ConversationCharacterData(Hero.MainHero.CharacterObject),
                 new ConversationCharacterData(leader));
+            ClearPendingConversation();
         }, context: nameof(CaravanAmbushStateHandler));
+    }
+
+    private void ClearPendingConversation()
+    {
+        pendingConversation = null;
+        if (Campaign.Current != null) CampaignEvents.TickEvent.ClearListeners(this);
     }
 
     private void Recruited(MessagePayload<BanditPartyRecruitedByPlayer> payload)

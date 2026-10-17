@@ -98,8 +98,9 @@ internal class CaravanAmbushPatches
     private static void IssueFinalized(IssueBase __instance)
     {
         // The framework dismisses a disconnected owner's issue without finalizing its quest.
-        if (ModInformation.IsServer && __instance.IssueQuest is Quest quest &&
-            ContainerProvider.TryResolve<ICaravanAmbushEvents>(out var events)) events.Release(quest, completing: true);
+        if (ModInformation.IsClient || !(__instance.IssueQuest is Quest quest)) return;
+        quest.RemoveAllTrackedObjects();
+        if (ContainerProvider.TryResolve<ICaravanAmbushEvents>(out var events)) events.Release(quest, completing: true);
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.InitializeQuestOnGameLoad))]

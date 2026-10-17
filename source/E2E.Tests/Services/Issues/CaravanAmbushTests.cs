@@ -17,12 +17,15 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encyclopedia;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using TaleWorlds.MountAndBlade;
 using SandBox.GauntletUI.Map;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.CaravanAmbushIssue;
@@ -224,6 +227,8 @@ public class CaravanAmbushTests : IDisposable
         {
             BindParties();
             using (new AllowedThread()) IssueOf(Server)._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+            var quest = QuestOf(Server);
+            Assert.Equal(2, Campaign.Current.QuestManager.GetAllTrackedObjectsOfAQuest(quest).Count);
             Server.Resolve<IPlayerManager>().ClearPeer(Owner.NetPeer);
             Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(Owner.NetPeer, default(DisconnectInfo)));
             Assert.Null(IssueOfHero(Server));
@@ -233,6 +238,7 @@ public class CaravanAmbushTests : IDisposable
             Assert.False(bandits.IsCurrentlyUsedByAQuest);
             Assert.False(caravan.Ai.DoNotMakeNewDecisions);
             Assert.False(bandits.Ai.DoNotMakeNewDecisions);
+            Assert.Empty(Campaign.Current.QuestManager.GetAllTrackedObjectsOfAQuest(quest));
         });
     }
 
@@ -243,6 +249,8 @@ public class CaravanAmbushTests : IDisposable
         {
             BindParties();
             using (new AllowedThread()) IssueOf(Server)._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+            var quest = QuestOf(Server);
+            Assert.Equal(2, Campaign.Current.QuestManager.GetAllTrackedObjectsOfAQuest(quest).Count);
             Server.Resolve<IIssueOwnershipRegistry>().Remove(scenario.NotableId);
             Server.Resolve<IMessageBroker>().Publish(this, new AllGameObjectsRegistered());
             Assert.Null(IssueOfHero(Server));
@@ -252,6 +260,7 @@ public class CaravanAmbushTests : IDisposable
             Assert.False(bandits.IsCurrentlyUsedByAQuest);
             Assert.False(caravan.Ai.DoNotMakeNewDecisions);
             Assert.False(bandits.Ai.DoNotMakeNewDecisions);
+            Assert.Empty(Campaign.Current.QuestManager.GetAllTrackedObjectsOfAQuest(quest));
         });
     }
 
@@ -271,11 +280,57 @@ public class CaravanAmbushTests : IDisposable
     public void SavedCaravanConversationOpensOnlyForTheOwner()
     {
         using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
+        Owner.Call(() => Game.Current.GameStateManager._gameStates.Add(Game.Current.GameStateManager.CreateState<MapState>()));
         SendState(QuestScenario.ControllerA, true, 0);
         Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkCaravanAmbushConversation(
             scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA, caravanId)));
         Assert.Equal(1, conversations.CountFor(Owner));
         Assert.Equal(0, conversations.CountFor(Other));
+    }
+
+    [Fact]
+    public void SavedCaravanConversationWaitsForMissionAndLootScreensAndOpensOnce()
+    {
+        using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
+        Owner.Call(() => Game.Current.GameStateManager._gameStates.Add(ObjectHelper.SkipConstructor<MissionState>()));
+        SendState(QuestScenario.ControllerA, true, 0);
+        Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkCaravanAmbushConversation(
+            scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA, caravanId)));
+        Assert.Equal(0, conversations.CountFor(Owner));
+        Owner.Call(() =>
+        {
+            CampaignEvents.Instance.Tick(0f);
+            Assert.Equal(0, conversations.CountFor(Owner));
+            var states = Game.Current.GameStateManager;
+            states._gameStates.Clear();
+            var map = states.CreateState<MapState>();
+            states._gameStates.Add(map);
+            map._menuContext = Game.Current.ObjectManager.CreateObject<MenuContext>();
+            CampaignEvents.Instance.Tick(0f);
+            Assert.Equal(0, conversations.CountFor(Owner));
+            map._menuContext = null;
+            CampaignEvents.Instance.Tick(0f);
+            Assert.Equal(1, conversations.CountFor(Owner));
+            CampaignEvents.Instance.Tick(0f);
+            Assert.Equal(1, conversations.CountFor(Owner));
+        });
+        Assert.Equal(0, conversations.CountFor(Other));
+    }
+
+    [Fact]
+    public void FinalizedQuestDiscardsItsPendingConversation()
+    {
+        using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
+        SendState(QuestScenario.ControllerA, true, 0);
+        Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkCaravanAmbushConversation(
+            scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA, caravanId)));
+        Owner.Call(() => QuestOf(Owner).CompleteQuestWithCancel());
+        Owner.Call(() =>
+        {
+            Game.Current.GameStateManager._gameStates.Add(Game.Current.GameStateManager.CreateState<MapState>());
+            CampaignEvents.Instance.Tick(0f);
+        });
+        Assert.Equal(0, conversations.CountFor(Owner));
     }
 
     [Theory]
@@ -361,6 +416,8 @@ public class CaravanAmbushTests : IDisposable
             bandits.SetPartyUsedByQuest(true);
             caravan.Ai.SetDoNotMakeNewDecisions(true);
             bandits.Ai.SetDoNotMakeNewDecisions(true);
+            QuestOf(Server).AddTrackedObject(caravan);
+            QuestOf(Server).AddTrackedObject(bandits);
             caravan.Position = PlayerHero(QuestScenario.ControllerA).PartyBelongedTo.Position;
         }
         PlayerHero(QuestScenario.ControllerA);
