@@ -8,6 +8,7 @@ using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using System.Reflection;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 
 namespace E2E.Tests.Services.Issues;
@@ -28,7 +29,8 @@ internal sealed class QuestScenario
     public EnvironmentInstance ClientA => testEnvironment.Clients.First();
     public EnvironmentInstance ClientB => testEnvironment.Clients.Last();
 
-    public QuestScenario(E2ETestEnvironment testEnvironment)
+    public QuestScenario(E2ETestEnvironment testEnvironment, Func<Hero, IssueBase>? createIssue = null,
+        Action<EnvironmentInstance, Hero>? prepare = null)
     {
         this.testEnvironment = testEnvironment;
 
@@ -39,17 +41,17 @@ internal sealed class QuestScenario
 
         foreach (var instance in new[] { Server, ClientA, ClientB })
         {
-            AddIssue(instance);
+            AddIssue(instance, createIssue, prepare);
         }
     }
 
-    public void Accept(EnvironmentInstance client)
+    public void Accept(EnvironmentInstance client, IEnumerable<MethodBase>? disabledMethods = null)
     {
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Hero>(NotableId, out var notable));
             notable.Issue.StartIssueWithQuest();
-        });
+        }, disabledMethods);
     }
 
     public QuestBase QuestOf(EnvironmentInstance instance)
@@ -101,12 +103,23 @@ internal sealed class QuestScenario
         var heroId = testEnvironment.CreateRegisteredObject<Hero>();
         var partyId = testEnvironment.CreateRegisteredObject<MobileParty>();
 
+        foreach (var instance in new[] { Server, ClientA, ClientB })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                using (new AllowedThread()) hero._partyBelongedTo = party;
+            });
+        }
+
         Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(controllerId, heroId, partyId, "", ""))));
         testEnvironment.ConnectRegisteredPlayer(client, controllerId);
         client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
     }
 
-    private void AddIssue(EnvironmentInstance instance)
+    private void AddIssue(EnvironmentInstance instance, Func<Hero, IssueBase>? createIssue,
+        Action<EnvironmentInstance, Hero>? prepare)
     {
         instance.Call(() =>
         {
@@ -114,7 +127,8 @@ internal sealed class QuestScenario
 
             using (new AllowedThread())
             {
-                var issue = new AllowedIssue(notable, null);
+                prepare?.Invoke(instance, notable);
+                var issue = createIssue == null ? new AllowedIssue(notable, null) : createIssue(notable);
                 issue.StringId = IssueId;
                 issue._issueState = IssueBase.IssueState.Ongoing;
 

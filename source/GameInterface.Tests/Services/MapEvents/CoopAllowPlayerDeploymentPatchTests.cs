@@ -13,6 +13,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class CoopAllowPlayerDeploymentPatchTests
 {
     [Fact]
