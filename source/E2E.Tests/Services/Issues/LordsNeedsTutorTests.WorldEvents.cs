@@ -125,6 +125,70 @@ public sealed partial class LordsNeedsTutorTests
             });
     }
 
+    [Theory]
+    [InlineData(MapEvent.BattleTypes.IsForcingSupplies, true)]
+    [InlineData(MapEvent.BattleTypes.IsForcingVolunteers, true)]
+    [InlineData(MapEvent.BattleTypes.IsForcingSupplies, false)]
+    public void CoercionOfTheGiversVillageFailsOnlyTheActingOwnersQuest(MapEvent.BattleTypes type, bool related)
+    {
+        Accept();
+        var second = AcceptObserversQuest();
+        var villageId = environment.CreateRegisteredObject<Village>();
+        var boundId = environment.CreateRegisteredObject<Settlement>();
+        var townId = environment.CreateRegisteredObject<Town>();
+        var unrelatedClanId = environment.CreateRegisteredObject<Clan>();
+        var power = 0f;
+        var relation = 0f;
+        var otherRelation = 0f;
+        Server.Call(() =>
+        {
+            var giver = Get<Hero>(Server, giverId);
+            var owner = Get<Hero>(Server, heroIds[0]);
+            var observer = Get<Hero>(Server, heroIds[1]);
+            var villageSettlement = Get<Settlement>(Server, settlementId);
+            using (new AllowedThread())
+            {
+                var village = Get<Village>(Server, villageId);
+                var bound = Get<Settlement>(Server, boundId);
+                var town = Get<Town>(Server, townId);
+                bound.SetSettlementComponent(town);
+                town.OwnerClan = related ? giver.Clan : Get<Clan>(Server, unrelatedClanId);
+                villageSettlement.SetSettlementComponent(village);
+                villageSettlement.Village = village;
+                village.Bound = bound;
+                if (!giver.Clan.AliveLords.Contains(giver)) giver.Clan._aliveLordsCache.Add(giver);
+                giver._power = 50f;
+            }
+            power = giver.Power;
+            relation = owner.GetRelation(giver);
+            otherRelation = observer.GetRelation(giver);
+            MapEvent map;
+            using (new AllowedThread())
+            {
+                map = new MapEvent();
+                map._mapEventType = type;
+                map.MapEventSettlement = villageSettlement;
+            }
+            CampaignEventDispatcher.Instance.OnMapEventStarted(map, Get<MobileParty>(Server, partyIds[0]).Party, villageSettlement.Party);
+            Assert.Equal(related ? power - 10 : power, giver.Power);
+            Assert.Equal(related ? relation - 5 : relation, owner.GetRelation(giver));
+            Assert.Equal(otherRelation, observer.GetRelation(giver));
+        });
+        environment.FlushCoalescer();
+        if (related) Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        else Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                var pupil = Get<Hero>(instance, pupilId);
+                Assert.Equal(!related, Get<Hero>(instance, giverId).Issue != null);
+                Assert.Equal(related ? 0 : 1, Get<MobileParty>(instance, partyIds[0]).MemberRoster.GetTroopCount(pupil.CharacterObject));
+                Assert.Equal(0, JewelryCount(Get<MobileParty>(instance, partyIds[0])));
+                if (related) Assert.Null(pupil.CompanionOf);
+                Assert.True(second.QuestOf(Server).IsOngoing);
+            });
+    }
+
     [Fact]
     public void RejoinRequestsAddOnlyTheOwnersPupilOnce()
     {
@@ -161,7 +225,7 @@ public sealed partial class LordsNeedsTutorTests
     {
         Accept();
         AcceptObserversQuest();
-        using var escape = new MethodCallRecorder(AccessTools.Method(typeof(EndCaptivityAction), nameof(EndCaptivityAction.ApplyByEscape)));
+        using var escape = new MethodCallRecorder(AccessTools.Method(typeof(EndCaptivityAction), nameof(EndCaptivityAction.ApplyInternal)));
         Server.Call(() =>
         {
             var party = Get<MobileParty>(Server, partyIds[0]);
@@ -171,6 +235,9 @@ public sealed partial class LordsNeedsTutorTests
                 var side = new MapEventSide(map, BattleSideEnum.Defender, party.Party);
                 side._battleParties.Add(new MapEventParty(party.Party));
                 party.Party._mapEventSide = side;
+                var pupil = Get<Hero>(Server, pupilId);
+                Assert.True(pupil.IsPlayerCompanion);
+                Assert.True(side.Parties.Single().Troops.FindIndexOfCharacter(pupil.CharacterObject).IsValid);
             }
             CampaignEventDispatcher.Instance.OnHeroPrisonerTaken(Get<MobileParty>(Server, partyIds[1]).Party,
                 Get<Hero>(Server, heroIds[ownerCaptured ? 0 : 1]));

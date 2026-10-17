@@ -4,7 +4,7 @@ All live flows below are pending. Run only after the supervisor assigns a live l
 
 Source: installed Native v1.4.8, `TaleWorlds.CampaignSystem.dll` SHA-256 `1F8E33E2ED73E6EC653D7629180AFB70649DDC6E5BD1657A802A264EFDA1C3AE`. Whole-type decompilations inspected: `LordsNeedsTutorIssueBehavior`, `IssueBase`, `QuestBase`, `QuestManager`, `CampaignEventDispatcher`. Member names in this table refer to those types.
 
-The framework owns acceptance races, per-player similar commitments, owner resolution, branch dispatch and completion replay. Tutor adds pupil selection, acceptance side effects, progress and dialogue proofs, world callbacks, pupil restrictions and personal journal updates. The server mirror is never started with `StartQuest`; only the owner has a running quest in the quest manager.
+The framework owns acceptance races, per-player similar commitments, owner resolution, branch dispatch and completion replay. Tutor adds pupil selection, acceptance side effects, progress and dialogue proofs, world callbacks, pupil restrictions and personal journal updates. The server mirror is never started with `StartQuest`; only the owner has a running quest in the quest manager. Quest trait XP follows the framework's explicit current policy: it is skipped rather than applied to the shared server trait store (`Framework/Rewards/QuestTraitXpPatches`). No Tutor-specific trait layer is added.
 
 ## Setup and observations
 
@@ -38,7 +38,7 @@ For every row retain server and both clients' before/after pupil clan, companion
 | `OnClanLeaderChanged` | Pupil becomes a clan leader | Failure journal and cleanup. |
 | `OnHeroesMarried` | Owner marries pupil; unrelated marriage | Owner marriage cancels while preserving marriage clan membership; unrelated marriage does not cancel. |
 | `OnWarDeclared`, `OnClanChangedKingdom` | Owner-caused hostility versus external war; faction changes into/out of war | Native fail/cancel distinction and correct journal/relations for that owner. |
-| `OnMapEventStarted` | Applicable minor/major coercion encounter | Native coercion consequences on owner's quest only, through an actual encounter. |
+| `OnMapEventStarted` | Force supplies and force recruits from a village owned by the giver's clan; repeat in an unrelated village | Related village fails only the acting owner's quest, -5 giver relation and -10 giver power, then pupil cleanup. Unrelated village leaves both quests active. Honor XP follows the framework policy above. |
 | `OnPrisonerTaken` | Owner captured with pupil participating; unrelated player captured | Participating pupil escapes per vanilla; other player's capture does not drive this quest. |
 | `OnNewCompanionAdded`, `OnPerkReset`, `CheckCompanionLimit` | Owner exceeds companion limit; owner's perk reset reduces it; another player's limit changes | Cancel only where the owner's actual companion count exceeds their limit. |
 | `OnSettlementEntered`, `OnGameLoadFinished` | Pupil without a party in Danustica; enter hall and reload/reconnect | Correct hall placement and dialogue on owner, no observer quest dialogue or duplicate location character. |
