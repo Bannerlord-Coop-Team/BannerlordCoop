@@ -98,7 +98,7 @@ public interface IEducationCampaignBehaviorInterface : IGameAbstraction
     /// Server method
     /// Client finalized education, applies the attributes and skills its options granted. Returns false when the stage was no longer pending and nothing was applied
     /// </summary>
-    bool UpdateEducationStage(Hero child, short target, List<CharacterAttribute> attributes, List<SkillObject> skills);
+    bool UpdateEducationStage(Hero child, short target, List<CharacterAttribute> attributes, List<SkillObject> skills, string senderControllerId);
 
     /// <summary>
     /// Server method
@@ -298,14 +298,20 @@ public class EducationCampaignBehaviorInterface : IEducationCampaignBehaviorInte
         CancelPendingNotifications((childKey, controllerId) => childKey.Item1 == victim || controllerId == victimPlayer?.ControllerId);
     }
 
-    public bool UpdateEducationStage(Hero child, short target, List<CharacterAttribute> attributes, List<SkillObject> skills)
+    public bool UpdateEducationStage(Hero child, short target, List<CharacterAttribute> attributes, List<SkillObject> skills, string senderControllerId)
     {
         if (!TryGetEducationBehavior(out var educationBehavior)) return false;
 
         var childKey = (child, EducationCampaignBehavior.ChildStateToAge((EducationCampaignBehavior.ChildAgeState)target));
-        if (!pendingNotifications.ContainsKey(childKey))
+        if (!pendingNotifications.TryGetValue(childKey, out var educatorControllerId) || educatorControllerId != senderControllerId)
         {
-            Logger.Warning($"Education stage for key ({childKey.child.StringId}, {childKey.Item2}) was updated after pending notification was removed. Education changes not applied.");
+            Logger.Warning($"Education stage for key ({childKey.child.StringId}, {childKey.Item2}) was updated by {senderControllerId} without a pending notification for them. Education changes not applied.");
+            return false;
+        }
+
+        if (!IsValidStageReward(educationBehavior.GetStage(child, (EducationCampaignBehavior.ChildAgeState)target), attributes, skills))
+        {
+            Logger.Warning($"Education stage for key ({childKey.child.StringId}, {childKey.Item2}) sent attributes or skills the stage doesn't offer. Education changes not applied.");
             return false;
         }
 
@@ -328,6 +334,20 @@ public class EducationCampaignBehaviorInterface : IEducationCampaignBehaviorInte
     private void RemovePendingNotification((Hero, int) childKey)
     {
         pendingNotifications.Remove(childKey);
+    }
+
+    private static bool IsValidStageReward(EducationCampaignBehavior.EducationStage stage, List<CharacterAttribute> attributes, List<SkillObject> skills)
+    {
+        var options = stage._superPages.SelectMany(pages => pages).SelectMany(page => page.Options).ToList();
+
+        // One option is chosen per page, so the most any page can grant bounds the total
+        int maxAttributes = stage._superPages.Sum(pages => pages.SelectMany(page => page.Options).Select(option => option.Attributes.Length).DefaultIfEmpty(0).Max());
+        int maxSkills = stage._superPages.Sum(pages => pages.SelectMany(page => page.Options).Select(option => option.Skills.Length).DefaultIfEmpty(0).Max());
+
+        return attributes.Count <= maxAttributes
+            && skills.Count <= maxSkills
+            && attributes.All(attribute => options.Any(option => option.Attributes.Contains(attribute)))
+            && skills.All(skill => options.Any(option => option.Skills.Contains(skill)));
     }
 
     public void OnFinalize(Hero child, short target, EducationCampaignBehavior.EducationStage stage, List<string> chosenOptions)

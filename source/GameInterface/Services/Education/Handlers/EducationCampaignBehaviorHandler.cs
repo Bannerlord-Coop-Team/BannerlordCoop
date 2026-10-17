@@ -140,7 +140,7 @@ internal class EducationCampaignBehaviorHandler : IHandler
         var attributeIds = new List<string>();
         foreach (var attribute in data.Attributes)
         {
-            if (objectManager.TryGetIdWithLogging(attribute, out var attributeId)) continue;
+            if (!objectManager.TryGetIdWithLogging(attribute, out var attributeId)) continue;
 
             attributeIds.Add(attributeId);
         }
@@ -148,7 +148,7 @@ internal class EducationCampaignBehaviorHandler : IHandler
         var skillIds = new List<string>();
         foreach (var skill in data.Skills)
         {
-            if (objectManager.TryGetIdWithLogging(skill, out var skillId)) continue;
+            if (!objectManager.TryGetIdWithLogging(skill, out var skillId)) continue;
 
             skillIds.Add(skillId);
         }
@@ -175,14 +175,16 @@ internal class EducationCampaignBehaviorHandler : IHandler
             var skills = new List<SkillObject>();
             foreach (var skillId in data.SkillIds ?? new List<string>())
             {
-                if (objectManager.TryGetObjectWithLogging<SkillObject>(skillId, out var skill)) continue;
+                if (!objectManager.TryGetObjectWithLogging<SkillObject>(skillId, out var skill)) continue;
 
                 skills.Add(skill);
             }
 
-            if (educationInterface.UpdateEducationStage(child, data.Target, attributes, skills)) return;
+            var sender = (NetPeer)obj.Who;
+            if (playerManager.TryGetPlayer(sender, out var senderPlayer)
+                && educationInterface.UpdateEducationStage(child, data.Target, attributes, skills, senderPlayer.ControllerId)) return;
 
-            network.Send((NetPeer)obj.Who, new NetworkEducationStageRejected(data.ChildHandle));
+            network.Send(sender, new NetworkEducationStageRejected(data.ChildHandle));
         });
     }
 
