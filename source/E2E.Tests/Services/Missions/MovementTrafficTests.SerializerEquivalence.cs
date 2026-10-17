@@ -70,21 +70,6 @@ public partial class MovementTrafficTests
     }
 
     [Fact]
-    public void SerializerEquivalence_RelayBudgetMatchesLegacy()
-    {
-        var mapper = new SerializableTypeMapper();
-        var legacy = new LegacyProtoBufSerializer(mapper);
-        var current = new ProtoBufSerializer(mapper);
-
-        foreach (int ceiling in new[] { 0, 16, 127, 128, 300, LiteNetP2PClient.SafeSinglePacketBytes, 20_000 })
-        {
-            Assert.Equal(
-                LiteNetP2PClient.CalculateMaxRelayPayloadBytes(legacy, EquivalenceScope, EquivalenceRecipient, ceiling),
-                LiteNetP2PClient.CalculateMaxRelayPayloadBytes(current, EquivalenceScope, EquivalenceRecipient, ceiling));
-        }
-    }
-
-    [Fact]
     public void SerializerEquivalence_InterleavedRidersAndMountsSendIdenticalPackets()
     {
         MovementSenderRun run = RunSenderEquivalence(

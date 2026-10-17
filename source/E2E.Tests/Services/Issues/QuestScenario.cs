@@ -18,6 +18,8 @@ internal sealed class QuestScenario
     public const string ControllerA = "player-A";
     public const string ControllerB = "player-B";
 
+    public static readonly Type IssueType = typeof(AllowedIssue);
+
     private readonly E2ETestEnvironment testEnvironment;
 
     public string NotableId { get; }

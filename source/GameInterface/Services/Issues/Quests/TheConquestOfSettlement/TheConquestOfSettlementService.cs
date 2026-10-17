@@ -15,13 +15,11 @@ using TaleWorlds.SaveSystem;
 
 namespace GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 
-using Issue = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssue;
 using Quest = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssueQuest;
 
 internal interface ITheConquestOfSettlementService
 {
     bool TryOpenOwnerScope(IssueBase issue, out IDisposable scope);
-    bool HasQuest(Hero hero);
     bool IsVisible(QuestBase quest);
     bool IsVisible(JournalLogEntry entry);
     void RecordLocalQuest(Quest quest);
@@ -64,18 +62,6 @@ internal sealed class TheConquestOfSettlementService : ITheConquestOfSettlementS
 
         scope = new MainHeroSubstitutionScope(hero, party);
         return true;
-    }
-
-    public bool HasQuest(Hero hero)
-    {
-        if (hero == null || Campaign.Current?.IssueManager == null)
-        {
-            return false;
-        }
-
-        return Campaign.Current.IssueManager.Issues.Values
-            .OfType<Issue>()
-            .Any(issue => issue.IsSolvingWithQuest && IsOwnedBy(issue, hero));
     }
 
     public bool IsVisible(QuestBase quest)
