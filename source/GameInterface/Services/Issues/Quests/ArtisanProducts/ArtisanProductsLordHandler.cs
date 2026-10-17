@@ -174,4 +174,3 @@ internal class ArtisanProductsLordHandler : IHandler
         }, context: nameof(ArtisanProductsLordHandler));
     }
 }
-
