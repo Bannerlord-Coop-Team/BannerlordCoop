@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -52,7 +53,7 @@ public class PregnancyCampaignBehaviorInterface : IPregnancyCampaignBehaviorInte
                 if (MBRandom.RandomFloat > pregnancyModel.StillbirthProbability)
                 {
                     bool isOffspringFemale = MBRandom.RandomFloat <= pregnancyModel.DeliveringFemaleOffspringProbability;
-                    Hero bornChild = HeroCreator.DeliverOffSpring(mother, pregnancy.Father, isOffspringFemale);
+                    Hero bornChild = DeliverOffSpring(mother, pregnancy.Father, isOffspringFemale);
                     deliveredOffspring.Add(bornChild);
                 }
                 else
@@ -106,5 +107,62 @@ public class PregnancyCampaignBehaviorInterface : IPregnancyCampaignBehaviorInte
         }
 
         return missionMembershipRegistry?.IsControllerInMission(controlledObject.ObjectControllerId) != false;
+    }
+
+    private Hero DeliverOffSpring(Hero mother, Hero father, bool isOffspringFemale)
+    {
+        RepairMissingParentCharacterData(mother.CharacterObject);
+        RepairMissingParentCharacterData(father.CharacterObject);
+
+        CharacterObject characterTemplateForOffspring = Campaign.Current.Models.HeroCreationModel.GetCharacterTemplateForOffspring(mother, father, isOffspringFemale);
+        var (birthDay, deathDay) = Campaign.Current.Models.HeroCreationModel.GetBirthAndDeathDay(characterTemplateForOffspring, true, 0);
+        Hero hero = HeroCreator.CreateHero(characterTemplateForOffspring, true, birthDay, deathDay);
+        HeroCreator.HeroInitializationArgs heroInitializationArgs = new HeroCreator.HeroInitializationArgs(hero, true)
+            .SetMother(mother)
+            .SetFather(father)
+            .SetIsFemale(isOffspringFemale)
+            .SetOccupation(isOffspringFemale ? mother.Occupation : father.Occupation)
+            .SetLevel(1)
+            .SetGenerateFirstAndFullName(true);
+
+        // Replace Hero.MainHero usage to match closer to vanilla's culture assignment when only one parent is a player
+        if (mother.IsPlayerHero() && !father.IsPlayerHero())
+        {
+            heroInitializationArgs.SetClan(mother.Clan).SetCulture(mother.Culture);
+        }
+        else if (!mother.IsPlayerHero() && father.IsPlayerHero())
+        {
+            heroInitializationArgs.SetClan(father.Clan).SetCulture(father.Culture);
+        }
+        else
+        {
+            // Children with only NPC parents or only player parents choose culture randomly
+            // Married players are always in the same clan so using the father's clan is fine
+            CultureObject culture = (MBRandom.RandomFloat < 0.5f) ? father.Culture : mother.Culture;
+            heroInitializationArgs.SetClan(father.Clan).SetCulture(culture);
+        }
+
+        HeroCreator.InitializeHeroFromSettings(heroInitializationArgs.Hero, heroInitializationArgs);
+        return hero;
+    }
+
+    private static void RepairMissingParentCharacterData(CharacterObject parentCharacter)
+    {
+        if (parentCharacter._culture == null)
+        {
+            parentCharacter.Culture = parentCharacter.HeroObject.Culture;
+        }
+
+        if (parentCharacter.BodyPropertyRange == null)
+        {
+            // Vanilla player characters use the main_hero range
+            var bodyPropertyRange = parentCharacter.OriginalCharacter?.BodyPropertyRange
+                ?? MBObjectManager.Instance.GetObject<CharacterObject>("main_hero")?.BodyPropertyRange;
+            if (bodyPropertyRange != null)
+            {
+                // Repair template's properties for later reads during hero creation
+                parentCharacter.BodyPropertyRange = bodyPropertyRange;
+            }
+        }
     }
 }

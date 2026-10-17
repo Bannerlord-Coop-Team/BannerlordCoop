@@ -45,7 +45,8 @@ public class BattleAuthorityMigratorTests
             Mock.Of<IBattleDeploymentCoordinator>(),
             Mock.Of<IAgentFormationAssigner>(),
             Mock.Of<IMissionContext>(),
-            reinforcementFielder.Object);
+            reinforcementFielder.Object,
+            Mock.Of<IBattleInstanceLifecycle>());
 
         broker.Publish(this, new MissionPeerDisconnected("dropped", mapEventId));
 

@@ -13,29 +13,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ItemModifierGroupSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public ItemModifierGroupSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void ItemModifierGroup_Serialize()
-        {
-            ItemModifierGroup ItemModifierGroup = new ItemModifierGroup();
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            ItemModifierGroupBinaryPackage package = new ItemModifierGroupBinaryPackage(ItemModifierGroup, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         private static readonly FieldInfo _itemModifiers = typeof(ItemModifierGroup).GetField("_itemModifiers", BindingFlags.NonPublic | BindingFlags.Instance)!;

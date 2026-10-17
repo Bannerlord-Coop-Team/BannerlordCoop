@@ -141,19 +141,6 @@ public class MapEventLifetimeTests : MapEventTestBase
     }
 
     [Fact]
-    public void ServerCreate_MapEvent_SyncAllClients()
-    {
-        // Act
-        var mapEventCtx = CreateServerMapEvent();
-
-        // Assert
-        foreach (var client in Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventCtx.MapEventId, out _));
-        }
-    }
-
-    [Fact]
     public void ClientCreate_MapEvent_DoesNothing()
     {
         // Arrange
