@@ -674,6 +674,7 @@ namespace Coop.Tests.Server.Connections.States
                 context.PlayerPartyRestorer,
                 context.ObjectManager,
                 context.ModuleInfoProvider,
+                context.ModuleNameProvider,
                 context.ExistingPlayerSender,
                 context.SteamBanList,
                 context.JoinValidationDenialLog);
