@@ -15,12 +15,14 @@ internal readonly struct NetworkHeadmanNeedsGrainProgress : IServerToClientComma
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
     [ProtoMember(3)] public readonly int Progress;
+    [ProtoMember(4)] public readonly bool EffectsResolved;
 
-    public NetworkHeadmanNeedsGrainProgress(string giverId, string issueId, int progress)
+    public NetworkHeadmanNeedsGrainProgress(string giverId, string issueId, int progress, bool effectsResolved)
     {
         GiverId = giverId;
         IssueId = issueId;
         Progress = progress;
+        EffectsResolved = effectsResolved;
     }
 }
 
@@ -88,10 +90,13 @@ internal class HeadmanNeedsGrainJournalHandler : IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (!ownership.TryGetOwner(data.GiverId, data.IssueId, out var owner) || owner != controller.ControllerId) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver)) return;
             var issue = giver.Issue;
-            if (issue == null || issue.StringId != data.IssueId || !issue.IsSolvingWithAlternative || issue.JournalEntries.Count == 0) return;
+            if (!(issue is TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue) ||
+                issue.StringId != data.IssueId || !issue.IsSolvingWithAlternative) return;
+            issue._areIssueEffectsResolved = data.EffectsResolved;
+            if (!ownership.TryGetOwner(data.GiverId, data.IssueId, out var owner) || owner != controller.ControllerId ||
+                issue.JournalEntries.Count == 0) return;
             issue.JournalEntries[0].UpdateCurrentProgress(data.Progress);
         }, context: nameof(HeadmanNeedsGrainJournalHandler));
     }

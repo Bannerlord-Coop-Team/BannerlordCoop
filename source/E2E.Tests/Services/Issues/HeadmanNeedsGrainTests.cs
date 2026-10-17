@@ -338,12 +338,15 @@ public class HeadmanNeedsGrainTests : IDisposable
     public void ServerInventoryUpdates_RefreshTheOwnersJournalAndRemoveTheReadyLogWhenGrainIsLost()
     {
         Accept();
+        ClientA.Call(() => ClientA.Resolve<IIssueOwnershipRegistry>().Remove(scenario.NotableId));
         StageDelivery(true, true);
         ClientA.Call(() =>
         {
             var quest = QuestHere(ClientA);
             Assert.Equal(quest._neededGrainAmount, quest._playerAcceptedQuestLog.CurrentProgress);
             Assert.NotNull(quest._playerHasNeededGrainsLog);
+            Assert.True(ClientA.Resolve<IIssueOwnershipRegistry>().TrySetOwner(
+                scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
         }, Texts);
         Server.Call(() => Get<MobileParty>(Server, scenario.PlayerA.PartyId).ItemRoster.Clear());
         environment.FlushCoalescer();
@@ -535,12 +538,19 @@ public class HeadmanNeedsGrainTests : IDisposable
         var progress = 0;
         Server.Call(() =>
         {
+            IssueHere(Server).AlternativeSolutionIssueEffectClearTime = CampaignTime.Now;
             Campaign.Current.IssueManager.DailyTick();
             progress = IssueHere(Server).JournalEntries[0].CurrentProgress;
             Assert.True(progress > 0);
         }, Texts);
         ClientA.Call(() => Assert.Equal(progress, ownerIssue.JournalEntries[0].CurrentProgress));
         ClientB.Call(() => Assert.Empty(IssueHere(ClientB).JournalEntries));
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                Assert.Equal(0f, IssueHere(instance).GetActiveIssueEffectAmount(DefaultIssueEffects.SettlementProsperity));
+                Assert.Equal(0f, IssueHere(instance).GetActiveIssueEffectAmount(DefaultIssueEffects.SettlementLoyalty));
+            });
 
         Server.Call(() =>
         {

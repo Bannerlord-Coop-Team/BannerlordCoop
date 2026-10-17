@@ -24,7 +24,8 @@ internal class HeadmanNeedsGrainJournalPatches
         {
             if (issue.IsSolvingWithAlternative && issue.JournalEntries.Count > 0 &&
                 objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId))
-                network.SendAll(new NetworkHeadmanNeedsGrainProgress(giverId, issue.StringId, issue.JournalEntries[0].CurrentProgress));
+                network.SendAll(new NetworkHeadmanNeedsGrainProgress(giverId, issue.StringId,
+                    issue.JournalEntries[0].CurrentProgress, issue._areIssueEffectsResolved));
         }
     }
 
