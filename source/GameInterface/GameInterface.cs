@@ -90,8 +90,6 @@ public class GameInterface : IGameInterface
     {
         patchInstaller.Install(harmony);
 
-        Services.Issues.Generic.QuestTypeBootstrap.EnsureAllMigratedTypesRegistered();
-
         foreach (HarmonyPatchCategoryRegistration patchCategory in patchCategories)
         {
             patchCategory.Apply(harmony);

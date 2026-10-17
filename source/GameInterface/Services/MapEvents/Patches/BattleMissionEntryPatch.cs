@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages;
@@ -8,7 +8,6 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -28,7 +27,7 @@ namespace GameInterface.Services.MapEvents.Patches;
 // CampaignMission.OpenBattleMission has two overloads — pin the MissionInitializerRecord one (the field-
 // battle path BattleHandler.OpenAttackMission uses). Without the explicit signature AccessTools.Method is
 // ambiguous and PatchAll throws, which aborts ALL GameInterface patching.
-[HarmonyPatch]
+[HarmonyPatch(typeof(CampaignMission), nameof(CampaignMission.OpenBattleMission), new[] { typeof(MissionInitializerRecord) })]
 internal class BattleMissionEntryPatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<BattleMissionEntryPatch>();
@@ -36,14 +35,6 @@ internal class BattleMissionEntryPatch
     // OpenBattleMission can be reached more than once around a single encounter; attach the P2P behaviors
     // exactly once per mission. ConditionalWeakTable lets the mission be GC'd freely.
     private static readonly ConditionalWeakTable<Mission, object> AttachedMissions = new();
-
-    [HarmonyTargetMethods]
-    private static IEnumerable<MethodBase> TargetMethods()
-    {
-        yield return AccessTools.Method(typeof(CampaignMission), nameof(CampaignMission.OpenBattleMission),
-            new[] { typeof(MissionInitializerRecord) });
-        yield return AccessTools.Method(typeof(CampaignMission), nameof(CampaignMission.OpenBattleMissionWhileEnteringSettlement));
-    }
 
     // Engage the spawn gate BEFORE OpenBattleMission builds the mission, because the deployment controller
     // spawns the initial wave during mission setup (inside OpenBattleMission) — earlier than the postfix.

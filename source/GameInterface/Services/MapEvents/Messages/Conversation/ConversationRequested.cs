@@ -14,15 +14,13 @@ internal readonly struct ConversationRequested : IEvent
     public readonly bool ForcePlayerOutFromSettlement;
     public readonly ConversationRestartSource Source;
     public readonly bool ArmyTalkEncounter;
-    public readonly string RequestId;
 
-    public ConversationRequested(PartyBase defenderParty, PartyBase attackerParty, bool forcePlayerOutFromSettlement, ConversationRestartSource source, bool armyTalkEncounter, string requestId = null)
+    public ConversationRequested(PartyBase defenderParty, PartyBase attackerParty, bool forcePlayerOutFromSettlement, ConversationRestartSource source, bool armyTalkEncounter)
     {
         DefenderParty = defenderParty;
         AttackerParty = attackerParty;
         ForcePlayerOutFromSettlement = forcePlayerOutFromSettlement;
         Source = source;
         ArmyTalkEncounter = armyTalkEncounter;
-        RequestId = requestId;
     }
 }

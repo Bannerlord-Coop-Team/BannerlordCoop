@@ -103,7 +103,6 @@ internal class MapEventResultsHandler : IHandler
                     playerMapEventPartyId,
                     networkPlayerLootData));
             }
-            messageBroker.Publish(mapEvent, new MapEventResultsCommitted(mapEvent));
         });
     }
 

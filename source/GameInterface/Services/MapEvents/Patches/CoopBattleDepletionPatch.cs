@@ -1,8 +1,5 @@
-﻿using System.Runtime.CompilerServices;
-using System.Collections.Generic;
-using System.Reflection;
+using System.Runtime.CompilerServices;
 using HarmonyLib;
-using SandBox.Missions.MissionLogics;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -23,22 +20,15 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// </para>
 /// Only active in a coop battle; ordinary battles keep the native count-based check.
 /// </summary>
-[HarmonyPatch]
+[HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), nameof(DefaultBattleMissionAgentSpawnLogic.IsSideDepleted))]
 internal class CoopBattleDepletionPatch
 {
     // Per spawn-logic (i.e. per mission): whether each side has ever had a live agent, so a side that simply
     // hasn't spawned/arrived yet isn't treated as depleted at the start.
-    private static readonly ConditionalWeakTable<object, bool[]> SideHadAgents = new();
-
-    [HarmonyTargetMethods]
-    private static IEnumerable<MethodBase> TargetMethods()
-    {
-        yield return AccessTools.Method(typeof(DefaultBattleMissionAgentSpawnLogic), nameof(DefaultBattleMissionAgentSpawnLogic.IsSideDepleted));
-        yield return AccessTools.Method(typeof(WhileEnteringSettlementBattleMissionController), nameof(WhileEnteringSettlementBattleMissionController.IsSideDepleted));
-    }
+    private static readonly ConditionalWeakTable<DefaultBattleMissionAgentSpawnLogic, bool[]> SideHadAgents = new();
 
     [HarmonyPrefix]
-    private static bool Prefix(object __instance, BattleSideEnum side, ref bool __result)
+    private static bool Prefix(DefaultBattleMissionAgentSpawnLogic __instance, BattleSideEnum side, ref bool __result)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
         if (side != BattleSideEnum.Attacker && side != BattleSideEnum.Defender) return true;
