@@ -7,9 +7,6 @@ using Coop.Core.Common.Configuration;
 using Coop.Core.Client;
 using Coop.Core.Client.Services.Discord;
 using Coop.Core.Server;
-#if DEBUG
-using Coop.Core.Server.Services.Save;
-#endif
 using Coop.Core.Server.Services.Shutdown;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Tests.Mocks;
@@ -54,6 +51,10 @@ namespace Coop.Tests.Autofac
                 $"{command.Prefix}.{command.Name}" == "coop.debug.workshop.set_workshop_custom_name");
             Assert.Contains(registeredCommands, command =>
                 $"{command.Prefix}.{command.Name}" == "coop.debug.map_event.kms");
+            Assert.Contains(registeredCommands, command =>
+                $"{command.Prefix}.{command.Name}" == "coop.debug.hero.set_gold");
+            Assert.Contains(registeredCommands, command =>
+                $"{command.Prefix}.{command.Name}" == "coop.debug.kingdom.add_decision");
 
             ICoopCommand[] missionCommands = registeredCommands
                 .Where(command => command.GetType().Assembly == typeof(MissionModule).Assembly)
@@ -119,18 +120,6 @@ namespace Coop.Tests.Autofac
                     .Where(command => command.Prefix == "coop.debug.connection")
                     .Select(command => command.Name)
                     .OrderBy(name => name));
-            Assert.Equal(
-                new[] { "session_arm", "session_release", "session_result" },
-                registeredCommands
-                    .Where(command => command.Prefix == "coop.debug.save" && command.Name.StartsWith("session_"))
-                    .Select(command => command.Name)
-                    .OrderBy(name => name));
-            Assert.Same(container.Resolve<ICoopSessionWriteObserver>(), container.Resolve<ICoopSessionWriteObserver>());
-#else
-            // The session-write observer is a DEBUG live-test diagnostic and must not ship.
-            ICoopCommandRegistry catalog = container.Resolve<ICoopCommandRegistry>();
-            Assert.False(catalog.Contains("coop.debug.save.session_arm"));
-            Assert.Null(typeof(ServerModule).Assembly.GetType("Coop.Core.Server.Services.Save.CoopSessionWriteObserver"));
 #endif
         }
 

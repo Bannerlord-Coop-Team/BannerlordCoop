@@ -16,20 +16,16 @@ namespace E2E.Tests.Services.Workshops
         }
 
         [Fact]
-        public void Server_Workshop_Properties()
+        public void Server_Workshop_FieldsAndProperties()
         {
+            TestEnvironment.AssertReferenceField<Workshop, Hero>(nameof(Workshop._owner));
+
             TestEnvironment.AssertProperty<Workshop, int>(nameof(Workshop.Capital), 5);
             TestEnvironment.AssertProperty<Workshop, int>(nameof(Workshop.InitialCapital), 5);
             TestEnvironment.AssertProperty<Workshop, CampaignTime>(nameof(Workshop.LastRunCampaignTime), new CampaignTime(500));
 
             //CustomName? TextObject
             //TestEnvironment.AssertReferenceProperty<Workshop, WorkshopType>(nameof(Workshop.WorkshopType));
-        }
-
-        [Fact]
-        public void Server_Workshop_Fields()
-        {
-            TestEnvironment.AssertReferenceField<Workshop, Hero>(nameof(Workshop._owner));
         }        
     }
 }

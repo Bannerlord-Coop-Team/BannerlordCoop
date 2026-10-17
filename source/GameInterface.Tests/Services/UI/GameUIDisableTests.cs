@@ -10,25 +10,6 @@ namespace GameInterface.Tests.Services.UI;
 [Collection(ModInformationRoleCollection.Name)]
 public class GameUIDisableTests
 {
-    [Theory]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    public void QuestsState_IsAllowedOnClientOnly(bool isServer, bool expected)
-    {
-        var questsState = ObjectHelper.SkipConstructor<QuestsState>();
-        bool originalIsServer = ModInformation.IsServer;
-
-        try
-        {
-            ModInformation.IsServer = isServer;
-            Assert.Equal(expected, GameUIDisable.PushStatePatch(questsState));
-        }
-        finally
-        {
-            ModInformation.IsServer = originalIsServer;
-        }
-    }
-
     [Fact]
     public void KingdomState_IsAllowedOnClientOnly()
     {
@@ -42,6 +23,26 @@ public class GameUIDisableTests
 
             ModInformation.IsServer = true;
             Assert.False(GameUIDisable.PushStatePatch(kingdomState));
+        }
+        finally
+        {
+            ModInformation.IsServer = originalIsServer;
+        }
+    }
+
+    [Fact]
+    public void QuestsState_IsAllowedOnClientOnly()
+    {
+        var questsState = ObjectHelper.SkipConstructor<QuestsState>();
+        bool originalIsServer = ModInformation.IsServer;
+
+        try
+        {
+            ModInformation.IsServer = false;
+            Assert.True(GameUIDisable.PushStatePatch(questsState));
+
+            ModInformation.IsServer = true;
+            Assert.False(GameUIDisable.PushStatePatch(questsState));
         }
         finally
         {

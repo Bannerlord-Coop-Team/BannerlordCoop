@@ -74,16 +74,12 @@ internal class RaidProductionRewardsHandler : IHandler
             }
         }
 
-        var settlement = component.MapEvent?.MapEventSettlement;
         network.SendAll(new NetworkRaidProductionRewardsUpdated(
             componentId,
             itemIds.ToArray(),
             values.ToArray(),
             component.MapEvent?.WasEverInLootingPhase == true,
-            component.RaidDamage,
-            settlement != null,
-            settlement?.SettlementHitPoints ?? 0f,
-            settlement?.Village?.Hearth ?? 0f));
+            component.RaidDamage));
     }
 
     private void Handle_RaidLootedItemsUpdated(MessagePayload<RaidLootedItemsUpdated> payload)
@@ -160,13 +156,6 @@ internal class RaidProductionRewardsHandler : IHandler
             {
                 component._raidProductionRewards = rewards;
                 component.RaidDamage = data.RaidDamage;
-                if (data.HasSettlementState && component.MapEvent?.MapEventSettlement != null)
-                {
-                    var settlement = component.MapEvent.MapEventSettlement;
-                    settlement.SettlementHitPoints = data.SettlementHitPoints;
-                    if (settlement.Village != null)
-                        settlement.Village.Hearth = data.VillageHearth;
-                }
                 if (data.WasEverInLootingPhase && component.MapEvent != null)
                     component.MapEvent.WasEverInLootingPhase = true;
             }

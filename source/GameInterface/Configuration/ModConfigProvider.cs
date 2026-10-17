@@ -72,6 +72,8 @@ public readonly struct ModOptions
 
     [ProtoMember(25)]
     public readonly bool BlockAiWarDeclarationsOnOfflinePlayers { get; } = false;
+    [ProtoMember(26)]
+    public readonly int SpawnRateWanderers { get; } = 1;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -93,6 +95,7 @@ public readonly struct ModOptions
         SpeedLimitWhilePlayersInBattle = modOptionsData.SpeedLimitWhilePlayersInBattle ?? SpeedLimitWhilePlayersInBattle;
         EnsureUnaffiliatedWanderers = modOptionsData.EnsureUnaffiliatedWanderers ?? EnsureUnaffiliatedWanderers;
         WandererLimit = modOptionsData.WandererLimit ?? WandererLimit;
+        SpawnRateWanderers = modOptionsData.SpawnRateWanderers ?? SpawnRateWanderers;
         WandererLimitScalesWithPlayers = modOptionsData.WandererLimitScalesWithPlayers ?? WandererLimitScalesWithPlayers;
         PlayerKingdomClanTierRequired = modOptionsData.PlayerKingdomClanTierRequired ?? PlayerKingdomClanTierRequired;
         CoopClansEnabled = modOptionsData.CoopClansEnabled ?? CoopClansEnabled;

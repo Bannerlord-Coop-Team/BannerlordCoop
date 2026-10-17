@@ -14,7 +14,9 @@ public static class SessionDiscovery
     {
         public static readonly UnavailableSteamLobbyBrowser Instance = new UnavailableSteamLobbyBrowser();
 
-        public void RequestLobbies(System.Action<System.Collections.Generic.IReadOnlyList<SteamLobbySummary>, string> onCompleted)
+        public void RequestLobbies(
+            System.Action<System.Collections.Generic.IReadOnlyList<SteamLobbySummary>, string> onCompleted,
+            System.Action<System.Collections.Generic.IReadOnlyList<SteamLobbySummary>> onProgress = null)
         {
             onCompleted(System.Array.Empty<SteamLobbySummary>(), "Steam is unavailable");
         }

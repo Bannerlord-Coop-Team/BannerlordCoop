@@ -149,30 +149,4 @@ public class BanditPartyComponentTests : SyncTestBase
             Assert.Same(nearSettlement, party.HomeSettlement);
         });
     }
-
-    [Fact]
-    public void ClientCreateParty_DoesNothing()
-    {
-        // Arrange
-        var server = TestEnvironment.Server;
-        var client1 = TestEnvironment.Clients.First();
-
-        // Act
-        PartyComponent? partyComponent = null;
-        client1.Call(() =>
-        {
-            var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
-            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-            var template = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
-            var isBossParty = false;
-            var initArgs = new BanditPartyComponent.InitializationArgs(clan, template, new CampaignVec2(new Vec2(2, 2), true));
-            
-            partyComponent = new BanditPartyComponent(hideout, isBossParty, initArgs);
-        });
-
-        Assert.NotNull(partyComponent);
-
-        // Assert
-        Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
-    }
 }

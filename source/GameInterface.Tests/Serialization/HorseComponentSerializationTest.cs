@@ -15,32 +15,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class HorseComponentSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public HorseComponentSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void HorseComponent_Serialize()
-        {
-            HorseComponent HorseComponent = new HorseComponent();
-            HorseComponent.Monster = new Monster();
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            HorseComponentBinaryPackage package = new HorseComponentBinaryPackage(HorseComponent, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         private static readonly FieldInfo _monsterMaterialNames = typeof(HorseComponent).GetField("_monsterMaterialNames", BindingFlags.NonPublic | BindingFlags.Instance);

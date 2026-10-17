@@ -31,6 +31,7 @@ internal static class CoopSessionMigrationRules
         PreserveWithMigration.Add(AccessTools.Property(typeof(InteractionsPlayerData), nameof(InteractionsPlayerData.PlayerKnowTournaments)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(InteractionsPlayerData), nameof(InteractionsPlayerData.PlayerWarningTime)));
         PreserveWithMigration.Add(AccessTools.Property(typeof(InteractionsPlayerData), nameof(InteractionsPlayerData.PlayerHasMetRansomBroker)));
+        PreserveWithMigration.Add(AccessTools.Property(typeof(InteractionsPlayerData), nameof(InteractionsPlayerData.PlayerHasMetHermit)));
 
         PreserveWithMigration.Add(AccessTools.Property(typeof(TradePlayerData), nameof(TradePlayerData.PlayerItemsTradeData)));
 

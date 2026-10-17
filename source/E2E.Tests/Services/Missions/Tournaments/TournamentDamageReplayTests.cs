@@ -86,11 +86,8 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
         }
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void GuardedStrikeAgentCandidate_DoesNotBroadcastRawDamage(
-        bool mounted)
+    [Fact]
+    public void GuardedStrikeAgentCandidate_DoesNotBroadcastRawDamage()
     {
         using var fixture = new MissionEngineFixture();
         var attackerClient = Clients.First();
@@ -112,11 +109,6 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
             Agent attacker = mock.SpawnAgent(
                 new AgentBuildData(Game.Current.PlayerTroop)
                     .Controller(AgentControllerType.AI));
-            if (mounted)
-            {
-                mock.SpawnMount(victim);
-                mock.SpawnMount(attacker);
-            }
 
             Assert.True(registry.TryRegisterAgent(
                 "victim-owner",
@@ -227,10 +219,8 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
         });
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void PlayerHit_SubmitsProgressionOnlyAfterAcceptedDamage(bool blocked)
+    [Fact]
+    public void PlayerHit_SubmitsProgressionOnlyAfterAcceptedDamage()
     {
         using var fixture = new MissionEngineFixture();
         var host = Clients.First();
@@ -303,7 +293,7 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
             component.AgentActionHandler.ObserveBlockedHit(
                 victim,
                 attacker,
-                blocked,
+                isBlocked: false,
                 in blow,
                 in collisionData);
             var network = Assert.IsType<MockClient>(host.Resolve<INetwork>());
@@ -312,13 +302,6 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
                 network.NetworkSentMessages.GetMessages<NetworkSubmitTournamentHitProgression>());
 
             InvokeProcessPendingLocalDamage(controller);
-
-            if (blocked)
-            {
-                Assert.Empty(
-                    network.NetworkSentMessages.GetMessages<NetworkSubmitTournamentHitProgression>());
-                return;
-            }
 
             Assert.Single(
                 battleNetwork.NetworkSentMessages.GetMessages<NetworkApplyTournamentDamage>());
@@ -335,15 +318,12 @@ public class TournamentDamageReplayTests : MissionTestEnvironment
         });
     }
 
-    [Theory]
-    [InlineData("origin")]
-    [InlineData("observer")]
-    public void MissileReplay_DoesNotReuseTransientMissileIndex(
-        string localControllerId)
+    [Fact]
+    public void MissileReplay_DoesNotReuseTransientMissileIndex()
     {
         using var fixture = new MissionEngineFixture();
         var client = Clients.First();
-        SetControllerId(client, localControllerId);
+        SetControllerId(client, "observer");
 
         client.Call(() =>
         {

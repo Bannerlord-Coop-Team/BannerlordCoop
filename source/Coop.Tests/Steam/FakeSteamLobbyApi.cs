@@ -44,6 +44,7 @@ namespace Coop.Tests.Steam
         public Action PendingCreateCompletion;
         public Action PendingJoinCompletion;
         public Action PendingListCompletion;
+        public Action<IReadOnlyList<ulong>> ListPageCallback;
 
         public bool IsOverlayEnabled => OverlayEnabled;
         public string LocalPersonaName => PersonaName;
@@ -96,10 +97,11 @@ namespace Coop.Tests.Steam
             completion?.Invoke();
         }
 
-        public void RequestLobbyList(Action<IReadOnlyList<ulong>, bool> onCompleted)
+        public void RequestLobbyList(Action<IReadOnlyList<ulong>, bool> onCompleted, Action<IReadOnlyList<ulong>> onPage = null)
         {
             if (ThrowOnListRequest) throw new InvalidOperationException("scripted lobby-list failure");
 
+            ListPageCallback = onPage;
             PendingListCompletion = () => onCompleted(ListedLobbyIds, ListSucceeds);
 
             if (CompleteOperationsImmediately) CompletePendingList();

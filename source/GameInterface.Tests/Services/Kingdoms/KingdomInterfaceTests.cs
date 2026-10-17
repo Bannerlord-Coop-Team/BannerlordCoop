@@ -82,6 +82,26 @@ public class KingdomInterfaceTests : IDisposable
         offlineWarProtection.Verify(protection => protection.ShouldRefuse(It.IsAny<CampaignKingdomDecision>(), out ignored), Times.Never);
     }
 
+    [Fact]
+    public void RemoveDecisionPrefix_ClientAllowedScope_LeavesTheRemovalToTheServer()
+    {
+        ModInformation.IsServer = false;
+        UseSyncPolicy(allowOriginal: true);
+        var kingdom = ObjectHelper.SkipConstructor<Kingdom>();
+        var claimant = ObjectHelper.SkipConstructor<SettlementClaimantDecision>();
+        var peace = ObjectHelper.SkipConstructor<MakePeaceKingdomDecision>();
+        kingdom._unresolvedDecisions = new MBList<CampaignKingdomDecision> { claimant, peace };
+
+        using (new AllowedThread())
+        {
+            Assert.False(kingdomInterface.RemoveDecisionPrefix(kingdom, claimant));
+        }
+
+        // The server's remove of index 0 still lands on the claimant instead of the peace decision after it.
+        kingdomInterface.RemoveDecision(kingdom, kingdom._unresolvedDecisions[0]);
+        Assert.Same(peace, Assert.Single(kingdom._unresolvedDecisions));
+    }
+
     private void UseSyncPolicy(bool allowOriginal)
     {
         var builder = new ContainerBuilder();
