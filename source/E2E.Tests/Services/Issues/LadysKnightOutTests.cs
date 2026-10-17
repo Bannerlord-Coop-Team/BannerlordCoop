@@ -32,6 +32,7 @@ public class LadysKnightOutTests : IDisposable
 {
     private readonly E2ETestEnvironment environment;
     private readonly QuestScenario scenario;
+    private readonly string secondGiverId;
     private readonly List<(EnvironmentInstance Instance, HeroCreationModel Model)> models = new();
     private IEnumerable<EnvironmentInstance> Instances => environment.Clients.Prepend(environment.Server);
 
@@ -39,6 +40,7 @@ public class LadysKnightOutTests : IDisposable
     {
         environment = new E2ETestEnvironment(output);
         scenario = new QuestScenario(environment);
+        secondGiverId = environment.CreateRegisteredObject<Hero>();
         var settlementId = environment.CreateRegisteredObject<Settlement>();
         var townId = environment.CreateRegisteredObject<Town>();
         foreach (var instance in Instances)
@@ -107,7 +109,7 @@ public class LadysKnightOutTests : IDisposable
     [Fact]
     public void ServerCreatesTheRealOfferWithTheSameIdentityOnBothClients()
     {
-        var giverId = environment.CreateRegisteredObject<Hero>();
+        var giverId = secondGiverId;
         foreach (var instance in Instances)
             instance.Call(() =>
             {
@@ -209,7 +211,6 @@ public class LadysKnightOutTests : IDisposable
     public void FrameworkAllowsSeparatePlayersButRefusesASecondQuestForTheSamePlayer(bool samePlayer)
     {
         Accept(scenario.ClientA);
-        var secondGiverId = environment.CreateRegisteredObject<Hero>();
         foreach (var instance in Instances)
         {
             instance.Call(() =>
