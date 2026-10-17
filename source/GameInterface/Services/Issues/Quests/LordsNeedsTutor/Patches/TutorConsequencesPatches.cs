@@ -131,8 +131,9 @@ internal class TutorDialogueBranchPatches
         if (ModInformation.IsServer) return true;
         var branch = __originalMethod.Name == nameof(Quest.FirstConversationEndConsequence)
             ? LordsNeedsTutorBranch.Introduction : LordsNeedsTutorBranch.Rejoin;
-        return ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dialogueDispatcher) &&
-            dialogueDispatcher.BeforeQuestBranch(__instance, (byte)branch);
+        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dialogueDispatcher)) return false;
+        if (branch == LordsNeedsTutorBranch.Introduction) __instance._firstConversationInitialized = true;
+        return dialogueDispatcher.BeforeQuestBranch(__instance, (byte)branch);
     }
 }
 

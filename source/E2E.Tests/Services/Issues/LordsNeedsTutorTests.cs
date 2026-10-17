@@ -3,6 +3,8 @@ using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
+using HarmonyLib;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
@@ -244,8 +246,8 @@ public sealed partial class LordsNeedsTutorTests : IDisposable
                 Assert.Null(pupil.CompanionOf);
                 foreach (var skill in Skills.All) Assert.Equal(originalFocus[skill.StringId], pupil.HeroDeveloper.GetFocus(skill));
                 Assert.Equal(0, Get<MobileParty>(instance, partyIds[0]).MemberRoster.GetTroopCount(pupil.CharacterObject));
-                Assert.Equal(0, Get<MobileParty>(instance, partyIds[1]).ItemRoster.GetItemNumber(Get<ItemObject>(instance, jewelryId)));
-                var jewels = Get<MobileParty>(instance, partyIds[0]).ItemRoster.GetItemNumber(Get<ItemObject>(instance, jewelryId));
+                Assert.Equal(0, JewelryCount(Get<MobileParty>(instance, partyIds[1])));
+                var jewels = JewelryCount(Get<MobileParty>(instance, partyIds[0]));
                 Assert.Equal(ending == "success" ? expectedGift : 0, jewels);
                 var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog((JournalLogEntry entry) => entry.RelatedHero == Get<Hero>(instance, giverId));
                 if (instance == Observer) Assert.Null(archive);
@@ -364,6 +366,24 @@ public sealed partial class LordsNeedsTutorTests : IDisposable
             Assert.Equal(0, quest._startQuestLog.CurrentProgress);
             Assert.False(quest._questCompletedStartConversation);
         });
+    }
+
+    private static int JewelryCount(MobileParty party) => party.ItemRoster
+        .Where(entry => entry.EquipmentElement.Item?.ItemCategory == DefaultItemCategories.Jewelry).Sum(entry => entry.Amount);
+
+    [Fact]
+    public void IntroductionStopsBeingOfferedWhileItsServerConfirmationIsPending()
+    {
+        Accept();
+        using var confirmation = new MethodCallRecorder(AccessTools.Method(typeof(TutorJournal), nameof(TutorJournal.Send)));
+        Owner.Call(() =>
+        {
+            var quest = (Quest)scenario.QuestOf(Owner);
+            Assert.False(quest._firstConversationInitialized);
+            quest.FirstConversationEndConsequence();
+            Assert.True(quest._firstConversationInitialized);
+        });
+        Server.Call(() => Assert.True(((Quest)scenario.QuestOf(Server))._firstConversationInitialized));
     }
 
     [Fact]
