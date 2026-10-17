@@ -5,6 +5,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using Helpers;
 using System.Reflection;
@@ -171,5 +172,98 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.True(quest.IsOngoing);
         });
         Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+    }
+
+    [Theory]
+    [InlineData(nameof(Quest.CreateDeserterParty))]
+    [InlineData(nameof(Quest.CreateDefenderParty))]
+    [InlineData(nameof(Quest.DestroyDeserterParty))]
+    [InlineData(nameof(Quest.DestroyDefenderParty))]
+    [InlineData(nameof(Quest.ReleaseDeserterParty))]
+    [InlineData(nameof(Quest.HourlyTick))]
+    [InlineData(nameof(Quest.GameMenuOptionSelected))]
+    [InlineData(nameof(Quest.OnWarDeclared))]
+    [InlineData(nameof(Quest.OnClanChangedKingdom))]
+    [InlineData(nameof(Quest.OnMapEventStarted))]
+    [InlineData(nameof(Quest.OnSettlementLeft))]
+    public void WorldMethod_IsBlockedEvenDuringOwnerReplay(string methodName)
+    {
+        var quest = Accept();
+        var method = AccessTools.Method(typeof(Quest), methodName);
+        // The constructor recorder already covers deserter creation.
+        if (methodName == nameof(Quest.CreateDeserterParty))
+        {
+            creation.Clear();
+            Owner.Call(() => { using (new AllowedThread()) quest.CreateDeserterParty(); });
+            Assert.Equal(0, creation.CountFor(Owner));
+            return;
+        }
+
+        using var recorder = new MethodCallRecorder(Priority.Last, method);
+        var arguments = method.GetParameters().Select(parameter => parameter.ParameterType.IsValueType
+            ? Activator.CreateInstance(parameter.ParameterType) : null).ToArray();
+        Owner.Call(() => { using (new AllowedThread()) method.Invoke(quest, arguments); });
+        Assert.Equal(0, recorder.CountFor(Owner));
+    }
+
+    [Fact]
+    public void SeparatePlayers_CanHoldSeparateDeserterQuests()
+    {
+        Accept();
+        var secondId = AddSecondIssue();
+        Other.Call(() =>
+        {
+            Assert.True(Other.ObjectManager.TryGetObject<Hero>(secondId, out var notable));
+            notable.Issue.StartIssueWithQuest();
+            notable.Issue.IssueQuest.StartQuest();
+        }, TextLinks);
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(secondId, "second_deserters", out var owner));
+            Assert.Equal(QuestScenario.ControllerB, owner);
+        });
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+        Owner.Call(() =>
+        {
+            Assert.True(Owner.ObjectManager.TryGetObject<Hero>(secondId, out var notable));
+            Assert.Null(notable.Issue.IssueQuest);
+        });
+    }
+
+    [Fact]
+    public void SamePlayer_CannotTakeAnotherDeserterQuest()
+    {
+        Accept();
+        var secondId = AddSecondIssue();
+        Owner.Call(() =>
+        {
+            Assert.True(Owner.ObjectManager.TryGetObject<Hero>(secondId, out var notable));
+            notable.Issue.StartIssueWithQuest();
+        }, TextLinks);
+        Server.Call(() =>
+        {
+            Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(secondId, "second_deserters", out _));
+        });
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+    }
+
+    private string AddSecondIssue()
+    {
+        var secondId = environment.CreateRegisteredObject<Hero>();
+        foreach (var instance in new[] { Server, Owner, Other })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(secondId, out var notable));
+                using (new AllowedThread())
+                {
+                    Prepare(instance, notable);
+                    var issue = new Issue(notable) { StringId = "second_deserters" };
+                    Campaign.Current.IssueManager._issues.Add(notable, issue);
+                    notable.OnIssueCreatedForHero(issue);
+                }
+            });
+        }
+        return secondId;
     }
 }

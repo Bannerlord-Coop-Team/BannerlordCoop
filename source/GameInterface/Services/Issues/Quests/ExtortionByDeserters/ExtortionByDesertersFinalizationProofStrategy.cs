@@ -34,6 +34,11 @@ internal class ExtortionByDesertersFinalizationProofStrategy : IFinalizationProo
                 deserterQuest._defenderMobileParty != null) return false;
 
             deserterQuest.CreateDefenderParty();
+            deserterQuest._defenderMobileParty.MapEventSide = raid.DefenderSide;
+            TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.MapEventSide = raid.DefenderSide;
+            party.IgnoreByOtherPartiesTill(CampaignTime.Now - CampaignTime.Hours(1f));
+            if (deserterQuest.QuestSettlement.MilitiaPartyComponent != null)
+                deserterQuest.QuestSettlement.MilitiaPartyComponent.MobileParty.MapEventSide = null;
             if (ContainerProvider.TryResolve<ExtortionByDesertersSync>(out var sync)) sync.Send(deserterQuest, ambush: true);
             return true;
         }

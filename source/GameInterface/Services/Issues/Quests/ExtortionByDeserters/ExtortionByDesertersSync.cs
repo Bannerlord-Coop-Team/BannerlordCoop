@@ -74,8 +74,8 @@ internal class ExtortionByDesertersSync : IHandler
 
             MobileParty deserters = null;
             MobileParty defenders = null;
-            if (data.DeserterId.Length != 0 && !objects.TryGetObjectWithLogging(data.DeserterId, out deserters)) return;
-            if (data.DefenderId.Length != 0 && !objects.TryGetObjectWithLogging(data.DefenderId, out defenders)) return;
+            if (!string.IsNullOrEmpty(data.DeserterId) && !objects.TryGetObjectWithLogging(data.DeserterId, out deserters)) return;
+            if (!string.IsNullOrEmpty(data.DefenderId) && !objects.TryGetObjectWithLogging(data.DefenderId, out defenders)) return;
 
             if (deserters != null && quest._deserterMobileParty != deserters)
             {
@@ -85,7 +85,7 @@ internal class ExtortionByDesertersSync : IHandler
             quest._deserterMobileParty = deserters;
             quest._defenderMobileParty = defenders;
             quest._currentState = (State)data.State;
-            if (data.Log.Length != 0) quest.AddLog(new TextObject(data.Log));
+            if (!string.IsNullOrEmpty(data.Log)) quest.AddLog(new TextObject(data.Log));
             if (data.Ambush && deserters != null && defenders != null && quest.IsOngoing)
             {
                 quest.StartAmbushEncounter();

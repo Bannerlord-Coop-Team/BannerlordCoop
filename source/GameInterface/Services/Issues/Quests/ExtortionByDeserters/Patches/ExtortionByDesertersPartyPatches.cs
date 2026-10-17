@@ -1,11 +1,16 @@
 ﻿using Common;
 using HarmonyLib;
+using Common.Util;
+using Helpers;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Conversation;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
@@ -24,8 +29,25 @@ internal class ExtortionByDesertersPartyPatches
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.StartAmbushEncounter))]
     [HarmonyPrefix]
-    private static bool StartAmbushEncounterPrefix(Quest __instance) =>
-        ModInformation.IsClient && __instance._deserterMobileParty != null && __instance._defenderMobileParty != null;
+    private static bool StartAmbushEncounterPrefix(Quest __instance)
+    {
+        if (ModInformation.IsServer || __instance._deserterMobileParty == null ||
+            __instance._defenderMobileParty == null || MobileParty.MainParty.MapEvent == null) return false;
+
+        // Adopt the server's raid; vanilla's full ambush method would add client-created battle parties.
+        using (new AllowedThread())
+        {
+            if (PlayerEncounter.Current != null) PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
+            PlayerEncounter.Start();
+            PlayerEncounter.Init();
+            var leader = ConversationHelper.GetConversationCharacterPartyLeader(__instance._deserterMobileParty.Party);
+            var player = new ConversationCharacterData(CharacterObject.PlayerCharacter, PartyBase.MainParty, noHorse: true);
+            var deserter = new ConversationCharacterData(leader, __instance._deserterMobileParty.Party, noHorse: true);
+            GameMenu.ActivateGameMenu("encounter_meeting");
+            CampaignMapConversation.OpenConversation(player, deserter);
+        }
+        return false;
+    }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnBattleStarted))]
     [HarmonyPrefix]

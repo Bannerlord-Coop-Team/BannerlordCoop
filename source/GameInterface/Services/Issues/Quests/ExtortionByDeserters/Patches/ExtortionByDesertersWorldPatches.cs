@@ -122,7 +122,13 @@ internal class ExtortionByDesertersWorldPatches
             __instance.CompleteQuestWithCancel();
             return false;
         }
-        if (deserters.MapEvent != null) return false;
+        if (deserters.MapEvent != null)
+        {
+            // The server's unstarted quest cannot depend on a client BattleStarted listener.
+            if (ContainerProvider.TryResolve<ExtortionByDesertersFinalizationProofStrategy>(out var proof))
+                proof.TryRunBranch(__instance, (byte)ExtortionByDesertersBranch.Ambush);
+            return false;
+        }
 
         switch (__instance._currentState)
         {
