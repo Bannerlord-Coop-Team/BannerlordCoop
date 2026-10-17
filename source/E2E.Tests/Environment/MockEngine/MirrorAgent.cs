@@ -15,7 +15,25 @@ public sealed class MirrorAgent
 {
     public int Index { get; set; }
     public AgentControllerType Controller { get; set; }
-    public float Health { get; set; } = 100f;
+    private Agent agent;
+    private float health = 100f;
+
+    // An inlined vanilla getter reads this field instead of the Harmony health prefix.
+    public float Health
+    {
+        get => agent == null ? health : agent._health;
+        set
+        {
+            health = value;
+            if (agent != null) agent._health = value;
+        }
+    }
+
+    internal void BindAgent(Agent value)
+    {
+        agent = value;
+        agent._health = health;
+    }
     public bool IsActive { get; set; } = true;
     public bool IsHuman { get; set; } = true;
     public bool WasKilled { get; set; }
@@ -174,7 +192,11 @@ public static class AgentMirror
 {
     private static readonly ConditionalWeakTable<Agent, MirrorAgent> Table = new();
 
-    public static void Bind(Agent agent, MirrorAgent mirror) => Table.AddOrUpdate(agent, mirror);
+    public static void Bind(Agent agent, MirrorAgent mirror)
+    {
+        mirror.BindAgent(agent);
+        Table.AddOrUpdate(agent, mirror);
+    }
 
     public static bool TryGet(Agent agent, out MirrorAgent mirror) => Table.TryGetValue(agent, out mirror);
 }

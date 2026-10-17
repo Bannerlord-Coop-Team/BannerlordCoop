@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using Autofac;
 using E2E.Tests.Environment.Instance;
 using GameInterface;
@@ -190,6 +191,8 @@ public sealed class MissionEngineFixture : IDisposable
         Prefix(typeof(Agent), "set_LookDirection", nameof(Agent_set_LookDirection));
         Prefix(typeof(Agent), nameof(Agent.GetMovementDirection), nameof(Agent_GetMovementDirection));
         Prefix(typeof(Agent), nameof(Agent.SetMovementDirection), nameof(Agent_SetMovementDirection));
+        harmony.Patch(AccessTools.Method(typeof(Missions.Agents.Packets.AgentData), "ApplyMovementDirection"),
+            transpiler: new HarmonyMethod(AccessTools.Method(typeof(MissionEngineFixture), nameof(MovementDirectionBoundary))));
         Prefix(typeof(Agent), nameof(Agent.TeleportToPosition), nameof(Agent_TeleportToPosition));
         Prefix(typeof(Agent), "get_MovementLockedState", nameof(Agent_get_MovementLockedState));
         Prefix(typeof(Agent), nameof(Agent.GetTargetPosition), nameof(Agent_GetTargetPosition));
@@ -972,6 +975,27 @@ public sealed class MissionEngineFixture : IDisposable
         if (!AgentMirror.TryGet(__instance, out var m)) return true;
         __result = m.MovementDirection;
         return false;
+    }
+
+    private static IEnumerable<CodeInstruction> MovementDirectionBoundary(IEnumerable<CodeInstruction> instructions)
+    {
+        var setter = AccessTools.Method(typeof(Agent), nameof(Agent.SetMovementDirection));
+        var body = instructions.ToList();
+        if (body.Count(instruction => instruction.Calls(setter)) != 1)
+            throw new InvalidOperationException("Expected one Agent.SetMovementDirection boundary.");
+        foreach (var instruction in body.Where(instruction => instruction.Calls(setter)))
+        {
+            instruction.opcode = OpCodes.Call;
+            instruction.operand = AccessTools.Method(typeof(MissionEngineFixture), nameof(SetMirrorMovementDirection));
+        }
+        return body;
+    }
+
+    private static void SetMirrorMovementDirection(Agent agent, in Vec2 direction)
+    {
+        // Keep this native boundary mocked even when a compiled caller bypasses the setter detour.
+        if (Agent_SetMovementDirection(agent, direction))
+            agent.SetMovementDirection(direction);
     }
 
     private static bool Agent_SetMovementDirection(Agent __instance, Vec2 __0)
