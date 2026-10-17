@@ -2,11 +2,13 @@
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using Quest = TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior.SmugglersIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.Smugglers.Patches;
@@ -22,7 +24,34 @@ internal class SmugglersQuestEventPatches
     [HarmonyPostfix]
     private static void OnMapEventEndedPostfix(MapEvent mapEvent)
     {
-        RunAsOwners(quest => quest.OnMapEventEnded(mapEvent));
+        // Most battles have no party used by a quest in them
+        if (!mapEvent.InvolvedParties.Any(party => party.MobileParty?.IsCurrentlyUsedByAQuest == true))
+        {
+            return;
+        }
+
+        RunAsOwners(quest =>
+        {
+            quest.OnMapEventEnded(mapEvent);
+            CancelIfDefeatedWithoutOwner(quest, mapEvent);
+        });
+    }
+
+    // Vanilla only expects the owner to fight the smugglers, another player beating them leaves the quest unwinnable
+    private static void CancelIfDefeatedWithoutOwner(Quest quest, MapEvent mapEvent)
+    {
+        var smugglers = quest._smugglerParty?.Party;
+        if (!quest.IsOngoing || smugglers == null || !mapEvent.InvolvedParties.Contains(smugglers))
+        {
+            return;
+        }
+
+        if (smugglers.Side == BattleSideEnum.None || mapEvent.DefeatedSide != smugglers.Side)
+        {
+            return;
+        }
+
+        quest.CompleteQuestWithCancel();
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]

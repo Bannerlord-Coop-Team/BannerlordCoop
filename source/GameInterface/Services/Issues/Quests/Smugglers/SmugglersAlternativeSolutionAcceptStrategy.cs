@@ -4,7 +4,7 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Quests.Smugglers;
 
-// The alternative solution has fixed math (no randomness)
+// The framework carries the failure chance and casualties, nothing else is rolled
 internal class SmugglersAlternativeSolutionAcceptStrategy : IAlternativeSolutionAcceptStrategy
 {
     public byte[] Capture(IssueBase issue) => Array.Empty<byte>();

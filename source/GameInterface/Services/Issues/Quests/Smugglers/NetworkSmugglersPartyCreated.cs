@@ -13,12 +13,16 @@ public readonly struct NetworkSmugglersPartyCreated : IServerToClientCommand
     public readonly string IssueId;
 
     [ProtoMember(3)]
+    public readonly string ControllerId;
+
+    [ProtoMember(4)]
     public readonly string PartyId;
 
-    public NetworkSmugglersPartyCreated(string issueOwnerId, string issueId, string partyId)
+    public NetworkSmugglersPartyCreated(string issueOwnerId, string issueId, string controllerId, string partyId)
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
+        ControllerId = controllerId;
         PartyId = partyId;
     }
 }

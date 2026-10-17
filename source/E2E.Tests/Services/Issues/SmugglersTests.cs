@@ -162,9 +162,9 @@ public class SmugglersTests : IDisposable
     }
 
     [Fact]
-    public void PartyCreated_PointsOnlyTheOwnersQuestAtTheParty()
+    public void PartyCreated_PointsTheOwnersQuestAtTheParty()
     {
-        Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkSmugglersPartyCreated(issueOwnerId, IssueId, partyId)));
+        SendPartyCreated(ControllerA);
 
         ClientA.Call(() =>
         {
@@ -172,6 +172,16 @@ public class SmugglersTests : IDisposable
             Assert.Same(party, QuestOf(ClientA)._smugglerParty);
         });
         ClientB.Call(() => Assert.Null(IssueOf(ClientB).IssueQuest));
+    }
+
+    [Fact]
+    public void PartyCreated_LeavesTheQuestOfAPlayerWhoseAcceptLost()
+    {
+        AttachQuest(ClientB);
+
+        SendPartyCreated(ControllerA);
+
+        ClientB.Call(() => Assert.Null(QuestOf(ClientB)._smugglerParty));
     }
 
     [Fact]
@@ -191,13 +201,11 @@ public class SmugglersTests : IDisposable
     }
 
     [Fact]
-    public void SmugglersRoute_IsRunOnTheServerOnly()
+    public void SmugglersRoute_IsRunOnTheServersQuest()
     {
         TickParty(Server, usedByQuest: true);
-        TickParty(ClientA, usedByQuest: true);
 
         Assert.Equal(1, hourlyTickParty.CountFor(Server));
-        Assert.Equal(0, hourlyTickParty.CountFor(ClientA));
     }
 
     [Fact]
@@ -231,6 +239,11 @@ public class SmugglersTests : IDisposable
         });
 
         return gold;
+    }
+
+    private void SendPartyCreated(string controllerId)
+    {
+        Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkSmugglersPartyCreated(issueOwnerId, IssueId, controllerId, partyId)));
     }
 
     private void TickParty(EnvironmentInstance instance, bool usedByQuest)

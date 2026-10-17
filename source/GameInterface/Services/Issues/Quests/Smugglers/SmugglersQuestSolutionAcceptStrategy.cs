@@ -22,12 +22,18 @@ internal class SmugglersQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrate
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IIssueOwnerResolver ownerResolver;
+    private readonly IIssueOwnershipRegistry ownership;
 
-    public SmugglersQuestSolutionAcceptStrategy(INetwork network, IObjectManager objectManager, IIssueOwnerResolver ownerResolver)
+    public SmugglersQuestSolutionAcceptStrategy(
+        INetwork network,
+        IObjectManager objectManager,
+        IIssueOwnerResolver ownerResolver,
+        IIssueOwnershipRegistry ownership)
     {
         this.network = network;
         this.objectManager = objectManager;
         this.ownerResolver = ownerResolver;
+        this.ownership = ownership;
     }
 
     public byte[] Capture(IssueBase issue) => Array.Empty<byte>();
@@ -52,11 +58,12 @@ internal class SmugglersQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrate
         }
 
         if (!objectManager.TryGetIdWithLogging(issue.IssueOwner, out var issueOwnerId) ||
-            !objectManager.TryGetIdWithLogging(quest._smugglerParty, out var partyId))
+            !objectManager.TryGetIdWithLogging(quest._smugglerParty, out var partyId) ||
+            !ownership.TryGetOwner(issueOwnerId, issue.StringId, out var controllerId))
         {
             return;
         }
 
-        network.SendAll(new NetworkSmugglersPartyCreated(issueOwnerId, issue.StringId, partyId));
+        network.SendAll(new NetworkSmugglersPartyCreated(issueOwnerId, issue.StringId, controllerId, partyId));
     }
 }

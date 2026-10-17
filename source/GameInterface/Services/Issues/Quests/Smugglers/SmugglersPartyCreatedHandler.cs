@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem.Party;
@@ -15,12 +16,18 @@ internal class SmugglersPartyCreatedHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly IIssueResolver issueResolver;
+    private readonly IControllerIdProvider controllerIdProvider;
 
-    public SmugglersPartyCreatedHandler(IMessageBroker messageBroker, IObjectManager objectManager, IIssueResolver issueResolver)
+    public SmugglersPartyCreatedHandler(
+        IMessageBroker messageBroker,
+        IObjectManager objectManager,
+        IIssueResolver issueResolver,
+        IControllerIdProvider controllerIdProvider)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.issueResolver = issueResolver;
+        this.controllerIdProvider = controllerIdProvider;
 
         messageBroker.Subscribe<NetworkSmugglersPartyCreated>(Handle_NetworkSmugglersPartyCreated);
     }
@@ -39,9 +46,14 @@ internal class SmugglersPartyCreatedHandler : IHandler
 
         var data = payload.What;
 
+        // A player whose accept lost the race still has a quest until its rejection arrives
+        if (data.ControllerId != controllerIdProvider.ControllerId)
+        {
+            return;
+        }
+
         GameThread.RunSafe(() =>
         {
-            // Only the owner has a quest object
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
                 !(issue.IssueQuest is Quest quest))
             {
