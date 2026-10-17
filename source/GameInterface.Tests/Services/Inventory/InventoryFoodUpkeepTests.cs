@@ -100,7 +100,7 @@ public class InventoryFoodUpkeepTests
     }
 
     [Fact]
-    public void StalePlayerRoster_RejectsDiffThatWouldGoBelowZero()
+    public void StalePlayerRoster_ClampsDiffThatWouldGoBelowZero()
     {
         var grain = new ItemObject("grain");
         var authoritative = new ItemRoster();
@@ -108,7 +108,8 @@ public class InventoryFoodUpkeepTests
         var initial = new ItemRosterElement[] { new(grain, 10) };
         var submitted = new ItemRosterElement[] { new(grain, 0) };
 
-        Assert.False(TradeHandler.TryRebaseInventoryData(authoritative, initial, submitted, out _));
+        Assert.True(TradeHandler.TryRebaseInventoryData(authoritative, initial, submitted, out var rebased));
+        Assert.Empty(rebased);
     }
 
     [Fact]

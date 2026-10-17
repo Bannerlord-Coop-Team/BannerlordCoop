@@ -209,6 +209,15 @@ internal class TradeHandler : IHandler
                 MessageBroker.Instance.Publish(this, new WarehouseRosterManaged(payload.Who as NetPeer, hero, currentSettlementComponent.Settlement, fromItemRosterData));
             }
 
+            // The submitting client has already reset its screen before the server applies
+            // the commit. Refresh only that peer so slaughter/donation backups and market
+            // deltas cannot leave its local roster behind, while other open screens remain intact.
+            if (peer != null)
+            {
+                messageBroker.Publish(peer, new ResendItemRoster(toRoster));
+                if (fromRoster != null) messageBroker.Publish(peer, new ResendItemRoster(fromRoster));
+            }
+
             // Update hero equipment with new data
             inventoryLogicInterface.UpdateEquipmentWithData(ownerParty, characterEquipmentsData, initialHero);
             network.SendAll(new UpdateEquipmentClients(message.CharacterIdEquipmentsData, message.OwnerPartyId, message.InitialHeroId));
@@ -265,8 +274,19 @@ internal class TradeHandler : IHandler
 
             int authoritativeAmount = FindAmount(rebased, element);
             long finalAmount = (long)authoritativeAmount + delta;
-            if (finalAmount < 0 || finalAmount > int.MaxValue) return false;
-            rebased.AddToCounts(element, delta);
+            if (finalAmount < 0)
+            {
+                // The server consumed the remaining stock after the client snapshot.
+                // Keep the client's other staged changes instead of rejecting a one-shot
+                // loot/reward screen that cannot be reopened.
+                delta = -authoritativeAmount;
+            }
+            else if (finalAmount > int.MaxValue)
+            {
+                return false;
+            }
+
+            if (delta != 0) rebased.AddToCounts(element, delta);
         }
 
         rebasedRoster = rebased.ToArray();
