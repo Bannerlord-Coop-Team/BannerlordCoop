@@ -5,6 +5,7 @@ using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using HarmonyLib;
 using Moq;
 using System;
 using System.Collections.Generic;
@@ -100,6 +101,40 @@ public class ConquestQuestOwnershipTests : IDisposable
         Assert.False(observerService.IsVisible(quest));
         Assert.True(restoredOwnerService.IsVisible(entry));
         Assert.False(observerService.IsVisible(entry));
+    }
+
+    [Fact]
+    public void PersistenceHooksAreDiscoveredByTheUncategorizedInstaller()
+    {
+        var harmony = new Harmony($"{nameof(ConquestQuestOwnershipTests)}.{Guid.NewGuid():N}");
+        try
+        {
+            harmony.PatchAllUncategorized(typeof(global::GameInterface.GameInterface).Assembly);
+
+            Assert.Contains(
+                Harmony.GetPatchInfo(AccessTools.Method(typeof(Campaign), "OnInitialize")).Prefixes,
+                patch => patch.owner == harmony.Id &&
+                    patch.PatchMethod.DeclaringType == typeof(TheConquestOfSettlementPersistencePatches) &&
+                    patch.PatchMethod.Name == nameof(TheConquestOfSettlementPersistencePatches.CampaignOnInitializePrefix));
+            Assert.Contains(
+                Harmony.GetPatchInfo(AccessTools.Method(
+                    typeof(TheConquestOfSettlementIssueBehavior),
+                    nameof(TheConquestOfSettlementIssueBehavior.RegisterEvents))).Postfixes,
+                patch => patch.owner == harmony.Id &&
+                    patch.PatchMethod.DeclaringType == typeof(TheConquestOfSettlementPersistencePatches) &&
+                    patch.PatchMethod.Name == nameof(TheConquestOfSettlementPersistencePatches.RegisterEventsPostfix));
+            Assert.Contains(
+                Harmony.GetPatchInfo(AccessTools.Method(
+                    typeof(TheConquestOfSettlementIssueBehavior),
+                    nameof(TheConquestOfSettlementIssueBehavior.SyncData))).Postfixes,
+                patch => patch.owner == harmony.Id &&
+                    patch.PatchMethod.DeclaringType == typeof(TheConquestOfSettlementPersistencePatches) &&
+                    patch.PatchMethod.Name == nameof(TheConquestOfSettlementPersistencePatches.SyncDataPostfix));
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
     }
 
     [Fact]
