@@ -80,7 +80,7 @@ public class TradeHandlerTests
         merchantRoster.AddToCounts(new EquipmentElement(shield, null), 3);
 
         // The client bought every shield it saw, so its merchant proposal has no shield entry left
-        var merchantRosterData = withTombstone ? new[] { default(ItemRosterElement) } : new ItemRosterElement[0];
+        var merchantRosterData = withTombstone ? new[] { default(ItemRosterElement) } : System.Array.Empty<ItemRosterElement>();
         var partyRosterData = new[]
         {
             new ItemRosterElement(new EquipmentElement(shield, null), 5)
@@ -110,7 +110,7 @@ public class TradeHandlerTests
         merchantRoster.AddToCounts(new EquipmentElement(shield, null), 3);
 
         // The bought shields left the party roster (equipped during the trade), so none can be taken back
-        var merchantRosterData = new ItemRosterElement[0];
+        var merchantRosterData = System.Array.Empty<ItemRosterElement>();
         var partyRosterData = new[] { default(ItemRosterElement) };
 
         var boughtItems = new List<(ItemRosterElement, int)>
@@ -133,7 +133,7 @@ public class TradeHandlerTests
         var merchantRoster = new ItemRoster();
         merchantRoster.AddToCounts(new EquipmentElement(shield, null), 3);
 
-        var merchantRosterData = new ItemRosterElement[0];
+        var merchantRosterData = System.Array.Empty<ItemRosterElement>();
         var partyRosterData = new[]
         {
             new ItemRosterElement(new EquipmentElement(shield, null), 1)
