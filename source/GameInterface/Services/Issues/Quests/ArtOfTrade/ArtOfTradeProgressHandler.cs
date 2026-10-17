@@ -3,14 +3,17 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using System.Linq;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssueQuest;
@@ -26,9 +29,12 @@ internal sealed class ArtOfTradeProgressHandler : IHandler
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager players;
     private readonly IControllerIdProvider controller;
+    private readonly IIssueOwnerResolver owners;
+    private readonly Dictionary<Hero, TroopRoster> returningTroops = new Dictionary<Hero, TroopRoster>();
 
     public ArtOfTradeProgressHandler(IMessageBroker broker, INetwork network, IObjectManager objects,
-        IIssueResolver issues, IIssueOwnershipRegistry ownership, IPlayerManager players, IControllerIdProvider controller)
+        IIssueResolver issues, IIssueOwnershipRegistry ownership, IPlayerManager players, IControllerIdProvider controller,
+        IIssueOwnerResolver owners)
     {
         this.broker = broker;
         this.network = network;
@@ -37,6 +43,7 @@ internal sealed class ArtOfTradeProgressHandler : IHandler
         this.ownership = ownership;
         this.players = players;
         this.controller = controller;
+        this.owners = owners;
         broker.Subscribe<ArtOfTradeProgressChanged>(Progress);
         broker.Subscribe<RequestArtOfTradeProgress>(ReceiveProgress);
         broker.Subscribe<ArtOfTradeJournalFinalizing>(Finalizing);
@@ -44,6 +51,8 @@ internal sealed class ArtOfTradeProgressHandler : IHandler
         broker.Subscribe<ArtOfTradeIssueJournalChanged>(IssueJournal);
         broker.Subscribe<ArtOfTradePurchaseRejected>(RejectPurchase);
         broker.Subscribe<NetworkArtOfTradePurchaseRejected>(ReceivePurchaseRejected);
+        broker.Subscribe<ArtOfTradeTroopsDeferred>(DeferTroops);
+        broker.Subscribe<ArtOfTradeHourlyTick>(ReturnTroops);
     }
 
     public void Dispose()
@@ -55,6 +64,33 @@ internal sealed class ArtOfTradeProgressHandler : IHandler
         broker.Unsubscribe<ArtOfTradeIssueJournalChanged>(IssueJournal);
         broker.Unsubscribe<ArtOfTradePurchaseRejected>(RejectPurchase);
         broker.Unsubscribe<NetworkArtOfTradePurchaseRejected>(ReceivePurchaseRejected);
+        broker.Unsubscribe<ArtOfTradeTroopsDeferred>(DeferTroops);
+        broker.Unsubscribe<ArtOfTradeHourlyTick>(ReturnTroops);
+    }
+
+    private void DeferTroops(MessagePayload<ArtOfTradeTroopsDeferred> payload)
+    {
+        if (ModInformation.IsClient || !owners.TryResolveOwnerHero(payload.What.Issue, out var hero)) return;
+        if (!returningTroops.TryGetValue(hero, out var roster))
+        {
+            roster = TroopRoster.CreateDummyTroopRoster();
+            returningTroops.Add(hero, roster);
+        }
+        // Finalization clears the issue roster and ownership before a busy player can receive troops.
+        roster.Add(payload.What.Issue.AlternativeSolutionSentTroops);
+    }
+
+    private void ReturnTroops(MessagePayload<ArtOfTradeHourlyTick> payload)
+    {
+        if (ModInformation.IsClient) return;
+        foreach (var entry in returningTroops.ToArray())
+        {
+            if (entry.Key.PartyBelongedTo == null) continue;
+            using var scope = new MainHeroSubstitutionScope(entry.Key, entry.Key.PartyBelongedTo);
+            if (!Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) continue;
+            Campaign.Current.IssueManager.MakeAlternativeTroopsReturn(entry.Value);
+            returningTroops.Remove(entry.Key);
+        }
     }
 
     private void Progress(MessagePayload<ArtOfTradeProgressChanged> payload)

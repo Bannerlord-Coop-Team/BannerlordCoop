@@ -6,6 +6,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using Issue = TaleWorlds.CampaignSystem.Issues.LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssue;
@@ -15,6 +16,35 @@ namespace GameInterface.Services.Issues.Quests.ArtOfTrade.Patches;
 [HarmonyPatch]
 internal class ArtOfTradeIssuePatches
 {
+    [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.TryToMakeTroopsReturn))]
+    [HarmonyPrefix]
+    private static bool ReturningTroops(IssueBase issue)
+    {
+        if (!(issue is Issue) || ModInformation.IsClient || CallOriginalPolicy.IsOriginalAllowed() ||
+            Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return true;
+        MessageBroker.Instance.Publish(issue, new ArtOfTradeTroopsDeferred(issue));
+        return false;
+    }
+
+    [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.HourlyTick))]
+    [HarmonyPostfix]
+    private static void HourlyTick()
+    {
+        if (ModInformation.IsServer) MessageBroker.Instance.Publish(typeof(ArtOfTradeIssuePatches), new ArtOfTradeHourlyTick());
+    }
+
+    [HarmonyPatch(typeof(JournalLog), nameof(JournalLog.UpdateCurrentProgress))]
+    [HarmonyPrefix]
+    private static bool JournalProgress(JournalLog __instance)
+    {
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
+        foreach (var issue in Campaign.Current.IssueManager.Issues.Values)
+        {
+            if (issue is Issue && issue.IsSolvingWithAlternative && issue.JournalEntries.Contains(__instance)) return false;
+        }
+        return true;
+    }
+
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithCancel))]
     [HarmonyPrefix]
     private static bool Cancel(IssueBase __instance, out (IssueBase Issue, IDisposable Owner, IssueOutcome Outcome) __state)

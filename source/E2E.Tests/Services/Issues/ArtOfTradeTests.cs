@@ -411,10 +411,12 @@ public class ArtOfTradeTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    public void CompanionDispatchAndInheritedCompletionKeepTheRewardWithTheOwner(bool fails, bool cancels)
+    [InlineData(false, false, false, false)]
+    [InlineData(false, false, false, true)]
+    [InlineData(true, false, false, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, true, true, false)]
+    public void CompanionDispatchAndInheritedCompletionKeepTheRewardWithTheOwner(bool fails, bool cancels, bool deferred, bool clientFirst)
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
@@ -443,18 +445,31 @@ public class ArtOfTradeTests : IDisposable
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
         var serverIssue = IssueOf(Server);
         var ownerIssue = IssueOf(Owner);
+        if (clientFirst) WithPlayer(Owner, () => Campaign.Current.IssueManager.DailyTick());
         Server.Call(() => Campaign.Current.IssueManager.DailyTick(), NativePresentation);
+        if (!clientFirst) WithPlayer(Owner, () => Campaign.Current.IssueManager.DailyTick());
         Assert.Equal(serverIssue.JournalEntries[0].CurrentProgress, ownerIssue.JournalEntries[0].CurrentProgress);
-        Assert.True(ownerIssue.JournalEntries[0].CurrentProgress > 0);
+        Assert.Equal(1, ownerIssue.JournalEntries[0].CurrentProgress);
         int reward = 0;
         int otherGold = 0;
+        int originalTroops = 0;
+        int originalCompanions = 0;
+        int otherTroops = 0;
         WithPlayer(Server, () =>
         {
             Hero.MainHero.Gold = 0;
+            originalTroops = MobileParty.MainParty.MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId));
+            originalCompanions = MobileParty.MainParty.MemberRoster.GetTroopCount(Get<Hero>(Server, companionId).CharacterObject);
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerB, out var other));
             otherGold = Get<Hero>(Server, other.HeroId).Gold;
+            otherTroops = Get<MobileParty>(Server, other.MobilePartyId).MemberRoster.TotalManCount;
             reward = serverIssue.RewardGold;
             serverIssue._failureChance = fails ? 1f : -1f;
+            if (deferred)
+            {
+                using var allowed = new AllowedThread();
+                Hero.MainHero.ChangeState(Hero.CharacterStates.Prisoner);
+            }
             if (cancels) serverIssue.CompleteIssueWithCancel();
             else serverIssue.CompleteIssueWithAlternativeSolution();
         });
@@ -463,11 +478,26 @@ public class ArtOfTradeTests : IDisposable
         Assert.Equal(fails || cancels ? 0 : 5, serverIssue.RelationshipChangeWithIssueOwner);
         Assert.Empty(serverIssue.AlternativeSolutionSentTroops.GetTroopRoster());
         Assert.Equal(serverIssue.JournalEntries.Last().LogText.Value, ownerIssue.JournalEntries.Last().LogText.Value);
+        if (deferred)
+        {
+            WithPlayer(Server, () =>
+            {
+                Assert.Empty(Campaign.Current.IssueManager._awaitingAlternativeSolutionTroops.GetTroopRoster());
+                Assert.Equal(originalTroops, MobileParty.MainParty.MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId)));
+                using var allowed = new AllowedThread();
+                Hero.MainHero.ChangeState(Hero.CharacterStates.Active);
+            });
+            Server.Call(() => Campaign.Current.IssueManager.HourlyTick(), NativePresentation);
+            Server.Call(() => Campaign.Current.IssueManager.HourlyTick(), NativePresentation);
+        }
         WithPlayer(Server, () =>
         {
             Assert.Equal(fails || cancels ? 0 : reward, Hero.MainHero.Gold);
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerB, out var other));
             Assert.Equal(otherGold, Get<Hero>(Server, other.HeroId).Gold);
+            Assert.Equal(otherTroops, Get<MobileParty>(Server, other.MobilePartyId).MemberRoster.TotalManCount);
+            Assert.Equal(originalTroops + 10, MobileParty.MainParty.MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId)));
+            Assert.Equal(originalCompanions + 1, MobileParty.MainParty.MemberRoster.GetTroopCount(Get<Hero>(Server, companionId).CharacterObject));
         });
     }
 

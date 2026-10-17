@@ -36,6 +36,14 @@ internal sealed class ArtOfTradePurchaseRejected : IEvent
     public ArtOfTradePurchaseRejected(Quest quest) { Quest = quest; }
 }
 
+internal sealed class ArtOfTradeTroopsDeferred : IEvent
+{
+    public IssueBase Issue { get; }
+    public ArtOfTradeTroopsDeferred(IssueBase issue) { Issue = issue; }
+}
+
+internal sealed class ArtOfTradeHourlyTick : IEvent { }
+
 [ProtoContract(SkipConstructor = true)]
 public sealed class NetworkArtOfTradePurchaseRejected : IServerToClientCommand
 {
