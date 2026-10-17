@@ -247,7 +247,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
     }
 
     // Vanilla's daily tick advances the first journal entry of every issue solved by an alternative, which only
-    // the start adds. Added without the log event so nothing is announced to a player who does not own the issue.
+    // the start adds. It has no text and skips the log event, so the accept is not shown to a player who does not own the issue.
     private static void AddReturnDaysLog(IssueBase issue)
     {
         if (issue.JournalEntries.Count > 0)
@@ -255,7 +255,14 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             return;
         }
 
-        issue._journalEntries.Add(new JournalLog(CampaignTime.Now, issue.Title, new TextObject("{=VFO7rMzK}Return Days"), 0, issue.AlternativeSolutionBaseDurationInDaysInternal));
+        var returnDays = new JournalLog(
+            CampaignTime.Now,
+            TextObject.GetEmpty(),
+            new TextObject("{=VFO7rMzK}Return Days"),
+            0,
+            issue.AlternativeSolutionBaseDurationInDaysInternal);
+
+        issue._journalEntries.Add(returnDays);
     }
 
     private static AlternativeSolutionVanillaState CaptureState(IssueBase issue)
