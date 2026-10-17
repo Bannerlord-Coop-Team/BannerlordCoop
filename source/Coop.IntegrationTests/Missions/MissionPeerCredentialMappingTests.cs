@@ -6,6 +6,7 @@ using Common.PacketHandlers;
 using Common.Serialization;
 using Common.Tests.Utils;
 using Coop.Core.Server.Services.Instances;
+using Coop.IntegrationTests.Kingdoms;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
 using LiteNetLib;
@@ -24,6 +25,8 @@ using System.Threading.Tasks;
 
 namespace Coop.IntegrationTests.Missions;
 
+// Timed socket callbacks must not compete with parallel container construction.
+[Collection(KingdomSyncGameThreadCollection.Name)]
 public class MissionPeerCredentialMappingTests
 {
     private const string InstanceId = "battle-instance";
