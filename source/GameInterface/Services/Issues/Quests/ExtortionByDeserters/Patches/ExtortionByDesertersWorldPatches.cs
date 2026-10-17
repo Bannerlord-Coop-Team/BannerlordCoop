@@ -116,6 +116,7 @@ internal class ExtortionByDesertersWorldPatches
     private static bool TickPrefix(Quest __instance)
     {
         if (ModInformation.IsClient || !__instance.IsOngoing) return false;
+        if (__instance._currentState == State.DesertersAreDefeated) return false;
         var deserters = __instance._deserterMobileParty;
         if (deserters == null || !deserters.IsActive)
         {

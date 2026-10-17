@@ -247,6 +247,21 @@ public class ExtortionByDesertersTests : IDisposable
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
     }
 
+    [Fact]
+    public void Victory_RemainsReadyForHandInAfterTheDeserterPartyIsGone()
+    {
+        Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        Server.Call(() =>
+        {
+            quest._currentState = State.DesertersAreDefeated;
+            quest._deserterMobileParty = null;
+            quest.HourlyTick();
+            Assert.True(quest.IsOngoing);
+        });
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
     private string AddSecondIssue()
     {
         var secondId = environment.CreateRegisteredObject<Hero>();

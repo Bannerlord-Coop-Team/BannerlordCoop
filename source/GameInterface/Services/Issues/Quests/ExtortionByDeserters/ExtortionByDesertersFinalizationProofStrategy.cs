@@ -28,7 +28,8 @@ internal class ExtortionByDesertersFinalizationProofStrategy : IFinalizationProo
         {
             var party = deserterQuest._deserterMobileParty;
             var raid = party?.MapEvent;
-            if (raid?.IsRaid != true || raid.AttackerSide.LeaderParty != party.Party ||
+            if (raid?.IsRaid != true || raid.HasWinner || raid.IsFinalized ||
+                raid.AttackerSide.LeaderParty != party.Party ||
                 raid.DefenderSide.LeaderParty != deserterQuest.QuestSettlement.Party ||
                 TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.CurrentSettlement != deserterQuest.QuestSettlement ||
                 deserterQuest._defenderMobileParty != null) return false;
