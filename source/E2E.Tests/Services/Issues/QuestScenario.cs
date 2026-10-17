@@ -21,21 +21,28 @@ internal sealed class QuestScenario
     public static readonly Type IssueType = typeof(AllowedIssue);
 
     private readonly E2ETestEnvironment testEnvironment;
+    private readonly Func<Hero, IssueBase> issueFactory;
+    private readonly Action<EnvironmentInstance, Hero>? configureGiver;
 
     public string NotableId { get; }
+    public (string HeroId, string PartyId) PlayerA { get; }
+    public (string HeroId, string PartyId) PlayerB { get; }
 
     public EnvironmentInstance Server => testEnvironment.Server;
     public EnvironmentInstance ClientA => testEnvironment.Clients.First();
     public EnvironmentInstance ClientB => testEnvironment.Clients.Last();
 
-    public QuestScenario(E2ETestEnvironment testEnvironment)
+    public QuestScenario(E2ETestEnvironment testEnvironment, Func<Hero, IssueBase>? issueFactory = null,
+        Action<EnvironmentInstance, Hero>? configureGiver = null)
     {
         this.testEnvironment = testEnvironment;
+        this.issueFactory = issueFactory ?? (hero => new AllowedIssue(hero, null));
+        this.configureGiver = configureGiver;
 
         NotableId = testEnvironment.CreateRegisteredObject<Hero>();
 
-        RegisterPlayer(ClientA, ControllerA);
-        RegisterPlayer(ClientB, ControllerB);
+        PlayerA = RegisterPlayer(ClientA, ControllerA);
+        PlayerB = RegisterPlayer(ClientB, ControllerB);
 
         foreach (var instance in new[] { Server, ClientA, ClientB })
         {
@@ -96,7 +103,7 @@ internal sealed class QuestScenario
         return controllerId;
     }
 
-    private void RegisterPlayer(EnvironmentInstance client, string controllerId)
+    private (string HeroId, string PartyId) RegisterPlayer(EnvironmentInstance client, string controllerId)
     {
         var heroId = testEnvironment.CreateRegisteredObject<Hero>();
         var partyId = testEnvironment.CreateRegisteredObject<MobileParty>();
@@ -104,6 +111,7 @@ internal sealed class QuestScenario
         Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(controllerId, heroId, partyId, "", ""))));
         testEnvironment.ConnectRegisteredPlayer(client, controllerId);
         client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+        return (heroId, partyId);
     }
 
     private void AddIssue(EnvironmentInstance instance)
@@ -114,7 +122,8 @@ internal sealed class QuestScenario
 
             using (new AllowedThread())
             {
-                var issue = new AllowedIssue(notable, null);
+                configureGiver?.Invoke(instance, notable);
+                var issue = issueFactory(notable);
                 issue.StringId = IssueId;
                 issue._issueState = IssueBase.IssueState.Ongoing;
 
