@@ -272,13 +272,43 @@ public class LadysKnightOutTests : IDisposable
     [Fact]
     public void ServerRefusesAStaleOfferWhenSecurityHasMadeItIneligible()
     {
+        long dueTime = 0;
         scenario.Server.Call(() =>
         {
-            using (new AllowedThread()) scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).CurrentSettlement.Town.Security = 81;
+            var giver = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId);
+            using (new AllowedThread()) giver.CurrentSettlement.Town.Security = 81;
+            giver.Issue.IssueDueTime = CampaignTime.DaysFromNow(9);
+            dueTime = giver.Issue.IssueDueTime.NumTicks;
         });
         scenario.Accept(scenario.ClientA);
         Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
         Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+        scenario.ClientA.Call(() =>
+        {
+            var issue = scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+            Assert.True(issue.IsOngoingWithoutQuest);
+            Assert.False(issue.IsTriedToSolveBefore);
+            Assert.Null(issue.IssueQuest);
+            Assert.Equal(dueTime, issue.IssueDueTime.NumTicks);
+        });
+        scenario.Server.Call(() =>
+        {
+            var giver = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId);
+            Assert.True(giver.Issue.IsOngoingWithoutQuest);
+            Assert.False(scenario.Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _));
+            using (new AllowedThread()) giver.CurrentSettlement.Town.Security = 40;
+        });
+        scenario.ClientA.Call(() =>
+        {
+            var giver = scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId);
+            Assert.True(Campaign.Current.IssueManager.StartIssueQuest(giver));
+            var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+            quest.QuestAcceptedConsequences();
+            Assert.True(quest.IsOngoing);
+            Assert.Single(quest.JournalEntries);
+        });
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
     }
 
     [Fact]
