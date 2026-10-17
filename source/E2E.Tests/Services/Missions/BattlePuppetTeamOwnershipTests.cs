@@ -119,6 +119,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                 var registry = client.Resolve<INetworkAgentRegistry>();
                 Assert.True(registry.TryGetAgentInfo(agentId, out var agentInfo));
                 Assert.True(AgentMirror.TryGet(agentInfo.Agent, out var mirror));
+                var origin = Assert.IsType<CoopAgentOrigin>(agentInfo.Agent.Origin);
+                Assert.Equal(DecodeSpawnBatch(client, wire).Single().MapEventPartyId, origin.MapEventPartyId);
                 Assert.NotNull(mirror.SpawnEquipment);
                 Assert.False(client.ObjectManager.TryGetId(mirror.SpawnEquipment, out _));
             });

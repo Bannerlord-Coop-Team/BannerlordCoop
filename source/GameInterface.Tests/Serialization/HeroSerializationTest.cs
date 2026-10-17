@@ -22,17 +22,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
         private readonly ITestOutputHelper output;
 
-        IContainer container;
+        ILifetimeScope container;
         public HeroSerializationTest(ITestOutputHelper output)
         {
             this.output = output;
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
+            container = SerializationTestContainer.BeginScope();
         }
 
         private void EnsureAllMemberCoverage(Hero hero)

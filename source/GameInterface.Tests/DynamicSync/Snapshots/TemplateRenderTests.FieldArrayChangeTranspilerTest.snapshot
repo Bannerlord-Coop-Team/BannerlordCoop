@@ -1,2 +1,0 @@
-        [HarmonyTranspiler]
-        static IEnumerable<CodeInstruction> TestFieldArrayChangeTranspiler(IEnumerable<CodeInstruction> instructions) => ListFieldChangeTranspiler<string, , >(instructions, "TestFieldArray");

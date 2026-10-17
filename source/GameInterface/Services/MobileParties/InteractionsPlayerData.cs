@@ -60,9 +60,13 @@ public class InteractionsPlayerData
     [ProtoMember(10)]
     public Dictionary<string, bool> PlayerHasBoughtTunToParty { get; }
 
-    // Dictionary<PlayerHeroId, HasMetRahsomBroker>
+    // Dictionary<PlayerHeroId, HasMetRansomBroker>
     [ProtoMember(11)]
     public Dictionary<string, bool> PlayerHasMetRansomBroker { get; }
+
+    // Dictionary<PlayerHeroId, HasTalkedWithHermitBefore>
+    [ProtoMember(12)]
+    public Dictionary<string, bool> PlayerHasMetHermit { get; }
 
     public InteractionsPlayerData(
         Dictionary<string, Dictionary<string, int>> playerInteractedVillagers,
@@ -75,7 +79,8 @@ public class InteractionsPlayerData
         Dictionary<string, List<string>> playerAlreadySneakedSettlements,
         Dictionary<string, string> playerOrderedDrinkThisDayInSettlement,
         Dictionary<string, bool> playerHasBoughtTunToParty,
-        Dictionary<string, bool> playerHasMetRansomBroker)
+        Dictionary<string, bool> playerHasMetRansomBroker,
+        Dictionary<string, bool> playerHasMetHermit)
     {
         PlayerInteractedVillagers = playerInteractedVillagers ?? new();
         PlayerInteractedCaravans = playerInteractedCaravans ?? new();
@@ -88,5 +93,6 @@ public class InteractionsPlayerData
         PlayerOrderedDrinkThisDayInSettlement = playerOrderedDrinkThisDayInSettlement ?? new();
         PlayerHasBoughtTunToParty = playerHasBoughtTunToParty ?? new();
         PlayerHasMetRansomBroker = playerHasMetRansomBroker ?? new();
+        PlayerHasMetHermit = playerHasMetHermit ?? new();
     }
 }

@@ -2,7 +2,6 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes;
-using GameInterface.Services.Issues;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.Villages;
 using HarmonyLib;
@@ -119,9 +118,6 @@ internal class PartyScreenLogicPatches
             }
 
             ForceTransferScreenTracker.TryClaimForceTransferId(__instance.MemberRosters[0], out var forceTransferId);
-            var rightMemberRoster = ContainerProvider.TryResolve<ExtortionAlternativeSelection>(out var selection)
-                ? selection.GetCommitRoster(__instance)
-                : __instance.MemberRosters[1];
             var message = new PartyDoneLogicAttempted(
                 Hero.MainHero,
                 releasedPrisonersRoster,
@@ -129,7 +125,7 @@ internal class PartyScreenLogicPatches
                 recruitedPrisonersRoster,
                 __instance.MemberRosters[0],
                 __instance.PrisonerRosters[0],
-                rightMemberRoster,
+                __instance.MemberRosters[1],
                 __instance.PrisonerRosters[1],
                 __instance._initialData.LeftMemberRoster,
                 __instance._initialData.LeftPrisonerRoster,
@@ -156,6 +152,14 @@ internal class PartyScreenLogicPatches
                 TroopRoster duplicateLeftMemberRoster = __instance.MemberRosters[0].CloneRosterData();
                 TroopRoster duplicateLeftPrisonerRoster = __instance.PrisonerRosters[0].CloneRosterData();
 
+                TroopRoster questLeftMemberRoster = __instance.MemberRosters[0];
+                TroopRoster questTroops = null;
+                if (partyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage)
+                {
+                    questTroops = TroopRoster.CreateDummyTroopRoster();
+                    questTroops.Add(questLeftMemberRoster);
+                }
+
                 InCommit = true;
                 try
                 {
@@ -179,6 +183,11 @@ internal class PartyScreenLogicPatches
                         __instance,
                         duplicateLeftMemberRoster,
                         duplicateLeftPrisonerRoster);
+
+                    if (questTroops != null)
+                    {
+                        RestoreQuestTroops(questLeftMemberRoster, questTroops);
+                    }
                 }
                 finally
                 {
@@ -197,6 +206,12 @@ internal class PartyScreenLogicPatches
     {
         partyScreenLogic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftMemberRoster;
         partyScreenLogic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftPrisonerRoster;
+    }
+
+    internal static void RestoreQuestTroops(TroopRoster sentTroops, TroopRoster transferredTroops)
+    {
+        sentTroops.Clear();
+        sentTroops.Add(transferredTroops);
     }
 
     [HarmonyPatch(nameof(PartyScreenLogic.OnPartyScreenClosed))]

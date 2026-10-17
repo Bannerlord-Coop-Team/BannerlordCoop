@@ -14,31 +14,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class HeroDeveloperSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public HeroDeveloperSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void HeroDeveloper_Serialize()
-        {
-            HeroDeveloper HeroDeveloper = (HeroDeveloper)FormatterServices.GetUninitializedObject(typeof(HeroDeveloper));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            HeroDeveloperBinaryPackage package = new HeroDeveloperBinaryPackage(HeroDeveloper, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

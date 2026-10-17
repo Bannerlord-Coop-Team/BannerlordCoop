@@ -265,4 +265,29 @@ public class NetworkAgentRegistryTests
         Assert.Equal("mount-origin", resolvedMount.OriginalOwner);
         Assert.Equal("successor", resolvedMount.CurrentAuthority);
     }
+
+    /// <summary>The agent id resolves back to the same agent and keeps the stable owner for result attribution.</summary>
+    [Fact]
+    [Trait("Requirement", "BR-105")]
+    public void AgentIdentifier_RoundTripsToTheSameAgent_AndPreservesStableOwner()
+    {
+        var provider = new Mock<IControllerIdProvider>();
+        provider.SetupGet(p => p.ControllerId).Returns("me");
+        var registry = new NetworkAgentRegistry(provider.Object);
+
+        var agent = ObjectHelper.SkipConstructor<Agent>();
+        var agentId = Guid.NewGuid();
+
+        Assert.True(registry.TryRegisterAgent("owner1", agentId, agent));
+
+        // The id resolves to the same agent and carries the stable owner.
+        Assert.True(registry.TryGetAgentInfo(agentId, out var byId));
+        Assert.Same(agent, byId.Agent);
+        Assert.Equal(agentId, byId.AgentId);
+        Assert.Equal("owner1", byId.OriginalOwner);
+
+        // The reverse lookup resolves to the same stable id.
+        Assert.True(registry.TryGetAgentInfo(agent, out var byAgent));
+        Assert.Equal(agentId, byAgent.AgentId);
+    }
 }

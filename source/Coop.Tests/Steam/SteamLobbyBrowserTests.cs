@@ -1,6 +1,8 @@
 ﻿using Common.Network.Session;
 using Coop.Steam;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 
 namespace Coop.Tests.Steam;
@@ -56,6 +58,50 @@ public class SteamLobbyBrowserTests
         Assert.True(lobby.PasswordRequired);
         Assert.Equal(3, lobby.ConnectedPlayers);
         Assert.True(lobby.IsCompatible);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void RequestLobbies_ReportsPublicProgressBeforeCompletion()
+    {
+        api.CompleteOperationsImmediately = false;
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000042 });
+        AddLobby(43, new SessionJoinInfo { Port = 4201, ServerSteamId = 76561198000000043 });
+
+        IReadOnlyList<SteamLobbySummary> progress = null;
+        IReadOnlyList<SteamLobbySummary> results = null;
+        browser.RequestLobbies((lobbies, _) => results = lobbies, lobbies => progress = lobbies);
+
+        api.ListPageCallback(new ulong[] { 42 });
+
+        Assert.Equal(42UL, Assert.Single(progress).LobbyId);
+        Assert.Null(results);
+
+        api.CompletePendingList();
+
+        Assert.Equal(new ulong[] { 42, 43 }, results.Select(lobby => lobby.LobbyId));
+    }
+
+    [Fact]
+    public void RequestLobbies_FailedProgressReportDoesNotFailTheSearch()
+    {
+        api.CompleteOperationsImmediately = false;
+        AddLobby(42, new SessionJoinInfo { Port = 4200, ServerSteamId = 76561198000000042 });
+
+        IReadOnlyList<SteamLobbySummary> results = null;
+        string error = "not completed";
+        browser.RequestLobbies(
+            (lobbies, completionError) =>
+            {
+                results = lobbies;
+                error = completionError;
+            },
+            _ => throw new InvalidOperationException("scripted progress failure"));
+
+        api.ListPageCallback(new ulong[] { 42 });
+        api.CompletePendingList();
+
+        Assert.Equal(42UL, Assert.Single(results).LobbyId);
         Assert.Null(error);
     }
 
