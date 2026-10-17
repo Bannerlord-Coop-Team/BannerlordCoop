@@ -10,4 +10,6 @@ public enum IssueOutcome
     IssueTimedOut = 5,
     IssueStayAliveFailed = 6,
     AlternativeSolution = 7,
+    LordAcceptedCounterOffer = 8,
+    LordRefusedCounterOffer = 9,
 }

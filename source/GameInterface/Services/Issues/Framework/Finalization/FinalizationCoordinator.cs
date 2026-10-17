@@ -349,6 +349,14 @@ internal class FinalizationCoordinator : IHandler
             case IssueOutcome.AlternativeSolution:
                 issue.IssueFinalized();
                 return true;
+            case IssueOutcome.LordAcceptedCounterOffer:
+                issue.AddLog(new JournalLog(CampaignTime.Now, issue.LordSolutionCounterOfferAcceptLog));
+                issue.IssueFinalized();
+                return true;
+            case IssueOutcome.LordRefusedCounterOffer:
+                issue.AddLog(new JournalLog(CampaignTime.Now, issue.LordSolutionCounterOfferRefuseLog));
+                issue.IssueFinalized();
+                return true;
             default:
                 return false;
         }
