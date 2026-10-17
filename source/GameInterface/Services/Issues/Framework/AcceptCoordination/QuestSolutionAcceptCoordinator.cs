@@ -34,6 +34,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IIssueConversationTracker conversationTracker;
+    private readonly IIssueAcceptPreconditions acceptPreconditions;
 
     public QuestSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -43,7 +44,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager,
         IControllerIdProvider controllerIdProvider,
-        IIssueConversationTracker conversationTracker)
+        IIssueConversationTracker conversationTracker,
+        IIssueAcceptPreconditions acceptPreconditions)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -53,6 +55,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         this.playerManager = playerManager;
         this.controllerIdProvider = controllerIdProvider;
         this.conversationTracker = conversationTracker;
+        this.acceptPreconditions = acceptPreconditions;
 
         messageBroker.Subscribe<QuestSolutionAcceptTriggered>(Handle_QuestSolutionAcceptTriggered);
         messageBroker.Subscribe<RequestQuestSolutionAccept>(Handle_RequestQuestSolutionAccept);
@@ -122,6 +125,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             !issue.IsOngoingWithoutQuest ||
             (issue.GetType().Name == "TheConquestOfSettlementIssue" &&
                 !conversationTracker.TryGet(data.IssueOwnerId, player.ControllerId, data.IssueId)) ||
+            !acceptPreconditions.CanTake(issue, playerHero, player.ControllerId) ||
             !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
         {
             Reject(peer, data);

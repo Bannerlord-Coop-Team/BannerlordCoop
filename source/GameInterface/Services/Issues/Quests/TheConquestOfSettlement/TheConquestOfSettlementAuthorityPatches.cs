@@ -72,20 +72,6 @@ internal static class TheConquestOfSettlementWarInitiatorPatch
     }
 }
 
-[HarmonyPatch(typeof(IssueBase), "get_IssueQuestCanBeDuplicated")]
-internal static class TheConquestOfSettlementDuplicatePatch
-{
-    [HarmonyPostfix]
-    private static void Postfix(IssueBase __instance, ref bool __result)
-    {
-        if (__instance is Issue && !CallOriginalPolicy.IsOriginalAllowed() &&
-            ContainerProvider.TryResolve<ITheConquestOfSettlementService>(out var service))
-        {
-            __result = !service.HasQuest(Hero.MainHero);
-        }
-    }
-}
-
 [HarmonyPatch(typeof(IssuesCampaignBehavior), "OnIssueUpdated")]
 internal static class TheConquestOfSettlementRewardPatch
 {

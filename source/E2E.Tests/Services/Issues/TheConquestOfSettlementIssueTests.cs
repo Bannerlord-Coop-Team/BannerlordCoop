@@ -148,6 +148,24 @@ public sealed class TheConquestOfSettlementIssueTests : IDisposable
             });
     }
 
+    [Fact]
+    public void ServerRefusesAnOwnerOutsideTheGiversKingdom()
+    {
+        var owner = environment.Clients.First();
+        var other = environment.Clients.Last();
+        AcceptMapOffer(ownerInGiversKingdom: false);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        foreach (var instance in new[] { Server, owner, other })
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(issueOwnerId, out var giver));
+                Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(issueOwnerId, giver.Issue.StringId, out _));
+                Assert.Null(giver.Issue.IssueQuest);
+            });
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -218,12 +236,13 @@ public sealed class TheConquestOfSettlementIssueTests : IDisposable
         });
     }
 
-    private void AcceptMapOffer()
+    private void AcceptMapOffer(bool ownerInGiversKingdom = true)
     {
         var owner = environment.Clients.First();
         var other = environment.Clients.Last();
         var ownerPartyId = RegisterPlayer(owner, "owner");
         RegisterPlayer(other, "other");
+        MakeOwnerEligible(ownerInGiversKingdom);
         var giverPartyId = PlaceGiverOnMap();
         CreateIssue();
         BeginEngagement(owner, ownerPartyId, giverPartyId);
@@ -242,6 +261,65 @@ public sealed class TheConquestOfSettlementIssueTests : IDisposable
             Assert.IsType<Quest>(giver.Issue.IssueQuest).QuestAcceptedConsequences();
         });
 
+    }
+
+    // The server runs vanilla's take conditions as the owner, so the giver's kingdom must be at war with the
+    // target's, still hold a fortification, and count the owner's clan among its own
+    private void MakeOwnerEligible(bool ownerInGiversKingdom)
+    {
+        string ownerHeroId = null!;
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("owner", out var player));
+            ownerHeroId = player.HeroId;
+        });
+
+        var giverKingdomId = environment.CreateRegisteredObject<Kingdom>();
+        var giverClanId = environment.CreateRegisteredObject<Clan>();
+        var ownerClanId = environment.CreateRegisteredObject<Clan>();
+        var enemyKingdomId = environment.CreateRegisteredObject<Kingdom>();
+        var enemyClanId = environment.CreateRegisteredObject<Clan>();
+        var giverFortId = environment.CreateRegisteredObject<Settlement>();
+        var giverTownId = environment.CreateRegisteredObject<Town>();
+        var targetTownId = environment.CreateRegisteredObject<Town>();
+
+        foreach (var instance in new[] { Server }.Concat(environment.Clients))
+            instance.Call(() =>
+            {
+                T Get<T>(string id) where T : class
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<T>(id, out var obj));
+                    return obj;
+                }
+
+                var giverKingdom = Get<Kingdom>(giverKingdomId);
+                var giverClan = Get<Clan>(giverClanId);
+                var ownerClan = Get<Clan>(ownerClanId);
+                var enemyKingdom = Get<Kingdom>(enemyKingdomId);
+                var enemyClan = Get<Clan>(enemyClanId);
+                var giverTown = Get<Town>(giverTownId);
+                var targetTown = Get<Town>(targetTownId);
+
+                using (new AllowedThread())
+                {
+                    giverClan._kingdom = giverKingdom;
+                    ownerClan._kingdom = ownerInGiversKingdom ? giverKingdom : null;
+                    enemyClan._kingdom = enemyKingdom;
+                    Get<Hero>(issueOwnerId).Clan = giverClan;
+                    Get<Hero>(ownerHeroId).Clan = ownerClan;
+
+                    Get<Settlement>(giverFortId).SetSettlementComponent(giverTown);
+                    giverTown._ownerClan = giverClan;
+                    giverClan.OnFortificationAdded(giverTown);
+
+                    Get<Settlement>(targetSettlementId).SetSettlementComponent(targetTown);
+                    targetTown._ownerClan = enemyClan;
+
+                    // Kingdoms made here share an unset Id, so their stance is keyed by argument order
+                    FactionManager.DeclareWar(giverKingdom, enemyKingdom);
+                    FactionManager.DeclareWar(enemyKingdom, giverKingdom);
+                }
+            });
     }
 
     private string RegisterPlayer(EnvironmentInstance client, string controllerId)
