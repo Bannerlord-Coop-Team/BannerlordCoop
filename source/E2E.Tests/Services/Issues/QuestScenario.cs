@@ -28,7 +28,7 @@ internal sealed class QuestScenario
     public EnvironmentInstance ClientA => testEnvironment.Clients.First();
     public EnvironmentInstance ClientB => testEnvironment.Clients.Last();
 
-    public QuestScenario(E2ETestEnvironment testEnvironment)
+    public QuestScenario(E2ETestEnvironment testEnvironment, Func<Hero, IssueBase>? createIssue = null)
     {
         this.testEnvironment = testEnvironment;
 
@@ -39,7 +39,7 @@ internal sealed class QuestScenario
 
         foreach (var instance in new[] { Server, ClientA, ClientB })
         {
-            AddIssue(instance);
+            AddIssue(instance, createIssue);
         }
     }
 
@@ -66,7 +66,7 @@ internal sealed class QuestScenario
         return quest;
     }
 
-    public QuestBase AttachQuest(EnvironmentInstance instance)
+    public QuestBase AttachQuest(EnvironmentInstance instance, Func<Hero, QuestBase>? createQuest = null)
     {
         QuestBase quest = null!;
 
@@ -76,7 +76,7 @@ internal sealed class QuestScenario
 
             using (new AllowedThread())
             {
-                quest = new UnstartedQuest("quest_attached", notable);
+                quest = createQuest == null ? new UnstartedQuest("quest_attached", notable) : createQuest(notable);
                 notable.Issue.IssueQuest = quest;
             }
         });
@@ -106,7 +106,7 @@ internal sealed class QuestScenario
         client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
     }
 
-    private void AddIssue(EnvironmentInstance instance)
+    private void AddIssue(EnvironmentInstance instance, Func<Hero, IssueBase>? createIssue)
     {
         instance.Call(() =>
         {
@@ -114,7 +114,7 @@ internal sealed class QuestScenario
 
             using (new AllowedThread())
             {
-                var issue = new AllowedIssue(notable, null);
+                var issue = createIssue == null ? new AllowedIssue(notable, null) : createIssue(notable);
                 issue.StringId = IssueId;
                 issue._issueState = IssueBase.IssueState.Ongoing;
 
