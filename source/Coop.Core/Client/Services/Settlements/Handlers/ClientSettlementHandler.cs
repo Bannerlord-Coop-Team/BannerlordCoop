@@ -27,22 +27,9 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Subscribe<NetworkChangeWallHitPointsRatio>(HandleHitPointsRatio);
         messageBroker.Subscribe<NetworkChangeLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
 
-        //ClaimBY Hero
-        messageBroker.Subscribe<LordConversationCampaignBehaviourPlayerChangedClaim>(HandleClientCampaignBehaviorClaim);
-        messageBroker.Subscribe<NetworkChangeLordConverationCampaignBehaviorPlayerClaimOther>(HandleClientOthersCampaignBehaviorClaim);
-
-        //ClaimBY Value
-        messageBroker.Subscribe<LordConversationCampaignBehaviourPlayerChangedClaimValue>(HandleClientOthersCampaignBehaviorClaimValue);
-        messageBroker.Subscribe<NetworkChangeLordConverationCampaignBehaviorPlayerClaimValueOther>(HandleClientOthersCampaignBehaviorClaimValue);
-
-        // Settlement.CanBeClaimed
-        messageBroker.Subscribe<NetworkChangeSettlementClaimantCanBeClaimed>(HandleSettlementClaimaintCanBeClaimed);
-
         //client auditorNetworkSettlementAuditResults
 
         messageBroker.Subscribe<NetworkSettlementAuditResults>(HandleAuditor);
-
-
 
     }
 
@@ -50,39 +37,6 @@ internal class ClientSettlementHandler : IHandler
     {
         var obj = payload.What;
         messageBroker.Publish(this, new SettlementAuditResponse(obj.Data, obj.ServerAuditResults));
-    }
-
-    private void HandleSettlementClaimaintCanBeClaimed(MessagePayload<NetworkChangeSettlementClaimantCanBeClaimed> payload)
-    {
-        var obj = payload.What;
-
-        messageBroker.Publish(this, new ChangeSettlementClaimantCanBeClaimed(obj.SettlementId, obj.CanBeClaimed));
-    }
-
-    private void HandleClientOthersCampaignBehaviorClaimValue(MessagePayload<NetworkChangeLordConverationCampaignBehaviorPlayerClaimValueOther> payload)
-    {
-        var obj = payload.What;
-        messageBroker.Publish(this, new ChangeLordConversationCampaignBehaviorPlayerClaimValueOthers(obj.SettlementId, obj.ClaimValue));
-
-    }
-
-    private void HandleClientOthersCampaignBehaviorClaimValue(MessagePayload<LordConversationCampaignBehaviourPlayerChangedClaimValue> payload)
-    {
-        var obj = payload.What;
-        network.SendAll(new ClientChangeLordConversationCampaignBehaviorPlayerClaimValue(obj.SettlementId, obj.ClaimValue));
-    }
-
-    private void HandleClientOthersCampaignBehaviorClaim(MessagePayload<NetworkChangeLordConverationCampaignBehaviorPlayerClaimOther> payload)
-    {
-        var obj = payload.What;
-
-        messageBroker.Publish(this, new ChangeLordConversationCampaignBehaviorPlayerClaimOthers(obj.SettlementId, obj.HeroId));
-    }
-
-    private void HandleClientCampaignBehaviorClaim(MessagePayload<LordConversationCampaignBehaviourPlayerChangedClaim> payload)
-    {
-        var obj = payload.What;
-        network.SendAll(new ClientChangeLordConversationCampaignBehaviorPlayerClaim(obj.SettlementId, obj.HeroId));
     }
 
     private void HandleLastVisitTimeOfOwner(MessagePayload<NetworkChangeLastVisitTimeOfOwner> payload)
@@ -166,14 +120,7 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Unsubscribe<NetworkChangeSettlementMobileParty>(HandleMobileParty);
         messageBroker.Unsubscribe<NetworkChangeWallHitPointsRatio>(HandleHitPointsRatio);
         messageBroker.Unsubscribe<NetworkChangeLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
-        messageBroker.Unsubscribe<LordConversationCampaignBehaviourPlayerChangedClaim>(HandleClientCampaignBehaviorClaim);
-        messageBroker.Unsubscribe<NetworkChangeLordConverationCampaignBehaviorPlayerClaimOther>(HandleClientOthersCampaignBehaviorClaim);
 
-
-        messageBroker.Unsubscribe<LordConversationCampaignBehaviourPlayerChangedClaimValue>(HandleClientOthersCampaignBehaviorClaimValue);
-        messageBroker.Unsubscribe<NetworkChangeLordConverationCampaignBehaviorPlayerClaimValueOther>(HandleClientOthersCampaignBehaviorClaimValue);
-
-        messageBroker.Unsubscribe<NetworkChangeSettlementClaimantCanBeClaimed>(HandleSettlementClaimaintCanBeClaimed);
         messageBroker.Unsubscribe<NetworkSettlementAuditResults>(HandleAuditor);
     }
 }

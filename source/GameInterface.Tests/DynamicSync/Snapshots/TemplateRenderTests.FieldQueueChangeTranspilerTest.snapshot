@@ -1,2 +1,0 @@
-        [HarmonyTranspiler]
-        static IEnumerable<CodeInstruction> TestFieldQueueChangeTranspiler(IEnumerable<CodeInstruction> instructions) => ListFieldChangeTranspiler<long, AddQueueFieldMessage, RemoveQueueFieldMessage>(instructions, "TestFieldQueue");
