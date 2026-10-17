@@ -5,6 +5,7 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.SiegeEvents.Patches;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -53,6 +54,8 @@ internal class SiegeDefenderVictoryHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
 
             pendingSettlement = settlement;
+            // Finishing the staged encounter must not take the defender out of this town.
+            SiegeDefenderFinishPatch.PendingDefenderVictorySettlement = settlement;
         });
     }
 
@@ -61,12 +64,21 @@ internal class SiegeDefenderVictoryHandler : IHandler
         if (ModInformation.IsServer || pendingSettlement == null) return;
         // The mission screen is still up (or popping): re-establishing PlayerEncounter now is unsafe. Wait.
         if (MissionState.Current != null) return;
-        // The battle results are still staged on this encounter. The normal after battle flow shows the prisoner
-        // and loot screens and finishes the encounter, as vanilla does before it ends the siege. Wait for it.
-        if (HasStagedBattleResults(PlayerEncounter.Current)) return;
+        // The battle results are still staged on this encounter. Vanilla shows the prisoner and loot screens and
+        // finishes the encounter before it ends the siege. The encounter menu only resumes it if it reopens while
+        // the destroyed event is still attached, so resume it here, like hideout results (HideoutResultUpdatePatch).
+        // PlayerEncounter.Update runs the same after battle flow and waits while a loot screen is open.
+        if (HasStagedBattleResults(PlayerEncounter.Current))
+        {
+            // A capture conversation is still open; updating now would reopen it every tick.
+            if (Campaign.Current.ConversationManager.IsConversationInProgress) return;
+            PlayerEncounter.Update();
+            if (PlayerEncounter.Current != null) return;
+        }
 
         var settlement = pendingSettlement;
         pendingSettlement = null;
+        SiegeDefenderFinishPatch.PendingDefenderVictorySettlement = null;
         siegeEventInterface.PromptSiegeDefenderVictory(settlement);
     }
 
@@ -79,5 +91,6 @@ internal class SiegeDefenderVictoryHandler : IHandler
         messageBroker.Unsubscribe<NetworkPromptSiegeDefenderVictory>(Handle_NetworkPromptSiegeDefenderVictory);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
         pendingSettlement = null;
+        SiegeDefenderFinishPatch.PendingDefenderVictorySettlement = null;
     }
 }
