@@ -3,6 +3,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Generic.CreationCapture;
 using GameInterface.Services.Issues.Generic.Dispatch;
@@ -42,6 +43,7 @@ internal interface ILordWantsRivalCapturedQuestService
     void MirrorQuestAccepted(Hero giver, RivalCapturedAcceptFields fields);
     bool TryEnterOwnerScope(Quest quest, out IDisposable scope);
     bool IsOwnedBy(Quest quest, Hero hero);
+    bool IsLocalPeerOwner(Hero giver);
     bool IsPresentWithGiver(string controllerId, Hero giver);
     void RequestChoice(Quest quest, RivalCapturedChoice choice);
     void ApplyChoice(Player player, RequestRivalCapturedChoice request);
@@ -68,21 +70,21 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controllerIdProvider;
-    private readonly IIssueOwnershipRegistry ownership;
+    private readonly IIssueOwnerResolver ownerResolver;
     private readonly IIssueGenerationRegistry generations;
     private readonly ConversationPartyTracker conversations;
     private readonly PendingRegistry<(Quest Quest, Hero Target, Player Owner, int Generation)> pendingCaptures = new();
 
     public LordWantsRivalCapturedQuestService(IObjectManager objectManager, INetwork network,
         IPlayerManager playerManager, IControllerIdProvider controllerIdProvider,
-        IIssueOwnershipRegistry ownership, IIssueGenerationRegistry generations,
+        IIssueOwnerResolver ownerResolver, IIssueGenerationRegistry generations,
         ConversationPartyTracker conversations)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.playerManager = playerManager;
         this.controllerIdProvider = controllerIdProvider;
-        this.ownership = ownership;
+        this.ownerResolver = ownerResolver;
         this.generations = generations;
         this.conversations = conversations;
     }
@@ -137,7 +139,7 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
 
     public void RejectAcceptance(Hero giver)
     {
-        if (giver?.Issue?.IssueQuest is not Quest quest || ownership.TryGetOwnerControllerId(giver, out _)) return;
+        if (giver?.Issue?.IssueQuest is not Quest quest || TryGetOwner(giver, out _)) return;
 
         // A rejected optimistic client accept must discard only its local quest so the
         // still-available issue can be retried after the generation catches up.
@@ -200,7 +202,7 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
     public bool TryEnterOwnerScope(Quest quest, out IDisposable scope)
     {
         scope = null;
-        if (!ownership.TryGetOwnerControllerId(quest.QuestGiver, out var controllerId) ||
+        if (!TryGetOwner(quest.QuestGiver, out var controllerId) ||
             !playerManager.TryGetPlayer(controllerId, out var player)) return false;
         return TryEnterOwnerScope(player, out scope);
     }
@@ -269,8 +271,17 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
     public bool IsOwnedBy(Quest quest, Hero hero)
     {
         return objectManager.TryGetId(hero, out var heroId) &&
-            ownership.TryGetOwnerControllerId(quest.QuestGiver, out var controllerId) &&
+            TryGetOwner(quest.QuestGiver, out var controllerId) &&
             playerManager.TryGetPlayer(controllerId, out var player) && player.HeroId == heroId;
+    }
+
+    public bool IsLocalPeerOwner(Hero giver) =>
+        TryGetOwner(giver, out var controllerId) && controllerId == controllerIdProvider.ControllerId;
+
+    private bool TryGetOwner(Hero giver, out string controllerId)
+    {
+        controllerId = null;
+        return giver?.Issue != null && ownerResolver.TryGetOwnerControllerId(giver.Issue, out controllerId);
     }
 
     public bool IsPresentWithGiver(string controllerId, Hero giver)
@@ -288,7 +299,7 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
 
     public void RequestChoice(Quest quest, RivalCapturedChoice choice)
     {
-        if (!quest.IsOngoing || !ownership.IsLocalPeerOwner(quest.QuestGiver) ||
+        if (!quest.IsOngoing || !IsLocalPeerOwner(quest.QuestGiver) ||
             !objectManager.TryGetIdWithLogging(quest.QuestGiver, out var giverId) ||
             !generations.TryGetGeneration(quest.QuestGiver, out var generation)) return;
 
@@ -298,7 +309,7 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
     public void ApplyChoice(Player player, RequestRivalCapturedChoice request)
     {
         if (!objectManager.TryGetObjectWithLogging<Hero>(request.GiverId, out var giver) ||
-            !ownership.TryGetOwnerControllerId(giver, out var controllerId) || controllerId != player.ControllerId ||
+            !TryGetOwner(giver, out var controllerId) || controllerId != player.ControllerId ||
             !generations.TryGetGeneration(giver, out var generation) || generation != request.Generation ||
             giver.Issue?.IssueQuest is not Quest quest || !quest.IsOngoing ||
             !TryEnterOwnerScope(quest, out var scope)) return;
@@ -346,7 +357,7 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
 
         foreach (var quest in Campaign.Current.QuestManager.Quests.OfType<Quest>())
         {
-            if (!quest.IsOngoing || !ownership.TryGetOwnerControllerId(quest.QuestGiver, out var owner) ||
+            if (!quest.IsOngoing || !TryGetOwner(quest.QuestGiver, out var owner) ||
                 owner != player.ControllerId || !generations.TryGetGeneration(quest.QuestGiver, out var generation) ||
                 !objectManager.TryGetHandleWithLogging(quest._targetHero.CharacterObject, out var targetHandle) ||
                 !prisoners.Data.Any(troop => troop.CharacterId == targetHandle && troop.Number > 0)) continue;
@@ -406,7 +417,7 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
 
     public void SendProgress(Quest quest)
     {
-        if (!ownership.TryGetOwnerControllerId(quest.QuestGiver, out var controllerId) ||
+        if (!TryGetOwner(quest.QuestGiver, out var controllerId) ||
             !playerManager.TryGetPeer(controllerId, out var peer) ||
             !objectManager.TryGetIdWithLogging(quest.QuestGiver, out var giverId) ||
             !generations.TryGetGeneration(quest.QuestGiver, out var generation)) return;
@@ -417,7 +428,7 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
     public void MirrorProgress(NetworkRivalCapturedProgress data)
     {
         if (!objectManager.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver) ||
-            !ownership.IsLocalPeerOwner(giver) ||
+            !IsLocalPeerOwner(giver) ||
             !generations.TryGetGeneration(giver, out var generation) || generation != data.Generation ||
             giver.Issue?.IssueQuest is not Quest quest || !quest.IsOngoing) return;
 
@@ -562,7 +573,7 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
         {
             foreach (var quest in Campaign.Current.QuestManager.Quests.OfType<Quest>().ToArray())
             {
-                if (quest.IsOngoing && ownership.TryGetOwnerControllerId(quest.QuestGiver, out var owner) && owner == controllerId)
+                if (quest.IsOngoing && TryGetOwner(quest.QuestGiver, out var owner) && owner == controllerId)
                     quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.\""));
             }
         }
@@ -614,7 +625,7 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
     {
         foreach (var quest in manager.Quests.OfType<Quest>().ToArray())
         {
-            if (ownership.IsLocalPeerOwner(quest.QuestGiver)) continue;
+            if (IsLocalPeerOwner(quest.QuestGiver)) continue;
             manager.RemoveAllTrackedObjectsForQuest(quest);
             manager._quests.Remove(quest);
             if (quest.QuestGiver.Issue?.IssueQuest == quest) quest.QuestGiver.Issue.IssueQuest = null;

@@ -202,8 +202,8 @@ internal class RivalCapturedDialoguePatches
     {
         if (CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
         return ModInformation.IsClient && __instance.IsOngoing &&
-            ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership) &&
-            ownership.IsLocalPeerOwner(__instance.QuestGiver);
+            ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests) &&
+            quests.IsLocalPeerOwner(__instance.QuestGiver);
     }
 
     [HarmonyPatch("OnTimedOut")]
@@ -248,8 +248,8 @@ internal class RivalCapturedCompletionPatches
         __state = null;
         if (__instance is not Quest quest) return true;
         if (ModInformation.IsClient && RivalCapturedPlayerChangedPatch.OldPlayer != null &&
-            ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership) &&
-            ownership.IsLocalPeerOwner(quest.QuestGiver)) return false;
+            ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var ownerQuests) &&
+            ownerQuests.IsLocalPeerOwner(quest.QuestGiver)) return false;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (!quest.IsOngoing) return false;
         if (quest.QuestGiver?.Issue?.IssueQuest != quest && __originalMethod.Name == nameof(QuestBase.CompleteQuestWithCancel))

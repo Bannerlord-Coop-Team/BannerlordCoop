@@ -139,7 +139,6 @@ public class GameInterfaceModule : Module
         builder.RegisterType<AlleyGarrisonData>().As<IAlleyGarrisonData>().InstancePerDependency();
         builder.RegisterType<IssueGenerationRegistry>().As<IIssueGenerationRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
-        builder.RegisterType<LegacyIssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<LordWantsRivalCapturedQuestService>()
             .As<ILordWantsRivalCapturedQuestService>()
             .InstancePerLifetimeScope();

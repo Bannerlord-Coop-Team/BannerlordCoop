@@ -10,6 +10,7 @@ using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsToOffloadSto
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.CreationCapture;
 using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
 using GameInterface.Services.MapEvents;
@@ -34,7 +35,6 @@ namespace E2E.Tests.Services.Issues;
 
 using Issue = LordWantsRivalCapturedIssueBehavior.LordWantsRivalCapturedIssue;
 using Quest = LordWantsRivalCapturedIssueBehavior.LordWantsRivalCapturedIssueQuest;
-using IIssueAcceptPreconditions = GameInterface.Services.Issues.Framework.Interface.IIssueAcceptPreconditions;
 
 public sealed class LordWantsRivalCapturedTests : IDisposable
 {
@@ -49,7 +49,9 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
     private readonly string playerId;
     private readonly string partyId;
     private readonly string giverPartyId;
+    private readonly string settlementId;
     private const string Controller = "rival-captured-player";
+    private const string OtherController = "other-rival-player";
 
     public LordWantsRivalCapturedTests(ITestOutputHelper output)
     {
@@ -60,7 +62,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
         partyId = environment.CreateRegisteredObject<MobileParty>();
         giverPartyId = environment.CreateRegisteredObject<MobileParty>();
         var targetPartyId = environment.CreateRegisteredObject<MobileParty>();
-        var settlementId = environment.CreateRegisteredObject<Settlement>();
+        settlementId = environment.CreateRegisteredObject<Settlement>();
         var kingdomId = environment.CreateRegisteredObject<Kingdom>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
 
@@ -113,7 +115,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
 
         environment.ConnectRegisteredPlayer(Client, Controller);
         Client.Resolve<IControllerIdProvider>().SetControllerId(Controller);
-        OtherClient.Resolve<IControllerIdProvider>().SetControllerId("other-rival-player");
+        OtherClient.Resolve<IControllerIdProvider>().SetControllerId(OtherController);
         Server.Call(() =>
         {
             Assert.True(Server.Resolve<ILordWantsRivalCapturedQuestService>().IsPresentWithGiver(Controller, Get<Hero>(Server, giverId)));
@@ -134,18 +136,84 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
 
     private Quest GetQuest(EnvironmentInstance instance) => Assert.IsType<Quest>(Get<Hero>(instance, giverId).Issue.IssueQuest);
 
-    private void Accept()
+    private void Accept() => Accept(Client, Controller, giverId, playerId, partyId);
+
+    private void Accept(EnvironmentInstance client, string controllerId, string issueGiverId, string heroId, string mobilePartyId)
     {
-        Client.Call(() =>
+        RequestAccept(client, controllerId, issueGiverId, heroId, mobilePartyId);
+        Server.Call(() => Assert.True(Assert.IsType<Quest>(Get<Hero>(Server, issueGiverId).Issue.IssueQuest).IsOngoing));
+    }
+
+    // Starts the quest the way the accept dialog does, without the dialog's own CheckPreconditions
+    private void RequestAccept(EnvironmentInstance client, string controllerId, string issueGiverId, string heroId, string mobilePartyId)
+    {
+        client.Call(() =>
         {
-            var giver = Get<Hero>(Client, giverId);
-            using (new MainHeroSubstitutionScope(Get<Hero>(Client, playerId), Get<MobileParty>(Client, partyId)))
+            var giver = Get<Hero>(client, issueGiverId);
+            using (new MainHeroSubstitutionScope(Get<Hero>(client, heroId), Get<MobileParty>(client, mobilePartyId)))
             {
-                MessageBroker.Instance.Publish(giver, new IssueConversationOpenedLocally(giver, Controller));
+                MessageBroker.Instance.Publish(giver, new IssueConversationOpenedLocally(giver, controllerId));
                 Assert.True(Campaign.Current.IssueManager.StartIssueQuest(giver));
             }
         });
-        Server.Call(() => Assert.True(GetQuest(Server).IsOngoing));
+    }
+
+    // A second player in the same kingdom and settlement, with a rival issue from a second giver
+    private (string GiverId, string PlayerId, string PartyId) AddOtherPlayerAndIssue(int tier = 2, int troops = 50)
+    {
+        var otherGiverId = environment.CreateRegisteredObject<Hero>();
+        var otherGiverPartyId = environment.CreateRegisteredObject<MobileParty>();
+        var otherPlayerId = environment.CreateRegisteredObject<Hero>();
+        var otherPartyId = environment.CreateRegisteredObject<MobileParty>();
+        var otherTroopId = environment.CreateRegisteredObject<CharacterObject>();
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                var giver = Get<Hero>(instance, otherGiverId);
+                var giverParty = Get<MobileParty>(instance, otherGiverPartyId);
+                var player = Get<Hero>(instance, otherPlayerId);
+                var party = Get<MobileParty>(instance, otherPartyId);
+                var settlement = Get<Settlement>(instance, settlementId);
+                using (new AllowedThread())
+                {
+                    giver.Clan.SetLeader(giver);
+                    player.Clan.SetLeader(player);
+                    giver.Clan._kingdom = Get<Hero>(instance, giverId).Clan.Kingdom;
+                    player.Clan._kingdom = giver.Clan.Kingdom;
+                    player.Clan._tier = tier;
+                    giver.PartyBelongedTo = giverParty;
+                    player.PartyBelongedTo = party;
+                    giverParty.ActualClan = giver.Clan;
+                    party.ActualClan = player.Clan;
+                    giverParty.CurrentSettlement = settlement;
+                    party.CurrentSettlement = settlement;
+                    giver.StayingInSettlement = settlement;
+                    party.MemberRoster.Clear();
+                    party.MemberRoster.AddToCounts(Get<CharacterObject>(instance, otherTroopId), troops);
+                }
+                Assert.Equal(troops, party.MemberRoster.TotalHealthyCount);
+                Assert.True(instance.Resolve<IPlayerManager>().AddPlayer(
+                    new Player(OtherController, otherPlayerId, otherPartyId, "", "")));
+            });
+        }
+        environment.ConnectRegisteredPlayer(OtherClient, OtherController);
+        Server.Call(() =>
+        {
+            var target = Get<Hero>(Server, targetId);
+            var data = new PotentialIssueData((in PotentialIssueData _, Hero giver) => new Issue(giver, target),
+                typeof(Issue), IssueBase.IssueFrequency.Rare);
+            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in data, Get<Hero>(Server, otherGiverId)));
+        });
+        return (otherGiverId, otherPlayerId, otherPartyId);
+    }
+
+    private static string OwnerOf(EnvironmentInstance instance, string issueGiverId)
+    {
+        var issue = Get<Hero>(instance, issueGiverId).Issue;
+        return issue != null && instance.Resolve<IIssueOwnerResolver>().TryGetOwnerControllerId(issue, out var controllerId)
+            ? controllerId
+            : null;
     }
 
     private void AllocateTargetPrisonerLoot()
@@ -532,7 +600,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
         Accept();
         Server.Call(() =>
         {
-            var allocatedPlayer = new Player(changedIdentity == "controller" ? "other-rival-player" : Controller,
+            var allocatedPlayer = new Player(changedIdentity == "controller" ? OtherController : Controller,
                 changedIdentity == "hero" ? giverId : playerId,
                 changedIdentity == "party" ? giverPartyId : partyId, "", "");
             Assert.True(Server.ObjectManager.TryGetHandle(Get<Hero>(Server, targetId).CharacterObject, out var handle));
@@ -655,39 +723,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
     public void RivalPreconditionsScopeDuplicatesToThePlayerAndKeepNativeRequirements(int tier, int troops, bool eligible)
     {
         Accept();
-        var otherGiverId = environment.CreateRegisteredObject<Hero>();
-        var otherPlayerId = environment.CreateRegisteredObject<Hero>();
-        var otherPartyId = environment.CreateRegisteredObject<MobileParty>();
-        var otherTroopId = environment.CreateRegisteredObject<CharacterObject>();
-        foreach (var instance in Instances)
-        {
-            instance.Call(() =>
-            {
-                var giver = Get<Hero>(instance, otherGiverId);
-                var player = Get<Hero>(instance, otherPlayerId);
-                var party = Get<MobileParty>(instance, otherPartyId);
-                using (new AllowedThread())
-                {
-                    giver.Clan._kingdom = Get<Hero>(instance, giverId).Clan.Kingdom;
-                    player.Clan._kingdom = giver.Clan.Kingdom;
-                    player.Clan._tier = tier;
-                    player.PartyBelongedTo = party;
-                    party.ActualClan = player.Clan;
-                    party.MemberRoster.Clear();
-                    party.MemberRoster.AddToCounts(Get<CharacterObject>(instance, otherTroopId), troops);
-                }
-                Assert.Equal(troops, party.MemberRoster.TotalHealthyCount);
-                Assert.True(instance.Resolve<IPlayerManager>().AddPlayer(
-                    new Player("other-rival-player", otherPlayerId, otherPartyId, "", "")));
-            });
-        }
-        Server.Call(() =>
-        {
-            var target = Get<Hero>(Server, targetId);
-            var data = new PotentialIssueData((in PotentialIssueData _, Hero giver) => new Issue(giver, target),
-                typeof(Issue), IssueBase.IssueFrequency.Rare);
-            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in data, Get<Hero>(Server, otherGiverId)));
-        });
+        var (otherGiverId, otherPlayerId, otherPartyId) = AddOtherPlayerAndIssue(tier, troops);
 
         foreach (var client in environment.Clients)
         {
@@ -707,8 +743,71 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
             var preconditions = Server.Resolve<IIssueAcceptPreconditions>();
             Assert.False(preconditions.CanTake(issue, Get<Hero>(Server, playerId), Controller));
             // The server leaves the troop count to the accepting client's own check
-            Assert.Equal(tier >= 2, preconditions.CanTake(issue, Get<Hero>(Server, otherPlayerId), "other-rival-player"));
+            Assert.Equal(tier >= 2, preconditions.CanTake(issue, Get<Hero>(Server, otherPlayerId), OtherController));
         });
+    }
+
+    [Fact]
+    public void DifferentPlayersHoldSeparateRivalQuestsAtTheSameTime()
+    {
+        Accept();
+        var other = AddOtherPlayerAndIssue();
+        Accept(OtherClient, OtherController, other.GiverId, other.PlayerId, other.PartyId);
+
+        Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>().Count());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.Equal(Controller, OwnerOf(instance, giverId));
+                Assert.Equal(OtherController, OwnerOf(instance, other.GiverId));
+            });
+        }
+        Server.Call(() =>
+        {
+            Assert.True(GetQuest(Server).IsOngoing);
+            Assert.True(Assert.IsType<Quest>(Get<Hero>(Server, other.GiverId).Issue.IssueQuest).IsOngoing);
+        });
+        foreach (var (client, ownGiverId, otherGiverId) in new[] { (Client, giverId, other.GiverId), (OtherClient, other.GiverId, giverId) })
+        {
+            client.Call(() =>
+            {
+                var ownQuest = Assert.IsType<Quest>(Get<Hero>(client, ownGiverId).Issue.IssueQuest);
+                Assert.Same(ownQuest, Assert.Single(Campaign.Current.QuestManager.Quests.OfType<Quest>()));
+                var otherIssue = Get<Hero>(client, otherGiverId).Issue;
+                Assert.True(otherIssue.IsSolvingWithQuest);
+                Assert.Null(otherIssue.IssueQuest);
+            });
+        }
+    }
+
+    [Fact]
+    public void ServerRefusesASecondRivalQuestToThePlayerWhoAlreadyHoldsOne()
+    {
+        Accept();
+        var other = AddOtherPlayerAndIssue();
+        RequestAccept(Client, Controller, other.GiverId, playerId, partyId);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Server.Call(() =>
+        {
+            Assert.True(Get<Hero>(Server, other.GiverId).Issue.IsOngoingWithoutQuest);
+            Assert.Null(OwnerOf(Server, other.GiverId));
+            Assert.True(GetQuest(Server).IsOngoing);
+        });
+        Client.Call(() =>
+        {
+            var issue = Get<Hero>(Client, other.GiverId).Issue;
+            Assert.True(issue.IsOngoingWithoutQuest);
+            Assert.Null(issue.IssueQuest);
+            Assert.Same(GetQuest(Client), Assert.Single(Campaign.Current.QuestManager.Quests.OfType<Quest>()));
+        });
+
+        // The refused issue is still open to an eligible player
+        Accept(OtherClient, OtherController, other.GiverId, other.PlayerId, other.PartyId);
+        foreach (var instance in Instances)
+            instance.Call(() => Assert.Equal(OtherController, OwnerOf(instance, other.GiverId)));
     }
 
     [Fact]
@@ -751,7 +850,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
             Assert.True(quest.IsOngoing);
             Assert.Single(quest.JournalEntries);
             Assert.True(quest.IsTracked(Get<Hero>(Client, targetId)));
-            Assert.True(Client.Resolve<IIssueOwnershipRegistry>().IsLocalPeerOwner(quest.QuestGiver));
+            Assert.Equal(Controller, OwnerOf(Client, giverId));
             Assert.Equal(-37, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
         });
         Server.Call(() => Assert.True(GetQuest(Server).IsOngoing));
@@ -776,7 +875,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
             }
             Assert.True(players.RemovePlayer(registered));
             Assert.Null(Get<Hero>(Server, giverId).Issue);
-            Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(Get<Hero>(Server, giverId), out _));
+            Assert.DoesNotContain(Server.Resolve<IIssueOwnershipRegistry>().GetAll(), entry => entry.IssueOwnerId == giverId);
             Assert.True(Server.ObjectManager.TryGetId(Get<Hero>(Server, targetId).PartyBelongedTo, out var replacementPartyId));
             Assert.True(players.AddPlayer(new Player(Controller, targetId, replacementPartyId, "", "")));
             Assert.Empty(Campaign.Current.QuestManager.Quests.OfType<Quest>());
@@ -1033,7 +1132,7 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
                 strategy.ReplayQuestAccepted(giver);
                 var quest = GetQuest(Server);
                 Assert.True(quest.IsOngoing);
-                Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwnerControllerId(giver, out _));
+                Assert.Null(OwnerOf(Server, giverId));
                 strategy.RejectAcceptance(giver);
                 Assert.True(quest.IsFinalized);
                 Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
