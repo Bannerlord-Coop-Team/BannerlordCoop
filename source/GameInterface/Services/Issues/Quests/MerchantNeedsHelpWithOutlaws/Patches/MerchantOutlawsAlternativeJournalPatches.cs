@@ -4,6 +4,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using Issue = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssue;
+using Quest = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws.Patches;
 
@@ -22,6 +23,13 @@ internal class MerchantOutlawsAlternativeJournalPatches
     [HarmonyPrefix]
     private static void FinalizedPrefix(IssueBase __instance)
     {
+        // Framework dismissal ends the issue directly, without finalizing its unstarted server quest.
+        if (ModInformation.IsServer && __instance is Issue && __instance.IssueQuest is Quest quest && quest.IsOngoing)
+        {
+            quest.FinalizeQuest();
+            quest.AfterFinalize();
+        }
+
         if (__instance is Issue && ContainerProvider.TryResolve<IMerchantOutlawsProgress>(out var progress)) progress.Send(__instance);
     }
 }

@@ -15,6 +15,7 @@ using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
@@ -205,6 +206,8 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             {
                 issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
                 ApplyState(issue, data.State);
+                // Vanilla's daily tick reads the first log even for another player's mission.
+                if (issue.JournalEntries.Count == 0) issue._journalEntries.Add(new JournalLog(CampaignTime.Now, new TextObject("{=!}")));
                 return;
             }
 

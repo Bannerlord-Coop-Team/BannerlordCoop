@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.Issues;
 using Quest = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws.Patches;
@@ -51,6 +52,15 @@ internal class MerchantOutlawsOutcomePatches
 
         __instance._validPartiesList.Clear();
         return false;
+    }
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.QuestAcceptedConsequences))]
+    [HarmonyPrefix]
+    private static bool AcceptedPrefix(Quest __instance)
+    {
+        // A refusal or world cancellation can arrive before the player closes the offer dialogue.
+        return __instance.IsOngoing && __instance._questProgressLogTest == null &&
+            IssueManager.GetIssueOfQuest(__instance) != null;
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.QuestAcceptedConsequences))]

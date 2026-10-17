@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Util;
+using Common.Network.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -11,8 +12,11 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using Helpers;
+using LiteNetLib;
+using Moq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -21,6 +25,7 @@ using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -168,6 +173,21 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Fact]
+    public void AnOfferClosedAfterItsCancellationCannotStartAnOrphanQuest()
+    {
+        Accept(startQuest: false);
+        var ownerQuest = Quest(ClientA);
+        Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
+        AssertEndedEverywhere();
+        ClientA.Call(() =>
+        {
+            ownerQuest.QuestAcceptedConsequences();
+            Assert.DoesNotContain(ownerQuest, Campaign.Current.QuestManager.Quests);
+            Assert.Null(ownerQuest._questProgressLogTest);
+        }, TextHelpers);
+    }
+
+    [Fact]
     public void DestroyingATargetUpdatesOnlyTheOwnerAndCountsItOnce()
     {
         Accept();
@@ -237,6 +257,40 @@ public class MerchantOutlawsTests : IDisposable
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Server.Call(() => Assert.Equal(100, Get<Hero>(Server, scenario.PlayerA.HeroId).Gold));
         Assert.True(Quest(ClientA).IsOngoing);
+    }
+
+    [Fact]
+    public void FrameworkDisconnectDismissalReleasesTheServersTargets()
+    {
+        Accept();
+        var serverQuest = Quest(Server);
+        Assert.NotEmpty(serverQuest._validPartiesList);
+        Server.Call(() =>
+        {
+            Server.Resolve<IPlayerManager>().ClearPeer(ClientA.NetPeer);
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(ClientA.NetPeer, default(DisconnectInfo)));
+        }, TextHelpers);
+        Server.PumpGameThread();
+        Assert.Empty(serverQuest._validPartiesList);
+        Assert.True(serverQuest.IsFinalized);
+        AssertEndedEverywhere();
+    }
+
+    [Fact]
+    public void RaidOnTheGiversVillageCancelsItsQuest()
+    {
+        Accept();
+        var villageId = environment.CreateRegisteredObject<Village>();
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread()) Get<Settlement>(instance, settlementId).SetSettlementComponent(Get<Village>(instance, villageId));
+            });
+        }
+        Server.Call(() => CampaignEventDispatcher.Instance.OnVillageBeingRaided(Get<Village>(Server, villageId)), TextHelpers);
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        AssertEndedEverywhere();
     }
 
     [Fact]
@@ -322,9 +376,11 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails)
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker)
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
@@ -336,8 +392,10 @@ public class MerchantOutlawsTests : IDisposable
                 using (new AllowedThread())
                 {
                     Get<CharacterObject>(instance, troopId).Level = 20;
+                    Get<CharacterObject>(instance, troopId).UpgradeTargets = Array.Empty<CharacterObject>();
                     Get<Hero>(instance, companionId).HitPoints = 100;
                     Get<Hero>(instance, companionId).SetSkillValue(DefaultSkills.Tactics, 150);
+                    Get<Hero>(instance, companionId)._partyBelongedTo = Get<MobileParty>(instance, scenario.PlayerA.MobilePartyId);
                 }
             });
         }
@@ -359,18 +417,60 @@ public class MerchantOutlawsTests : IDisposable
             using (new AllowedThread())
             {
                 party.MemberRoster.AddToCounts(companion.CharacterObject, -1);
-                party.MemberRoster.AddToCounts(troop, -sent);
                 issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                issue.AlternativeSolutionSentTroops.AddToCounts(troop, sent);
             }
-            ClientA.Resolve<IMessageBroker>().Publish(this, new AlternativeSolutionAcceptRequested(issue));
+
+            var logic = new PartyScreenLogic();
+            logic.Initialize(new PartyScreenLogicInitializationData
+            {
+                LeftMemberRoster = issue.AlternativeSolutionSentTroops,
+                RightMemberRoster = party.MemberRoster,
+                LeftPrisonerRoster = TroopRoster.CreateDummyTroopRoster(),
+                RightPrisonerRoster = party.PrisonRoster,
+                RightOwnerParty = party.Party,
+                RightLeaderHero = Get<Hero>(ClientA, scenario.PlayerA.HeroId),
+                PartyPresentationDoneButtonDelegate = PartyScreenHelper.ManageTroopsAndPrisonersDoneHandler,
+            });
+            logic._partyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+            var transfer = new PartyScreenLogic.PartyCommand();
+            transfer.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, sent, 0, -1);
+            using (new AllowedThread()) logic.TransferTroop(transfer, false);
+            if (cancelPicker)
+            {
+                using (new AllowedThread()) logic.Reset(true);
+            }
+            else
+            {
+                Assert.True(logic.DoneLogic(false));
+                Assert.Equal(sent, issue.AlternativeSolutionSentTroops.GetTroopCount(troop));
+            }
+            var agent = new Mock<IAgent>();
+            agent.SetupGet(value => value.Character).Returns(Get<Hero>(ClientA, scenario.NotableId).CharacterObject);
+            Campaign.Current.ConversationManager._conversationAgents.Add(agent.Object);
+            if (cancel) IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_b_consequence();
+            else IssuesCampaignBehavior.issue_offer_player_accept_alternative_5_a_consequence();
         }, TextHelpers);
         environment.FlushCoalescer();
+
+        if (cancel)
+        {
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+            Server.Call(() =>
+            {
+                Assert.Equal(sent + 5, Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId)));
+                Assert.True(Get<Hero>(Server, scenario.NotableId).Issue.IsOngoingWithoutQuest);
+            });
+            return;
+        }
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
         Issue ownerIssue = null!;
         ClientA.Call(() => ownerIssue = Assert.IsType<Issue>(Get<Hero>(ClientA, scenario.NotableId).Issue));
+        foreach (var client in new[] { ClientA, ClientB })
+        {
+            client.Call(() => Campaign.Current.IssueManager.DailyTick(), TextHelpers);
+        }
 
         Server.Call(() =>
         {
@@ -393,7 +493,7 @@ public class MerchantOutlawsTests : IDisposable
         AssertEndedEverywhere();
     }
 
-    private void Accept()
+    private void Accept(bool startQuest = true)
     {
         ClientA.Call(() =>
         {
@@ -401,7 +501,7 @@ public class MerchantOutlawsTests : IDisposable
             using (new MainHeroSubstitutionScope(player, player.PartyBelongedTo))
             {
                 Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithQuest();
-                Quest(ClientA).QuestAcceptedConsequences();
+                if (startQuest) Quest(ClientA).QuestAcceptedConsequences();
             }
         }, TextHelpers);
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
