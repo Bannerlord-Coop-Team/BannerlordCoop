@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Registry.Messages;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Issues.Messages;
@@ -55,6 +56,7 @@ internal class LordNeedsHorsesIssueHandler : IHandler
         messageBroker.Subscribe<NetworkLordNeedsHorsesJournal>(Handle_NetworkJournal);
         messageBroker.Subscribe<LordNeedsHorsesTraitProgressChanged>(Handle_TraitProgressChanged);
         messageBroker.Subscribe<NetworkLordNeedsHorsesTraitProgress>(Handle_NetworkTraitProgress);
+        messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
     }
 
     public void Dispose()
@@ -67,6 +69,15 @@ internal class LordNeedsHorsesIssueHandler : IHandler
         messageBroker.Unsubscribe<NetworkLordNeedsHorsesJournal>(Handle_NetworkJournal);
         messageBroker.Unsubscribe<LordNeedsHorsesTraitProgressChanged>(Handle_TraitProgressChanged);
         messageBroker.Unsubscribe<NetworkLordNeedsHorsesTraitProgress>(Handle_NetworkTraitProgress);
+        messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
+    }
+
+    // Owners loaded from the save are recorded with the framework once the heroes have ids
+    private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> payload)
+    {
+        if (ModInformation.IsClient) return;
+
+        ownership.MirrorAll();
     }
 
     private void Handle_SwitchedPlayer(MessagePayload<SwitchedPlayer> payload) => questService.RestoreLocalTraitProgress();

@@ -389,43 +389,6 @@ public class GenericQuestTypeAcceptSecurityTests : IDisposable
         });
     }
 
-    [Theory]
-    [InlineData(false, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(true, false, true)]
-    public void HorseQuestConflict_UsesTheSolversControllerWithoutResolvingOtherPlayersParties(
-        bool sameOwner, bool registerOtherOwner, bool expected)
-    {
-        var fixture = SetupVillageOwner();
-        var controllerId = ConnectPlayer(fixture);
-        var otherGiverId = TestEnvironment.CreateRegisteredObject<Hero>();
-        Server.Call(() =>
-        {
-            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
-            var hero = Server.GetRegisteredObject<Hero>(player.HeroId);
-            var party = Server.GetRegisteredObject<MobileParty>(player.MobilePartyId);
-            var giver = Server.GetRegisteredObject<Hero>(otherGiverId);
-            if (registerOtherOwner)
-                Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("other-solver", otherGiverId, null, "", "")));
-            var active = ObjectHelper.SkipConstructor<LordNeedsHorsesIssueBehavior.LordNeedsHorsesIssue>();
-            active._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
-            var ownership = Server.Resolve<IIssueOwnershipRegistry>();
-            ownership.SetOwner(giver, sameOwner ? controllerId : "other-solver");
-            Campaign.Current.IssueManager._issues.Add(giver, active);
-            try
-            {
-                using (new MainHeroSubstitutionScope(hero, party))
-                    Assert.Equal(expected, Server.Resolve<ILordNeedsHorsesQuest>().HasConflictingQuest(
-                        ObjectHelper.SkipConstructor<LordNeedsHorsesIssueBehavior.LordNeedsHorsesIssue>()));
-            }
-            finally
-            {
-                Campaign.Current.IssueManager._issues.Remove(giver);
-                ownership.Clear(giver);
-            }
-        });
-    }
-
     [Fact]
     public void RequestQuestTypeAcceptAlternative_PeerNeverOpenedConversation_RejectedDespiteFreshGeneration()
     {

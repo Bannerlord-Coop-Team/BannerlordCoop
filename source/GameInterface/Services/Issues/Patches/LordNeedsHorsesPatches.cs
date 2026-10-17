@@ -305,33 +305,6 @@ internal class LordNeedsHorsesAlternativeCompletionPatch
     }
 }
 
-// SimilarCommitmentsGatePatch only hides issues whose owner IIssueOwnerResolver knows, and this quest's owners are in
-// the Generic ownership registry, so vanilla's similar commitments refusal and the per-player check below stay here.
-[HarmonyPatch(typeof(IssueBase), "get_IssueQuestCanBeDuplicated")]
-internal class LordNeedsHorsesDuplicateGatePatch
-{
-    [HarmonyPostfix]
-    private static void Postfix(IssueBase __instance, ref bool __result)
-    {
-        if (__instance is Issue && !CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) __result = true;
-    }
-}
-
-[HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CheckPreconditions))]
-internal class LordNeedsHorsesEligibilityPatch
-{
-    [HarmonyPostfix]
-    private static void Postfix(IssueBase __instance, Hero issueGiver, ref bool __result, ref TextObject explanation)
-    {
-        if (__instance is not Issue issue || !issue.IsOngoingWithoutQuest || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return;
-        if (ContainerProvider.TryResolve<ILordNeedsHorsesQuest>(out var service) && !service.HasConflictingQuest(issue)) return;
-        // Vanilla ranks the stay-alive cancel and then the at-war refusal above the duplicate one, which outranks the rest.
-        if (!__result && (!issue.IssueStayAliveConditions() || issueGiver.MapFaction.IsAtWarWith(Hero.MainHero.MapFaction))) return;
-        __result = false;
-        explanation = new TextObject("{=HvY7wjHt}I don't think you can help me. I think you may have other, similar commitments that could interfere.");
-    }
-}
-
 [HarmonyPatch(typeof(LordNeedsHorsesIssueBehavior), nameof(LordNeedsHorsesIssueBehavior.ConditionsHold))]
 internal class LordNeedsHorsesPlayerClanGiverPatch
 {

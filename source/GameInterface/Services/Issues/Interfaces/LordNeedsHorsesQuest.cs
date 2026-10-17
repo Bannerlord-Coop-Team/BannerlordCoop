@@ -40,7 +40,6 @@ internal interface ILordNeedsHorsesQuest : IRaceArbitratedAcceptMirrorStrategy<L
     void RequestOutcome(Quest quest, IssueFinalizeReason reason);
     void WaitForAcceptance(Hero giver);
     void ResumeAcceptanceConversation(Hero giver, bool accepted);
-    bool HasConflictingQuest(Issue issue);
     JournalLogEntry CreateJournal(Issue issue);
     IDisposable SelectCoercionTraitProgress(Hero giver);
     void ApplyTraitProgress(Hero hero, int progress);
@@ -319,22 +318,6 @@ internal sealed class LordNeedsHorsesQuest : ILordNeedsHorsesQuest
         return issue.IssueQuest is Quest quest
             ? new LordNeedsHorsesJournalLogEntry(controllerId, quest.Title, issue.IssueOwner, issue, quest)
             : new LordNeedsHorsesJournalLogEntry(controllerId, issue.Title, issue.IssueOwner, issue);
-    }
-
-    public bool HasConflictingQuest(Issue issue)
-    {
-        if (!objectManager.TryGetIdWithLogging(Hero.MainHero, out var heroId)) return true;
-        var solver = playerManager.Players.FirstOrDefault(player => player.HeroId == heroId);
-        if (solver == null) return true;
-
-        foreach (var entry in Campaign.Current.IssueManager.Issues)
-        {
-            if (entry.Value is not Issue other || other == issue ||
-                (!other.IsSolvingWithQuest && !other.IsSolvingWithAlternative)) continue;
-            if (ownership.TryGetOwnerControllerId(entry.Key, out var ownerControllerId) &&
-                ownerControllerId == solver.ControllerId) return true;
-        }
-        return false;
     }
 
     public bool TryResolvePlayer(Hero giver, out Hero hero, out MobileParty party)
