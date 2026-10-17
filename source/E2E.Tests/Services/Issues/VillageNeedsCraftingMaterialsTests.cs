@@ -35,7 +35,6 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
     private const int AccepterPayment = 1234;
 
     private static readonly FieldInfo RequestedItemField = AccessTools.Field(typeof(Issue), nameof(Issue._requestedItem));
-    private static readonly FieldInfo RequestedItemAmountField = AccessTools.Field(typeof(Quest), nameof(Quest._requestedItemAmount));
 
     private static readonly MethodBase[] QuestLogTexts =
     {
@@ -168,28 +167,25 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(true, 0, 0)]
-    [InlineData(false, 5, 0)]
-    [InlineData(true, 5, 1)]
-    public void SuccessBranch_RunsOnlyWhenTheOwnerBringsTheMaterialsToTheVillage(bool inVillage, int carried, int expectedRuns)
+    [InlineData(true, false, 0)]
+    [InlineData(false, true, 0)]
+    [InlineData(true, true, 1)]
+    public void SuccessBranch_RunsOnlyWhenTheOwnerBringsTheMaterialsToTheVillage(bool inVillage, bool carriesEnough, int expectedRuns)
     {
-        using var success = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.Success)));
+        Accept();
+
+        using var completion = new MethodCallRecorder(AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess)));
 
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-
-            var quest = (Quest)RuntimeHelpers.GetUninitializedObject(typeof(Quest));
-            quest.QuestGiver = notable;
-            AccessTools.Field(typeof(Quest), nameof(Quest._requestedItem)).SetValue(quest, DefaultItems.IronIngot1);
-            RequestedItemAmountField.SetValue(quest, 5);
+            var quest = QuestOfHere(Server);
 
             using (new AllowedThread())
             {
                 ownerParty.CurrentSettlement = inVillage ? settlement : null;
-                ownerParty.ItemRoster.AddToCounts(DefaultItems.IronIngot1, carried);
+                ownerParty.ItemRoster.AddToCounts(DefaultItems.IronIngot1, quest._requestedItemAmount - (carriesEnough ? 0 : 1));
             }
 
             var previousMainParty = Campaign.Current.MainParty;
@@ -204,9 +200,9 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
             {
                 Campaign.Current.MainParty = previousMainParty;
             }
-        });
+        }, QuestLogTexts);
 
-        Assert.Equal(expectedRuns, success.CountFor(Server));
+        Assert.Equal(expectedRuns, completion.CountFor(Server));
     }
 
     [Fact]
