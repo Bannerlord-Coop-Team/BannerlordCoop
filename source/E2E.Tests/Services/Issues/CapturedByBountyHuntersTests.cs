@@ -217,34 +217,39 @@ public class CapturedByBountyHuntersTests : IDisposable
     }
 
     [Fact]
-    public void AnOwnerWithoutAPartyIsNotPaidForAnotherPlayersClear()
+    public void AnOwnerWithoutAPartyFailsWithoutConsequencesWhenAnotherPlayerClears()
     {
         GiveTheGangLeaderTheIssue();
         AcceptOnClientA();
         var ownerGold = GoldOnServer(ownerHeroId);
+        RemoveTheOwnersParty();
 
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+        EndBattleOnTheServer(BattleState.AttackerVictory, new[] { otherPartyId }, otherHeroId, otherPartyId);
 
-            using (new AllowedThread())
-            {
-                owner._partyBelongedTo = null;
-            }
-        });
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
+
+        Assert.Equal(ownerGold, GoldOnServer(ownerHeroId));
+        AssertGiverPowerChangedOnceBy(0);
+        AssertTheIssueIsGoneEverywhere();
+    }
+
+    [Fact]
+    public void AnOwnerWithoutAPartyKeepsTheQuestWhileBanditsHoldTheHideout()
+    {
+        GiveTheGangLeaderTheIssue();
+        AcceptOnClientA();
+        RemoveTheOwnersParty();
+        PutBanditsInTheHideout();
 
         EndBattleOnTheServer(BattleState.AttackerVictory, new[] { otherPartyId }, otherHeroId, otherPartyId);
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.Equal(ownerGold, GoldOnServer(ownerHeroId));
         AssertGiverPowerChangedOnceBy(0);
     }
 
-    [Fact]
-    public void ABattleElsewhereWhileBanditsHoldTheHideoutChangesNothing()
+    private void PutBanditsInTheHideout()
     {
-        GiveTheGangLeaderTheIssue();
-        AcceptOnClientA();
         var banditPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
         Server.Call(() =>
@@ -257,6 +262,27 @@ public class CapturedByBountyHuntersTests : IDisposable
                 hideout._partiesCache.Add(bandits);
             }
         });
+    }
+
+    private void RemoveTheOwnersParty()
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+
+            using (new AllowedThread())
+            {
+                owner._partyBelongedTo = null;
+            }
+        });
+    }
+
+    [Fact]
+    public void ABattleElsewhereWhileBanditsHoldTheHideoutChangesNothing()
+    {
+        GiveTheGangLeaderTheIssue();
+        AcceptOnClientA();
+        PutBanditsInTheHideout();
 
         EndBattleOnTheServer(BattleState.AttackerVictory, ownerTakesPart: false);
 
