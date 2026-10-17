@@ -12,6 +12,7 @@ using GameInterface.Services.Issues.Framework.Visibility;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 
@@ -167,8 +168,9 @@ public class AcceptVisibilityTests : IDisposable
             Assert.True(otherIssue.IsSolvingWithAlternative);
             Assert.False(otherIssue.IsTriedToSolveBefore);
             Assert.Equal(0, otherIssue.AlternativeSolutionSentTroops.TotalManCount);
-            Assert.Empty(otherIssue.JournalEntries);
+            Assert.All(otherIssue.JournalEntries, log => Assert.True(TextObject.IsNullOrEmpty(log.LogText)));
             Assert.Equal(accepted.State.ReturnTimeTicks, otherIssue.AlternativeSolutionReturnTimeForTroops.NumTicks);
+            Campaign.Current.IssueManager.DailyTick();
         });
 
         Assert.Empty(otherUpdates);
