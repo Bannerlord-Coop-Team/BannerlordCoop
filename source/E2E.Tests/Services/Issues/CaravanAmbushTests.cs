@@ -39,6 +39,7 @@ public class CaravanAmbushTests : IDisposable
     private readonly QuestScenario scenario;
     private readonly string caravanId;
     private readonly string banditId;
+    private readonly GameStateManager previousGameStateManager = GameStateManager.Current;
     private EnvironmentInstance Server => scenario.Server;
     private EnvironmentInstance Owner => scenario.ClientA;
     private EnvironmentInstance Other => scenario.ClientB;
@@ -56,7 +57,11 @@ public class CaravanAmbushTests : IDisposable
         Owner.Call(() => QuestOf(Owner).StartQuest());
     }
 
-    public void Dispose() => environment.Dispose();
+    public void Dispose()
+    {
+        Owner.Call(() => GameStateManager._current = previousGameStateManager);
+        environment.Dispose();
+    }
 
     [Fact]
     public void CreationKeepsTheServersDestination()
@@ -280,7 +285,11 @@ public class CaravanAmbushTests : IDisposable
     public void SavedCaravanConversationOpensOnlyForTheOwner()
     {
         using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
-        Owner.Call(() => Game.Current.GameStateManager._gameStates.Add(Game.Current.GameStateManager.CreateState<MapState>()));
+        Owner.Call(() =>
+        {
+            GameStateManager._current = Game.Current.GameStateManager;
+            GameStateManager.Current._gameStates.Add(GameStateManager.Current.CreateState<MapState>());
+        });
         SendState(QuestScenario.ControllerA, true, 0);
         Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkCaravanAmbushConversation(
             scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA, caravanId)));
@@ -292,7 +301,12 @@ public class CaravanAmbushTests : IDisposable
     public void SavedCaravanConversationWaitsForMissionAndLootScreensAndOpensOnce()
     {
         using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
-        Owner.Call(() => Game.Current.GameStateManager._gameStates.Add(ObjectHelper.SkipConstructor<MissionState>()));
+        Owner.Call(() =>
+        {
+            GameStateManager._current = Game.Current.GameStateManager;
+            GameStateManager.Current._gameStates.Add(ObjectHelper.SkipConstructor<MissionState>());
+            Assert.IsType<MissionState>(GameStateManager.Current.ActiveState);
+        });
         SendState(QuestScenario.ControllerA, true, 0);
         Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkCaravanAmbushConversation(
             scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA, caravanId)));
@@ -321,6 +335,7 @@ public class CaravanAmbushTests : IDisposable
     public void FinalizedQuestDiscardsItsPendingConversation()
     {
         using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
+        Owner.Call(() => GameStateManager._current = Game.Current.GameStateManager);
         SendState(QuestScenario.ControllerA, true, 0);
         Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkCaravanAmbushConversation(
             scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA, caravanId)));
