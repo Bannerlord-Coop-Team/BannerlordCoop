@@ -17,7 +17,18 @@ internal class HeadmanNeedsGrainWorldEventPatches
     [HarmonyPostfix]
     private static void WarPostfix(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail)
     {
-        RunAsOwners(quest => quest.OnWarDeclared(faction1, faction2, declareWarDetail));
+        // CrimeRatingService raises this event as the responsible player.
+        var instigator = Hero.MainHero;
+        RunAsOwners(quest =>
+        {
+            if (declareWarDetail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange && Hero.MainHero != instigator)
+            {
+                QuestHelper.CheckWarDeclarationAndFailOrCancelTheQuest(quest, faction1, faction2, declareWarDetail,
+                    quest.PlayerDeclaredWarQuestLogText, quest.CancelLogOnWarDeclared, forceCancel: true);
+                return;
+            }
+            quest.OnWarDeclared(faction1, faction2, declareWarDetail);
+        });
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
@@ -37,6 +48,9 @@ internal class HeadmanNeedsGrainWorldEventPatches
     private static bool WarPrefix(Quest __instance, IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail detail)
     {
         if (ModInformation.IsClient) return false;
+        if (detail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange &&
+            !((faction1 == Hero.MainHero.MapFaction && faction2 == __instance.QuestGiver.MapFaction) ||
+            (faction2 == Hero.MainHero.MapFaction && faction1 == __instance.QuestGiver.MapFaction))) return false;
         var mapEvent = Hero.MainHero?.PartyBelongedTo?.MapEvent;
         if (detail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange ||
             (detail == DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility && mapEvent?.IsRaid == true &&

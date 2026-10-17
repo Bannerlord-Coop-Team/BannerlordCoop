@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Issues.Quests.HeadmanNeedsGrain;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 

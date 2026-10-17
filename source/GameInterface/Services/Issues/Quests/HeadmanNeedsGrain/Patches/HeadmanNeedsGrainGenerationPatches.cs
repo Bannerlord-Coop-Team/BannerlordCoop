@@ -1,7 +1,8 @@
 ﻿using Common;
-using Common.Messaging;
+using Common.Network;
+using GameInterface.Policies;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Heroes.Extensions;
-using GameInterface.Services.Issues.Framework.Finalization;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -23,14 +24,23 @@ internal class HeadmanNeedsGrainGenerationPatches
     {
         __state = __instance is Issue;
         if (!__state) return true;
+        if (ModInformation.IsClient && CallOriginalPolicy.IsOriginalAllowed())
+        {
+            __state = false;
+            return true;
+        }
         __state = ModInformation.IsServer && !issueSolver.IsPlayerHero();
         return __state;
     }
 
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithAiLord))]
     [HarmonyPostfix]
-    private static void AiCompletionPostfix(IssueBase __instance, bool __state)
+    private static void AiCompletionPostfix(IssueBase __instance, Hero issueSolver, bool __state)
     {
-        if (__state) MessageBroker.Instance.Publish(__instance, new IssueOutcomeObserved(__instance, IssueOutcome.IssueStayAliveFailed));
+        if (!__state || !ContainerProvider.TryResolve<IObjectManager>(out var objects) ||
+            !objects.TryGetIdWithLogging(__instance.IssueOwner, out var giverId) ||
+            !objects.TryGetIdWithLogging(issueSolver, out var solverId) ||
+            !ContainerProvider.TryResolve<INetwork>(out var network)) return;
+        network.SendAll(new NetworkHeadmanNeedsGrainAiCompleted(giverId, __instance.StringId, solverId));
     }
 }

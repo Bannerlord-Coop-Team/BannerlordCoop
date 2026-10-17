@@ -12,6 +12,7 @@ The implementation was checked against full decompilations of `HeadmanNeedsGrain
 `TownMarketData`, `JournalLog`, `LogEntry` and `TraitLevelingHelper` from the installed
 `TaleWorlds.CampaignSystem.dll`, SHA-256
 `1F8E33E2ED73E6EC653D7629180AFB70649DDC6E5BD1657A802A264EFDA1C3AE`.
+The installed SandBox module version is `v1.4.8`.
 The local decompilations are retained under ignored `artifacts/3762-*.cs`.
 
 ## Decisions
@@ -31,6 +32,10 @@ The local decompilations are retained under ignored `artifacts/3762-*.cs`.
   village for the log when there is no event settlement.
 - The new accept path has no conversation-tracker precondition. The old map-conversation tracking
   cherry-pick targets a deleted file and is unnecessary here.
+- Retain the framework's existing disconnect/restart dismissal policy. Active direct quests do not
+  resume after their owner disconnects. Server restart discards unowned companion missions after
+  freeing their companions; ordinary sent troops are not restored by that shared policy. This port
+  does not add a separate persistence lifecycle or claim active-quest resumption.
 
 ## Automated checks
 
@@ -72,7 +77,7 @@ remain unchanged. Resolve a real headman with `coop.debug.issues.give` and the r
 | Companion failure | inherited completion, `AlternativeSolutionEndWithFail` | Preserve the exact-zero RNG failure branch despite default zero failure chance: troops return, giver -5 power, notable relations -3 and town prosperity -10. |
 | Busy owner | framework `BeforeAlternativeSolutionCompletion` | While return is disallowed, keep the same issue and troops; complete and return once on a later eligible tick. |
 | AI lord arrival | `IssuesCampaignBehavior.OnSettlementEntered`, `CompleteIssueWithAiLord` | A real AI may complete an unaccepted offer; player arrival cannot; clients remove the offer. |
-| Save and reconnect | behavior `SyncData`, framework ownership/visibility | Verify accepted ownership, journal isolation, nearby market, average price, trait XP and subsequent completion after reconnect/save load. |
+| Save and reconnect | behavior `SyncData`, framework ownership/visibility/dismissal | Verify framework dismissal on disconnect/restart, journal isolation, nearby market, average price and owner trait XP after loading and switching to the local hero. Active-quest resumption is unsupported by the framework. |
 
 There is no lord solution (`IsThereLordSolution == false`), counteroffer, bribe, persuasion,
 requested-item variant or quest-specific combat mission. Direct reward gold is zero and direct

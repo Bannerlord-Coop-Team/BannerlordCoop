@@ -21,6 +21,8 @@ internal interface IHeadmanNeedsGrainTraitRewards : IGameAbstraction
     void SyncData(IDataStore dataStore);
     void RequestSeed();
     void Seed(Hero owner, Dictionary<string, int> values);
+    void Restore(Hero owner);
+    void RefreshSeed();
 }
 
 internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
@@ -28,6 +30,7 @@ internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private Dictionary<Hero, Dictionary<string, int>> progress = new Dictionary<Hero, Dictionary<string, int>>();
+    private Hero seededOwner;
 
     public HeadmanNeedsGrainTraitRewards(INetwork network, IObjectManager objectManager)
     {
@@ -55,14 +58,23 @@ internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
         model.GetTraitLevelForTraitXp(owner, trait, xp + amount, out var level, out var remainingXp);
         values[trait.StringId] = remainingXp;
         owner.SetTraitLevel(trait, level);
-        network.SendAll(new NetworkHeadmanNeedsGrainTraitReward(ownerId, giverId, trait.StringId, remainingXp, level, (int)note));
+        network.SendAll(new NetworkHeadmanNeedsGrainTraitReward(ownerId, giverId, trait.StringId, amount, (int)note));
     }
 
     public void RequestSeed()
     {
-        if (ModInformation.IsServer || Campaign.Current.PlayerTraitDeveloper == null) return;
-        network.SendAll(new RequestHeadmanNeedsGrainTraitSeed(TraitObject.All.ToDictionary(
-            trait => trait.StringId, trait => Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(trait))));
+        if (ModInformation.IsServer || Hero.MainHero == null || Campaign.Current.PlayerTraitDeveloper == null) return;
+        seededOwner = Hero.MainHero;
+        var values = TraitObject.All.ToDictionary(
+            trait => trait.StringId, trait => Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(trait));
+        progress[seededOwner] = values;
+        network.SendAll(new RequestHeadmanNeedsGrainTraitSeed(values));
+    }
+
+    public void RefreshSeed()
+    {
+        var owner = Hero.MainHero;
+        if (owner != null && (owner == seededOwner || progress.ContainsKey(owner))) RequestSeed();
     }
 
     public void Seed(Hero owner, Dictionary<string, int> values)
@@ -74,8 +86,9 @@ internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
         {
             var trait = MBObjectManager.Instance.GetObject<TraitObject>(value.Key);
             if (trait == null) continue;
-            model.GetTraitLevelForTraitXp(owner, trait, value.Value, out var level, out _);
-            if (level == owner.GetTraitLevel(trait)) accepted[value.Key] = value.Value;
+            model.GetTraitLevelForTraitXp(owner, trait, value.Value, out var level, out var xp);
+            accepted[value.Key] = xp;
+            if (owner.GetTraitLevel(trait) != level) owner.SetTraitLevel(trait, level);
         }
         progress[owner] = accepted;
     }
@@ -84,8 +97,12 @@ internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
     {
         dataStore.SyncData("_coop_grain_trait_progress", ref progress);
         if (progress == null) progress = new Dictionary<Hero, Dictionary<string, int>>();
-        if (!dataStore.IsLoading || ModInformation.IsServer) return;
-        if (!progress.TryGetValue(Hero.MainHero, out var values)) return;
+        if (dataStore.IsLoading && ModInformation.IsClient) Restore(Hero.MainHero);
+    }
+
+    public void Restore(Hero owner)
+    {
+        if (owner == null || Campaign.Current.PlayerTraitDeveloper == null || !progress.TryGetValue(owner, out var values)) return;
         foreach (var value in values)
         {
             var trait = MBObjectManager.Instance.GetObject<TraitObject>(value.Key);
@@ -107,17 +124,15 @@ internal readonly struct NetworkHeadmanNeedsGrainTraitReward : IServerToClientCo
     [ProtoMember(1)] public readonly string OwnerId;
     [ProtoMember(2)] public readonly string GiverId;
     [ProtoMember(3)] public readonly string TraitId;
-    [ProtoMember(4)] public readonly int Xp;
-    [ProtoMember(5)] public readonly int Level;
-    [ProtoMember(6)] public readonly int Note;
+    [ProtoMember(4)] public readonly int Amount;
+    [ProtoMember(5)] public readonly int Note;
 
-    public NetworkHeadmanNeedsGrainTraitReward(string ownerId, string giverId, string traitId, int xp, int level, int note)
+    public NetworkHeadmanNeedsGrainTraitReward(string ownerId, string giverId, string traitId, int amount, int note)
     {
         OwnerId = ownerId;
         GiverId = giverId;
         TraitId = traitId;
-        Xp = xp;
-        Level = level;
+        Amount = amount;
         Note = note;
     }
 }
@@ -165,10 +180,14 @@ internal class HeadmanNeedsGrainTraitRewardHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver)) return;
             var trait = MBObjectManager.Instance.GetObject<TraitObject>(data.TraitId);
             if (trait == null) return;
-            var previousLevel = owner.GetTraitLevel(trait);
-            Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(trait, data.Xp);
-            using (new Common.Util.AllowedThread()) owner.SetTraitLevel(trait, data.Level);
-            if (previousLevel != data.Level) CampaignEventDispatcher.Instance.OnPlayerTraitChanged(trait, previousLevel);
+            var model = Campaign.Current.Models.CharacterDevelopmentModel;
+            var currentXp = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(trait);
+            model.GetTraitLevelForTraitXp(owner, trait, currentXp, out var previousLevel, out _);
+            model.GetTraitLevelForTraitXp(owner, trait, currentXp + data.Amount, out var level, out var xp);
+            Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(trait, xp);
+            using (new Common.Util.AllowedThread()) owner.SetTraitLevel(trait, level);
+            if (previousLevel != level) CampaignEventDispatcher.Instance.OnPlayerTraitChanged(trait, previousLevel);
+            rewards.RequestSeed();
             LogEntry.AddLogEntry(new PlayerReputationChangesLogEntry(trait, giver, (ActionNotes)data.Note));
         }, context: nameof(HeadmanNeedsGrainTraitRewardHandler));
     }

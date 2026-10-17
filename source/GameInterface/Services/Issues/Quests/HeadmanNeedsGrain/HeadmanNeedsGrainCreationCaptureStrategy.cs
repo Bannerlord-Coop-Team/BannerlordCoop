@@ -67,7 +67,7 @@ internal class HeadmanNeedsGrainCreationCaptureStrategy : ICreationCaptureStrate
             return false;
         }
 
-        captured = Capture(new Issue(issueOwner));
+        captured = System.Array.Empty<byte>();
         return true;
     }
 }

@@ -15,6 +15,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
@@ -32,19 +33,11 @@ public class HeadmanNeedsGrainTests : IDisposable
     private static readonly MethodBase[] Texts =
     {
         AccessTools.Method(typeof(Quest), nameof(Quest.SetDialogs)),
-        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.PlayerAcceptedQuestLogText)),
-        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.PlayerHasNeededGrainsLogText)),
-        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.SuccessLog)),
-        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestTimeoutLogText)),
-        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.CancelLogOnWarDeclared)),
-        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.CancelLogOnVillageRaided)),
         AccessTools.Method(typeof(LogEntry), nameof(LogEntry.AddLogEntry), new[] { typeof(LogEntry) }),
-        AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)),
-        AccessTools.PropertyGetter(typeof(Issue), nameof(Issue.AlternativeSolutionStartLog)),
-        AccessTools.PropertyGetter(typeof(Issue), nameof(Issue.IssueAlternativeSolutionSuccessLog)),
     };
 
     private readonly E2ETestEnvironment environment;
+    private readonly Harmony textHarmony = new($"grain-text-{Guid.NewGuid()}");
     private readonly QuestScenario scenario;
     private readonly string villageSettlementId;
     private readonly string villageId;
@@ -53,6 +46,7 @@ public class HeadmanNeedsGrainTests : IDisposable
     private readonly string kingdomId;
     private readonly string giverClanId;
     private readonly string playerClanId;
+    private readonly string otherPlayerClanId;
     private readonly string grainCategoryId;
     private EnvironmentInstance Server => scenario.Server;
     private EnvironmentInstance ClientA => scenario.ClientA;
@@ -62,6 +56,8 @@ public class HeadmanNeedsGrainTests : IDisposable
     public HeadmanNeedsGrainTests(ITestOutputHelper output)
     {
         environment = new E2ETestEnvironment(output);
+        textHarmony.Patch(AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.EncyclopediaLink)),
+            prefix: new HarmonyMethod(typeof(HeadmanNeedsGrainTests), nameof(HeroLinkPrefix)));
         villageSettlementId = environment.CreateRegisteredObject<Settlement>();
         villageId = environment.CreateRegisteredObject<Village>();
         townSettlementId = environment.CreateRegisteredObject<Settlement>();
@@ -69,6 +65,7 @@ public class HeadmanNeedsGrainTests : IDisposable
         kingdomId = environment.CreateRegisteredObject<Kingdom>();
         giverClanId = environment.CreateRegisteredObject<Clan>();
         playerClanId = environment.CreateRegisteredObject<Clan>();
+        otherPlayerClanId = environment.CreateRegisteredObject<Clan>();
         grainCategoryId = environment.CreateRegisteredObject<ItemCategory>();
         scenario = new QuestScenario(environment, hero => new Issue(hero), ConfigureGiver);
 
@@ -85,7 +82,7 @@ public class HeadmanNeedsGrainTests : IDisposable
                     {
                         var hero = Get<Hero>(instance, player.HeroId);
                         hero._partyBelongedTo = Get<MobileParty>(instance, player.PartyId);
-                        hero.Clan = Get<Clan>(instance, playerClanId);
+                        hero.Clan = Get<Clan>(instance, player.HeroId == scenario.PlayerA.HeroId ? playerClanId : otherPlayerClanId);
                         hero.Gold = 10000;
                     }
 
@@ -94,14 +91,25 @@ public class HeadmanNeedsGrainTests : IDisposable
                         var player = instance == ClientA ? scenario.PlayerA : scenario.PlayerB;
                         Game.Current.PlayerTroop = Get<Hero>(instance, player.HeroId).CharacterObject;
                         Campaign.Current.MainParty = Get<MobileParty>(instance, player.PartyId);
-                        Campaign.Current.PlayerDefaultFaction = Get<Clan>(instance, playerClanId);
+                        Campaign.Current.PlayerDefaultFaction = Get<Hero>(instance, player.HeroId).Clan;
                     }
                 }
             });
         }
     }
 
-    public void Dispose() => environment.Dispose();
+    public void Dispose()
+    {
+        environment.Dispose();
+        textHarmony.UnpatchAll(textHarmony.Id);
+    }
+
+    // The managed campaign harness has no encyclopedia page catalog.
+    private static bool HeroLinkPrefix(Hero __instance, ref string __result)
+    {
+        __result = __instance.StringId;
+        return false;
+    }
 
     [Fact]
     public void Accept_UsesRealPreconditionsAndKeepsTheQuestOnlyOnTheOwnerClient()
@@ -135,6 +143,7 @@ public class HeadmanNeedsGrainTests : IDisposable
     public void Delivery_RechecksTheVillageAndTheOwnersActualGrain(bool atVillage, bool enoughGrain, bool succeeds)
     {
         Accept();
+        var ownerQuest = (Quest)scenario.QuestOf(ClientA);
         StageDelivery(atVillage, enoughGrain);
         ClientA.Call(() => QuestHere(ClientA).Success(), Texts);
         environment.FlushCoalescer();
@@ -153,10 +162,20 @@ public class HeadmanNeedsGrainTests : IDisposable
             {
                 Assert.Null(Get<Hero>(instance, scenario.NotableId).Issue);
                 Assert.Equal(0, Get<MobileParty>(instance, scenario.PlayerA.PartyId).ItemRoster.GetItemNumber(DefaultItems.Grain));
-                Assert.Equal(1050f, Get<Town>(instance, townId).Prosperity);
+                Assert.True(Get<Town>(instance, townId).Prosperity == 1050f, $"{instance.GetType().Name} prosperity {Get<Town>(instance, townId).Prosperity}");
                 Assert.Equal(10000, Get<Hero>(instance, scenario.PlayerB.HeroId).Gold);
             });
         }
+        ClientA.Call(() =>
+        {
+            Assert.Single(ownerQuest.JournalEntries.Where(log => log.LogText.Value == ownerQuest.SuccessLog.Value));
+            Assert.Equal(70, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Mercy));
+            Assert.Equal(50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
+            ownerQuest.Success();
+            Assert.Equal(50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
+        }, Texts);
+        ClientB.Call(() => Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity)));
+        Server.Call(() => Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity)));
     }
 
     [Fact]
@@ -171,9 +190,85 @@ public class HeadmanNeedsGrainTests : IDisposable
             instance.Call(() =>
             {
                 Assert.Null(Get<Hero>(instance, scenario.NotableId).Issue);
-                Assert.Equal(990f, Get<Town>(instance, townId).Prosperity);
+                Assert.True(Get<Town>(instance, townId).Prosperity == 990f, $"{instance.GetType().Name} prosperity {Get<Town>(instance, townId).Prosperity}");
             });
         }
+    }
+
+    [Theory]
+    [InlineData(20)]
+    [InlineData(-20)]
+    public void Delivery_PreservesTraitXpEarnedOrLostAfterAcceptance(int delta)
+    {
+        Accept();
+        ClientA.Call(() => TraitLevelingHelper.AddPlayerTraitXPAndLogEntry(
+            DefaultTraits.Generosity, delta, ActionNotes.DefaultNote, Hero.MainHero), Texts);
+        StageDelivery(true, true);
+        ClientA.Call(() => QuestHere(ClientA).Success(), Texts);
+        ClientA.Call(() => Assert.Equal(50 + delta, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity)));
+        ClientB.Call(() => Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity)));
+    }
+
+    [Fact]
+    public void LoadedTraitProgress_IsRestoredAfterSwitchingFromTheSavedHeroToTheLocalPlayer()
+    {
+        ClientA.Call(() =>
+        {
+            var first = Get<Hero>(ClientA, scenario.PlayerA.HeroId);
+            var second = Get<Hero>(ClientA, scenario.PlayerB.HeroId);
+            var records = new Dictionary<string, object>
+            {
+                ["_coop_grain_trait_progress"] = new Dictionary<Hero, Dictionary<string, int>>
+                {
+                    [first] = new() { [DefaultTraits.Generosity.StringId] = 123 },
+                    [second] = new() { [DefaultTraits.Generosity.StringId] = 456 },
+                },
+            };
+            Game.Current.PlayerTroop = second.CharacterObject;
+            var rewards = ClientA.Resolve<IHeadmanNeedsGrainTraitRewards>();
+            rewards.SyncData(new TestDataStore(false, records));
+            Assert.Equal(456, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
+            Game.Current.PlayerTroop = first.CharacterObject;
+            ChangePlayerCharacterAction.Apply(first);
+            Assert.Equal(123, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
+        }, Texts.Append(AccessTools.Method(typeof(ChangePlayerCharacterAction), nameof(ChangePlayerCharacterAction.Apply))));
+    }
+
+    [Fact]
+    public void SaveData_PreservesTheAveragePriceAndTheServersChosenMarket()
+    {
+        Server.Call(() =>
+        {
+            var behavior = Campaign.Current.GetCampaignBehavior<Behavior>();
+            var issue = IssueHere(Server);
+            var market = issue._nearbySuitableSettlementCache;
+            var records = new Dictionary<string, object>();
+            behavior.SyncData(new TestDataStore(true, records));
+            behavior._averageGrainPriceInCalradia = 0;
+            issue._nearbySuitableSettlementCache = null;
+            behavior.SyncData(new TestDataStore(false, records));
+            Assert.Equal(25, behavior._averageGrainPriceInCalradia);
+            Assert.Same(market, issue._nearbySuitableSettlementCache);
+        });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AiCompletion_PreservesTheAiOutcomeAndRefusesAControlledPlayer(bool player)
+    {
+        var solverId = player ? scenario.PlayerA.HeroId : environment.CreateRegisteredObject<Hero>();
+        Server.Call(() => IssueHere(Server).CompleteIssueWithAiLord(Get<Hero>(Server, solverId)));
+        if (player)
+        {
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkHeadmanNeedsGrainAiCompleted>());
+            Server.Call(() => Assert.True(IssueHere(Server).IsOngoingWithoutQuest));
+            return;
+        }
+        var completion = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkHeadmanNeedsGrainAiCompleted>());
+        Assert.Equal(solverId, completion.SolverId);
+        foreach (var instance in Instances)
+            instance.Call(() => Assert.Null(Get<Hero>(instance, scenario.NotableId).Issue));
     }
 
     [Fact]
@@ -209,15 +304,21 @@ public class HeadmanNeedsGrainTests : IDisposable
         DeclareWarAction.DeclareWarDetail detail, IssueOutcome outcome)
     {
         Accept();
-        Server.Call(() => DeclareWarAction.ApplyInternal(Get<Kingdom>(Server, kingdomId), Get<Clan>(Server, playerClanId), detail), Texts);
+        Server.Call(() =>
+        {
+            var hero = Get<Hero>(Server, scenario.PlayerA.HeroId);
+            using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+                DeclareWarAction.ApplyInternal(Get<Kingdom>(Server, kingdomId), Get<Clan>(Server, playerClanId), detail);
+        }, Texts);
         Assert.Equal(outcome, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void SeparateGivers_AllowOneCopyPerPlayerAndRefuseTheSamePlayersSecondCopy(bool samePlayer)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void SeparateGivers_AllowOneCopyPerPlayerAndKeepOtherPlayersQuestUnchanged(bool samePlayer, bool crime)
     {
         Accept();
         var secondGiverId = environment.CreateRegisteredObject<Hero>();
@@ -243,19 +344,56 @@ public class HeadmanNeedsGrainTests : IDisposable
         }
 
         var acceptingClient = samePlayer ? ClientA : ClientB;
-        acceptingClient.Call(() => Get<Hero>(acceptingClient, secondGiverId).Issue.StartIssueWithQuest(), Texts);
+        Quest secondQuest = null!;
+        acceptingClient.Call(() =>
+        {
+            var giver = Get<Hero>(acceptingClient, secondGiverId);
+            giver.Issue.StartIssueWithQuest();
+            if (!samePlayer)
+            {
+                secondQuest = (Quest)giver.Issue.IssueQuest;
+                secondQuest.QuestAcceptedConsequences();
+            }
+        }, Texts);
         Server.Call(() =>
         {
             var owned = Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(secondGiverId, secondIssueId, out var controller);
             Assert.Equal(!samePlayer, owned);
             if (owned) Assert.Equal(QuestScenario.ControllerB, controller);
         });
+        if (samePlayer) return;
+
+        if (crime)
+        {
+            Server.Call(() =>
+            {
+                var hero = Get<Hero>(Server, scenario.PlayerA.HeroId);
+                using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+                    DeclareWarAction.ApplyInternal(Get<Kingdom>(Server, kingdomId), hero.MapFaction,
+                        DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange);
+            }, Texts);
+        }
+        else
+        {
+            StageDelivery(true, true);
+            ClientA.Call(() => QuestHere(ClientA).Success(), Texts);
+        }
+        ClientB.Call(() =>
+        {
+            Assert.True(secondQuest.IsOngoing);
+            Assert.Equal(0, secondQuest._playerAcceptedQuestLog.CurrentProgress);
+            Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+            Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
+            Assert.Same(secondQuest, Get<Hero>(ClientB, secondGiverId).Issue.IssueQuest);
+        });
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void CompanionSolution_ChargesTheOwnerAndReturnsTroopsOnTheServerForEitherOutcome(bool failure)
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public void CompanionSolution_ChargesTheOwnerAndReturnsTroopsOnTheServerForEitherOutcome(bool failure, bool poor, bool busy)
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
@@ -279,6 +417,13 @@ public class HeadmanNeedsGrainTests : IDisposable
             });
         }
 
+        if (poor)
+        {
+            Server.Call(() =>
+            {
+                using (new AllowedThread()) Get<Hero>(Server, scenario.PlayerA.HeroId).Gold = 0;
+            });
+        }
         ClientA.Call(() =>
         {
             var issue = IssueHere(ClientA);
@@ -287,12 +432,32 @@ public class HeadmanNeedsGrainTests : IDisposable
             issue.StartIssueWithAlternativeSolution();
         }, Texts);
         environment.FlushCoalescer();
+        if (poor)
+        {
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAcceptRejected>());
+            Server.Call(() =>
+            {
+                Assert.True(IssueHere(Server).IsOngoingWithoutQuest);
+                Assert.Equal(0, Get<Hero>(Server, scenario.PlayerA.HeroId).Gold);
+            });
+            return;
+        }
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
         Server.Call(() => Assert.Equal(10000 - funding, Get<Hero>(Server, scenario.PlayerA.HeroId).Gold));
 
         Server.Call(() =>
         {
             var issue = IssueHere(Server);
+            if (busy)
+            {
+                var hero = Get<Hero>(Server, scenario.PlayerA.HeroId);
+                using (new AllowedThread()) hero.ChangeState(Hero.CharacterStates.Prisoner);
+                issue.CompleteIssueWithAlternativeSolution();
+                Assert.Same(issue, IssueHere(Server));
+                Assert.Equal(7, issue.AlternativeSolutionSentTroops.TotalManCount);
+                using (new AllowedThread()) hero.ChangeState(Hero.CharacterStates.Active);
+            }
             issue._failureChance = failure ? 1f : -1f;
             issue.CompleteIssueWithAlternativeSolution();
         }, Texts);
@@ -307,7 +472,8 @@ public class HeadmanNeedsGrainTests : IDisposable
                 var party = Get<MobileParty>(instance, scenario.PlayerA.PartyId);
                 Assert.Equal(6, party.MemberRoster.GetTroopCount(Get<CharacterObject>(instance, troopId)));
                 Assert.True(party.MemberRoster.Contains(Get<Hero>(instance, companionId).CharacterObject));
-                Assert.Equal(Hero.CharacterStates.Active, Get<Hero>(instance, companionId).HeroState);
+                Assert.True(Get<Hero>(instance, companionId).HeroState == Hero.CharacterStates.Active,
+                    $"{instance.GetType().Name} companion {Get<Hero>(instance, companionId).HeroState}");
                 Assert.Equal(10000, Get<Hero>(instance, scenario.PlayerB.HeroId).Gold);
                 Assert.Equal(failure ? 990f : 1050f, Get<Town>(instance, townId).Prosperity);
             });
@@ -364,5 +530,30 @@ public class HeadmanNeedsGrainTests : IDisposable
     {
         Assert.True(instance.ObjectManager.TryGetObject<T>(id, out var obj));
         return obj;
+    }
+
+    private sealed class TestDataStore : IDataStore
+    {
+        private readonly Dictionary<string, object> records;
+        public bool IsSaving { get; }
+        public bool IsLoading => !IsSaving;
+
+        public TestDataStore(bool isSaving, Dictionary<string, object> records)
+        {
+            IsSaving = isSaving;
+            this.records = records;
+        }
+
+        public bool SyncData<T>(string key, ref T data)
+        {
+            if (IsSaving)
+            {
+                records[key] = data!;
+                return true;
+            }
+            if (!records.TryGetValue(key, out var value)) return false;
+            data = (T)value;
+            return true;
+        }
     }
 }

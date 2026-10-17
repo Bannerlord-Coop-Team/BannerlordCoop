@@ -1,10 +1,13 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
+using Common.Messaging;
+using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Extensions;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.Localization;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -21,6 +24,21 @@ internal class HeadmanNeedsGrainBranchPatches
     private static void AcceptPrefix()
     {
         if (ModInformation.IsClient && ContainerProvider.TryResolve<IHeadmanNeedsGrainTraitRewards>(out var traits)) traits.RequestSeed();
+    }
+
+    [HarmonyPatch(typeof(ChangePlayerCharacterAction), nameof(ChangePlayerCharacterAction.Apply))]
+    [HarmonyPostfix]
+    private static void RestoreTraitsPostfix(Hero hero)
+    {
+        if (ModInformation.IsClient && hero == Hero.MainHero && ContainerProvider.TryResolve<IHeadmanNeedsGrainTraitRewards>(out var traits))
+            traits.Restore(hero);
+    }
+
+    [HarmonyPatch(typeof(TraitLevelingHelper), nameof(TraitLevelingHelper.AddPlayerTraitXPAndLogEntry))]
+    [HarmonyPostfix]
+    private static void RefreshTraitsPostfix()
+    {
+        if (ModInformation.IsClient && ContainerProvider.TryResolve<IHeadmanNeedsGrainTraitRewards>(out var traits)) traits.RefreshSeed();
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.Success))]
@@ -104,5 +122,20 @@ internal class HeadmanNeedsGrainBranchPatches
         if (TaleWorlds.CampaignSystem.Hero.MainHero.Gold < __instance.AlternativeSolutionNeededGold)
             throw new System.InvalidOperationException("The grain solution owner cannot fund the companion");
         return true;
+    }
+
+    [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.TryToMakeTroopsReturn))]
+    [HarmonyPostfix]
+    private static void ReturnPostfix(IssueBase issue)
+    {
+        if (ModInformation.IsClient || !(issue is Issue)) return;
+        foreach (var troop in issue.AlternativeSolutionSentTroops.GetTroopRoster())
+        {
+            if (troop.Character.IsHero && troop.Character.HeroObject.HeroState == Hero.CharacterStates.Active)
+            {
+                var hero = troop.Character.HeroObject;
+                MessageBroker.Instance.Publish(hero, new HeroStateChanged((int)hero.HeroState, hero));
+            }
+        }
     }
 }

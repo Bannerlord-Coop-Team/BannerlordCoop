@@ -40,6 +40,6 @@ internal class HeadmanNeedsGrainJournalPatches
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objects) ||
             !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
             !ContainerProvider.TryResolve<INetwork>(out var network)) return;
-        network.SendAll(new NetworkHeadmanNeedsGrainLog(giverId, issue.StringId, text.ToString(), questLog));
+        network.SendAll(new NetworkHeadmanNeedsGrainLog(giverId, issue.StringId, text, questLog));
     }
 }
