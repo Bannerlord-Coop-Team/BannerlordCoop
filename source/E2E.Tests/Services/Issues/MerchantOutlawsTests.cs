@@ -467,10 +467,17 @@ public class MerchantOutlawsTests : IDisposable
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
         Issue ownerIssue = null!;
         ClientA.Call(() => ownerIssue = Assert.IsType<Issue>(Get<Hero>(ClientA, scenario.NotableId).Issue));
+        foreach (var instance in Instances)
+        {
+            instance.Call(() => Get<Hero>(instance, scenario.NotableId).Issue.AlternativeSolutionIssueEffectClearTime = CampaignTime.Now);
+        }
+        Server.Call(() => Campaign.Current.IssueManager.DailyTick(), TextHelpers);
+        Assert.Equal(2, ownerIssue.JournalEntries.Count);
         foreach (var client in new[] { ClientA, ClientB })
         {
             client.Call(() => Campaign.Current.IssueManager.DailyTick(), TextHelpers);
         }
+        Assert.Equal(2, ownerIssue.JournalEntries.Count);
 
         Server.Call(() =>
         {

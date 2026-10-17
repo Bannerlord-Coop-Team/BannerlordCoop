@@ -11,6 +11,17 @@ namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws.Patc
 [HarmonyPatch]
 internal class MerchantOutlawsAlternativeJournalPatches
 {
+    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.OnAlternativeSolutionSolvedAndTroopsAreReturning))]
+    [HarmonyPrefix]
+    private static bool ReturningPrefix(IssueBase __instance)
+    {
+        if (ModInformation.IsServer || !(__instance is Issue)) return true;
+
+        // The server sends this log, so a client tick must not append it again.
+        __instance._areIssueEffectsResolved = true;
+        return false;
+    }
+
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]
     [HarmonyPostfix]
     private static void DailyPostfix(IssueManager __instance)
