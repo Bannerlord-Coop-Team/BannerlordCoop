@@ -310,10 +310,13 @@ internal class TradeHandler : IHandler
     }
 
     /// <summary>
-    /// Moves any purchased quantity the merchant can no longer supply from the party roster data back to
-    /// the merchant roster data and refunds the prorated cost. Only what the party data still holds can be
-    /// taken back, so the refund and the merchant restore follow the quantity actually removed. Both arrays
-    /// may be replaced when an entry has to be appended.
+    /// Takes any purchased quantity the merchant can no longer supply out of the party roster data and refunds
+    /// the prorated cost. Only what the party data still holds can be taken back, so the refund follows the
+    /// quantity actually removed.
+    /// The merchant roster data is the client's view, which misses what other players bought since, and the
+    /// caller rebuilds the live roster from it. Each bought item's merchant stock is therefore set from the live
+    /// roster: what the server holds minus what this trade keeps. Vanilla logs a buy and a sell of the same
+    /// item against each other, so a bought item has no sale to add back.
     /// </summary>
     internal static int ReconcilePurchases(
         ItemRoster merchantRoster,
@@ -324,31 +327,45 @@ internal class TradeHandler : IHandler
     {
         foreach (var boughtItem in boughtItems)
         {
+            var element = boughtItem.Item1.EquipmentElement;
             int amount = boughtItem.Item1.Amount;
-            int elementIndex = merchantRoster.FindIndexOfElement(boughtItem.Item1.EquipmentElement);
+            int elementIndex = merchantRoster.FindIndexOfElement(element);
             int available = elementIndex >= 0 ? merchantRoster.GetElementNumber(elementIndex) : 0;
-            int shortfall = amount - available;
-            if (shortfall <= 0) continue;
+            int kept = amount;
 
-            // Items missing from the party data (equipped during the trade) cannot be taken back
-            int partyIndex = partyRosterData?.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1)) ?? -1;
-            int removed = partyIndex >= 0 ? System.Math.Min(shortfall, System.Math.Max(partyRosterData[partyIndex].Amount, 0)) : 0;
-            if (removed == 0) continue;
-
-            partyRosterData[partyIndex].Amount -= removed;
-
-            int merchantIndex = merchantRosterData?.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1)) ?? -1;
-            if (merchantIndex >= 0) merchantRosterData[merchantIndex].Amount += removed;
-            else if (merchantRosterData != null)
+            if (amount > available)
             {
-                System.Array.Resize(ref merchantRosterData, merchantRosterData.Length + 1);
-                merchantRosterData[merchantRosterData.Length - 1] = new ItemRosterElement(boughtItem.Item1.EquipmentElement, removed);
+                // Items missing from the party data (equipped during the trade) cannot be taken back
+                int partyIndex = partyRosterData?.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1)) ?? -1;
+                int removed = partyIndex >= 0 ? System.Math.Min(amount - available, System.Math.Max(partyRosterData[partyIndex].Amount, 0)) : 0;
+                if (removed > 0)
+                {
+                    partyRosterData[partyIndex].Amount -= removed;
+                    totalAmount -= (boughtItem.Item2 * removed) / amount;
+                    kept -= removed;
+                }
             }
 
-            totalAmount -= amount > 0 ? (boughtItem.Item2 * removed) / amount : boughtItem.Item2;
+            SetRosterDataAmount(ref merchantRosterData, element, System.Math.Max(available - kept, 0));
         }
 
         return totalAmount;
+    }
+
+    private static void SetRosterDataAmount(ref ItemRosterElement[] rosterData, EquipmentElement element, int amount)
+    {
+        if (rosterData == null) return;
+
+        int index = rosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.IsEqualTo(element));
+        if (index >= 0)
+        {
+            rosterData[index].Amount = amount;
+        }
+        else if (amount > 0)
+        {
+            System.Array.Resize(ref rosterData, rosterData.Length + 1);
+            rosterData[rosterData.Length - 1] = new ItemRosterElement(element, amount);
+        }
     }
 
     private (ItemRosterElementData, int)[] ResolveTradeItemIds(
