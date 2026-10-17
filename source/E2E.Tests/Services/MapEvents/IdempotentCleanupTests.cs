@@ -21,8 +21,8 @@ namespace E2E.Tests.Services.MapEvents;
 /// duplicating rewards, deleting unrelated parties, or corrupting campaign state. The map-event finalize is
 /// deduped per event instance (<c>BattleFinalizeHandler.TryMarkFinalized</c>, keyed by a
 /// <see cref="System.Runtime.CompilerServices.ConditionalWeakTable{TKey, TValue}"/>), so a repeated finalize of
-/// one battle is ignored and never reaches into a different, concurrent battle. The mission-active gate
-/// (<see cref="BattleSpawnGate"/>) is likewise cleared idempotently on mission exit.
+/// one battle is ignored and never reaches into a different, concurrent battle. The mission-active gate half
+/// lives in <c>BattleSpawnGateTests.EndBattle_ClearsActiveBattle_Idempotently</c>.
 /// </summary>
 public class IdempotentCleanupTests : MapEventTestBase
 {
@@ -168,30 +168,6 @@ public class IdempotentCleanupTests : MapEventTestBase
             Assert.True(expectedSeeded == party.MemberRoster.GetElementNumber(troop),
                 $"[{instance.GetType().Name}] party {partyId} lost its seeded troops: expected {expectedSeeded}, has {party.MemberRoster.GetElementNumber(troop)}");
         });
-    }
-
-    /// <summary>
-    /// The mission-side half of BR-091: the coop-battle-active gate (<see cref="BattleSpawnGate"/>) that the
-    /// Missions stack clears on mission exit must be safe to clear more than once (a duplicated teardown, a
-    /// migration, a reconnect) — a second <see cref="BattleSpawnGate.EndBattle"/> neither throws nor resurrects
-    /// the previously-active battle.
-    /// </summary>
-    [Fact]
-    [Trait("Requirement", "BR-091")]
-    public void RepeatedMissionEndBattle_ClearsTheActiveBattleGate_Idempotently()
-    {
-        BattleSpawnGate.BeginBattle("some-map-event-id");
-        Assert.True(BattleSpawnGate.IsCoopBattleActive);
-
-        // First teardown clears the gate.
-        BattleSpawnGate.EndBattle();
-        Assert.False(BattleSpawnGate.IsCoopBattleActive);
-        Assert.Null(BattleSpawnGate.ActiveMapEventId);
-
-        // A repeated teardown is a safe no-op — no throw, and the battle stays cleared.
-        BattleSpawnGate.EndBattle();
-        Assert.False(BattleSpawnGate.IsCoopBattleActive);
-        Assert.Null(BattleSpawnGate.ActiveMapEventId);
     }
 
     private static void AssertMapEventRemoved(EnvironmentInstance instance, string mapEventId)

@@ -134,9 +134,29 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             IsTradeProposalEnabled,
             null);
 
-#if TESTER
         AddMarriageDialogs(starter);
-#endif
+
+        starter.AddPlayerLine(
+            "coop_player_party_interaction_map_tracking",
+            InitialToken,
+            InitiatorWaitToken,
+            GameTexts.FindText("str_coop_map_tracking_request").ToString(),
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.RequestMapTracking),
+            () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.RequestMapTracking),
+            PlayerPartyDialogPriority,
+            null,
+            null);
+
+        starter.AddPlayerLine(
+            "coop_player_party_interaction_stop_map_tracking",
+            InitialToken,
+            CloseToken,
+            GameTexts.FindText("str_coop_map_tracking_stop").ToString(),
+            () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.StopMapTracking),
+            () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.StopMapTracking),
+            PlayerPartyDialogPriority,
+            null,
+            null);
 
         starter.AddPlayerLine(
             "coop_player_party_interaction_services",
@@ -160,7 +180,6 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             IsHostileDemandEnabled,
             null);
 
-#if TESTER
         starter.AddPlayerLine(
             "coop_player_party_interaction_join_clan",
             ServiceToken,
@@ -171,7 +190,6 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             PlayerPartyDialogPriority,
             IsJoinClanEnabled,
             null);
-#endif
 
         starter.AddPlayerLine(
             "coop_player_party_interaction_vassal",

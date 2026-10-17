@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using GameInterface.Services.MapEvents.Handlers;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
@@ -13,6 +14,7 @@ using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -493,8 +495,15 @@ internal class MapEventPatches
         bool hasPlayerParty = __instance.InvolvedParties.Any(
             x => x != null && x.IsMobile && !x.MobileParty.IsControlledByThisInstance());
 
+        // Only a connected player's mission resolves a player battle. Once every player in it has been offline
+        // for the grace period it resolves like an AI battle, otherwise nothing ever ends it (#3864).
+        // An offline player's battle can still be finishing its mission or a server simulation, which must stay the
+        // only thing resolving it.
+        bool waitsForPlayers = hasPlayerParty &&
+            (WaitsForPlayers(__instance) || IsBattleModeBusy(__instance));
+
         // Siege map events must not enter native campaign resolution, even on an allowed-thread setup path.
-        if (hasPlayerParty && !__instance.IsRaidHostileAction())
+        if (waitsForPlayers && !__instance.IsRaidHostileAction())
             return false;
 
         // Receive path / setup: let the original run when patches are standing down.
@@ -513,7 +522,7 @@ internal class MapEventPatches
                 return !HasOccupiedBattleMission(__instance);
         }
 
-        if (hasPlayerParty)
+        if (waitsForPlayers)
             return false;
 
         // A settlement PartyBase is a complete participant even though it has no MobileParty.
@@ -566,6 +575,66 @@ internal class MapEventPatches
         }
 
         return true;
+    }
+
+    // When each player battle was first seen with every player in it offline
+    private static readonly ConditionalWeakTable<MapEvent, StrongBox<DateTime>> allPlayersOfflineSince = new();
+
+    /// <summary>
+    /// The server only resolves a battle with a player party through that player's mission. Once every such
+    /// player is offline nothing would resolve it (#3864), so after a grace period the battle is simulated like
+    /// an AI battle. The grace period lets a player who crashed or dropped rejoin and still fight it, and starts
+    /// over whenever one of them is back. Hideout battles always wait.
+    /// </summary>
+    private static bool WaitsForPlayers(MapEvent mapEvent)
+    {
+        if (mapEvent.IsHideoutBattle) return true;
+
+        if (HasConnectedPlayerParty(mapEvent))
+        {
+            allPlayersOfflineSince.Remove(mapEvent);
+            return true;
+        }
+
+        var offlineSince = allPlayersOfflineSince.GetValue(mapEvent, _ =>
+        {
+            Logger.Information("Every player in map event {MapEventId} is offline, resolving it in {GracePeriod} unless one rejoins",
+                mapEvent.StringId, MapEventConfig.OfflinePlayerGracePeriod);
+            return new StrongBox<DateTime>(DateTime.UtcNow);
+        });
+
+        return DateTime.UtcNow - offlineSince.Value < MapEventConfig.OfflinePlayerGracePeriod;
+    }
+
+    // lets tests start a battle's grace period in the past instead of waiting it out
+    internal static void SetAllPlayersOfflineSince(MapEvent mapEvent, DateTime since)
+    {
+        allPlayersOfflineSince.Remove(mapEvent);
+        allPlayersOfflineSince.Add(mapEvent, new StrongBox<DateTime>(since));
+    }
+
+    /// <summary>A player party with no registered owner counts as connected, which keeps the battle waiting.</summary>
+    private static bool HasConnectedPlayerParty(MapEvent mapEvent)
+    {
+        // without the player manager, keep waiting like before
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return true;
+
+        return mapEvent.InvolvedParties.Any(party =>
+            party != null &&
+            party.IsMobile &&
+            !party.MobileParty.IsControlledByThisInstance() &&
+            !playerManager.IsOwnerOfPartyDisconnected(party.MobileParty));
+    }
+
+    private static bool IsBattleModeBusy(MapEvent mapEvent)
+    {
+        if (HasOccupiedBattleMission(mapEvent))
+            return true;
+
+        return ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
+            objectManager.TryGetId(mapEvent, out var mapEventId) &&
+            ServerBattleModeArbiter.TryGetMode(mapEventId, out var mode) &&
+            mode == BattleStartMode.Simulation;
     }
 
     private static bool HasOccupiedBattleMission(MapEvent mapEvent)

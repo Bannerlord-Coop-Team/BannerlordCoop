@@ -1,5 +1,4 @@
 ﻿using GameInterface.AutoSync;
-using GameInterface.Utils;
 using HarmonyLib;
 using System;
 using System.Collections.Concurrent;
@@ -23,7 +22,6 @@ public class GameInterface : IGameInterface
     public const string HARMONY_CONFIGURED_MINOR_FACTION_CATEGORY = "ConfiguredMinorFactionPatches";
 
     public const string HARMONY_GAME_STARTED_CATEGORY = "GameStartedPatches";
-    public const string HARMONY_ISSUE_CONSEQUENCES_CATEGORY = "IssueConsequencePatches";
 
     private const string PatchingFailedEarlierMessage =
         "Patching failed earlier in this session. Restart Bannerlord before joining or hosting again.";
@@ -36,18 +34,21 @@ public class GameInterface : IGameInterface
 
     private readonly Harmony harmony;
     private readonly IAutoSyncPatchCollector patchCollector;
-    private readonly AutoSyncPatcher AutoSyncPatcher;
+    private readonly IAutoSyncPatcher autoSyncPatcher;
+    private readonly IGameInterfacePatchInstaller patchInstaller;
     private readonly IEnumerable<HarmonyPatchCategoryRegistration> patchCategories;
 
     public GameInterface(
         Harmony harmony,
         IAutoSyncPatchCollector patchCollector,
-        AutoSyncPatcher AutoSyncPatcher,
+        IAutoSyncPatcher autoSyncPatcher,
+        IGameInterfacePatchInstaller patchInstaller,
         IEnumerable<HarmonyPatchCategoryRegistration> patchCategories)
     {
         this.harmony = harmony;
         this.patchCollector = patchCollector;
-        this.AutoSyncPatcher = AutoSyncPatcher;
+        this.autoSyncPatcher = autoSyncPatcher;
+        this.patchInstaller = patchInstaller;
         this.patchCategories = patchCategories;
     }
 
@@ -65,7 +66,7 @@ public class GameInterface : IGameInterface
         if (Harmony.HasAnyPatches(harmony.Id))
         {
             // Reconnect skips the install below, so handlers torn down on disconnect must be rebound here.
-            AutoSyncPatcher.RebindHandlers();
+            autoSyncPatcher.RebindHandlers();
             return;
         }
 
@@ -87,25 +88,14 @@ public class GameInterface : IGameInterface
 
     private void PatchAllCore()
     {
-        var assembly = typeof(GameInterface).Assembly;
-
-        // Must run before any other detour below, or a fragile no-op method's detour can corrupt its inline
-        // x64 unwind info and deadlock the GC.
-        FragileDetourGuard.Apply(harmony);
-
-        harmony.PatchCategory(assembly, HARMONY_STATIC_FIXES_CATEGORY);
-        harmony.PatchAllUncategorized(assembly);
-
-        Services.Issues.Generic.QuestTypeBootstrap.EnsureAllMigratedTypesRegistered();
+        patchInstaller.Install(harmony);
 
         foreach (HarmonyPatchCategoryRegistration patchCategory in patchCategories)
         {
             patchCategory.Apply(harmony);
         }
 
-        AutoSyncPatcher.PatchAll();
-        // Compile quest consequences after the setters that synchronize their side effects.
-        harmony.PatchCategory(assembly, HARMONY_ISSUE_CONSEQUENCES_CATEGORY);
+        autoSyncPatcher.PatchAll();
     }
 
     public void PatchGameStarted()

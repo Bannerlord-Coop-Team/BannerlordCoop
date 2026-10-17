@@ -246,7 +246,11 @@ internal class BattleMissionStartHandler : IHandler
                     missionStartMessage = new NetworkStartAttackMission(payload.What.MapEventId, initializer,
                         hideoutRaid.InitiatingPartyId, isHideout: true, hideoutRaid.IsDirectAssault);
                 }
-                else if (mapEvent.IsSiegeAssault || mapEvent.IsSiegeAmbush)
+                // Vanilla flips Siege and SiegeOutside as defenders outside the walls join or leave, so a late
+                // joiner gets the mission kind the battle opened with instead of re-reading the live type.
+                else if (siegeMissionSnapshots.ContainsKey(payload.What.MapEventId) ||
+                         (!mapEventMissionInitializers.ContainsKey(payload.What.MapEventId) &&
+                          (mapEvent.IsSiegeAssault || mapEvent.IsSiegeAmbush)))
                 {
                     operation = "build siege mission snapshot";
                     var snapshot = siegeMissionSnapshots.GetOrAdd(payload.What.MapEventId, _ => BuildSiegeMissionSnapshot(payload.What.MapEventId, mapEvent));
@@ -620,6 +624,8 @@ internal class BattleMissionStartHandler : IHandler
             }
             if (settlementResolution == MissionSettlementResolution.Rejected)
                 return;
+
+            InitializePlayerEncounter(battle);
 
             // The scene is the fixed settlement scene keyed by wall level — no terrain seed on the siege
             // path. Mirrors vanilla CreateSandBoxMissionInitializerRecord; atmosphere is client-local,

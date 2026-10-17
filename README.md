@@ -35,40 +35,9 @@ Dedicated-server operators can block Steam64 identities with a [server-side ban 
 
 Server setup walkthrough: https://www.youtube.com/watch?v=laZM967Eals
 
-## Current Features
+## Roadmap
 
-- Shared campaign map
-- Player and AI movement synchronization
-- Map encounters
-- Party and troop management
-- Character skills and progression
-- Clan and kingdom management
-- Settlement management
-- Recruitment and trading
-- Caravans and villager parties
-- Smithing
-- Player captivity
-- Field battles
-- Village raids
-- PvE and PvP combat
-- Simulated battles
-- Players visible inside locations such as taverns and village scenes
-- Dedicated server support
-- Steam integration
-
-### Experimental Features
-
-- Sieges and sally-outs
-- Armies
-
-### Planned Features
-
-- Additional campaign systems and stability improvements
-- Hideouts
-- War Sails DLC support
-- Quests
-
-Planned items and release priorities may change as development continues.
+https://bannerlordcoop.com/#roadmap
 
 ## Multiplayer Battles
 

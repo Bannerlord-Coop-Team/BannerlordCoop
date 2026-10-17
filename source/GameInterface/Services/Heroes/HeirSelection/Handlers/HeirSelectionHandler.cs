@@ -11,7 +11,6 @@ using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
-using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
@@ -47,7 +46,6 @@ internal class HeirSelectionHandler : IHandler
     private readonly ICoopSessionMigrator coopSessionMigrator;
     private readonly PlayerDeathCutsceneHandler cutscenesHandler;
     private readonly PlayerDeletionHandler playerDeletionHandler;
-    private readonly IArtisanOverpricedGoodsActions artisanActions;
     private readonly ISendCoalescer sendCoalescer;
     private readonly Dictionary<string, IMessage> sentSelections = new();
     private double lastCheckDays = -1;
@@ -67,7 +65,6 @@ internal class HeirSelectionHandler : IHandler
         ICoopSessionMigrator coopSessionMigrator,
         PlayerDeathCutsceneHandler cutscenesHandler,
         PlayerDeletionHandler playerDeletionHandler,
-        IArtisanOverpricedGoodsActions artisanActions,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
@@ -80,7 +77,6 @@ internal class HeirSelectionHandler : IHandler
         this.coopSessionMigrator = coopSessionMigrator;
         this.cutscenesHandler = cutscenesHandler;
         this.playerDeletionHandler = playerDeletionHandler;
-        this.artisanActions = artisanActions;
         this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
@@ -92,6 +88,9 @@ internal class HeirSelectionHandler : IHandler
 
         messageBroker.Subscribe<HeirSelectionOver>(Handle_HeirSelectionOver);
         messageBroker.Subscribe<NetworkHeirSelectionOver>(Handle_NetworkHeirSelectionOver);
+
+        messageBroker.Subscribe<HeirSelectedForRetirement>(Handle_HeirSelectedForRetirement);
+        messageBroker.Subscribe<NetworkHeirSelectedForRetirement>(Handle_NetworkHeirSelectedForRetirement);
 
         messageBroker.Subscribe<ChangePlayerCharacterAfterHeirSelection>(Handle_ChangePlayerCharacterAfterHeirSelection);
         messageBroker.Subscribe<NetworkChangePlayerCharacterAfterHeirSelection>(Handle_NetworkChangePlayerCharacterAfterHeirSelection);
@@ -110,6 +109,9 @@ internal class HeirSelectionHandler : IHandler
 
         messageBroker.Unsubscribe<HeirSelectionOver>(Handle_HeirSelectionOver);
         messageBroker.Unsubscribe<NetworkHeirSelectionOver>(Handle_NetworkHeirSelectionOver);
+
+        messageBroker.Unsubscribe<HeirSelectedForRetirement>(Handle_HeirSelectedForRetirement);
+        messageBroker.Unsubscribe<NetworkHeirSelectedForRetirement>(Handle_NetworkHeirSelectedForRetirement);
 
         messageBroker.Unsubscribe<ChangePlayerCharacterAfterHeirSelection>(Handle_ChangePlayerCharacterAfterHeirSelection);
         messageBroker.Unsubscribe<NetworkChangePlayerCharacterAfterHeirSelection>(Handle_NetworkChangePlayerCharacterAfterHeirSelection);
@@ -357,6 +359,43 @@ internal class HeirSelectionHandler : IHandler
         });
     }
 
+    private void Handle_HeirSelectedForRetirement(MessagePayload<HeirSelectedForRetirement> obj)
+    {
+        var data = obj.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.OriginalHero, out var originalHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.SelectedHeir, out var selectedHeirId)) return;
+
+        network.SendAll(new NetworkHeirSelectedForRetirement(originalHeroId, selectedHeirId));
+    }
+
+    private void Handle_NetworkHeirSelectedForRetirement(MessagePayload<NetworkHeirSelectedForRetirement> obj)
+    {
+        if (obj.Who is not NetPeer peer) return;
+
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!playerManager.TryGetPlayer(peer, out var player) || player.HeroId != data.OriginalHeroId)
+            {
+                Logger.Warning($"Ignoring heir selection for hero {data.OriginalHeroId} from peer {peer.Id} because that peer no longer controls the hero");
+                return;
+            }
+
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.OriginalHeroId, out var originalHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.SelectedHeirId, out var selectedHeir)) return;
+
+            if (originalHero.Clan == null || !originalHero.Clan.GetHeirApparents().ContainsKey(selectedHeir))
+            {
+                Logger.Warning($"Ignoring invalid heir {data.SelectedHeirId} for hero {data.OriginalHeroId}");
+                return;
+            }
+
+            applyHeirSelectionActionInterface.ApplyByRetirement(originalHero, selectedHeir);
+        });
+    }
+
     private void Handle_ChangePlayerCharacterAfterHeirSelection(MessagePayload<ChangePlayerCharacterAfterHeirSelection> obj)
     {
         var data = obj.What;
@@ -387,8 +426,6 @@ internal class HeirSelectionHandler : IHandler
             Logger.Error($"Could not prepare heir {heirId} as the new player for controller {registeredPlayer.ControllerId}");
             return;
         }
-
-        artisanActions.CancelOwnedIssues(registeredPlayer, permanentRemoval: false);
 
         if (!playerManager.ReplacePlayer(registeredPlayer, replacementPlayer))
         {
