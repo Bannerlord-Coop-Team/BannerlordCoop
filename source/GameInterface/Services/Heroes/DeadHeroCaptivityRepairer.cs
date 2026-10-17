@@ -22,12 +22,16 @@ internal class DeadHeroCaptivityRepairer : IDeadHeroCaptivityRepairer
 
     public bool TryRestoreDeadState(Hero hero)
     {
-        if (hero?.HeroState != Hero.CharacterStates.Prisoner || !HasCompletedDeathFingerprint(hero))
+        // Saves have held completed deaths as Prisoner and as Released (#3867). Either way the hero
+        // stays in the alive collection with its progression already gone and crashes the load.
+        if (hero == null || hero.HeroState == Hero.CharacterStates.Dead || !HasCompletedDeathFingerprint(hero))
             return false;
+
+        var savedState = hero.HeroState;
 
         // ChangeState reads progression owners that Hero.OnDeath deliberately released.
         hero._heroState = Hero.CharacterStates.Dead;
-        Logger.Warning("Restored dead state for death-marked prisoner hero {HeroId}", hero.StringId);
+        Logger.Warning("Restored dead state for death-marked {State} hero {HeroId}", savedState, hero.StringId);
         return true;
     }
 

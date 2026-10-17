@@ -16,8 +16,9 @@ public interface IModuleValidator
     /// </summary>
     /// <param name="serverModules">The server modules</param>
     /// <param name="clientModules">The client modules</param>
+    /// <param name="displayNames">Optional display name per module id, only used to make the reason readable.</param>
     /// <returns>Null if the validation was successful, otherwise a reason for the failure of the validation.</returns>
-    public bool Validate(IEnumerable<ModuleInfo> serverModules, IEnumerable<ModuleInfo> clientModules, out string error);
+    public bool Validate(IEnumerable<ModuleInfo> serverModules, IEnumerable<ModuleInfo> clientModules, out string error, IReadOnlyDictionary<string, string> displayNames = null);
 
     /// <summary>
     /// Ensures none of the given modules is official optional content (DLC). Coop does not support
@@ -32,14 +33,14 @@ public interface IModuleValidator
 /// <inheritdoc href="IModuleValidator" />
 public class ModuleValidator : IModuleValidator
 {
-    public bool Validate(IEnumerable<ModuleInfo> serverModules, IEnumerable<ModuleInfo> clientModules, out string error)
+    public bool Validate(IEnumerable<ModuleInfo> serverModules, IEnumerable<ModuleInfo> clientModules, out string error, IReadOnlyDictionary<string, string> displayNames = null)
     {
         if (!ValidateGameVersion(serverModules, clientModules, out error))
         {
             return false;
         }
 
-        if (!ValidateNoDlc(clientModules, out error))
+        if (!ValidateNoDlc(clientModules, displayNames, out error))
         {
             return false;
         }
@@ -56,11 +57,11 @@ public class ModuleValidator : IModuleValidator
 
             if (clientModule.Id == null)
             {
-                errors.Add($"To join the server the module {Describe(serverModule)} with version '{serverModule.Version.ToString()}' is required.");
+                errors.Add($"To join the server the module {Describe(serverModule, displayNames)} with version '{serverModule.Version.ToString()}' is required.");
             }
             else if (!serverModule.Version.IsSame(clientModule.Version, true))
             {
-                errors.Add($"Wrong version of module {Describe(serverModule)} detected. Server uses '{serverModule.Version.ToString()}', client uses '{clientModule.Version.ToString()}'.");
+                errors.Add($"Wrong version of module {Describe(serverModule, displayNames)} detected. Server uses '{serverModule.Version.ToString()}', client uses '{clientModule.Version.ToString()}'.");
             }
         }
 
@@ -68,7 +69,7 @@ public class ModuleValidator : IModuleValidator
             serverModules.All(serverModule => serverModule.Id != clientModule.Id));
 
         errors.AddRange(modulesOnlyClientSide.Select(clientModule =>
-            $"Server does not support module {Describe(clientModule)}."));
+            $"Server does not support module {Describe(clientModule, displayNames)}."));
 
         if (errors.Any())
         {
@@ -82,16 +83,19 @@ public class ModuleValidator : IModuleValidator
 
     // 'Calradia Expanded' (CalradiaExpanded): players know the name, the id is what the files use.
     // The Coop line stays exact because the server matches on UnsupportedCoopModuleReason.
-    private static string Describe(ModuleInfo module)
+    private static string Describe(ModuleInfo module, IReadOnlyDictionary<string, string> displayNames)
     {
-        if (string.IsNullOrWhiteSpace(module.Name) ||
-            string.Equals(module.Name, module.Id, StringComparison.Ordinal) ||
+        string name = null;
+        if (module.Id != null) displayNames?.TryGetValue(module.Id, out name);
+
+        if (string.IsNullOrWhiteSpace(name) ||
+            string.Equals(name, module.Id, StringComparison.Ordinal) ||
             string.Equals(module.Id, "Coop", StringComparison.Ordinal))
         {
             return $"'{module.Id}'";
         }
 
-        return $"'{module.Name}' ({module.Id})";
+        return $"'{name}' ({module.Id})";
     }
 
     private static bool ShouldValidateModule(ModuleInfo module)
@@ -109,14 +113,17 @@ public class ModuleValidator : IModuleValidator
         return true;
     }
 
-    public bool ValidateNoDlc(IEnumerable<ModuleInfo> modules, out string error)
+    public bool ValidateNoDlc(IEnumerable<ModuleInfo> modules, out string error) =>
+        ValidateNoDlc(modules, null, out error);
+
+    private static bool ValidateNoDlc(IEnumerable<ModuleInfo> modules, IReadOnlyDictionary<string, string> displayNames, out string error)
     {
         var dlcModules = (modules ?? Enumerable.Empty<ModuleInfo>()).Where(module => module.IsDlc).ToList();
 
         if (dlcModules.Any())
         {
             error = "DLC is not supported. Please disable the following module(s): " +
-                string.Join(", ", dlcModules.Select(Describe)) + ".";
+                string.Join(", ", dlcModules.Select(module => Describe(module, displayNames))) + ".";
             return false;
         }
 

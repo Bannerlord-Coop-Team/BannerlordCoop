@@ -66,7 +66,8 @@ public class ValidateModuleState : ClientStateBase
         IControllerIdProvider controllerIdProvider,
         ICoopFinalizer coopFinalizer,
         IGameStateInterface gameStateInterface,
-        IModuleInfoProvider moduleInfoProvider) : base(logic)
+        IModuleInfoProvider moduleInfoProvider,
+        IModuleNameProvider moduleNameProvider) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -84,9 +85,10 @@ public class ValidateModuleState : ClientStateBase
 
 #if DEBUG
         network.SendAll(new NetworkModuleVersionsValidate(
-            moduleInfoProvider.GetModuleInfos(), JoinBuildDebugCommands.ReportedBuildVersion));
+            moduleInfoProvider.GetModuleInfos(), JoinBuildDebugCommands.ReportedBuildVersion, moduleNameProvider.GetDisplayName));
 #else
-        network.SendAll(new NetworkModuleVersionsValidate(moduleInfoProvider.GetModuleInfos()));
+        network.SendAll(new NetworkModuleVersionsValidate(
+            moduleInfoProvider.GetModuleInfos(), ModInformation.BuildVersion, moduleNameProvider.GetDisplayName));
 #endif
 
         // One-shot deadline covering this state's whole exchange; leaving the state disposes it.

@@ -12,8 +12,8 @@ public class NetworkModuleInfoTests
     [Fact]
     public void Serialize_WithName_RoundTripsName()
     {
-        var module = new ModuleInfo("CalradiaExpanded", false, false, new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 0, 0)) { Name = "Calradia Expanded" };
-        var message = new NetworkModuleVersionsValidate(new[] { module }, null);
+        var module = new ModuleInfo("CalradiaExpanded", false, false, new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 0, 0));
+        var message = new NetworkModuleVersionsValidate(new[] { module }, null, id => id == "CalradiaExpanded" ? "Calradia Expanded" : null);
 
         var copy = RoundTrip(message);
 
