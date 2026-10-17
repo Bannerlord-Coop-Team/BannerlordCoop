@@ -177,6 +177,8 @@ public class MerchantOutlawsTests : IDisposable
     {
         Accept(startQuest: false);
         var ownerQuest = Quest(ClientA);
+        ClientA.Call(() => Assert.Contains(Campaign.Current.ConversationManager._sentences,
+            sentence => ReferenceEquals(sentence.RelatedObject, ownerQuest)));
         Server.Call(() => Quest(Server).CompleteQuestWithCancel(), TextHelpers);
         AssertEndedEverywhere();
         ClientA.Call(() =>
@@ -184,6 +186,37 @@ public class MerchantOutlawsTests : IDisposable
             ownerQuest.QuestAcceptedConsequences();
             Assert.DoesNotContain(ownerQuest, Campaign.Current.QuestManager.Quests);
             Assert.Null(ownerQuest._questProgressLogTest);
+            Assert.False(ownerQuest.IsOngoing);
+            Assert.DoesNotContain(Campaign.Current.ConversationManager._sentences,
+                sentence => ReferenceEquals(sentence.RelatedObject, ownerQuest));
+        }, TextHelpers);
+
+        Server.Call(() =>
+        {
+            var giver = Get<Hero>(Server, scenario.NotableId);
+            var potential = new PotentialIssueData((in PotentialIssueData _, Hero owner) =>
+                new Issue(owner, Get<Hideout>(Server, hideoutId)), typeof(Issue), IssueBase.IssueFrequency.VeryCommon);
+            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in potential, giver));
+        });
+        ClientA.Call(() =>
+        {
+            var player = Get<Hero>(ClientA, scenario.PlayerA.HeroId);
+            using (new MainHeroSubstitutionScope(player, player.PartyBelongedTo))
+            {
+                var giver = Get<Hero>(ClientA, scenario.NotableId);
+                giver.Issue.StartIssueWithQuest();
+                var quest = Quest(ClientA);
+                var manager = Campaign.Current.ConversationManager;
+                var agent = new Mock<IAgent>();
+                agent.SetupGet(value => value.Character).Returns(giver.CharacterObject);
+                manager._conversationAgents.Add(agent.Object);
+                var offer = manager._sentences.First(sentence =>
+                    sentence.InputToken == manager.GetStateIndex("issue_classic_quest_start") && sentence.RunCondition());
+                Assert.Same(quest, offer.RelatedObject);
+                offer.RunConsequence(Game.Current);
+                Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
+                Assert.NotNull(quest._questProgressLogTest);
+            }
         }, TextHelpers);
     }
 

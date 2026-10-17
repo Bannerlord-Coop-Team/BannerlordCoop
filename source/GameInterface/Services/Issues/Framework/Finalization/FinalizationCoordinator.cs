@@ -276,6 +276,9 @@ internal class FinalizationCoordinator : IHandler
 
         if (quest != null && !Campaign.Current.QuestManager.Quests.Contains(quest))
         {
+            // Constructors register dialogue even before the acceptance line starts the quest.
+            quest.FinalizeQuest();
+            quest.AfterFinalize();
             issue.IssueQuest = null;
             issue.IsTriedToSolveBefore = false;
             quest = null;
