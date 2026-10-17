@@ -14,6 +14,7 @@ using GameInterface.Services.MapEvents.Participation;
 using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -577,10 +578,22 @@ internal class MapEventPatches
         return true;
     }
 
-    private static bool HasConnectedPlayerParty(MapEvent mapEvent) =>
-        // without the service, keep waiting like before
-        !ContainerProvider.TryResolve<IMapEventPlayerPresence>(out var presence) ||
-        presence.HasConnectedPlayerParty(mapEvent);
+    /// <summary>
+    /// The server only resolves a battle with a player party through that player's mission. Once every such
+    /// player is offline nothing would resolve it (#3864), so the battle is then simulated like an AI battle.
+    /// A player party with no registered owner counts as connected, which keeps the battle waiting.
+    /// </summary>
+    private static bool HasConnectedPlayerParty(MapEvent mapEvent)
+    {
+        // without the player manager, keep waiting like before
+        if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager)) return true;
+
+        return mapEvent.InvolvedParties.Any(party =>
+            party != null &&
+            party.IsMobile &&
+            !party.MobileParty.IsControlledByThisInstance() &&
+            !playerManager.IsOwnerOfPartyDisconnected(party.MobileParty));
+    }
 
     private static bool IsBattleModeBusy(MapEvent mapEvent)
     {
