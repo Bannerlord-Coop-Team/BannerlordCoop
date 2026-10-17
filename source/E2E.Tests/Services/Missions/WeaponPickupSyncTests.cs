@@ -380,6 +380,8 @@ public class WeaponPickupSyncTests
         {
             AccessTools.Method(typeof(Mission), nameof(Mission.SpawnWeaponAsDropFromAgentAux)),
             AccessTools.Method(typeof(Mission), nameof(Mission.SpawnWeaponAsDropFromMissile)),
+            // Every missile ends here, whether it dropped, stuck in an agent or vanished.
+            AccessTools.Method(typeof(Mission), nameof(Mission.OnMissileRemoved)),
         };
 
         try

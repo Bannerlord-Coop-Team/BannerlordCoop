@@ -26,6 +26,21 @@ public class MissileItemDropPatch
         SpawnedItemEntity item = __state?.Entity?.GetFirstScriptOfType<SpawnedItemEntity>();
         if (item == null) return;
 
-        MessageBroker.Instance.Publish(__instance, new MissileItemDropped(missileIndex, __state.ShooterAgent, item));
+        MessageBroker.Instance.Publish(__instance,
+            new MissileItemDropped(missileIndex, __state, __state.ShooterAgent, item));
+    }
+}
+
+/// <summary>
+/// Reports every missile the engine removes. Hits, misses that vanish and drops all end here, so the missile
+/// handler forgets the shot it kept for that index before the index is reused.
+/// </summary>
+[HarmonyPatch(typeof(Mission), nameof(Mission.OnMissileRemoved))]
+[HarmonyPatchCategory(MissionModule.WeaponDropPatchCategory)]
+public class MissileRemovedPatch
+{
+    static void Postfix(Mission __instance, int missileIndex)
+    {
+        MessageBroker.Instance.Publish(__instance, new MissileRemoved(missileIndex));
     }
 }

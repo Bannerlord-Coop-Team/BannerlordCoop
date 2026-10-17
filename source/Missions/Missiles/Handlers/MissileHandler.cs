@@ -38,7 +38,7 @@ public class MissileHandler : IMissileHandler
     private readonly ConcurrentDictionary<(Guid AgentId, long ShotSequence), byte> pendingReconstructions = new();
     private readonly ConcurrentDictionary<(Guid AgentId, long ShotSequence), ImpactHint> impactHints = new();
     private readonly Dictionary<int, (Guid AgentId, long ShotSequence)> localShots = new();
-    private readonly Dictionary<int, (Guid AgentId, long ShotSequence)> reconstructedShots = new();
+    private readonly Dictionary<int, (Mission.Missile Missile, Guid AgentId, long ShotSequence)> reconstructedShots = new();
     private long nextShotSequence = CreateShotSequenceSeed();
     private volatile bool disposed;
     private const int MaxReconstructionAttempts = 30;
@@ -66,6 +66,7 @@ public class MissileHandler : IMissileHandler
         messageBroker.Subscribe<AgentShoot>(AgentShootSend);
         messageBroker.Subscribe<NetworkAgentShoot>(AgentShootReceive);
         messageBroker.Subscribe<MissileItemDropped>(Handle_MissileItemDropped);
+        messageBroker.Subscribe<MissileRemoved>(Handle_MissileRemoved);
     }
 
     ~MissileHandler() => Dispose();
@@ -79,6 +80,7 @@ public class MissileHandler : IMissileHandler
         messageBroker.Unsubscribe<AgentShoot>(AgentShootSend);
         messageBroker.Unsubscribe<NetworkAgentShoot>(AgentShootReceive);
         messageBroker.Unsubscribe<MissileItemDropped>(Handle_MissileItemDropped);
+        messageBroker.Unsubscribe<MissileRemoved>(Handle_MissileRemoved);
         pendingReconstructions.Clear();
         impactHints.Clear();
         localShots.Clear();
@@ -202,19 +204,30 @@ public class MissileHandler : IMissileHandler
         localShots.Remove(dropped.MissileIndex);
         reconstructedShots.Remove(dropped.MissileIndex);
 
-        if (!networkAgentRegistry.TryGetAgentInfo(dropped.Shooter, out var shooterInfo)) return;
-
+        // A replayed shot may fly from a stand-in shooter, so it is matched by the missile object it was replayed
+        // as. That still rejects an entry left behind by an older missile at the same index.
         (Guid AgentId, long ShotSequence) shot;
-        if (hasLocal && localShot.AgentId == shooterInfo.AgentId)
+        if (hasReconstructed && dropped.Missile != null && ReferenceEquals(reconstructedShot.Missile, dropped.Missile))
+            shot = (reconstructedShot.AgentId, reconstructedShot.ShotSequence);
+        else if (hasLocal && networkAgentRegistry.TryGetAgentInfo(dropped.Shooter, out var shooterInfo)
+            && localShot.AgentId == shooterInfo.AgentId)
             shot = localShot;
-        else if (hasReconstructed && reconstructedShot.AgentId == shooterInfo.AgentId)
-            shot = reconstructedShot;
         else
             return;
 
         messageBroker.Publish(this, new MissileItemIdentified(
             dropped.Item,
             CreateMissileItemId(shot.AgentId, shot.ShotSequence)));
+    }
+
+    // [Game thread] The engine removed a missile. Hits, vanished misses and drops all end here, so whatever is
+    // still kept for this index belongs to a missile that no longer exists and must not outlive it.
+    private void Handle_MissileRemoved(MessagePayload<MissileRemoved> payload)
+    {
+        if (disposed) return;
+
+        localShots.Remove(payload.What.MissileIndex);
+        reconstructedShots.Remove(payload.What.MissileIndex);
     }
 
     internal static Guid CreateMissileItemId(Guid agentId, long shotSequence)
@@ -347,7 +360,7 @@ public class MissileHandler : IMissileHandler
         Mission.Missile missile = new Mission.Missile(mission, index, missileEntity, agent, missileWeapon, null);
         mission._missilesList.Add(missile);
         mission._missilesDictionary[index] = missile;
-        reconstructedShots[index] = (shot.AgentId, shot.ShotSequence);
+        reconstructedShots[index] = (missile, shot.AgentId, shot.ShotSequence);
 
         Logger.Debug("Reconstructed missile sequence {sequence}, source {sourceIndex}, as local {localIndex}",
             shot.ShotSequence, shot.MissileIndex, index);

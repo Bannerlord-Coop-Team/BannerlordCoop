@@ -980,6 +980,60 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void ReplayedMissile_FromAStandInShooter_SharesTheShotIdentity()
+    {
+        RunWithStuckMissileClients((clients, picker, shooter, itemObject, weapon) =>
+        {
+            // The original shooter is not on this client, so the replay flew from an unregistered stand-in.
+            Guid missingShooterId = Guid.NewGuid();
+            Agent standIn = ObjectHelper.SkipConstructor<Agent>();
+            Mission.Missile replay = clients.Picker.RecordShot(missileIndex: 7, missingShooterId);
+
+            SpawnedItemEntity copy = clients.Picker.DropMissile(replay, standIn, weapon, missileIndex: 7, sceneId: 96);
+
+            Assert.True(clients.Picker.Items.TryGetId(copy, out Guid copyId));
+            Assert.Equal(MissileHandler.CreateMissileItemId(missingShooterId, 4242), copyId);
+        });
+    }
+
+    [Fact]
+    public void ReplayedMissile_FromAnOlderMissileAtAReusedIndex_StaysUnidentified()
+    {
+        RunWithStuckMissileClients((clients, picker, shooter, itemObject, weapon) =>
+        {
+            clients.Picker.RecordShot(missileIndex: 7, clients.ShooterId);
+            Mission.Missile newer = ObjectHelper.SkipConstructor<Mission.Missile>();
+
+            SpawnedItemEntity copy = clients.Picker.DropMissile(newer, shooter, weapon, missileIndex: 7, sceneId: 97);
+
+            Assert.False(clients.Picker.Items.TryGetId(copy, out _));
+            Assert.True(clients.Picker.Spawner.IsPresent(copy));
+        });
+    }
+
+    [Fact]
+    public void MissileRemovedWithoutADrop_ForgetsItsShot_AndTheReusedIndexNamesTheNextShot()
+    {
+        RunWithStuckMissileClients((clients, picker, shooter, itemObject, weapon) =>
+        {
+            // A hit that sticks in an agent or a miss that vanishes ends the missile without a world item.
+            clients.Picker.RecordShot(missileIndex: 7, clients.ShooterId, shotSequence: 1);
+            clients.Peer.RecordShot(missileIndex: 7, clients.ShooterId, shotSequence: 1);
+            clients.Picker.RemoveMissile(7);
+            clients.Peer.RemoveMissile(7);
+
+            Assert.Equal(0, clients.Picker.KeptShotCount("reconstructedShots"));
+            Assert.Equal(0, clients.Peer.KeptShotCount("localShots"));
+
+            Mission.Missile next = clients.Picker.RecordShot(missileIndex: 7, clients.ShooterId, shotSequence: 2);
+            SpawnedItemEntity copy = clients.Picker.DropMissile(next, shooter, weapon, missileIndex: 7, sceneId: 98);
+
+            Assert.True(clients.Picker.Items.TryGetId(copy, out Guid copyId));
+            Assert.Equal(MissileHandler.CreateMissileItemId(clients.ShooterId, 2), copyId);
+        });
+    }
+
     private delegate void StuckMissileTest(
         StuckMissileClients clients, Agent picker, Agent shooter, ItemObject itemObject, MissionWeapon weapon);
 
@@ -1083,18 +1137,47 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             Guid? shotAgentId = null)
         {
             Assert.True(agentRegistry.TryGetAgentInfo(shooter, out CoopAgentInfo shooterInfo));
-            FieldInfo field = typeof(MissileHandler).GetField(shotMap, BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.NotNull(field);
-            var shots = Assert.IsType<Dictionary<int, (Guid AgentId, long ShotSequence)>>(field.GetValue(missiles));
-            shots[missileIndex] = (shotAgentId ?? shooterInfo.AgentId, ShotSequence);
+            Mission.Missile missile = RecordShot(missileIndex, shotAgentId ?? shooterInfo.AgentId);
+            return DropMissile(missile, shooter, weapon, missileIndex, sceneId);
+        }
 
+        public Mission.Missile RecordShot(int missileIndex, Guid shotAgentId, long shotSequence = ShotSequence)
+        {
+            Mission.Missile missile = ObjectHelper.SkipConstructor<Mission.Missile>();
+            object shots = ShotMap(shotMap);
+            if (shots is Dictionary<int, (Guid AgentId, long ShotSequence)> local)
+                local[missileIndex] = (shotAgentId, shotSequence);
+            else
+                Assert.IsType<Dictionary<int, (Mission.Missile Missile, Guid AgentId, long ShotSequence)>>(shots)
+                    [missileIndex] = (missile, shotAgentId, shotSequence);
+            return missile;
+        }
+
+        public SpawnedItemEntity DropMissile(
+            Mission.Missile missile,
+            Agent visualShooter,
+            MissionWeapon weapon,
+            int missileIndex,
+            int sceneId)
+        {
             // A stuck missile is a single round on every client.
             MissionWeapon stuck = weapon;
             stuck.Amount = 1;
             SpawnedItemEntity item = Spawner.AddPresent(stuck);
             item.Id = new MissionObjectId(sceneId, true);
-            Broker.Publish(this, new MissileItemDropped(missileIndex, shooter, item));
+            Broker.Publish(this, new MissileItemDropped(missileIndex, missile, visualShooter, item));
             return item;
+        }
+
+        public void RemoveMissile(int missileIndex) => Broker.Publish(this, new MissileRemoved(missileIndex));
+
+        public int KeptShotCount(string map) => ((System.Collections.IDictionary)ShotMap(map)).Count;
+
+        private object ShotMap(string map)
+        {
+            FieldInfo field = typeof(MissileHandler).GetField(map, BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(field);
+            return field.GetValue(missiles);
         }
 
         public void Dispose()
