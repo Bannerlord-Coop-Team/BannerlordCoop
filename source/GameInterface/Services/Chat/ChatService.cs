@@ -28,6 +28,7 @@ public sealed class ChatService : IChatService, IDisposable
     private readonly IPlayerManager playerManager;
     private readonly IChatPlayerNameResolver playerNameResolver;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IChatFactionMembership factionMembership;
     private readonly IMessageBroker messageBroker;
     private readonly IChatVanillaLogGate vanillaLogGate;
     private readonly IChatEventLog eventLog;
@@ -39,6 +40,7 @@ public sealed class ChatService : IChatService, IDisposable
         IPlayerManager playerManager,
         IChatPlayerNameResolver playerNameResolver,
         IControllerIdProvider controllerIdProvider,
+        IChatFactionMembership factionMembership,
         ICoopOptionsStore optionsStore,
         IMessageBroker messageBroker,
         IChatVanillaLogGate vanillaLogGate,
@@ -49,6 +51,7 @@ public sealed class ChatService : IChatService, IDisposable
         if (playerManager == null) throw new ArgumentNullException(nameof(playerManager));
         if (playerNameResolver == null) throw new ArgumentNullException(nameof(playerNameResolver));
         if (controllerIdProvider == null) throw new ArgumentNullException(nameof(controllerIdProvider));
+        if (factionMembership == null) throw new ArgumentNullException(nameof(factionMembership));
         if (optionsStore == null) throw new ArgumentNullException(nameof(optionsStore));
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
         if (vanillaLogGate == null) throw new ArgumentNullException(nameof(vanillaLogGate));
@@ -59,6 +62,7 @@ public sealed class ChatService : IChatService, IDisposable
         this.playerManager = playerManager;
         this.playerNameResolver = playerNameResolver;
         this.controllerIdProvider = controllerIdProvider;
+        this.factionMembership = factionMembership;
         this.messageBroker = messageBroker;
         this.vanillaLogGate = vanillaLogGate;
         this.eventLog = eventLog;
@@ -68,11 +72,11 @@ public sealed class ChatService : IChatService, IDisposable
             () => controllerIdProvider.ControllerId,
             killFeedColorService.GetColor);
         var showChat = ChatOptionsTabProvider.GetShowChatOrDefault(optionsStore.LoadOrDefault());
-        overlay = new ChatOverlay(viewModel, RequestParticipants, showChat, vanillaLogGate);
+        overlay = new ChatOverlay(viewModel, RefreshOnOpen, showChat, vanillaLogGate);
         messageBroker.Subscribe<ChatVisibilitySelected>(HandleChatVisibilitySelected);
     }
 
-    public bool IsTyping => viewModel.IsOpen;
+    public bool IsTyping => overlay.IsInputFocused;
 
     public void Initialize()
     {
@@ -118,6 +122,25 @@ public sealed class ChatService : IChatService, IDisposable
     internal void RequestParticipants()
     {
         network.SendAll(new NetworkRequestChatParticipants());
+    }
+
+    private void RefreshOnOpen()
+    {
+        RefreshGroupChannels();
+        RequestParticipants();
+    }
+
+    private void RefreshGroupChannels()
+    {
+        bool inClan = false;
+        bool inKingdom = false;
+        if (playerManager.TryGetPlayer(controllerIdProvider.ControllerId, out var player))
+        {
+            inClan = factionMembership.GetClan(player) != null;
+            inKingdom = factionMembership.GetKingdom(player) != null;
+        }
+
+        viewModel.SetGroupChannelMembership(inClan, inKingdom);
     }
 
     private void HandleChatVisibilitySelected(MessagePayload<ChatVisibilitySelected> payload)

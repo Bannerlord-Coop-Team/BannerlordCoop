@@ -127,6 +127,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<NetworkOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<LocalMovementBandwidth>().As<ILocalMovementBandwidth>().InstancePerDependency();
         builder.RegisterType<ChatPlayerName>().As<IChatPlayerNameResolver>().InstancePerDependency();
+        builder.RegisterType<ChatFactionMembership>().As<IChatFactionMembership>().InstancePerDependency();
         builder.RegisterType<ChatVanillaLogGate>().As<IChatVanillaLogGate>().InstancePerDependency();
         builder.RegisterType<ChatEventLog>().As<IChatEventLog>().InstancePerDependency();
         builder.RegisterType<PlayerPartyRestorer>().As<IPlayerPartyRestorer>().InstancePerDependency();
