@@ -365,7 +365,6 @@ public class HeadmanNeedsGrainTests : IDisposable
         Server.Call(() => CampaignEventDispatcher.Instance.OnVillageBeingRaided(Get<Village>(Server, villageId)), Texts);
         Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
-
     }
 
     [Theory]
@@ -394,7 +393,6 @@ public class HeadmanNeedsGrainTests : IDisposable
             foreach (var instance in Instances)
                 instance.Call(() => Assert.Equal(90f, Get<Hero>(instance, scenario.NotableId).Power));
         }
-
     }
 
     [Theory]
