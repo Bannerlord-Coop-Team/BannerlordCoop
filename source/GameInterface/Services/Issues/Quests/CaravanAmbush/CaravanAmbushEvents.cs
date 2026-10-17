@@ -1,7 +1,10 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.ObjectManager;
+using Common.Network;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -14,18 +17,26 @@ internal interface ICaravanAmbushEvents
 {
     void Run(Action<Quest> action);
     void BattleEnded(Quest quest, MapEvent battle);
-    void Release(Quest quest);
+    void Release(Quest quest, bool completing = false);
+    void OpenOwnerConversation(Quest quest);
 }
 
 internal class CaravanAmbushEvents : ICaravanAmbushEvents
 {
     private readonly IOutcomeDispatcher dispatcher;
     private readonly ICaravanAmbushStatePublisher publisher;
+    private readonly INetwork network;
+    private readonly IObjectManager objects;
+    private readonly IIssueOwnerResolver owners;
 
-    public CaravanAmbushEvents(IOutcomeDispatcher dispatcher, ICaravanAmbushStatePublisher publisher)
+    public CaravanAmbushEvents(IOutcomeDispatcher dispatcher, ICaravanAmbushStatePublisher publisher,
+        INetwork network, IObjectManager objects, IIssueOwnerResolver owners)
     {
         this.dispatcher = dispatcher;
         this.publisher = publisher;
+        this.network = network;
+        this.objects = objects;
+        this.owners = owners;
     }
 
     public void Run(Action<Quest> action)
@@ -52,7 +63,8 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         if (!losers.Parties.Any(party => party.Party == quest._banditParty.Party)) return;
         quest._isCaravanSaved = true;
         Release(quest);
-        if (!winners.Parties.Any(party => party.Party == MobileParty.MainParty.Party))
+        var ownerParty = MobileParty.MainParty;
+        if (ownerParty == null || !winners.Parties.Any(party => party.Party == ownerParty.Party))
         {
             quest.OnCaravanSurvivedWithoutHelp();
         }
@@ -60,12 +72,35 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         {
             quest.OnQuestSucceeded();
         }
-        // The owner talks to the surviving caravan on their client to collect its goods.
+        else
+        {
+            publisher.Publish(quest);
+            OpenOwnerConversation(quest);
+        }
     }
 
-    public void Release(Quest quest)
+    public void OpenOwnerConversation(Quest quest)
     {
-        ReleaseParty(quest._caravanParty, quest._targetSettlement);
+        var issue = IssueManager.GetIssueOfQuest(quest);
+        if (issue == null || quest._caravanParty == null ||
+            !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
+            !objects.TryGetIdWithLogging(quest._caravanParty, out var caravanId) ||
+            !owners.TryGetOwnerControllerId(issue, out var controllerId)) return;
+        network.SendAll(new NetworkCaravanAmbushConversation(ownerId, issue.StringId, controllerId, caravanId));
+    }
+
+    public void Release(Quest quest, bool completing = false)
+    {
+        if (!completing && quest._isCaravanSaved && quest._caravanParty?.IsActive == true)
+        {
+            // Keep the caravan available for the owner's reward conversation.
+            quest._caravanParty.SetMoveGoToPoint(quest._caravanParty.Position, MobileParty.NavigationType.Default);
+            quest._caravanParty.Ai.SetDoNotMakeNewDecisions(true);
+        }
+        else
+        {
+            ReleaseParty(quest._caravanParty, quest._targetSettlement);
+        }
         ReleaseParty(quest._banditParty, quest._banditParty?.HomeSettlement);
     }
 

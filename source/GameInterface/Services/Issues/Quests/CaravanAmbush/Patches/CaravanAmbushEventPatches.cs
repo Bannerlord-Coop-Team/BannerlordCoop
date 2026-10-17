@@ -36,13 +36,6 @@ internal class CaravanAmbushEventPatches
             events.Run(quest => events.BattleEnded(quest, mapEvent));
     }
 
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnBanditPartyRecruited))]
-    [HarmonyPostfix]
-    private static void Recruited(MobileParty banditParty) => Run(quest =>
-    {
-        if (quest._banditParty == banditParty) quest.OnBanditPartyRecruited(banditParty);
-    });
-
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementEntered))]
     [HarmonyPostfix]
     private static void Arrived(MobileParty party, Settlement settlement, Hero hero) => Run(quest =>

@@ -1,11 +1,13 @@
 ﻿using Common.Network;
 using Common.Util;
+using Common.Messaging;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.CaravanAmbush;
+using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -155,6 +157,7 @@ public class CaravanAmbushTests : IDisposable
         Server.Call(() =>
         {
             Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
             goldBefore = PlayerHero(QuestScenario.ControllerA).Gold;
             BindParties();
             QuestOf(Server)._isCaravanSaved = true;
@@ -184,9 +187,10 @@ public class CaravanAmbushTests : IDisposable
             // Keep the caravan on the winning side, as it is in a rescued ambush battle.
             quest._caravanParty.Party.MapEventSide = battle.AttackerSide;
             battle.BattleState = BattleState.AttackerVictory;
-            Server.Resolve<ICaravanAmbushEvents>().Run(q => Server.Resolve<ICaravanAmbushEvents>().BattleEnded(q, battle));
+            CampaignEventDispatcher.Instance.OnMapEventEnded(battle);
             Assert.True(quest._isCaravanSaved);
-            Assert.False(quest._caravanParty.IsCurrentlyUsedByAQuest);
+            Assert.True(quest._caravanParty.IsCurrentlyUsedByAQuest);
+            Assert.True(quest._caravanParty.Ai.DoNotMakeNewDecisions);
             Assert.False(quest._banditParty.IsCurrentlyUsedByAQuest);
         }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
         Assert.Equal(ownerParticipated ? 0 : 1, survived.CountFor(Server));
@@ -208,11 +212,45 @@ public class CaravanAmbushTests : IDisposable
         });
     }
 
+    [Fact]
+    public void DismissingTheIssueReleasesBothParties()
+    {
+        Server.Call(() =>
+        {
+            BindParties();
+            IssueOf(Server).IssueFinalized();
+            Server.ObjectManager.TryGetObject<MobileParty>(caravanId, out var caravan);
+            Server.ObjectManager.TryGetObject<MobileParty>(banditId, out var bandits);
+            Assert.False(caravan.IsCurrentlyUsedByAQuest);
+            Assert.False(bandits.IsCurrentlyUsedByAQuest);
+            Assert.False(caravan.Ai.DoNotMakeNewDecisions);
+            Assert.False(bandits.Ai.DoNotMakeNewDecisions);
+        });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RecruitmentRewardsOnlyTheQuestOwner(bool ownerRecruits)
+    {
+        using var hiring = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.OnPlayerHiredBandits)));
+        Server.Call(() =>
+        {
+            BindParties();
+            var recruiter = PlayerHero(ownerRecruits ? QuestScenario.ControllerA : QuestScenario.ControllerB).PartyBelongedTo;
+            Server.ObjectManager.TryGetObject<MobileParty>(banditId, out var bandits);
+            Server.Resolve<IMessageBroker>().Publish(this, new BanditPartyRecruitedByPlayer(bandits, recruiter));
+        });
+        Assert.Equal(ownerRecruits ? 1 : 0, hiring.CountFor(Server));
+        Assert.Equal(ownerRecruits ? 0 : 1, Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>().Count());
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void ClientTicksDoNotMovePartiesOrApplyTimeoutPenalties(bool timeout)
     {
+        using var ticks = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.HourlyTick)));
         Owner.Call(() =>
         {
             var quest = QuestOf(Owner);
@@ -221,6 +259,7 @@ public class CaravanAmbushTests : IDisposable
             Assert.Equal(0, quest.RelationshipChangeWithQuestGiver);
             Assert.Empty(quest.JournalEntries);
         });
+        Assert.Equal(0, ticks.CountFor(Owner));
     }
 
     [Theory]

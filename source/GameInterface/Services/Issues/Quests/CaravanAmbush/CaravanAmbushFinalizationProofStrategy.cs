@@ -15,9 +15,10 @@ internal class CaravanAmbushFinalizationProofStrategy : IFinalizationProofStrate
     public bool TryRunBranch(QuestBase quest, byte proof)
     {
         if (!(quest is Quest caravan) || proof != (byte)CaravanAmbushBranch.CollectReward) return false;
-        if (!caravan.IsOngoing || !caravan._isCaravanSaved || caravan._caravanParty == null) return true;
-        var radius = Campaign.Current.Models.EncounterModel.GetEncounterJoiningRadius;
-        if (MobileParty.MainParty.Position.DistanceSquared(caravan._caravanParty.Position) > radius * radius) return true;
+        if (!caravan.IsOngoing || !caravan._isCaravanSaved || caravan._caravanParty == null || MobileParty.MainParty == null)
+        {
+            return false;
+        }
         caravan.OnQuestSucceeded();
         return true;
     }

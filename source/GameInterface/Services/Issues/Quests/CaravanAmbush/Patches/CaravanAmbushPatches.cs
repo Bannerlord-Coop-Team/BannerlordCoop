@@ -90,15 +90,29 @@ internal class CaravanAmbushPatches
     {
         if (ModInformation.IsClient || !(__instance is Quest quest)) return;
         if (ContainerProvider.TryResolve<ICaravanAmbushStatePublisher>(out var publisher)) publisher.Publish(quest);
-        if (ContainerProvider.TryResolve<ICaravanAmbushEvents>(out var events)) events.Release(quest);
+        if (ContainerProvider.TryResolve<ICaravanAmbushEvents>(out var events)) events.Release(quest, completing: true);
+    }
+
+    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
+    [HarmonyPrefix]
+    private static void IssueFinalized(IssueBase __instance)
+    {
+        // The framework dismisses a disconnected owner's issue without finalizing its quest.
+        if (ModInformation.IsServer && __instance.IssueQuest is Quest quest &&
+            ContainerProvider.TryResolve<ICaravanAmbushEvents>(out var events)) events.Release(quest, completing: true);
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.InitializeQuestOnGameLoad))]
     [HarmonyPrefix]
     private static bool LoadQuest(Quest __instance)
     {
-        if (ModInformation.IsClient) __instance.SetDialogs();
-        return false;
+        if (ModInformation.IsClient)
+        {
+            __instance.SetDialogs();
+            return false;
+        }
+
+        return true;
     }
 
 }

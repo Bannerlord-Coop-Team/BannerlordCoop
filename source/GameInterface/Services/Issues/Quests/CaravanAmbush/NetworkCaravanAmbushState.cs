@@ -28,3 +28,20 @@ internal class NetworkCaravanAmbushState : IServerToClientCommand
         Journal = journal;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+internal class NetworkCaravanAmbushConversation : IServerToClientCommand
+{
+    [ProtoMember(1)] public string IssueOwnerId { get; }
+    [ProtoMember(2)] public string IssueId { get; }
+    [ProtoMember(3)] public string ControllerId { get; }
+    [ProtoMember(4)] public string CaravanId { get; }
+
+    public NetworkCaravanAmbushConversation(string ownerId, string issueId, string controllerId, string caravanId)
+    {
+        IssueOwnerId = ownerId;
+        IssueId = issueId;
+        ControllerId = controllerId;
+        CaravanId = caravanId;
+    }
+}
