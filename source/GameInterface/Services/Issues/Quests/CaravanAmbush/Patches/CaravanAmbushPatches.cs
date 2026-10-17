@@ -114,7 +114,6 @@ internal class CaravanAmbushPatches
 
         return true;
     }
-
 }
 
 [HarmonyPatch]
