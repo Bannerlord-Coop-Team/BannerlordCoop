@@ -238,12 +238,20 @@ public sealed class RevenueFarmingTests : IDisposable
         });
     }
 
-    [Fact]
-    public void CancellationBeforeTheAcceptanceDialogueDoesNotStartTheDetachedQuest()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CancellationBeforeTheAcceptanceDialogueDoesNotStartTheDetachedQuest(bool disconnect)
     {
         scenario.Accept(Client);
         var local = Quest(Client);
-        Server.Call(() =>
+        if (disconnect)
+        {
+            Server.Call(() => Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer));
+            Server.SimulateMessage(this, new PlayerDisconnected(Client.NetPeer, default));
+            environment.ConnectRegisteredPlayer(Client, owner.ControllerId);
+        }
+        else Server.Call(() =>
         {
             var quest = Quest(Server);
             quest.OnVillageRaid(quest.RevenueVillages[0].Village);

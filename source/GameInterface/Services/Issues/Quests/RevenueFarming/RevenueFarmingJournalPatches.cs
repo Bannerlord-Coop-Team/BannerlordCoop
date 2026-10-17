@@ -1,5 +1,6 @@
 ﻿using Common;
 using HarmonyLib;
+using GameInterface.Services.Issues.Framework.Finalization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +12,17 @@ using TaleWorlds.MountAndBlade.GauntletUI;
 namespace GameInterface.Services.Issues.Quests.RevenueFarming;
 
 using Quest = RevenueFarmingIssueBehavior.RevenueFarmingIssueQuest;
+
+[HarmonyPatch(typeof(FinalizationCoordinator), "Replay")]
+internal class RevenueFarmingDetachedDialoguePatch
+{
+    private static void Prefix(IssueBase issue)
+    {
+        if (ModInformation.IsClient && issue.IssueQuest is Quest quest &&
+            !Campaign.Current.QuestManager.Quests.Contains(quest))
+            Campaign.Current.ConversationManager.RemoveRelatedLines(quest);
+    }
+}
 
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.RemoveTrackedObject))]
 internal class RevenueFarmingRemoveTrackingPatch
