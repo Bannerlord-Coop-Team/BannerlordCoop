@@ -96,7 +96,10 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     [Fact]
     public void Accept_GrantsTheHerdAndGrainOnceToItsOwner_AndStartsOnlyTheirJournal()
     {
+        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
         Accept(ClientA);
+        Assert.Equal(1, notices.CountFor(ClientA));
+        Assert.Equal(0, notices.CountFor(ClientB));
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
         var serverQuest = accepted[Server];
         foreach (var instance in Instances)

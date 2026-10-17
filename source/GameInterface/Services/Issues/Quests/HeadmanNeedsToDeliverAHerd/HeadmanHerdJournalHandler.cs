@@ -3,12 +3,15 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
+using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
+using TaleWorlds.Core;
 using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
@@ -36,21 +39,39 @@ internal class HeadmanHerdJournalHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objects;
     private readonly IIssueResolver issues;
+    private readonly IControllerIdProvider controllerId;
 
-    public HeadmanHerdJournalHandler(IMessageBroker broker, INetwork network, IObjectManager objects, IIssueResolver issues)
+    public HeadmanHerdJournalHandler(IMessageBroker broker, INetwork network, IObjectManager objects, IIssueResolver issues, IControllerIdProvider controllerId)
     {
         this.broker = broker;
         this.network = network;
         this.objects = objects;
         this.issues = issues;
+        this.controllerId = controllerId;
         broker.Subscribe<HeadmanHerdLogAdded>(Send);
         broker.Subscribe<NetworkHeadmanHerdLog>(Receive);
+        broker.Subscribe<NetworkQuestSolutionAccepted>(ShowGrant);
     }
 
     public void Dispose()
     {
         broker.Unsubscribe<HeadmanHerdLogAdded>(Send);
         broker.Unsubscribe<NetworkHeadmanHerdLog>(Receive);
+        broker.Unsubscribe<NetworkQuestSolutionAccepted>(ShowGrant);
+    }
+
+    private void ShowGrant(MessagePayload<NetworkQuestSolutionAccepted> payload)
+    {
+        if (ModInformation.IsServer || payload.What.ControllerId != controllerId.ControllerId) return;
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) || !(issue.IssueQuest is Quest quest)) return;
+            var text = new TextObject("{=GgBtpOEm}{.%}{ANIMAL_COUNT} {?ANIMAL_COUNT > 1}{PLURAL(ANIMAL_TYPE)}{?}{ANIMAL_TYPE}{\\?}{.%} added to your party.");
+            text.SetTextVariable("ANIMAL_COUNT", quest._animalCountToDeliver);
+            text.SetTextVariable("ANIMAL_TYPE", quest._herdTypeToDeliver.Name);
+            MBInformationManager.AddQuickInformation(text);
+        }, context: nameof(HeadmanHerdJournalHandler));
     }
 
     private void Send(MessagePayload<HeadmanHerdLogAdded> payload)
