@@ -43,6 +43,12 @@ internal sealed class QuestScenario
         }
     }
 
+    public QuestScenario(E2ETestEnvironment testEnvironment, string notableId)
+    {
+        this.testEnvironment = testEnvironment;
+        NotableId = notableId;
+    }
+
     public void Accept(EnvironmentInstance client)
     {
         client.Call(() =>
