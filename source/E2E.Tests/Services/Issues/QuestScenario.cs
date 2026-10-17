@@ -21,6 +21,7 @@ internal sealed class QuestScenario
     public static readonly Type IssueType = typeof(AllowedIssue);
 
     private readonly E2ETestEnvironment testEnvironment;
+    private readonly Func<EnvironmentInstance, Hero, IssueBase>? createIssue;
 
     public string NotableId { get; }
 
@@ -28,9 +29,10 @@ internal sealed class QuestScenario
     public EnvironmentInstance ClientA => testEnvironment.Clients.First();
     public EnvironmentInstance ClientB => testEnvironment.Clients.Last();
 
-    public QuestScenario(E2ETestEnvironment testEnvironment)
+    public QuestScenario(E2ETestEnvironment testEnvironment, Func<EnvironmentInstance, Hero, IssueBase>? createIssue = null)
     {
         this.testEnvironment = testEnvironment;
+        this.createIssue = createIssue;
 
         NotableId = testEnvironment.CreateRegisteredObject<Hero>();
 
@@ -114,7 +116,7 @@ internal sealed class QuestScenario
 
             using (new AllowedThread())
             {
-                var issue = new AllowedIssue(notable, null);
+                var issue = createIssue == null ? new AllowedIssue(notable, null) : createIssue(instance, notable);
                 issue.StringId = IssueId;
                 issue._issueState = IssueBase.IssueState.Ongoing;
 
