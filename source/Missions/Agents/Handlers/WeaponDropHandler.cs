@@ -6,6 +6,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
+using Missions.Missiles.Message;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -194,6 +195,7 @@ public class WeaponDropHandler : IWeaponDropHandler
         messageBroker.Subscribe<WeaponPickedup>(HandleWeaponPickedup);
         messageBroker.Subscribe<WeaponPickupApplied>(HandleWeaponPickupApplied);
         messageBroker.Subscribe<PendingWorldItemPickupsRejected>(HandlePendingWorldItemPickupsRejected);
+        messageBroker.Subscribe<MissileItemIdentified>(HandleMissileItemIdentified);
     }
 
     ~WeaponDropHandler()
@@ -214,6 +216,7 @@ public class WeaponDropHandler : IWeaponDropHandler
         messageBroker.Unsubscribe<WeaponPickedup>(HandleWeaponPickedup);
         messageBroker.Unsubscribe<WeaponPickupApplied>(HandleWeaponPickupApplied);
         messageBroker.Unsubscribe<PendingWorldItemPickupsRejected>(HandlePendingWorldItemPickupsRejected);
+        messageBroker.Unsubscribe<MissileItemIdentified>(HandleMissileItemIdentified);
         deferredMissionDrops.Clear();
         pendingDrops.Clear();
         activeDrops.Clear();
@@ -502,6 +505,25 @@ public class WeaponDropHandler : IWeaponDropHandler
                 return;
             }
         }
+    }
+
+    // [Game thread] Every client spawns its own copy of a stuck missile; the shot names them all with one id. A copy
+    // that lands after a peer already picked the missile up is removed instead of becoming pickable again.
+    private void HandleMissileItemIdentified(MessagePayload<MissileItemIdentified> payload)
+    {
+        MissileItemIdentified identified = payload.What;
+        if (disposed || identified.Item == null || identified.WorldItemId == Guid.Empty) return;
+
+        if (retiredWorldItemIds.Contains(identified.WorldItemId) ||
+            consumedWorldItemIds.Contains(identified.WorldItemId))
+        {
+            if (!worldItemSpawner.TryRemove(identified.Item))
+                Logger.Error("[WeaponDrop] Failed to remove consumed missile item={WorldItemId}", identified.WorldItemId);
+            return;
+        }
+
+        worldItemRegistry.Register(identified.WorldItemId, identified.Item);
+        messageBroker.Publish(this, new WorldItemIdentityResolved(identified.Item, identified.WorldItemId));
     }
 
     private bool TryCreateTransition(
