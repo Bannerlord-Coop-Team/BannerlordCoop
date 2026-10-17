@@ -3,6 +3,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.Core;
 using Quest = TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.CapturedByBountyHunters.Patches;
@@ -31,7 +32,7 @@ internal class CapturedByBountyHuntersOutcomePatches
             // vanilla branches are decided here. Losing the hideout battle removes the owner's party before it ends.
             if (owner?.PartyBelongedTo == null)
             {
-                if (WasCapturedByThisBattlesWinners(owner, mapEvent) && mapEvent.MapEventSettlement == quest._questHideout)
+                if (mapEvent.MapEventSettlement == quest._questHideout && WasCapturedLosingThisAssault(owner, mapEvent))
                 {
                     quest.AddLog(quest.PlayerLostTheFightLogText);
                     quest.FailConsequences(isTimedOut: false);
@@ -49,15 +50,15 @@ internal class CapturedByBountyHuntersOutcomePatches
         });
     }
 
-    private static bool WasCapturedByThisBattlesWinners(Hero owner, MapEvent mapEvent)
+    // Taken prisoner during this battle by the defenders who beat the assault, not merely held by someone who fought it
+    private static bool WasCapturedLosingThisAssault(Hero owner, MapEvent mapEvent)
     {
         var captor = owner?.IsPrisoner == true ? owner.PartyBelongedToAsPrisoner : null;
-        if (captor?.MapEvent != mapEvent)
-        {
-            return false;
-        }
 
-        return mapEvent.DefeatedSide != captor.Side;
+        return captor?.MapEvent == mapEvent &&
+            captor.Side == BattleSideEnum.Defender &&
+            mapEvent.DefeatedSide == BattleSideEnum.Attacker &&
+            owner.CaptivityStartTime >= mapEvent.BattleStartTime;
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventEnded))]
