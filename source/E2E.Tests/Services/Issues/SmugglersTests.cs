@@ -11,11 +11,14 @@ using GameInterface.Services.Issues.Quests.Smugglers;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using SandBox.GauntletUI.Map;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior.SmugglersIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior.SmugglersIssueQuest;
@@ -34,6 +37,7 @@ public class SmugglersTests : IDisposable
     private readonly MethodCallRecorder succeedQuest;
     private readonly MethodCallRecorder successLogs;
     private readonly MethodCallRecorder hourlyTickParty;
+    private readonly MethodCallRecorder cancelQuest;
 
     private readonly string issueOwnerId;
     private readonly string partyId;
@@ -50,6 +54,7 @@ public class SmugglersTests : IDisposable
         // Last, so the patches under test decide before the recorder skips the original
         succeedQuest = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.SucceedQuest)));
         hourlyTickParty = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.OnHourlyTickParty)));
+        cancelQuest = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithCancel)));
 
         // The success logs read the quest giver's character and the town name, which these quests leave unset
         successLogs = new MethodCallRecorder(
@@ -74,6 +79,7 @@ public class SmugglersTests : IDisposable
     {
         succeedQuest.Dispose();
         hourlyTickParty.Dispose();
+        cancelQuest.Dispose();
         successLogs.Dispose();
         TestEnvironment.Dispose();
     }
@@ -216,6 +222,35 @@ public class SmugglersTests : IDisposable
         Assert.Equal(0, hourlyTickParty.CountFor(Server));
     }
 
+    [Fact]
+    public void SmugglersBeatenWithoutTheOwner_CancelTheQuest()
+    {
+        EndBattleAgainstTheSmugglers(BattleState.AttackerVictory);
+
+        Assert.Equal(1, cancelQuest.CountFor(Server));
+    }
+
+    [Fact]
+    public void SmugglersWinningWithoutTheOwner_KeepTheQuest()
+    {
+        EndBattleAgainstTheSmugglers(BattleState.DefenderVictory);
+
+        Assert.Equal(0, cancelQuest.CountFor(Server));
+    }
+
+    [Fact]
+    public void ClientTimeout_LeavesTheFailureToTheServer()
+    {
+        ClientA.Call(() =>
+        {
+            var quest = QuestOf(ClientA);
+
+            quest.OnTimedOut();
+
+            Assert.Equal(0, quest.RelationshipChangeWithQuestGiver);
+        });
+    }
+
     private int RunBribeAsOwner(int ownerGold)
     {
         var gold = 0;
@@ -239,6 +274,34 @@ public class SmugglersTests : IDisposable
         });
 
         return gold;
+    }
+
+    // Another party attacks the smugglers, the owner is not in the battle
+    private void EndBattleAgainstTheSmugglers(BattleState battleState)
+    {
+        // The map event visual needs a render context, its constructor is skipped and its Initialize turned off
+        var disabledMethods = new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) };
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var smugglers));
+            var attacker = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var quest = QuestOf(Server);
+
+            using (new AllowedThread())
+            {
+                smugglers.SetPartyUsedByQuest(true);
+                quest._smugglerParty = smugglers;
+            }
+
+            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+            mapEvent.Initialize(attacker.Party, smugglers.Party, new FieldBattleEventComponent(mapEvent), MapEvent.BattleTypes.FieldBattle);
+            mapEvent.MapEventVisual = null;
+            mapEvent.BattleState = battleState;
+
+            CampaignEventDispatcher.Instance.OnMapEventEnded(mapEvent);
+        }, disabledMethods);
     }
 
     private void SendPartyCreated(string controllerId)

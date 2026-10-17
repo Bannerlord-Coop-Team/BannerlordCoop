@@ -32,6 +32,12 @@ internal class SmugglersQuestEventPatches
 
         RunAsOwners(quest =>
         {
+            // Vanilla reads the party without a null check, it is only missing when spawning it failed
+            if (quest._smugglerParty == null)
+            {
+                return;
+            }
+
             quest.OnMapEventEnded(mapEvent);
             CancelIfDefeatedWithoutOwner(quest, mapEvent);
         });
@@ -40,8 +46,8 @@ internal class SmugglersQuestEventPatches
     // Vanilla only expects the owner to fight the smugglers, another player beating them leaves the quest unwinnable
     private static void CancelIfDefeatedWithoutOwner(Quest quest, MapEvent mapEvent)
     {
-        var smugglers = quest._smugglerParty?.Party;
-        if (!quest.IsOngoing || smugglers == null || !mapEvent.InvolvedParties.Contains(smugglers))
+        var smugglers = quest._smugglerParty.Party;
+        if (!quest.IsOngoing || !mapEvent.InvolvedParties.Contains(smugglers))
         {
             return;
         }
@@ -118,6 +124,11 @@ internal class SmugglersQuestEventPatches
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnHourlyTickParty))]
     [HarmonyPrefix]
     private static bool OnHourlyTickPartyPrefix() => ModInformation.IsServer;
+
+    // The server fails the quest when it times out, a client replaying the timeout only ends its copy
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
+    [HarmonyPrefix]
+    private static bool OnTimedOutPrefix() => ModInformation.IsServer;
 
     private static void RunAsOwners(Action<Quest> listener)
     {
