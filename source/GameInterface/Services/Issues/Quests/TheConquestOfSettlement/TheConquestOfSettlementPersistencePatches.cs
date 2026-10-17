@@ -4,19 +4,25 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 
-[HarmonyPatch(typeof(TheConquestOfSettlementIssueBehavior))]
 internal static class TheConquestOfSettlementPersistencePatches
 {
-    [HarmonyPatch(nameof(TheConquestOfSettlementIssueBehavior.RegisterEvents))]
-    [HarmonyPostfix]
-    private static void RegisterEventsPostfix()
+    [HarmonyPatch(typeof(Campaign), "OnInitialize")]
+    [HarmonyPrefix]
+    internal static void CampaignOnInitializePrefix()
     {
         TheConquestOfSettlementService.ResetQuestOwners();
     }
 
-    [HarmonyPatch(nameof(TheConquestOfSettlementIssueBehavior.SyncData))]
+    [HarmonyPatch(typeof(TheConquestOfSettlementIssueBehavior), nameof(TheConquestOfSettlementIssueBehavior.RegisterEvents))]
     [HarmonyPostfix]
-    private static void SyncDataPostfix(IDataStore dataStore)
+    internal static void RegisterEventsPostfix()
+    {
+        TheConquestOfSettlementService.ResetQuestOwnersIfNotRestored();
+    }
+
+    [HarmonyPatch(typeof(TheConquestOfSettlementIssueBehavior), nameof(TheConquestOfSettlementIssueBehavior.SyncData))]
+    [HarmonyPostfix]
+    internal static void SyncDataPostfix(IDataStore dataStore)
     {
         TheConquestOfSettlementService.SyncQuestOwners(dataStore);
     }

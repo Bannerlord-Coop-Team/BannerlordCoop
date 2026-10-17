@@ -36,6 +36,7 @@ internal sealed class TheConquestOfSettlementService : ITheConquestOfSettlementS
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controllerIdProvider;
     private static readonly ConcurrentDictionary<string, string> questOwners = new();
+    private static bool questOwnersRestored;
 
     public TheConquestOfSettlementService(
         IObjectManager objectManager,
@@ -130,6 +131,15 @@ internal sealed class TheConquestOfSettlementService : ITheConquestOfSettlementS
     internal static void ResetQuestOwners()
     {
         questOwners.Clear();
+        questOwnersRestored = false;
+    }
+
+    internal static void ResetQuestOwnersIfNotRestored()
+    {
+        if (!questOwnersRestored)
+        {
+            questOwners.Clear();
+        }
     }
 
     internal static void SyncQuestOwners(IDataStore dataStore)
@@ -149,6 +159,7 @@ internal sealed class TheConquestOfSettlementService : ITheConquestOfSettlementS
         }
 
         questOwners.Clear();
+        questOwnersRestored = true;
         if (saveData == null)
         {
             return;
