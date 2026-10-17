@@ -76,6 +76,7 @@ internal class ArtisanProductsWorldEventPatches
     [HarmonyPrefix]
     private static bool Menu() => ModInformation.IsClient;
 
+
     private static void Run(Action<Quest> action)
     {
         if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher)) dispatcher.RunAsOwners(action);
