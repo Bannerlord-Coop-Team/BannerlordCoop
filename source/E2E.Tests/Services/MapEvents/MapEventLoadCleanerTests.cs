@@ -396,7 +396,17 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.Null(defender.Party.MapEventSide);
             Assert.Equal(MoveModeType.Hold, attacker.PartyMoveMode);
             Assert.Null(attacker.MoveTargetParty);
+
+            // the old battle keeps no participants and no network registration
+            Assert.True(mapEvent.IsFinalized);
+            Assert.Empty(mapEvent.AttackerSide.Parties);
+            Assert.Empty(mapEvent.DefenderSide.Parties);
+            Assert.Empty(mapEvent.InvolvedParties);
+            Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out _));
         }, MapEventDisabledMethods);
+
+        // only the cleaner's own retirement, FinalizeEventAux does not run the ended battle again
+        Assert.Single(Server.InternalMessages.GetMessages<MapEventFinalized>());
     }
 
     [Fact]
