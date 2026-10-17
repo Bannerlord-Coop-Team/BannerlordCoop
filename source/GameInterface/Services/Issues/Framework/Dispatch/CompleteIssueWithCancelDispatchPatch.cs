@@ -1,4 +1,4 @@
-using GameInterface.Services.Issues.Framework.Finalization;
+﻿using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Issues;

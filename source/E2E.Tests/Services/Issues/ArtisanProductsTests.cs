@@ -397,6 +397,7 @@ public class ArtisanProductsTests : IDisposable
     [InlineData(IssueBase.IssueState.SolvingWithLordSolution)]
     public void GiverDeath_EndsQuestlessSolutionsOnEveryPeer(IssueBase.IssueState state)
     {
+        var troopId = state == IssueBase.IssueState.SolvingWithAlternativeSolution ? environment.CreateRegisteredObject<CharacterObject>() : null;
         foreach (var instance in new[] { Server, Owner, Other })
             instance.Call(() =>
             {
@@ -406,13 +407,19 @@ public class ArtisanProductsTests : IDisposable
                     issue._issueState = state;
                     issue.IsTriedToSolveBefore = instance == Owner;
                     instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(scenario.NotableId, issue.StringId, QuestScenario.ControllerA);
+                    if (troopId != null && instance != Other)
+                        issue.AlternativeSolutionSentTroops.AddToCounts(instance.GetRegisteredObject<CharacterObject>(troopId), 9);
                 }
             });
         Server.Call(() => CampaignEventDispatcher.Instance.OnHeroKilled(Server.GetRegisteredObject<Hero>(scenario.NotableId), null,
             KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false));
         Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        environment.FlushCoalescer();
         foreach (var instance in new[] { Server, Owner, Other })
             instance.Call(() => Assert.Null(instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
+        if (troopId != null)
+            foreach (var instance in new[] { Server, Owner })
+                instance.Call(() => Assert.Equal(9, OwnerParty(instance).MemberRoster.GetTroopCount(instance.GetRegisteredObject<CharacterObject>(troopId))));
     }
 
     [Theory]
