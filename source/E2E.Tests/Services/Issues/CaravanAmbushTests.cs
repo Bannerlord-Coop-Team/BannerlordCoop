@@ -3,6 +3,7 @@ using Common.Util;
 using Common.Messaging;
 using Common.Network.Messages;
 using LiteNetLib;
+using GameInterface.Registry.Messages;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -225,6 +226,25 @@ public class CaravanAmbushTests : IDisposable
             using (new AllowedThread()) IssueOf(Server)._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
             Server.Resolve<IPlayerManager>().ClearPeer(Owner.NetPeer);
             Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(Owner.NetPeer, default(DisconnectInfo)));
+            Assert.Null(IssueOfHero(Server));
+            Server.ObjectManager.TryGetObject<MobileParty>(caravanId, out var caravan);
+            Server.ObjectManager.TryGetObject<MobileParty>(banditId, out var bandits);
+            Assert.False(caravan.IsCurrentlyUsedByAQuest);
+            Assert.False(bandits.IsCurrentlyUsedByAQuest);
+            Assert.False(caravan.Ai.DoNotMakeNewDecisions);
+            Assert.False(bandits.Ai.DoNotMakeNewDecisions);
+        });
+    }
+
+    [Fact]
+    public void ServerStartupDismissesASavedQuestAndReleasesItsParties()
+    {
+        Server.Call(() =>
+        {
+            BindParties();
+            using (new AllowedThread()) IssueOf(Server)._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+            Server.Resolve<IIssueOwnershipRegistry>().Remove(scenario.NotableId);
+            Server.Resolve<IMessageBroker>().Publish(this, new AllGameObjectsRegistered());
             Assert.Null(IssueOfHero(Server));
             Server.ObjectManager.TryGetObject<MobileParty>(caravanId, out var caravan);
             Server.ObjectManager.TryGetObject<MobileParty>(banditId, out var bandits);
