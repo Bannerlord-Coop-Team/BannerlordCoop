@@ -38,14 +38,17 @@ internal class MobilePartyBehaviorHandler : IHandler
     private readonly IMobilePartyInterface mobilePartyInterface;
     private readonly IObjectManager objectManager;
     private readonly IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot;
+    private readonly IPartyNavigationRepair partyNavigationRepair;
 
     public MobilePartyBehaviorHandler(
         IMessageBroker messageBroker,
         IControllerIdProvider controllerIdProvider,
         IMobilePartyInterface mobilePartyInterface,
         IObjectManager objectManager,
-        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot)
+        IMobilePartyBehaviorSnapshot mobilePartyBehaviorSnapshot,
+        IPartyNavigationRepair partyNavigationRepair)
     {
+        this.partyNavigationRepair = partyNavigationRepair;
         this.messageBroker = messageBroker;
         this.controllerIdProvider = controllerIdProvider;
         this.mobilePartyInterface = mobilePartyInterface;
@@ -162,7 +165,12 @@ internal class MobilePartyBehaviorHandler : IHandler
             }
 
             if (ModInformation.IsServer)
+            {
                 PublishAuthoritativeBehavior(party, data);
+
+                // A player order is the moment a frozen server copy shows: free it before it is ticked.
+                partyNavigationRepair.TryRepair(party, out _);
+            }
 
             if (attachedParties != null)
             {
