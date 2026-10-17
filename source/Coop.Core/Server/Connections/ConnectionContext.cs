@@ -25,6 +25,7 @@ public class ConnectionContext
         INetwork network,
         IModuleValidator moduleValidator,
         IModuleInfoProvider moduleInfoProvider,
+        IModuleNameProvider moduleNameProvider,
         IPlayerManager playerManager,
         IPlayerPartyRestorer playerPartyRestorer,
         IPlayerCreationRollback playerCreationRollback,
@@ -46,6 +47,7 @@ public class ConnectionContext
         Network = network;
         ModuleValidator = moduleValidator;
         ModuleInfoProvider = moduleInfoProvider;
+        ModuleNameProvider = moduleNameProvider;
         PlayerManager = playerManager;
         PlayerPartyRestorer = playerPartyRestorer;
         PlayerCreationRollback = playerCreationRollback;
@@ -68,6 +70,7 @@ public class ConnectionContext
     public INetwork Network { get; }
     public IModuleValidator ModuleValidator { get; }
     public IModuleInfoProvider ModuleInfoProvider { get; }
+    public IModuleNameProvider ModuleNameProvider { get; }
     public IPlayerManager PlayerManager { get; }
     public IPlayerPartyRestorer PlayerPartyRestorer { get; }
     public IPlayerCreationRollback PlayerCreationRollback { get; }

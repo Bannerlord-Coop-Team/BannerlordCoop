@@ -10,29 +10,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class PolicyObjectSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public PolicyObjectSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void PolicyObject_Serialize()
-        {
-            PolicyObject testPolicyObject = new PolicyObject("Test");
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            PolicyObjectBinaryPackage package = new PolicyObjectBinaryPackage(testPolicyObject, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]
