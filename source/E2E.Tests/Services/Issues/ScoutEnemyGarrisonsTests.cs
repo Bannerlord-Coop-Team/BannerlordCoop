@@ -171,15 +171,25 @@ public class ScoutEnemyGarrisonsTests : IDisposable
     public void HandedOffEnding_StopsTheQuestListenersOnlyOnTheClient()
     {
         var targetIds = CreateTargets();
+        var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var outcomes = new List<QuestOutcomeRequested>();
 
         Client.Call(() =>
         {
-            var quest = QuestWithTargets(Resolve(Client, targetIds));
+            Assert.True(Client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Client.Resolve<IMessageBroker>().Subscribe<QuestOutcomeRequested>(payload => outcomes.Add(payload.What));
 
-            ScoutEnemyGarrisonsOutcomeHandOffPatch.Postfix(quest);
+            var quest = IssueBackedQuest(giver, Resolve(Client, targetIds));
 
+            // The dispatcher hands the cancel of a registered issue's quest to the server instead of running it
+            quest.CompleteQuestWithCancel();
+
+            Assert.True(quest.IsOngoing);
             Assert.True(ScoutEnemyGarrisonsBranchPatches.IsHandedOff(quest));
         });
+
+        var outcome = Assert.Single(outcomes);
+        Assert.Equal(IssueOutcome.QuestCancel, outcome.Outcome);
 
         Server.Call(() =>
         {
@@ -224,6 +234,19 @@ public class ScoutEnemyGarrisonsTests : IDisposable
             Client.PumpGameThread();
 
             Assert.Equal(new[] { false, true }, ListenerRuns);
+
+            // Outside a replay the listener runs at once
+            Client.Call(() =>
+            {
+                Assert.True(Client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+
+                var quest = QuestWithTargets(Resolve(Client, targetIds));
+                quest.QuestGiver = giver;
+
+                quest.OnArmyDispersed((Army)RuntimeHelpers.GetUninitializedObject(typeof(Army)), Army.ArmyDispersionReason.Unknown, false);
+            });
+
+            Assert.Equal(new[] { false, true, true }, ListenerRuns);
         }
         finally
         {
@@ -292,6 +315,22 @@ public class ScoutEnemyGarrisonsTests : IDisposable
         issue._settlement3 = targets[2];
 
         return issue;
+    }
+
+    private static Quest IssueBackedQuest(Hero giver, Settlement[] targets)
+    {
+        var quest = QuestWithTargets(targets);
+        quest.QuestGiver = giver;
+
+        var issue = IssueWithTargets(targets);
+
+        using (new AllowedThread())
+        {
+            issue.IssueQuest = quest;
+            Campaign.Current.IssueManager._issues.Add(giver, issue);
+        }
+
+        return quest;
     }
 
     private static Quest QuestWithTargets(Settlement[] targets)
