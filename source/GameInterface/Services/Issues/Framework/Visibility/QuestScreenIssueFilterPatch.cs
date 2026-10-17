@@ -52,12 +52,6 @@ internal class QuestScreenIssueFilterPatch
             return false;
         }
 
-        if (Generic.QuestTypeRegistry.Get(issue) != null)
-        {
-            return !ContainerProvider.TryResolve<Generic.IIssueOwnershipRegistry>(out var legacyOwnership)
-                || !legacyOwnership.IsLocalPeerOwner(issue.IssueOwner);
-        }
-
         if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver) ||
             !ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider))
         {

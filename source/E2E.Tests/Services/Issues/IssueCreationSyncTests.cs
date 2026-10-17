@@ -6,9 +6,7 @@ using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Localization;
 using Xunit.Abstractions;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 
@@ -68,11 +66,11 @@ public class IssueCreationSyncTests : IDisposable
         TestEnvironment.Dispose();
     }
 
-    private void CreateIssueOnServer(string issueOwnerId = null)
+    private void CreateIssueOnServer()
     {
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(issueOwnerId ?? notableId, out var notable));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(hideoutSettlementId, out var hideout));
 
             var potentialIssue = new PotentialIssueData(
@@ -92,17 +90,9 @@ public class IssueCreationSyncTests : IDisposable
     [Fact]
     public void AnIssueTheServerCreatesIsBuiltOnEveryClientWithTheServersValues()
     {
-        const int serverIssueIndex = 41;
-        Server.Call(() => Campaign.Current.IssueManager._nextIssueUniqueIndex = serverIssueIndex);
-        foreach (var (client, index) in TestEnvironment.Clients.Select((client, index) => (client, index)))
-        {
-            client.Call(() => Campaign.Current.IssueManager._nextIssueUniqueIndex = serverIssueIndex + index + 1);
-        }
-
         CreateIssueOnServer();
 
         var created = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
-        Assert.Equal($"issue_{serverIssueIndex}", created.IssueId);
         Assert.Equal(notableId, created.IssueOwnerId);
         Assert.Equal(typeof(AllowedIssue).Name, created.IssueTypeName);
 
@@ -129,43 +119,6 @@ public class IssueCreationSyncTests : IDisposable
                 Assert.Equal(StolenTradeGood, issue._randomForStolenTradeGood);
                 Assert.Same(hideout, issue._issueHideout);
                 Assert.Same(counterOfferHero, issue.CounterOfferHero);
-            });
-        }
-    }
-
-    [Fact]
-    public void SeparateIssuesDoNotShareJournalHistoryOnAnyPeer()
-    {
-        var secondNotableId = TestEnvironment.CreateRegisteredObject<Hero>();
-        foreach (var instance in AllInstances)
-        {
-            instance.Call(() =>
-            {
-                Assert.True(instance.ObjectManager.TryGetObject<Hero>(secondNotableId, out var notable));
-                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(ownerSettlementId, out var settlement));
-                using (new AllowedThread())
-                {
-                    notable.StayingInSettlement = settlement;
-                    notable.Occupation = Occupation.GangLeader;
-                }
-            });
-        }
-
-        CreateIssueOnServer();
-        CreateIssueOnServer(secondNotableId);
-
-        foreach (var instance in AllInstances)
-        {
-            instance.Call(() =>
-            {
-                Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var first));
-                Assert.True(instance.ObjectManager.TryGetObject<Hero>(secondNotableId, out var second));
-                Assert.False(string.IsNullOrEmpty(first.Issue.StringId));
-                Assert.False(string.IsNullOrEmpty(second.Issue.StringId));
-                var history = new JournalLogEntry(new TextObject("first issue"), first, null, false, first.Issue);
-
-                Assert.True(history.IsRelatedTo(first.Issue));
-                Assert.False(history.IsRelatedTo(second.Issue));
             });
         }
     }

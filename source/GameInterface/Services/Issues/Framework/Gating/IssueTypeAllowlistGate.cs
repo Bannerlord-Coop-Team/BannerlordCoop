@@ -1,6 +1,5 @@
 ﻿using Common.Logging;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.Issues.Generic;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -85,8 +84,7 @@ internal class IssueTypeAllowlistGate
 
         var behaviorType = __instance.GetType();
 
-        var isRegistered = registry.Descriptors.Any(descriptor => descriptor.IssueType.DeclaringType == behaviorType)
-            || Generic.QuestTypeRegistry.IsRegisteredForBehavior(behaviorType);
+        var isRegistered = registry.Descriptors.Any(descriptor => descriptor.IssueType.DeclaringType == behaviorType);
 
         if (!isRegistered)
         {

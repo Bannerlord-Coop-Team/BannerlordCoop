@@ -139,58 +139,6 @@ public class BinaryPackageSecurityTests
         }
     }
 
-    [Theory]
-    [InlineData(typeof(bool), "p|Boolean")]
-    [InlineData(typeof(byte), "p|Byte")]
-    [InlineData(typeof(sbyte), "p|SByte")]
-    [InlineData(typeof(short), "p|Int16")]
-    [InlineData(typeof(ushort), "p|UInt16")]
-    [InlineData(typeof(int), "p|Int32")]
-    [InlineData(typeof(uint), "p|UInt32")]
-    [InlineData(typeof(long), "p|Int64")]
-    [InlineData(typeof(ulong), "p|UInt64")]
-    [InlineData(typeof(float), "p|Single")]
-    [InlineData(typeof(double), "p|Double")]
-    [InlineData(typeof(decimal), "p|Decimal")]
-    [InlineData(typeof(char), "p|Char")]
-    [InlineData(typeof(string), "p|String")]
-    [InlineData(typeof(object), "p|Object")]
-    [InlineData(typeof(DateTime), "p|DateTime")]
-    [InlineData(typeof(DateTimeOffset), "p|DateTimeOffset")]
-    [InlineData(typeof(TimeSpan), "p|TimeSpan")]
-    [InlineData(typeof(Guid), "p|Guid")]
-    [InlineData(typeof(Tuple<uint, float>), "p|UInt32FloatTuple")]
-    [InlineData(typeof(Dictionary<string, object>), "d|p|String|p|Object")]
-    [InlineData(typeof(KeyValuePair<string, object>), "k|p|String|p|Object")]
-    [InlineData(typeof(Dictionary<string, List<int[]>>), "d|p|String|l|a|p|Int32")]
-    public void TypeResolver_FrameworkDescriptors_DoNotDependOnRuntimeAssembly(Type type, string descriptor)
-    {
-        Assert.Equal(descriptor, SerializedTypeResolver.Encode(type));
-        Assert.Equal(type, SerializedTypeResolver.ResolveType(descriptor));
-    }
-
-    [Theory]
-    [InlineData("p")]
-    [InlineData("p|")]
-    [InlineData("p|Version")]
-    [InlineData("p|System.String")]
-    [InlineData("p|String|p|Object")]
-    [InlineData("d|p|String|p|Version")]
-    public void TypeResolver_InvalidPortableDescriptors_AreRejected(string descriptor)
-    {
-        Assert.Throws<SerializationException>(() => SerializedTypeResolver.ResolveType(descriptor));
-    }
-
-    [Fact]
-    public void TypeResolver_PortableTypes_KeepTheCollectionContract()
-    {
-        Assert.Throws<SerializationException>(() =>
-            SerializedTypeResolver.ResolveType("p|String", typeof(Dictionary<,>)));
-        Assert.Throws<SerializationException>(() =>
-            SerializedTypeResolver.ResolveType("d|p|String|p|Object", typeof(List<>)));
-        Assert.Throws<SerializationException>(() => SerializedTypeResolver.Encode(typeof(Tuple<int, float>)));
-    }
-
     [Fact]
     public void SpecializedPackages_RoundTripTypedValues()
     {

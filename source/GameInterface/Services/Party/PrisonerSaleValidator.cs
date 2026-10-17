@@ -28,7 +28,6 @@ internal class PrisonerSaleValidator : IPrisonerSaleValidator
             var requestedHealthy = Math.Max(requested.Number - requestedWounded, 0);
             var availableWounded = Math.Min(Math.Max(available.WoundedNumber, 0), Math.Max(available.Number, 0));
             var availableHealthy = Math.Max(available.Number - availableWounded, 0);
-            var availableXp = Math.Max(available.Xp, 0);
             var validatedIndex = validatedRoster.FindIndexOfTroop(requested.Character);
             if (validatedIndex >= 0)
             {
@@ -36,7 +35,6 @@ internal class PrisonerSaleValidator : IPrisonerSaleValidator
                 var alreadyValidated = validatedRoster.GetElementCopyAtIndex(validatedIndex);
                 availableWounded -= alreadyValidated.WoundedNumber;
                 availableHealthy -= alreadyValidated.Number - alreadyValidated.WoundedNumber;
-                availableXp -= alreadyValidated.Xp;
             }
 
             var woundedToSell = Math.Min(requestedWounded, availableWounded);
@@ -46,26 +44,12 @@ internal class PrisonerSaleValidator : IPrisonerSaleValidator
             if (totalToSell == 0)
                 continue;
 
-            // Keep the selected XP allocation; taking the whole remaining stack also takes its remaining XP.
-            var xpToTransfer = totalToSell == availableHealthy + availableWounded
-                ? availableXp
-                : Math.Min(Math.Max(requested.Xp, 0), availableXp);
-            if (preserveTroopXp && availableRoster.OwnerParty != null)
-            {
-                // Move any XP that vanilla would otherwise discard from the reduced stack.
-                var remainder = available;
-                remainder.Number = availableHealthy + availableWounded - totalToSell;
-                remainder.WoundedNumber = availableWounded - woundedToSell;
-                remainder.Xp = availableXp - xpToTransfer;
-                availableRoster.OwnerParty.OnXpChanged(availableRoster, ref remainder);
-                xpToTransfer = availableXp - remainder.Xp;
-            }
             validatedRoster.AddToCounts(
                 requested.Character,
                 totalToSell,
                 false,
                 woundedToSell,
-                preserveTroopXp ? xpToTransfer : 0,
+                preserveTroopXp && validatedIndex < 0 ? available.Xp : 0,
                 true);
         }
 
