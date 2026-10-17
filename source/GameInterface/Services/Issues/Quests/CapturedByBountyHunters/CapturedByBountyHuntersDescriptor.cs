@@ -14,17 +14,16 @@ internal class CapturedByBountyHuntersDescriptor : IQuestTypeDescriptor
 
     public IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy { get; }
 
-    public IFinalizationProofStrategy FinalizationProofStrategy { get; }
+    // The server decides the outcome itself, see CapturedByBountyHuntersOutcomePatches
+    public IFinalizationProofStrategy FinalizationProofStrategy => null;
 
     public CapturedByBountyHuntersDescriptor(
         CapturedByBountyHuntersCreationCaptureStrategy creationCaptureStrategy,
         CapturedByBountyHuntersQuestSolutionAcceptStrategy questSolutionAcceptStrategy,
-        CapturedByBountyHuntersAlternativeSolutionAcceptStrategy alternativeSolutionAcceptStrategy,
-        CapturedByBountyHuntersFinalizationProofStrategy finalizationProofStrategy)
+        CapturedByBountyHuntersAlternativeSolutionAcceptStrategy alternativeSolutionAcceptStrategy)
     {
         CreationCaptureStrategy = creationCaptureStrategy;
         QuestSolutionAcceptStrategy = questSolutionAcceptStrategy;
         AlternativeSolutionAcceptStrategy = alternativeSolutionAcceptStrategy;
-        FinalizationProofStrategy = finalizationProofStrategy;
     }
 }

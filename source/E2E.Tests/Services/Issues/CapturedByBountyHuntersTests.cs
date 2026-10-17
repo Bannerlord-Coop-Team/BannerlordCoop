@@ -2,7 +2,6 @@
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
-using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.CreationCapture;
 using GameInterface.Services.Issues.Framework.Finalization;
@@ -14,8 +13,10 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssueQuest;
@@ -29,14 +30,20 @@ public class CapturedByBountyHuntersTests : IDisposable
     private const float InitialPower = 100;
     private const float PowerChange = 10;
 
+    private static readonly FieldInfo SideMapEventField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapEvent));
+
     private static readonly MethodBase[] OutcomeLogTexts =
     {
+        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.SuccessQuestLogText)),
+        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.PlayerLostTheFightLogText)),
+        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.HideoutClearedBySomeoneElseLogText)),
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.TimeOutLogText)),
     };
 
     private readonly string gangLeaderId;
     private readonly string hideoutId;
     private readonly string ownerHeroId;
+    private readonly string ownerPartyId;
     private readonly string otherHeroId;
 
     private E2ETestEnvironment TestEnvironment { get; }
@@ -52,8 +59,8 @@ public class CapturedByBountyHuntersTests : IDisposable
         gangLeaderId = TestEnvironment.CreateRegisteredObject<Hero>();
         hideoutId = TestEnvironment.CreateRegisteredObject<Settlement>();
 
-        ownerHeroId = RegisterPlayer(ClientA, "player-A");
-        otherHeroId = RegisterPlayer(ClientB, "player-B");
+        (ownerHeroId, ownerPartyId) = RegisterPlayer(ClientA, "player-A");
+        (otherHeroId, _) = RegisterPlayer(ClientB, "player-B");
 
         foreach (var instance in Instances)
         {
@@ -68,7 +75,6 @@ public class CapturedByBountyHuntersTests : IDisposable
                 }
             });
         }
-
     }
 
     public void Dispose()
@@ -136,16 +142,15 @@ public class CapturedByBountyHuntersTests : IDisposable
     }
 
     [Fact]
-    public void AHideoutBattleWonOnTheOwnersClientPaysTheOwnerOnTheServer()
+    public void AHideoutBattleTheOwnerWinsPaysTheOwnerOnTheServer()
     {
         GiveTheGangLeaderTheIssue();
         AcceptOnClientA();
         var ownerGold = GoldOnServer(ownerHeroId);
         var otherGold = GoldOnServer(otherHeroId);
 
-        ClientA.Call(() => QuestOnClientA().SuccessConsequences());
+        EndBattleOnTheServer(BattleState.AttackerVictory, ownerTakesPart: true);
 
-        Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
 
@@ -156,20 +161,36 @@ public class CapturedByBountyHuntersTests : IDisposable
     }
 
     [Fact]
-    public void AHideoutBattleLostOnTheOwnersClientFailsTheQuestOnTheServer()
+    public void AHideoutBattleTheOwnerLosesFailsTheQuestOnTheServer()
     {
         GiveTheGangLeaderTheIssue();
         AcceptOnClientA();
         var ownerGold = GoldOnServer(ownerHeroId);
 
-        ClientA.Call(() => QuestOnClientA().FailConsequences(isTimedOut: false));
+        EndBattleOnTheServer(BattleState.DefenderVictory, ownerTakesPart: true);
 
-        Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
 
         Assert.Equal(ownerGold, GoldOnServer(ownerHeroId));
         AssertGiverPowerChangedOnceBy(-PowerChange);
+        AssertTheIssueIsGoneEverywhere();
+    }
+
+    [Fact]
+    public void AHideoutClearedBySomeoneElseFailsTheQuestWithoutConsequences()
+    {
+        GiveTheGangLeaderTheIssue();
+        AcceptOnClientA();
+        var ownerGold = GoldOnServer(ownerHeroId);
+
+        EndBattleOnTheServer(BattleState.AttackerVictory, ownerTakesPart: false);
+
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
+
+        Assert.Equal(ownerGold, GoldOnServer(ownerHeroId));
+        AssertGiverPowerChangedOnceBy(0);
         AssertTheIssueIsGoneEverywhere();
     }
 
@@ -190,32 +211,30 @@ public class CapturedByBountyHuntersTests : IDisposable
     }
 
     [Fact]
-    public void ABranchFromAPlayerWhoDoesNotOwnTheQuestIsIgnored()
+    public void TheOwnersClientNeverRunsTheBattleConsequences()
     {
         GiveTheGangLeaderTheIssue();
         AcceptOnClientA();
+        var ownerGold = GoldOnServer(ownerHeroId);
 
-        ClientB.Call(() =>
+        ClientA.Call(() =>
         {
-            Assert.True(ClientB.ObjectManager.TryGetObject<Hero>(gangLeaderId, out var gangLeader));
+            var quest = QuestOnClientA();
 
             using (new AllowedThread())
             {
-                gangLeader.Issue.IssueQuest = new Quest("quest_foreign", gangLeader, CampaignTime.Never, RewardGold, ((Issue)gangLeader.Issue)._hideout);
+                quest.OnMapEventEnded(HideoutBattle(ClientA, BattleState.AttackerVictory));
+                quest.SuccessConsequences();
+                quest.FailConsequences(isTimedOut: false);
             }
 
-            ((Quest)gangLeader.Issue.IssueQuest).SuccessConsequences();
-        });
+            Assert.True(quest.IsOngoing);
+        }, OutcomeLogTexts);
 
-        Assert.Single(ClientB.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(ownerGold, GoldOnServer(ownerHeroId));
         AssertGiverPowerChangedOnceBy(0);
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(gangLeaderId, out var gangLeader));
-            Assert.True(gangLeader.Issue.IsSolvingWithQuest);
-        });
     }
 
     // Only the server runs the consequences, the clients get the change through the power sync
@@ -248,6 +267,44 @@ public class CapturedByBountyHuntersTests : IDisposable
         {
             Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(gangLeaderId, IssueId, out _));
         });
+    }
+
+    private void EndBattleOnTheServer(BattleState result, bool ownerTakesPart)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            var mapEvent = HideoutBattle(Server, result);
+
+            if (ownerTakesPart)
+            {
+                var attackerSide = (MapEventSide)RuntimeHelpers.GetUninitializedObject(typeof(MapEventSide));
+                SideMapEventField.SetValue(attackerSide, mapEvent);
+                attackerSide.MissionSide = BattleSideEnum.Attacker;
+                ownerParty.Party._mapEventSide = attackerSide;
+            }
+
+            try
+            {
+                CampaignEventDispatcher.Instance.OnMapEventEnded(mapEvent);
+            }
+            finally
+            {
+                ownerParty.Party._mapEventSide = null;
+            }
+        }, OutcomeLogTexts);
+    }
+
+    // The hideout has no parties left, as after the bounty hunters were beaten
+    private MapEvent HideoutBattle(EnvironmentInstance instance, BattleState result)
+    {
+        Assert.True(instance.ObjectManager.TryGetObject<Settlement>(hideoutId, out var hideout));
+
+        var mapEvent = (MapEvent)RuntimeHelpers.GetUninitializedObject(typeof(MapEvent));
+        mapEvent.MapEventSettlement = hideout;
+        mapEvent._battleState = result;
+
+        return mapEvent;
     }
 
     private void AcceptOnClientA()
@@ -309,16 +366,28 @@ public class CapturedByBountyHuntersTests : IDisposable
         return issue;
     }
 
-    private string RegisterPlayer(EnvironmentInstance client, string controllerId)
+    private (string HeroId, string PartyId) RegisterPlayer(EnvironmentInstance client, string controllerId)
     {
         var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
-        Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(controllerId, heroId, partyId, "", ""))));
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+
+            // The server runs the outcome as this hero, with this party as the main party
+            using (new AllowedThread())
+            {
+                hero._partyBelongedTo = party;
+            }
+
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(controllerId, heroId, partyId, "", "")));
+        });
         TestEnvironment.ConnectRegisteredPlayer(client, controllerId);
         client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
 
-        return heroId;
+        return (heroId, partyId);
     }
 
     private void GiveTheGangLeaderTheIssue()

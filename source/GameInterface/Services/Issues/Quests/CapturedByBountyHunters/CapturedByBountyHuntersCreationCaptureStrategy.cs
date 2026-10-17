@@ -2,7 +2,6 @@
 using GameInterface.Services.ObjectManager;
 using Helpers;
 using System.IO;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
@@ -45,10 +44,11 @@ internal class CapturedByBountyHuntersCreationCaptureStrategy : ICreationCapture
             return false;
         }
 
+        // The issue ends on its own once its hideout is no longer infested
         var hideout = SettlementHelper.FindNearestHideoutToSettlement(
             issueOwner.CurrentSettlement,
             MobileParty.NavigationType.Default,
-            candidate => candidate.Hideout.IsInfested) ?? Campaign.Current.AllHideouts.FirstOrDefault();
+            candidate => candidate.Hideout.IsInfested);
         if (hideout == null)
         {
             return false;
