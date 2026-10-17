@@ -199,6 +199,50 @@ public class LeaderlessClanResolverTests : IDisposable
         });
     }
 
+    [Fact]
+    public void RetirementWithoutHeir_RecruitedCompanion_IsReleasedAliveInsteadOfKilled()
+    {
+        // #3928 review: the game's clan destruction kills every living member, recruited companions included
+        var clanId = CreateKingdomClan(out _);
+        var leaderId = AddMember(clanId, age: 40);
+        var companionId = environment.CreateRegisteredObject<Hero>();
+        var townId = environment.CreateRegisteredObject<Town>();
+
+        environment.Server.Call(() =>
+        {
+            var clan = environment.Server.GetRegisteredObject<Clan>(clanId);
+            var leader = environment.Server.GetRegisteredObject<Hero>(leaderId);
+            var companion = environment.Server.GetRegisteredObject<Hero>(companionId);
+            clan.SetLeader(leader);
+            companion._heroState = Hero.CharacterStates.Active;
+            companion.SetBirthDay(CampaignTime.YearsFromNow(-30));
+            companion.SetNewOccupation(Occupation.Wanderer);
+            companion.CompanionOf = clan;
+            var town = environment.Server.GetRegisteredObject<Town>(townId);
+            town.Governor = companion;
+            Assert.Contains(companion, clan.Heroes);
+
+            environment.Server.Resolve<IApplyHeirSelectionActionInterface>().ApplyByRetirementWithoutHeir(leader);
+
+            Assert.True(companion.IsAlive);
+            Assert.Equal(KillCharacterAction.KillCharacterActionDetail.None, companion.DeathMark);
+            Assert.Null(companion.CompanionOf);
+            Assert.DoesNotContain(companion, clan.Heroes);
+            Assert.NotSame(clan, companion.Clan);
+            Assert.Null(companion.GovernorOf);
+        }, TextMethods);
+
+        foreach (var client in environment.Clients)
+        {
+            client.Call(() =>
+            {
+                var companion = client.GetRegisteredObject<Hero>(companionId);
+                Assert.True(companion.IsAlive);
+                Assert.Null(companion.CompanionOf);
+            });
+        }
+    }
+
     private string CreateKingdomClan(out string kingdomId, string existingKingdomId = null)
     {
         string clanId = null;

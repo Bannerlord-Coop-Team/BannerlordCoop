@@ -23,8 +23,8 @@ public interface ILeaderlessClanResolver
     Hero FindSuccessor(Clan clan, Hero excluded = null);
 
     /// <summary>
-    /// Destroys a clan nobody can lead, after moving its children to a relative's or another lord clan and taking its
-    /// disabled (retired) heroes out, since the game's clan destruction kills every living member.
+    /// Destroys a clan nobody can lead, after releasing its companions, moving its children to a relative's or another
+    /// lord clan and taking its disabled (retired) heroes out, since the game's clan destruction kills every living member.
     /// </summary>
     void CloseClan(Clan clan);
 }
@@ -100,11 +100,19 @@ internal sealed class LeaderlessClanResolver : ILeaderlessClanResolver
 
     public void CloseClan(Clan clan)
     {
-        foreach (var hero in clan.Heroes.Where(hero => hero.IsAlive && !hero.IsWanderer).ToList())
+        // recruited companions sit in Clan.Heroes through CompanionOf, so they are let go the way the game fires a
+        // companion: off the clan and out of any party, governorship or captivity, back on the map as a wanderer
+        foreach (var companion in clan.Companions.Where(hero => hero.IsAlive).ToList())
         {
-            if (hero.IsDisabled)
+            logger.Information("Releasing companion {HeroId} before closing clan {ClanId}", companion.StringId, clan.StringId);
+            RemoveCompanionAction.ApplyByFire(clan, companion);
+        }
+
+        foreach (var hero in clan.Heroes.Where(hero => hero.IsAlive).ToList())
+        {
+            if (hero.IsDisabled || hero.IsWanderer)
             {
-                // a retired hero keeps its state and retirement record
+                // a retired hero keeps its state and retirement record, and a wanderer is not moved into a lord clan
                 hero.Clan = null;
                 continue;
             }
