@@ -67,7 +67,7 @@ internal class ScoutEnemyGarrisonsOutcomeHandOffPatch
     }
 
     [HarmonyPostfix]
-    private static void Postfix(QuestBase __instance)
+    internal static void Postfix(QuestBase __instance)
     {
         // Still running after an ending means the dispatcher handed the ending to the server instead
         if (ModInformation.IsClient && __instance is Quest quest && quest.IsOngoing)
