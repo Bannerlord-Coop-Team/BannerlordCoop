@@ -1,6 +1,8 @@
 ﻿using Common.Network;
 using Common.Util;
 using Common.Messaging;
+using Common.Network.Messages;
+using LiteNetLib;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -12,6 +14,7 @@ using GameInterface.Services.Players;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -194,6 +197,7 @@ public class CaravanAmbushTests : IDisposable
             Assert.False(quest._banditParty.IsCurrentlyUsedByAQuest);
         }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
         Assert.Equal(ownerParticipated ? 0 : 1, survived.CountFor(Server));
+        Assert.Equal(ownerParticipated ? 1 : 0, Server.NetworkSentMessages.GetMessages<NetworkCaravanAmbushConversation>().Count());
     }
 
     [Fact]
@@ -213,12 +217,15 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
-    public void DismissingTheIssueReleasesBothParties()
+    public void DisconnectDismissalReleasesBothParties()
     {
         Server.Call(() =>
         {
             BindParties();
-            IssueOf(Server).IssueFinalized();
+            using (new AllowedThread()) IssueOf(Server)._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+            Server.Resolve<IPlayerManager>().ClearPeer(Owner.NetPeer);
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(Owner.NetPeer, default(DisconnectInfo)));
+            Assert.Null(IssueOfHero(Server));
             Server.ObjectManager.TryGetObject<MobileParty>(caravanId, out var caravan);
             Server.ObjectManager.TryGetObject<MobileParty>(banditId, out var bandits);
             Assert.False(caravan.IsCurrentlyUsedByAQuest);
@@ -226,6 +233,29 @@ public class CaravanAmbushTests : IDisposable
             Assert.False(caravan.Ai.DoNotMakeNewDecisions);
             Assert.False(bandits.Ai.DoNotMakeNewDecisions);
         });
+    }
+
+    [Fact]
+    public void ProximityWarningsAreShownOnlyOnceAndOnlyToTheOwner()
+    {
+        using var warnings = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
+        SendState(QuestScenario.ControllerA, false, 1);
+        SendState(QuestScenario.ControllerA, false, 1);
+        SendState(QuestScenario.ControllerA, false, 3);
+        SendState(QuestScenario.ControllerA, false, 4);
+        Assert.Equal(2, warnings.CountFor(Owner));
+        Assert.Equal(0, warnings.CountFor(Other));
+    }
+
+    [Fact]
+    public void SavedCaravanConversationOpensOnlyForTheOwner()
+    {
+        using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
+        SendState(QuestScenario.ControllerA, true, 0);
+        Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkCaravanAmbushConversation(
+            scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA, caravanId)));
+        Assert.Equal(1, conversations.CountFor(Owner));
+        Assert.Equal(0, conversations.CountFor(Other));
     }
 
     [Theory]
@@ -317,6 +347,12 @@ public class CaravanAmbushTests : IDisposable
     }
 
     private IssueBase IssueOf(EnvironmentInstance instance)
+    {
+        Assert.True(instance.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+        return giver.Issue;
+    }
+
+    private IssueBase? IssueOfHero(EnvironmentInstance instance)
     {
         Assert.True(instance.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
         return giver.Issue;
