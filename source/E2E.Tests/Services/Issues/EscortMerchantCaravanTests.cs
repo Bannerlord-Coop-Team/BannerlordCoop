@@ -1,16 +1,23 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
+using Common;
+using Common.Messaging;
+using Common.Network.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.EscortMerchantCaravan;
 using GameInterface.Services.Players;
+using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
+using LiteNetLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -23,10 +30,11 @@ namespace E2E.Tests.Services.Issues;
 
 public class EscortMerchantCaravanTests : IDisposable
 {
+    private readonly struct DeferredPartyRegistration : IEvent { }
+    private static MobileParty? observedHourlyParty;
     private static readonly MethodBase[] WithoutWorldSetup =
     {
         AccessTools.Method(typeof(Quest), nameof(Quest.SpawnCaravan)),
-        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.PlayerStartsQuestLogText)),
     };
 
     private readonly E2ETestEnvironment environment;
@@ -58,13 +66,39 @@ public class EscortMerchantCaravanTests : IDisposable
                 Assert.True(instance.ObjectManager.TryGetObject<Town>(townComponentId, out var townComponent));
                 using (new AllowedThread())
                 {
+                    Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+                    Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
                     giver.StayingInSettlement = town;
                     giver.Occupation = Occupation.Merchant;
                     giver.Clan = clan;
                     town.Town = townComponent;
                     town.Town.Security = 50;
+                    town.Town.Prosperity = 1000;
                 }
             });
+        }
+        foreach (var controllerId in new[] { QuestScenario.ControllerA, QuestScenario.ControllerB })
+        {
+            var player = Server.Resolve<IPlayerManager>().Players.Single(p => p.ControllerId == controllerId);
+            foreach (var instance in new[] { Server, Owner, Other })
+            {
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
+                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party));
+                    using (new AllowedThread())
+                    {
+                        hero._partyBelongedTo = party;
+                        if ((instance == Owner && controllerId == QuestScenario.ControllerA) ||
+                            (instance == Other && controllerId == QuestScenario.ControllerB))
+                        {
+                            Campaign.Current.MainParty = party;
+                            Game.Current.PlayerTroop = hero.CharacterObject;
+                            Campaign.Current.PlayerDefaultFaction = hero.Clan;
+                        }
+                    }
+                });
+            }
         }
     }
 
@@ -103,6 +137,101 @@ public class EscortMerchantCaravanTests : IDisposable
         });
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TheFrameworkAllowsTwoOwnersButRefusesASecondEscortForTheSamePlayer(bool samePlayer)
+    {
+        Accept();
+        var secondId = environment.CreateRegisteredObject<Hero>();
+        foreach (var instance in new[] { Server, Owner, Other })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(secondId, out var second));
+                using (new AllowedThread())
+                {
+                    second.StayingInSettlement = giver.CurrentSettlement;
+                    second.Clan = giver.Clan;
+                    var issue = new Issue(second);
+                    issue.StringId = "issue_second_escort";
+                    Campaign.Current.IssueManager._issues.Add(second, issue);
+                    second.OnIssueCreatedForHero(issue);
+                }
+            });
+        }
+        var accepter = samePlayer ? Owner : Other;
+        accepter.Call(() =>
+        {
+            Assert.True(accepter.ObjectManager.TryGetObject<Hero>(secondId, out var giver));
+            giver.Issue.StartIssueWithQuest();
+            if (giver.Issue.IssueQuest is Quest quest && quest.IsOngoing) quest.QuestAcceptedConsequences();
+        }, WithoutWorldSetup);
+
+        if (samePlayer)
+        {
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+        }
+        else
+        {
+            Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>().Count());
+            Server.Call(() =>
+            {
+                Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(secondId, "issue_second_escort", out var owner));
+                Assert.Equal(QuestScenario.ControllerB, owner);
+            });
+            Owner.Call(() =>
+            {
+                Assert.True(Owner.ObjectManager.TryGetObject<Hero>(secondId, out var giver));
+                Assert.Null(giver.Issue.IssueQuest);
+            });
+            Other.Call(() =>
+            {
+                Assert.True(Other.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+                Assert.Null(giver.Issue.IssueQuest);
+            });
+        }
+    }
+
+    [Fact]
+    public void TheUnstartedServerQuestReceivesTheDailyTickAsItsOwner()
+    {
+        Accept();
+        Server.Call(() =>
+        {
+            var quest = QuestOn(Server);
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(caravanId, out var caravan));
+            quest._questCaravanMobileParty = caravan;
+            var days = quest._daysSpentForEscorting;
+            Campaign.Current.QuestManager.DailyTick();
+            Assert.Equal(days + 1, quest._daysSpentForEscorting);
+        });
+        Owner.Call(() => Assert.Equal(2, QuestOn(Owner)._daysSpentForEscorting));
+    }
+
+    [Fact]
+    public void ARejectedAcceptCannotRestartFromTheDelayedNpcConsequence()
+    {
+        Accept();
+        Quest rejected = null!;
+        Other.Call(() =>
+        {
+            Assert.True(Other.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+            giver.Issue.StartIssueWithQuest();
+            rejected = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+        });
+        Other.Call(() =>
+        {
+            Assert.True(rejected.IsFinalized);
+            rejected.QuestAcceptedConsequences();
+            Assert.True(rejected.IsFinalized);
+            Assert.DoesNotContain(rejected, Campaign.Current.QuestManager.Quests);
+        });
+        Assert.Equal(1, spawn.CountFor(Server));
+    }
+
     [Fact]
     public void TheServerPublishesCaravanAndVisitedSettlementProgressOnlyToTheOwner()
     {
@@ -134,6 +263,57 @@ public class EscortMerchantCaravanTests : IDisposable
     }
 
     [Fact]
+    public void AmbushAndRouteNoticesReachOnlyTheQuestOwner()
+    {
+        Accept();
+        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
+        Server.Call(() => Server.Resolve<IEscortProgress>().Notify(QuestOn(Server), new TextObject("The caravan is ambushed"), 100));
+        Assert.Equal(1, notices.CountFor(Owner));
+        Assert.Equal(0, notices.CountFor(Other));
+        Assert.Equal(0, notices.CountFor(Server));
+    }
+
+    [Fact]
+    public void DeferredRegistrationProgressAndFinalizationApplyInGameThreadOrder()
+    {
+        Accept();
+        var quest = QuestOn(Owner);
+        var state = Server.NetworkSentMessages.GetMessages<NetworkEscortProgress>().Last();
+        state.CaravanId = caravanId;
+        state.Days = 9;
+        MobileParty caravan = null!;
+        Owner.Call(() =>
+        {
+            caravan = Owner.GetRegisteredObject<MobileParty>(caravanId);
+            Assert.True(Owner.ObjectManager.Remove(caravan));
+        });
+        void Register(MessagePayload<DeferredPartyRegistration> _)
+            => GameThread.RunSafe(() => Assert.True(Owner.ObjectManager.AddExisting(caravanId, caravan)));
+        var messages = Owner.Resolve<IMessageBroker>();
+        messages.Subscribe<DeferredPartyRegistration>(Register);
+        try
+        {
+            Owner.SimulateMessage(this, new DeferredPartyRegistration(), markGameThread: false);
+            Owner.SimulateMessage(Server.NetPeer, state, markGameThread: false);
+            Owner.SimulateMessage(Server.NetPeer,
+                new NetworkIssueFinalized(scenario.NotableId, QuestScenario.IssueId, IssueOutcome.QuestCancel), markGameThread: false);
+            Assert.False(quest.IsFinalized);
+            Assert.True(Owner.PendingGameThreadActionCount >= 3);
+            Owner.PumpGameThread();
+            Owner.Call(() =>
+            {
+                Assert.Same(caravan, quest._questCaravanMobileParty);
+                Assert.Equal(9, quest._daysSpentForEscorting);
+                Assert.True(quest.IsFinalized);
+            });
+        }
+        finally
+        {
+            messages.Unsubscribe<DeferredPartyRegistration>(Register);
+        }
+    }
+
+    [Fact]
     public void AProgressMessageForAnotherIssueCannotReplaceTheOwnersCaravan()
     {
         Accept();
@@ -143,6 +323,217 @@ public class EscortMerchantCaravanTests : IDisposable
             CaravanId = caravanId,
         });
         Owner.Call(() => Assert.Null(QuestOn(Owner)._questCaravanMobileParty));
+    }
+
+    [Theory]
+    [InlineData(true, 10)]
+    [InlineData(false, -20)]
+    public void AlternativeConsequencesAndTheFinalJournalBelongToTheOwner(bool success, int prosperityChange)
+    {
+        Issue ownerIssue = null!;
+        Owner.Call(() =>
+        {
+            Assert.True(Owner.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+            ownerIssue = Assert.IsType<Issue>(giver.Issue);
+            ownerIssue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+        });
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
+            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA));
+            var issue = Assert.IsType<Issue>(giver.Issue);
+            issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+            var before = giver.CurrentSettlement.Town.Prosperity;
+            using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+            {
+                if (success) issue.AlternativeSolutionEndWithSuccessConsequence();
+                else issue.AlternativeSolutionEndWithFailureConsequence();
+                issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject("Companion returned")));
+                issue.IssueFinalized();
+            }
+            Assert.Equal(before + prosperityChange, giver.CurrentSettlement.Town.Prosperity);
+        });
+        Owner.Call(() => Assert.Contains(ownerIssue.JournalEntries, log => log.LogText.ToString() == "Companion returned"));
+        Other.Call(() =>
+        {
+            Assert.True(Other.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+            Assert.Empty(giver.Issue.JournalEntries);
+        });
+    }
+
+    [Fact]
+    public void AReplacementMerchantPreservesTheCompanionIssueAndItsPlayerOwnership()
+    {
+        var replacementId = environment.CreateRegisteredObject<Hero>();
+        foreach (var instance in new[] { Server, Owner, Other })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+                giver.Issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(scenario.NotableId,
+                    QuestScenario.IssueId, QuestScenario.ControllerA));
+            });
+        }
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(replacementId, out var replacement));
+            Campaign.Current.IssueManager.ChangeIssueOwner(giver.Issue, replacement);
+        });
+        foreach (var instance in new[] { Server, Owner, Other })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var previous));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(replacementId, out var replacement));
+                Assert.Null(previous.Issue);
+                Assert.IsType<Issue>(replacement.Issue);
+                Assert.Equal(QuestScenario.IssueId, replacement.Issue.StringId);
+                Assert.True(replacement.Issue.IsSolvingWithAlternative);
+                Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(replacementId, QuestScenario.IssueId, out var owner));
+                Assert.Equal(QuestScenario.ControllerA, owner);
+                Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _));
+            });
+        }
+    }
+
+    [Fact]
+    public void ReplacingADeadMerchantCancelsTheExistingQuestBeforeItCanBeOrphaned()
+    {
+        Accept();
+        var ownerQuest = QuestOn(Owner);
+        var replacementId = environment.CreateRegisteredObject<Hero>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(replacementId, out var replacement));
+            using (new AllowedThread()) giver.ChangeState(Hero.CharacterStates.Dead);
+            Campaign.Current.IssueManager.ChangeIssueOwner(giver.Issue, replacement);
+            Assert.Null(replacement.Issue);
+        });
+        Owner.Call(() => Assert.True(ownerQuest.IsFinalized));
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+    }
+
+    [Fact]
+    public void TheStartingJournalUsesTheMerchantTownWithoutAServerCurrentSettlement()
+    {
+        Accept();
+        Server.Call(() =>
+        {
+            var previous = Campaign.Current.MainParty;
+            Campaign.Current.MainParty = null;
+            try
+            {
+                var quest = QuestOn(Server);
+                Assert.Contains(quest.QuestGiver.CurrentSettlement.Name.ToString(), quest.PlayerStartsQuestLogText.ToString());
+            }
+            finally
+            {
+                Campaign.Current.MainParty = previous;
+            }
+        });
+    }
+
+    [Fact]
+    public void CaptivityKeepsHourlyWorkOnTheRegisteredPlayerParty()
+    {
+        Accept();
+        var harmony = new Harmony($"escort-captivity-{Guid.NewGuid()}");
+        var method = AccessTools.Method(typeof(Quest), nameof(Quest.HourlyTick));
+        harmony.Patch(method, prefix: new HarmonyMethod(typeof(EscortMerchantCaravanTests), nameof(ObserveHourlyParty)) { priority = Priority.Last });
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(caravanId, out var caravan));
+                using (new AllowedThread()) hero._partyBelongedTo = null;
+                QuestOn(Server)._questCaravanMobileParty = caravan;
+                observedHourlyParty = null;
+                Campaign.Current.QuestManager.HourlyTick();
+                Assert.Same(party, observedHourlyParty);
+            });
+        }
+        finally
+        {
+            harmony.Unpatch(method, HarmonyPatchType.Prefix, harmony.Id);
+        }
+    }
+
+    private static bool ObserveHourlyParty()
+    {
+        observedHourlyParty = MobileParty.MainParty;
+        return false;
+    }
+
+    [Fact]
+    public void DisconnectDismissalFullyFinalizesTheUnstartedServerQuest()
+    {
+        Accept();
+        var quest = QuestOn(Server);
+        Server.Call(() =>
+        {
+            quest.AddTrackedObject(quest.QuestGiver);
+            Server.Resolve<IPlayerManager>().ClearPeer(Owner.NetPeer);
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(Owner.NetPeer, default(DisconnectInfo)));
+            Assert.True(quest.IsFinalized);
+            Assert.Null(quest.OfferDialogFlow);
+            Assert.Null(quest.DiscussDialogFlow);
+            Assert.Empty(Campaign.Current.QuestManager.GetAllTrackedObjectsOfAQuest(quest));
+        });
+    }
+
+    [Fact]
+    public void AnAcceptFailureRestoresTheIssueInsteadOfLeavingAnUnownedQuest()
+    {
+        var harmony = new Harmony($"escort-accept-failure-{Guid.NewGuid()}");
+        var method = AccessTools.Method(typeof(EscortProgress), nameof(EscortProgress.Publish));
+        harmony.Patch(method, prefix: new HarmonyMethod(typeof(EscortMerchantCaravanTests), nameof(FailProgress)));
+        CampaignTime due = default;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+            due = giver.Issue.IssueDueTime;
+        });
+        try
+        {
+            Owner.Call(() =>
+            {
+                Assert.True(Owner.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+                giver.Issue.StartIssueWithQuest();
+            });
+        }
+        finally
+        {
+            harmony.Unpatch(method, HarmonyPatchType.Prefix, harmony.Id);
+        }
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+            Assert.True(giver.Issue.IsOngoingWithoutQuest);
+            Assert.Null(giver.Issue.IssueQuest);
+            Assert.Equal(due, giver.Issue.IssueDueTime);
+            Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _));
+        });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Owner.Call(() =>
+        {
+            Assert.True(Owner.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+            Assert.True(giver.Issue.IsOngoingWithoutQuest);
+            Assert.Null(giver.Issue.IssueQuest);
+            Assert.Equal(due, giver.Issue.IssueDueTime);
+        });
+    }
+
+    private static void FailProgress()
+    {
+        if (ModInformation.IsServer) throw new InvalidOperationException("test progress failure");
     }
 
     [Fact]

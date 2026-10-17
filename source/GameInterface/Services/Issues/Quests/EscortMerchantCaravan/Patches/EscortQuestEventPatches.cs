@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -7,6 +8,8 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.EscortMerchantCaravanIssueBehavior.EscortMerchantCaravanIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan.Patches;
@@ -75,19 +78,28 @@ internal class EscortQuestEventPatches
         dispatcher.RunAsOwners<Quest>(quest =>
         {
             if (quest._questCaravanMobileParty == null) return;
+            if (!ContainerProvider.TryResolve<IEscortOwnerParty>(out var parties) ||
+                !parties.TryGet(IssueManager.GetIssueOfQuest(quest), out var party))
+            {
+                quest.CompleteQuestWithCancel(new TextObject("Your caravan escort ended because your party is no longer available."));
+                return;
+            }
             var previous = CurrentQuest;
             CurrentQuest = quest;
             var before = Progress(quest);
-            try
+            using (new MainHeroSubstitutionScope(Hero.MainHero, party))
             {
-                action(quest);
-                if (quest.IsOngoing && !before.Equals(Progress(quest)) &&
-                    ContainerProvider.TryResolve<IEscortProgress>(out var progress))
-                    progress.Publish(quest);
-            }
-            finally
-            {
-                CurrentQuest = previous;
+                try
+                {
+                    action(quest);
+                    if (quest.IsOngoing && !before.Equals(Progress(quest)) &&
+                        ContainerProvider.TryResolve<IEscortProgress>(out var progress))
+                        progress.Publish(quest);
+                }
+                finally
+                {
+                    CurrentQuest = previous;
+                }
             }
         });
     }

@@ -18,4 +18,8 @@ internal sealed class NetworkEscortProgress : IServerToClientCommand
     [ProtoMember(10)] public byte[] Journal;
     [ProtoMember(11)] public string[] TrackedParties;
     [ProtoMember(12)] public string[] TrackedSettlements;
+    [ProtoMember(13)] public bool Alternative;
+    [ProtoMember(14)] public byte[] Notice;
+    [ProtoMember(15)] public int ExtraTime;
+    [ProtoMember(16)] public bool FollowCaravan;
 }

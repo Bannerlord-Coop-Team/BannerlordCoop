@@ -4,6 +4,7 @@ using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.EscortMerchantCaravanIssueBehavior.EscortMerchantCaravanIssueQuest;
 
@@ -16,8 +17,8 @@ internal class EscortQuestPatches
     [HarmonyPrefix]
     private static bool Accept(Quest __instance)
     {
-        if (ModInformation.IsServer) return false;
-        __instance.StartQuest();
+        if (ModInformation.IsServer || !__instance.IsOngoing || IssueManager.GetIssueOfQuest(__instance) == null) return false;
+        if (!Campaign.Current.QuestManager.Quests.Contains(__instance)) __instance.StartQuest();
         if (__instance._playerStartsQuestLog == null)
             __instance._playerStartsQuestLog = __instance.AddDiscreteLog(__instance.PlayerStartsQuestLogText,
                 new TextObject("{=r2y3n7dR}Visited Settlements"), 0, __instance._requiredSettlementNumber);
@@ -43,6 +44,16 @@ internal class EscortQuestPatches
     {
         if (__instance.IsOngoing && __instance._questCaravanMobileParty != null) return true;
         __result = false;
+        return false;
+    }
+
+    [HarmonyPatch(typeof(PartyBase), nameof(PartyBase.SetAsCameraFollowParty))]
+    [HarmonyPrefix]
+    private static bool Follow(PartyBase __instance)
+    {
+        var quest = EscortQuestEventPatches.CurrentQuest;
+        if (ModInformation.IsClient || quest == null || __instance != quest._questCaravanMobileParty?.Party) return true;
+        if (ContainerProvider.TryResolve<IEscortProgress>(out var progress)) progress.Publish(quest, true);
         return false;
     }
 
@@ -78,9 +89,16 @@ internal class EscortQuestPatches
     [HarmonyPrefix]
     private static void Dismiss(IssueBase __instance)
     {
+        if (ModInformation.IsServer &&
+            __instance is EscortMerchantCaravanIssueBehavior.EscortMerchantCaravanIssue issue &&
+            issue.IsSolvingWithAlternative && ContainerProvider.TryResolve<IEscortProgress>(out var progress))
+            progress.PublishAlternative(issue);
         // The framework dismisses a disconnected player's issue without completing its quest.
         if (ModInformation.IsServer && __instance.IssueQuest is Quest quest && quest.IsOngoing)
-            quest.OnFinalize();
+        {
+            __instance.IssueQuest = null;
+            quest.CompleteQuestWithCancel();
+        }
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnFinalize))]
