@@ -34,6 +34,7 @@ public class EscortMerchantCaravanTests : IDisposable
 {
     private readonly struct DeferredPartyRegistration : IEvent { }
     private static MobileParty? observedHourlyParty;
+    private static PartyBase? observedAttacker;
     private static readonly MethodBase[] WithoutWorldSetup =
     {
         AccessTools.Method(typeof(Quest), nameof(Quest.SpawnCaravan)),
@@ -523,6 +524,52 @@ public class EscortMerchantCaravanTests : IDisposable
     private static bool ObserveHourlyParty()
     {
         observedHourlyParty = MobileParty.MainParty;
+        return false;
+    }
+
+    [Fact]
+    public void AQueuedAttackAfterCaptivityUsesTheRegisteredOwnerParty()
+    {
+        Accept();
+        var ownerQuest = QuestOn(Owner);
+        var harmony = new Harmony($"escort-captive-attack-{Guid.NewGuid()}");
+        var method = AccessTools.Method(typeof(BeHostileAction), nameof(BeHostileAction.ApplyEncounterHostileAction));
+        harmony.Patch(method, prefix: new HarmonyMethod(typeof(EscortMerchantCaravanTests), nameof(ObserveHostility)) { priority = Priority.Last });
+        try
+        {
+            PartyBase expected = null!;
+            Server.Call(() =>
+            {
+                Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(caravanId, out var caravan));
+                using (new AllowedThread())
+                {
+                    hero._partyBelongedTo = null;
+                    caravan.IsActive = true;
+                }
+                Campaign.Current.MainParty = null;
+                QuestOn(Server)._questCaravanMobileParty = caravan;
+                expected = party.Party;
+                observedAttacker = null;
+            });
+            Server.SimulateMessage(Owner.NetPeer, new RequestQuestBranch(scenario.NotableId,
+                QuestScenario.IssueId, (byte)EscortBranch.AttackCaravan), markGameThread: false);
+            Server.PumpGameThread();
+            Assert.Same(expected, observedAttacker);
+            Owner.Call(() => Assert.True(ownerQuest.IsFinalized));
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        }
+        finally
+        {
+            harmony.Unpatch(method, HarmonyPatchType.Prefix, harmony.Id);
+        }
+    }
+
+    private static bool ObserveHostility(PartyBase __0)
+    {
+        observedAttacker = __0;
         return false;
     }
 
