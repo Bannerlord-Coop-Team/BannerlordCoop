@@ -4,6 +4,7 @@ using GameInterface.Services.Issues.Framework.Dispatch;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
+using GameInterface.Services.Issues.Quests.LadysKnightOut;
 using System;
 
 namespace GameInterface.Services.Issues;
@@ -24,6 +25,8 @@ internal class IssuesModule : Module
         builder.RegisterType<AlternativeSolutionTroopValidator>().As<IAlternativeSolutionTroopValidator>().InstancePerDependency();
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
+        builder.RegisterType<LadysKnightOutTournamentProgress>().As<ILadysKnightOutTournamentProgress>().InstancePerLifetimeScope();
+        builder.RegisterType<LadysKnightOutHonorProgress>().As<ILadysKnightOutHonorProgress>().InstancePerLifetimeScope();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)
             .Where(IsQuestPiece)
