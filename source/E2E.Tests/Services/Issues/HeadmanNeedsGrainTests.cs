@@ -8,7 +8,6 @@ using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.HeadmanNeedsGrain;
-using GameInterface.Services.ItemRosters.Patches;
 using HarmonyLib;
 using Helpers;
 using System.Reflection;
@@ -96,6 +95,13 @@ public class HeadmanNeedsGrainTests : IDisposable
                 }
             });
         }
+
+        Server.Call(() =>
+        {
+            foreach (var player in new[] { scenario.PlayerA, scenario.PlayerB })
+                Get<MobileParty>(Server, player.PartyId).ItemRoster.Clear();
+        });
+        environment.FlushCoalescer();
     }
 
     public void Dispose()
@@ -212,6 +218,8 @@ public class HeadmanNeedsGrainTests : IDisposable
     [Fact]
     public void LoadedTraitProgress_IsRestoredAfterSwitchingFromTheSavedHeroToTheLocalPlayer()
     {
+        textHarmony.Patch(AccessTools.Method(typeof(ChangePlayerCharacterAction), nameof(ChangePlayerCharacterAction.Apply)),
+            prefix: new HarmonyMethod(typeof(HeadmanNeedsGrainTests), nameof(SkipMapCharacterSwitch)) { priority = Priority.First });
         ClientA.Call(() =>
         {
             var first = Get<Hero>(ClientA, scenario.PlayerA.HeroId);
@@ -231,8 +239,10 @@ public class HeadmanNeedsGrainTests : IDisposable
             Game.Current.PlayerTroop = first.CharacterObject;
             ChangePlayerCharacterAction.Apply(first);
             Assert.Equal(123, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
-        }, Texts.Append(AccessTools.Method(typeof(ChangePlayerCharacterAction), nameof(ChangePlayerCharacterAction.Apply))));
+        }, Texts);
     }
+
+    private static bool SkipMapCharacterSwitch() => false;
 
     [Fact]
     public void SaveData_PreservesTheAveragePriceAndTheServersChosenMarket()
@@ -275,14 +285,18 @@ public class HeadmanNeedsGrainTests : IDisposable
     public void ServerInventoryUpdates_RefreshTheOwnersJournalAndRemoveTheReadyLogWhenGrainIsLost()
     {
         Accept();
+        StageDelivery(true, true);
         ClientA.Call(() =>
         {
             var quest = QuestHere(ClientA);
-            var roster = Get<MobileParty>(ClientA, scenario.PlayerA.PartyId).ItemRoster;
-            ItemRosterPatch.AddToCountsOverride(roster, new EquipmentElement(DefaultItems.Grain), quest._neededGrainAmount);
             Assert.Equal(quest._neededGrainAmount, quest._playerAcceptedQuestLog.CurrentProgress);
             Assert.NotNull(quest._playerHasNeededGrainsLog);
-            ItemRosterPatch.ClearOverride(roster);
+        }, Texts);
+        Server.Call(() => Get<MobileParty>(Server, scenario.PlayerA.PartyId).ItemRoster.Clear());
+        environment.FlushCoalescer();
+        ClientA.Call(() =>
+        {
+            var quest = QuestHere(ClientA);
             Assert.Equal(0, quest._playerAcceptedQuestLog.CurrentProgress);
             Assert.Null(quest._playerHasNeededGrainsLog);
         }, Texts);
@@ -382,6 +396,7 @@ public class HeadmanNeedsGrainTests : IDisposable
         {
             Assert.True(secondQuest.IsOngoing);
             Assert.Equal(0, secondQuest._playerAcceptedQuestLog.CurrentProgress);
+            Assert.Equal(0, Get<MobileParty>(ClientB, scenario.PlayerB.PartyId).ItemRoster.GetItemNumber(DefaultItems.Grain));
             Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
             Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
             Assert.Same(secondQuest, Get<Hero>(ClientB, secondGiverId).Issue.IssueQuest);
