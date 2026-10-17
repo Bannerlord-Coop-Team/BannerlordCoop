@@ -1,0 +1,794 @@
+﻿using Autofac;
+using Common.Messaging;
+using Common.Util;
+using E2E.Tests.Environment;
+using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
+using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
+using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Quests.VillageNeedsTools;
+using GameInterface.Services.ItemRosters.Patches;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using HarmonyLib;
+using Helpers;
+using System.Reflection;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+using Xunit.Abstractions;
+using Issue = TaleWorlds.CampaignSystem.Issues.VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue;
+using Quest = TaleWorlds.CampaignSystem.Issues.VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest;
+
+namespace E2E.Tests.Services.Issues;
+
+public class VillageNeedsToolsTests : IDisposable
+{
+    private const string IssueName = "VillageNeedsToolsIssue";
+    private const string IssueId = "issue_village_needs_tools";
+    private const string ControllerA = "player-A";
+    private const string ControllerB = "player-B";
+    private const int ServerPayment = 900;
+
+    private static readonly FieldInfo PaymentField = AccessTools.Field(typeof(Issue), nameof(Issue._payment));
+
+    private static readonly MethodBase[] QuestLogTexts =
+    {
+        AccessTools.Method(typeof(Quest), nameof(Quest.SetDialogs)),
+        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestStartedLog)),
+        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestSuccessLog)),
+        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.WarDeclaredQuestCancelLog)),
+        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.PlayerDeclaredWarQuestLogText)),
+        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestTimeOutFailLog)),
+    };
+
+    private static readonly MethodBase[] AlternativeSolutionLogTexts =
+    {
+        AccessTools.PropertyGetter(typeof(Issue), nameof(Issue.AlternativeSolutionStartLog)),
+        AccessTools.PropertyGetter(typeof(Issue), nameof(Issue.IssueAlternativeSolutionSuccessLog)),
+        AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)),
+    };
+
+    private readonly string notableId;
+    private readonly string settlementId;
+    private readonly string villageId;
+    private readonly string boundSettlementId;
+    private readonly string townId;
+    private readonly string giverClanId;
+    private readonly string kingdomId;
+    private readonly string playerClanId;
+    private readonly string ownerHeroId;
+    private readonly string ownerPartyId;
+    private readonly string otherHeroId;
+
+    private E2ETestEnvironment TestEnvironment { get; }
+    private EnvironmentInstance Server => TestEnvironment.Server;
+    private EnvironmentInstance ClientA => TestEnvironment.Clients.First();
+    private EnvironmentInstance ClientB => TestEnvironment.Clients.Last();
+    private EnvironmentInstance[] Instances => new[] { Server, ClientA, ClientB };
+
+    public VillageNeedsToolsTests(ITestOutputHelper output)
+    {
+        TestEnvironment = new E2ETestEnvironment(output);
+
+        notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        villageId = TestEnvironment.CreateRegisteredObject<Village>();
+        boundSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        townId = TestEnvironment.CreateRegisteredObject<Town>();
+        giverClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        playerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        (ownerHeroId, ownerPartyId) = RegisterPlayer(ClientA, ControllerA);
+        (otherHeroId, _) = RegisterPlayer(ClientB, ControllerB);
+
+        GiveTheNotableTheIssue(Server, ServerPayment);
+        GiveTheNotableTheIssue(ClientA, ServerPayment);
+        GiveTheNotableTheIssue(ClientB, ServerPayment);
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                instance.ObjectManager.AddExisting("tools", DefaultItems.Tools);
+                instance.ObjectManager.AddExisting("grain", DefaultItems.Grain);
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
+                using (new AllowedThread())
+                {
+                    owner._partyBelongedTo = party;
+                    party.ItemRoster.Clear();
+                    if (instance == ClientA) Campaign.Current.MainParty = party;
+                }
+            });
+        }
+    }
+
+    public void Dispose()
+    {
+        TestEnvironment.Dispose();
+    }
+
+    [Fact]
+    public void DebugCapture_IsRefusedForAHeroOutsideAVillage()
+    {
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+
+            Assert.False(Descriptor(Server).CreationCaptureStrategy.TryBuildDebugCapture(hero, out _));
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CreationCapture_PreservesTheOfferWhenTheClientsVillageEconomyDiffers(bool exchange)
+    {
+        if (exchange) SetExchangeOffer();
+        byte[] captured = null!;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            captured = Descriptor(Server).CreationCaptureStrategy.Capture(notable.Issue);
+        });
+
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            using (new AllowedThread())
+            {
+                notable.CurrentSettlement.Village.Hearth = exchange ? 650f : 250f;
+                var type = new VillageType("tools_test");
+                type._productions = new MBList<(ItemObject, float)> { (DefaultItems.Grain, 1f) };
+                notable.CurrentSettlement.Village.VillageType = type;
+                var copy = (Issue)Descriptor(ClientA).CreationCaptureStrategy.CreateIssue(notable, captured);
+                var original = (Issue)notable.Issue;
+                Assert.Same(DefaultItems.Tools, copy._requestedItem);
+                Assert.Equal(original._numberOfRequestedItem, copy._numberOfRequestedItem);
+                Assert.Equal(original._payment, copy._payment);
+                Assert.Equal(original._exchangeItem, copy._exchangeItem);
+                Assert.Equal(original._numberOfExchangeItem, copy._numberOfExchangeItem);
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TwoPlayersCanHoldSeparateToolsQuestsButOnePlayerCannotHoldTwo(bool anotherPlayer)
+    {
+        Accept();
+        var secondGiverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(secondGiverId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var firstGiver));
+                using (new AllowedThread())
+                {
+                    giver.StayingInSettlement = firstGiver.CurrentSettlement;
+                    giver.Clan = firstGiver.Clan;
+                    var issue = new Issue(giver, DefaultItems.Tools);
+                    issue.StringId = "tools_second";
+                    issue._issueState = IssueBase.IssueState.Ongoing;
+                    Campaign.Current.IssueManager._issues.Add(giver, issue);
+                    giver.OnIssueCreatedForHero(issue);
+                }
+            });
+        }
+
+        var client = anotherPlayer ? ClientB : ClientA;
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(secondGiverId, out var giver));
+            giver.Issue.StartIssueWithQuest();
+            giver.Issue.IssueQuest.StartQuest();
+        }, QuestLogTexts);
+
+        Server.Call(() =>
+        {
+            var owns = Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(secondGiverId, "tools_second", out var owner);
+            Assert.Equal(anotherPlayer, owns);
+            if (anotherPlayer) Assert.Equal(ControllerB, owner);
+        });
+        Assert.Equal(ControllerA, OwnerOnServer());
+        Assert.Equal(anotherPlayer ? 2 : 1, Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>().Count());
+        Assert.Equal(anotherPlayer ? 0 : 1, Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>().Count());
+    }
+
+    [Fact]
+    public void Accept_IsRefusedWhenTheVillageAlreadyHasTools()
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var village));
+            using (new AllowedThread()) village.ItemRoster.AddToCounts(DefaultItems.Tools, 1);
+        });
+        Accept();
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+    }
+
+    [Fact]
+    public void Accept_KeepsTheCapturedOfferAndGivesOnlyTheOwnerAQuest()
+    {
+        Accept();
+
+        var accepterQuest = QuestOf(ClientA);
+        var serverQuest = QuestOf(Server);
+
+        Assert.Equal(ControllerA, OwnerOnServer());
+        Assert.Equal(ServerPayment, accepterQuest.RewardGold);
+        Assert.Equal(ServerPayment, serverQuest.RewardGold);
+        Assert.Equal(accepterQuest._numberOfRequestedGood, serverQuest._numberOfRequestedGood);
+
+        ClientB.Call(() =>
+        {
+            Assert.True(ClientB.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            Assert.Null(notable.Issue.IssueQuest);
+            Assert.True(notable.Issue.IsSolvingWithQuest);
+        });
+    }
+
+    [Theory]
+    [InlineData(true, false, 0)]
+    [InlineData(false, true, 0)]
+    [InlineData(true, true, 1)]
+    public void SuccessBranch_RunsOnlyWhenTheOwnerBringsTheToolsToTheVillage(bool inVillage, bool carriesEnough, int expectedRuns)
+    {
+        Accept();
+
+        using var completion = new MethodCallRecorder(AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess)));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            var quest = QuestOfHere(Server);
+
+            using (new AllowedThread())
+            {
+                ownerParty.CurrentSettlement = inVillage ? settlement : null;
+                ownerParty.ItemRoster.AddToCounts(DefaultItems.Tools, quest._numberOfRequestedGood - (carriesEnough ? 0 : 1));
+            }
+
+            var previousMainParty = Campaign.Current.MainParty;
+            Campaign.Current.MainParty = ownerParty;
+
+            try
+            {
+                var proof = (byte)VillageNeedsToolsBranch.DeliverTools;
+                Assert.True(Descriptor(Server).FinalizationProofStrategy.TryRunBranch(quest, proof));
+            }
+            finally
+            {
+                Campaign.Current.MainParty = previousMainParty;
+            }
+        }, QuestLogTexts);
+
+        Assert.Equal(expectedRuns, completion.CountFor(Server));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OwnersSuccess_PaysThePromisedGoldOrGoodsAndEndsTheIssueEverywhere(bool exchange)
+    {
+        if (exchange) SetExchangeOffer();
+        Accept();
+
+        var amount = QuestOf(Server)._numberOfRequestedGood;
+        var otherGoldBefore = 0;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(otherHeroId, out var otherHero));
+
+            using (new AllowedThread())
+            {
+                ownerHero._partyBelongedTo = ownerParty;
+                ownerParty.CurrentSettlement = settlement;
+                ownerParty.ItemRoster.AddToCounts(DefaultItems.Tools, amount);
+                ownerHero.Gold = 10000;
+                otherHero.Gold = 50;
+            }
+
+            otherGoldBefore = otherHero.Gold;
+        });
+
+        ClientA.Call(() =>
+        {
+            var quest = (Quest)QuestOfHere(ClientA);
+            quest.FinishQuestSuccess1();
+        }, QuestLogTexts);
+
+        var request = Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Assert.Equal((byte)VillageNeedsToolsBranch.DeliverTools, request.Proof);
+
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+                Assert.Null(notable.Issue);
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(otherHeroId, out var otherHero));
+
+            Assert.Equal(10000 + (exchange ? 0 : ServerPayment), ownerHero.Gold);
+            Assert.Equal(otherGoldBefore, otherHero.Gold);
+            Assert.Equal(0, ownerParty.ItemRoster.GetItemNumber(DefaultItems.Tools));
+            Assert.Equal(exchange ? 12 : 0, ownerParty.ItemRoster.GetItemNumber(DefaultItems.Grain));
+            Assert.Equal(exchange ? 690f : 670f, settlement.Village.Hearth);
+            Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out _));
+        });
+
+        ClientA.Call(() => Assert.DoesNotContain(Campaign.Current.QuestManager.Quests.OfType<Quest>(), quest => quest.IsOngoing));
+    }
+
+    [Fact]
+    public void OwnersTimeout_RunsTheFailConsequencesOnTheServerOnly()
+    {
+        Accept();
+
+        ClientA.Call(() =>
+        {
+            QuestOfHere(ClientA).CompleteQuestWithTimeOut();
+        }, QuestLogTexts);
+        TestEnvironment.FlushCoalescer();
+
+        var request = Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        Assert.Equal(IssueOutcome.QuestTimeOut, request.Outcome);
+
+        // The timeout penalty is authoritative and is not repeated during client replay
+        var finalized = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>();
+        Assert.Equal(IssueOutcome.QuestTimeOut, Assert.Single(finalized).Outcome);
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.Null(notable.Issue);
+                // Only the server's -30 is applied
+                Assert.Equal(620f, settlement.Village.Hearth);
+            });
+        }
+    }
+
+    [Fact]
+    public void AlternativeSolution_ChargesTheOwnerAndReturnsTroopsWithTheVanillaReward()
+    {
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var otherGoldBefore = 0;
+        var expectedGold = 0;
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                troop.Level = 16;
+                troop.UpgradeTargets = Array.Empty<CharacterObject>();
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(otherHeroId, out var otherHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+
+            ownerParty.MemberRoster.AddToCounts(ownerHero.CharacterObject, 1);
+            ownerParty.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+            ownerParty.MemberRoster.AddToCounts(troop, 6);
+
+            using (new AllowedThread())
+            {
+                ownerHero._partyBelongedTo = ownerParty;
+                ownerHero.Gold = 10000;
+                otherHero.Gold = 50;
+            }
+
+            otherGoldBefore = otherHero.Gold;
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            var issue = (Issue)notable.Issue;
+            expectedGold = 10000 - issue.CostOfToolsForAlternativeSolution + issue._payment + issue.RewardGold;
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            party.MemberRoster.AddToCounts(companion.CharacterObject, -1);
+            party.MemberRoster.AddToCounts(troop, -6);
+        });
+        TestEnvironment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            Assert.True(ClientA.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.True(ClientA.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            var issue = notable.Issue;
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = ownerParty;
+                issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                issue.AlternativeSolutionSentTroops.AddToCounts(troop, 6);
+            }
+
+            ClientA.Resolve<IMessageBroker>().Publish(this, new AlternativeSolutionAcceptRequested(issue));
+        }, AlternativeSolutionLogTexts);
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+        Assert.Equal(ControllerA, OwnerOnServer());
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+                var issue = (Issue)notable.Issue;
+
+                Assert.True(issue.IsSolvingWithAlternative);
+                Assert.Equal(ServerPayment, issue._payment);
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            notable.Issue._failureChance = 0f;
+            notable.Issue.CompleteIssueWithAlternativeSolution();
+        }, AlternativeSolutionLogTexts);
+        TestEnvironment.FlushCoalescer();
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.Null(notable.Issue);
+                Assert.Equal(700f, settlement.Village.Hearth);
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(otherHeroId, out var otherHero));
+
+            Assert.Equal(expectedGold, ownerHero.Gold);
+            Assert.Equal(otherGoldBefore, otherHero.Gold);
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.True(party.MemberRoster.Contains(companion.CharacterObject));
+            Assert.Equal(6, party.MemberRoster.GetTroopCount(troop));
+        });
+    }
+
+    [Fact]
+    public void OwnersClient_CountsToolsTheServerAddsRemovesAndClears()
+    {
+        Accept();
+
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            var quest = (Quest)QuestOfHere(ClientA);
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = ownerParty;
+                quest._numberOfToolsLog = quest.AddDiscreteLog(new TaleWorlds.Localization.TextObject("{=!}Tools"), new TaleWorlds.Localization.TextObject("{=!}Tools"), 0, quest._numberOfRequestedGood);
+            }
+
+            Assert.Equal(0, quest._numberOfToolsLog.CurrentProgress);
+
+            ItemRosterPatch.AddToCountsOverride(ownerParty.ItemRoster, new EquipmentElement(DefaultItems.Tools), 1);
+
+            Assert.Equal(1, quest._numberOfToolsLog.CurrentProgress);
+
+            ItemRosterPatch.AddToCountsOverride(ownerParty.ItemRoster, new EquipmentElement(DefaultItems.Tools), quest._numberOfRequestedGood + 3);
+            Assert.Equal(quest._numberOfRequestedGood, quest._numberOfToolsLog.CurrentProgress);
+
+            ItemRosterPatch.AddToCountsOverride(ownerParty.ItemRoster, new EquipmentElement(DefaultItems.Tools), -5);
+            Assert.Equal(quest._numberOfRequestedGood - 1, quest._numberOfToolsLog.CurrentProgress);
+
+            ItemRosterPatch.ClearOverride(ownerParty.ItemRoster);
+
+            Assert.Equal(0, quest._numberOfToolsLog.CurrentProgress);
+        }, QuestLogTexts);
+    }
+
+    [Theory]
+    [InlineData(DeclareWarAction.DeclareWarDetail.CausedByRebellion, IssueOutcome.QuestCancel)]
+    [InlineData(DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility, IssueOutcome.QuestFail)]
+    public void AWarDeclaredOnTheServerEndsTheQuestEverywhere(DeclareWarAction.DeclareWarDetail detail, IssueOutcome outcome)
+    {
+        Accept();
+        PutThePlayersInTheirOwnClan();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
+
+            DeclareWarAction.ApplyInternal(kingdom, playerClan, detail);
+        }, QuestLogTexts);
+
+        Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(outcome, finalized.Outcome);
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+                Assert.Null(notable.Issue);
+            });
+        }
+    }
+
+    [Fact]
+    public void AWarReplayedOnTheOwnersClientLeavesTheQuestToTheServer()
+    {
+        Accept();
+        PutThePlayersInTheirOwnClan();
+
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(ClientA.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
+            var quest = (Quest)QuestOfHere(ClientA);
+
+            using (new AllowedThread())
+            {
+                FactionManager.DeclareWar(kingdom, playerClan);
+                quest.OnWarDeclared(kingdom, playerClan, DeclareWarAction.DeclareWarDetail.CausedByRebellion);
+            }
+
+            Assert.True(quest.IsOngoing);
+        }, QuestLogTexts);
+
+        Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+                Assert.NotNull(notable.Issue);
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ServerRaid_CancelsOnlyIfItIsTheGiversVillage(bool giverVillage)
+    {
+        Accept();
+        var ownerQuest = QuestOf(ClientA);
+        var mapEventId = TestEnvironment.CreateRegisteredObject<MapEvent>();
+        var otherVillageId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(giverVillage ? settlementId : otherVillageId, out var settlement));
+            mapEvent.MapEventSettlement = settlement;
+            CampaignEventDispatcher.Instance.RaidCompleted(BattleSideEnum.Attacker, new RaidEventComponent(mapEvent));
+        }, QuestLogTexts.Concat(new[] { AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.VillageRaidedQuestCancelLog)) }));
+
+        var finalized = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>();
+        if (giverVillage)
+        {
+            Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(finalized).Outcome);
+            Assert.True(ownerQuest.IsFinalized);
+        }
+        else
+        {
+            Assert.Empty(finalized);
+            Assert.True(QuestOf(ClientA).IsOngoing);
+        }
+    }
+
+    [Fact]
+    public void JoiningAHostileKingdomOnTheServer_CancelsTheOwnersQuest()
+    {
+        Accept();
+        PutThePlayersInTheirOwnClan();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
+            using (new AllowedThread()) FactionManager.DeclareWar(kingdom, playerClan);
+            CampaignEventDispatcher.Instance.OnClanChangedKingdom(playerClan, null, kingdom,
+                ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+        }, QuestLogTexts);
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+    }
+
+    [Theory]
+    [InlineData(MapEvent.BattleTypes.IsForcingSupplies, true)]
+    [InlineData(MapEvent.BattleTypes.IsForcingVolunteers, true)]
+    [InlineData(MapEvent.BattleTypes.FieldBattle, false)]
+    public void ServerCoercion_FailsTheOwnersQuestForSuppliesOrRecruits(MapEvent.BattleTypes type, bool fails)
+    {
+        Accept();
+        var mapEventId = TestEnvironment.CreateRegisteredObject<MapEvent>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            mapEvent.MapEventSettlement = settlement;
+            mapEvent._mapEventType = type;
+            CampaignEventDispatcher.Instance.OnMapEventStarted(mapEvent, party.Party, settlement.Party);
+        }, QuestLogTexts.Concat(new[] { AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)) }));
+
+        var finalized = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>();
+        if (fails) Assert.Equal(IssueOutcome.QuestFail, Assert.Single(finalized).Outcome);
+        else Assert.Empty(finalized);
+    }
+
+    private void Accept()
+    {
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            notable.Issue.StartIssueWithQuest();
+            var quest = Assert.IsType<Quest>(notable.Issue.IssueQuest);
+            quest.StartQuest();
+            quest._numberOfToolsLog = quest.AddDiscreteLog(new TaleWorlds.Localization.TextObject("{=!}Tools"), new TaleWorlds.Localization.TextObject("{=!}Tools"), 0, quest._numberOfRequestedGood);
+        }, QuestLogTexts);
+    }
+
+    private void SetExchangeOffer()
+    {
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+                AccessTools.Field(typeof(Issue), nameof(Issue._exchangeItem)).SetValue(notable.Issue, DefaultItems.Grain);
+                AccessTools.Field(typeof(Issue), nameof(Issue._numberOfExchangeItem)).SetValue(notable.Issue, 12);
+            });
+        }
+    }
+
+    private Quest QuestOf(EnvironmentInstance instance)
+    {
+        Quest quest = null!;
+        instance.Call(() => quest = QuestOfHere(instance));
+        return quest;
+    }
+
+    private Quest QuestOfHere(EnvironmentInstance instance)
+    {
+        Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+        return Assert.IsType<Quest>(notable.Issue.IssueQuest);
+    }
+
+    private string OwnerOnServer()
+    {
+        var controllerId = string.Empty;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out controllerId));
+        });
+
+        return controllerId;
+    }
+
+    private IQuestTypeDescriptor Descriptor(EnvironmentInstance instance)
+    {
+        Assert.True(instance.Container.Resolve<IQuestTypeRegistry>().TryGetByName(IssueName, out var descriptor));
+        return descriptor;
+    }
+
+    private void PutThePlayersInTheirOwnClan()
+    {
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
+
+                using (new AllowedThread())
+                {
+                    ownerHero.Clan = playerClan;
+                }
+            });
+        }
+    }
+
+    private (string HeroId, string PartyId) RegisterPlayer(EnvironmentInstance client, string controllerId)
+    {
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(controllerId, heroId, partyId, "", ""))));
+        TestEnvironment.ConnectRegisteredPlayer(client, controllerId);
+        client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+
+        return (heroId, partyId);
+    }
+
+    private void GiveTheNotableTheIssue(EnvironmentInstance instance, int payment)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(instance.ObjectManager.TryGetObject<Village>(villageId, out var village));
+            Assert.True(instance.ObjectManager.TryGetObject<Settlement>(boundSettlementId, out var boundSettlement));
+            Assert.True(instance.ObjectManager.TryGetObject<Town>(townId, out var town));
+            Assert.True(instance.ObjectManager.TryGetObject<Clan>(giverClanId, out var giverClan));
+            Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+
+            using (new AllowedThread())
+            {
+                settlement.SetSettlementComponent(village);
+                boundSettlement.SetSettlementComponent(town);
+                town.OwnerClan = giverClan;
+                village.Bound = boundSettlement;
+                village.Hearth = 650f;
+                notable.StayingInSettlement = settlement;
+                notable.Occupation = Occupation.RuralNotable;
+
+                // Gives the notable a map faction for the war tests
+                giverClan._kingdom = kingdom;
+                notable.Clan = giverClan;
+
+                var issue = new Issue(notable, DefaultItems.Tools);
+                PaymentField.SetValue(issue, payment);
+                issue.StringId = IssueId;
+                issue._issueState = IssueBase.IssueState.Ongoing;
+
+                Campaign.Current.IssueManager._issues.Add(notable, issue);
+                notable.OnIssueCreatedForHero(issue);
+            }
+        });
+    }
+}
