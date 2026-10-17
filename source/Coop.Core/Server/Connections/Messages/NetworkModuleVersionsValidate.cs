@@ -27,6 +27,12 @@ public record NetworkModuleVersionsValidate : ICommand
     }
 
     public NetworkModuleVersionsValidate(IEnumerable<ModuleInfo> modules, string? coopBuildVersion)
+        : this(modules, coopBuildVersion, null)
+    {
+    }
+
+    /// <param name="displayName">Display name per module id, sent only so join refusals can name mods.</param>
+    public NetworkModuleVersionsValidate(IEnumerable<ModuleInfo> modules, string? coopBuildVersion, Func<string, string>? displayName)
     {
         CoopBuildVersion = coopBuildVersion;
         if (modules is null)
@@ -35,6 +41,6 @@ public record NetworkModuleVersionsValidate : ICommand
             return;
         }
 
-        Modules = modules.Select(m => new NetworkModuleInfo(m.Id, m.IsOfficial, m.IsDlc, m.Version, m.Name)).ToArray();
+        Modules = modules.Select(m => new NetworkModuleInfo(m.Id, m.IsOfficial, m.IsDlc, m.Version, displayName?.Invoke(m.Id))).ToArray();
     }
 }

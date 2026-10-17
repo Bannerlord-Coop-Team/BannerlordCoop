@@ -14,7 +14,6 @@ namespace GameInterface.Serialization.Internal
         private bool IsOfficial;
         private bool IsDlc;
         private string Version;
-        private string Name;
 
         public ModuleInfoBinaryPackage(ModuleInfo obj, IBinaryPackageFactory binaryPackageFactory)
             : base(obj, binaryPackageFactory)
@@ -27,12 +26,11 @@ namespace GameInterface.Serialization.Internal
             IsOfficial = Object.IsOfficial;
             IsDlc = Object.IsDlc;
             Version = Object.Version.ToString();
-            Name = Object.Name;
         }
 
         protected override void UnpackInternal()
         {
-            Object = new ModuleInfo(Id, IsOfficial, IsDlc, ApplicationVersion.FromString(Version)) { Name = Name };
+            Object = new ModuleInfo(Id, IsOfficial, IsDlc, ApplicationVersion.FromString(Version));
         }
     }
 }

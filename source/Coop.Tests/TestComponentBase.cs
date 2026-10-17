@@ -112,6 +112,7 @@ internal abstract class TestComponentBase
         RegisterMock<IAutoSyncPatchCollector>(builder);
         RegisterMock<IHeroInterface>(builder);
         RegisterMock<IModuleInfoProvider>(builder);
+        RegisterMock<IModuleNameProvider>(builder);
         RegisterMock<IRegistryManager>(builder);
         RegisterMock<IMapEventLoadCleaner>(builder);
         RegisterMock<IHideoutResultEncounter>(builder);

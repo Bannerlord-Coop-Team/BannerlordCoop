@@ -395,17 +395,24 @@ public class ModuleValidatorTests
     {
         var serverModules = new List<ModuleInfo>
         {
-            new ModuleInfo { Id = "CalradiaExpanded", Name = "Calradia Expanded", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 0, 0) },
-            new ModuleInfo { Id = "RBM", Name = "Realistic Battle Mod", Version = new ApplicationVersion(ApplicationVersionType.Release, 3, 0, 0, 0) }
+            new ModuleInfo { Id = "CalradiaExpanded", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 2, 0, 0) },
+            new ModuleInfo { Id = "RBM", Version = new ApplicationVersion(ApplicationVersionType.Release, 3, 0, 0, 0) }
         };
 
         var clientModules = new List<ModuleInfo>
         {
-            new ModuleInfo { Id = "CalradiaExpanded", Name = "Calradia Expanded", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 1, 0, 0) },
-            new ModuleInfo { Id = "ExtraMod", Name = "Extra Mod", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 0) }
+            new ModuleInfo { Id = "CalradiaExpanded", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 1, 0, 0) },
+            new ModuleInfo { Id = "ExtraMod", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 0) }
         };
 
-        var result = new ModuleValidator().Validate(serverModules, clientModules, out var error);
+        var names = new Dictionary<string, string>
+        {
+            ["CalradiaExpanded"] = "Calradia Expanded",
+            ["RBM"] = "Realistic Battle Mod",
+            ["ExtraMod"] = "Extra Mod",
+        };
+
+        var result = new ModuleValidator().Validate(serverModules, clientModules, out var error, names);
 
         Assert.False(result);
         Assert.Equal(string.Join(Environment.NewLine,
@@ -415,17 +422,21 @@ public class ModuleValidatorTests
     }
 
     [Fact]
-    public void Validate_UsesIdOnly_WhenNameMatchesId()
+    public void Validate_UsesIdOnly_WhenNameMatchesIdOrIsUnknown()
     {
         var serverModules = new List<ModuleInfo>
         {
-            new ModuleInfo { Id = "ModuleA", Name = "ModuleA", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 0) }
+            new ModuleInfo { Id = "ModuleA", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 0) },
+            new ModuleInfo { Id = "ModuleB", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 0) }
         };
 
-        var result = new ModuleValidator().Validate(serverModules, new List<ModuleInfo>(), out var error);
+        var result = new ModuleValidator().Validate(serverModules, new List<ModuleInfo>(), out var error,
+            new Dictionary<string, string> { ["ModuleA"] = "ModuleA" });
 
         Assert.False(result);
-        Assert.Equal("To join the server the module 'ModuleA' with version 'v1.0.0.0' is required.", error);
+        Assert.Equal(string.Join(Environment.NewLine,
+            "To join the server the module 'ModuleA' with version 'v1.0.0.0' is required.",
+            "To join the server the module 'ModuleB' with version 'v1.0.0.0' is required."), error);
     }
 
     [Fact]
@@ -433,26 +444,38 @@ public class ModuleValidatorTests
     {
         var clientModules = new List<ModuleInfo>
         {
-            new ModuleInfo { Id = "Coop", Name = "Bannerlord Coop", Version = new ApplicationVersion(ApplicationVersionType.Release, 0, 1, 6, 0) }
+            new ModuleInfo { Id = "Coop", Version = new ApplicationVersion(ApplicationVersionType.Release, 0, 1, 6, 0) }
         };
 
-        var result = new ModuleValidator().Validate(new List<ModuleInfo>(), clientModules, out var error);
+        var result = new ModuleValidator().Validate(new List<ModuleInfo>(), clientModules, out var error,
+            new Dictionary<string, string> { ["Coop"] = "Bannerlord Coop" });
 
         Assert.False(result);
         Assert.Equal("Server does not support module 'Coop'.", error);
     }
 
     [Fact]
-    public void ValidateNoDlc_NamesDlc_WhenDisplayNameIsKnown()
+    public void Validate_NamesDlc_WhenDisplayNameIsKnown()
     {
-        var modules = new List<ModuleInfo>
+        var gameVersion = new ApplicationVersion(ApplicationVersionType.Release, 1, 4, 8, 0);
+        var serverModules = new List<ModuleInfo> { new ModuleInfo { Id = "Native", IsOfficial = true, Version = gameVersion } };
+        var clientModules = new List<ModuleInfo>
         {
-            new ModuleInfo { Id = "NavalDLC", Name = "War Sails", IsOfficial = true, IsDlc = true }
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = gameVersion },
+            new ModuleInfo { Id = "NavalDLC", IsOfficial = true, IsDlc = true, Version = gameVersion }
         };
 
-        var result = new ModuleValidator().ValidateNoDlc(modules, out var error);
+        var result = new ModuleValidator().Validate(serverModules, clientModules, out var error,
+            new Dictionary<string, string> { ["NavalDLC"] = "War Sails" });
 
         Assert.False(result);
         Assert.Equal("DLC is not supported. Please disable the following module(s): 'War Sails' (NavalDLC).", error);
+    }
+
+    [Fact]
+    public void ModuleInfo_DisplayNameDoesNotTakePartInEquality()
+    {
+        // names live outside ModuleInfo so they never affect compatibility (#3885 review)
+        Assert.Null(typeof(ModuleInfo).GetProperty("Name"));
     }
 }
