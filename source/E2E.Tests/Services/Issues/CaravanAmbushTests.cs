@@ -10,6 +10,7 @@ using GameInterface.Services.Players;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -153,6 +154,7 @@ public class CaravanAmbushTests : IDisposable
         var ownerQuest = QuestOf(Owner);
         Server.Call(() =>
         {
+            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
             goldBefore = PlayerHero(QuestScenario.ControllerA).Gold;
             BindParties();
             QuestOf(Server)._isCaravanSaved = true;
@@ -180,7 +182,7 @@ public class CaravanAmbushTests : IDisposable
             battle.Initialize(attacker.Party, quest._banditParty.Party, new FieldBattleEventComponent(battle), MapEvent.BattleTypes.FieldBattle);
             battle.MapEventVisual = null;
             // Keep the caravan on the winning side, as it is in a rescued ambush battle.
-            battle.AttackerSide.AddPartyInternal(quest._caravanParty.Party);
+            quest._caravanParty.Party.MapEventSide = battle.AttackerSide;
             battle.BattleState = BattleState.AttackerVictory;
             Server.Resolve<ICaravanAmbushEvents>().Run(q => Server.Resolve<ICaravanAmbushEvents>().BattleEnded(q, battle));
             Assert.True(quest._isCaravanSaved);
@@ -270,6 +272,7 @@ public class CaravanAmbushTests : IDisposable
             bandits.SetPartyUsedByQuest(true);
             caravan.Ai.SetDoNotMakeNewDecisions(true);
             bandits.Ai.SetDoNotMakeNewDecisions(true);
+            caravan.Position = PlayerHero(QuestScenario.ControllerA).PartyBelongedTo.Position;
         }
         PlayerHero(QuestScenario.ControllerA);
     }
