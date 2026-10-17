@@ -25,11 +25,18 @@ internal class CapturedByBountyHuntersOutcomePatches
 
         dispatcher.RunAsOwners<Quest>(quest =>
         {
-            // An owner without a party, a prisoner for one, would be checked against the party of whoever ended the battle.
-            // They took no part in it, so only vanilla's branch for a hideout someone else cleared applies.
-            if (Hero.MainHero?.PartyBelongedTo == null)
+            var owner = Hero.MainHero;
+
+            // An owner without a party would be checked against the party of whoever ended the battle, so their two
+            // vanilla branches are decided here. Losing the hideout battle removes the owner's party before it ends.
+            if (owner?.PartyBelongedTo == null)
             {
-                if (quest._questHideout.Parties.Count == 0)
+                if (WasCapturedByThisBattlesWinners(owner, mapEvent) && mapEvent.MapEventSettlement == quest._questHideout)
+                {
+                    quest.AddLog(quest.PlayerLostTheFightLogText);
+                    quest.FailConsequences(isTimedOut: false);
+                }
+                else if (quest._questHideout.Parties.Count == 0)
                 {
                     quest.AddLog(quest.HideoutClearedBySomeoneElseLogText);
                     quest.CompleteQuestWithFail();
@@ -40,6 +47,17 @@ internal class CapturedByBountyHuntersOutcomePatches
 
             quest.OnMapEventEnded(mapEvent);
         });
+    }
+
+    private static bool WasCapturedByThisBattlesWinners(Hero owner, MapEvent mapEvent)
+    {
+        var captor = owner?.IsPrisoner == true ? owner.PartyBelongedToAsPrisoner : null;
+        if (captor?.MapEvent != mapEvent)
+        {
+            return false;
+        }
+
+        return mapEvent.DefeatedSide != captor.Side;
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventEnded))]
