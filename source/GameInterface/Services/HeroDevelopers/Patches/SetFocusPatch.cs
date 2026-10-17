@@ -1,4 +1,5 @@
-﻿using GameInterface.Policies;
+﻿using Common;
+using GameInterface.Policies;
 using GameInterface.Utils;
 using HarmonyLib;
 using System.Reflection;
@@ -16,7 +17,7 @@ namespace GameInterface.Services.HeroDevelopers.Patches
         [HarmonyPrefix]
         private static bool SetFocusPrefix(HeroDeveloper __instance, SkillObject focus, int newAmount)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer) return true;
 
             var newFocuses = __instance._newFocuses;
             if (newFocuses == null) return true;

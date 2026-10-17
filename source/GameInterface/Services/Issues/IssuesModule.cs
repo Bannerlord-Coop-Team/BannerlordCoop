@@ -17,6 +17,7 @@ internal class IssuesModule : Module
 
     protected override void Load(ContainerBuilder builder)
     {
+        builder.RegisterType<Quests.LordsNeedsTutor.TutorJournal>().As<Quests.LordsNeedsTutor.ITutorJournal>().InstancePerDependency();
         builder.RegisterType<QuestTypeRegistry>().As<IQuestTypeRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<IssueResolver>().As<IIssueResolver>().InstancePerLifetimeScope();
         builder.RegisterType<IssueOwnerResolver>().As<IIssueOwnerResolver>().InstancePerLifetimeScope();
