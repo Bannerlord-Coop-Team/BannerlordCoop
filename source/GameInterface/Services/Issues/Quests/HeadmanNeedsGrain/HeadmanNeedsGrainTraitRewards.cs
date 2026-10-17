@@ -58,14 +58,14 @@ internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
         model.GetTraitLevelForTraitXp(owner, trait, xp + amount, out var level, out var remainingXp);
         values[trait.StringId] = remainingXp;
         owner.SetTraitLevel(trait, level);
-        network.SendAll(new NetworkHeadmanNeedsGrainTraitReward(ownerId, giverId, trait.StringId, amount, (int)note));
+        network.SendAll(new NetworkHeadmanNeedsGrainTraitReward(ownerId, giverId, trait.StringId, amount, (int)note, level));
     }
 
     public void RequestSeed()
     {
         if (ModInformation.IsServer || Hero.MainHero == null || Campaign.Current.PlayerTraitDeveloper == null) return;
         seededOwner = Hero.MainHero;
-        var values = TraitObject.All.ToDictionary(
+        var values = new[] { DefaultTraits.Mercy, DefaultTraits.Generosity, DefaultTraits.Honor }.ToDictionary(
             trait => trait.StringId, trait => Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(trait));
         progress[seededOwner] = values;
         network.SendAll(new RequestHeadmanNeedsGrainTraitSeed(values));
@@ -85,7 +85,7 @@ internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
         foreach (var value in values)
         {
             var trait = MBObjectManager.Instance.GetObject<TraitObject>(value.Key);
-            if (trait == null) continue;
+            if (!IsRewardTrait(trait)) continue;
             model.GetTraitLevelForTraitXp(owner, trait, value.Value, out var level, out var xp);
             accepted[value.Key] = xp;
             if (owner.GetTraitLevel(trait) != level) owner.SetTraitLevel(trait, level);
@@ -106,9 +106,12 @@ internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
         foreach (var value in values)
         {
             var trait = MBObjectManager.Instance.GetObject<TraitObject>(value.Key);
-            if (trait != null) Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(trait, value.Value);
+            if (IsRewardTrait(trait)) Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(trait, value.Value);
         }
     }
+
+    private static bool IsRewardTrait(TraitObject trait) =>
+        trait == DefaultTraits.Mercy || trait == DefaultTraits.Generosity || trait == DefaultTraits.Honor;
 }
 
 [ProtoContract(SkipConstructor = true)]
@@ -126,14 +129,16 @@ internal readonly struct NetworkHeadmanNeedsGrainTraitReward : IServerToClientCo
     [ProtoMember(3)] public readonly string TraitId;
     [ProtoMember(4)] public readonly int Amount;
     [ProtoMember(5)] public readonly int Note;
+    [ProtoMember(6)] public readonly int Level;
 
-    public NetworkHeadmanNeedsGrainTraitReward(string ownerId, string giverId, string traitId, int amount, int note)
+    public NetworkHeadmanNeedsGrainTraitReward(string ownerId, string giverId, string traitId, int amount, int note, int level)
     {
         OwnerId = ownerId;
         GiverId = giverId;
         TraitId = traitId;
         Amount = amount;
         Note = note;
+        Level = level;
     }
 }
 
@@ -176,10 +181,15 @@ internal class HeadmanNeedsGrainTraitRewardHandler : IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner) || owner != Hero.MainHero) return;
-            if (!objectManager.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.OwnerId, out var owner)) return;
             var trait = MBObjectManager.Instance.GetObject<TraitObject>(data.TraitId);
             if (trait == null) return;
+            if (owner != Hero.MainHero)
+            {
+                using (new Common.Util.AllowedThread()) owner.SetTraitLevel(trait, data.Level);
+                return;
+            }
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver)) return;
             var model = Campaign.Current.Models.CharacterDevelopmentModel;
             var currentXp = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(trait);
             model.GetTraitLevelForTraitXp(owner, trait, currentXp, out var previousLevel, out _);

@@ -10,6 +10,21 @@ using TaleWorlds.Localization;
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain;
 
 [ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkHeadmanNeedsGrainProgress : IServerToClientCommand
+{
+    [ProtoMember(1)] public readonly string GiverId;
+    [ProtoMember(2)] public readonly string IssueId;
+    [ProtoMember(3)] public readonly int Progress;
+
+    public NetworkHeadmanNeedsGrainProgress(string giverId, string issueId, int progress)
+    {
+        GiverId = giverId;
+        IssueId = issueId;
+        Progress = progress;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkHeadmanNeedsGrainLog : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string GiverId;
@@ -57,12 +72,28 @@ internal class HeadmanNeedsGrainJournalHandler : IHandler
         this.controller = controller;
         broker.Subscribe<NetworkHeadmanNeedsGrainLog>(Handle);
         broker.Subscribe<NetworkHeadmanNeedsGrainAiCompleted>(HandleAi);
+        broker.Subscribe<NetworkHeadmanNeedsGrainProgress>(HandleProgress);
     }
 
     public void Dispose()
     {
         broker.Unsubscribe<NetworkHeadmanNeedsGrainLog>(Handle);
         broker.Unsubscribe<NetworkHeadmanNeedsGrainAiCompleted>(HandleAi);
+        broker.Unsubscribe<NetworkHeadmanNeedsGrainProgress>(HandleProgress);
+    }
+
+    private void HandleProgress(MessagePayload<NetworkHeadmanNeedsGrainProgress> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!ownership.TryGetOwner(data.GiverId, data.IssueId, out var owner) || owner != controller.ControllerId) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver)) return;
+            var issue = giver.Issue;
+            if (issue == null || issue.StringId != data.IssueId || !issue.IsSolvingWithAlternative || issue.JournalEntries.Count == 0) return;
+            issue.JournalEntries[0].UpdateCurrentProgress(data.Progress);
+        }, context: nameof(HeadmanNeedsGrainJournalHandler));
     }
 
     private void HandleAi(MessagePayload<NetworkHeadmanNeedsGrainAiCompleted> payload)

@@ -20,6 +20,7 @@ using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 using Behavior = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior;
 using Issue = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue;
@@ -47,6 +48,7 @@ public class HeadmanNeedsGrainTests : IDisposable
     private readonly string playerClanId;
     private readonly string otherPlayerClanId;
     private readonly string grainCategoryId;
+    private readonly string otherNotableId;
     private EnvironmentInstance Server => scenario.Server;
     private EnvironmentInstance ClientA => scenario.ClientA;
     private EnvironmentInstance ClientB => scenario.ClientB;
@@ -66,6 +68,7 @@ public class HeadmanNeedsGrainTests : IDisposable
         playerClanId = environment.CreateRegisteredObject<Clan>();
         otherPlayerClanId = environment.CreateRegisteredObject<Clan>();
         grainCategoryId = environment.CreateRegisteredObject<ItemCategory>();
+        otherNotableId = environment.CreateRegisteredObject<Hero>();
         scenario = new QuestScenario(environment, hero => new Issue(hero), ConfigureGiver);
 
         foreach (var instance in Instances)
@@ -82,6 +85,8 @@ public class HeadmanNeedsGrainTests : IDisposable
                         var hero = Get<Hero>(instance, player.HeroId);
                         hero._partyBelongedTo = Get<MobileParty>(instance, player.PartyId);
                         hero.Clan = Get<Clan>(instance, player.HeroId == scenario.PlayerA.HeroId ? playerClanId : otherPlayerClanId);
+                        hero.Clan.SetLeader(hero);
+                        hero.Clan.Renown = 0;
                         hero.Gold = 10000;
                     }
 
@@ -93,6 +98,7 @@ public class HeadmanNeedsGrainTests : IDisposable
                         Campaign.Current.PlayerDefaultFaction = Get<Hero>(instance, player.HeroId).Clan;
                     }
                 }
+                new IssuesCampaignBehavior().RegisterEvents();
             });
         }
 
@@ -126,6 +132,41 @@ public class HeadmanNeedsGrainTests : IDisposable
         ClientA.Call(() => amount = QuestHere(ClientA)._neededGrainAmount);
         Server.Call(() => Assert.Equal(amount, QuestHere(Server)._neededGrainAmount));
         ClientB.Call(() => Assert.Null(IssueHere(ClientB).IssueQuest));
+    }
+
+    [Fact]
+    public void Accept_DoesNotNormalizeUnrelatedHiddenTraits()
+    {
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                using (new AllowedThread()) Get<Hero>(instance, scenario.PlayerA.HeroId).SetTraitLevel(DefaultTraits.Commander, 5);
+            });
+        ClientA.Call(() => Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Commander, 4000));
+        Accept();
+        foreach (var instance in Instances)
+            instance.Call(() => Assert.Equal(5, Get<Hero>(instance, scenario.PlayerA.HeroId).GetTraitLevel(DefaultTraits.Commander)));
+    }
+
+    [Fact]
+    public void Delivery_PreservesTraitLevelThresholdCrossing()
+    {
+        var expectedLevel = 0;
+        var expectedXp = 0;
+        ClientA.Call(() =>
+        {
+            var model = Campaign.Current.Models.CharacterDevelopmentModel;
+            var xp = model.GetTraitXpRequiredForTraitLevel(DefaultTraits.Generosity, 1) - 25;
+            Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Generosity, xp);
+            model.GetTraitLevelForTraitXp(Hero.MainHero, DefaultTraits.Generosity, xp + 50, out expectedLevel, out expectedXp);
+            Assert.True(expectedLevel > 0);
+        });
+        Accept();
+        StageDelivery(true, true);
+        ClientA.Call(() => QuestHere(ClientA).Success(), Texts);
+        foreach (var instance in Instances)
+            instance.Call(() => Assert.Equal(expectedLevel, Get<Hero>(instance, scenario.PlayerA.HeroId).GetTraitLevel(DefaultTraits.Generosity)));
+        ClientA.Call(() => Assert.Equal(expectedXp, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity)));
     }
 
     [Fact]
@@ -170,6 +211,12 @@ public class HeadmanNeedsGrainTests : IDisposable
                 Assert.Equal(0, Get<MobileParty>(instance, scenario.PlayerA.PartyId).ItemRoster.GetItemNumber(DefaultItems.Grain));
                 Assert.True(Get<Town>(instance, townId).Prosperity == 1050f, $"{instance.GetType().Name} prosperity {Get<Town>(instance, townId).Prosperity}");
                 Assert.Equal(10000, Get<Hero>(instance, scenario.PlayerB.HeroId).Gold);
+                Assert.Equal(10000, Get<Hero>(instance, scenario.PlayerA.HeroId).Gold);
+                Assert.Equal(110f, Get<Hero>(instance, scenario.NotableId).Power);
+                Assert.Equal(1f, Get<Clan>(instance, playerClanId).Renown);
+                Assert.Equal(5, Get<Hero>(instance, scenario.PlayerA.HeroId).GetRelation(Get<Hero>(instance, scenario.NotableId)));
+                Assert.Equal(1, Get<Hero>(instance, scenario.PlayerA.HeroId).GetRelation(Get<Hero>(instance, otherNotableId)));
+                Assert.Equal(0, Get<Hero>(instance, scenario.PlayerB.HeroId).GetRelation(Get<Hero>(instance, scenario.NotableId)));
             });
         }
         ClientA.Call(() =>
@@ -188,6 +235,7 @@ public class HeadmanNeedsGrainTests : IDisposable
     public void Timeout_AppliesTheWorldPenaltyOnceAndEndsEveryCopy()
     {
         Accept();
+        var ownerQuest = (Quest)scenario.QuestOf(ClientA);
         ClientA.Call(() => QuestHere(ClientA).CompleteQuestWithTimeOut(), Texts);
         environment.FlushCoalescer();
         Assert.Equal(IssueOutcome.QuestTimeOut, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
@@ -197,8 +245,12 @@ public class HeadmanNeedsGrainTests : IDisposable
             {
                 Assert.Null(Get<Hero>(instance, scenario.NotableId).Issue);
                 Assert.True(Get<Town>(instance, townId).Prosperity == 990f, $"{instance.GetType().Name} prosperity {Get<Town>(instance, townId).Prosperity}");
+                Assert.Equal(95f, Get<Hero>(instance, scenario.NotableId).Power);
+                Assert.Equal(-5, Get<Hero>(instance, scenario.PlayerA.HeroId).GetRelation(Get<Hero>(instance, scenario.NotableId)));
+                Assert.Equal(-3, Get<Hero>(instance, scenario.PlayerA.HeroId).GetRelation(Get<Hero>(instance, otherNotableId)));
             });
         }
+        ClientA.Call(() => Assert.Single(ownerQuest.JournalEntries.Where(log => log.LogText.Value == ownerQuest.QuestTimeoutLogText.Value)));
     }
 
     [Theory]
@@ -207,6 +259,7 @@ public class HeadmanNeedsGrainTests : IDisposable
     public void Delivery_PreservesTraitXpEarnedOrLostAfterAcceptance(int delta)
     {
         Accept();
+
         ClientA.Call(() => TraitLevelingHelper.AddPlayerTraitXPAndLogEntry(
             DefaultTraits.Generosity, delta, ActionNotes.DefaultNote, Hero.MainHero), Texts);
         StageDelivery(true, true);
@@ -309,6 +362,7 @@ public class HeadmanNeedsGrainTests : IDisposable
         Server.Call(() => CampaignEventDispatcher.Instance.OnVillageBeingRaided(Get<Village>(Server, villageId)), Texts);
         Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+
     }
 
     [Theory]
@@ -318,6 +372,7 @@ public class HeadmanNeedsGrainTests : IDisposable
         DeclareWarAction.DeclareWarDetail detail, IssueOutcome outcome)
     {
         Accept();
+        var ownerQuest = (Quest)scenario.QuestOf(ClientA);
         Server.Call(() =>
         {
             var hero = Get<Hero>(Server, scenario.PlayerA.HeroId);
@@ -326,6 +381,17 @@ public class HeadmanNeedsGrainTests : IDisposable
         }, Texts);
         Assert.Equal(outcome, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        if (detail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange)
+        {
+            ClientA.Call(() =>
+            {
+                Assert.Single(ownerQuest.JournalEntries.Where(log => log.LogText.Value.Contains("accused of a crime")));
+                Assert.Equal(-50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+            });
+            foreach (var instance in Instances)
+                instance.Call(() => Assert.Equal(90f, Get<Hero>(instance, scenario.NotableId).Power));
+        }
+
     }
 
     [Theory]
@@ -413,6 +479,8 @@ public class HeadmanNeedsGrainTests : IDisposable
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
         var funding = 0;
+        var villageGold = 0;
+        Server.Call(() => villageGold = Get<Village>(Server, villageId).Gold);
         foreach (var instance in Instances)
         {
             instance.Call(() =>
@@ -460,6 +528,19 @@ public class HeadmanNeedsGrainTests : IDisposable
         }
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
         Server.Call(() => Assert.Equal(10000 - funding, Get<Hero>(Server, scenario.PlayerA.HeroId).Gold));
+        foreach (var instance in Instances)
+            instance.Call(() => Assert.Equal(villageGold + funding, Get<Village>(instance, villageId).Gold));
+
+        var ownerIssue = (Issue)GetIssue(ClientA);
+        var progress = 0;
+        Server.Call(() =>
+        {
+            Campaign.Current.IssueManager.DailyTick();
+            progress = IssueHere(Server).JournalEntries[0].CurrentProgress;
+            Assert.True(progress > 0);
+        }, Texts);
+        ClientA.Call(() => Assert.Equal(progress, ownerIssue.JournalEntries[0].CurrentProgress));
+        ClientB.Call(() => Assert.Empty(IssueHere(ClientB).JournalEntries));
 
         Server.Call(() =>
         {
@@ -491,8 +572,28 @@ public class HeadmanNeedsGrainTests : IDisposable
                     $"{instance.GetType().Name} companion {Get<Hero>(instance, companionId).HeroState}");
                 Assert.Equal(10000, Get<Hero>(instance, scenario.PlayerB.HeroId).Gold);
                 Assert.Equal(failure ? 990f : 1050f, Get<Town>(instance, townId).Prosperity);
+                Assert.Equal(10000 - funding, Get<Hero>(instance, scenario.PlayerA.HeroId).Gold);
+                Assert.Equal(failure ? 95f : 110f, Get<Hero>(instance, scenario.NotableId).Power);
+                Assert.Equal(failure ? 0f : 1f, Get<Clan>(instance, playerClanId).Renown);
+                Assert.Equal(failure ? -3 : 5, Get<Hero>(instance, scenario.PlayerA.HeroId).GetRelation(Get<Hero>(instance, scenario.NotableId)));
+                Assert.Equal(failure ? -3 : 1, Get<Hero>(instance, scenario.PlayerA.HeroId).GetRelation(Get<Hero>(instance, otherNotableId)));
             });
         }
+        ClientA.Call(() =>
+        {
+            Assert.Equal(failure ? 0 : 30, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
+            if (failure)
+                Assert.Single(ownerIssue.JournalEntries.Where(log => log.LogText.Value.Contains("has failed to resolve the matter")));
+            else
+                Assert.Single(ownerIssue.JournalEntries.Where(log => log.LogText.Value == ownerIssue.IssueAlternativeSolutionSuccessLog.Value));
+        });
+    }
+
+    private IssueBase GetIssue(EnvironmentInstance instance)
+    {
+        IssueBase issue = null!;
+        instance.Call(() => issue = IssueHere(instance));
+        return issue;
     }
 
     private void Accept(bool start = true)
@@ -531,7 +632,15 @@ public class HeadmanNeedsGrainTests : IDisposable
         notable.Occupation = Occupation.Headman;
         var clan = Get<Clan>(instance, giverClanId);
         clan._kingdom = Get<Kingdom>(instance, kingdomId);
-        notable.Clan = clan;
+        notable.Clan = null;
+        notable.AddPower(100f - notable.Power);
+        var other = Get<Hero>(instance, otherNotableId);
+        other.Occupation = Occupation.Headman;
+        other.StayingInSettlement = settlement;
+        other.Clan = null;
+        settlement._notablesCache ??= new MBList<Hero>();
+        if (!settlement._notablesCache.Contains(notable)) settlement._notablesCache.Add(notable);
+        if (!settlement._notablesCache.Contains(other)) settlement._notablesCache.Add(other);
         town.OwnerClan = clan;
         Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[]
         {

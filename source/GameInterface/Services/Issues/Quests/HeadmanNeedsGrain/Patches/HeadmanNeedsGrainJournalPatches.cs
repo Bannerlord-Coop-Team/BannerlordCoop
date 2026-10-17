@@ -2,6 +2,7 @@
 using Common.Network;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
@@ -13,6 +14,20 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 [HarmonyPatch]
 internal class HeadmanNeedsGrainJournalPatches
 {
+    [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]
+    [HarmonyPostfix]
+    private static void DailyTickPostfix()
+    {
+        if (ModInformation.IsClient || !ContainerProvider.TryResolve<IObjectManager>(out var objects) ||
+            !ContainerProvider.TryResolve<INetwork>(out var network)) return;
+        foreach (var issue in Campaign.Current.IssueManager.Issues.Values.OfType<Issue>())
+        {
+            if (issue.IsSolvingWithAlternative && issue.JournalEntries.Count > 0 &&
+                objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId))
+                network.SendAll(new NetworkHeadmanNeedsGrainProgress(giverId, issue.StringId, issue.JournalEntries[0].CurrentProgress));
+        }
+    }
+
     [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddLog))]
     [HarmonyPostfix]
     private static void QuestLogPostfix(QuestBase __instance, TextObject text)
