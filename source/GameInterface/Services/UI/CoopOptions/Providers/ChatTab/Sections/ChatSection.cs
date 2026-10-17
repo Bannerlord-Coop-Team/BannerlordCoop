@@ -19,8 +19,8 @@ public class ChatSection : CoopOptionsSectionVM
 
     public override string Id => SectionId;
     public string TitleText => "Chat";
-    public string DescriptionText => "Configure the in-game co-op chat overlay.";
-    public string ShowChatText => "Show Chat";
+    public string DescriptionText => "Configure co-op player chat. Game event lines still show in the bottom-left log.";
+    public string ShowChatText => "Show Player Chat";
 
     [DataSourceProperty]
     public bool ShowChat

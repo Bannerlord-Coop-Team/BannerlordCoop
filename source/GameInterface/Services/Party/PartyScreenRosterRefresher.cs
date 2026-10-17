@@ -1,6 +1,5 @@
 ﻿using Common.Logging;
 using SandBox.GauntletUI;
-using GameInterface.Services.Issues.Generic;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -9,7 +8,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.ScreenSystem;
@@ -26,10 +24,6 @@ internal interface IPartyScreenRosterRefresher
     bool TryRemoveZeroCounts(TroopRoster authoritativeRoster);
 
     bool TryApply(ItemRoster authoritativeRoster, Action<ItemRoster> applyAuthoritative);
-
-    void RefreshXp(PartyScreenLogic logic, CharacterObject character);
-
-    void RefreshDoneState(PartyScreenLogic logic);
 }
 
 internal readonly struct PartyScreenSelectionIdentity
@@ -64,31 +58,10 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
 
     private static readonly ILogger Logger = LogManager.GetLogger<PartyScreenRosterRefresher>();
     private readonly IPartyScreenRosterBaselineProvider baselineProvider;
-    private readonly IAlternativeSolutionTroopSelection troopSelection;
 
-    public PartyScreenRosterRefresher(IPartyScreenRosterBaselineProvider baselineProvider,
-        IAlternativeSolutionTroopSelection troopSelection)
+    public PartyScreenRosterRefresher(IPartyScreenRosterBaselineProvider baselineProvider)
     {
         this.baselineProvider = baselineProvider;
-        this.troopSelection = troopSelection;
-    }
-
-    public void RefreshXp(PartyScreenLogic logic, CharacterObject character)
-    {
-        if (logic.CurrentData.RightMemberRoster.GetTroopCount(character) > 0)
-            RefreshTroop(logic, logic._initialData.RightMemberRoster, character, false, false);
-        if (logic.CurrentData.LeftMemberRoster.GetTroopCount(character) > 0)
-            RefreshTroop(logic, logic._initialData.LeftMemberRoster, character, false, false);
-    }
-
-    public void RefreshDoneState(PartyScreenLogic logic) => RefreshDoneState(logic, GetPartyVm(logic));
-
-    internal void RefreshDoneState(PartyScreenLogic logic, PartyVM partyVm)
-    {
-        if (partyVm == null || !ReferenceEquals(partyVm.PartyScreenLogic, logic)) return;
-        partyVm.IsDoneDisabled = !logic.IsDoneActive();
-        partyVm.DoneHint.HintText = new TextObject("{=!}" + logic.DoneReasonString);
-        partyVm.IsCancelDisabled = !logic.IsCancelActive();
     }
 
     public bool TryApply(
@@ -119,20 +92,10 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         var baseline = baselineProvider.GetBaselineRoster(logic, authoritativeRoster);
         if (baseline == null) return false;
 
-        var reserved = troopSelection.GetReservedTroops(logic, authoritativeRoster);
-        bool isIssueSelection = ReferenceEquals(baseline, logic._initialData.RightMemberRoster) &&
-            troopSelection.FindIssue(logic) != null;
-        if (reserved != null && troopSelection.IsCommitPending(logic))
-        {
-            applyAuthoritative(authoritativeRoster, character);
-            return true;
-        }
-
         var visible = GetVisibleRoster(logic, baseline);
         var saved = GetSavedRoster(logic, baseline);
         var previousBaseline = RosterElementState.Read(baseline, character);
         var previousVisible = RosterElementState.Read(visible, character);
-        int previousSelectedXp = isIssueSelection ? logic.CurrentData.LeftMemberRoster.GetElementXp(character) : 0;
         var previousSaved = saved == null
             ? default
             : RosterElementState.Read(saved, character);
@@ -144,46 +107,18 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
 
         applyAuthoritative(authoritativeRoster, character);
         var authoritative = RosterElementState.Read(authoritativeRoster, character);
-        if (reserved != null && !RosterElementState.TryRebase(authoritative,
-            RosterElementState.Read(reserved, character), default, out authoritative, allowUnassignedXp: true))
-        {
-            troopSelection.Rollback(troopSelection.FindIssue(logic)?.IssueOwner);
-            notifyPendingChangesReset();
-            return true;
-        }
 
         RosterElementState rebasedSaved = default;
         bool canRebase =
-            RosterElementState.TryRebase(authoritative, previousBaseline, previousVisible, out var rebasedVisible,
-                allowUnassignedXp: isIssueSelection) &&
+            RosterElementState.TryRebase(authoritative, previousBaseline, previousVisible, out var rebasedVisible) &&
             (saved == null ||
                 RosterElementState.TryRebase(
                     authoritative,
                     previousBaseline,
                     previousSaved,
-                    out rebasedSaved,
-                    allowUnassignedXp: isIssueSelection));
+                    out rebasedSaved));
 
-        if (isIssueSelection && !TryBalanceSelectionXp(logic, baseline, logic._initialData.LeftMemberRoster,
-            character, ref authoritative))
-        {
-            authoritative.Write(baseline, character);
-            troopSelection.Rollback(troopSelection.FindIssue(logic)?.IssueOwner);
-            if (ReferenceEquals(authoritativeRoster, visible))
-                authoritative.Write(authoritativeRoster, character, preserveXp: true);
-            notifyPendingChangesReset();
-            return true;
-        }
         authoritative.Write(baseline, character);
-
-        if (canRebase)
-        {
-            if (isIssueSelection)
-            {
-                canRebase = TryBalanceSelectionXp(logic, visible, logic.CurrentData.LeftMemberRoster, character, ref rebasedVisible) &&
-                    (saved == null || TryBalanceSelectionXp(logic, saved, logic._savedData.LeftMemberRoster, character, ref rebasedSaved));
-            }
-        }
         if (!canRebase)
         {
             logic.CurrentData.ResetUsing(logic._initialData);
@@ -197,42 +132,12 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         rebasedVisible.Write(visible, character);
         if (saved != null) rebasedSaved.Write(saved, character);
         RefreshRecruitablePrisoners(logic);
-        if (!isIssueSelection || rebasedVisible.Number > 0 ||
-            previousVisible.Number != rebasedVisible.Number || previousVisible.Wounded != rebasedVisible.Wounded)
-            RefreshTroop(
-                logic,
-                baseline,
-                character,
-                previousVisible.Number != rebasedVisible.Number,
-                previousVisible.Wounded != rebasedVisible.Wounded);
-        if (isIssueSelection && logic.CurrentData.LeftMemberRoster.GetTroopCount(character) > 0 &&
-            logic.CurrentData.LeftMemberRoster.GetElementXp(character) != previousSelectedXp)
-            RefreshTroop(logic, logic._initialData.LeftMemberRoster, character, false, false);
-        return true;
-    }
-
-    private static bool TryBalanceSelectionXp(PartyScreenLogic logic, TroopRoster remaining,
-        TroopRoster selected, CharacterObject character, ref RosterElementState remainingState)
-    {
-        if (!remainingState.Exists || remainingState.Xp == 0) return true;
-        var element = new TroopRosterElement(character) { Number = remainingState.Number, Xp = remainingState.Xp };
-        logic.RightOwnerParty.OnXpChanged(remaining, ref element);
-        int overflow = remainingState.Xp - element.Xp;
-        if (overflow == 0) return true;
-
-        int selectedIndex = selected.FindIndexOfTroop(character);
-        if (selectedIndex < 0) return false;
-        var selectedElement = selected.GetElementCopyAtIndex(selectedIndex);
-        long selectedXp = (long)selectedElement.Xp + overflow;
-        if (selectedXp > int.MaxValue) return false;
-        selectedElement.Xp = (int)selectedXp;
-        logic.RightOwnerParty.OnXpChanged(selected, ref selectedElement);
-        if (selectedElement.Xp != selectedXp) return false;
-
-        // Keep each screen snapshot within native stack caps without discarding earned XP.
-        remainingState = remainingState.WithXp(element.Xp);
-        selected.SetElementXp(selectedIndex, selectedElement.Xp);
-        selected.UpdateVersion();
+        RefreshTroop(
+            logic,
+            baseline,
+            character,
+            previousVisible.Number != rebasedVisible.Number,
+            previousVisible.Wounded != rebasedVisible.Wounded);
         return true;
     }
 
@@ -390,7 +295,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         replacement.UpdateRecruitable();
     }
 
-    private void RefreshTroop(
+    private static void RefreshTroop(
         PartyScreenLogic logic,
         TroopRoster baseline,
         CharacterObject character,
@@ -425,7 +330,9 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
         if (numberChanged)
         {
             partyVm.RefreshPartyInformation();
-            RefreshDoneState(logic, partyVm);
+            partyVm.IsDoneDisabled = !logic.IsDoneActive();
+            partyVm.DoneHint.HintText = new TextObject("{=!}" + logic.DoneReasonString);
+            partyVm.IsCancelDisabled = !logic.IsCancelActive();
             RefreshSort(logic, partyVm, identity);
 
             if (identity.Side == PartyScreenLogic.PartyRosterSide.Right)
@@ -556,8 +463,6 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             Xp = xp;
         }
 
-        public RosterElementState WithXp(int xp) => new RosterElementState(Exists, Number, Wounded, xp);
-
         public static RosterElementState Read(TroopRoster roster, CharacterObject character)
         {
             int index = roster.FindIndexOfTroop(character);
@@ -575,8 +480,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             RosterElementState authoritative,
             RosterElementState previousBaseline,
             RosterElementState previousVisible,
-            out RosterElementState rebased,
-            bool allowUnassignedXp = false)
+            out RosterElementState rebased)
         {
             long number = authoritative.Number +
                 ((long)previousVisible.Number - previousBaseline.Number);
@@ -590,7 +494,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
                 wounded > number ||
                 xp < 0 ||
                 xp > int.MaxValue ||
-                (!allowUnassignedXp && number == 0 && xp != 0))
+                (number == 0 && xp != 0))
             {
                 rebased = default;
                 return false;
@@ -609,7 +513,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             return true;
         }
 
-        public void Write(TroopRoster roster, CharacterObject character, bool preserveXp = false)
+        public void Write(TroopRoster roster, CharacterObject character)
         {
             int index = roster.FindIndexOfTroop(character);
             if (!Exists)
@@ -625,9 +529,7 @@ internal class PartyScreenRosterRefresher : IPartyScreenRosterRefresher
             if (index < 0) index = roster.AddNewElement(character, -1);
             roster.SetElementNumber(index, Number);
             roster.SetElementWoundedNumber(index, Wounded);
-            // A count-only authoritative change can retain XP above the reduced stack's cap.
-            if (preserveXp) roster.data[index].Xp = Xp;
-            else roster.SetElementXp(index, Xp);
+            roster.SetElementXp(index, Xp);
             roster.InitializeCachedData();
         }
     }

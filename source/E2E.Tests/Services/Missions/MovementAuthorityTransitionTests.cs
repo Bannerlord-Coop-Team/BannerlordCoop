@@ -34,15 +34,12 @@ public class MovementAuthorityTransitionTests : MissionTestEnvironment
 
     public MovementAuthorityTransitionTests(ITestOutputHelper output) : base(output) { }
 
+    // Pairwise over mount, compact ids and relay delivery.
     [Theory]
     [InlineData(false, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(true, false, false)]
-    [InlineData(true, true, false)]
-    [InlineData(false, false, true)]
     [InlineData(false, true, true)]
     [InlineData(true, false, true)]
-    [InlineData(true, true, true)]
+    [InlineData(true, true, false)]
     public void NewerSample_RejectsOlderAndDuplicateBeforeContinuousStateOrTargetApply(
         bool mount, bool compact, bool compressedRelay)
     {

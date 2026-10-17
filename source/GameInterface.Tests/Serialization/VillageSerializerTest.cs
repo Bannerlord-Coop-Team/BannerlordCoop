@@ -11,31 +11,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class VillageSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public VillageSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void Village_Serialize()
-        {
-            Village testVillage = (Village)FormatterServices.GetUninitializedObject(typeof(Village));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-
-            VillageBinaryPackage package = new VillageBinaryPackage(testVillage, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

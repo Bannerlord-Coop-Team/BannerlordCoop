@@ -187,7 +187,8 @@ namespace Coop.Tests.Client.States
                 clientComponent.Container.Resolve<IControllerIdProvider>(),
                 coopFinalizer.Object,
                 gameStateInterface.Object,
-                clientComponent.Container.Resolve<IModuleInfoProvider>());
+                clientComponent.Container.Resolve<IModuleInfoProvider>(),
+                clientComponent.Container.Resolve<IModuleNameProvider>());
             ((ClientLogic)clientLogic).State = validateState;
 
             using var gameThreadBlocked = new ManualResetEventSlim(false);

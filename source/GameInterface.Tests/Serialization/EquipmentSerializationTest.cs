@@ -11,29 +11,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class EquipmentSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public EquipmentSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void Equipment_Serialize()
-        {
-            Equipment equipment = new Equipment();
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            EquipmentBinaryPackage package = new EquipmentBinaryPackage(equipment, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

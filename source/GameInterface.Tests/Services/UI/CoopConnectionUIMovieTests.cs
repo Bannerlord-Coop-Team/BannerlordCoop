@@ -89,8 +89,7 @@ public class CoopConnectionUIMovieTests
             passwordButton.Attribute("Command.Click")?.Value);
         Assert.Equal("@PasswordFilterButtonText",
             passwordButton.Attribute("Parameter.Text")?.Value);
-        Assert.Equal("@IsSearchSteamLobbiesDisabled",
-            passwordButton.Attribute("IsDisabled")?.Value);
+        Assert.Null(passwordButton.Attribute("IsDisabled"));
 
         var minimumPlayersInput = FindById(document, "MinimumPlayersFilterInput");
         Assert.Equal("@MinimumSteamLobbyPlayers",
