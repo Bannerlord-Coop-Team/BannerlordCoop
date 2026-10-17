@@ -25,9 +25,16 @@ internal class CapturedByBountyHuntersOutcomePatches
 
         dispatcher.RunAsOwners<Quest>(quest =>
         {
-            // An owner without a party, a prisoner for one, would be checked against the party of whoever ended the battle
+            // An owner without a party, a prisoner for one, would be checked against the party of whoever ended the battle.
+            // They took no part in it, so only vanilla's branch for a hideout someone else cleared applies.
             if (Hero.MainHero?.PartyBelongedTo == null)
             {
+                if (quest._questHideout.Parties.Count == 0)
+                {
+                    quest.AddLog(quest.HideoutClearedBySomeoneElseLogText);
+                    quest.CompleteQuestWithFail();
+                }
+
                 return;
             }
 

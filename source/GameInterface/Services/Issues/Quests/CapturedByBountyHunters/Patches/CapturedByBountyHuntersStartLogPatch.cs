@@ -43,6 +43,6 @@ internal class CapturedByBountyHuntersStartLogPatch
 
     private static Settlement SettlementOf(Quest quest)
     {
-        return Settlement.CurrentSettlement ?? quest.QuestGiver.CurrentSettlement;
+        return Settlement.CurrentSettlement ?? quest.QuestGiver.CurrentSettlement ?? quest.QuestGiver.HomeSettlement;
     }
 }
