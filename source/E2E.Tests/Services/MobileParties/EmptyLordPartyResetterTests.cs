@@ -1,4 +1,8 @@
-﻿using E2E.Tests.Environment;
+﻿using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
+using GameInterface.Services.MobileParties.Extensions;
+using Common.Util;
+using E2E.Tests.Environment;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -77,6 +81,46 @@ public class EmptyLordPartyResetterTests : IDisposable
         });
     }
     [Fact]
+    public void Reset_AllTroopsWounded_LeavesItAlone()
+    {
+        // wounded troops heal, so the party is not stuck (#3916 review)
+        var (heroId, partyId) = CreateLordParty(healthyTroops: 0);
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+
+        environment.Server.Call(() =>
+        {
+            var party = environment.Server.GetRegisteredObject<MobileParty>(partyId);
+            var troop = environment.Server.GetRegisteredObject<CharacterObject>(troopId);
+            party.MemberRoster.AddToCounts(troop, 6, woundedCount: 6);
+            Assert.Equal(0, party.MemberRoster.TotalHealthyCount);
+
+            Assert.Equal(0, environment.Server.Resolve<IEmptyLordPartyResetter>().ResetEmptyLordParties());
+
+            Assert.Equal(Hero.CharacterStates.Active, environment.Server.GetRegisteredObject<Hero>(heroId).HeroState);
+            Assert.True(party.IsActive);
+        });
+    }
+
+    [Fact]
+    public void IsStrandedLordParty_InSettlementOrBesieging_IsFalse()
+    {
+        var (_, partyId) = CreateLordParty(healthyTroops: 0);
+        var settlementId = environment.CreateRegisteredObject<Settlement>();
+
+        environment.Server.Call(() =>
+        {
+            var party = environment.Server.GetRegisteredObject<MobileParty>(partyId);
+            Assert.True(EmptyLordPartyResetter.IsStrandedLordParty(party));
+
+            party.SetCurrentSettlementDirectly(environment.Server.GetRegisteredObject<Settlement>(settlementId));
+            Assert.False(EmptyLordPartyResetter.IsStrandedLordParty(party));
+
+            party.SetCurrentSettlementDirectly(null);
+            party._besiegerCamp = ObjectHelper.SkipConstructor<BesiegerCamp>();
+            Assert.False(EmptyLordPartyResetter.IsStrandedLordParty(party));
+        });
+    }
+    [Fact]
     public void IsStrandedLordParty_PrisonerOrDeadLord_IsFalse()
     {
         var (heroId, partyId) = CreateLordParty(healthyTroops: 0);
@@ -109,12 +153,23 @@ public class EmptyLordPartyResetterTests : IDisposable
             Assert.True(environment.Server.ObjectManager.TryGetId(hero, out heroId));
             hero._heroState = Hero.CharacterStates.Active;
             hero.PartyBelongedTo = party;
+            // test parties spawn inside a settlement; a stranded party is out on the map
+            party.SetCurrentSettlementDirectly(null);
+            Assert.Null(party.SiegeEvent);
+            Assert.Null(party.BesiegerCamp);
 
-            // everyone left is wounded, the lord included
+            // test parties come with soldiers; a stranded party has none left, only its wounded lord
             hero.HitPoints = 1;
             var roster = party.MemberRoster;
-            for (int i = 0; i < roster.Count; i++)
-                roster.SetElementWoundedNumber(i, roster.GetElementNumber(i));
+            for (int i = roster.Count - 1; i >= 0; i--)
+            {
+                var element = roster.GetElementCopyAtIndex(i);
+                if (element.Character.IsHero)
+                    roster.SetElementWoundedNumber(i, element.Number);
+                else
+                    roster.AddToCountsAtIndex(i, -element.Number, -element.WoundedNumber);
+            }
+            roster.RemoveZeroCounts();
             roster.InitializeCachedData();
             if (healthyTroops > 0)
                 roster.AddToCounts(troop, healthyTroops);

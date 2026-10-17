@@ -17,7 +17,7 @@ public interface IEmptyLordPartyResetter
 }
 
 /// <summary>
-/// A save can hold AI lord parties with no healthy men outside any battle, for example after a
+/// A save can hold AI lord parties with no troops left outside any battle, for example after a
 /// broken battle was force-ended. An empty party has nothing to do, so the lord stands on the map
 /// for good. On load the lord gets the game's own "escaped after defeat" handling instead: the
 /// empty party is destroyed, the lord becomes a fugitive and later returns in a settlement to
@@ -58,7 +58,7 @@ internal sealed class EmptyLordPartyResetter : IEmptyLordPartyResetter
                 Reset(party, lord);
                 resetCount++;
                 logger.Warning(
-                    "Reset AI lord {HeroId} whose party {PartyId} had no healthy men after load",
+                    "Reset AI lord {HeroId} whose party {PartyId} had no troops left after load",
                     lord.StringId,
                     party.StringId);
             }
@@ -80,7 +80,14 @@ internal sealed class EmptyLordPartyResetter : IEmptyLordPartyResetter
         if (lord == null || !lord.IsAlive || lord.IsPrisoner)
             return false;
 
-        return party.MapEvent == null && party.MemberRoster.TotalHealthyCount == 0;
+        // Only a party with no troops left at all is stuck for good. Wounded troops heal (a lord resting
+        // in a town recovers), and a party in a settlement or a siege is still doing something.
+        return party.MapEvent == null &&
+            party.CurrentSettlement == null &&
+            party.SiegeEvent == null &&
+            party.BesiegerCamp == null &&
+            party.MemberRoster.TotalRegulars == 0 &&
+            party.MemberRoster.TotalHealthyCount == 0;
     }
 
     private bool IsPlayerOwned(MobileParty party, ISet<string> playerObjectIds)
@@ -110,7 +117,8 @@ internal sealed class EmptyLordPartyResetter : IEmptyLordPartyResetter
         if (army != null)
         {
             if (army.LeaderParty == party)
-                DisbandArmyAction.ApplyByArmyLeaderIsDead(army);
+                // the lord lives on as a fugitive, so not the dead-leader reason
+                DisbandArmyAction.ApplyByLeaderPartyRemoved(army);
             else
                 party.Army = null;
         }
