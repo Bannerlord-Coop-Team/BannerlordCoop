@@ -41,10 +41,10 @@ internal sealed class ArtisanProductsTroopReturns : IArtisanProductsTroopReturns
         foreach (var entry in pending.ToArray())
         {
             if (!players.TryGetPlayer(entry.Key, out var player) || !players.IsConnected(player) ||
-                !objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) || hero.PartyBelongedTo == null ||
-                !Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) continue;
+                !objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) || hero.PartyBelongedTo == null) continue;
             using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
             {
+                if (!Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) continue;
                 foreach (var element in entry.Value.GetTroopRoster())
                     if (element.Character.IsHero) element.Character.HeroObject.ChangeState(Hero.CharacterStates.Active);
                 hero.PartyBelongedTo.MemberRoster.Add(entry.Value);
