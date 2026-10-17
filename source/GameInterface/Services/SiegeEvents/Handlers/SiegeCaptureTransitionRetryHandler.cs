@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -21,6 +22,7 @@ internal class SiegeCaptureTransitionRetryHandler : IHandler
     // tick), so plain statics are safe. Static so Arm is reachable from SiegeEventInterface without a back-reference.
     private static MobileParty pendingLeaderParty;
     private static Settlement pendingSettlement;
+    private static Clan pendingPreviousOwnerClan;
 
     private readonly IMessageBroker messageBroker;
     private readonly ISiegeEventInterface siegeEventInterface;
@@ -34,10 +36,11 @@ internal class SiegeCaptureTransitionRetryHandler : IHandler
     }
 
     /// <summary>Parks a settlement-taken transition until the battle presentation has finished tearing down.</summary>
-    internal static void Arm(MobileParty leaderParty, Settlement settlement)
+    internal static void Arm(MobileParty leaderParty, Settlement settlement, Clan previousOwnerClan)
     {
         pendingLeaderParty = leaderParty;
         pendingSettlement = settlement;
+        pendingPreviousOwnerClan = previousOwnerClan;
     }
 
     internal static bool IsBattlePresentationActive()
@@ -49,25 +52,28 @@ internal class SiegeCaptureTransitionRetryHandler : IHandler
             .Any(state => state.IsSimulationActive) == true;
     }
 
-    internal static bool TryTakeReady(out MobileParty leaderParty, out Settlement settlement)
+    internal static bool TryTakeReady(out MobileParty leaderParty, out Settlement settlement, out Clan previousOwnerClan)
     {
         leaderParty = null;
         settlement = null;
+        previousOwnerClan = null;
         if (pendingSettlement == null || IsBattlePresentationActive()) return false;
 
         leaderParty = pendingLeaderParty;
         settlement = pendingSettlement;
+        previousOwnerClan = pendingPreviousOwnerClan;
         pendingLeaderParty = null;
         pendingSettlement = null;
+        pendingPreviousOwnerClan = null;
         return true;
     }
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
         if (ModInformation.IsServer) return;
-        if (!TryTakeReady(out var leaderParty, out var settlement)) return;
+        if (!TryTakeReady(out var leaderParty, out var settlement, out var previousOwnerClan)) return;
 
-        siegeEventInterface.PromptLocalAftermathChoice(leaderParty, settlement);
+        siegeEventInterface.PromptLocalAftermathChoice(leaderParty, settlement, previousOwnerClan);
     }
 
     public void Dispose()
@@ -75,5 +81,6 @@ internal class SiegeCaptureTransitionRetryHandler : IHandler
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
         pendingLeaderParty = null;
         pendingSettlement = null;
+        pendingPreviousOwnerClan = null;
     }
 }

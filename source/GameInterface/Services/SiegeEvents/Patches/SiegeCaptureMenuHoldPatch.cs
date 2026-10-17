@@ -1,6 +1,8 @@
 ﻿using HarmonyLib;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -26,6 +28,19 @@ internal static class SiegeCaptureMenuHoldPatch
     internal static void Release(Settlement settlement)
     {
         if (settlement != null) pendingChoice.Remove(settlement);
+    }
+
+    /// <summary>
+    /// The held capture an encounter menu belongs to: a live encounter's own settlement, or the only held
+    /// capture when the stale siege encounter was already finished.
+    /// </summary>
+    internal static bool TryGetHeldSettlement(PlayerEncounter encounter, out Settlement settlement)
+    {
+        settlement = encounter != null
+            ? encounter.EncounterSettlementAux
+            : pendingChoice.Count == 1 ? pendingChoice.First() : null;
+
+        return settlement != null && pendingChoice.Contains(settlement);
     }
 
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_town_outside_on_init))]

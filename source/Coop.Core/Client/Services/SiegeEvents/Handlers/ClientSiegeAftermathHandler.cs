@@ -6,6 +6,7 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -40,8 +41,10 @@ internal class ClientSiegeAftermathHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.LeaderPartyId, out var leaderParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
+            // The clan only feeds the consequence text, so a miss keeps the client's own snapshot instead of dropping the menu.
+            objectManager.TryGetObject<Clan>(obj.PreviousOwnerClanId, out var previousOwnerClan);
 
-            siegeEventInterface.PromptLocalAftermathChoice(leaderParty, settlement);
+            siegeEventInterface.PromptLocalAftermathChoice(leaderParty, settlement, previousOwnerClan);
         });
     }
 

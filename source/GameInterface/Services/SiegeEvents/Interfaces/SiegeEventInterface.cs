@@ -24,11 +24,13 @@ public readonly struct PendingSiegeAftermathPrompt
 {
     public MobileParty LeaderParty { get; }
     public Settlement Settlement { get; }
+    public Clan PreviousOwnerClan { get; }
 
-    public PendingSiegeAftermathPrompt(MobileParty leaderParty, Settlement settlement)
+    public PendingSiegeAftermathPrompt(MobileParty leaderParty, Settlement settlement, Clan previousOwnerClan)
     {
         LeaderParty = leaderParty;
         Settlement = settlement;
+        PreviousOwnerClan = previousOwnerClan;
     }
 }
 
@@ -183,13 +185,13 @@ public interface ISiegeEventInterface : IGameAbstraction
 
     /// <summary>
     /// Opens the settlement-taken choice menu when this client leads the parked aftermath and its
-    /// own encounter flow hasn't opened it already.
+    /// own encounter flow hasn't opened it already. previousOwnerClan is the defeated owner the server snapshotted.
     /// </summary>
-    void PromptLocalAftermathChoice(MobileParty leaderParty, Settlement settlement);
+    void PromptLocalAftermathChoice(MobileParty leaderParty, Settlement settlement, Clan previousOwnerClan);
 
     /// <summary>
-    /// Backstop that routes a stale post-capture siege-assault encounter (a host attacker whose gated aftermath
-    /// transition missed) into the settlement-taken menu. Driven off the encounter menu, not the prompt.
+    /// Backstop that routes the capturing leader's stale post-capture siege-assault encounter (when the aftermath
+    /// prompt transition missed) into the settlement-taken menu. Driven off the encounter menu, not the prompt.
     /// </summary>
     void RouteCapturedSettlementToAftermathMenu(Settlement settlement);
 
@@ -211,6 +213,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     private bool reloadRestorePending;
     private bool reloadRestoreSubscribed;
     private Settlement localAftermathChoiceSettlement;
+    private Clan localAftermathPreviousOwnerClan;
     private Settlement localAftermathNarrationSettlement;
 
     public bool IsCampaignMissionActive =>
@@ -417,7 +420,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     {
         return Patches.SiegeAftermathPatches.PendingAftermaths
             .Where(pair => pair.Value.MatchesCurrentCapture(pair.Key))
-            .Select(pair => new PendingSiegeAftermathPrompt(pair.Value.LeaderParty, pair.Key))
+            .Select(pair => new PendingSiegeAftermathPrompt(pair.Value.LeaderParty, pair.Key, pair.Value.PreviousOwnerClan))
             .ToArray();
     }
 
@@ -789,7 +792,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         }
     }
 
-    public void PromptLocalAftermathChoice(MobileParty leaderParty, Settlement settlement)
+    public void PromptLocalAftermathChoice(MobileParty leaderParty, Settlement settlement, Clan previousOwnerClan)
     {
         // Identity-stable check: the network-resolved leaderParty can be a divergent instance after a host's
         // post-mission party resync, so a reference compare would silently drop the real local leader.
@@ -798,6 +801,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         // This client is both the choice owner and a local narration participant. Keep the identities
         // separate: non-leader participants need narration too, but only the leader owns the menu hold.
         localAftermathChoiceSettlement = settlement;
+        localAftermathPreviousOwnerClan = previousOwnerClan;
         localAftermathNarrationSettlement = settlement;
 
         // Hold the aftermath menu open until the player picks (see SiegeCaptureMenuHoldPatch): a co-op
@@ -808,29 +812,33 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         // before replacing the encounter menu, otherwise its completion reopens the generic encounter.
         if (SiegeCaptureTransitionRetryHandler.IsBattlePresentationActive())
         {
-            SiegeCaptureTransitionRetryHandler.Arm(leaderParty, settlement);
+            Logger.Information("Parked the capture aftermath menu for {Settlement} until the battle presentation closes", settlement.StringId);
+            SiegeCaptureTransitionRetryHandler.Arm(leaderParty, settlement, previousOwnerClan);
             return;
         }
 
         var currentMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId;
         if (currentMenu != null && (currentMenu.StartsWith("menu_settlement_taken") || currentMenu == "siege_aftermath_contextual_summary")) return;
 
-        SwitchLocalPartyToSettlementTaken(settlement);
+        SwitchLocalPartyToSettlementTaken(settlement, previousOwnerClan);
     }
 
     // Client-local capture-aftermath transition: finish the stale pre-mission siege encounter and open the
     // settlement-taken menu. Shared by the aftermath-choice prompt and the encounter-menu backstop that catches
-    // a host attacker whose gated retry missed. The local player is the capturing leader (its clan now owns the
-    // settlement), so besiegerParty is MainParty.
-    private void SwitchLocalPartyToSettlementTaken(Settlement settlement)
+    // a missed prompt transition. The local player is the capturing leader, so besiegerParty is MainParty.
+    private void SwitchLocalPartyToSettlementTaken(Settlement settlement, Clan previousOwnerClan)
     {
+        Logger.Information("Opening the capture aftermath menu for {Settlement}", settlement.StringId);
+
         // menu_settlement_taken_on_init routes on _besiegerParty == MainParty to reach the leader submenu that
         // carries Devastate/Pillage/Mercy; set the fields the client's OnMapEventEnded prefix would have set.
         var aftermathBehavior = Campaign.Current?.GetCampaignBehavior<SiegeAftermathCampaignBehavior>();
         if (aftermathBehavior != null)
         {
             aftermathBehavior._besiegerParty = MobileParty.MainParty;
-            aftermathBehavior._prevSettlementOwnerClan = settlement.OwnerClan;
+            // A vassal's capture already belongs to the ruler, so without the server's owner keep the defeated one
+            // OnMapEventEnded snapshotted. OwnerClan is only the last resort, vanilla's consequence text reads its Leader.
+            aftermathBehavior._prevSettlementOwnerClan = previousOwnerClan ?? aftermathBehavior._prevSettlementOwnerClan ?? settlement.OwnerClan;
             aftermathBehavior._wasPlayerArmyMember = false;
         }
 
@@ -868,12 +876,13 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     {
         if (settlement == null) return;
 
-        // Backstop for a HOST attacker: the aftermath-prompt transition parks in the gated retry (the host is
-        // still in its own mission when the prompt arrives) and can miss. This runs off the observable stuck
-        // encounter menu instead, so it lands regardless of why the prompt path failed.
+        // Backstop for a capturing leader whose prompt transition missed, e.g. the map rebuilding the stale encounter
+        // menu after the loot screen. Runs off that observable stuck menu, whatever made the prompt path fail.
+        var previousOwnerClan = localAftermathChoiceSettlement == settlement ? localAftermathPreviousOwnerClan : null;
         localAftermathChoiceSettlement = settlement;
+        localAftermathPreviousOwnerClan = previousOwnerClan;
         SiegeCaptureMenuHoldPatch.HoldFor(settlement);
-        SwitchLocalPartyToSettlementTaken(settlement);
+        SwitchLocalPartyToSettlementTaken(settlement, previousOwnerClan);
     }
 
     public void SetLocalAftermathNarration(Settlement settlement, int aftermathType)
@@ -881,6 +890,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         if (localAftermathChoiceSettlement == settlement)
         {
             localAftermathChoiceSettlement = null;
+            localAftermathPreviousOwnerClan = null;
         }
 
         var matchesLocalNarration = localAftermathNarrationSettlement == settlement;
@@ -947,6 +957,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         ClearReloadedPlayerRestoreRetry();
         SiegeCaptureMenuHoldPatch.Release(localAftermathChoiceSettlement);
         localAftermathChoiceSettlement = null;
+        localAftermathPreviousOwnerClan = null;
         localAftermathNarrationSettlement = null;
     }
 
