@@ -9,9 +9,9 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 /// <summary>The server's constructor creates the party, then binds the owner's quest to it.</summary>
 internal class ExtortionByDesertersQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
 {
-    private readonly ExtortionByDesertersSync sync;
+    private readonly Func<ExtortionByDesertersSync> sync;
 
-    public ExtortionByDesertersQuestSolutionAcceptStrategy(ExtortionByDesertersSync sync)
+    public ExtortionByDesertersQuestSolutionAcceptStrategy(Func<ExtortionByDesertersSync> sync)
     {
         this.sync = sync;
     }
@@ -22,7 +22,7 @@ internal class ExtortionByDesertersQuestSolutionAcceptStrategy : IQuestSolutionA
     {
         if (ModInformation.IsServer && issue.IssueQuest is Quest quest)
         {
-            sync.Send(quest);
+            sync().Send(quest);
         }
     }
 }
