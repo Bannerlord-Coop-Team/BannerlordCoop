@@ -54,14 +54,19 @@ internal class ScoutEnemyGarrisonsCreationCaptureStrategy : ICreationCaptureStra
             return false;
         }
 
-        // The closest enemy fortifications, so the quest can be played without crossing the map
-        var targets = Settlement.All
-            .Where(settlement => settlement.IsFortification && settlement.MapFaction.IsAtWarWith(issueOwner.MapFaction))
-            .OrderBy(settlement => DistanceTo(issueOwner, settlement))
-            .Take(TargetCount)
-            .ToList();
+        // Like vanilla all targets belong to one enemy kingdom, the closest ones so the quest can be played without crossing the map
+        var targets = Kingdom.All
+            .Where(kingdom => kingdom.IsAtWarWith(issueOwner.MapFaction))
+            .Select(kingdom => kingdom.Settlements
+                .Where(settlement => ScoutEnemyGarrisonsIssueBehavior.SuitableSettlementCondition(settlement, issueOwner))
+                .OrderBy(settlement => DistanceTo(issueOwner, settlement))
+                .Take(TargetCount)
+                .ToList())
+            .Where(settlements => settlements.Count == TargetCount)
+            .OrderBy(settlements => DistanceTo(issueOwner, settlements[0]))
+            .FirstOrDefault();
 
-        if (targets.Count < TargetCount)
+        if (targets == null)
         {
             return false;
         }
@@ -85,7 +90,8 @@ internal class ScoutEnemyGarrisonsCreationCaptureStrategy : ICreationCaptureStra
             {
                 for (var i = 0; i < TargetCount; i++)
                 {
-                    if (!objectManager.TryGetObjectWithLogging<Settlement>(reader.ReadString(), out var target))
+                    if (stream.Position >= stream.Length ||
+                        !objectManager.TryGetObjectWithLogging<Settlement>(reader.ReadString(), out var target))
                     {
                         return false;
                     }

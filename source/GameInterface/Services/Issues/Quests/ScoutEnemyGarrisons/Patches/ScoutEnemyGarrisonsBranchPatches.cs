@@ -1,6 +1,11 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+﻿using Common;
+using GameInterface.Policies;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.CompilerServices;
+using TaleWorlds.CampaignSystem;
 using Quest = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsQuest;
 
 namespace GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Patches;
@@ -8,8 +13,8 @@ namespace GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Patches;
 [HarmonyPatch]
 internal class ScoutEnemyGarrisonsBranchPatches
 {
-    // Quests whose finished scouting this client already handed to the server
-    private static readonly ConditionalWeakTable<Quest, object> Reported = new ConditionalWeakTable<Quest, object>();
+    // Quests whose ending this client already handed to the server, they keep running until the server's outcome arrives
+    private static readonly ConditionalWeakTable<Quest, object> HandedOff = new ConditionalWeakTable<Quest, object>();
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.AllScoutingDone))]
     [HarmonyPrefix]
@@ -20,21 +25,70 @@ internal class ScoutEnemyGarrisonsBranchPatches
             return true;
         }
 
-        // The quest keeps ticking until the server's outcome arrives, the hourly tick must not report it again
-        if (Reported.TryGetValue(__instance, out _))
-        {
-            return false;
-        }
-
         if (dispatcher.BeforeQuestBranch(__instance, (byte)ScoutEnemyGarrisonsBranch.AllScoutingDone))
         {
             return true;
         }
 
-        Reported.Add(__instance, new object());
-
-        // The server grants the rewards, the owner's journal still gets vanilla's success entry
-        __instance.AddLog(__instance.QuestSuccess);
+        HandOff(__instance);
         return false;
     }
+
+    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess))]
+    [HarmonyPrefix]
+    private static void ReplayedSuccessPrefix(QuestBase __instance)
+    {
+        // The server ran AllScoutingDone, the owner's journal gets vanilla's success entry when the outcome is replayed
+        if (ModInformation.IsClient && __instance is Quest quest && CallOriginalPolicy.IsOriginalAllowed())
+        {
+            quest.AddLog(quest.QuestSuccess);
+        }
+    }
+
+    internal static bool IsHandedOff(Quest quest) => HandedOff.TryGetValue(quest, out _);
+
+    internal static void HandOff(Quest quest)
+    {
+        if (!IsHandedOff(quest))
+        {
+            HandedOff.Add(quest, new object());
+        }
+    }
+}
+
+[HarmonyPatch]
+internal class ScoutEnemyGarrisonsOutcomeHandOffPatch
+{
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithCancel));
+        yield return AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithFail));
+        yield return AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut));
+    }
+
+    [HarmonyPostfix]
+    private static void Postfix(QuestBase __instance)
+    {
+        // Still running after an ending means the dispatcher handed the ending to the server instead
+        if (ModInformation.IsClient && __instance is Quest quest && quest.IsOngoing)
+        {
+            ScoutEnemyGarrisonsBranchPatches.HandOff(quest);
+        }
+    }
+}
+
+[HarmonyPatch]
+internal class ScoutEnemyGarrisonsHandedOffListenerPatch
+{
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.HourlyTick));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnSettlementOwnerChanged));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnArmyDispersed));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
+    }
+
+    // Otherwise every hour logs and requests the same ending again until the server answers
+    [HarmonyPrefix]
+    internal static bool Prefix(Quest __instance) => !ScoutEnemyGarrisonsBranchPatches.IsHandedOff(__instance);
 }
