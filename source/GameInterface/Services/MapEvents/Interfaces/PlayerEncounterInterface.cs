@@ -13,6 +13,13 @@ namespace GameInterface.Services.MapEvents.Interfaces;
 public interface IPlayerEncounterInterface : IGameAbstraction
 {
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter);
+
+    /// <summary>
+    /// Runs the staged after-battle states (hero capture, loot screens) up to <see cref="PlayerEncounterState.End"/>
+    /// without finishing the encounter. Returns true once the encounter has reached End; false while a state is
+    /// still waiting (a loot screen or conversation is open).
+    /// </summary>
+    public bool AdvanceBattleResults(PlayerEncounter playerEncounter);
     public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter);
 }
 
@@ -24,49 +31,56 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
     {
         GameThread.RunSafe(() =>
         {
-            playerEncounter._stateHandled = false;
-            while (!playerEncounter._stateHandled)
+            if (AdvanceBattleResults(playerEncounter))
+                EndPlayerEncounter(playerEncounter);
+        });
+    }
+
+    public bool AdvanceBattleResults(PlayerEncounter playerEncounter)
+    {
+        playerEncounter._stateHandled = false;
+        while (!playerEncounter._stateHandled)
+        {
+            if (PlayerEncounter.Current._leaveEncounter)
             {
-                if (PlayerEncounter.Current._leaveEncounter)
-                {
+                playerEncounter._stateHandled = true;
+                break;
+            }
+
+            switch (playerEncounter.EncounterState)
+            {
+                case PlayerEncounterState.PlayerVictory:
+                    playerEncounter.DoPlayerVictory();
+                    break;
+                case PlayerEncounterState.PlayerTotalDefeat: // Player defeats handled elsewhere
+                    playerEncounter.EncounterState = PlayerEncounterState.End;
+                    break;
+                case PlayerEncounterState.CaptureHeroes:
+                    playerEncounter.DoCaptureHeroes();
+                    break;
+                case PlayerEncounterState.FreeHeroes:
+                    playerEncounter.DoFreeOrCapturePrisonerHeroes();
+                    break;
+                case PlayerEncounterState.LootParty:
+                    playerEncounter.DoLootMembersAndPrisonersOfParty();
+                    break;
+                case PlayerEncounterState.LootInventory:
+                    playerEncounter.DoLootInventory();
+                    break;
+                case PlayerEncounterState.LootShips:
+                    playerEncounter.DoLootShips();
+                    break;
+                case PlayerEncounterState.End:
+                    return true;
+                default:
+                    // Begin/Wait and any future states are not after-battle work. Yield until the
+                    // next campaign tick instead of spinning forever when no player map event exists.
                     playerEncounter._stateHandled = true;
                     break;
-                }
-
-                switch (playerEncounter.EncounterState)
-                {
-                    case PlayerEncounterState.PlayerVictory:
-                        playerEncounter.DoPlayerVictory();
-                        break;
-                    case PlayerEncounterState.PlayerTotalDefeat: // Player defeats handled elsewhere
-                        playerEncounter.EncounterState = PlayerEncounterState.End;
-                        break;
-                    case PlayerEncounterState.CaptureHeroes:
-                        playerEncounter.DoCaptureHeroes();
-                        break;
-                    case PlayerEncounterState.FreeHeroes:
-                        playerEncounter.DoFreeOrCapturePrisonerHeroes();
-                        break;
-                    case PlayerEncounterState.LootParty:
-                        playerEncounter.DoLootMembersAndPrisonersOfParty();
-                        break;
-                    case PlayerEncounterState.LootInventory:
-                        playerEncounter.DoLootInventory();
-                        break;
-                    case PlayerEncounterState.LootShips:
-                        playerEncounter.DoLootShips();
-                        break;
-                    case PlayerEncounterState.End:
-                        EndPlayerEncounter(playerEncounter);
-                        break;
-                    default:
-                        // Begin/Wait and any future states are not after-battle work. Yield until the
-                        // next campaign tick instead of spinning forever when no player map event exists.
-                        playerEncounter._stateHandled = true;
-                        break;
-                }
             }
-        });
+        }
+
+        return false;
     }
 
     public void ReleaseHeroesWithoutConversation(PlayerEncounter playerEncounter)
