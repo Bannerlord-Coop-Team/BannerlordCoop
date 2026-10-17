@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using GameInterface.Services.MapEvents.Handlers;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
@@ -493,8 +494,12 @@ internal class MapEventPatches
         bool hasPlayerParty = __instance.InvolvedParties.Any(
             x => x != null && x.IsMobile && !x.MobileParty.IsControlledByThisInstance());
 
+        // Only a connected player's mission resolves a player battle. Once every player in it is offline it
+        // resolves like an AI battle, otherwise nothing ever ends it (#3864). Hideouts keep waiting.
+        bool waitsForPlayers = hasPlayerParty && (__instance.IsHideoutBattle || HasConnectedPlayerParty(__instance));
+
         // Siege map events must not enter native campaign resolution, even on an allowed-thread setup path.
-        if (hasPlayerParty && !__instance.IsRaidHostileAction())
+        if (waitsForPlayers && !__instance.IsRaidHostileAction())
             return false;
 
         // Receive path / setup: let the original run when patches are standing down.
@@ -513,7 +518,11 @@ internal class MapEventPatches
                 return !HasOccupiedBattleMission(__instance);
         }
 
-        if (hasPlayerParty)
+        if (waitsForPlayers)
+            return false;
+
+        // an offline player's battle can still be finishing its mission or a server simulation
+        if (hasPlayerParty && IsBattleModeBusy(__instance))
             return false;
 
         // A settlement PartyBase is a complete participant even though it has no MobileParty.
@@ -566,6 +575,22 @@ internal class MapEventPatches
         }
 
         return true;
+    }
+
+    private static bool HasConnectedPlayerParty(MapEvent mapEvent) =>
+        // without the service, keep waiting like before
+        !ContainerProvider.TryResolve<IMapEventPlayerPresence>(out var presence) ||
+        presence.HasConnectedPlayerParty(mapEvent);
+
+    private static bool IsBattleModeBusy(MapEvent mapEvent)
+    {
+        if (HasOccupiedBattleMission(mapEvent))
+            return true;
+
+        return ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
+            objectManager.TryGetId(mapEvent, out var mapEventId) &&
+            ServerBattleModeArbiter.TryGetMode(mapEventId, out var mode) &&
+            mode == BattleStartMode.Simulation;
     }
 
     private static bool HasOccupiedBattleMission(MapEvent mapEvent)
