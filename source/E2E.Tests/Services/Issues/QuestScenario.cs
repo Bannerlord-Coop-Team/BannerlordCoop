@@ -28,7 +28,11 @@ internal sealed class QuestScenario
     public EnvironmentInstance ClientA => testEnvironment.Clients.First();
     public EnvironmentInstance ClientB => testEnvironment.Clients.Last();
 
-    public QuestScenario(E2ETestEnvironment testEnvironment)
+    public QuestScenario(E2ETestEnvironment testEnvironment) : this(testEnvironment, notable => new AllowedIssue(notable, null))
+    {
+    }
+
+    public QuestScenario(E2ETestEnvironment testEnvironment, Func<Hero, IssueBase> createIssue)
     {
         this.testEnvironment = testEnvironment;
 
@@ -39,7 +43,7 @@ internal sealed class QuestScenario
 
         foreach (var instance in new[] { Server, ClientA, ClientB })
         {
-            AddIssue(instance);
+            AddIssue(instance, createIssue);
         }
     }
 
@@ -106,7 +110,7 @@ internal sealed class QuestScenario
         client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
     }
 
-    private void AddIssue(EnvironmentInstance instance)
+    private void AddIssue(EnvironmentInstance instance, Func<Hero, IssueBase> createIssue)
     {
         instance.Call(() =>
         {
@@ -114,7 +118,7 @@ internal sealed class QuestScenario
 
             using (new AllowedThread())
             {
-                var issue = new AllowedIssue(notable, null);
+                var issue = createIssue(notable);
                 issue.StringId = IssueId;
                 issue._issueState = IssueBase.IssueState.Ongoing;
 

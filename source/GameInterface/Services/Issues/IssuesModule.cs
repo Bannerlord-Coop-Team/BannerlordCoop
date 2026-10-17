@@ -5,6 +5,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
 using System;
+using GameInterface.Services.Issues.Quests.RevenueFarming;
 
 namespace GameInterface.Services.Issues;
 
@@ -30,6 +31,9 @@ internal class IssuesModule : Module
             .AsSelf()
             .AsImplementedInterfaces()
             .InstancePerLifetimeScope();
+
+        builder.RegisterType<RevenueFarmingSessionStore>().As<IRevenueFarmingSessionStore>().InstancePerLifetimeScope();
+        builder.RegisterType<RevenueFarmingActions>().As<IRevenueFarmingActions>().InstancePerDependency();
 
         base.Load(builder);
     }
