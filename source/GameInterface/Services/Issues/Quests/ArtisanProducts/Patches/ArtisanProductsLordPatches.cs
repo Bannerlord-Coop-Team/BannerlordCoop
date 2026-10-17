@@ -15,28 +15,6 @@ namespace GameInterface.Services.Issues.Quests.ArtisanProducts.Patches;
 [HarmonyPatch]
 internal class ArtisanProductsLordPatches
 {
-    [HarmonyPatch]
-    [HarmonyPrefix]
-    private static bool CounterOffer(ref IssueBase __result)
-    {
-        if (ModInformation.IsServer || !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) ||
-            !ContainerProvider.TryResolve<IControllerIdProvider>(out var local)) return true;
-        __result = null;
-        var merchant = Hero.OneToOneConversationHero;
-        if (merchant == null) return false;
-        foreach (var issue in Campaign.Current.IssueManager.Issues.Values)
-        {
-            if (issue.CounterOfferHero != merchant || !issue.IsSolvingWithLordSolution) continue;
-            if (issue is Issue && (!owners.TryGetOwnerControllerId(issue, out var owner) || owner != local.ControllerId)) continue;
-            __result = issue;
-            break;
-        }
-        return false;
-    }
-
-    [HarmonyTargetMethod]
-    private static MethodBase CounterOfferTarget() => AccessTools.Method(typeof(IssuesCampaignBehavior), "GetCounterOfferersIssue");
-
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.StartIssueWithLordSolution))]
     [HarmonyPrefix]
     private static bool Start(IssueBase __instance) => Before(__instance, ArtisanProductsLordAction.Start);
@@ -68,6 +46,31 @@ internal class ArtisanProductsLordPatches
     {
         if (!(issue is Issue artisan) || ModInformation.IsServer || AllowedThread.IsThisThreadAllowed()) return true;
         MessageBroker.Instance.Publish(issue, new ArtisanProductsLordRequested(artisan, action));
+        return false;
+    }
+}
+
+[HarmonyPatch]
+internal class ArtisanProductsCounterOfferPatch
+{
+    [HarmonyTargetMethod]
+    private static MethodBase Target() => AccessTools.Method(typeof(IssuesCampaignBehavior), "GetCounterOfferersIssue");
+
+    [HarmonyPrefix]
+    private static bool Prefix(ref IssueBase __result)
+    {
+        if (ModInformation.IsServer || !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) ||
+            !ContainerProvider.TryResolve<IControllerIdProvider>(out var local)) return true;
+        __result = null;
+        var merchant = Hero.OneToOneConversationHero;
+        if (merchant == null) return false;
+        foreach (var issue in Campaign.Current.IssueManager.Issues.Values)
+        {
+            if (issue.CounterOfferHero != merchant || !issue.IsSolvingWithLordSolution) continue;
+            if (issue is Issue && (!owners.TryGetOwnerControllerId(issue, out var owner) || owner != local.ControllerId)) continue;
+            __result = issue;
+            break;
+        }
         return false;
     }
 }
