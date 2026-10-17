@@ -1,9 +1,11 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using Helpers;
 using System.IO;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using Issue = TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssue;
 
@@ -43,8 +45,10 @@ internal class CapturedByBountyHuntersCreationCaptureStrategy : ICreationCapture
             return false;
         }
 
-        var hideouts = Campaign.Current.AllHideouts;
-        var hideout = hideouts.FirstOrDefault(candidate => candidate.IsInfested) ?? hideouts.FirstOrDefault();
+        var hideout = SettlementHelper.FindNearestHideoutToSettlement(
+            issueOwner.CurrentSettlement,
+            MobileParty.NavigationType.Default,
+            candidate => candidate.Hideout.IsInfested) ?? Campaign.Current.AllHideouts.FirstOrDefault();
         if (hideout == null)
         {
             return false;
