@@ -1,6 +1,6 @@
-﻿using Common;
-using GameInterface.Policies;
+﻿using GameInterface.Policies;
 using HarmonyLib;
+using Common;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.GameState;
@@ -20,7 +20,7 @@ internal class MBObjectBasePatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         // IssueManager assigns issue identities on the authoritative server.
-        if (ModInformation.IsServer && __instance is IssueBase) return true;
+        if (__instance is IssueBase && ModInformation.IsServer) return true;
 
         if (allowedTypes.Contains(__instance.GetType())) return true;
 
