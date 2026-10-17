@@ -126,9 +126,6 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             return;
         }
 
-        var previousDueTime = issue.IssueDueTime;
-        var previousTriedToSolveBefore = issue.IsTriedToSolveBefore;
-
         try
         {
             // Creates the quest object the owner's outcomes run on, it is never started so it registers no events
@@ -145,7 +142,6 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         catch (Exception e)
         {
             Logger.Error(e, "Starting the quest of {issue} failed", data.IssueId);
-            RollbackQuestStart(issue, previousDueTime, previousTriedToSolveBefore);
             ownership.Remove(data.IssueOwnerId);
             Reject(peer, data);
             return;
@@ -162,21 +158,6 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     private void Reject(NetPeer peer, RequestQuestSolutionAccept data)
     {
         network.Send(peer, new NetworkQuestSolutionAcceptRejected(data.IssueOwnerId, data.IssueId));
-    }
-
-    private static void RollbackQuestStart(IssueBase issue, CampaignTime previousDueTime, bool previousTriedToSolveBefore)
-    {
-        var strayQuest = issue?.IssueQuest;
-        if (strayQuest == null) return;
-
-        // The quest was created before its captured fields were validated. Detach it first so
-        // cancellation cannot finalize the issue that another player may still be accepting.
-        issue.IssueQuest = null;
-        issue._issueState = IssueBase.IssueState.Ongoing;
-        issue.IssueDueTime = previousDueTime;
-        issue.IsTriedToSolveBefore = previousTriedToSolveBefore;
-        using (new AllowedThread())
-            strayQuest.CompleteQuestWithCancel();
     }
 
     private void Handle_NetworkQuestSolutionAccepted(MessagePayload<NetworkQuestSolutionAccepted> payload)
@@ -223,14 +204,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor))
+            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
             {
-                return;
-            }
-
-            if (descriptor.QuestSolutionAcceptStrategy is IQuestSolutionAcceptRejectionStrategy rejectionStrategy)
-            {
-                rejectionStrategy.Reject(issue);
                 return;
             }
 

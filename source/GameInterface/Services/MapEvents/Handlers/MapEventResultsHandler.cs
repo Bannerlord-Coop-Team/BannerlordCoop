@@ -3,7 +3,6 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Interfaces;
@@ -12,7 +11,6 @@ using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using GameInterface.Services.TroopRosters.Data;
 using Serilog;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -34,7 +32,6 @@ internal class MapEventResultsHandler : IHandler
     private readonly IMapEventInitializationBarrier initializationBarrier;
     private readonly IMapEventContributionBarrier contributionBarrier;
     private readonly IPlayerManager playerManager;
-    private readonly ILordWantsRivalCapturedQuestService rivalCapturedQuests;
     private readonly ConditionalWeakTable<MapEvent, HashSet<string>> receivedHideoutResults = new();
 
     public MapEventResultsHandler(
@@ -44,8 +41,7 @@ internal class MapEventResultsHandler : IHandler
         IMapEventResultsInterface mapEventResultsInterface,
         IMapEventInitializationBarrier initializationBarrier,
         IMapEventContributionBarrier contributionBarrier,
-        IPlayerManager playerManager,
-        ILordWantsRivalCapturedQuestService rivalCapturedQuests)
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -54,7 +50,6 @@ internal class MapEventResultsHandler : IHandler
         this.initializationBarrier = initializationBarrier;
         this.contributionBarrier = contributionBarrier;
         this.playerManager = playerManager;
-        this.rivalCapturedQuests = rivalCapturedQuests;
 
         messageBroker.Subscribe<CommitMapEventResults>(Handle_CommitMapEventResults);
         messageBroker.Subscribe<NetworkCommitMapEventResults>(Handle_NetworkCommitMapEventResults);
@@ -100,11 +95,6 @@ internal class MapEventResultsHandler : IHandler
                 {
                     continue;
                 }
-
-                var prisoners = default(TroopRosterData);
-                if (playerSide == mapEvent.WinningSide)
-                    networkPlayerLootData.LootedPrisoners?.TryGetValue(playerMapEventPartyId, out prisoners);
-                rivalCapturedQuests.RecordPendingCaptures(player, prisoners);
 
                 network.Send(peer, new NetworkCommitMapEventResults(
                     mapEventId,

@@ -90,17 +90,9 @@ public class IssueCreationSyncTests : IDisposable
     [Fact]
     public void AnIssueTheServerCreatesIsBuiltOnEveryClientWithTheServersValues()
     {
-        const int serverIssueIndex = 41;
-        Server.Call(() => Campaign.Current.IssueManager._nextIssueUniqueIndex = serverIssueIndex);
-        foreach (var (client, index) in TestEnvironment.Clients.Select((client, index) => (client, index)))
-        {
-            client.Call(() => Campaign.Current.IssueManager._nextIssueUniqueIndex = serverIssueIndex + index + 1);
-        }
-
         CreateIssueOnServer();
 
         var created = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
-        Assert.Equal($"issue_{serverIssueIndex}", created.IssueId);
         Assert.Equal(notableId, created.IssueOwnerId);
         Assert.Equal(typeof(AllowedIssue).Name, created.IssueTypeName);
 

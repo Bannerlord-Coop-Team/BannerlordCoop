@@ -10,10 +10,3 @@ public interface IQuestSolutionAcceptStrategy
     // Every mirror: force what Capture read
     void Apply(IssueBase issue, byte[] captured);
 }
-
-// Optional hook for issue types that need to undo more than the generic quest
-// mirror cleanup when the server rejects an optimistic local acceptance.
-public interface IQuestSolutionAcceptRejectionStrategy
-{
-    void Reject(IssueBase issue);
-}

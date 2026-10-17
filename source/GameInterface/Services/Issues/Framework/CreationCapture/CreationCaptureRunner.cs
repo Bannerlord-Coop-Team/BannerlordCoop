@@ -116,10 +116,7 @@ internal class CreationCaptureRunner : IHandler
                 return;
             }
 
-            using (new AllowedThread())
-            {
-                issue.StringId = data.IssueId;
-            }
+            issue.StringId = data.IssueId;
             strategy.ApplyAfterCreation(issue, captured);
         }, context: nameof(CreationCaptureRunner));
     }

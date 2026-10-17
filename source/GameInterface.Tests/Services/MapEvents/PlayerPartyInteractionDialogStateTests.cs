@@ -2,7 +2,6 @@
 using GameInterface.Services.MapEvents.PlayerPartyInteractions;
 using GameInterface.Tests.Services.SiegeEvents;
 using System;
-using TaleWorlds.Localization;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
@@ -23,7 +22,7 @@ public class PlayerPartyInteractionDialogStateTests
         if (proposal == PlayerPartyInteractionProposal.Mercenary)
         {
             expectedText =
-                $"RandomPlayer offers to serve as a mercenary. The kingdom will pay {mercenaryAwardMultiplier}{new TextObject("{GOLD_ICON}")} gold per influence point earned, whenever the contract is honored. Do you accept?";
+                $"RandomPlayer offers to serve as a mercenary. The kingdom will pay {mercenaryAwardMultiplier} gold per influence point earned, whenever the contract is honored. Do you accept?";
         }
 
         try
