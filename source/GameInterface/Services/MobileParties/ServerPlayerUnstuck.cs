@@ -13,6 +13,7 @@ using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -26,9 +27,9 @@ namespace GameInterface.Services.MobileParties;
 internal interface IServerPlayerUnstuck
 {
     /// <summary>
-    /// Force-applies every applicable exit for the player's registered party and hero, each step
-    /// guarded independently, and sends the result to the player's connection when it has one.
-    /// Runs on the game thread.
+    /// Force-applies every applicable exit for the player's registered party and hero, then moves a
+    /// free party off a map spot it cannot move from, each step guarded independently, and sends the
+    /// result to the player's connection when it has one. Runs on the game thread.
     /// </summary>
     /// <returns>One line per step applied, skipped or failed.</returns>
     string[] Apply(Player player, bool includeCaptivity);
@@ -45,6 +46,7 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
     private readonly IPlayerManager playerManager;
     private readonly ISettlementInterface settlementInterface;
     private readonly ISiegeEventInterface siegeEventInterface;
+    private readonly IPartyNavigationRepair partyNavigationRepair;
 
     public ServerPlayerUnstuck(
         IMessageBroker messageBroker,
@@ -52,8 +54,10 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         IObjectManager objectManager,
         IPlayerManager playerManager,
         ISettlementInterface settlementInterface,
-        ISiegeEventInterface siegeEventInterface)
+        ISiegeEventInterface siegeEventInterface,
+        IPartyNavigationRepair partyNavigationRepair)
     {
+        this.partyNavigationRepair = partyNavigationRepair;
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
@@ -151,13 +155,31 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
             });
         }
 
+        // Last, so a party the exits above just freed is checked at its final spot.
+        try
+        {
+            if (partyNavigationRepair.TryRepair(party, out var previousPosition))
+            {
+                actions.Add($"Moved the party from {Format(previousPosition)}, a map spot it could not move from, " +
+                    $"to {Format(party.Position)}.");
+            }
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Unstuck step {Step} failed", "map position repair");
+            actions.Add($"Failed map position repair: {e.GetType().Name} ({e.Message}).");
+        }
+
         if (actions.Count == 0)
         {
-            actions.Add("No server-side stuck state found (captivity, map event, army, siege camp, settlement).");
+            actions.Add("No server-side stuck state found (captivity, map event, army, siege camp, settlement, map position).");
         }
 
         return SendResult(player, partyId, actions);
     }
+
+    private static string Format(CampaignVec2 position) =>
+        string.Format(CultureInfo.InvariantCulture, "{0:0.##},{1:0.##}", position.X, position.Y);
 
     private string[] SendResult(Player player, string partyId, List<string> actions)
     {
