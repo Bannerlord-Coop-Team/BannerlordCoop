@@ -11,6 +11,8 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.EscortMerchantCaravan;
 using GameInterface.Services.Players;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using LiteNetLib;
 using System.Reflection;
@@ -243,7 +245,7 @@ public class EscortMerchantCaravanTests : IDisposable
             quest._questCaravanMobileParty = caravan;
             quest._daysSpentForEscorting = 4;
             quest._visitedSettlements.Add(quest.QuestGiver.CurrentSettlement);
-            quest._playerStartsQuestLog = quest.AddDiscreteLog(new TextObject("Escort started"), new TextObject("Visited Settlements"), 1, 6);
+            quest.UpdateQuestTaskStage(quest._playerStartsQuestLog, 1);
             Server.Resolve<IEscortProgress>().Publish(quest);
         });
         Owner.Call(() =>
@@ -259,6 +261,58 @@ public class EscortMerchantCaravanTests : IDisposable
         {
             Assert.True(Other.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
             Assert.Null(giver.Issue.IssueQuest);
+        });
+    }
+
+    [Fact]
+    public void CancellationBeforeTheNpcConsequenceCleansUpTheUnstartedQuest()
+    {
+        Quest pending = null!;
+        Owner.Call(() =>
+        {
+            Assert.True(Owner.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+            giver.Issue.StartIssueWithQuest();
+            pending = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+            pending.AddTrackedObject(giver);
+            Assert.DoesNotContain(pending, Campaign.Current.QuestManager.Quests);
+        }, WithoutWorldSetup);
+        Server.Call(() => Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(q => q.CompleteQuestWithCancel()));
+        Owner.Call(() =>
+        {
+            Assert.True(pending.IsFinalized);
+            Assert.Null(pending.OfferDialogFlow);
+            Assert.Null(pending.DiscussDialogFlow);
+            Assert.Empty(Campaign.Current.QuestManager.GetAllTrackedObjectsOfAQuest(pending));
+            pending.QuestAcceptedConsequences();
+            Assert.DoesNotContain(pending, Campaign.Current.QuestManager.Quests);
+            Assert.True(pending.IsFinalized);
+        });
+    }
+
+    [Fact]
+    public void BanditsBelongToOnlyOneActiveEscortAndBecomeAvailableWhenReleased()
+    {
+        Accept();
+        using var recruitment = new MethodCallRecorder(Priority.Last,
+            AccessTools.Method(typeof(Quest), nameof(Quest.CheckPartyAndMakeItAttackTheCaravan)));
+        Server.Call(() =>
+        {
+            var first = QuestOn(Server);
+            var second = new Quest("second_escort", first.QuestGiver, first.QuestDueTime, 0.5f, 100);
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(caravanId, out var bandit));
+            first._otherBanditParty = bandit;
+            second.CheckPartyAndMakeItAttackTheCaravan(bandit);
+            Assert.Equal(0, recruitment.CountFor(Server));
+            first._otherBanditParty = null;
+            second.CheckPartyAndMakeItAttackTheCaravan(bandit);
+            Assert.Equal(1, recruitment.CountFor(Server));
+            first._questBanditMobileParty = bandit;
+            second.CheckPartyAndMakeItAttackTheCaravan(bandit);
+            Assert.Equal(1, recruitment.CountFor(Server));
+            first.CompleteQuestWithCancel();
+            second.CheckPartyAndMakeItAttackTheCaravan(bandit);
+            Assert.Equal(2, recruitment.CountFor(Server));
+            second.CompleteQuestWithCancel();
         });
     }
 
@@ -490,6 +544,25 @@ public class EscortMerchantCaravanTests : IDisposable
     }
 
     [Fact]
+    public void SelectingAnHeirCancelsTheOriginalPlayersAgreement()
+    {
+        Accept();
+        var ownerQuest = QuestOn(Owner);
+        var heirId = environment.CreateRegisteredObject<Hero>();
+        Server.Call(() =>
+        {
+            var players = Server.Resolve<IPlayerManager>();
+            Assert.True(players.TryGetPlayer(QuestScenario.ControllerA, out var original));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heirId, out var heir));
+            Assert.True(players.ReplacePlayer(original, new Player(original.ControllerId, heirId,
+                original.MobilePartyId, original.ClanId, original.CharacterObjectId)));
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerHeirSelectionCompleted(heir));
+        });
+        Owner.Call(() => Assert.True(ownerQuest.IsFinalized));
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+    }
+
+    [Fact]
     public void AnAcceptFailureRestoresTheIssueInsteadOfLeavingAnUnownedQuest()
     {
         var harmony = new Harmony($"escort-accept-failure-{Guid.NewGuid()}");
@@ -625,7 +698,9 @@ public class EscortMerchantCaravanTests : IDisposable
             else if (outcome == IssueOutcome.QuestFail) serverQuest.CompleteQuestWithFail();
             else if (outcome == IssueOutcome.QuestSuccess) serverQuest.CompleteQuestWithSuccess();
             else serverQuest.CompleteQuestWithTimeOut();
-        }, new[] { AccessTools.Method(typeof(Quest), nameof(Quest.OnTimedOut)) });
+            if (outcome == IssueOutcome.QuestTimeOut)
+                Assert.Equal(980, serverQuest.QuestGiver.CurrentSettlement.Town.Prosperity);
+        });
         Assert.Equal(1, cleanup.CountFor(Server));
         Assert.Equal(0, cleanup.CountFor(Owner));
         Owner.Call(() =>

@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using System;
@@ -64,6 +65,7 @@ internal sealed class EscortProgress : IEscortProgress
             TrackedParties = tracked.OfType<MobileParty>().Where(p => p.IsActive).Select(Id).ToArray(),
             TrackedSettlements = tracked.OfType<Settlement>().Select(Id).ToArray(),
             FollowCaravan = followCaravan,
+            DueTimeTicks = quest.QuestDueTime.NumTicks,
         };
         // Party creation and updates must reach the game-thread queue before the quest references them.
         coalescer?.Flush(network);
@@ -139,19 +141,36 @@ internal sealed class EscortProgressHandler : IHandler
     private readonly IIssueResolver issues;
     private readonly IControllerIdProvider controller;
     private readonly IBinaryPackageFactory packages;
+    private readonly IOutcomeDispatcher dispatcher;
 
     public EscortProgressHandler(IMessageBroker messages, IObjectManager objects, IIssueResolver issues,
-        IControllerIdProvider controller, IBinaryPackageFactory packages)
+        IControllerIdProvider controller, IBinaryPackageFactory packages, IOutcomeDispatcher dispatcher)
     {
         this.messages = messages;
         this.objects = objects;
         this.issues = issues;
         this.controller = controller;
         this.packages = packages;
+        this.dispatcher = dispatcher;
         messages.Subscribe<NetworkEscortProgress>(Receive);
+        messages.Subscribe<PlayerHeirSelectionCompleted>(HeirSelected);
     }
 
-    public void Dispose() => messages.Unsubscribe<NetworkEscortProgress>(Receive);
+    public void Dispose()
+    {
+        messages.Unsubscribe<NetworkEscortProgress>(Receive);
+        messages.Unsubscribe<PlayerHeirSelectionCompleted>(HeirSelected);
+    }
+
+    private void HeirSelected(MessagePayload<PlayerHeirSelectionCompleted> payload)
+    {
+        if (ModInformation.IsClient) return;
+        GameThread.RunSafe(() => dispatcher.RunAsOwners<Quest>(quest =>
+        {
+            if (Hero.MainHero == payload.What.PlayerHero)
+                quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan."));
+        }), context: nameof(EscortProgressHandler));
+    }
 
     private void Receive(MessagePayload<NetworkEscortProgress> payload)
     {
@@ -196,6 +215,7 @@ internal sealed class EscortProgressHandler : IHandler
                 quest._customPartyComponent = null;
                 quest._visitedSettlements = visited;
                 quest._daysSpentForEscorting = state.Days;
+                quest.QuestDueTime = new CampaignTime(state.DueTimeTicks);
                 quest._journalEntries.Clear();
                 quest._journalEntries.AddRange(logs);
                 quest._playerStartsQuestLog = logs.FirstOrDefault();

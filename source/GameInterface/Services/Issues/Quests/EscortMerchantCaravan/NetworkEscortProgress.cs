@@ -22,4 +22,5 @@ internal sealed class NetworkEscortProgress : IServerToClientCommand
     [ProtoMember(14)] public byte[] Notice;
     [ProtoMember(15)] public int ExtraTime;
     [ProtoMember(16)] public bool FollowCaravan;
+    [ProtoMember(17)] public long DueTimeTicks;
 }

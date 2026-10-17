@@ -1,7 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
-using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
@@ -13,6 +13,16 @@ namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan.Patches;
 [HarmonyPatch]
 internal class EscortQuestPatches
 {
+    [HarmonyPatch(typeof(Quest), nameof(Quest.CheckPartyAndMakeItAttackTheCaravan))]
+    [HarmonyPrefix]
+    private static bool RecruitBandit(Quest __instance, MobileParty mobileParty)
+    {
+        if (ModInformation.IsClient) return false;
+        return !Campaign.Current.IssueManager.Issues.Values.Any(issue =>
+            issue.IssueQuest is Quest other && other != __instance && other.IsOngoing &&
+            (other._otherBanditParty == mobileParty || other._questBanditMobileParty == mobileParty));
+    }
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.QuestAcceptedConsequences))]
     [HarmonyPrefix]
     private static bool Accept(Quest __instance)

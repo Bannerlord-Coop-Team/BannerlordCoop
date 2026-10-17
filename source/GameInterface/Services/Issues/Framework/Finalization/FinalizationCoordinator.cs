@@ -278,6 +278,7 @@ internal class FinalizationCoordinator : IHandler
         {
             issue.IssueQuest = null;
             issue.IsTriedToSolveBefore = false;
+            if (quest.IsOngoing) quest.CompleteQuestWithCancel();
             quest = null;
         }
 

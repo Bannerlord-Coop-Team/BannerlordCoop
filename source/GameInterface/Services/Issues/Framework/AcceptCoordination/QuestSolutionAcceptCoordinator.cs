@@ -148,7 +148,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             issue.IssueQuest = null;
             try
             {
-                failedQuest?.CompleteQuestWithCancel();
+                using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
+                    failedQuest?.CompleteQuestWithCancel();
             }
             catch (Exception cleanupError)
             {
