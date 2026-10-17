@@ -79,6 +79,9 @@ internal class OtherNotificationsHandler : IHandler
         messageBroker.Subscribe<NetworkNotifyCaughtIllness>(Handle_NetworkNotifyCaughtIllness);
 
         messageBroker.Subscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
+
+        messageBroker.Subscribe<NotifyCleanHideoutRelations>(Handle_NotifyCleanHideoutRelations);
+        messageBroker.Subscribe<NetworkNotifyCleanHideoutRelations>(Handle_NetworkNotifyCleanHideoutRelations);
     }
 
     public void Dispose()
@@ -123,6 +126,9 @@ internal class OtherNotificationsHandler : IHandler
         messageBroker.Unsubscribe<NetworkNotifyCaughtIllness>(Handle_NetworkNotifyCaughtIllness);
 
         messageBroker.Unsubscribe<NetworkNotifyRemovedSupporter>(Handle_NetworkNotifyRemovedSupporter);
+
+        messageBroker.Unsubscribe<NotifyCleanHideoutRelations>(Handle_NotifyCleanHideoutRelations);
+        messageBroker.Unsubscribe<NetworkNotifyCleanHideoutRelations>(Handle_NetworkNotifyCleanHideoutRelations);
     }
 
     private void Handle_NotifyAnimalsSlaughteredToEat(MessagePayload<NotifyAnimalsSlaughteredToEat> obj)
@@ -490,6 +496,29 @@ internal class OtherNotificationsHandler : IHandler
             TextObject textObject = new TextObject("{=aaOIjHeP}{NOTABLE.NAME} no longer supports your clan as your relationship deteriorated too much.", null);
             textObject.SetCharacterProperties("NOTABLE", notable.CharacterObject, false);
             InformationManager.DisplayMessage(new InformationMessage(textObject.ToString(), new Color(0f, 1f, 0f, 1f)));
+        });
+    }
+
+    private void Handle_NotifyCleanHideoutRelations(MessagePayload<NotifyCleanHideoutRelations> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetIdWithLogging(obj.What.PlayerHero, out var playerHeroId)) return;
+
+            network.SendAll(new NetworkNotifyCleanHideoutRelations(playerHeroId, obj.What.RelationValue));
+        });
+    }
+
+    private void Handle_NetworkNotifyCleanHideoutRelations(MessagePayload<NetworkNotifyCleanHideoutRelations> obj)
+    {
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.PlayerHeroId, out var playerHero)) return;
+
+            if (playerHero != Hero.MainHero) return;
+
+            MBTextManager.SetTextVariable("RELATION_VALUE", obj.What.RelationValue);
+            MBInformationManager.AddQuickInformation(new TextObject("{=o0qwDa0q}Your relation increased by {RELATION_VALUE} with nearby notables.", null), 0, null, null, "");
         });
     }
 }

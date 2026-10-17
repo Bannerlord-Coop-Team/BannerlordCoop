@@ -118,7 +118,7 @@ public class SettlementAuditorTests : IDisposable
         Task? lateResponse = null;
         network.Setup(n => n.SendAll(It.IsAny<IMessage>())).Callback(() => lateResponse = Task.Run(async () =>
         {
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimeSpan.FromMilliseconds(250));
             Respond();
         }));
 

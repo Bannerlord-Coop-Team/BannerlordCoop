@@ -89,6 +89,9 @@ internal class HeirSelectionHandler : IHandler
         messageBroker.Subscribe<HeirSelectionOver>(Handle_HeirSelectionOver);
         messageBroker.Subscribe<NetworkHeirSelectionOver>(Handle_NetworkHeirSelectionOver);
 
+        messageBroker.Subscribe<HeirSelectedForRetirement>(Handle_HeirSelectedForRetirement);
+        messageBroker.Subscribe<NetworkHeirSelectedForRetirement>(Handle_NetworkHeirSelectedForRetirement);
+
         messageBroker.Subscribe<ChangePlayerCharacterAfterHeirSelection>(Handle_ChangePlayerCharacterAfterHeirSelection);
         messageBroker.Subscribe<NetworkChangePlayerCharacterAfterHeirSelection>(Handle_NetworkChangePlayerCharacterAfterHeirSelection);
 
@@ -106,6 +109,9 @@ internal class HeirSelectionHandler : IHandler
 
         messageBroker.Unsubscribe<HeirSelectionOver>(Handle_HeirSelectionOver);
         messageBroker.Unsubscribe<NetworkHeirSelectionOver>(Handle_NetworkHeirSelectionOver);
+
+        messageBroker.Unsubscribe<HeirSelectedForRetirement>(Handle_HeirSelectedForRetirement);
+        messageBroker.Unsubscribe<NetworkHeirSelectedForRetirement>(Handle_NetworkHeirSelectedForRetirement);
 
         messageBroker.Unsubscribe<ChangePlayerCharacterAfterHeirSelection>(Handle_ChangePlayerCharacterAfterHeirSelection);
         messageBroker.Unsubscribe<NetworkChangePlayerCharacterAfterHeirSelection>(Handle_NetworkChangePlayerCharacterAfterHeirSelection);
@@ -350,6 +356,43 @@ internal class HeirSelectionHandler : IHandler
             objectManager.TryGetObject(player.MobilePartyId, out MobileParty originalParty);
             applyHeirSelectionActionInterface.ApplyByDeath(originalHero, selectedHeir, originalParty);
             GameThread.EnqueueSafe(() => RefreshSuccessions(selectedHeir.Clan));
+        });
+    }
+
+    private void Handle_HeirSelectedForRetirement(MessagePayload<HeirSelectedForRetirement> obj)
+    {
+        var data = obj.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.OriginalHero, out var originalHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.SelectedHeir, out var selectedHeirId)) return;
+
+        network.SendAll(new NetworkHeirSelectedForRetirement(originalHeroId, selectedHeirId));
+    }
+
+    private void Handle_NetworkHeirSelectedForRetirement(MessagePayload<NetworkHeirSelectedForRetirement> obj)
+    {
+        if (obj.Who is not NetPeer peer) return;
+
+        var data = obj.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!playerManager.TryGetPlayer(peer, out var player) || player.HeroId != data.OriginalHeroId)
+            {
+                Logger.Warning($"Ignoring heir selection for hero {data.OriginalHeroId} from peer {peer.Id} because that peer no longer controls the hero");
+                return;
+            }
+
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.OriginalHeroId, out var originalHero)) return;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(data.SelectedHeirId, out var selectedHeir)) return;
+
+            if (originalHero.Clan == null || !originalHero.Clan.GetHeirApparents().ContainsKey(selectedHeir))
+            {
+                Logger.Warning($"Ignoring invalid heir {data.SelectedHeirId} for hero {data.OriginalHeroId}");
+                return;
+            }
+
+            applyHeirSelectionActionInterface.ApplyByRetirement(originalHero, selectedHeir);
         });
     }
 
