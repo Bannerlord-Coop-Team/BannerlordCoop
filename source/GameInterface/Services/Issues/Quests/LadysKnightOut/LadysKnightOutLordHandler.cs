@@ -4,6 +4,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
@@ -57,7 +58,10 @@ internal sealed class LadysKnightOutLordHandler : IHandler
     {
         if (ModInformation.IsServer || !objects.TryGetIdWithLogging(payload.What.Issue.IssueOwner, out var giverId)) return;
         network.SendAll(new RequestLadysKnightOutLord
-        { GiverId = giverId, IssueId = payload.What.Issue.StringId, Complete = payload.What.Complete });
+        {
+            GiverId = giverId, IssueId = payload.What.Issue.StringId, Complete = payload.What.Complete,
+            Difficulty = payload.What.Issue.IssueDifficultyMultiplier,
+        });
     }
 
     private void HandleRequest(MessagePayload<RequestLadysKnightOutLord> payload)
@@ -70,6 +74,7 @@ internal sealed class LadysKnightOutLordHandler : IHandler
                 !objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero)) return;
 
             using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+            using (new IssueDifficultyOverride(data.Difficulty))
             {
                 if (data.Complete)
                 {
@@ -102,7 +107,13 @@ internal sealed class LadysKnightOutLordHandler : IHandler
         GameThread.RunSafe(() =>
         {
             var data = payload.What;
-            if (!issues.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) || !(issue is Issue) || !issue.IsOngoingWithoutQuest) return;
+            if (!issues.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) || !(issue is Issue) || issue.IsSolvingWithLordSolution) return;
+            var strayQuest = issue.IssueQuest;
+            if (strayQuest != null)
+            {
+                issue.IssueQuest = null;
+                using (new AllowedThread()) strayQuest.CompleteQuestWithCancel();
+            }
             ownership.TrySetOwner(data.GiverId, data.IssueId, data.ControllerId);
             issue._issueDifficultyMultiplier = data.Difficulty;
             issue._issueState = IssueBase.IssueState.SolvingWithLordSolution;
@@ -110,6 +121,7 @@ internal sealed class LadysKnightOutLordHandler : IHandler
             if (data.ControllerId != controller.ControllerId) return;
             using (new AllowedThread()) issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(data.StartLog)));
             CampaignEvents.BeforeGameMenuOpenedEvent.AddNonSerializedListener(issue, issue.BeforeGameMenuOpened);
+            if (!Campaign.Current.ConversationManager.IsConversationInProgress) issue.BeforeGameMenuOpened(null);
         }, context: nameof(LadysKnightOutLordHandler));
     }
 }

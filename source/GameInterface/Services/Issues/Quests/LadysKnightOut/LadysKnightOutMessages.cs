@@ -18,6 +18,7 @@ internal sealed class RequestLadysKnightOutLord : ICommand
     [ProtoMember(1)] public string GiverId;
     [ProtoMember(2)] public string IssueId;
     [ProtoMember(3)] public bool Complete;
+    [ProtoMember(4)] public float Difficulty;
 }
 
 [ProtoContract(SkipConstructor = true)]
