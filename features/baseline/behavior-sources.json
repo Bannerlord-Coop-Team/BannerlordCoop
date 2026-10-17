@@ -1,0 +1,77 @@
+{
+  "implementation": "5f4d63cc0975174ab42cfe1da67fc6d7214065e7",
+  "sources": {
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyTroopUpgradeModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyTroopUpgradeModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 164,
+      "decompiled_sha256": "3cd7f919fc39d983974cdaf8931793902f5e5c311db9a15c200c113efeaca848",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultTradeItemPriceFactorModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultTradeItemPriceFactorModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 204,
+      "decompiled_sha256": "6f531f9776bfc5d85f01a72f1ad9ce1e8306cb1d47841ba17e571801b357239f",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyWageModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultPartyWageModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 288,
+      "decompiled_sha256": "c2da6f426624b9da8eb8580e44752303cbfb315f26fcd7c82c41f39bc0264c43",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultClanTierModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultClanTierModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 169,
+      "decompiled_sha256": "1a67fc97181439641783300c475a6e5c918983dd09f626bba4339a88ce40bf3c",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.GameComponents.DefaultKingdomCreationModel": {
+      "type": "TaleWorlds.CampaignSystem.GameComponents.DefaultKingdomCreationModel",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 97,
+      "decompiled_sha256": "ea628ba99b3ae431277b77b356b61d34283d371a74023a820c44eb4ba57ab33a",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior": {
+      "type": "TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior",
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "version": "Native v1.4.8",
+      "line_count": 975,
+      "decompiled_sha256": "0f2a89245a0dfbde3de885a82fbf1e5d8a238b7920992872b7df4a7f9673a014",
+      "provider": "complete installed type via focus-safe native decompiler"
+    },
+    "coop.trade": {
+      "type": "coop.trade",
+      "assembly": "source/GameInterface/Services/Inventory/Handlers/TradeHandler.cs",
+      "sha256": "3b081ebf53ac0b2cdd79ea4009289d853dcb4bea85f4e883f480ba8ab6ff2fd9",
+      "version": "repository@5f4d63cc0975174ab42cfe1da67fc6d7214065e7",
+      "line_count": 515,
+      "decompiled_sha256": "76c094be0dbf39a25a41b8be025c0caac36624980bbd67bd514d9d2666901552",
+      "provider": "repository"
+    },
+    "coop.development": {
+      "type": "coop.development",
+      "assembly": "source/GameInterface/Services/CharacterDevelopers/Handlers/CharacterDeveloperHandler.cs",
+      "sha256": "445695ecf039f6490d3c279eaa38432532053e8634fd16668a9cdec3e25f9832",
+      "version": "repository@5f4d63cc0975174ab42cfe1da67fc6d7214065e7",
+      "line_count": 188,
+      "decompiled_sha256": "ebec9ed227016bb2cc5e2f30173bb21043b2aaf1f20b8bda637549ce5aebaa54",
+      "provider": "repository"
+    }
+  }
+}

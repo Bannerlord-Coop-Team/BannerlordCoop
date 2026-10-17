@@ -1,0 +1,143 @@
+{
+  "ok": true,
+  "schema_version": "bannerlord-analysis/v2",
+  "call_id": "bac_7152eb907a914b2eaa4a75f4096fe8bf",
+  "server": {
+    "version": "0.2.0",
+    "installation_generation": "bamcp_255a134dc5e98d7add7fc8073e32cd86"
+  },
+  "duration_ms": 40,
+  "data": {
+    "valid": true,
+    "require_current_installed_build": true,
+    "results": [
+      {
+        "valid": true,
+        "artifact_id": "ba1_6c1b496377053476b1f2dc2ccc1701643de14d1d47fcf335f24ff7af18773c00",
+        "artifact_kind": "managed-source",
+        "artifact_exists": true,
+        "range_valid": true,
+        "source_hash_match": true,
+        "current_build_match": true,
+        "legacy_metadata": false,
+        "canonical_reference": "ba1_6c1b496377053476b1f2dc2ccc1701643de14d1d47fcf335f24ff7af18773c00 lines 1-435; bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll; sha256 1f8e33e2ed73",
+        "source_identity": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+        "source_sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+        "game_version": "v1.4.8",
+        "failure_code": null
+      },
+      {
+        "valid": true,
+        "artifact_id": "ba1_141b3e92d8d4e88af81825fb826c4fc6a79b2e4d1cd181aec77499981505a655",
+        "artifact_kind": "managed-source",
+        "artifact_exists": true,
+        "range_valid": true,
+        "source_hash_match": true,
+        "current_build_match": true,
+        "legacy_metadata": false,
+        "canonical_reference": "ba1_141b3e92d8d4e88af81825fb826c4fc6a79b2e4d1cd181aec77499981505a655 lines 1-180; Modules/SandBox/bin/Win64_Shipping_Client/SandBox.dll; sha256 587c6e94c425",
+        "source_identity": "Modules/SandBox/bin/Win64_Shipping_Client/SandBox.dll",
+        "source_sha256": "587c6e94c425745c1478f632f3b66226ff8298666cb27e8e6d9a62488df5956a",
+        "game_version": "v1.4.8",
+        "failure_code": null
+      },
+      {
+        "valid": true,
+        "artifact_id": "ba1_10daf06fd31280db8f9cdbb1b96828a297d5c4cc352598537a77386379710f63",
+        "artifact_kind": "managed-source",
+        "artifact_exists": true,
+        "range_valid": true,
+        "source_hash_match": true,
+        "current_build_match": true,
+        "legacy_metadata": false,
+        "canonical_reference": "ba1_10daf06fd31280db8f9cdbb1b96828a297d5c4cc352598537a77386379710f63 lines 1-2336; bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll; sha256 1f8e33e2ed73",
+        "source_identity": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+        "source_sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+        "game_version": "v1.4.8",
+        "failure_code": null
+      },
+      {
+        "valid": true,
+        "artifact_id": "ba1_65746d7dcea08ead4de9c020707197db6ebde76ba7a241149c9ee13c0eddf5a4",
+        "artifact_kind": "managed-source",
+        "artifact_exists": true,
+        "range_valid": true,
+        "source_hash_match": true,
+        "current_build_match": true,
+        "legacy_metadata": false,
+        "canonical_reference": "ba1_65746d7dcea08ead4de9c020707197db6ebde76ba7a241149c9ee13c0eddf5a4 lines 1-775; bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll; sha256 1f8e33e2ed73",
+        "source_identity": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+        "source_sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+        "game_version": "v1.4.8",
+        "failure_code": null
+      },
+      {
+        "valid": true,
+        "artifact_id": "ba1_eed29bbee61ea97a2526e91aa4fec0473dd9aabc894c4be1b48ce9a40830b79e",
+        "artifact_kind": "managed-source",
+        "artifact_exists": true,
+        "range_valid": true,
+        "source_hash_match": true,
+        "current_build_match": true,
+        "legacy_metadata": false,
+        "canonical_reference": "ba1_eed29bbee61ea97a2526e91aa4fec0473dd9aabc894c4be1b48ce9a40830b79e lines 1-1515; bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll; sha256 1f8e33e2ed73",
+        "source_identity": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+        "source_sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+        "game_version": "v1.4.8",
+        "failure_code": null
+      },
+      {
+        "valid": true,
+        "artifact_id": "ba1_0485d2837cac2d58efa921b3d7967d5c2e73703ec118fffb208f8f0088e6b34b",
+        "artifact_kind": "managed-source",
+        "artifact_exists": true,
+        "range_valid": true,
+        "source_hash_match": true,
+        "current_build_match": true,
+        "legacy_metadata": false,
+        "canonical_reference": "ba1_0485d2837cac2d58efa921b3d7967d5c2e73703ec118fffb208f8f0088e6b34b lines 1-3242; bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll; sha256 1f8e33e2ed73",
+        "source_identity": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+        "source_sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+        "game_version": "v1.4.8",
+        "failure_code": null
+      },
+      {
+        "valid": true,
+        "artifact_id": "ba1_2fac2122392422e0074f047b0579c58a36d7c26aa3f6121de277f8a968f095b9",
+        "artifact_kind": "managed-source",
+        "artifact_exists": true,
+        "range_valid": true,
+        "source_hash_match": true,
+        "current_build_match": true,
+        "legacy_metadata": false,
+        "canonical_reference": "ba1_2fac2122392422e0074f047b0579c58a36d7c26aa3f6121de277f8a968f095b9 lines 1-121; bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll; sha256 1f8e33e2ed73",
+        "source_identity": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+        "source_sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+        "game_version": "v1.4.8",
+        "failure_code": null
+      },
+      {
+        "valid": true,
+        "artifact_id": "ba1_f3d8b8b96e00103d7a08551797822f1bdebc9b8ed4d9735607cec017908e651f",
+        "artifact_kind": "managed-source",
+        "artifact_exists": true,
+        "range_valid": true,
+        "source_hash_match": true,
+        "current_build_match": true,
+        "legacy_metadata": false,
+        "canonical_reference": "ba1_f3d8b8b96e00103d7a08551797822f1bdebc9b8ed4d9735607cec017908e651f lines 1-975; bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll; sha256 1f8e33e2ed73",
+        "source_identity": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+        "source_sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+        "game_version": "v1.4.8",
+        "failure_code": null
+      }
+    ],
+    "validated_count": 8,
+    "semantic_judgment_performed": false
+  },
+  "provenance": {},
+  "diagnostics": {
+    "cache_hit": false,
+    "warnings": []
+  }
+}

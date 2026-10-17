@@ -1,0 +1,58 @@
+{
+  "kind": "expanded-feature-map-authoring-receipt",
+  "observed_utc": "2026-10-05T16:53:53.656901+00:00",
+  "repository": "Bannerlord-Coop-Team/BannerlordCoop",
+  "implementation_commit": "5f4d63cc0975174ab42cfe1da67fc6d7214065e7",
+  "implementation_tree": "9fc0c1eb1986a7c6d86549dadccd324280610431",
+  "native_module_version": "v1.4.8",
+  "source_provider": "Existing focus-safe native decompiler fallback; full installed types read in isolated authoring scratch",
+  "decompiler": {
+    "ilspycmd": "10.1.0.8386",
+    "ICSharpCode.Decompiler": "10.1.0.8386"
+  },
+  "assembly_hashes_after_reads": [
+    {
+      "assembly": "Modules/SandBox/bin/Win64_Shipping_Client/SandBox.dll",
+      "sha256": "587c6e94c425745c1478f632f3b66226ff8298666cb27e8e6d9a62488df5956a",
+      "matches_recorded_sources": true
+    },
+    {
+      "assembly": "bin/Win64_Shipping_Client/TaleWorlds.CampaignSystem.dll",
+      "sha256": "1f8e33e2ed73e6ec653d7629180afb70649ddc6e5bd1657a802a264efda1c3ae",
+      "matches_recorded_sources": true
+    }
+  ],
+  "installed_complete_types": 175,
+  "repository_production_files": 2,
+  "default_campaign_models_inspected": 124,
+  "default_campaign_models_structurally_indexed": 122,
+  "registered_issue_types_indexed": 43,
+  "agent_models_indexed": 3,
+  "menu_behaviors_indexed": 3,
+  "behavior_leaves": 2572,
+  "candidate_requirements": 1202,
+  "definition_inspected_leaves": 1260,
+  "source_interpreted_cases": 110,
+  "perk_choices": 374,
+  "perk_effects": 721,
+  "menu_choices": 165,
+  "distinct_linked_perk_reference_locations": 913,
+  "structural_paths": 8637,
+  "structurally_indexed_types": 171,
+  "input_sha256": {
+    "catalog.csv": "c340316dc49b2b77e320eb0fb49c64f320308f82f59240512d76240a3e7c7461",
+    "behavior-leaves.csv": "96e3c8d1adf84076f8d6f16b201896fe8ef715c4e99a9ce3aca78028727c4dd0",
+    "source-paths.csv": "18d9c437aa52565b905bf0c21c677eadbd3103498dbb6aa9f0b888d13583b746",
+    "interpreted-cases.json": "be376bcd8faa0e4490045accc3cf1dbc6d641a8fa579eeef0537e0fad32852df",
+    "baseline/behavior-sources.json": "f2448159c826fba572857229c529c3ebd0913b2f62eca8aa166ebbdb8150b9f6",
+    "baseline/perk-effects.json": "74953e7d4b12ceb661ffd5bd301ee133de7cc9ffa325824a861ada9cf28e6d11"
+  },
+  "proof_limits": [
+    "Native hash/decompiler authoring record, not Bannerlord Analysis app validation of these expanded ranges",
+    "Structural source navigation is not a control-flow proof or an interpreted behavior oracle",
+    "Perk/menu declarations do not establish consumer/caller behavior or co-op compatibility",
+    "Only curated source-interpreted cases establish the stated member-level outcomes",
+    "No new harness, CI, game build, deployment, runtime, save, or owner/lane mutation",
+    "All new behavior leaves remain runtime unrun; earlier selector receipts are preserved with their original source and scope"
+  ]
+}
