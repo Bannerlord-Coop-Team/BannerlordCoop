@@ -65,6 +65,21 @@ internal class PlayerVillageLandSeaLeavePatch
     }
 }
 
+[HarmonyPatch(typeof(EncounterGameMenuBehavior))]
+internal class PlayerNavalTownLeavePatch
+{
+    [HarmonyPatch(nameof(EncounterGameMenuBehavior.game_menu_town_naval_outside_leave_on_consequence))]
+    [HarmonyPrefix]
+    public static bool Prefix()
+    {
+        var party = MobileParty.MainParty;
+
+        MessageBroker.Instance.Publish(party, new EndSettlementEncounterAttempted(party, SettlementLeaveType.SetSail));
+
+        return false;
+    }
+}
+
 [HarmonyPatch(typeof(RetirementCampaignBehavior))]
 internal class PlayerLeaveRetirementSettlementPatch
 {

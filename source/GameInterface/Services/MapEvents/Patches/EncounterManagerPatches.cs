@@ -11,6 +11,7 @@ using GameInterface.Services.Players;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -52,6 +53,10 @@ internal class EncounterManagerPatches
         if (ModInformation.IsServer) return true;
 
         if (!attackerParty.IsControlledByThisInstance())
+            return false;
+
+        // The map keeps ticking under an open encounter, so a party still engaging a settlement it didn't enter retries every tick
+        if (PlayerEncounter.Current != null)
             return false;
 
         var message = new StartSettlementEncounterAttempted(attackerParty, settlement);

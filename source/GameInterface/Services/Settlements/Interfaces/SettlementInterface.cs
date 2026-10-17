@@ -157,7 +157,7 @@ internal class SettlementInterface : ISettlementInterface
             else if (leaveType == SettlementLeaveType.Disembark)
                 mainParty.DisembarkToPosition(leftSettlement.GatePosition);
             else
-                mainParty.Position = leftSettlement.GatePosition;
+                mainParty.Position = mainParty.IsCurrentlyAtSea ? leftSettlement.PortPosition : leftSettlement.GatePosition;
         }
 
         // ExitToLast returns to the map inside Finish. Hold first so the still-active target cannot

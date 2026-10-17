@@ -55,6 +55,9 @@ internal readonly struct NetworkInitializeSiegeEvent : IServerToClientCommand
     [ProtoMember(16)]
     public SiegeEngineGraphSnapshot[] DefenderEngines { get; }
 
+    [ProtoMember(17)]
+    public bool IsBlockadeActive { get; }
+
     public NetworkInitializeSiegeEvent(
         string siegeEventId,
         uint siegeEventHandle,
@@ -83,6 +86,7 @@ internal readonly struct NetworkInitializeSiegeEvent : IServerToClientCommand
         BesiegerPartyHandles = null;
         AttackerEngines = null;
         DefenderEngines = null;
+        IsBlockadeActive = false;
     }
 
     public NetworkInitializeSiegeEvent(SiegeEventGraphSnapshot snapshot)
@@ -104,6 +108,7 @@ internal readonly struct NetworkInitializeSiegeEvent : IServerToClientCommand
         BesiegerPartyHandles = snapshot.BesiegerPartyHandles;
         AttackerEngines = snapshot.AttackerEngines;
         DefenderEngines = snapshot.DefenderEngines;
+        IsBlockadeActive = snapshot.IsBlockadeActive;
     }
 
     public SiegeEventGraphSnapshot ToSnapshot() => new SiegeEventGraphSnapshot(
@@ -122,5 +127,6 @@ internal readonly struct NetworkInitializeSiegeEvent : IServerToClientCommand
         BesiegerTroopsKilled,
         BesiegerPartyHandles,
         AttackerEngines,
-        DefenderEngines);
+        DefenderEngines,
+        IsBlockadeActive);
 }
