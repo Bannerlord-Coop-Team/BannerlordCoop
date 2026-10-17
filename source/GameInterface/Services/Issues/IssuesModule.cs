@@ -22,6 +22,7 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueOwnerResolver>().As<IIssueOwnerResolver>().SingleInstance();
         builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().SingleInstance();
         builder.RegisterType<AlternativeSolutionTroopValidator>().As<IAlternativeSolutionTroopValidator>().InstancePerDependency();
+        builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().SingleInstance();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)
