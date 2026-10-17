@@ -196,7 +196,7 @@ namespace GameInterface.AutoSync.Builders
                 IncludeDeclaredMethods = true,
                 TargetMethods = dynamicRegistryItem.TargetMethods.Select(method => new
                 {
-                    DeclaringType = AutoSyncUtils.GetSimpleTypeName(method.DeclaringType),
+                    DeclaringType = method.DeclaringType.FullName.Replace('+', '.'),
                     method.Name,
                 }),
                 Prefixes = prefixes,
@@ -228,7 +228,7 @@ namespace GameInterface.AutoSync.Builders
                     IncludeDeclaredMethods = false,
                     TargetMethods = categorizedTargets.Value.Select(method => new
                     {
-                        DeclaringType = AutoSyncUtils.GetSimpleTypeName(method.DeclaringType),
+                        DeclaringType = method.DeclaringType.FullName.Replace('+', '.'),
                         method.Name,
                     }),
                     Prefixes = Enumerable.Empty<string>(),

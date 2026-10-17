@@ -1,11 +1,13 @@
 ﻿using GameInterface.AutoSync;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Settlements;
 using Quest = TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.ArtisanOverpricedGoods;
 
-/// <summary>Rebinds the patched quest callbacks after the town's field synchronization is installed.</summary>
+/// <summary>Rebinds outcome callbacks after their field synchronization is installed.</summary>
 internal class ArtisanOverpricedGoodsSync : IAutoSync
 {
     public ArtisanOverpricedGoodsSync(AutoSyncRegistry registry)

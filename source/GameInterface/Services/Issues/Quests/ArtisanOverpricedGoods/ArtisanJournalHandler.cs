@@ -26,9 +26,9 @@ internal readonly struct NetworkArtisanJournal : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
-    [ProtoMember(3)] public readonly string[] Logs;
+    [ProtoMember(3)] public readonly TextObject[] Logs;
 
-    public NetworkArtisanJournal(string giverId, string issueId, string[] logs)
+    public NetworkArtisanJournal(string giverId, string issueId, TextObject[] logs)
     {
         GiverId = giverId;
         IssueId = issueId;
@@ -71,7 +71,7 @@ internal class ArtisanJournalHandler : IHandler
         var issue = payload.What.Issue;
         if (issue.IsSolvingWithLordSolution || !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
         var entries = issue.IssueQuest?.JournalEntries ?? issue.JournalEntries;
-        network.SendAll(new NetworkArtisanJournal(giverId, issue.StringId, entries.Select(log => log.LogText.ToString()).ToArray()));
+        network.SendAll(new NetworkArtisanJournal(giverId, issue.StringId, entries.Select(log => log.LogText).ToArray()));
     }
 
     private void HandleJournal(MessagePayload<NetworkArtisanJournal> payload)
@@ -83,13 +83,13 @@ internal class ArtisanJournalHandler : IHandler
             if (!resolver.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) ||
                 !owners.TryGetOwnerControllerId(issue, out var owner) || owner != controller.ControllerId) return;
 
+            if (data.Logs == null) return;
             foreach (var text in data.Logs)
             {
                 var entries = issue.IssueQuest?.JournalEntries ?? issue.JournalEntries;
-                if (entries.Any(log => log.LogText.ToString() == text)) continue;
-                var logText = new TextObject("{=!}" + text);
-                if (issue.IssueQuest != null) issue.IssueQuest.AddLog(logText);
-                else issue.AddLog(new JournalLog(CampaignTime.Now, logText));
+                if (entries.Any(log => log.LogText.ToString() == text.ToString())) continue;
+                if (issue.IssueQuest != null) issue.IssueQuest.AddLog(text);
+                else issue.AddLog(new JournalLog(CampaignTime.Now, text));
             }
         }, context: nameof(ArtisanJournalHandler));
     }

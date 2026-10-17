@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System.Linq;
@@ -25,7 +26,7 @@ internal class ArtisanOverpricedGoodsBranchPatches
     [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess))]
     [HarmonyPrefix, HarmonyPriority(Priority.First)]
     private static bool SuccessPrefix(QuestBase __instance) =>
-        !(__instance is Quest quest) || quest._givenTradeGoods == quest._requestedTradeGoodAmount;
+        !(__instance is Quest quest) || CallOriginalPolicy.IsOriginalAllowed() || quest._givenTradeGoods == quest._requestedTradeGoodAmount;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnCompleteWithSuccess))]
     [HarmonyPrefix]

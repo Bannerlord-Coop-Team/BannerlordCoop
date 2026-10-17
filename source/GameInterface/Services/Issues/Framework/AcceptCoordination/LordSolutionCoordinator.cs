@@ -9,6 +9,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -73,7 +74,11 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         {
             if (!resolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
                 !issue.IsThereLordSolution || !objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) ||
-                hero.PartyBelongedTo == null || hero.PartyBelongedTo.CurrentSettlement != issue.IssueOwner.CurrentSettlement) return;
+                hero.PartyBelongedTo == null || hero.PartyBelongedTo.CurrentSettlement != issue.IssueOwner.CurrentSettlement)
+            {
+                Reject(peer, data.Operation);
+                return;
+            }
 
             using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
             {
@@ -81,7 +86,11 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
                 {
                     if (!issue.IsOngoingWithoutQuest || !preconditions.CanTake(issue, hero, player.ControllerId) ||
                         !issue.LordSolutionCondition(out _) || Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution ||
-                        !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId)) return;
+                        !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
+                    {
+                        Reject(peer, data.Operation);
+                        return;
+                    }
 
                     issue.StartIssueWithLordSolution();
                     network.SendAll(new NetworkLordSolutionStarted(data.IssueOwnerId, data.IssueId,
@@ -90,7 +99,11 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
                 }
 
                 if (!issue.IsSolvingWithLordSolution ||
-                    !ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != player.ControllerId) return;
+                    !ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != player.ControllerId)
+                {
+                    Reject(peer, data.Operation);
+                    return;
+                }
 
                 IssueOutcome outcome;
                 switch (data.Operation)
@@ -100,16 +113,29 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
                         outcome = IssueOutcome.LordAcceptedCounterOffer;
                         break;
                     case LordSolutionOperation.RefuseCounterOffer:
-                        if (Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution) return;
+                        if (Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution)
+                        {
+                            Reject(peer, data.Operation);
+                            return;
+                        }
                         issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
                         outcome = IssueOutcome.LordRefusedCounterOffer;
                         break;
                     default:
+                        Reject(peer, data.Operation);
                         return;
                 }
                 broker.Publish(issue, new IssueOutcomeObserved(issue, outcome));
             }
         }, context: nameof(LordSolutionCoordinator));
+    }
+
+    private void Reject(NetPeer peer, LordSolutionOperation operation)
+    {
+        var message = operation == LordSolutionOperation.Start
+            ? "The decree could not be accepted. Check your influence and speak to the artisan again."
+            : "The decree decision could not be applied. Return to the artisan's town and check your influence.";
+        network.Send(peer, new SendInformationMessage(message));
     }
 
     private void HandleStarted(MessagePayload<NetworkLordSolutionStarted> payload)
@@ -127,7 +153,9 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
                 else issue._issueState = IssueBase.IssueState.SolvingWithLordSolution;
             }
             issue._issueDifficultyMultiplier = data.Difficulty;
-            issue.IsTriedToSolveBefore = true;
+            issue.IsTriedToSolveBefore = data.ControllerId == controller.ControllerId;
+            // The conversation's menu event may have passed while acceptance waited for the server.
+            if (data.ControllerId == controller.ControllerId) issue.BeforeGameMenuOpened(null);
         }, context: nameof(LordSolutionCoordinator));
     }
 }
