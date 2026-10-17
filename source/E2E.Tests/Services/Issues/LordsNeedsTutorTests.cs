@@ -19,6 +19,7 @@ using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
@@ -173,7 +174,9 @@ public sealed class LordsNeedsTutorTests : IDisposable
                 var pupil = Get<Hero>(instance, pupilId);
                 var party = Get<MobileParty>(instance, partyIds[0]);
                 Assert.Same(party.ActualClan, pupil.CompanionOf);
-                foreach (var skill in Skills.All) Assert.Equal(originalFocus[skill.StringId] + 1, pupil.HeroDeveloper.GetFocus(skill));
+                foreach (var skill in Skills.All)
+                    Assert.True(originalFocus[skill.StringId] + 1 == pupil.HeroDeveloper.GetFocus(skill),
+                        $"{(instance == Server ? "server" : "client")} {skill.StringId} focus was not granted");
                 Assert.Equal(1, party.MemberRoster.GetTroopCount(pupil.CharacterObject));
                 Assert.Equal(0, Get<MobileParty>(instance, partyIds[1]).MemberRoster.GetTroopCount(pupil.CharacterObject));
                 var quest = Get<Hero>(instance, giverId).Issue.IssueQuest;
@@ -212,6 +215,7 @@ public sealed class LordsNeedsTutorTests : IDisposable
     public void TerminalFlowsEndTheOwnerQuestAndCleanUpThePupil(string ending)
     {
         Accept();
+        var expectedGift = ((Quest)scenario.QuestOf(Owner))._randomForQuestReward;
         if (ending == "success")
         {
             Owner.Call(() => ((Quest)scenario.QuestOf(Owner)).FirstConversationEndConsequence());
@@ -242,8 +246,10 @@ public sealed class LordsNeedsTutorTests : IDisposable
                 Assert.Equal(0, Get<MobileParty>(instance, partyIds[0]).MemberRoster.GetTroopCount(pupil.CharacterObject));
                 Assert.Equal(0, Get<MobileParty>(instance, partyIds[1]).ItemRoster.GetItemNumber(Get<ItemObject>(instance, jewelryId)));
                 var jewels = Get<MobileParty>(instance, partyIds[0]).ItemRoster.GetItemNumber(Get<ItemObject>(instance, jewelryId));
-                if (ending == "success") Assert.InRange(jewels, 2, 4);
-                else Assert.Equal(0, jewels);
+                Assert.Equal(ending == "success" ? expectedGift : 0, jewels);
+                var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog((JournalLogEntry entry) => entry.RelatedHero == Get<Hero>(instance, giverId));
+                if (instance == Observer) Assert.Null(archive);
+                else Assert.NotNull(archive);
             });
     }
 
