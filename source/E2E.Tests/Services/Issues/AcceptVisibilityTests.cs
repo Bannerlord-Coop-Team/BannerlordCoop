@@ -12,6 +12,7 @@ using GameInterface.Services.Issues.Framework.Visibility;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 
@@ -167,7 +168,9 @@ public class AcceptVisibilityTests : IDisposable
             Assert.True(otherIssue.IsSolvingWithAlternative);
             Assert.False(otherIssue.IsTriedToSolveBefore);
             Assert.Equal(0, otherIssue.AlternativeSolutionSentTroops.TotalManCount);
-            Assert.Empty(otherIssue.JournalEntries);
+            // Only the textless entry vanilla's daily tick advances, nothing the other player can read
+            var returnDays = Assert.Single(otherIssue.JournalEntries);
+            Assert.True(TextObject.IsNullOrEmpty(returnDays.LogText));
             Assert.Equal(accepted.State.ReturnTimeTicks, otherIssue.AlternativeSolutionReturnTimeForTroops.NumTicks);
         });
 
