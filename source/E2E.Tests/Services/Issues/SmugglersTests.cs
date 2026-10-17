@@ -239,6 +239,38 @@ public class SmugglersTests : IDisposable
     }
 
     [Fact]
+    public void SmugglersDialog_OpensOnlyForTheQuestsOwnParty()
+    {
+        var otherPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(ClientA.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var otherParty));
+            var quest = QuestOf(ClientA);
+            var conversation = Campaign.Current.ConversationManager;
+
+            // No leader troop and nobody talked to, so vanilla's own check passes for any party
+            using (new AllowedThread())
+            {
+                party.MemberRoster.Clear();
+                quest._smugglerParty = party;
+            }
+
+            var leaderCondition = AccessTools.FirstMethod(typeof(Quest), method =>
+                method.Name.StartsWith("<" + nameof(Quest.GetSmugglerPartyDialog) + ">") && method.ReturnType == typeof(bool));
+
+            conversation._conversationParty = otherParty;
+            Assert.False((bool)leaderCondition.Invoke(quest, null));
+
+            conversation._conversationParty = party;
+            Assert.True((bool)leaderCondition.Invoke(quest, null));
+
+            conversation._conversationParty = null;
+        });
+    }
+
+    [Fact]
     public void ClientTimeout_LeavesTheFailureToTheServer()
     {
         ClientA.Call(() =>
