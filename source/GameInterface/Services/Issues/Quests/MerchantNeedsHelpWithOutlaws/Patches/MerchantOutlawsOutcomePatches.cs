@@ -1,0 +1,62 @@
+﻿using Common;
+using GameInterface.Services.Issues.Framework.Interface;
+using HarmonyLib;
+using Quest = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssueQuest;
+
+namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws.Patches;
+
+[HarmonyPatch]
+internal class MerchantOutlawsOutcomePatches
+{
+    [HarmonyPatch(typeof(Quest), nameof(Quest.SuccessConsequences))]
+    [HarmonyPrefix]
+    private static bool SuccessPrefix(Quest __instance)
+    {
+        return !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) ||
+            dispatcher.BeforeQuestBranch(__instance, MerchantOutlawsFinalizationProofStrategy.Success);
+    }
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.AddQuestStepLog))]
+    [HarmonyPrefix]
+    private static bool ProgressPrefix(Quest __instance)
+    {
+        if (ModInformation.IsClient) return false;
+
+        // The server mirror has no acceptance dialogue and therefore no progress log.
+        __instance._questProgressLogTest?.UpdateCurrentProgress(__instance._questPartyProgress);
+        if (ContainerProvider.TryResolve<IMerchantOutlawsProgress>(out var progress)) progress.Send(__instance);
+        if (__instance._questPartyProgress >= __instance._totalPartyCount) __instance.SuccessConsequences();
+        return false;
+    }
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
+    [HarmonyPrefix]
+    private static bool TimeoutPrefix() => ModInformation.IsServer;
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnFinalize))]
+    [HarmonyPrefix]
+    private static bool FinalizePrefix(Quest __instance)
+    {
+        if (ModInformation.IsServer)
+        {
+            if (ContainerProvider.TryResolve<IMerchantOutlawsProgress>(out var progress)) progress.Send(__instance, final: true);
+            return true;
+        }
+
+        // AI cleanup belongs to the server; the owner only removes its map markers.
+        foreach (var party in __instance._validPartiesList)
+        {
+            if (__instance.IsTracked(party)) __instance.RemoveTrackedObject(party);
+        }
+
+        __instance._validPartiesList.Clear();
+        return false;
+    }
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.QuestAcceptedConsequences))]
+    [HarmonyPostfix]
+    private static void AcceptedPostfix(Quest __instance)
+    {
+        __instance._questProgressLogTest?.UpdateCurrentProgress(__instance._questPartyProgress);
+    }
+}
