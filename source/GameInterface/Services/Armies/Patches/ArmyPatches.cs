@@ -233,11 +233,7 @@ public class ArmyPatches
     {
         if (!army._parties.Contains(mobileParty))
         {
-            if (IsHalfRemoved(mobileParty, army))
-            {
-                Logger.Warning("Finishing the army leave of {PartyId}, left half removed from army {ArmyName}", mobileParty.StringId, army.Name);
-                FinishArmyLeave(mobileParty, army, clientMobileParty);
-            }
+            ReleaseHalfRemovedParty(mobileParty, army, clientMobileParty);
             return;
         }
         army.LeaderParty.UpdateVersionNo();
@@ -252,46 +248,57 @@ public class ArmyPatches
         bool condition = false;
         if (ModInformation.IsServer) // only let the server destroy, autoregistry will then sync destruction to the client
         {
-            if (army.LeaderParty == mobileParty && !army._armyIsDispersing)
+            // the disband below runs while this party is out of _parties but still linked to the army,
+            // so it must not release it as half removed; FinishArmyLeave below is its one leave
+            var previousLeavingParty = partyLeavingArmy;
+            partyLeavingArmy = mobileParty;
+            try
             {
-                army.FinishArmyObjective();
-                condition = true;
-                DisbandArmyAction.ApplyByLeaderPartyRemoved(army);
-            }
-            if (((army != null) ? army.LeaderParty : null) == mobileParty)
-            {
-                if (!condition)
+                if (army.LeaderParty == mobileParty && !army._armyIsDispersing)
                 {
                     army.FinishArmyObjective();
+                    condition = true;
+                    DisbandArmyAction.ApplyByLeaderPartyRemoved(army);
                 }
-                if (!army._armyIsDispersing)
+                if (((army != null) ? army.LeaderParty : null) == mobileParty)
                 {
-                    Army army2 = mobileParty.Army;
-                    if (((army2 != null) ? army2.LeaderParty.LeaderHero : null) == null)
+                    if (!condition)
                     {
-                        DisbandArmyAction.ApplyByArmyLeaderIsDead(mobileParty.Army);
+                        army.FinishArmyObjective();
+                    }
+                    if (!army._armyIsDispersing)
+                    {
+                        Army army2 = mobileParty.Army;
+                        if (((army2 != null) ? army2.LeaderParty.LeaderHero : null) == null)
+                        {
+                            DisbandArmyAction.ApplyByArmyLeaderIsDead(mobileParty.Army);
+                        }
+                        else
+                        {
+                            DisbandArmyAction.ApplyByObjectiveFinished(mobileParty.Army);
+                        }
+                    }
+                }
+                else if (army.Parties.Count == 0 && !army._armyIsDispersing)
+                {
+                    if (mobileParty.Army != null && clientMobileParty?.Army != null && mobileParty.Army == clientMobileParty?.Army && (clientMobileParty?.LeaderHero?.IsPrisoner ?? false))
+                    {
+                        DisbandArmyAction.ApplyByPlayerTakenPrisoner(army);
                     }
                     else
                     {
-                        DisbandArmyAction.ApplyByObjectiveFinished(mobileParty.Army);
+                        DisbandArmyAction.ApplyByNotEnoughParty(army);
                     }
                 }
-            }
-            else if (army.Parties.Count == 0 && !army._armyIsDispersing)
-            {
-                if (mobileParty.Army != null && clientMobileParty?.Army != null && mobileParty.Army == clientMobileParty?.Army && (clientMobileParty?.LeaderHero?.IsPrisoner ?? false))
-                {
-                    DisbandArmyAction.ApplyByPlayerTakenPrisoner(army);
-                }
-                else
+                // Mainplayer cant have an army with only itself
+                if (army.LeaderParty == clientMobileParty && army.Parties.Count <= 1)
                 {
                     DisbandArmyAction.ApplyByNotEnoughParty(army);
                 }
             }
-            // Mainplayer cant have an army with only itself
-            if (army.LeaderParty == clientMobileParty && army.Parties.Count <= 1)
+            finally
             {
-                DisbandArmyAction.ApplyByNotEnoughParty(army);
+                partyLeavingArmy = previousLeavingParty;
             }
         }
         FinishArmyLeave(mobileParty, army, clientMobileParty);
@@ -335,15 +342,36 @@ public class ArmyPatches
         CampaignEventDispatcher.Instance.OnPartyLeftArmy(mobileParty, army);
     }
 
+    // The party a normal removal is taking out of an army while the server disbands it. It is out of
+    // _parties but still linked, and its removal finishes the leave itself.
+    private static MobileParty partyLeavingArmy;
+
+    private static bool IsAttachedToLeader(MobileParty mobileParty, Army army) =>
+        army.LeaderParty != null && mobileParty.AttachedTo == army.LeaderParty;
+
     // A removal that stopped after _parties.Remove (#3892) leaves the party linked to this army but out
-    // of its list, so the normal removal and both disband paths would skip it.
-    private static bool IsHalfRemoved(MobileParty mobileParty, Army army) =>
-        !army._parties.Contains(mobileParty) &&
-        (mobileParty._army == army || (army.LeaderParty != null && mobileParty.AttachedTo == army.LeaderParty));
+    // of its list, so the normal removal and both disband paths would skip it. A party that joined
+    // another army since then only keeps a stale attachment to this army's leader, so it loses that
+    // attachment and keeps its new army.
+    private static void ReleaseHalfRemovedParty(MobileParty mobileParty, Army army, MobileParty clientMobileParty)
+    {
+        if (mobileParty == partyLeavingArmy || army._parties.Contains(mobileParty)) return;
+
+        if (mobileParty._army == army || (mobileParty._army == null && IsAttachedToLeader(mobileParty, army)))
+        {
+            Logger.Warning("Finishing the army leave of {PartyId}, left half removed from army {ArmyName}", mobileParty.StringId, army.Name);
+            FinishArmyLeave(mobileParty, army, clientMobileParty);
+        }
+        else if (IsAttachedToLeader(mobileParty, army))
+        {
+            Logger.Warning("Detaching {PartyId} from the leader of army {ArmyName}, it is already in army {CurrentArmyName}", mobileParty.StringId, army.Name, mobileParty._army.Name);
+            mobileParty.AttachedTo = null;
+        }
+    }
 
     /// <summary>
-    /// Finishes the leave of every party left half removed from <paramref name="army"/>. Called when the
-    /// army disbands, on the server before vanilla disperses it and on clients when it is destroyed,
+    /// Releases every party left half removed from <paramref name="army"/>. Called when the army
+    /// disbands, on the server before vanilla disperses it and on clients when it is destroyed,
     /// since afterwards the army is deregistered and nothing can address those parties anymore.
     /// </summary>
     internal static void ReleaseHalfRemovedParties(Army army)
@@ -352,10 +380,9 @@ public class ArmyPatches
         if (parties == null) return;
 
         var clientMobileParty = ModInformation.IsClient ? MobileParty.MainParty : null;
-        foreach (var party in parties.Where(party => party != null && IsHalfRemoved(party, army)).ToList())
+        foreach (var party in parties.Where(party => party != null && (party._army == army || IsAttachedToLeader(party, army))).ToList())
         {
-            Logger.Warning("Releasing {PartyId}, left half removed from disbanding army {ArmyName}", party.StringId, army.Name);
-            FinishArmyLeave(party, army, clientMobileParty);
+            ReleaseHalfRemovedParty(party, army, clientMobileParty);
         }
     }
 
