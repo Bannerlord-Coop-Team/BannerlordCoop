@@ -103,6 +103,7 @@ public sealed class RevenueFarmingTests : IDisposable
         });
         owner = Player(QuestScenario.ControllerA);
         other = Player(QuestScenario.ControllerB);
+        environment.FlushCoalescer();
         foreach (var instance in Instances) instance.Call(() =>
         {
             using (new AllowedThread())
@@ -116,7 +117,6 @@ public sealed class RevenueFarmingTests : IDisposable
                     hero.Gold = 2000;
                     party.ItemRoster.Clear();
                     party.MemberRoster.Clear();
-                    party.MemberRoster.AddToCounts(Object<CharacterObject>(instance, troopId), 40);
                     party.CurrentSettlement = Object<Settlement>(instance, townId);
                 }
                 if (instance != Server)
@@ -134,7 +134,16 @@ public sealed class RevenueFarmingTests : IDisposable
                     map._menuContext.GameMenu.StringId = "village";
                 }
             }
+            Assert.Equal(0, Object<MobileParty>(instance, owner.MobilePartyId).ItemRoster.GetItemNumber(DefaultItems.Grain));
         });
+        Server.Call(() =>
+        {
+            foreach (var player in new[] { owner, other })
+                Object<MobileParty>(Server, player.MobilePartyId).MemberRoster.AddToCounts(Object<CharacterObject>(Server, troopId), 40);
+        });
+        environment.FlushCoalescer();
+        foreach (var instance in Instances) instance.Call(() =>
+            Assert.Equal(40, Object<MobileParty>(instance, owner.MobilePartyId).MemberRoster.TotalHealthyCount));
         menus = new MethodCallRecorder(Priority.VeryHigh,
             AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
             AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish)),
