@@ -44,6 +44,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestSuccessLogText)),
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestCanceledWarDeclaredLogText)),
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.PlayerHasNeededItemsLogText)),
+        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestFailedWithTimeOutLogText)),
     };
 
     private readonly string notableId;
@@ -129,7 +130,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
     }
 
     [Fact]
-    public void Accept_MakesTheAccepterTheOwnerAndForcesItsAmountAndPaymentOntoTheServer()
+    public void Accept_MakesTheAccepterTheOwnerAndForcesItsPaymentOntoTheServer()
     {
         Accept();
 
@@ -137,6 +138,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         var serverQuest = QuestOf(Server);
 
         Assert.Equal(ControllerA, OwnerOnServer());
+        Assert.Equal(AccepterPayment, accepterQuest.RewardGold);
         Assert.Equal(AccepterPayment, serverQuest.RewardGold);
         Assert.Equal(accepterQuest._requestedItemAmount, serverQuest._requestedItemAmount);
 
@@ -268,6 +270,36 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
             Assert.Equal(amount, settlement.Party.ItemRoster.GetItemNumber(DefaultItems.IronIngot1));
             Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out _));
         });
+    }
+
+    [Fact]
+    public void OwnersTimeout_RunsTheFailConsequencesOnTheServerOnly()
+    {
+        Accept();
+
+        ClientA.Call(() =>
+        {
+            QuestOfHere(ClientA).CompleteQuestWithTimeOut();
+        }, QuestLogTexts);
+
+        var request = Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        Assert.Equal(IssueOutcome.QuestTimeOut, request.Outcome);
+
+        // Vanilla fails the quest from inside its timeout, the fail is announced first
+        var finalized = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>();
+        Assert.Equal(IssueOutcome.QuestFail, finalized.First().Outcome);
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.Null(notable.Issue);
+                // The server's -40 replicates, the owner's client must not apply its own on top
+                Assert.Equal(610f, settlement.Village.Hearth);
+            });
+        }
     }
 
     [Fact]
