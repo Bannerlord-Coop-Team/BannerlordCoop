@@ -3,6 +3,14 @@ using ProtoBuf;
 
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 
+internal enum ExtortionByDesertersNotice : byte
+{
+    None,
+    DesertersNoticedPlayer,
+    PlayerLeftVillage,
+    DesertersDefeated,
+}
+
 /// <summary>Owner-only quest progress, sent after the referenced world objects.</summary>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkExtortionByDesertersState : IServerToClientCommand
@@ -15,9 +23,10 @@ public readonly struct NetworkExtortionByDesertersState : IServerToClientCommand
     [ProtoMember(6)] public readonly int State;
     [ProtoMember(7)] public readonly string Log;
     [ProtoMember(8)] public readonly bool Ambush;
+    [ProtoMember(9)] public readonly byte Notice;
 
     public NetworkExtortionByDesertersState(string issueOwnerId, string issueId, string controllerId,
-        string deserterId, string defenderId, int state, string log, bool ambush)
+        string deserterId, string defenderId, int state, string log, bool ambush, byte notice = 0)
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
@@ -27,5 +36,6 @@ public readonly struct NetworkExtortionByDesertersState : IServerToClientCommand
         State = state;
         Log = log;
         Ambush = ambush;
+        Notice = notice;
     }
 }

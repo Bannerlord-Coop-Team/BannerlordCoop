@@ -51,14 +51,7 @@ internal class ExtortionByDesertersPartyPatches
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnBattleStarted))]
     [HarmonyPrefix]
-    private static bool OnBattleStartedPrefix(Quest __instance, PartyBase attackerParty)
-    {
-        if (ModInformation.IsClient && attackerParty == __instance._deserterMobileParty?.Party)
-        {
-            Request(__instance, ExtortionByDesertersBranch.Ambush);
-        }
-        return false;
-    }
+    private static bool OnBattleStartedPrefix() => false;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.GameMenuOpened))]
     [HarmonyPrefix]

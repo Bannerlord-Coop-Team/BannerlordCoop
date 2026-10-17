@@ -1,4 +1,4 @@
-using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
+﻿using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using ProtoBuf;
 using System.IO;
 using Xunit;
@@ -16,7 +16,7 @@ public class ExtortionByDesertersStateTests
     public void RoundTrip_PreservesOwnerAndProgress(int state, string deserters, string defenders, bool ambush)
     {
         var sent = new NetworkExtortionByDesertersState("headman", "issue-generation", "player-A",
-            deserters, defenders, state, "quest progress", ambush);
+            deserters, defenders, state, "quest progress", ambush, 3);
         using var stream = new MemoryStream();
         Serializer.Serialize(stream, sent);
         stream.Position = 0;
@@ -29,5 +29,6 @@ public class ExtortionByDesertersStateTests
         Assert.Equal(state, received.State);
         Assert.Equal("quest progress", received.Log);
         Assert.Equal(ambush, received.Ambush);
+        Assert.Equal(3, received.Notice);
     }
 }

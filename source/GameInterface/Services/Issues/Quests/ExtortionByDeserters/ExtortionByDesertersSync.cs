@@ -5,7 +5,9 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 using State = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest.ExtortionByDesertersQuestState;
@@ -36,7 +38,8 @@ internal class ExtortionByDesertersSync : IHandler
 
     public void Dispose() => broker.Unsubscribe<NetworkExtortionByDesertersState>(Handle);
 
-    public void Send(Quest quest, string log = "", bool ambush = false)
+    public void Send(Quest quest, string log = "", bool ambush = false,
+        ExtortionByDesertersNotice notice = ExtortionByDesertersNotice.None)
     {
         if (ModInformation.IsClient)
         {
@@ -56,7 +59,7 @@ internal class ExtortionByDesertersSync : IHandler
         if (quest._defenderMobileParty != null && !objects.TryGetIdWithLogging(quest._defenderMobileParty, out defenderId)) return;
 
         network.SendAll(new NetworkExtortionByDesertersState(ownerId, issue.StringId, controllerId,
-            deserterId, defenderId, (int)quest._currentState, log, ambush));
+            deserterId, defenderId, (int)quest._currentState, log, ambush, (byte)notice));
     }
 
     private void Handle(MessagePayload<NetworkExtortionByDesertersState> payload)
@@ -77,6 +80,9 @@ internal class ExtortionByDesertersSync : IHandler
             if (!string.IsNullOrEmpty(data.DeserterId) && !objects.TryGetObjectWithLogging(data.DeserterId, out deserters)) return;
             if (!string.IsNullOrEmpty(data.DefenderId) && !objects.TryGetObjectWithLogging(data.DefenderId, out defenders)) return;
 
+            if (quest._deserterMobileParty != null && quest._deserterMobileParty != deserters &&
+                quest.IsTracked(quest._deserterMobileParty)) quest.RemoveTrackedObject(quest._deserterMobileParty);
+
             if (deserters != null && quest._deserterMobileParty != deserters)
             {
                 quest.AddTrackedObject(deserters);
@@ -85,7 +91,24 @@ internal class ExtortionByDesertersSync : IHandler
             quest._deserterMobileParty = deserters;
             quest._defenderMobileParty = defenders;
             quest._currentState = (State)data.State;
+            if (quest._currentState == State.DesertersAreDefeated)
+            {
+                if (!quest.IsTracked(quest.QuestGiver)) quest.AddTrackedObject(quest.QuestGiver);
+                if (!quest.IsTracked(quest.QuestSettlement)) quest.AddTrackedObject(quest.QuestSettlement);
+            }
             if (!string.IsNullOrEmpty(data.Log)) quest.AddLog(new TextObject(data.Log));
+            switch ((ExtortionByDesertersNotice)data.Notice)
+            {
+                case ExtortionByDesertersNotice.DesertersNoticedPlayer:
+                    MBInformationManager.AddQuickInformation(quest.OnDesertersNoticedPlayerNotificationText, 0, Hero.MainHero.CharacterObject);
+                    break;
+                case ExtortionByDesertersNotice.PlayerLeftVillage:
+                    MBInformationManager.AddQuickInformation(quest.OnPlayerLeftQuestSettlementNotificationText, 0, quest.QuestGiver.CharacterObject);
+                    break;
+                case ExtortionByDesertersNotice.DesertersDefeated:
+                    MBInformationManager.AddQuickInformation(quest.OnPlayerDefeatedDesertersNotificationText, 0, quest.QuestGiver.CharacterObject);
+                    break;
+            }
             if (data.Ambush && deserters != null && defenders != null && quest.IsOngoing)
             {
                 quest.StartAmbushEncounter();

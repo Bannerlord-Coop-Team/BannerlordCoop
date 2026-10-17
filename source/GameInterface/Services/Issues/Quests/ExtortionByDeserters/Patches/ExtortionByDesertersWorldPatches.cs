@@ -2,6 +2,7 @@
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -21,6 +22,40 @@ internal class ExtortionByDesertersWorldPatches
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
     [HarmonyPostfix]
     private static void HourlyTickPostfix() => Run(quest => quest.HourlyTick());
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnStartBattle))]
+    [HarmonyPostfix]
+    private static void BattleStartedPostfix(PartyBase attackerParty)
+    {
+        Run(quest =>
+        {
+            if (attackerParty == quest._deserterMobileParty?.Party &&
+                ContainerProvider.TryResolve<ExtortionByDesertersFinalizationProofStrategy>(out var proof))
+                proof.TryRunBranch(quest, (byte)ExtortionByDesertersBranch.Ambush);
+        });
+    }
+
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEvent))]
+    [HarmonyPrefix]
+    private static void FinalizeEventPrefix(MapEvent __instance, out List<Quest> __state)
+    {
+        var affected = new List<Quest>();
+        Run(quest => { if (quest._deserterMobileParty?.MapEvent == __instance) affected.Add(quest); });
+        __state = affected;
+    }
+
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEvent))]
+    [HarmonyPostfix]
+    private static void FinalizeEventPostfix(List<Quest> __state)
+    {
+        if (__state.Count == 0) return;
+        Run(quest =>
+        {
+            if (__state.Contains(quest) && quest._deserterBattleFinalizedForTheFirstTime &&
+                ContainerProvider.TryResolve<ExtortionByDesertersFinalizationProofStrategy>(out var proof))
+                proof.TryRunBranch(quest, (byte)ExtortionByDesertersBranch.BattleCleanup);
+        });
+    }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
     [HarmonyPostfix]
@@ -82,7 +117,8 @@ internal class ExtortionByDesertersWorldPatches
                 MobileParty.NavigationType.Default, false, false);
             __instance._currentState = State.DesertersDefeatedPlayer;
         }
-        Sync(__instance);
+        Sync(__instance, __instance._currentState == State.DesertersAreDefeated
+            ? ExtortionByDesertersNotice.DesertersDefeated : ExtortionByDesertersNotice.None);
         return false;
     }
 
@@ -144,7 +180,12 @@ internal class ExtortionByDesertersWorldPatches
                     __instance.HandleDesertersRunningAway();
                     __instance._currentState = State.DesertersRunningAwayFromPlayer;
                     __instance._desertersRunAwayTimeoutTime = CampaignTime.HoursFromNow(10f);
-                    Sync(__instance, __instance.OnDesertersNoticedPlayerNotificationText.ToString());
+                    Sync(__instance, ExtortionByDesertersNotice.DesertersNoticedPlayer);
+                }
+                else if (!__instance._playerAwayFromSettlementNotificationSent)
+                {
+                    __instance._playerAwayFromSettlementNotificationSent = true;
+                    Sync(__instance, ExtortionByDesertersNotice.PlayerLeftVillage);
                 }
                 break;
             case State.DesertersRunningAwayFromPlayer:
@@ -170,8 +211,8 @@ internal class ExtortionByDesertersWorldPatches
         if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher)) dispatcher.RunAsOwners(listener);
     }
 
-    private static void Sync(Quest quest, string log = "")
+    private static void Sync(Quest quest, ExtortionByDesertersNotice notice = ExtortionByDesertersNotice.None)
     {
-        if (ContainerProvider.TryResolve<ExtortionByDesertersSync>(out var sync)) sync.Send(quest, log);
+        if (ContainerProvider.TryResolve<ExtortionByDesertersSync>(out var sync)) sync.Send(quest, notice: notice);
     }
 }

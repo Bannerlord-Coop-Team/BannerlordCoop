@@ -3,6 +3,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
+using System.Linq;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
@@ -13,18 +14,23 @@ internal class ExtortionByDesertersRewardPatches
 {
     [HarmonyPatch(typeof(Quest), nameof(Quest.ApplyQuestResult))]
     [HarmonyPrefix]
-    private static bool ApplyQuestResultPrefix(Quest __instance, ref Quest.ExtortionByDesertersQuestResult result)
-    {
-        if (ModInformation.IsServer) return true;
-        if (!result.IsSuccess) return false;
+    private static bool ApplyQuestResultPrefix() => ModInformation.IsServer;
 
-        var branch = result.GoldMultiplier == 1f ? ExtortionByDesertersBranch.FullReward :
-            result.GoldMultiplier == 0.5f ? ExtortionByDesertersBranch.HalfReward : ExtortionByDesertersBranch.RefuseReward;
-        if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+    [HarmonyPatch(typeof(Quest), nameof(Quest.QuestCompletionDialogFlow), MethodType.Getter)]
+    [HarmonyPostfix]
+    private static void RewardDialogPostfix(Quest __instance, DialogFlow __result)
+    {
+        var choices = __result.Lines.Where(line => line.ConsequenceDelegate != null).ToArray();
+        for (var i = 0; i < choices.Length; i++)
         {
-            dispatcher.BeforeQuestBranch(__instance, (byte)branch);
+            var proof = (byte)((byte)ExtortionByDesertersBranch.FullReward + i);
+            var consequence = choices[i].ConsequenceDelegate;
+            choices[i].ConsequenceDelegate = () =>
+            {
+                if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) &&
+                    dispatcher.BeforeQuestBranch(__instance, proof)) consequence();
+            };
         }
-        return false;
     }
 
     [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddLog), new[] { typeof(TextObject), typeof(bool) })]

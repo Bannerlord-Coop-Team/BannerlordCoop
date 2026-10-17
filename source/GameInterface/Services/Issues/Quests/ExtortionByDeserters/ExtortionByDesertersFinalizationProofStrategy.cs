@@ -48,8 +48,14 @@ internal class ExtortionByDesertersFinalizationProofStrategy : IFinalizationProo
         {
             if (!deserterQuest._deserterBattleFinalizedForTheFirstTime) return false;
             deserterQuest._deserterBattleFinalizedForTheFirstTime = false;
-            if (deserterQuest._currentState == State.DesertersAreDefeated) deserterQuest.DestroyDeserterParty();
+            if (deserterQuest._currentState == State.DesertersAreDefeated)
+            {
+                deserterQuest.DestroyDeserterParty();
+                deserterQuest._deserterMobileParty = null;
+            }
             deserterQuest.DestroyDefenderParty();
+            deserterQuest._defenderMobileParty = null;
+            if (ContainerProvider.TryResolve<ExtortionByDesertersSync>(out var sync)) sync.Send(deserterQuest);
             return true;
         }
 
@@ -70,6 +76,7 @@ internal class ExtortionByDesertersFinalizationProofStrategy : IFinalizationProo
                 return false;
         }
 
+        deserterQuest.AddLog(deserterQuest.OnQuestSucceededLogText);
         deserterQuest.CompleteQuestWithSuccess();
         return true;
     }
