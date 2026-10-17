@@ -152,11 +152,11 @@ public class ScoutEnemyGarrisonsTests : IDisposable
                 Client.Resolve<IMessageBroker>().Subscribe<QuestBranchRequested>(payload => requests.Add(payload.What));
 
                 var quest = QuestWithTargets(Resolve(Client, targetIds));
-                Assert.True(ScoutEnemyGarrisonsHandedOffListenerPatch.Prefix(quest));
 
                 quest.AllScoutingDone();
 
-                Assert.False(ScoutEnemyGarrisonsHandedOffListenerPatch.Prefix(quest));
+                // The hourly tick would call AllScoutingDone again, a quest built without a giver would also throw
+                quest.HourlyTick();
             });
 
             // The success entry waits for the server's outcome
@@ -168,6 +168,74 @@ public class ScoutEnemyGarrisonsTests : IDisposable
     }
 
     [Fact]
+    public void HandedOffEnding_StopsTheQuestListenersOnlyOnTheClient()
+    {
+        var targetIds = CreateTargets();
+
+        Client.Call(() =>
+        {
+            var quest = QuestWithTargets(Resolve(Client, targetIds));
+
+            ScoutEnemyGarrisonsOutcomeHandOffPatch.Postfix(quest);
+
+            Assert.True(ScoutEnemyGarrisonsBranchPatches.IsHandedOff(quest));
+        });
+
+        Server.Call(() =>
+        {
+            var quest = QuestWithTargets(Resolve(Server, targetIds));
+
+            ScoutEnemyGarrisonsOutcomeHandOffPatch.Postfix(quest);
+
+            Assert.False(ScoutEnemyGarrisonsBranchPatches.IsHandedOff(quest));
+        });
+    }
+
+    [Fact]
+    public void ReplayedArmyDispersal_ReachesTheOwnerQuestOnTheNextFrame()
+    {
+        var targetIds = CreateTargets();
+        var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var harmony = new Harmony($"test-scout-army-dispersed-{Guid.NewGuid()}");
+        var listener = AccessTools.Method(typeof(Quest), nameof(Quest.OnArmyDispersed));
+        ListenerRuns.Clear();
+        harmony.Patch(listener, postfix: new HarmonyMethod(typeof(ScoutEnemyGarrisonsTests), nameof(RecordListenerRun)) { priority = Priority.Last });
+
+        try
+        {
+            Client.Call(() =>
+            {
+                Assert.True(Client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+
+                // Another lord's army, so vanilla's listener has nothing to cancel once it runs
+                var quest = QuestWithTargets(Resolve(Client, targetIds));
+                quest.QuestGiver = giver;
+                var army = (Army)RuntimeHelpers.GetUninitializedObject(typeof(Army));
+
+                // Clients fire the event while applying the server's message
+                using (new AllowedThread())
+                {
+                    quest.OnArmyDispersed(army, Army.ArmyDispersionReason.Unknown, false);
+                }
+            });
+
+            Assert.Equal(new[] { false }, ListenerRuns);
+
+            Client.PumpGameThread();
+
+            Assert.Equal(new[] { false, true }, ListenerRuns);
+        }
+        finally
+        {
+            harmony.Unpatch(listener, HarmonyPatchType.Postfix, harmony.Id);
+        }
+    }
+
+    private static readonly List<bool> ListenerRuns = new List<bool>();
+
+    private static void RecordListenerRun(bool __runOriginal) => ListenerRuns.Add(__runOriginal);
+
+    [Fact]
     public void ReplayedSuccess_AddsTheSuccessEntryToTheOwnerJournal()
     {
         var targetIds = CreateTargets();
@@ -177,17 +245,21 @@ public class ScoutEnemyGarrisonsTests : IDisposable
         using (new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess))))
         using (var logs = new MethodCallRecorder(AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog))))
         {
-            Client.Call(() =>
+            foreach (var instance in new[] { Client, Server })
             {
-                var quest = QuestWithTargets(Resolve(Client, targetIds));
-
-                using (new AllowedThread())
+                instance.Call(() =>
                 {
-                    quest.CompleteQuestWithSuccess();
-                }
-            });
+                    var quest = QuestWithTargets(Resolve(instance, targetIds));
+
+                    using (new AllowedThread())
+                    {
+                        quest.CompleteQuestWithSuccess();
+                    }
+                });
+            }
 
             Assert.Equal(1, logs.CountFor(Client));
+            Assert.Equal(0, logs.CountFor(Server));
         }
     }
 
