@@ -11,14 +11,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.Localization;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Issues.Patches;
@@ -431,42 +429,5 @@ internal class RivalCapturedPlayerRemovedPatch
                 ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests))
                 quests.CancelPlayerQuests(player.ControllerId);
         }, blocking: true);
-    }
-}
-
-[HarmonyPatch(typeof(IssueBase))]
-internal class RivalCapturedEligibilityPatches
-{
-    [HarmonyPatch("CheckPreconditions")]
-    [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> PreconditionsTranspiler(IEnumerable<CodeInstruction> instructions)
-    {
-        var getter = AccessTools.PropertyGetter(typeof(IssueBase), "IssueQuestCanBeDuplicated");
-        foreach (var instruction in instructions)
-        {
-            if (instruction.Calls(getter))
-            {
-                instruction.opcode = OpCodes.Call;
-                instruction.operand = AccessTools.Method(typeof(RivalCapturedEligibilityPatches), nameof(CanDuplicateType));
-            }
-            yield return instruction;
-        }
-    }
-
-    // Patch the caller because the native getter can be inlined before its detour is installed.
-    private static bool CanDuplicateType(IssueBase issue) =>
-        (issue is Issue && !CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) || issue.IssueQuestCanBeDuplicated;
-
-    [HarmonyPatch("CheckPreconditions")]
-    [HarmonyPostfix]
-    private static void PreconditionsPostfix(IssueBase __instance, ref bool __result, ref TextObject explanation)
-    {
-        if (__instance is not Issue issue || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate() ||
-            !ContainerProvider.TryResolve<ILordWantsRivalCapturedQuestService>(out var quests) ||
-            !quests.HasOtherPersonalQuest(issue)) return;
-
-        __result = false;
-        if (!issue.IssueOwner.MapFaction.IsAtWarWith(Hero.MainHero.MapFaction))
-            explanation.SetTextVariable("EXPLANATION", new TextObject("{=HvY7wjHt}I don't think you can help me. I think you may have other, similar commitments that could interfere."));
     }
 }

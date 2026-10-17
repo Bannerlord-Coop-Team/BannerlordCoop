@@ -42,7 +42,6 @@ internal interface ILordWantsRivalCapturedQuestService
     void MirrorQuestAccepted(Hero giver, RivalCapturedAcceptFields fields);
     bool TryEnterOwnerScope(Quest quest, out IDisposable scope);
     bool IsOwnedBy(Quest quest, Hero hero);
-    bool HasOtherPersonalQuest(Issue issue);
     bool IsPresentWithGiver(string controllerId, Hero giver);
     void RequestChoice(Quest quest, RivalCapturedChoice choice);
     void ApplyChoice(Player player, RequestRivalCapturedChoice request);
@@ -272,19 +271,6 @@ internal sealed class LordWantsRivalCapturedQuestService : ILordWantsRivalCaptur
         return objectManager.TryGetId(hero, out var heroId) &&
             ownership.TryGetOwnerControllerId(quest.QuestGiver, out var controllerId) &&
             playerManager.TryGetPlayer(controllerId, out var player) && player.HeroId == heroId;
-    }
-
-    public bool HasOtherPersonalQuest(Issue issue)
-    {
-        var controllerId = controllerIdProvider.ControllerId;
-        if (ModInformation.IsServer)
-        {
-            if (!TryGetCurrentPlayer(out var player)) return true;
-            controllerId = player.ControllerId;
-        }
-
-        return ownership.Snapshot().Any(entry => entry.Value == controllerId && entry.Key.Issue is Issue other &&
-            other != issue && other.IsSolvingWithQuest);
     }
 
     public bool IsPresentWithGiver(string controllerId, Hero giver)

@@ -34,6 +34,7 @@ namespace E2E.Tests.Services.Issues;
 
 using Issue = LordWantsRivalCapturedIssueBehavior.LordWantsRivalCapturedIssue;
 using Quest = LordWantsRivalCapturedIssueBehavior.LordWantsRivalCapturedIssueQuest;
+using IIssueAcceptPreconditions = GameInterface.Services.Issues.Framework.Interface.IIssueAcceptPreconditions;
 
 public sealed class LordWantsRivalCapturedTests : IDisposable
 {
@@ -688,27 +689,25 @@ public sealed class LordWantsRivalCapturedTests : IDisposable
             Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in data, Get<Hero>(Server, otherGiverId)));
         });
 
-        foreach (var instance in Instances)
+        foreach (var client in environment.Clients)
         {
-            instance.Call(() =>
+            client.Call(() =>
             {
-                var giver = Get<Hero>(instance, otherGiverId);
+                var giver = Get<Hero>(client, otherGiverId);
                 var issue = Assert.IsType<Issue>(giver.Issue);
-                var isOtherPlayer = instance == OtherClient;
-                using (new MainHeroSubstitutionScope(Get<Hero>(instance, isOtherPlayer ? otherPlayerId : playerId),
-                    Get<MobileParty>(instance, isOtherPlayer ? otherPartyId : partyId)))
+                var isOtherPlayer = client == OtherClient;
+                using (new MainHeroSubstitutionScope(Get<Hero>(client, isOtherPlayer ? otherPlayerId : playerId),
+                    Get<MobileParty>(client, isOtherPlayer ? otherPartyId : partyId)))
                     Assert.Equal(isOtherPlayer && eligible, issue.CheckPreconditions(giver, out _));
             });
         }
         Server.Call(() =>
         {
-            var giver = Get<Hero>(Server, otherGiverId);
-            using (new MainHeroSubstitutionScope(Get<Hero>(Server, otherPlayerId), Get<MobileParty>(Server, otherPartyId)))
-            {
-                Assert.Equal(eligible, giver.Issue.CheckPreconditions(giver, out _));
-                using (CallOriginalPolicy.AllowOriginalsForCurrentOperation())
-                    Assert.False(giver.Issue.CheckPreconditions(giver, out _));
-            }
+            var issue = Assert.IsType<Issue>(Get<Hero>(Server, otherGiverId).Issue);
+            var preconditions = Server.Resolve<IIssueAcceptPreconditions>();
+            Assert.False(preconditions.CanTake(issue, Get<Hero>(Server, playerId), Controller));
+            // The server leaves the troop count to the accepting client's own check
+            Assert.Equal(tier >= 2, preconditions.CanTake(issue, Get<Hero>(Server, otherPlayerId), "other-rival-player"));
         });
     }
 
