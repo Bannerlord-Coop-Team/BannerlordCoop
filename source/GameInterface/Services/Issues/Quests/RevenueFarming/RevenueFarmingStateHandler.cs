@@ -228,6 +228,8 @@ internal sealed class RevenueFarmingStateHandler : IHandler
                 quest._questProgressLog = quest._journalEntries[state.ProgressLogIndex];
             }
             if (!sessions.IsLocal(quest)) return;
+            if (state.IsFinalizing && !Campaign.Current.QuestManager.Quests.Contains(quest))
+                Campaign.Current.ConversationManager.RemoveRelatedLines(quest);
             if (newLog) CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, false);
             // Vanilla finalization needs the current revenue menu to decide whether to finish the encounter.
             if (!state.IsFinalizing) Present(session, state, newPrompt, menuSettlement);

@@ -14,6 +14,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encyclopedia;
@@ -79,6 +80,7 @@ public sealed class RevenueFarmingTests : IDisposable
                     village.VillageType = villageType;
                 }
                 var notable = Object<Hero>(instance, notableId);
+                notable.Clan = null;
                 notable.Occupation = Occupation.Headman;
                 notable.StayingInSettlement = Object<Settlement>(instance, villageIds[0]);
                 Object<Settlement>(instance, villageIds[0])._notablesCache = new MBList<Hero> { notable };
@@ -112,6 +114,8 @@ public sealed class RevenueFarmingTests : IDisposable
                     hero.PartyBelongedTo = party;
                     hero.Clan.SetLeader(hero);
                     hero.Gold = 2000;
+                    party.ItemRoster.Clear();
+                    party.MemberRoster.Clear();
                     party.MemberRoster.AddToCounts(Object<CharacterObject>(instance, troopId), 40);
                     party.CurrentSettlement = Object<Settlement>(instance, townId);
                 }
@@ -241,6 +245,29 @@ public sealed class RevenueFarmingTests : IDisposable
             local.QuestAcceptedConsequences();
             Assert.Empty(Campaign.Current.QuestManager.Quests.OfType<Quest>());
             Assert.Null(Client.Resolve<IRevenueFarmingSessionStore>().LocalQuest);
+        });
+        Server.Call(() =>
+        {
+            var giver = Object<Hero>(Server, scenario.NotableId);
+            var town = Object<Settlement>(Server, townId);
+            var potential = new PotentialIssueData((in PotentialIssueData _, Hero hero) => new Issue(hero, town),
+                typeof(Issue), IssueBase.IssueFrequency.Common);
+            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in potential, giver));
+        });
+        scenario.Accept(Client);
+        Client.Call(() =>
+        {
+            var quest = Quest(Client);
+            var conversation = Campaign.Current.ConversationManager;
+            var agent = new Mock<IAgent>();
+            agent.SetupGet(value => value.Character).Returns(quest.QuestGiver.CharacterObject);
+            conversation._conversationAgents.Add(agent.Object);
+            conversation.ActiveToken = conversation.GetStateIndex("issue_classic_quest_start");
+            var line = conversation._sentences.First(sentence =>
+                sentence.InputToken == conversation.ActiveToken && sentence.RunCondition());
+            line.RunConsequence(Game.Current);
+            Assert.NotSame(local, quest);
+            Assert.Same(quest, Assert.Single(Campaign.Current.QuestManager.Quests.OfType<Quest>()));
         });
     }
 
