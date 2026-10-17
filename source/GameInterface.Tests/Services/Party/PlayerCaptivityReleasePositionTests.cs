@@ -2,10 +2,8 @@
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Party;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Handlers;
 using GameInterface.Services.Party.Messages;
@@ -49,8 +47,7 @@ public class PlayerCaptivityReleasePositionTests
             objectManager.Object,
             network.Object,
             troopRosterInterface.Object,
-            villageHostileActionInterface.Object,
-            new AlternativeSolutionTroopSelection(() => Mock.Of<IPartyScreenRosterRefresher>()));
+            villageHostileActionInterface.Object);
     }
 
     [Fact]
@@ -262,8 +259,7 @@ public class PlayerCaptivityReleasePositionTests
             Helpers.PartyScreenHelper.PartyScreenMode.Normal,
             new TroopRosterOrderData(new()),
             applyReleasedAndTakenPrisonerActions: false,
-            donationSettlementId: "town_ES1",
-            questSelectionCommitId: "quest-selection-commit");
+            donationSettlementId: "town_ES1");
 
         byte[] bytes;
         using (var ms = new MemoryStream())
@@ -280,7 +276,6 @@ public class PlayerCaptivityReleasePositionTests
 
         AssertPosition(releasePosition, result.ReleaserPartyPosition);
         Assert.Equal("town_ES1", result.DonationSettlementId);
-        Assert.Equal("quest-selection-commit", result.QuestSelectionCommitId);
     }
 
     private void SetupObject<T>(string id, T obj)

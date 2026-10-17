@@ -145,7 +145,7 @@ internal class CreateCraftedWeaponInternalPatch
         if (GameStateManager.Current.ActiveState is CraftingState craftingState &&
             ReferenceEquals(craftingState.CraftingLogic._craftedItemObject, pendingCraftedItem))
         {
-            craftingState.CraftingLogic._craftedItemObject = null;
+            craftingState.CraftingLogic.ReIndex();
         }
 
         weaponDesignVM.CraftedItemObject = null;

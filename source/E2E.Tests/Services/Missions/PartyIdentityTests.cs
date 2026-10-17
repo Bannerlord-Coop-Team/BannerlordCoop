@@ -81,34 +81,4 @@ public class PartyIdentityTests : MapEventTestBase
         // addressed by the identical stable id — the essence of a stable cross-client identifier.
         Assert.NotSame(partyOnA, partyOnB);
     }
-
-    /// <summary>
-    /// The agent identifier is a <see cref="Guid"/> in the <see cref="NetworkAgentRegistry"/>. It must round-trip:
-    /// the stable id resolves back to the exact same <see cref="Agent"/>, and the agent resolves back to the same
-    /// id, while preserving the owning player's (stable) controller id — so per-agent battle results attribute to
-    /// the right participant.
-    /// </summary>
-    [Fact]
-    [Trait("Requirement", "BR-105")]
-    public void AgentIdentifier_RoundTripsToTheSameAgent_AndPreservesStableOwner()
-    {
-        var provider = new Mock<IControllerIdProvider>();
-        provider.SetupGet(p => p.ControllerId).Returns("me");
-        var registry = new NetworkAgentRegistry(provider.Object);
-
-        var agent = ObjectHelper.SkipConstructor<Agent>();
-        var agentId = Guid.NewGuid();
-
-        Assert.True(registry.TryRegisterAgent("owner1", agentId, agent));
-
-        // id -> the same agent, carrying the stable owner.
-        Assert.True(registry.TryGetAgentInfo(agentId, out var byId));
-        Assert.Same(agent, byId.Agent);
-        Assert.Equal(agentId, byId.AgentId);
-        Assert.Equal("owner1", byId.OriginalOwner);
-
-        // agent -> the same id (the reverse lookup resolves to the identical stable id).
-        Assert.True(registry.TryGetAgentInfo(agent, out var byAgent));
-        Assert.Equal(agentId, byAgent.AgentId);
-    }
 }

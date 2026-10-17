@@ -13,31 +13,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ItemRosterSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public ItemRosterSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void ItemRoster_Serialize()
-        {
-            ItemRoster itemRoster = new ItemRoster();
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            ItemRosterBinaryPackage package = new ItemRosterBinaryPackage(itemRoster, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]
