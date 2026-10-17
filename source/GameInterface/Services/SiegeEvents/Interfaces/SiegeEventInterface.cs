@@ -219,6 +219,9 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     private bool reloadRestoreSubscribed;
     private Settlement localAftermathChoiceSettlement;
     private Settlement localAftermathNarrationSettlement;
+    // A won siege's army member waiting for its encounter End to route it to the settlement-taken menu. Kept
+    // apart from the narration identity, which the applied-aftermath broadcast clears, often before that End.
+    private Settlement pendingArmyMemberAftermathSettlement;
 
     public bool IsCampaignMissionActive =>
         TaleWorlds.MountAndBlade.MissionState.Current != null ||
@@ -806,6 +809,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         // separate: non-leader participants need narration too, but only the leader owns the menu hold.
         localAftermathChoiceSettlement = settlement;
         localAftermathNarrationSettlement = settlement;
+        pendingArmyMemberAftermathSettlement = null;
 
         // Hold the aftermath menu open until the player picks (see SiegeCaptureMenuHoldPatch): a co-op
         // client can't pause, so its encounter would otherwise roll the choice menu out to the town menu.
@@ -825,26 +829,26 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         SwitchLocalPartyToSettlementTaken(settlement);
     }
 
-    // Client-local capture-aftermath transition: finish the stale pre-mission siege encounter and open the
-    // settlement-taken menu. Shared by the aftermath-choice prompt and the encounter-menu backstop that catches
-    // a host attacker whose gated retry missed. The local player is the capturing leader (its clan now owns the
-    // settlement), so besiegerParty is MainParty.
     public bool TryRouteArmyMemberToAftermath()
     {
-        var settlement = localAftermathNarrationSettlement;
-        var aftermathBehavior = Campaign.Current?.GetCampaignBehavior<SiegeAftermathCampaignBehavior>();
-        if (!IsArmyMemberAftermath(settlement, localAftermathChoiceSettlement, aftermathBehavior?._wasPlayerArmyMember == true))
-            return false;
+        // Consumed by the first encounter End after the won siege, routed or not, so it can't reach a later one.
+        var settlement = pendingArmyMemberAftermathSettlement;
+        pendingArmyMemberAftermathSettlement = null;
+        if (settlement == null) return false;
 
         SwitchLocalPartyToSettlementTaken(settlement, asArmyMember: true);
         return true;
     }
 
-    // The client's OnMapEventEnded prefix sets the narration context and _wasPlayerArmyMember for a won siege;
+    // The client's OnMapEventEnded prefix sets _wasPlayerArmyMember before the narration context for a won siege;
     // a choice settlement means this player leads and gets the choice menu instead.
     internal static bool IsArmyMemberAftermath(Settlement narrationSettlement, Settlement choiceSettlement, bool wasPlayerArmyMember) =>
         narrationSettlement != null && choiceSettlement == null && wasPlayerArmyMember;
 
+    // Client-local capture-aftermath transition: finish the stale pre-mission siege encounter and open the
+    // settlement-taken menu. Shared by the aftermath-choice prompt and the encounter-menu backstop that catches
+    // a host attacker whose gated retry missed. The local player is the capturing leader (its clan now owns the
+    // settlement), so besiegerParty is MainParty. An army member (asArmyMember) is routed from its encounter End.
     private void SwitchLocalPartyToSettlementTaken(Settlement settlement, bool asArmyMember = false)
     {
         // menu_settlement_taken_on_init routes on _besiegerParty == MainParty to reach the leader submenu that
@@ -904,6 +908,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         // still in its own mission when the prompt arrives) and can miss. This runs off the observable stuck
         // encounter menu instead, so it lands regardless of why the prompt path failed.
         localAftermathChoiceSettlement = settlement;
+        pendingArmyMemberAftermathSettlement = null;
         SiegeCaptureMenuHoldPatch.HoldFor(settlement);
         SwitchLocalPartyToSettlementTaken(settlement);
     }
@@ -949,6 +954,14 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     public void SetLocalAftermathNarrationContext(Settlement settlement)
     {
         localAftermathNarrationSettlement = settlement;
+
+        // Decide the army-member route now, while the prefix's fields are fresh; the leader's pick can be applied
+        // (and clear the narration identity) before this member's encounter reaches End.
+        var aftermathBehavior = Campaign.Current?.GetCampaignBehavior<SiegeAftermathCampaignBehavior>();
+        pendingArmyMemberAftermathSettlement =
+            IsArmyMemberAftermath(settlement, localAftermathChoiceSettlement, aftermathBehavior?._wasPlayerArmyMember == true)
+                ? settlement
+                : null;
     }
 
     internal bool HasLocalAftermathNarrationContext(Settlement settlement)
@@ -980,6 +993,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         SiegeCaptureMenuHoldPatch.Release(localAftermathChoiceSettlement);
         localAftermathChoiceSettlement = null;
         localAftermathNarrationSettlement = null;
+        pendingArmyMemberAftermathSettlement = null;
     }
 
     public void DeploySiegeEngine(SiegeEvent siegeEvent, BattleSideEnum side, SiegeEngineType engineType, int index)
