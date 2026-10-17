@@ -146,7 +146,15 @@ internal class TradeHandler : IHandler
             if (message.CurrentMobilePartyId != null && !objectManager.TryGetObjectWithLogging<MobileParty>(message.CurrentMobilePartyId, out currentMobileParty)) return;
 
             // The server may consume food after the client has submitted its inventory.
-            if (!MatchesInventoryBaseline(toRoster, message.InitialPlayerRoster))
+            // Reapply the client's per-item changes to the current authoritative roster so
+            // one-shot loot and reward screens are not rejected after they close.
+            var toItemRosterData = message.ToItemRosterData;
+            if (!MatchesInventoryBaseline(toRoster, message.InitialPlayerRoster) &&
+                !TryRebaseInventoryData(
+                    toRoster,
+                    message.InitialPlayerRoster,
+                    message.ToItemRosterData,
+                    out toItemRosterData))
             {
                 if (peer != null)
                 {
@@ -183,7 +191,6 @@ internal class TradeHandler : IHandler
             }
 
             var fromItemRosterData = message.FromItemRosterData;
-            var toItemRosterData = message.ToItemRosterData;
             var totalAmount = message.TotalAmount;
 
             // Undo any purchases that are no longer present in the roster
@@ -234,6 +241,59 @@ internal class TradeHandler : IHandler
         }
         return true;
     }
+
+    internal static bool TryRebaseInventoryData(
+        ItemRoster authoritativeRoster,
+        ItemRosterElement[] initialRoster,
+        ItemRosterElement[] submittedRoster,
+        out ItemRosterElement[] rebasedRoster)
+    {
+        rebasedRoster = null;
+        if (authoritativeRoster == null || initialRoster == null || submittedRoster == null) return false;
+
+        var elements = new List<EquipmentElement>();
+        AddUniqueElements(elements, initialRoster);
+        AddUniqueElements(elements, submittedRoster);
+
+        var rebased = new ItemRoster(authoritativeRoster);
+        foreach (var element in elements)
+        {
+            int initialAmount = FindAmount(initialRoster, element);
+            int submittedAmount = FindAmount(submittedRoster, element);
+            int delta = submittedAmount - initialAmount;
+            if (delta == 0) continue;
+
+            int authoritativeAmount = FindAmount(rebased, element);
+            long finalAmount = (long)authoritativeAmount + delta;
+            if (finalAmount < 0 || finalAmount > int.MaxValue) return false;
+            rebased.AddToCounts(element, delta);
+        }
+
+        rebasedRoster = rebased.ToArray();
+        return true;
+    }
+
+    private static void AddUniqueElements(List<EquipmentElement> elements, IEnumerable<ItemRosterElement> roster)
+    {
+        foreach (var item in roster)
+        {
+            var element = item.EquipmentElement;
+            if (element.Item == null || elements.Any(existing => SameElement(existing, element))) continue;
+            elements.Add(element);
+        }
+    }
+
+    private static int FindAmount(IEnumerable<ItemRosterElement> roster, EquipmentElement element)
+    {
+        foreach (var item in roster)
+        {
+            if (SameElement(item.EquipmentElement, element)) return item.Amount;
+        }
+        return 0;
+    }
+
+    private static bool SameElement(EquipmentElement left, EquipmentElement right)
+        => left.Item == right.Item && left.ItemModifier == right.ItemModifier;
 
     private bool TryValidateForceTransfer(CompleteTrade message, NetPeer peer)
     {

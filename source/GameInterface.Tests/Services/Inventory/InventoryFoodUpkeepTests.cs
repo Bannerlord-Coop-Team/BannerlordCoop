@@ -18,7 +18,7 @@ public class InventoryFoodUpkeepTests
     {
         var grain = new EquipmentElement(new ItemObject("grain"));
         var logic = CreateLogic(grain, initial);
-        var inventory = new InventoryLogicInterface(null, null);
+        var inventory = new InventoryScreenRosterRefresher();
         inventory.CaptureInventoryBaseline(logic);
 
         Assert.True(inventory.TryApplyInventoryUpdate(logic, logic._rosters[1], grain, change));
@@ -33,7 +33,7 @@ public class InventoryFoodUpkeepTests
     {
         var grain = new EquipmentElement(new ItemObject("grain"));
         var logic = CreateLogic(grain, 10);
-        var inventory = new InventoryLogicInterface(null, null);
+        var inventory = new InventoryScreenRosterRefresher();
         inventory.CaptureInventoryBaseline(logic);
         logic._rosters[1].AddToCounts(grain, -3);
         logic._rosters[0].AddToCounts(grain, 3);
@@ -52,7 +52,7 @@ public class InventoryFoodUpkeepTests
         var sheep = new EquipmentElement(new ItemObject("sheep"));
         var meat = new EquipmentElement(new ItemObject("meat"));
         var logic = CreateLogic(sheep, 2);
-        var inventory = new InventoryLogicInterface(null, null);
+        var inventory = new InventoryScreenRosterRefresher();
         inventory.CaptureInventoryBaseline(logic);
         var server = new ItemRoster(logic._rosters[1]);
         logic._rosters[1].AddToCounts(sheep, -1);
@@ -69,21 +69,65 @@ public class InventoryFoodUpkeepTests
         var grain = new EquipmentElement(new ItemObject("grain"));
         var logic = CreateLogic(grain, 5);
         logic._rosters[0].AddToCounts(grain, 10);
-        var inventory = new InventoryLogicInterface(null, null);
+        var inventory = new InventoryScreenRosterRefresher();
         inventory.CaptureInventoryBaseline(logic);
         logic._rosters[1].AddToCounts(grain, -5);
         logic._rosters[0].AddToCounts(grain, 5);
         // Simulate the roster backup refresh performed by native slaughter.
         logic._rostersBackup[0] = new ItemRoster(logic._rosters[0]);
         logic._rostersBackup[1] = new ItemRoster(logic._rosters[1]);
-        inventory.TryApplyInventoryUpdate(logic, logic._rosters[0], grain, 2);
+        Assert.False(inventory.TryApplyInventoryUpdate(logic, logic._rosters[0], grain, 2));
 
         inventory.RestoreInventoryBackup(logic);
 
         Assert.Equal(5, Count(logic._rostersBackup[1], grain));
-        Assert.Equal(12, Count(logic._rostersBackup[0], grain));
+        Assert.Equal(10, Count(logic._rostersBackup[0], grain));
         logic._rostersBackup[1].Clear();
         Assert.Equal(5, inventory.GetInventoryBaseline(logic).Single().Amount);
+    }
+
+    [Fact]
+    public void StalePlayerRoster_RebasesSubmittedChangesOnAuthoritativeFood()
+    {
+        var grain = new ItemObject("grain");
+        var authoritative = new ItemRoster();
+        authoritative.AddToCounts(grain, 8);
+        var initial = new ItemRosterElement[] { new(grain, 10) };
+        var submitted = new ItemRosterElement[] { new(grain, 7) };
+
+        Assert.True(TradeHandler.TryRebaseInventoryData(authoritative, initial, submitted, out var rebased));
+        Assert.Equal(5, rebased.Single().Amount);
+    }
+
+    [Fact]
+    public void StalePlayerRoster_RejectsDiffThatWouldGoBelowZero()
+    {
+        var grain = new ItemObject("grain");
+        var authoritative = new ItemRoster();
+        authoritative.AddToCounts(grain, 2);
+        var initial = new ItemRosterElement[] { new(grain, 10) };
+        var submitted = new ItemRosterElement[] { new(grain, 0) };
+
+        Assert.False(TradeHandler.TryRebaseInventoryData(authoritative, initial, submitted, out _));
+    }
+
+    [Fact]
+    public void ServerRosterSnapshot_AppliesElementDeltasWithoutClearingTheRoster()
+    {
+        var grain = new ItemObject("grain");
+        var sheep = new ItemObject("sheep");
+        var roster = new ItemRoster();
+        roster.AddToCounts(grain, 10);
+        var logic = new InventoryLogicInterface(null, null);
+
+        logic.UpdateRosterWithData(roster, new[]
+        {
+            new ItemRosterElement(grain, 7),
+            new ItemRosterElement(sheep, 2),
+        });
+
+        Assert.Equal(7, Count(roster, new EquipmentElement(grain)));
+        Assert.Equal(2, Count(roster, new EquipmentElement(sheep)));
     }
 
     [Fact]
@@ -118,7 +162,7 @@ public class InventoryFoodUpkeepTests
     {
         var grain = new EquipmentElement(new ItemObject("grain"));
         var logic = CreateLogic(grain, 5);
-        var inventory = new InventoryLogicInterface(null, null);
+        var inventory = new InventoryScreenRosterRefresher();
         inventory.CaptureInventoryBaseline(logic);
 
         Assert.False(inventory.TryApplyInventoryUpdate(logic, new ItemRoster(), grain, -1));

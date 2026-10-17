@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
@@ -8,6 +9,7 @@ using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using System.Collections.Generic;
+using Serilog;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 
@@ -18,6 +20,7 @@ namespace Coop.Core.Server.Services.ItemRosters.Handlers;
 /// </summary>
 public class ItemRosterMessageHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ItemRosterMessageHandler>();
     // Coalescer channel for per-element ItemRoster updates; member is the item+modifier pair.
     private const string ItemRosterUpdateChannel = "ItemRosterUpdate";
 
@@ -110,7 +113,11 @@ public class ItemRosterMessageHandler : IHandler
             var updates = new List<NetworkItemRosterUpdate>();
             foreach (var item in roster)
             {
-                if (!TryGetItemHandle(item.EquipmentElement.Item, out uint itemId)) return;
+                if (!TryGetItemHandle(item.EquipmentElement.Item, out uint itemId))
+                {
+                    Logger.Warning("Unable to resend item roster {RosterId}: item handle is unavailable", rosterId);
+                    return;
+                }
                 uint modifierId = 0;
                 if (item.EquipmentElement.ItemModifier != null &&
                     !objectManager.TryGetHandleWithLogging(item.EquipmentElement.ItemModifier, out modifierId)) return;

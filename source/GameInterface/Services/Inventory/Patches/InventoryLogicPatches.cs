@@ -22,7 +22,7 @@ internal class InventoryLogicPatches
     [HarmonyPostfix]
     static void InitializeRostersPostfix(InventoryLogic __instance)
     {
-        if (ContainerProvider.TryResolve<IInventoryLogicInterface>(out var inventory))
+        if (ContainerProvider.TryResolve<IInventoryScreenRosterRefresher>(out var inventory))
             inventory.CaptureInventoryBaseline(__instance);
     }
 
@@ -60,8 +60,10 @@ internal class InventoryLogicPatches
             }
         }
 
-        if (!ContainerProvider.TryResolve<IInventoryLogicInterface>(out var inventory))
+        if (!ContainerProvider.TryResolve<IInventoryScreenRosterRefresher>(out var screenInventory) ||
+            !ContainerProvider.TryResolve<IInventoryLogicInterface>(out var inventory))
         {
+            logger.Error("Unable to resolve inventory services while closing the inventory screen.");
             __result = false;
             return false;
         }
@@ -84,7 +86,7 @@ internal class InventoryLogicPatches
             __instance.GetBoughtItems(),
             __instance.GetSoldItems(),
             forceTransferId,
-            inventory.GetInventoryBaseline(__instance)
+            screenInventory.GetInventoryBaseline(__instance)
         );
 
         MessageBroker.Instance.Publish(__instance, message);

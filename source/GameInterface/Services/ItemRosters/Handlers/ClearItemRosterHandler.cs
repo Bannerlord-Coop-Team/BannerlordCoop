@@ -21,13 +21,13 @@ namespace GameInterface.Services.ItemRosters.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly IPartyScreenRosterRefresher partyScreenRosterRefresher;
-        private readonly IInventoryLogicInterface inventory;
+        private readonly IInventoryScreenRosterRefresher inventory;
 
         public ClearItemRosterHandler(
             IMessageBroker messageBroker,
             IObjectManager objectManager,
             IPartyScreenRosterRefresher partyScreenRosterRefresher,
-            IInventoryLogicInterface inventory) {
+            IInventoryScreenRosterRefresher inventory) {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.partyScreenRosterRefresher = partyScreenRosterRefresher;

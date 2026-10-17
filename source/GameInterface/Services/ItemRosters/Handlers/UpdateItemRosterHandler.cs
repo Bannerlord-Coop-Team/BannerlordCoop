@@ -22,13 +22,13 @@ internal class UpdateItemRosterHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly IPartyScreenRosterRefresher partyScreenRosterRefresher;
-    private readonly IInventoryLogicInterface inventory;
+    private readonly IInventoryScreenRosterRefresher inventory;
 
     public UpdateItemRosterHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         IPartyScreenRosterRefresher partyScreenRosterRefresher,
-        IInventoryLogicInterface inventory)
+        IInventoryScreenRosterRefresher inventory)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
