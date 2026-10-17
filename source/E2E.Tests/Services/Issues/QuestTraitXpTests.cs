@@ -73,5 +73,6 @@ public class QuestTraitXpTests : IDisposable
         Assert.False(QuestTraitXpPatches.OnIssueSolvedThroughQuestSingleTraitPrefix());
         Assert.False(QuestTraitXpPatches.OnIssueSolvedThroughAlternativeSolutionPrefix());
         Assert.False(QuestTraitXpPatches.OnIssueSolvedThroughBetrayalPrefix());
+        Assert.False(QuestTraitXpPatches.OnIssueFailedPrefix());
     }
 }

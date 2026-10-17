@@ -274,6 +274,13 @@ internal class FinalizationCoordinator : IHandler
     {
         var quest = issue.IssueQuest;
 
+        // The server already returned these troops; replaying vanilla cancellation would return them twice.
+        if (quest == null && issue.IsSolvingWithAlternative && outcome == IssueOutcome.QuestCancel)
+        {
+            issue.IssueFinalized();
+            return;
+        }
+
         if (quest != null && !Campaign.Current.QuestManager.Quests.Contains(quest))
         {
             issue.IssueQuest = null;

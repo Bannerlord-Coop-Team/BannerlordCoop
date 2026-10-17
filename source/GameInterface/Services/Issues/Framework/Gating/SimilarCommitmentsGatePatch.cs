@@ -34,9 +34,9 @@ internal class SimilarCommitmentsGatePatch
         {
             if (issue != __instance &&
                 issue.GetType() == __instance.GetType() &&
-                (issue.IsSolvingWithQuest || issue.IsSolvingWithAlternative) &&
-                ownerResolver.TryGetOwnerControllerId(issue, out var ownerControllerId) &&
-                ownerControllerId != controllerIdProvider.ControllerId)
+                (issue.IsSolvingWithQuest || issue.IsSolvingWithAlternative || issue.IsSolvingWithLordSolution) &&
+                ((ownerResolver.TryGetOwnerControllerId(issue, out var ownerControllerId) &&
+                  ownerControllerId != controllerIdProvider.ControllerId) || issue.IsSolvingWithLordSolution))
             {
                 __state.Add((issue, issue._issueState));
             }
@@ -46,7 +46,9 @@ internal class SimilarCommitmentsGatePatch
         {
             foreach (var hidden in __state)
             {
-                hidden.Issue._issueState = IssueBase.IssueState.Ongoing;
+                var belongsToAnother = ownerResolver.TryGetOwnerControllerId(hidden.Issue, out var ownerControllerId) &&
+                    ownerControllerId != controllerIdProvider.ControllerId;
+                hidden.Issue._issueState = belongsToAnother ? IssueBase.IssueState.Ongoing : IssueBase.IssueState.SolvingWithQuestSolution;
             }
         }
     }

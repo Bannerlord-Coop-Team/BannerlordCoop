@@ -28,7 +28,7 @@ internal sealed class QuestScenario
     public EnvironmentInstance ClientA => testEnvironment.Clients.First();
     public EnvironmentInstance ClientB => testEnvironment.Clients.Last();
 
-    public QuestScenario(E2ETestEnvironment testEnvironment)
+    public QuestScenario(E2ETestEnvironment testEnvironment, Action<EnvironmentInstance, string>? setupIssue = null)
     {
         this.testEnvironment = testEnvironment;
 
@@ -39,7 +39,8 @@ internal sealed class QuestScenario
 
         foreach (var instance in new[] { Server, ClientA, ClientB })
         {
-            AddIssue(instance);
+            if (setupIssue == null) AddIssue(instance);
+            else instance.Call(() => setupIssue(instance, NotableId));
         }
     }
 
