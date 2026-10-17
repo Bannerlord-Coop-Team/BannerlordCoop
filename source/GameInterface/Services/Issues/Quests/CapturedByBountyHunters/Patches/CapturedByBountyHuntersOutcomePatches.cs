@@ -23,7 +23,16 @@ internal class CapturedByBountyHuntersOutcomePatches
             return;
         }
 
-        dispatcher.RunAsOwners<Quest>(quest => quest.OnMapEventEnded(mapEvent));
+        dispatcher.RunAsOwners<Quest>(quest =>
+        {
+            // An owner without a party, a prisoner for one, would be checked against the party of whoever ended the battle
+            if (Hero.MainHero?.PartyBelongedTo == null)
+            {
+                return;
+            }
+
+            quest.OnMapEventEnded(mapEvent);
+        });
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventEnded))]
