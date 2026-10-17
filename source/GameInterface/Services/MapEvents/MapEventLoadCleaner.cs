@@ -101,6 +101,62 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                 mobileParty.ResetNavigationToHold();
             }
         }
+
+        ReleaseEndedMapEventLinks();
+    }
+
+    // A save can hold parties still linked to a battle that already ended (finalized, or no longer
+    // in the map event manager). Nothing ends that battle again, so the party never moves again and
+    // the map shows an empty 0/0 battle. Covers AI parties too, not only player battles.
+    private void ReleaseEndedMapEventLinks()
+    {
+        var liveMapEvents = new HashSet<MapEvent>(Campaign.Current.MapEventManager.MapEvents);
+        var parties = Campaign.Current.CampaignObjectManager.MobileParties
+            .Where(mobileParty => mobileParty != null)
+            .Select(mobileParty => mobileParty.Party)
+            .Concat(Settlement.All
+                .Where(settlement => settlement != null)
+                .Select(settlement => settlement.Party))
+            .Where(party => party != null)
+            .ToArray();
+
+        var endedMapEvents = parties
+            .Select(party => party.MapEventSide?.MapEvent)
+            .Where(mapEvent => mapEvent != null &&
+                (mapEvent.IsFinalized || !liveMapEvents.Contains(mapEvent)))
+            .Distinct()
+            .ToArray();
+
+        foreach (var mapEvent in endedMapEvents)
+        {
+            var linkedParties = parties
+                .Where(party => ReferenceEquals(party.MapEventSide?.MapEvent, mapEvent))
+                .ToArray();
+
+            logger.Warning(
+                "Releasing {PartyCount} parties from ended map event {MapEventId} after load",
+                linkedParties.Length,
+                mapEvent.StringId);
+
+            // The battle already ended, so mark it finalized before detaching. Removing the last
+            // party then cannot run FinalizeEvent again and replay its results.
+            if (!mapEvent.IsFinalized)
+                mapEvent.State = MapEventState.WaitingRemoval;
+
+            RepairPartySideLinks(mapEvent);
+            DetachFromFinalizedEvent(mapEvent);
+
+            foreach (var party in linkedParties)
+            {
+                // A link the event's sides never listed has no membership left to remove.
+                if (ReferenceEquals(party.MapEventSide?.MapEvent, mapEvent))
+                    party._mapEventSide = null;
+
+                var mobileParty = party.MobileParty;
+                if (mobileParty != null && mobileParty.IsActive && !mobileParty.IsPlayerParty())
+                    mobileParty.ResetNavigationToHold();
+            }
+        }
     }
 
     private void RepairPartySideLinks(MapEvent mapEvent)
@@ -212,6 +268,13 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             "Detaching {PartyCount} parties from half-finalized loaded player map event {MapEventId}",
             mapEvent.InvolvedParties.Count(),
             mapEvent.StringId);
+        DetachFromFinalizedEvent(mapEvent);
+    }
+
+    // Empties the sides of an event that is already finalized and retires its network object,
+    // without running FinalizeEvent (and its battle results) again.
+    private void DetachFromFinalizedEvent(MapEvent mapEvent)
+    {
         mapEvent.AttackerSide?.HandleMapEventEnd();
         mapEvent.DefenderSide?.HandleMapEventEnd();
         messageBroker.Publish(mapEvent, new MapEventFinalized(mapEvent));
