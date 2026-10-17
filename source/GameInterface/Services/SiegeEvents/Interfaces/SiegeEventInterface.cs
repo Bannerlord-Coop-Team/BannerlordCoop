@@ -194,6 +194,13 @@ public interface ISiegeEventInterface : IGameAbstraction
     void RouteCapturedSettlementToAftermathMenu(Settlement settlement);
 
     /// <summary>
+    /// Sends a local army member of a won siege to the settlement-taken menu, where they see the leader's
+    /// aftermath and continue, like vanilla <c>PlayerEncounter.DoEnd</c>. Finishes the local encounter itself.
+    /// </summary>
+    /// <returns>True when the local player was such an army member and was routed.</returns>
+    bool TryRouteArmyMemberToAftermath();
+
+    /// <summary>
     /// Builds/deploys a siege engine at a slot for one side, mirroring the map production popup.
     /// Server side; rejected while the siege is fighting an assault, matching the vanilla tick freeze.
     /// </summary>
@@ -822,12 +829,29 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     // settlement-taken menu. Shared by the aftermath-choice prompt and the encounter-menu backstop that catches
     // a host attacker whose gated retry missed. The local player is the capturing leader (its clan now owns the
     // settlement), so besiegerParty is MainParty.
-    private void SwitchLocalPartyToSettlementTaken(Settlement settlement)
+    public bool TryRouteArmyMemberToAftermath()
+    {
+        var settlement = localAftermathNarrationSettlement;
+        var aftermathBehavior = Campaign.Current?.GetCampaignBehavior<SiegeAftermathCampaignBehavior>();
+        if (!IsArmyMemberAftermath(settlement, localAftermathChoiceSettlement, aftermathBehavior?._wasPlayerArmyMember == true))
+            return false;
+
+        SwitchLocalPartyToSettlementTaken(settlement, asArmyMember: true);
+        return true;
+    }
+
+    // The client's OnMapEventEnded prefix sets the narration context and _wasPlayerArmyMember for a won siege;
+    // a choice settlement means this player leads and gets the choice menu instead.
+    internal static bool IsArmyMemberAftermath(Settlement narrationSettlement, Settlement choiceSettlement, bool wasPlayerArmyMember) =>
+        narrationSettlement != null && choiceSettlement == null && wasPlayerArmyMember;
+
+    private void SwitchLocalPartyToSettlementTaken(Settlement settlement, bool asArmyMember = false)
     {
         // menu_settlement_taken_on_init routes on _besiegerParty == MainParty to reach the leader submenu that
         // carries Devastate/Pillage/Mercy; set the fields the client's OnMapEventEnded prefix would have set.
+        // An army member keeps the prefix's _besiegerParty (the leader) and lands on the member narration.
         var aftermathBehavior = Campaign.Current?.GetCampaignBehavior<SiegeAftermathCampaignBehavior>();
-        if (aftermathBehavior != null)
+        if (aftermathBehavior != null && !asArmyMember)
         {
             aftermathBehavior._besiegerParty = MobileParty.MainParty;
             aftermathBehavior._prevSettlementOwnerClan = settlement.OwnerClan;
@@ -847,11 +871,19 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
             }
 
             // AllowedThread stands the co-op EncounterManager patch down so this runs locally, not round-tripped.
-            if (MobileParty.MainParty.CurrentSettlement != settlement)
+            // Vanilla DoEnd starts a member's encounter on the army leader and does not enter the settlement.
+            if (asArmyMember)
             {
-                EnterSettlementAction.ApplyForParty(MobileParty.MainParty, settlement);
+                EncounterManager.StartSettlementEncounter(MobileParty.MainParty.Army?.LeaderParty ?? MobileParty.MainParty, settlement);
             }
-            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+            else
+            {
+                if (MobileParty.MainParty.CurrentSettlement != settlement)
+                {
+                    EnterSettlementAction.ApplyForParty(MobileParty.MainParty, settlement);
+                }
+                EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+            }
 
             if (Campaign.Current?.CurrentMenuContext != null)
             {
