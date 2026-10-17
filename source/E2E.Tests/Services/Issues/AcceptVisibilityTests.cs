@@ -299,15 +299,19 @@ public class AcceptVisibilityTests : IDisposable
     }
 
     [Theory]
-    [InlineData(IssueOutcome.QuestSuccess)]
-    [InlineData(IssueOutcome.QuestCancel)]
-    public void QuestSolution_AClientThatJoinedLaterEndsTheIssueWithoutDrivingTheQuestFromTheSave(IssueOutcome outcome)
+    [InlineData(IssueOutcome.QuestSuccess, false)]
+    [InlineData(IssueOutcome.QuestCancel, false)]
+    [InlineData(IssueOutcome.QuestSuccess, true)]
+    [InlineData(IssueOutcome.QuestCancel, true)]
+    public void QuestSolution_AClientThatJoinedLaterEndsTheIssueWithoutDrivingTheQuestFromTheSave(IssueOutcome outcome, bool knowsOwner)
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
         var otherIssue = AddIssue(Other, notableId);
         ListenForIssueUpdatesOnTheOtherClient();
         ListenForQuestCompletionsOnTheOtherClient();
         LoadQuestSolutionFromSave(otherIssue, notableId);
+        if (knowsOwner)
+            Other.Call(() => Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, OwnerControllerId)));
 
         Other.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
 
