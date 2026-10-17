@@ -413,7 +413,13 @@ internal sealed class ChatVM : ViewModel
             string.Equals(selectedChannel?.ControllerId, channelId, StringComparison.Ordinal);
         bool viewingAll = IsOpen && selectedChannel?.IsAll == true && feedsAll;
         if (!IsOpen)
+        {
             AppendVisibleLine(line, passiveTrimmed);
+
+            // the closed feed fades, so the channel keeps the unread marker until it is opened (#3930)
+            if (line.IsPlayerChat && channelsById.TryGetValue(channelId, out var closedChannel))
+                closedChannel.MarkUnread();
+        }
         else if (viewingThisChannel || viewingAll)
         {
             ChatLineVM visibleTrimmed = viewingAll ? allTrimmed : trimmed;

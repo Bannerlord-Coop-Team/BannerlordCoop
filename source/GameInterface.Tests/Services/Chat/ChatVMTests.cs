@@ -57,7 +57,7 @@ public class ChatVMTests
     }
 
     [Fact]
-    public void Receive_DirectMessage_ShowsInClosedFeed_NotInAll()
+    public void Receive_DirectMessage_ShowsInClosedFeedAndMarksSenderUnread_NotInAll()
     {
         var vm = new ChatVM(_ => { }, () => "local");
 
@@ -72,7 +72,8 @@ public class ChatVMTests
         var all = vm.Channels.Single(channel => channel.IsAll);
         var direct = vm.Channels.Single(channel => channel.ControllerId == "other-controller");
         Assert.True(all.IsSelected);
-        Assert.False(direct.HasUnreadMessages);
+        // the fade feed is easy to miss, so the sender's tab shows it is unread (#3930)
+        Assert.True(direct.HasUnreadMessages);
         Assert.False(vm.IsOpen);
         Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[From Other Hero] Other Hero: meet me in Pravend"));
 
