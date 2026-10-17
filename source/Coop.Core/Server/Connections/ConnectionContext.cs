@@ -6,7 +6,6 @@ using Coop.Core.Server.Services.MobileParties;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.CampaignService.Interfaces;
 using GameInterface.Services.Heroes.Interfaces;
-using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
@@ -26,6 +25,7 @@ public class ConnectionContext
         INetwork network,
         IModuleValidator moduleValidator,
         IModuleInfoProvider moduleInfoProvider,
+        IModuleNameProvider moduleNameProvider,
         IPlayerManager playerManager,
         IPlayerPartyRestorer playerPartyRestorer,
         IPlayerCreationRollback playerCreationRollback,
@@ -41,13 +41,13 @@ public class ConnectionContext
         IServerOptionsProvider serverOptionsProvider,
         IJoinCampaignBaselineSender joinCampaignBaselineSender,
         IJoinCampaignKingdomBaseLineSender joinCampaignKingdomBaseLineSender,
-        IJoinValidationDenialLog joinValidationDenialLog,
-        IHeadmanHerdQuestAuthority herdQuestAuthority)
+        IJoinValidationDenialLog joinValidationDenialLog)
     {
         MessageBroker = messageBroker;
         Network = network;
         ModuleValidator = moduleValidator;
         ModuleInfoProvider = moduleInfoProvider;
+        ModuleNameProvider = moduleNameProvider;
         PlayerManager = playerManager;
         PlayerPartyRestorer = playerPartyRestorer;
         PlayerCreationRollback = playerCreationRollback;
@@ -64,13 +64,13 @@ public class ConnectionContext
         JoinCampaignBaselineSender = joinCampaignBaselineSender;
         JoinCampaignKingdomBaseLineSender = joinCampaignKingdomBaseLineSender;
         JoinValidationDenialLog = joinValidationDenialLog;
-        HerdQuestAuthority = herdQuestAuthority;
     }
 
     public IMessageBroker MessageBroker { get; }
     public INetwork Network { get; }
     public IModuleValidator ModuleValidator { get; }
     public IModuleInfoProvider ModuleInfoProvider { get; }
+    public IModuleNameProvider ModuleNameProvider { get; }
     public IPlayerManager PlayerManager { get; }
     public IPlayerPartyRestorer PlayerPartyRestorer { get; }
     public IPlayerCreationRollback PlayerCreationRollback { get; }
@@ -87,5 +87,4 @@ public class ConnectionContext
     public IJoinCampaignBaselineSender JoinCampaignBaselineSender { get; }
     public IJoinCampaignKingdomBaseLineSender JoinCampaignKingdomBaseLineSender { get; }
     public IJoinValidationDenialLog JoinValidationDenialLog { get; }
-    public IHeadmanHerdQuestAuthority HerdQuestAuthority { get; }
 }

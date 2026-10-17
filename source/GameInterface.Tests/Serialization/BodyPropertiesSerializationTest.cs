@@ -10,29 +10,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class BodyPropertiesSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public BodyPropertiesSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void BodyProperties_Serialize()
-        {
-            BodyProperties BodyProperties = new BodyProperties(new DynamicBodyProperties(1f, 2f, 3f), new StaticBodyProperties(1, 2, 3, 4, 5, 6, 7, 8));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            BodyPropertiesBinaryPackage package = new BodyPropertiesBinaryPackage(BodyProperties, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

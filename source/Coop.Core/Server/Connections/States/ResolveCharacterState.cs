@@ -5,13 +5,13 @@ using Common.Network;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Modules;
-using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
@@ -34,10 +34,10 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly IPlayerPartyRestorer playerPartyRestorer;
     private readonly IObjectManager objectManager;
     private readonly IModuleInfoProvider moduleInfoProvider;
+    private readonly IModuleNameProvider moduleNameProvider;
     private readonly IExistingPlayerSender existingPlayerSender;
     private readonly ISteamBanList steamBanList;
     private readonly IJoinValidationDenialLog denialLog;
-    private readonly IHeadmanHerdQuestAuthority herdQuestAuthority;
 
     // Refused validations on this connection; only the first is logged.
     private int denials;
@@ -50,10 +50,10 @@ public class ResolveCharacterState : ConnectionStateBase
         IPlayerPartyRestorer playerPartyRestorer,
         IObjectManager objectManager,
         IModuleInfoProvider moduleInfoProvider,
+        IModuleNameProvider moduleNameProvider,
         IExistingPlayerSender existingPlayerSender,
         ISteamBanList steamBanList,
-        IJoinValidationDenialLog denialLog,
-        IHeadmanHerdQuestAuthority herdQuestAuthority)
+        IJoinValidationDenialLog denialLog)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
@@ -63,10 +63,10 @@ public class ResolveCharacterState : ConnectionStateBase
         this.playerPartyRestorer = playerPartyRestorer;
         this.objectManager = objectManager;
         this.moduleInfoProvider = moduleInfoProvider;
+        this.moduleNameProvider = moduleNameProvider;
         this.existingPlayerSender = existingPlayerSender;
         this.steamBanList = steamBanList;
         this.denialLog = denialLog;
-        this.herdQuestAuthority = herdQuestAuthority;
 
         messageBroker.Subscribe<NetworkClientValidate>(Handle_ClientValidate);
         messageBroker.Subscribe<NetworkModuleVersionsValidate>(Handle_ModuleVersionsValidate);
@@ -109,7 +109,8 @@ public class ResolveCharacterState : ConnectionStateBase
                 result = moduleValidator.Validate(
                     serverModules,
                     clientModules.Select(ConvertToModuleInfo),
-                    out error);
+                    out error,
+                    DisplayNames(clientModules, serverModules));
 
                 // The client joins anyway on the lone Coop reason, so only log real refusals.
                 if (!result && !string.Equals(error, NetworkModuleVersionsValidated.UnsupportedCoopModuleReason, StringComparison.Ordinal))
@@ -216,15 +217,7 @@ public class ResolveCharacterState : ConnectionStateBase
             GameThread.Run(() =>
             {
                 heroExists = objectManager.TryGetObjectWithLogging(player.HeroId, out Hero _);
-                if (!heroExists)
-                {
-                    if (!playerManager.TryGetPlayer(controllerId, out var current) || !ReferenceEquals(current, player))
-                        throw new InvalidOperationException("Player registration changed during reconnect cleanup.");
-                    herdQuestAuthority.CancelForPlayerRemoval(controllerId);
-                    if (!playerManager.RemovePlayer(player))
-                        throw new InvalidOperationException("Failed to remove the missing hero's registration.");
-                    return;
-                }
+                if (!heroExists) return;
 
                 partyRestored = playerPartyRestorer.TryRestore(player, out restoredPlayer);
                 if (!partyRestored || ReferenceEquals(restoredPlayer, player)) return;
@@ -265,6 +258,8 @@ public class ResolveCharacterState : ConnectionStateBase
                 "Controller {ControllerId} is registered to hero {HeroId}, which no longer exists; " +
                 "dropping the stale registration and creating a new character",
                 controllerId, player.HeroId);
+
+            playerManager.RemovePlayer(player);
         }
 
         network.SendImmediate(peer, new NetworkClientValidated(false, null));
@@ -295,6 +290,29 @@ public class ResolveCharacterState : ConnectionStateBase
 
     public override void EnterMission()
     {
+    }
+
+    // Names only make the refusal readable: the client's for its modules (older clients send none),
+    // the server's own for modules the client lacks.
+    private Dictionary<string, string> DisplayNames(IEnumerable<NetworkModuleInfo> clientModules, IEnumerable<ModuleInfo> serverModules)
+    {
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var module in clientModules)
+        {
+            if (module?.Id != null && !string.IsNullOrWhiteSpace(module.Name))
+                names[module.Id] = module.Name;
+        }
+
+        foreach (var module in serverModules)
+        {
+            if (module.Id == null || names.ContainsKey(module.Id)) continue;
+
+            var name = moduleNameProvider.GetDisplayName(module.Id);
+            if (!string.IsNullOrWhiteSpace(name))
+                names[module.Id] = name;
+        }
+
+        return names;
     }
 
     private static ModuleInfo ConvertToModuleInfo(NetworkModuleInfo networkModuleInfo)

@@ -23,7 +23,6 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Handlers;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Interfaces;
-using GameInterface.Services.Issues.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using GameInterface.Services.ObjectManager;
@@ -428,6 +427,7 @@ public class ServerAdmissionGateTests
             Mock.Of<INetwork>(),
             Mock.Of<IModuleValidator>(),
             Mock.Of<IModuleInfoProvider>(),
+            Mock.Of<IModuleNameProvider>(),
             Mock.Of<IPlayerManager>(),
             Mock.Of<IPlayerPartyRestorer>(),
             Mock.Of<IPlayerCreationRollback>(),
@@ -443,8 +443,7 @@ public class ServerAdmissionGateTests
             Mock.Of<IServerOptionsProvider>(),
             Mock.Of<IJoinCampaignBaselineSender>(),
             Mock.Of<IJoinCampaignKingdomBaseLineSender>(),
-            Mock.Of<IJoinValidationDenialLog>(),
-            Mock.Of<IHeadmanHerdQuestAuthority>());
+            Mock.Of<IJoinValidationDenialLog>());
     }
 
     /// <summary>The real gate, which also signals once a shutdown has started closing it.</summary>
