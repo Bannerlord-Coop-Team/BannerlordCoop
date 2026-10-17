@@ -2,6 +2,7 @@
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.CreationCapture;
@@ -10,6 +11,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using Helpers;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
@@ -33,6 +35,13 @@ public class CapturedByBountyHuntersTests : IDisposable
 
     private static readonly FieldInfo SideMapEventField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapEvent));
 
+    // Test heroes and settlements have no encyclopedia links, a missing settlement still throws before these
+    private static readonly MethodBase[] AcceptLogLinks =
+    {
+        AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.GetCharacterProperties)),
+        AccessTools.PropertyGetter(typeof(Settlement), nameof(Settlement.EncyclopediaLinkWithName)),
+    };
+
     private static readonly MethodBase[] OutcomeLogTexts =
     {
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.SuccessQuestLogText)),
@@ -43,6 +52,7 @@ public class CapturedByBountyHuntersTests : IDisposable
 
     private readonly string gangLeaderId;
     private readonly string hideoutId;
+    private readonly string townId;
     private readonly string ownerHeroId;
     private readonly string ownerPartyId;
     private readonly string otherHeroId;
@@ -60,6 +70,7 @@ public class CapturedByBountyHuntersTests : IDisposable
 
         gangLeaderId = TestEnvironment.CreateRegisteredObject<Hero>();
         hideoutId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        townId = TestEnvironment.CreateRegisteredObject<Settlement>();
 
         (ownerHeroId, ownerPartyId) = RegisterPlayer(ClientA, "player-A");
         (otherHeroId, otherPartyId) = RegisterPlayer(ClientB, "player-B");
@@ -69,11 +80,13 @@ public class CapturedByBountyHuntersTests : IDisposable
             instance.Call(() =>
             {
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(gangLeaderId, out var gangLeader));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(townId, out var town));
 
                 using (new AllowedThread())
                 {
                     gangLeader.Occupation = Occupation.GangLeader;
                     gangLeader._power = InitialPower;
+                    gangLeader.StayingInSettlement = town;
                 }
             });
         }
@@ -87,20 +100,7 @@ public class CapturedByBountyHuntersTests : IDisposable
     [Fact]
     public void AnIssueTheServerCreatesIsBuiltOnEveryClientWithTheSameHideout()
     {
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(gangLeaderId, out var gangLeader));
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(hideoutId, out var hideout));
-
-            var potentialIssue = new PotentialIssueData(
-                (in PotentialIssueData _, Hero hero) => new Issue(hero, hideout),
-                typeof(Issue),
-                IssueBase.IssueFrequency.Common);
-
-            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in potentialIssue, gangLeader));
-        });
-
-        var created = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
+        var created = CreateIssueOnServer();
         Assert.Equal(typeof(Issue).Name, created.IssueTypeName);
 
         foreach (var client in TestEnvironment.Clients)
@@ -115,6 +115,23 @@ public class CapturedByBountyHuntersTests : IDisposable
                 Assert.Same(hideout, issue._hideout);
             });
         }
+    }
+
+    [Fact]
+    public void AnIssueTheServerCreatesCanBeAcceptedByAClientOutsideASettlement()
+    {
+        var created = CreateIssueOnServer();
+        Assert.False(string.IsNullOrEmpty(created.IssueId));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(gangLeaderId, out var gangLeader));
+            Assert.Equal(created.IssueId, gangLeader.Issue.StringId);
+        });
+
+        AcceptOnClientA(created.IssueId);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
     }
 
     [Fact]
@@ -394,25 +411,45 @@ public class CapturedByBountyHuntersTests : IDisposable
         return mapEvent;
     }
 
-    private void AcceptOnClientA()
+    private NetworkIssueCreated CreateIssueOnServer()
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(gangLeaderId, out var gangLeader));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(hideoutId, out var hideout));
+
+            var potentialIssue = new PotentialIssueData(
+                (in PotentialIssueData _, Hero hero) => new Issue(hero, hideout),
+                typeof(Issue),
+                IssueBase.IssueFrequency.Common);
+
+            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in potentialIssue, gangLeader));
+        });
+
+        return Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
+    }
+
+    // Client A is not in a settlement, as when the offer conversation is opened on the map
+    private void AcceptOnClientA(string issueId = IssueId)
     {
         ClientA.Call(() =>
         {
             Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(gangLeaderId, out var gangLeader));
+            Assert.Null(Settlement.CurrentSettlement);
+
             gangLeader.Issue.StartIssueWithQuest();
 
-            // The offer dialog's consequence starts the owner's quest
-            using (new AllowedThread())
-            {
-                gangLeader.Issue.IssueQuest.StartQuest();
-            }
+            // The offer dialog's consequence starts the owner's quest and writes its start log
+            var quest = Assert.IsType<Quest>(gangLeader.Issue.IssueQuest);
+            quest.QuestAcceptedConsequences();
 
-            Assert.Contains(gangLeader.Issue.IssueQuest, Campaign.Current.QuestManager.Quests);
-        });
+            Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
+            Assert.Single(quest.JournalEntries);
+        }, AcceptLogLinks);
 
         Server.Call(() =>
         {
-            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(gangLeaderId, IssueId, out var owner));
+            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(gangLeaderId, issueId, out var owner));
             Assert.Equal("player-A", owner);
         });
     }
