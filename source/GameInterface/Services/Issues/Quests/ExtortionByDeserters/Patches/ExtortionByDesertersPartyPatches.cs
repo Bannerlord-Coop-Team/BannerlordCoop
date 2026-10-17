@@ -93,5 +93,11 @@ internal class ExtortionByDesertersServerMethodsPatch
     }
 
     [HarmonyPrefix]
-    private static bool Prefix() => ModInformation.IsServer;
+    private static bool Prefix(MethodBase __originalMethod)
+    {
+        if (ModInformation.IsClient) return false;
+        if (__originalMethod.Name == nameof(Quest.OnSettlementLeft) || __originalMethod.Name == nameof(Quest.OnMapEventStarted))
+            return Hero.MainHero.PartyBelongedTo != null;
+        return true;
+    }
 }

@@ -6,6 +6,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using GameInterface.Services.Players;
+using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using Helpers;
 using System.Reflection;
@@ -381,6 +382,30 @@ public class ExtortionByDesertersTests : IDisposable
         Assert.Equal(IssueOutcome.QuestTimeOut,
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Other.Call(() => Assert.DoesNotContain(Campaign.Current.QuestManager.Quests, item => item is Quest));
+    }
+
+    [Fact]
+    public void CapturedOwner_DoesNotUseAnotherPlayersPartyForFlight()
+    {
+        Accept();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        var quest = (Quest)scenario.QuestOf(Server);
+        using var flight = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.HandleDesertersRunningAway)));
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var deserters));
+            using (new AllowedThread())
+            {
+                hero._partyBelongedTo = null;
+                hero.ChangeState(Hero.CharacterStates.Prisoner);
+            }
+            quest._deserterMobileParty = deserters;
+            using (new MainHeroSubstitutionScope(hero, null)) quest.HourlyTick();
+            Assert.Equal(State.DesertersMovingToSettlement, quest._currentState);
+        });
+        Assert.Equal(0, flight.Count);
     }
 
     private string AddSecondIssue()

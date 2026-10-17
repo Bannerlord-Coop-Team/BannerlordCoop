@@ -96,8 +96,10 @@ internal class ExtortionByDesertersWorldPatches
         var deserters = __instance._deserterMobileParty;
         if (ModInformation.IsClient || deserters == null || !mapEvent.InvolvedParties.Contains(deserters.Party)) return false;
 
-        var owner = MobileParty.MainParty.Party;
-        if (!mapEvent.InvolvedParties.Contains(owner))
+        var owner = Hero.MainHero.PartyBelongedTo?.Party;
+        var captor = Hero.MainHero.IsPrisoner ? Hero.MainHero.PartyBelongedToAsPrisoner : null;
+        var ownerWasCaptured = captor?.MapEvent == mapEvent && mapEvent.WinningSide == captor.Side;
+        if (!ownerWasCaptured && (owner == null || !mapEvent.InvolvedParties.Contains(owner)))
         {
             // Another player's victory must not leave a quest pointing at a destroyed party.
             if (mapEvent.WinningSide != BattleSideEnum.None && mapEvent.WinningSide != deserters.Party.Side)
@@ -106,7 +108,7 @@ internal class ExtortionByDesertersWorldPatches
         }
 
         __instance._deserterBattleFinalizedForTheFirstTime = true;
-        if (mapEvent.WinningSide == owner.Side)
+        if (!ownerWasCaptured && mapEvent.WinningSide == owner.Side)
         {
             __instance._currentState = State.DesertersAreDefeated;
             __instance.AddLog(__instance.OnDeserterPartyDefeatedLogText);
@@ -131,11 +133,11 @@ internal class ExtortionByDesertersWorldPatches
         if (attacker == null) return false;
         if (attacker == __instance._deserterMobileParty?.Party)
         {
-            if (MobileParty.MainParty.CurrentSettlement == village.Settlement) return false;
+            if (Hero.MainHero.PartyBelongedTo?.CurrentSettlement == village.Settlement) return false;
             __instance.ApplyQuestResult(__instance._questResultFail2);
             __instance.CompleteQuestWithFail(__instance.OnQuestFailed2LogText);
         }
-        else if (attacker == MobileParty.MainParty.Party)
+        else if (attacker == Hero.MainHero.PartyBelongedTo?.Party)
         {
             __instance.ApplyQuestResult(__instance._questResultFail3);
             __instance.CompleteQuestWithFail(__instance.OnQuestFailed3LogText);
@@ -167,15 +169,18 @@ internal class ExtortionByDesertersWorldPatches
             return false;
         }
 
+        var ownerParty = Hero.MainHero.PartyBelongedTo;
+        if (ownerParty == null && __instance._currentState != State.DesertersDefeatedPlayer) return false;
+
         switch (__instance._currentState)
         {
             case State.DesertersMovingToSettlement:
-                if (MobileParty.MainParty.CurrentSettlement == __instance.QuestSettlement)
+                if (ownerParty.CurrentSettlement == __instance.QuestSettlement)
                 {
                     SetPartyAiAction.GetActionForRaidingSettlement(deserters, __instance.QuestSettlement,
                         MobileParty.NavigationType.Default, false, false);
                 }
-                else if (deserters.Position.Distance(MobileParty.MainParty.Position) <= deserters.SeeingRange * 0.8f)
+                else if (deserters.Position.Distance(ownerParty.Position) <= deserters.SeeingRange * 0.8f)
                 {
                     __instance.HandleDesertersRunningAway();
                     __instance._currentState = State.DesertersRunningAwayFromPlayer;
@@ -189,7 +194,7 @@ internal class ExtortionByDesertersWorldPatches
                 }
                 break;
             case State.DesertersRunningAwayFromPlayer:
-                if (deserters.Position.Distance(MobileParty.MainParty.Position) > MobileParty.MainParty.SeeingRange + 3f ||
+                if (deserters.Position.Distance(ownerParty.Position) > ownerParty.SeeingRange + 3f ||
                     __instance._desertersRunAwayTimeoutTime.IsPast)
                 {
                     if (__instance._desertersRunAwayTimeoutTime.IsPast) __instance.DestroyDeserterParty();

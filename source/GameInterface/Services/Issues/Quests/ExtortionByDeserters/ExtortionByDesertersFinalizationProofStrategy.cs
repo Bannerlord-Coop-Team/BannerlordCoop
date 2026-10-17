@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 using State = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest.ExtortionByDesertersQuestState;
 
@@ -28,15 +29,17 @@ internal class ExtortionByDesertersFinalizationProofStrategy : IFinalizationProo
         {
             var party = deserterQuest._deserterMobileParty;
             var raid = party?.MapEvent;
-            if (raid?.IsRaid != true || raid.HasWinner || raid.IsFinalized ||
+            var ownerParty = Hero.MainHero.PartyBelongedTo;
+            if (ownerParty == null || raid?.IsRaid != true || raid.HasWinner || raid.IsFinalized ||
                 raid.AttackerSide.LeaderParty != party.Party ||
                 raid.DefenderSide.LeaderParty != deserterQuest.QuestSettlement.Party ||
-                TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.CurrentSettlement != deserterQuest.QuestSettlement ||
+                ownerParty.CurrentSettlement != deserterQuest.QuestSettlement ||
+                (ownerParty.MapEvent != null && ownerParty.MapEvent != raid) ||
                 deserterQuest._defenderMobileParty != null) return false;
 
             deserterQuest.CreateDefenderParty();
             deserterQuest._defenderMobileParty.MapEventSide = raid.DefenderSide;
-            TaleWorlds.CampaignSystem.Party.MobileParty.MainParty.MapEventSide = raid.DefenderSide;
+            ownerParty.MapEventSide = raid.DefenderSide;
             party.IgnoreByOtherPartiesTill(CampaignTime.Now - CampaignTime.Hours(1f));
             if (deserterQuest.QuestSettlement.MilitiaPartyComponent != null)
                 deserterQuest.QuestSettlement.MilitiaPartyComponent.MobileParty.MapEventSide = null;
