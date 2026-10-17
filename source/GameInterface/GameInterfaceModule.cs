@@ -23,8 +23,7 @@ using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Hideouts;
-using GameInterface.Services.Issues.Generic;
-using GameInterface.Services.Issues.Interfaces;
+using GameInterface.Services.Issues;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.LiveTesting;
@@ -105,6 +104,7 @@ public class GameInterfaceModule : Module
             .InstancePerLifetimeScope()
             .AutoActivate();
 
+        builder.RegisterType<GameInterfacePatchInstaller>().As<IGameInterfacePatchInstaller>().InstancePerDependency();
         builder.RegisterType<GameInterface>().As<IGameInterface>().InstancePerLifetimeScope().AutoActivate();
         // mod-config.json: one lazy read per session container (see IModConfig).
         builder.RegisterType<ModConfig>().As<IModConfig>().InstancePerLifetimeScope();
@@ -127,12 +127,15 @@ public class GameInterfaceModule : Module
         builder.RegisterType<NetworkOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
         builder.RegisterType<LocalMovementBandwidth>().As<ILocalMovementBandwidth>().InstancePerDependency();
         builder.RegisterType<ChatPlayerName>().As<IChatPlayerNameResolver>().InstancePerDependency();
+        builder.RegisterType<ChatVanillaLogGate>().As<IChatVanillaLogGate>().InstancePerDependency();
+        builder.RegisterType<ChatEventLog>().As<IChatEventLog>().InstancePerDependency();
         builder.RegisterType<PlayerPartyRestorer>().As<IPlayerPartyRestorer>().InstancePerDependency();
         builder.RegisterType<PlayerCreationRollback>().As<IPlayerCreationRollback>().InstancePerDependency();
         builder.RegisterType<ServerPlayerUnstuck>().As<IServerPlayerUnstuck>().InstancePerDependency();
         builder.RegisterType<MobilePartyBehaviorSnapshot>().As<IMobilePartyBehaviorSnapshot>().InstancePerDependency();
         builder.RegisterType<PartyBehaviorWireMapper>().As<IPartyBehaviorWireMapper>().InstancePerDependency();
         builder.RegisterType<AlleyGarrisonData>().As<IAlleyGarrisonData>().InstancePerDependency();
+        builder.RegisterModule<IssuesModule>();
 #if DEBUG
         builder.RegisterType<ClanLordMovementFixture>().As<IClanLordMovementFixture>().InstancePerLifetimeScope();
         builder.RegisterType<ClanLordMovementFixtureRules>().As<IClanLordMovementFixtureRules>().InstancePerDependency();
@@ -143,12 +146,6 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PeacePursuitCleaner>().As<IPeacePursuitCleaner>().InstancePerDependency();
         builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().InstancePerLifetimeScope();
-        builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
-        builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().InstancePerLifetimeScope();
-        builder.RegisterType<IssueGenerationRegistry>().As<IIssueGenerationRegistry>().InstancePerLifetimeScope();
-        builder.RegisterType<PendingLocalOwnerConsequenceRegistry>().As<IPendingLocalOwnerConsequenceRegistry>().InstancePerLifetimeScope();
-        builder.RegisterType<DisconnectedOwnerEvaluationSupport>().As<IDisconnectedOwnerEvaluationSupport>().InstancePerDependency();
-        builder.RegisterType<AwaitingAlternativeSolutionTroopsRegistry>().As<IAwaitingAlternativeSolutionTroopsRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<LocationConversationAgentGuard>().As<ILocationConversationAgentGuard>().InstancePerDependency();
@@ -172,6 +169,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PlayerSiegeTargetScoring>().As<IPlayerSiegeTargetScoring>().InstancePerDependency();
         builder.RegisterType<ArmyFormationPositionConvergence>().As<IArmyFormationPositionConvergence>().InstancePerDependency();
         builder.RegisterType<MapEventLoadCleaner>().As<IMapEventLoadCleaner>().InstancePerDependency();
+        builder.RegisterType<EmptyLordPartyResetter>().As<IEmptyLordPartyResetter>().InstancePerDependency();
         builder.RegisterType<EncounterMenuConditionRefresher>().As<IEncounterMenuConditionRefresher>().InstancePerDependency();
         builder.RegisterType<PartyScreenRosterRefresher>().As<IPartyScreenRosterRefresher>().InstancePerDependency();
         builder.RegisterType<PlayerTroopXpRelevance>().As<IPlayerTroopXpRelevance>().InstancePerDependency();

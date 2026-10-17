@@ -128,6 +128,7 @@ internal class PartyScreenHelperHandler : IHandler
         });
     }
 
+    // Client side: sends the troops donated on the garrison screen to the server.
     private void Handle_GarrisonDonated(MessagePayload<GarrisonDonated> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.CurrentSettlement, out var currentSettlementId)) return;
@@ -145,13 +146,19 @@ internal class PartyScreenHelperHandler : IHandler
                 element.Number));
         }
 
+        // Done is allowed without moving any troops, nothing to send then
+        if (troops.Count == 0) return;
+
         var message = new DonateToGarrison(currentSettlementId, troops);
 
         network.SendAll(message);
     }
 
+    // Server side: adds the donated troops to the settlement's garrison, creating it if needed.
     private void Handle_DonateToGarrison(MessagePayload<DonateToGarrison> obj)
     {
+        // protobuf drops an empty list so Troops arrives as null, the foreach below would NRE and kill the dedicated server
+        if (obj.What.Troops == null || obj.What.Troops.Count == 0) return;
         if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.CurrentSettlementId, out var currentSettlement)) return;
 
         GameThread.RunSafe(() =>

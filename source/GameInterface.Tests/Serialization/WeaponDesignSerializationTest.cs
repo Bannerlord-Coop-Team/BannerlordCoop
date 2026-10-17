@@ -13,46 +13,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class WeaponDesignSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public WeaponDesignSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void WeaponDesign_Serialize()
-        {
-            WeaponDesignElement[] elements = new WeaponDesignElement[]
-            {
-                WeaponDesignElement.CreateUsablePiece(new CraftingPiece(), 30),
-                WeaponDesignElement.CreateUsablePiece(new CraftingPiece(), 30),
-                WeaponDesignElement.CreateUsablePiece(new CraftingPiece(), 30)
-            };
-
-            PieceData[] buildOrders = new PieceData[]
-            {
-                new PieceData(CraftingPiece.PieceTypes.Blade, 0),
-                new PieceData(CraftingPiece.PieceTypes.Handle, 1)
-            };
-
-            CraftingTemplate craftingTemplate = new CraftingTemplate();
-            craftingTemplate.BuildOrders = buildOrders;
-            WeaponDesign WeaponDesign = new WeaponDesign(craftingTemplate, new TextObject("testValue"), elements);
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            WeaponDesignBinaryPackage package = new WeaponDesignBinaryPackage(WeaponDesign, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

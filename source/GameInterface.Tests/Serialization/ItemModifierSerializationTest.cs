@@ -10,29 +10,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ItemModifierSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public ItemModifierSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void ItemModifier_Serialize()
-        {
-            ItemModifier ItemModifier = new ItemModifier();
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            ItemModifierBinaryPackage package = new ItemModifierBinaryPackage(ItemModifier, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

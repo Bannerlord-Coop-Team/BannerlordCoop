@@ -152,6 +152,14 @@ internal class PartyScreenLogicPatches
                 TroopRoster duplicateLeftMemberRoster = __instance.MemberRosters[0].CloneRosterData();
                 TroopRoster duplicateLeftPrisonerRoster = __instance.PrisonerRosters[0].CloneRosterData();
 
+                TroopRoster questLeftMemberRoster = __instance.MemberRosters[0];
+                TroopRoster questTroops = null;
+                if (partyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage)
+                {
+                    questTroops = TroopRoster.CreateDummyTroopRoster();
+                    questTroops.Add(questLeftMemberRoster);
+                }
+
                 InCommit = true;
                 try
                 {
@@ -175,6 +183,11 @@ internal class PartyScreenLogicPatches
                         __instance,
                         duplicateLeftMemberRoster,
                         duplicateLeftPrisonerRoster);
+
+                    if (questTroops != null)
+                    {
+                        RestoreQuestTroops(questLeftMemberRoster, questTroops);
+                    }
                 }
                 finally
                 {
@@ -193,6 +206,12 @@ internal class PartyScreenLogicPatches
     {
         partyScreenLogic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftMemberRoster;
         partyScreenLogic.PrisonerRosters[(int)PartyScreenLogic.PartyRosterSide.Left] = leftPrisonerRoster;
+    }
+
+    internal static void RestoreQuestTroops(TroopRoster sentTroops, TroopRoster transferredTroops)
+    {
+        sentTroops.Clear();
+        sentTroops.Add(transferredTroops);
     }
 
     [HarmonyPatch(nameof(PartyScreenLogic.OnPartyScreenClosed))]
