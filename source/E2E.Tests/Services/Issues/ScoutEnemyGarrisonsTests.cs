@@ -1,11 +1,13 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons;
+using GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Patches;
 using HarmonyLib;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
@@ -112,7 +114,7 @@ public class ScoutEnemyGarrisonsTests : IDisposable
     }
 
     [Fact]
-    public void ScoutingBranch_RunsTheVanillaRewardsOnTheServer()
+    public void ScoutingBranch_RunsAllScoutingDoneOnTheServer()
     {
         Server.Call(() =>
         {
@@ -138,13 +140,11 @@ public class ScoutEnemyGarrisonsTests : IDisposable
     }
 
     [Fact]
-    public void ClientScoutingDone_IsHandedToTheServerOnce()
+    public void ClientScoutingDone_IsHandedToTheServerAndStopsTheQuestListeners()
     {
         var targetIds = CreateTargets();
         var requests = new List<QuestBranchRequested>();
 
-        // The success text needs a fully built quest giver, the test only counts the log entries
-        using (new MethodCallRecorder(AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestSuccess))))
         using (var logs = new MethodCallRecorder(AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog))))
         {
             Client.Call(() =>
@@ -152,16 +152,43 @@ public class ScoutEnemyGarrisonsTests : IDisposable
                 Client.Resolve<IMessageBroker>().Subscribe<QuestBranchRequested>(payload => requests.Add(payload.What));
 
                 var quest = QuestWithTargets(Resolve(Client, targetIds));
+                Assert.True(ScoutEnemyGarrisonsHandedOffListenerPatch.Prefix(quest));
 
                 quest.AllScoutingDone();
-                quest.AllScoutingDone();
+
+                Assert.False(ScoutEnemyGarrisonsHandedOffListenerPatch.Prefix(quest));
             });
 
-            Assert.Equal(1, logs.CountFor(Client));
+            // The success entry waits for the server's outcome
+            Assert.Equal(0, logs.CountFor(Client));
         }
 
         var request = Assert.Single(requests);
         Assert.Equal((byte)ScoutEnemyGarrisonsBranch.AllScoutingDone, request.Proof);
+    }
+
+    [Fact]
+    public void ReplayedSuccess_AddsTheSuccessEntryToTheOwnerJournal()
+    {
+        var targetIds = CreateTargets();
+
+        // The success text needs a fully built quest giver and finalizing needs a started quest, the test only counts the log entries
+        using (new MethodCallRecorder(AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestSuccess))))
+        using (new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess))))
+        using (var logs = new MethodCallRecorder(AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog))))
+        {
+            Client.Call(() =>
+            {
+                var quest = QuestWithTargets(Resolve(Client, targetIds));
+
+                using (new AllowedThread())
+                {
+                    quest.CompleteQuestWithSuccess();
+                }
+            });
+
+            Assert.Equal(1, logs.CountFor(Client));
+        }
     }
 
     private string[] CreateTargets() => new[]
