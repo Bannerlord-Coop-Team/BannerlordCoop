@@ -10,6 +10,7 @@ namespace E2E.Tests.Services.Issues;
 public class OutcomeDispatcherRunAsOwnersTests : IDisposable
 {
     private readonly StubIssueQuestGenerator quests = new();
+    private readonly StubIssuePreconditions preconditions = new(QuestScenario.IssueType);
     private readonly QuestScenario scenario;
 
     private E2ETestEnvironment TestEnvironment { get; }
@@ -24,6 +25,7 @@ public class OutcomeDispatcherRunAsOwnersTests : IDisposable
     {
         TestEnvironment.Dispose();
         quests.Dispose();
+        preconditions.Dispose();
     }
 
     [Fact]

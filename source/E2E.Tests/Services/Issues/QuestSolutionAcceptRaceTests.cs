@@ -9,6 +9,7 @@ namespace E2E.Tests.Services.Issues;
 public class QuestSolutionAcceptRaceTests : IDisposable
 {
     private readonly StubIssueQuestGenerator quests = new();
+    private readonly StubIssuePreconditions preconditions = new(QuestScenario.IssueType);
     private readonly QuestScenario scenario;
 
     private E2ETestEnvironment TestEnvironment { get; }
@@ -23,6 +24,7 @@ public class QuestSolutionAcceptRaceTests : IDisposable
     {
         TestEnvironment.Dispose();
         quests.Dispose();
+        preconditions.Dispose();
     }
 
     [Fact]
