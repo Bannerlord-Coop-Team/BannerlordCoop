@@ -172,7 +172,7 @@ internal class TradeHandler : IHandler
             // When looting, taken items are treated as bought items. Don't need to manage changed rosters in these cases
             if (fromRoster != null)
             {
-                totalAmount = ReconcilePurchases(fromRoster, fromItemRosterData, toItemRosterData, boughtItems, totalAmount);
+                totalAmount = ReconcilePurchases(fromRoster, ref fromItemRosterData, ref toItemRosterData, boughtItems, totalAmount);
             }
 
             // Update rosters with new data
@@ -310,13 +310,15 @@ internal class TradeHandler : IHandler
     }
 
     /// <summary>
-    /// Removes any purchased quantity the merchant can no longer supply from the party roster data and
-    /// refunds the prorated cost.
+    /// Moves any purchased quantity the merchant can no longer supply from the party roster data back to
+    /// the merchant roster data and refunds the prorated cost. Only what the party data still holds can be
+    /// taken back, so the refund and the merchant restore follow the quantity actually removed. Both arrays
+    /// may be replaced when an entry has to be appended.
     /// </summary>
     internal static int ReconcilePurchases(
         ItemRoster merchantRoster,
-        ItemRosterElement[] merchantRosterData,
-        ItemRosterElement[] partyRosterData,
+        ref ItemRosterElement[] merchantRosterData,
+        ref ItemRosterElement[] partyRosterData,
         List<(ItemRosterElement, int)> boughtItems,
         int totalAmount)
     {
@@ -325,20 +327,25 @@ internal class TradeHandler : IHandler
             int amount = boughtItem.Item1.Amount;
             int elementIndex = merchantRoster.FindIndexOfElement(boughtItem.Item1.EquipmentElement);
             int available = elementIndex >= 0 ? merchantRoster.GetElementNumber(elementIndex) : 0;
-            int difference = available - amount;
+            int shortfall = amount - available;
+            if (shortfall <= 0) continue;
 
-            if (difference < 0)
+            // Items missing from the party data (equipped during the trade) cannot be taken back
+            int partyIndex = partyRosterData?.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1)) ?? -1;
+            int removed = partyIndex >= 0 ? System.Math.Min(shortfall, System.Math.Max(partyRosterData[partyIndex].Amount, 0)) : 0;
+            if (removed == 0) continue;
+
+            partyRosterData[partyIndex].Amount -= removed;
+
+            int merchantIndex = merchantRosterData?.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1)) ?? -1;
+            if (merchantIndex >= 0) merchantRosterData[merchantIndex].Amount += removed;
+            else if (merchantRosterData != null)
             {
-                int fromRosterDataIndex = merchantRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
-                if (fromRosterDataIndex >= 0) merchantRosterData[fromRosterDataIndex].Amount -= difference;
-                else merchantRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, -difference));
-
-                int toRosterDataIndex = partyRosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1));
-                if (toRosterDataIndex >= 0) partyRosterData[toRosterDataIndex].Amount += difference;
-                else partyRosterData.AddItem(new ItemRosterElement(boughtItem.Item1.EquipmentElement, difference));
-
-                totalAmount -= amount > 0 ? (boughtItem.Item2 * -difference) / amount : boughtItem.Item2;
+                System.Array.Resize(ref merchantRosterData, merchantRosterData.Length + 1);
+                merchantRosterData[merchantRosterData.Length - 1] = new ItemRosterElement(boughtItem.Item1.EquipmentElement, removed);
             }
+
+            totalAmount -= amount > 0 ? (boughtItem.Item2 * removed) / amount : boughtItem.Item2;
         }
 
         return totalAmount;
