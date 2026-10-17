@@ -12,6 +12,10 @@ using Helpers;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Actions;
+using SandBox.GauntletUI.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -368,6 +372,128 @@ public class ExtortionByDesertersTests : IDisposable
         });
         Assert.Equal(1, branches.CountFor(Server));
         Assert.Equal(0, branches.CountFor(Owner));
+    }
+
+    [Fact]
+    public void ServerAmbush_AssignsOwnerAndCreatedDefendersAndRemovesMilitia()
+    {
+        Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        using var encounter = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(Quest), nameof(Quest.StartAmbushEncounter)));
+        var disabled = TextLinks.Concat(new[]
+        {
+            AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
+            AccessTools.Method(typeof(MobilePartyHelper), nameof(MobilePartyHelper.FillPartyManuallyAfterCreation)),
+        }).ToArray();
+        MobileParty ownerParty = null!;
+        MobileParty militia = null!;
+        MapEvent raid = null!;
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject(owner.MobilePartyId, out ownerParty));
+            quest.QuestSettlement.Culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
+            ownerParty.CurrentSettlement = quest.QuestSettlement;
+            var component = new MilitiaPartyComponent(quest.QuestSettlement, new MilitiaPartyComponent.InitializationArgs());
+            militia = MobileParty.CreateParty("extortion_test_militia", component);
+            quest.QuestSettlement.MilitiaPartyComponent = component;
+            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            quest._deserterMobileParty = deserters;
+            deserters.SetPartyUsedByQuest(true);
+            raid = CreateBattle(deserters, quest.QuestSettlement.Party, true);
+            militia.MapEventSide = raid.DefenderSide;
+            CampaignEventDispatcher.Instance.OnStartBattle(deserters.Party, quest.QuestSettlement.Party, null, false);
+            Assert.NotNull(quest._defenderMobileParty);
+            Assert.True(quest._defenderMobileParty.IsCurrentlyUsedByAQuest);
+            Assert.True(Server.ObjectManager.TryGetId(quest._defenderMobileParty, out _));
+            Assert.Same(raid.DefenderSide, quest._defenderMobileParty.MapEventSide);
+            Assert.Same(raid.DefenderSide, ownerParty.MapEventSide);
+            Assert.Null(militia.MapEventSide);
+            Assert.False(Server.Resolve<ExtortionByDesertersFinalizationProofStrategy>()
+                .TryRunBranch(quest, (byte)ExtortionByDesertersBranch.Ambush));
+        }, disabled);
+        Assert.Equal(1, encounter.CountFor(Owner));
+        Assert.Equal(0, encounter.CountFor(Other));
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Ambush);
+    }
+
+    [Fact]
+    public void CoopFinalizeAux_CleansQuestPartiesWithoutAnEncounterMenuRequest()
+    {
+        Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        using var destruction = new MethodCallRecorder(Priority.Last,
+            AccessTools.Method(typeof(DestroyPartyAction), nameof(DestroyPartyAction.Apply)));
+        Server.Call(() =>
+        {
+            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var defenders = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            quest._deserterMobileParty = deserters;
+            quest._defenderMobileParty = defenders;
+            deserters.SetPartyUsedByQuest(true);
+            var battle = CreateBattle(deserters, defenders.Party, false);
+            // Battle results were committed before the co-op finalizer tears down the event.
+            quest._currentState = State.DesertersAreDefeated;
+            quest._deserterBattleFinalizedForTheFirstTime = true;
+            battle.FinalizeEventAux();
+            Assert.True(battle.IsFinalized);
+            Assert.Null(quest._deserterMobileParty);
+            Assert.Null(quest._defenderMobileParty);
+            Assert.False(quest._deserterBattleFinalizedForTheFirstTime);
+            Assert.True(quest.IsOngoing);
+            battle.FinalizeEventAux();
+        }, TextLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
+        Assert.Equal(2, destruction.CountFor(Server));
+        Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+        Owner.Call(() =>
+        {
+            var ownerQuest = (Quest)scenario.QuestOf(Owner);
+            Assert.Null(ownerQuest._deserterMobileParty);
+            Assert.Null(ownerQuest._defenderMobileParty);
+            Assert.Equal(State.DesertersAreDefeated, ownerQuest._currentState);
+        });
+    }
+
+    private static MapEvent CreateBattle(MobileParty attacker, PartyBase defender, bool raid)
+    {
+        var battle = GameObjectCreator.CreateInitializedObject<MapEvent>();
+        battle.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+        battle.Initialize(attacker.Party, defender, new FieldBattleEventComponent(battle), MapEvent.BattleTypes.FieldBattle);
+        battle.MapEventVisual = null;
+        battle._mapEventType = raid ? MapEvent.BattleTypes.Raid : MapEvent.BattleTypes.FieldBattle;
+        return battle;
+    }
+
+    [Fact]
+    public void OwnerLeavingVillageBeforeRaid_ReticksFlightWithoutWaitingForAnHour()
+    {
+        Accept();
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        var quest = (Quest)scenario.QuestOf(Server);
+        using var flight = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.HandleDesertersRunningAway)));
+        using var notifications = new MethodCallRecorder(AccessTools.GetDeclaredMethods(typeof(MBInformationManager))
+            .Where(method => method.Name == nameof(MBInformationManager.AddQuickInformation)).ToArray());
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var owner));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerB, out var other));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(owner.MobilePartyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(other.MobilePartyId, out var otherParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var deserters));
+            quest._deserterMobileParty = deserters;
+            deserters.Position = ownerParty.Position;
+            ownerParty.CurrentSettlement = null;
+            CampaignEventDispatcher.Instance.OnSettlementLeft(otherParty, quest.QuestSettlement);
+            Assert.Equal(State.DesertersMovingToSettlement, quest._currentState);
+            CampaignEventDispatcher.Instance.OnSettlementLeft(ownerParty, quest.QuestSettlement);
+            Assert.Equal(State.DesertersRunningAwayFromPlayer, quest._currentState);
+            Assert.True(quest.IsOngoing);
+        });
+        Assert.Equal(1, flight.CountFor(Server));
+        Assert.Equal(1, notifications.CountFor(Owner));
+        Assert.Equal(0, notifications.CountFor(Other));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
     [Fact]

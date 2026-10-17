@@ -35,7 +35,7 @@ internal class ExtortionByDesertersWorldPatches
         });
     }
 
-    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEvent))]
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPrefix]
     private static void FinalizeEventPrefix(MapEvent __instance, out List<Quest> __state)
     {
@@ -44,11 +44,11 @@ internal class ExtortionByDesertersWorldPatches
         __state = affected;
     }
 
-    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEvent))]
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPostfix]
     private static void FinalizeEventPostfix(List<Quest> __state)
     {
-        if (__state.Count == 0) return;
+        if (__state == null || __state.Count == 0) return;
         Run(quest =>
         {
             if (__state.Contains(quest) && quest._deserterBattleFinalizedForTheFirstTime &&
@@ -75,7 +75,15 @@ internal class ExtortionByDesertersWorldPatches
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementLeft))]
     [HarmonyPostfix]
-    private static void LeftPostfix(MobileParty party, Settlement settlement) => Run(quest => quest.OnSettlementLeft(party, settlement));
+    private static void LeftPostfix(MobileParty party, Settlement settlement)
+    {
+        Run(quest =>
+        {
+            quest.OnSettlementLeft(party, settlement);
+            if (quest.IsOngoing && party == Hero.MainHero.PartyBelongedTo && settlement == quest.QuestSettlement)
+                quest.TickDesertersPartyLogic();
+        });
+    }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnVillageBeingRaided))]
     [HarmonyPostfix]
