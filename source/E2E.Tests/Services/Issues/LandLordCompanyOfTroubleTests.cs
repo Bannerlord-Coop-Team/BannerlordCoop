@@ -12,10 +12,12 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using Helpers;
+using SandBox.GauntletUI.Map;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -227,6 +229,116 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         Assert.Equal(ownerGrainBefore - 1, GrainIn(Owner));
     }
 
+    [Fact]
+    public void BeatingTheCompany_PaysTheOwnerAndSucceeds()
+    {
+        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        SetOwner();
+        var goldBefore = GoldOfOwner();
+        Quest quest = null!;
+
+        Server.Call(() => quest = CompanyTurnedHostile(companyPartyId));
+        EndFightOnServer(companyPartyId, BattleState.AttackerVictory);
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Equal(500, GoldOfOwner() - goldBefore);
+        Assert.Equal(5, quest.RelationshipChangeWithQuestGiver);
+        Assert.Equal(1, questEndings.Count);
+    }
+
+    [Fact]
+    public void LosingToTheCompany_FailsTheQuest()
+    {
+        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        SetOwner();
+        Quest quest = null!;
+
+        Server.Call(() => quest = CompanyTurnedHostile(companyPartyId));
+        EndFightOnServer(companyPartyId, BattleState.DefenderVictory);
+
+        Assert.Equal(-2, quest.RelationshipChangeWithQuestGiver);
+        Assert.Equal(1, questEndings.Count);
+    }
+
+    [Fact]
+    public void AnotherBattle_AfterTheCompanyTurnedHostile_DoesNotEndTheQuest()
+    {
+        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var otherPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        SetOwner();
+        var goldBefore = GoldOfOwner();
+
+        Server.Call(() => CompanyTurnedHostile(companyPartyId));
+        EndFightOnServer(otherPartyId, BattleState.AttackerVictory);
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Equal(0, questEndings.Count);
+        Assert.Equal(goldBefore, GoldOfOwner());
+    }
+
+    [Fact]
+    public void EndingTheQuest_DestroysTheHostileCompany()
+    {
+        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        MobileParty company = null!;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            var quest = CompanyTurnedHostile(companyPartyId);
+            company = quest._companyOfTroubleParty;
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = ownerParty;
+            }
+
+            quest.OnFinalize();
+        });
+        Server.PumpGameThread();
+
+        Assert.False(company.IsActive);
+    }
+
+    private Quest CompanyTurnedHostile(string companyPartyId)
+    {
+        Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(companyPartyId, out var company));
+
+        var quest = (Quest)AttachQuest(Server, companyTroopCount: 0).IssueQuest;
+        quest._companyOfTroubleParty = company;
+        return quest;
+    }
+
+    private void EndFightOnServer(string enemyPartyId, BattleState battleState)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(enemyPartyId, out var enemy));
+
+            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+            mapEvent.Initialize(ownerParty.Party, enemy.Party, new FieldBattleEventComponent(mapEvent), MapEvent.BattleTypes.FieldBattle);
+            mapEvent.MapEventVisual = null;
+            mapEvent._battleState = battleState;
+
+            CampaignEventDispatcher.Instance.OnMapEventEnded(mapEvent);
+        }, CharacterLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
+    }
+
+    private int GoldOfOwner()
+    {
+        var gold = 0;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            gold = ownerHero.Gold;
+        });
+
+        return gold;
+    }
+
     private void RunBranchAsOwner(Hero ownerHero, Quest quest, LandLordCompanyOfTroubleBranch branch)
     {
         using (new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo))
@@ -294,6 +406,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         quest._companyTroopCount = companyTroopCount;
         quest._questState = QuestBase.QuestStates.Ongoing;
         AccessTools.Field(typeof(QuestBase), nameof(QuestBase._journalEntries)).SetValue(quest, new MBList<JournalLog>());
+        AccessTools.Field(typeof(QuestBase), nameof(QuestBase.RewardGold)).SetValue(quest, 500);
 
         lord.Issue.IssueQuest = quest;
         return lord.Issue;

@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -39,6 +40,23 @@ internal class LandLordCompanyOfTroubleBranchPatches
 
         __instance._companyLeftQuestWillFail = false;
         GameMenu.ExitToLast();
+        return false;
+    }
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.CreateCompanyEnemyParty))]
+    [HarmonyPrefix]
+    private static bool CompanyTurnedHostilePrefix(Quest __instance)
+    {
+        if (BeforeBranch(__instance, LandLordCompanyOfTroubleBranch.CompanyTurnedHostile))
+        {
+            return true;
+        }
+
+        if (Campaign.Current.CurrentMenuContext != null)
+        {
+            GameMenu.ExitToLast();
+        }
+
         return false;
     }
 

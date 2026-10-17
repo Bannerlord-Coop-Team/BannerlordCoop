@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
 using Quest = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssueQuest;
 
@@ -14,6 +15,25 @@ internal class LandLordCompanyOfTroubleFinalizePatches
     private static bool OnFinalizePrefix()
     {
         return ModInformation.IsServer;
+    }
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnFinalize))]
+    [HarmonyPostfix]
+    private static void OnFinalizePostfix(Quest __instance)
+    {
+        var company = __instance._companyOfTroubleParty;
+        if (ModInformation.IsClient || company == null)
+        {
+            return;
+        }
+
+        GameThread.RunSafe(() =>
+        {
+            if (company.IsActive)
+            {
+                DestroyPartyAction.Apply(null, company);
+            }
+        }, context: nameof(LandLordCompanyOfTroubleFinalizePatches));
     }
 
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
