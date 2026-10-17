@@ -200,6 +200,34 @@ public class MapEventUpdateAuthorityTests : MapEventTestBase
     }
 
     [Fact]
+    public void MapEvent_WithOfflinePlayerWhileServerSimulationRuns_AllowedThreadUpdateIsBlocked()
+    {
+        // the allow original fast path must not run vanilla resolution next to a running simulation
+        var context = CreateServerMapEvent();
+        var (_, playerPartyId) = CreatePlayerHeroParty("offline-player");
+
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+
+                AddSyntheticMapEventParty(mapEvent.AttackerSide, playerParty.Party);
+                StartGracePeriodInThePast(mapEvent);
+                Assert.True(ServerBattleModeArbiter.TryClaimSimulation(context.MapEventId));
+
+                using (new AllowedThread())
+                    Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
+            }, MapEventDisabledMethods);
+        }
+        finally
+        {
+            Server.Call(() => ServerBattleModeArbiter.Release(context.MapEventId));
+        }
+    }
+
+    [Fact]
     public void MapEvent_WithOnlyOfflinePlayers_ResolvesWhenTheServerUpdates()
     {
         // #3864: the battle used to stay on the map with neither side losing troops

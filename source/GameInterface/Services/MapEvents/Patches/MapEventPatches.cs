@@ -497,7 +497,10 @@ internal class MapEventPatches
 
         // Only a connected player's mission resolves a player battle. Once every player in it has been offline
         // for the grace period it resolves like an AI battle, otherwise nothing ever ends it (#3864).
-        bool waitsForPlayers = hasPlayerParty && WaitsForPlayers(__instance);
+        // An offline player's battle can still be finishing its mission or a server simulation, which must stay the
+        // only thing resolving it.
+        bool waitsForPlayers = hasPlayerParty &&
+            (WaitsForPlayers(__instance) || IsBattleModeBusy(__instance));
 
         // Siege map events must not enter native campaign resolution, even on an allowed-thread setup path.
         if (waitsForPlayers && !__instance.IsRaidHostileAction())
@@ -520,10 +523,6 @@ internal class MapEventPatches
         }
 
         if (waitsForPlayers)
-            return false;
-
-        // an offline player's battle can still be finishing its mission or a server simulation
-        if (hasPlayerParty && IsBattleModeBusy(__instance))
             return false;
 
         // A settlement PartyBase is a complete participant even though it has no MobileParty.
