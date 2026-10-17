@@ -38,6 +38,23 @@ internal readonly struct NetworkAuthorizeLordBarter : ICommand
     }
 }
 
+/// <summary>
+/// The price the server put on an authorized defection, so the client's barter screen shows the price
+/// the server will enforce.
+/// </summary>
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkLordBarterAuthorized : ICommand
+{
+    [ProtoMember(1)] public readonly string RequestId;
+    [ProtoMember(2)] public readonly int JoinKingdomValue;
+
+    public NetworkLordBarterAuthorized(string requestId, int joinKingdomValue)
+    {
+        RequestId = requestId;
+        JoinKingdomValue = joinKingdomValue;
+    }
+}
+
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkCancelLordBarterAuthorization : ICommand
 {
