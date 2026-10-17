@@ -1,0 +1,162 @@
+﻿using Common;
+using Common.Messaging;
+using Common.Network;
+using Common.Util;
+using GameInterface.Policies;
+using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.GameDebug.Messages;
+using LiteNetLib;
+using System;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
+
+namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
+
+internal interface ILordSolutionCoordinator
+{
+    bool Before(IssueBase issue, LordSolutionOperation operation);
+}
+
+/// <summary>The server accepts a decree and applies its counter-offer as the owning player.</summary>
+internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
+{
+    private readonly IMessageBroker broker;
+    private readonly INetwork network;
+    private readonly IObjectManager objects;
+    private readonly IIssueResolver resolver;
+    private readonly IIssueOwnershipRegistry ownership;
+    private readonly IPlayerManager players;
+    private readonly IIssueAcceptPreconditions preconditions;
+    private readonly IControllerIdProvider controller;
+
+    public LordSolutionCoordinator(IMessageBroker broker, INetwork network, IObjectManager objects,
+        IIssueResolver resolver, IIssueOwnershipRegistry ownership, IPlayerManager players,
+        IIssueAcceptPreconditions preconditions, IControllerIdProvider controller)
+    {
+        this.broker = broker;
+        this.network = network;
+        this.objects = objects;
+        this.resolver = resolver;
+        this.ownership = ownership;
+        this.players = players;
+        this.preconditions = preconditions;
+        this.controller = controller;
+        broker.Subscribe<RequestLordSolution>(HandleRequest);
+        broker.Subscribe<NetworkLordSolutionStarted>(HandleStarted);
+    }
+
+    public void Dispose()
+    {
+        broker.Unsubscribe<RequestLordSolution>(HandleRequest);
+        broker.Unsubscribe<NetworkLordSolutionStarted>(HandleStarted);
+    }
+
+    public bool Before(IssueBase issue, LordSolutionOperation operation)
+    {
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId))
+        {
+            network.SendAll(new RequestLordSolution(giverId, issue.StringId, operation));
+        }
+        return false;
+    }
+
+    private void HandleRequest(MessagePayload<RequestLordSolution> payload)
+    {
+        if (ModInformation.IsClient || !(payload.Who is NetPeer peer) || !players.TryGetPlayer(peer, out var player)) return;
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!resolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
+                !issue.IsThereLordSolution || !objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) ||
+                hero.PartyBelongedTo == null)
+            {
+                Reject(peer, data.Operation);
+                return;
+            }
+
+            using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+            {
+                if (data.Operation == LordSolutionOperation.Start)
+                {
+                    if (hero.PartyBelongedTo.CurrentSettlement != issue.IssueOwner.CurrentSettlement ||
+                        !issue.IsOngoingWithoutQuest || !preconditions.CanTake(issue, hero, player.ControllerId) ||
+                        !issue.LordSolutionCondition(out _) || Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution ||
+                        !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
+                    {
+                        Reject(peer, data.Operation);
+                        return;
+                    }
+
+                    issue.StartIssueWithLordSolution();
+                    network.SendAll(new NetworkLordSolutionStarted(data.IssueOwnerId, data.IssueId,
+                        player.ControllerId, issue._issueDifficultyMultiplier));
+                    return;
+                }
+
+                if (!issue.IsSolvingWithLordSolution ||
+                    !ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != player.ControllerId)
+                {
+                    Reject(peer, data.Operation);
+                    return;
+                }
+
+                IssueOutcome outcome;
+                switch (data.Operation)
+                {
+                    case LordSolutionOperation.AcceptCounterOffer:
+                        issue.CompleteIssueWithLordSolutionWithAcceptCounterOffer();
+                        outcome = IssueOutcome.LordAcceptedCounterOffer;
+                        break;
+                    case LordSolutionOperation.RefuseCounterOffer:
+                        if (Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution)
+                        {
+                            Reject(peer, data.Operation);
+                            return;
+                        }
+                        issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
+                        outcome = IssueOutcome.LordRefusedCounterOffer;
+                        break;
+                    default:
+                        Reject(peer, data.Operation);
+                        return;
+                }
+                broker.Publish(issue, new IssueOutcomeObserved(issue, outcome));
+            }
+        }, context: nameof(LordSolutionCoordinator));
+    }
+
+    private void Reject(NetPeer peer, LordSolutionOperation operation)
+    {
+        var message = operation == LordSolutionOperation.Start
+            ? "The decree could not be accepted. Check your influence and speak to the artisan again."
+            : "The decree decision could not be applied. Check your influence and speak to the merchant again.";
+        network.Send(peer, new SendInformationMessage(message));
+    }
+
+    private void HandleStarted(MessagePayload<NetworkLordSolutionStarted> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var data = payload.What;
+        GameThread.RunSafe(() =>
+        {
+            if (!resolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _)) return;
+            ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, data.ControllerId);
+            using (new AllowedThread())
+            using (new IssueDifficultyOverride(data.Difficulty))
+            {
+                if (data.ControllerId == controller.ControllerId) issue.StartIssueWithLordSolution();
+                else issue._issueState = IssueBase.IssueState.SolvingWithLordSolution;
+            }
+            issue._issueDifficultyMultiplier = data.Difficulty;
+            issue.IsTriedToSolveBefore = data.ControllerId == controller.ControllerId;
+            // The conversation's menu event may have passed while acceptance waited for the server.
+            if (data.ControllerId == controller.ControllerId) issue.BeforeGameMenuOpened(null);
+        }, context: nameof(LordSolutionCoordinator));
+    }
+}

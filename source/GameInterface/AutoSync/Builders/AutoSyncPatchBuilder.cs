@@ -194,7 +194,11 @@ namespace GameInterface.AutoSync.Builders
                 PatchClassName = $"{declaringTypeName}_DynamicPatches",
                 PatchCategory = (string)null,
                 IncludeDeclaredMethods = true,
-                TargetMethods = dynamicRegistryItem.TargetMethods,
+                TargetMethods = dynamicRegistryItem.TargetMethods.Select(method => new
+                {
+                    DeclaringType = method.DeclaringType.FullName.Replace('+', '.'),
+                    method.Name,
+                }),
                 Prefixes = prefixes,
                 Transpilers = transpilers,
             });
@@ -222,7 +226,11 @@ namespace GameInterface.AutoSync.Builders
                     PatchClassName = $"{declaringTypeName}_Category{categoryIndex}_DynamicPatches",
                     PatchCategory = categorizedTargets.Key,
                     IncludeDeclaredMethods = false,
-                    TargetMethods = categorizedTargets.Value,
+                    TargetMethods = categorizedTargets.Value.Select(method => new
+                    {
+                        DeclaringType = method.DeclaringType.FullName.Replace('+', '.'),
+                        method.Name,
+                    }),
                     Prefixes = Enumerable.Empty<string>(),
                     Transpilers = transpilers,
                 });

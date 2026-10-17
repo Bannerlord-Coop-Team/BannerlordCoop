@@ -1,0 +1,51 @@
+﻿using Common;
+using HarmonyLib;
+using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Localization;
+using Issue = TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssue;
+
+namespace GameInterface.Services.Issues.Quests.ArtisanOverpricedGoods.Patches;
+
+[HarmonyPatch]
+internal class ArtisanOverpricedGoodsAuthorityPatches
+{
+    [HarmonyPatch(typeof(Issue), nameof(Issue.AlternativeSolutionStartConsequence))]
+    [HarmonyPrefix]
+    private static bool FundingPrefix() => ModInformation.IsServer;
+
+    [HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.OnIssueUpdated))]
+    [HarmonyPrefix]
+    private static bool IssueRewardsPrefix(IssueBase issue) => !(issue is Issue) || ModInformation.IsServer;
+
+    [HarmonyPatch(typeof(Issue), nameof(Issue.LordSolutionCondition))]
+    [HarmonyPrefix]
+    private static bool LordConditionPrefix(Issue __instance, ref bool __result, ref TextObject explanation)
+    {
+        // Settlement.CurrentSettlement is a campaign-wide encounter on the server, not the owner's town.
+        if (ModInformation.IsClient) return true;
+        __result = MobileParty.MainParty.CurrentSettlement == __instance.IssueSettlement &&
+            Clan.PlayerClan == __instance.IssueSettlement.OwnerClan;
+        explanation = __result ? null : new TextObject("{=bItEf0WN}You need to be the {?PLAYER.GENDER}lady{?}lord{\\?} of this settlement.");
+        return false;
+    }
+
+    [HarmonyPatch(typeof(Issue), nameof(Issue.DoTroopsSatisfyAlternativeSolution))]
+    [HarmonyPrefix]
+    private static bool AlternativeEligibilityPrefix(Issue __instance, TroopRoster troopRoster, ref bool __result, ref TextObject explanation)
+    {
+        if (ModInformation.IsClient) return true;
+        var companion = troopRoster.GetTroopRoster().FirstOrDefault(element => element.Character.IsHero).Character?.HeroObject;
+        var skill = companion == null ? default : __instance.GetAlternativeSolutionSkill(companion);
+        if (Hero.MainHero.Gold >= __instance.RequiredGoldForAlternativeSolution && companion != null &&
+            companion.GetSkillValue(skill.Item1) >= skill.Item2) return true;
+
+        __result = false;
+        explanation = new TextObject("{=!}The companion or purchase funding is unavailable.");
+        return false;
+    }
+}

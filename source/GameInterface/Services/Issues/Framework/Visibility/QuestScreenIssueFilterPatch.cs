@@ -20,9 +20,9 @@ namespace GameInterface.Services.Issues.Framework.Visibility;
 internal class QuestScreenIssueFilterPatch
 {
     [HarmonyPrefix]
-    private static void Prefix(out List<IssueBase> __state)
+    private static void Prefix(out List<(IssueBase Issue, IssueBase.IssueState State)> __state)
     {
-        __state = new List<IssueBase>();
+        __state = new List<(IssueBase, IssueBase.IssueState)>();
 
         var issueManager = Campaign.Current?.IssueManager;
         if (issueManager == null)
@@ -30,24 +30,24 @@ internal class QuestScreenIssueFilterPatch
             return;
         }
 
-        __state.AddRange(issueManager.Issues.Values.Where(IsAnotherPlayersTroopsMission));
-        SetState(__state, IssueBase.IssueState.Ongoing);
+        __state.AddRange(issueManager.Issues.Values.Where(IsAnotherPlayersTroopsMission).Select(issue => (issue, issue._issueState)));
+        SetState(__state, restore: false);
     }
 
     [HarmonyFinalizer]
-    private static void Finalizer(List<IssueBase> __state)
+    private static void Finalizer(List<(IssueBase Issue, IssueBase.IssueState State)> __state)
     {
         if (__state == null)
         {
             return;
         }
 
-        SetState(__state, IssueBase.IssueState.SolvingWithAlternativeSolution);
+        SetState(__state, restore: true);
     }
 
     internal static bool IsAnotherPlayersTroopsMission(IssueBase issue)
     {
-        if (!issue.IsSolvingWithAlternative)
+        if (!issue.IsSolvingWithAlternative && !issue.IsSolvingWithLordSolution)
         {
             return false;
         }
@@ -62,13 +62,13 @@ internal class QuestScreenIssueFilterPatch
             && ownerControllerId == controllerIdProvider.ControllerId);
     }
 
-    private static void SetState(List<IssueBase> issues, IssueBase.IssueState state)
+    private static void SetState(List<(IssueBase Issue, IssueBase.IssueState State)> issues, bool restore)
     {
         using (new AllowedThread())
         {
             foreach (var issue in issues)
             {
-                issue._issueState = state;
+                issue.Issue._issueState = restore ? issue.State : IssueBase.IssueState.Ongoing;
             }
         }
     }
