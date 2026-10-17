@@ -1,4 +1,6 @@
-﻿using E2E.Tests.Environment;
+﻿using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
@@ -46,34 +48,83 @@ public class LeaderlessClanResolverTests : IDisposable
     }
 
     [Fact]
-    public void Resolve_KingdomClanWithAnAdult_AppointsThemLeader()
+    public void Resolve_NullLeaderWithAnAdult_AppointsThemWithTheLeaderChangeSteps()
     {
+        // #3928 review: SetLeader alone skipped the governor, party and leader-changed event
         var clanId = CreateKingdomClan(out _);
-        var heroId = AddMember(clanId, age: 30);
+        var heroId = AddPartyLeader(clanId, age: 30);
+        var townId = environment.CreateRegisteredObject<Town>();
+
 
         environment.Server.Call(() =>
         {
             var clan = environment.Server.GetRegisteredObject<Clan>(clanId);
             var hero = environment.Server.GetRegisteredObject<Hero>(heroId);
-            environment.Server.Resolve<ILeaderlessClanResolver>().Resolve(clan);
+            var town = environment.Server.GetRegisteredObject<Town>(townId);
+            town.Governor = hero;
+            Assert.Same(town, hero.GovernorOf);
+
+            Hero changedTo = null;
+            CampaignEvents.OnClanLeaderChangedEvent.AddNonSerializedListener(this, (oldLeader, newLeader) => changedTo = newLeader);
+            try
+            {
+                environment.Server.Resolve<ILeaderlessClanResolver>().Resolve(clan);
+            }
+            finally
+            {
+                CampaignEvents.OnClanLeaderChangedEvent.ClearListeners(this);
+            }
 
             Assert.Same(hero, clan.Leader);
-            Assert.False(clan.IsEliminated);
-        });
+            Assert.Null(hero.GovernorOf);
+            Assert.Same(hero, hero.PartyBelongedTo.LeaderHero);
+            Assert.Same(hero, changedTo);
+        }, TextMethods);
     }
 
     [Fact]
-    public void Resolve_OnlyAChild_DestroysClan()
+    public void Resolve_DisabledLeader_HandsOverWithTheGameAction()
     {
         var clanId = CreateKingdomClan(out _);
-        AddMember(clanId, age: 8);
+        var formerId = AddMember(clanId, age: 60);
+        var heroId = AddPartyLeader(clanId, age: 30);
 
         environment.Server.Call(() =>
-            environment.Server.Resolve<ILeaderlessClanResolver>().Resolve(environment.Server.GetRegisteredObject<Clan>(clanId)), TextMethods);
+        {
+            var clan = environment.Server.GetRegisteredObject<Clan>(clanId);
+            var former = environment.Server.GetRegisteredObject<Hero>(formerId);
+            clan.SetLeader(former);
+            former._heroState = Hero.CharacterStates.Disabled;
+
+            environment.Server.Resolve<ILeaderlessClanResolver>().Resolve(clan);
+
+            Assert.Same(environment.Server.GetRegisteredObject<Hero>(heroId), clan.Leader);
+        }, TextMethods);
+    }
+
+    [Fact]
+    public void Resolve_OnlyAChild_MovesTheChildToTheParentsClanBeforeClosing()
+    {
+        // #3928 review: destroying the clan used to kill the child
+        var clanId = CreateKingdomClan(out _);
+        var childId = AddMember(clanId, age: 8);
+        var fatherClanId = CreateKingdomClan(out _);
+        var fatherId = AddMember(fatherClanId, age: 40);
+
+        environment.Server.Call(() =>
+        {
+            var child = environment.Server.GetRegisteredObject<Hero>(childId);
+            var father = environment.Server.GetRegisteredObject<Hero>(fatherId);
+            child.Father = father;
+
+            environment.Server.Resolve<ILeaderlessClanResolver>().Resolve(environment.Server.GetRegisteredObject<Clan>(clanId));
+
+            Assert.True(child.IsAlive);
+            Assert.Same(environment.Server.GetRegisteredObject<Clan>(fatherClanId), child.Clan);
+        }, TextMethods);
 
         Assert.False(environment.Server.ObjectManager.TryGetObject<Clan>(clanId, out _));
     }
-
     [Fact]
     public void RepairLoadedClans_LeavesClansWithALeaderOrNoKingdomAlone()
     {
@@ -111,6 +162,14 @@ public class LeaderlessClanResolverTests : IDisposable
 
         if (environment.Server.ObjectManager.TryGetObject<Clan>(clanId, out var remaining))
             Assert.False(LeaderlessClanResolver.NeedsLeader(remaining));
+
+        // #3928 review: closing the clan must not turn the retirement into a death
+        environment.Server.Call(() =>
+        {
+            var hero = environment.Server.GetRegisteredObject<Hero>(heroId);
+            Assert.Equal(Hero.CharacterStates.Disabled, hero.HeroState);
+            Assert.Equal(KillCharacterAction.KillCharacterActionDetail.None, hero.DeathMark);
+        });
     }
 
     private string CreateKingdomClan(out string kingdomId)
@@ -121,6 +180,7 @@ public class LeaderlessClanResolverTests : IDisposable
         {
             var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
             var clan = Clan.CreateClan("LeaderlessClan");
+            clan._defaultPartyTemplate = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
             clan._kingdom = kingdom;
             Assert.True(environment.Server.ObjectManager.TryGetId(clan, out clanId));
             Assert.True(environment.Server.ObjectManager.TryGetId(kingdom, out kId));
@@ -129,6 +189,21 @@ public class LeaderlessClanResolverTests : IDisposable
         return clanId;
     }
 
+    // a hero who already leads a party: creating a new one needs the world map, which tests don't have
+    private string AddPartyLeader(string clanId, int age)
+    {
+        var partyId = environment.CreateRegisteredObject<MobileParty>();
+        string heroId = null;
+        environment.Server.Call(() =>
+        {
+            var hero = environment.Server.GetRegisteredObject<MobileParty>(partyId).LeaderHero;
+            hero._heroState = Hero.CharacterStates.Active;
+            hero.SetBirthDay(CampaignTime.YearsFromNow(-age));
+            hero.Clan = environment.Server.GetRegisteredObject<Clan>(clanId);
+            Assert.True(environment.Server.ObjectManager.TryGetId(hero, out heroId));
+        });
+        return heroId;
+    }
     private string AddMember(string clanId, int age)
     {
         var heroId = environment.CreateRegisteredObject<Hero>();
