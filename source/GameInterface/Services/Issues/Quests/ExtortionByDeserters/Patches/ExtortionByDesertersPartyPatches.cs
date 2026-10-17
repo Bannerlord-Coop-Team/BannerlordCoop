@@ -1,5 +1,7 @@
 ﻿using Common;
 using HarmonyLib;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -12,14 +14,6 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 [HarmonyPatch]
 internal class ExtortionByDesertersPartyPatches
 {
-    [HarmonyPatch(typeof(Quest), nameof(Quest.CreateDeserterParty))]
-    [HarmonyPatch(typeof(Quest), nameof(Quest.CreateDefenderParty))]
-    [HarmonyPatch(typeof(Quest), nameof(Quest.DestroyDeserterParty))]
-    [HarmonyPatch(typeof(Quest), nameof(Quest.DestroyDefenderParty))]
-    [HarmonyPatch(typeof(Quest), nameof(Quest.ReleaseDeserterParty))]
-    [HarmonyPrefix]
-    private static bool WorldPartyPrefix() => ModInformation.IsServer;
-
     [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddTrackedObject))]
     [HarmonyPrefix]
     private static bool AddTrackedObjectPrefix(QuestBase __instance, ITrackableCampaignObject trackedObject)
@@ -55,11 +49,6 @@ internal class ExtortionByDesertersPartyPatches
         return false;
     }
 
-    [HarmonyPatch(typeof(Quest), nameof(Quest.HourlyTick))]
-    [HarmonyPatch(typeof(Quest), nameof(Quest.GameMenuOptionSelected))]
-    [HarmonyPrefix]
-    private static bool TickPrefix() => ModInformation.IsServer;
-
     private static void Request(Quest quest, ExtortionByDesertersBranch branch)
     {
         if (ContainerProvider.TryResolve<Framework.Interface.IOutcomeDispatcher>(out var dispatcher))
@@ -67,4 +56,27 @@ internal class ExtortionByDesertersPartyPatches
             dispatcher.BeforeQuestBranch(quest, (byte)branch);
         }
     }
+}
+
+/// <summary>These world methods must stay server-only even during client replay.</summary>
+[HarmonyPatch]
+internal class ExtortionByDesertersServerMethodsPatch
+{
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.CreateDeserterParty));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.CreateDefenderParty));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.DestroyDeserterParty));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.DestroyDefenderParty));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.ReleaseDeserterParty));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.HourlyTick));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.GameMenuOptionSelected));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnMapEventStarted));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnSettlementLeft));
+    }
+
+    [HarmonyPrefix]
+    private static bool Prefix() => ModInformation.IsServer;
 }

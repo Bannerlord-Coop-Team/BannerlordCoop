@@ -54,13 +54,6 @@ internal class ExtortionByDesertersWorldPatches
         Run(quest => quest.MapEventEnded(mapEvent));
     }
 
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnWarDeclared))]
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnClanChangedKingdom))]
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventStarted))]
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementLeft))]
-    [HarmonyPrefix]
-    private static bool ServerEventPrefix() => ModInformation.IsServer;
-
     [HarmonyPatch(typeof(Quest), nameof(Quest.MapEventEnded))]
     [HarmonyPrefix]
     private static bool MapEventEndedPrefix(Quest __instance, MapEvent mapEvent)

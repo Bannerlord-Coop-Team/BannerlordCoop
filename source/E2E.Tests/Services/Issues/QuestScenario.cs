@@ -8,6 +8,7 @@ using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using System.Reflection;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 
 namespace E2E.Tests.Services.Issues;
@@ -44,13 +45,13 @@ internal sealed class QuestScenario
         }
     }
 
-    public void Accept(EnvironmentInstance client)
+    public void Accept(EnvironmentInstance client, IEnumerable<MethodBase>? disabledMethods = null)
     {
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Hero>(NotableId, out var notable));
             notable.Issue.StartIssueWithQuest();
-        });
+        }, disabledMethods);
     }
 
     public QuestBase QuestOf(EnvironmentInstance instance)

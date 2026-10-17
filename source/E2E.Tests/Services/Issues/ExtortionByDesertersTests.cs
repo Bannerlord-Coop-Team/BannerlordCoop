@@ -6,6 +6,8 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using HarmonyLib;
+using Helpers;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
@@ -21,11 +23,17 @@ namespace E2E.Tests.Services.Issues;
 /// <summary>Exercises the real issue through the framework with two independent player clients.</summary>
 public class ExtortionByDesertersTests : IDisposable
 {
+    private static readonly MethodBase[] TextLinks =
+    {
+        AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.GetCharacterProperties)),
+        AccessTools.PropertyGetter(typeof(Settlement), nameof(Settlement.EncyclopediaLinkWithName)),
+    };
     private readonly E2ETestEnvironment environment;
     private readonly QuestScenario scenario;
     private readonly MethodCallRecorder creation;
     private readonly string villageId;
     private readonly string townId;
+    private readonly string townComponentId;
     private readonly string settlementId;
     private EnvironmentInstance Server => environment.Server;
     private EnvironmentInstance Owner => scenario.ClientA;
@@ -38,6 +46,7 @@ public class ExtortionByDesertersTests : IDisposable
         creation = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.CreateDeserterParty)));
         villageId = environment.CreateRegisteredObject<Village>();
         townId = environment.CreateRegisteredObject<Settlement>();
+        townComponentId = environment.CreateRegisteredObject<Town>();
         settlementId = environment.CreateRegisteredObject<Settlement>();
         scenario = new QuestScenario(environment, notable => new Issue(notable), Prepare);
     }
@@ -52,8 +61,10 @@ public class ExtortionByDesertersTests : IDisposable
     {
         Assert.True(instance.ObjectManager.TryGetObject<Village>(villageId, out var village));
         Assert.True(instance.ObjectManager.TryGetObject<Settlement>(townId, out var town));
+        Assert.True(instance.ObjectManager.TryGetObject<Town>(townComponentId, out var townComponent));
         Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
         village.Bound = town;
+        town.SetSettlementComponent(townComponent);
         town.Town.Security = 30;
         settlement.SetSettlementComponent(village);
         notable.StayingInSettlement = settlement;
@@ -62,7 +73,7 @@ public class ExtortionByDesertersTests : IDisposable
 
     private Quest Accept()
     {
-        scenario.Accept(Owner);
+        scenario.Accept(Owner, TextLinks);
         var quest = (Quest)scenario.QuestOf(Owner);
         Owner.Call(() => quest.StartQuest());
         return quest;
