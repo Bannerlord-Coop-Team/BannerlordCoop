@@ -9,6 +9,7 @@ using GameInterface.Services.Players;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -87,11 +88,16 @@ public class ArtisanProductsTests : IDisposable
             town._ownerClan = clan;
             giver.StayingInSettlement = origin;
             giver.Occupation = Occupation.Artisan;
-            giver.Clan = clan;
+            giver.Clan = null;
+            giver._homeSettlement = origin;
             merchant.StayingInSettlement = origin;
             merchant.Occupation = Occupation.Merchant;
+            merchant.Clan = null;
+            merchant._homeSettlement = origin;
             merchant.ChangeState(Hero.CharacterStates.Active);
             target.StayingInSettlement = destination;
+            target.Clan = null;
+            target._homeSettlement = destination;
             target.ChangeState(Hero.CharacterStates.Active);
             origin.AddHeroWithoutParty(merchant);
 
@@ -111,6 +117,9 @@ public class ArtisanProductsTests : IDisposable
             giver.OnIssueCreatedForHero(issue);
 
             if (Campaign.Current.IssueManager.Issues.Count > 1) return;
+            // The headless campaign does not register the native issue relation listener.
+            var behavior = new IssuesCampaignBehavior();
+            CampaignEvents.OnIssueUpdatedEvent.AddNonSerializedListener(behavior, behavior.OnIssueUpdated);
             foreach (var controllerId in new[] { QuestScenario.ControllerA, QuestScenario.ControllerB })
             {
                 // QuestScenario registers players on the server before constructing the issues.
@@ -263,6 +272,29 @@ public class ArtisanProductsTests : IDisposable
     }
 
     [Fact]
+    public void DeliveryRefusal_KeepsTheGoodsAndAppliesRelationsOnlyToTheOwner()
+    {
+        Accept();
+        var amount = ((Quest)scenario.QuestOf(Server))._amountOfRawGoodsToBeDelivered;
+        var gold = OwnerGold();
+        CarryAtDestination(amount);
+        Owner.Call(() => ((Quest)scenario.QuestOf(Owner)).DeliverItemsRejectOnConsequence());
+        Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Assert.Equal(gold, OwnerGold());
+        Server.Call(() =>
+        {
+            Assert.Equal(amount, OwnerParty(Server).ItemRoster.GetItemNumber(DefaultItems.Grain));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerB, out var other));
+            var hero = Server.GetRegisteredObject<Hero>(player.HeroId);
+            var giver = Server.GetRegisteredObject<Hero>(scenario.NotableId);
+            Assert.Equal(-20, CharacterRelationManager.GetHeroRelation(hero, giver));
+            Assert.Equal(-15, CharacterRelationManager.GetHeroRelation(hero, Server.GetRegisteredObject<Hero>(targetId)));
+            Assert.Equal(0, CharacterRelationManager.GetHeroRelation(Server.GetRegisteredObject<Hero>(other.HeroId), giver));
+        });
+    }
+
+    [Fact]
     public void ARealStayAliveRefusal_RejectsAcceptance()
     {
         Server.Call(() => Server.GetRegisteredObject<Hero>(targetId).ChangeState(Hero.CharacterStates.Dead));
@@ -310,6 +342,39 @@ public class ArtisanProductsTests : IDisposable
         Assert.Equal(acceptMerchant, before == OwnerGold());
         foreach (var instance in new[] { Server, Owner, Other })
             instance.Call(() => Assert.Null(instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void LordRefusal_WhenEligibilityChangesReportsTheRefusalAndAllowsAnotherChoice(bool loseInfluence)
+    {
+        Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution());
+        var originalClan = Server.GetRegisteredObject<Clan>(clanId);
+        var replacementClanId = environment.CreateRegisteredObject<Clan>();
+        Server.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                if (loseInfluence) originalClan.Influence = 0;
+                else Server.GetRegisteredObject<Town>(townId)._ownerClan = Server.GetRegisteredObject<Clan>(replacementClanId);
+            }
+        });
+        var gold = OwnerGold();
+        Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+        Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkArtisanProductsLord>(),
+            message => message.Action == ArtisanProductsLordAction.Rejected);
+        Assert.Equal(gold, OwnerGold());
+        Owner.Call(() =>
+        {
+            var issue = Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+            Assert.True(issue.IsSolvingWithLordSolution);
+            Assert.Contains(issue.JournalEntries, log => log.LogText.ToString().Contains("decree could not be issued"));
+        });
+        Other.Call(() => Assert.Empty(Other.GetRegisteredObject<Hero>(scenario.NotableId).Issue.JournalEntries));
+        Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithAcceptCounterOffer());
+        Owner.Call(() => Assert.Null(Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
+        Assert.Equal(gold, OwnerGold());
     }
 
     [Fact]
@@ -459,6 +524,14 @@ public class ArtisanProductsTests : IDisposable
                 Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(heirId, issue.StringId, out var controller));
                 Assert.Equal(QuestScenario.ControllerA, controller);
             });
+        Owner.Call(() =>
+        {
+            var quest = Owner.GetRegisteredObject<Hero>(heirId).Issue.IssueQuest;
+            Assert.Same(Owner.GetRegisteredObject<Hero>(heirId), quest.QuestGiver);
+            var tracked = Campaign.Current.QuestManager.GetAllTrackedObjectsOfAQuest(quest);
+            Assert.DoesNotContain(Owner.GetRegisteredObject<Hero>(scenario.NotableId), tracked);
+            Assert.Contains(Owner.GetRegisteredObject<Hero>(heirId), tracked);
+        });
     }
 
     [Fact]
@@ -474,7 +547,8 @@ public class ArtisanProductsTests : IDisposable
                 {
                     instance.GetRegisteredObject<Hero>(heirId).StayingInSettlement = instance.GetRegisteredObject<Settlement>(originId);
                     instance.GetRegisteredObject<Hero>(heirId).Occupation = Occupation.Artisan;
-                    instance.GetRegisteredObject<Hero>(heirId).Clan = instance.GetRegisteredObject<Clan>(clanId);
+                    instance.GetRegisteredObject<Hero>(heirId).Clan = null;
+                    instance.GetRegisteredObject<Hero>(heirId)._homeSettlement = instance.GetRegisteredObject<Settlement>(originId);
                 }
             });
         Server.Call(() => Campaign.Current.IssueManager.ChangeIssueOwner(
@@ -490,5 +564,12 @@ public class ArtisanProductsTests : IDisposable
         Owner.Call(quest.DeliverItemsFullyOnConsequence);
         Assert.Equal(IssueOutcome.QuestSuccess, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Server.Call(() => Assert.Equal(before + 30f, Server.GetRegisteredObject<Town>(townId).Prosperity));
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
+            var owner = Server.GetRegisteredObject<Hero>(player.HeroId);
+            Assert.True(CharacterRelationManager.GetHeroRelation(owner, Server.GetRegisteredObject<Hero>(heirId)) > 0);
+            Assert.Equal(-5, CharacterRelationManager.GetHeroRelation(owner, Server.GetRegisteredObject<Hero>(merchantId)));
+        });
     }
 }

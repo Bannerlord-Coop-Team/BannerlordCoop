@@ -17,7 +17,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.ArtisanCantSellProductsAtAFairPri
 
 namespace GameInterface.Services.Issues.Quests.ArtisanProducts;
 
-public enum ArtisanProductsLordAction : byte { Start, AcceptMerchant, RefuseMerchant, Journal }
+public enum ArtisanProductsLordAction : byte { Start, AcceptMerchant, RefuseMerchant, Journal, Rejected }
 
 internal readonly struct ArtisanProductsLordRequested : IEvent
 {
@@ -117,8 +117,18 @@ internal class ArtisanProductsLordHandler : IHandler
                     if (!issue.IsSolvingWithLordSolution ||
                         !ownership.TryGetOwner(data.OwnerId, data.IssueId, out var owner) || owner != player.ControllerId) return;
                     if (data.Action == ArtisanProductsLordAction.AcceptMerchant) issue.CompleteIssueWithLordSolutionWithAcceptCounterOffer();
-                    else if (data.Action == ArtisanProductsLordAction.RefuseMerchant && issue.LordSolutionCondition(out _) &&
-                        Clan.PlayerClan.Influence >= issue.NeededInfluenceForLordSolution) issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
+                    else if (data.Action == ArtisanProductsLordAction.RefuseMerchant)
+                    {
+                        if (!issue.LordSolutionCondition(out _) || Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution)
+                        {
+                            issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject("The decree could not be issued because you no longer own the town or have enough influence. Speak to the merchant again to reconsider the offer or try again when eligible.")));
+                            network.Send(peer, new NetworkArtisanProductsLord(data.OwnerId, data.IssueId, player.ControllerId,
+                                ArtisanProductsLordAction.Rejected, issue._issueDifficultyMultiplier,
+                                issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray()));
+                            return;
+                        }
+                        issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
+                    }
                     else return;
                     ownership.Remove(data.OwnerId);
                 }
@@ -138,7 +148,7 @@ internal class ArtisanProductsLordHandler : IHandler
             var localOwner = data.ControllerId == controller.ControllerId;
             using (new AllowedThread())
             {
-                if (data.Action == ArtisanProductsLordAction.Journal)
+                if (data.Action == ArtisanProductsLordAction.Journal || data.Action == ArtisanProductsLordAction.Rejected)
                 {
                     if (localOwner)
                         foreach (var text in data.Logs.Skip(issue.JournalEntries.Count))

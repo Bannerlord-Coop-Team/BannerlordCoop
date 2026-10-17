@@ -56,7 +56,7 @@ internal class ArtisanProductsInheritanceHandler : IHandler
         if (!objects.TryGetIdWithLogging(payload.What.Previous, out var previousId) ||
             !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId)) return;
         ownership.TryGetOwner(previousId, issue.StringId, out var controllerId);
-        if (issue.IssueQuest != null) issue.IssueQuest.QuestGiver = issue.IssueOwner;
+        UpdateQuestGiver(issue, payload.What.Previous);
         Move(previousId, ownerId, issue.StringId, controllerId);
         network.SendAll(new NetworkArtisanProductsOwnerChanged(previousId, ownerId, issue.StringId, controllerId));
     }
@@ -73,7 +73,7 @@ internal class ArtisanProductsInheritanceHandler : IHandler
             using (new AllowedThread())
             {
                 Campaign.Current.IssueManager.ChangeIssueOwner(issue, owner);
-                if (issue.IssueQuest != null) issue.IssueQuest.QuestGiver = owner;
+                UpdateQuestGiver(issue, previous);
             }
             Move(data.PreviousId, data.OwnerId, data.IssueId, data.ControllerId);
         }, context: nameof(ArtisanProductsInheritanceHandler));
@@ -83,5 +83,18 @@ internal class ArtisanProductsInheritanceHandler : IHandler
     {
         ownership.Remove(previousId);
         if (!string.IsNullOrEmpty(controllerId)) ownership.TrySetOwner(ownerId, issueId, controllerId);
+    }
+
+    private void UpdateQuestGiver(Issue issue, Hero previous)
+    {
+        var quest = issue.IssueQuest;
+        if (quest == null) return;
+        quest.QuestGiver = issue.IssueOwner;
+        var manager = Campaign.Current.QuestManager;
+        if (!manager.Quests.Contains(quest)) return;
+        if (manager.TrackedObjects.TryGetValue(previous, out var oldQuests) && oldQuests.Contains(quest))
+            manager.RemoveTrackedObjectForQuest(previous, quest);
+        if (!manager.TrackedObjects.TryGetValue(issue.IssueOwner, out var newQuests) || !newQuests.Contains(quest))
+            manager.AddTrackedObjectForQuest(issue.IssueOwner, quest);
     }
 }
