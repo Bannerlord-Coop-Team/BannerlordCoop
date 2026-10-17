@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -82,7 +83,26 @@ public class MapEventUpdateAuthorityTests : MapEventTestBase
     }
 
     [Fact]
-    public void MapEvent_WithOnlyOfflinePlayers_ServerUpdateIsAllowed()
+    public void MapEvent_WithOnlyOfflinePlayers_ServerUpdateIsBlockedDuringGracePeriod()
+    {
+        // a player who crashed or dropped gets time to rejoin and fight the battle themselves
+        var context = CreateServerMapEvent();
+        var (_, playerPartyId) = CreatePlayerHeroParty("offline-player");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+
+            AddSyntheticMapEventParty(mapEvent.AttackerSide, playerParty.Party);
+
+            Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
+            Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void MapEvent_WithOnlyOfflinePlayers_ServerUpdateIsAllowedAfterGracePeriod()
     {
         // #3864: nothing else resolves the battle once its players are gone
         var context = CreateServerMapEvent();
@@ -94,8 +114,40 @@ public class MapEventUpdateAuthorityTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
 
             AddSyntheticMapEventParty(mapEvent.AttackerSide, playerParty.Party);
+            StartGracePeriodInThePast(mapEvent);
 
             Assert.True(InvokeMapEventUpdatePrefix(mapEvent));
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void MapEvent_WhenAnOfflinePlayerRejoins_GracePeriodStartsOver()
+    {
+        var context = CreateServerMapEvent();
+        var (_, playerPartyId) = CreatePlayerHeroParty("player");
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
+
+            AddSyntheticMapEventParty(mapEvent.AttackerSide, playerParty.Party);
+            StartGracePeriodInThePast(mapEvent);
+        }, MapEventDisabledMethods);
+
+        ConnectPlayer("player");
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
+        }, MapEventDisabledMethods);
+
+        // offline again: a fresh grace period, not the old expired one
+        Server.Call(() => Server.Resolve<IPlayerManager>().ClearPeer(Clients.First().NetPeer));
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
         }, MapEventDisabledMethods);
     }
 
@@ -135,6 +187,7 @@ public class MapEventUpdateAuthorityTests : MapEventTestBase
                 Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
 
                 AddSyntheticMapEventParty(mapEvent.AttackerSide, playerParty.Party);
+                StartGracePeriodInThePast(mapEvent);
                 Assert.True(ServerBattleModeArbiter.TryClaimSimulation(context.MapEventId));
 
                 Assert.False(InvokeMapEventUpdatePrefix(mapEvent));
@@ -159,6 +212,7 @@ public class MapEventUpdateAuthorityTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerPartyId, out var playerParty));
             playerParty.Party._mapEventSide = mapEvent.AttackerSide;
             mapEvent.AttackerSide._battleParties.Add(new MapEventParty(playerParty.Party));
+            StartGracePeriodInThePast(mapEvent);
 
             for (int i = 0; i < 500 && mapEvent.State != MapEventState.WaitingRemoval; i++)
                 mapEvent.Update();
@@ -170,6 +224,9 @@ public class MapEventUpdateAuthorityTests : MapEventTestBase
     {
         Server.Call(() => Server.Resolve<IPlayerManager>().SetPeer(controllerId, Clients.First().NetPeer));
     }
+
+    private static void StartGracePeriodInThePast(MapEvent mapEvent) =>
+        MapEventPatches.SetAllPlayersOfflineSince(mapEvent, System.DateTime.UtcNow - MapEventConfig.OfflinePlayerGracePeriod - System.TimeSpan.FromMinutes(1));
     [Fact]
     public void MapEvent_WithMissingParty_ServerUpdateIsBlocked()
     {
