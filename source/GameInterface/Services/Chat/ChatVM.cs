@@ -211,6 +211,9 @@ internal sealed class ChatVM : ViewModel
         if (open && !IsPlayerChatEnabled) return;
 
         IsOpen = open;
+
+        // opening shows the selected tab, so whatever arrived on it while closed is now seen
+        if (open) selectedChannel?.SetSelected(true);
     }
 
     public void SetPlayerChatEnabled(bool enabled)
@@ -301,6 +304,7 @@ internal sealed class ChatVM : ViewModel
 
         string channelId;
         string line;
+        bool incomingDirect = false;
 
         switch (message.Channel)
         {
@@ -314,6 +318,7 @@ internal sealed class ChatVM : ViewModel
                     message.SenderControllerId,
                     getLocalControllerId(),
                     StringComparison.Ordinal);
+                incomingDirect = !sentByLocalPlayer;
                 channelId = sentByLocalPlayer ? message.RecipientControllerId : message.SenderControllerId;
                 string otherName = sentByLocalPlayer
                     ? DisplayName(message.RecipientName, message.RecipientControllerId)
@@ -339,7 +344,8 @@ internal sealed class ChatVM : ViewModel
 
         AddLine(
             channelId,
-            new ChatLineVM(line, getPlayerColor(message.SenderControllerId), isPlayerChat: true));
+            new ChatLineVM(line, getPlayerColor(message.SenderControllerId), isPlayerChat: true),
+            incomingDirect);
     }
 
     private void EnsureFixedChannel(string channelId, string displayName, ChatChannelKind kind)
@@ -387,7 +393,7 @@ internal sealed class ChatVM : ViewModel
         UpdateVisibleLines();
     }
 
-    private void AddLine(string channelId, ChatLineVM line)
+    private void AddLine(string channelId, ChatLineVM line, bool incomingDirect = false)
     {
         var history = histories[channelId];
 
@@ -416,9 +422,9 @@ internal sealed class ChatVM : ViewModel
         {
             AppendVisibleLine(line, passiveTrimmed);
 
-            // the closed feed fades, so the channel keeps the unread marker until it is opened (#3930)
-            if (line.IsPlayerChat && channelsById.TryGetValue(channelId, out var closedChannel))
-                closedChannel.MarkUnread();
+            // the closed feed fades, so a DM someone sent keeps the unread marker until it is seen (#3930)
+            if (incomingDirect && channelsById.TryGetValue(channelId, out var closedChannel))
+                closedChannel.MarkUnread(hidden: true);
         }
         else if (viewingThisChannel || viewingAll)
         {
