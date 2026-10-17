@@ -5,6 +5,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
 using System;
+using GameInterface.Services.Issues.Quests.EscortMerchantCaravan;
 
 namespace GameInterface.Services.Issues;
 
@@ -23,6 +24,7 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueOwnershipRegistry>().As<IIssueOwnershipRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<AlternativeSolutionTroopValidator>().As<IAlternativeSolutionTroopValidator>().InstancePerDependency();
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
+        builder.RegisterType<EscortProgress>().As<IEscortProgress>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)
