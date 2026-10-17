@@ -1,4 +1,6 @@
 ﻿using Common;
+using System.Linq;
+using GameInterface.Services.ItemRosters.Messages;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -114,7 +116,8 @@ internal class TradeHandler : IHandler
             currentSettlementComponentId,
             boughtItems,
             soldItems,
-            what.ForceTransferId
+            what.ForceTransferId,
+            what.InitialPlayerRoster
         );
 
         network.SendAll(message);
@@ -142,6 +145,29 @@ internal class TradeHandler : IHandler
             MobileParty currentMobileParty = null;
             if (message.CurrentMobilePartyId != null && !objectManager.TryGetObjectWithLogging<MobileParty>(message.CurrentMobilePartyId, out currentMobileParty)) return;
 
+            // The server may consume food after the client has submitted its inventory.
+            // Reapply the client's per-item changes to the current authoritative roster so
+            // one-shot loot and reward screens are not rejected after they close.
+            var toItemRosterData = message.ToItemRosterData;
+            if (!MatchesInventoryBaseline(toRoster, message.InitialPlayerRoster) &&
+                !TryRebaseInventoryData(
+                    toRoster,
+                    message.InitialPlayerRoster,
+                    message.ToItemRosterData,
+                    out toItemRosterData))
+            {
+                if (peer != null)
+                {
+                    messageBroker.Publish(peer, new ResendItemRoster(toRoster));
+                    if (fromRoster != null) messageBroker.Publish(peer, new ResendItemRoster(fromRoster));
+                    network.Send(peer, new UpdateEquipmentClients(
+                        ResolveCharacterIdEquipmentsData(ownerParty, initialHero.CharacterObject),
+                        message.OwnerPartyId, message.InitialHeroId));
+                    network.Send(peer, new SendInformationMessage("Inventory changed while closing. Please try again."));
+                }
+                return;
+            }
+
             var boughtItems = ResolveTradeItems(message.BoughtItems);
             var soldItems = ResolveTradeItems(message.SoldItems);
             ResolveCharacterEquipmentsData(message.CharacterIdEquipmentsData, out var characterEquipmentsData);
@@ -165,7 +191,6 @@ internal class TradeHandler : IHandler
             }
 
             var fromItemRosterData = message.FromItemRosterData;
-            var toItemRosterData = message.ToItemRosterData;
             var totalAmount = message.TotalAmount;
 
             // Undo any purchases that are no longer present in the roster
@@ -182,6 +207,15 @@ internal class TradeHandler : IHandler
             {
                 // Manage warehouse rosters separately as they involve more complicated logic
                 MessageBroker.Instance.Publish(this, new WarehouseRosterManaged(payload.Who as NetPeer, hero, currentSettlementComponent.Settlement, fromItemRosterData));
+            }
+
+            // The submitting client has already reset its screen before the server applies
+            // the commit. Refresh only that peer so slaughter/donation backups and market
+            // deltas cannot leave its local roster behind, while other open screens remain intact.
+            if (peer != null)
+            {
+                messageBroker.Publish(peer, new ResendItemRoster(toRoster));
+                if (fromRoster != null) messageBroker.Publish(peer, new ResendItemRoster(fromRoster));
             }
 
             // Update hero equipment with new data
@@ -203,6 +237,83 @@ internal class TradeHandler : IHandler
             );
         });
     }
+
+    internal static bool MatchesInventoryBaseline(ItemRoster roster, ItemRosterElement[] baseline)
+    {
+        if (baseline == null) return roster.Count == 0;
+        var occupied = baseline.Where(item => item.Amount != 0).ToArray();
+        if (roster.Count != occupied.Length) return false;
+        foreach (var item in occupied)
+        {
+            int index = roster.FindIndexOfElement(item.EquipmentElement);
+            if (index < 0 || roster.GetElementNumber(index) != item.Amount) return false;
+        }
+        return true;
+    }
+
+    internal static bool TryRebaseInventoryData(
+        ItemRoster authoritativeRoster,
+        ItemRosterElement[] initialRoster,
+        ItemRosterElement[] submittedRoster,
+        out ItemRosterElement[] rebasedRoster)
+    {
+        rebasedRoster = null;
+        if (authoritativeRoster == null || initialRoster == null || submittedRoster == null) return false;
+
+        var elements = new List<EquipmentElement>();
+        AddUniqueElements(elements, initialRoster);
+        AddUniqueElements(elements, submittedRoster);
+
+        var rebased = new ItemRoster(authoritativeRoster);
+        foreach (var element in elements)
+        {
+            int initialAmount = FindAmount(initialRoster, element);
+            int submittedAmount = FindAmount(submittedRoster, element);
+            int delta = submittedAmount - initialAmount;
+            if (delta == 0) continue;
+
+            int authoritativeAmount = FindAmount(rebased, element);
+            long finalAmount = (long)authoritativeAmount + delta;
+            if (finalAmount < 0)
+            {
+                // The server consumed the remaining stock after the client snapshot.
+                // Keep the client's other staged changes instead of rejecting a one-shot
+                // loot/reward screen that cannot be reopened.
+                delta = -authoritativeAmount;
+            }
+            else if (finalAmount > int.MaxValue)
+            {
+                return false;
+            }
+
+            if (delta != 0) rebased.AddToCounts(element, delta);
+        }
+
+        rebasedRoster = rebased.ToArray();
+        return true;
+    }
+
+    private static void AddUniqueElements(List<EquipmentElement> elements, IEnumerable<ItemRosterElement> roster)
+    {
+        foreach (var item in roster)
+        {
+            var element = item.EquipmentElement;
+            if (element.Item == null || elements.Any(existing => SameElement(existing, element))) continue;
+            elements.Add(element);
+        }
+    }
+
+    private static int FindAmount(IEnumerable<ItemRosterElement> roster, EquipmentElement element)
+    {
+        foreach (var item in roster)
+        {
+            if (SameElement(item.EquipmentElement, element)) return item.Amount;
+        }
+        return 0;
+    }
+
+    private static bool SameElement(EquipmentElement left, EquipmentElement right)
+        => left.Item == right.Item && left.ItemModifier == right.ItemModifier;
 
     private bool TryValidateForceTransfer(CompleteTrade message, NetPeer peer)
     {
