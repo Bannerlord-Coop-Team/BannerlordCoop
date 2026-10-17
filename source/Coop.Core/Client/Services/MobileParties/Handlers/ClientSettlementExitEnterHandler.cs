@@ -154,7 +154,6 @@ public class ClientSettlementExitEnterHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging(partyId, out MobileParty party)) return;
         if (!objectManager.TryGetObjectWithLogging(settlementId, out Settlement settlement)) return;
 
-        var previousEncounter = Campaign.Current?.PlayerEncounter;
         using (new AllowedThread())
         {
             settlementInterface.StartSettlementEncounter(party, settlement);
@@ -162,10 +161,6 @@ public class ClientSettlementExitEnterHandler : IHandler
             if (ShouldShowRaidOccupiedMenu(party, settlement))
                 GameMenu.SwitchToMenu("raid_occupied");
         }
-        // Quest entry requests need the initialized encounter, outside the receive scope.
-        var encounter = Campaign.Current?.PlayerEncounter;
-        if (encounter != null && encounter != previousEncounter && PlayerEncounter.EncounterSettlement == settlement)
-            messageBroker.Publish(this, new SettlementEncounterStarted(party, settlement));
 #if DEBUG
         Logger.Debug(
             "SettlementEncounterRecovery phase=applied partyHandle={PartyHandle} settlementHandle={SettlementHandle} encounter={HasEncounter} currentSettlement={CurrentSettlement} partyBattle={HasPartyBattle}",

@@ -1831,13 +1831,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     [Fact]
     public void KingdomDecisionFinalVote_SecondQueuedDecisionPromptsAfterDismiss()
     {
-        var (client1, _, player1, _, _) = SetUpPlayerDeclareWarVotes("TargetKingdomQueued", decisionCount: 2);
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
-            ChangeClanInfluenceAction.Apply(proposerClan, 1000f);
-        });
+        var (client1, _, _, _, _) = SetUpPlayerDeclareWarVotes("TargetKingdomQueued", decisionCount: 2);
 
         client1.Call(() =>
         {

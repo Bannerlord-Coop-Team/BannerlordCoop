@@ -64,7 +64,6 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.Barter;
 using TaleWorlds.Core;
 using TaleWorlds.Core.ImageIdentifiers;
 using TaleWorlds.Library;
-using TaleWorlds.Localization;
 using Xunit.Abstractions;
 using GameInterface.Services.Clans.Data;
 using TaleWorlds.ObjectSystem;

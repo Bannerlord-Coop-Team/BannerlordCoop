@@ -5,7 +5,6 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MapEvents;
 
@@ -60,7 +59,13 @@ internal sealed class MapEventBattleFactory
 
     internal static bool CanCreateMapEvent(PartyBase attacker, PartyBase defender, BattleCreationFlags flags)
     {
-        if (!ArePartiesAvailable(attacker, defender)) return false;
+        if (attacker == null || defender == null || ReferenceEquals(attacker, defender) ||
+            attacker.MapEventSide != null || defender.MapEventSide != null) return false;
+
+        if (DefaultMobilePartyAIModelPatches.IsAttackPrevented(
+                attacker.MobileParty,
+                defender.MobileParty))
+            return false;
 
         if (!WillCreateFieldBattle(attacker, defender, flags)) return true;
         var attackerMobileParty = attacker.MobileParty;
@@ -68,22 +73,6 @@ internal sealed class MapEventBattleFactory
         return attackerMobileParty?.IsActive == true && defenderMobileParty?.IsActive == true &&
             attackerMobileParty.CurrentSettlement == null && defenderMobileParty.CurrentSettlement == null;
     }
-
-    internal static MapEvent CreateSettlementQuestBattle(PartyBase attacker, PartyBase defender, Settlement settlement)
-    {
-        if (!ArePartiesAvailable(attacker, defender) || settlement == null || settlement.IsUnderSiege ||
-            attacker.MobileParty?.IsActive != true || defender.MobileParty?.IsActive != true ||
-            attacker.MobileParty.CurrentSettlement != settlement || defender.MobileParty.CurrentSettlement != settlement)
-            return null;
-
-        // The approved guard fight takes place inside the town, with both parties still settled.
-        return CreateFieldBattleEvent(attacker, defender, Campaign.Current.MapEventManager);
-    }
-
-    private static bool ArePartiesAvailable(PartyBase attacker, PartyBase defender) =>
-        attacker != null && defender != null && !ReferenceEquals(attacker, defender) &&
-        attacker.MapEventSide == null && defender.MapEventSide == null &&
-        !DefaultMobilePartyAIModelPatches.IsAttackPrevented(attacker.MobileParty, defender.MobileParty);
 
     private static bool WillCreateFieldBattle(PartyBase attacker, PartyBase defender, BattleCreationFlags flags)
     {

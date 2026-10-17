@@ -84,10 +84,7 @@ internal class IssueTypeAllowlistGate
 
         var behaviorType = __instance.GetType();
 
-        var isRegistered = registry.Descriptors.Any(descriptor => descriptor.IssueType.DeclaringType == behaviorType)
-            || FindIssueTypes()
-                .Where(issueType => issueType.DeclaringType == behaviorType)
-                .Any(global::GameInterface.Services.Issues.Generic.QuestTypeRegistry.IsRegistered);
+        var isRegistered = registry.Descriptors.Any(descriptor => descriptor.IssueType.DeclaringType == behaviorType);
 
         if (!isRegistered)
         {

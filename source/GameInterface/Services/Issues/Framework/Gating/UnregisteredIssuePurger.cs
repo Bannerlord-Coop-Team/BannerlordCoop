@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Framework.Interface;
 using Serilog;
 using System;
@@ -62,8 +61,7 @@ internal class UnregisteredIssuePurger : IHandler
         }
 
         var unregistered = issueManager.Issues.Values
-            .Where(issue => !registry.IsRegistered(issue.GetType())
-                && !QuestTypeRegistry.IsRegistered(issue.GetType()))
+            .Where(issue => !registry.IsRegistered(issue.GetType()))
             .ToList();
 
         var removed = 0;
@@ -79,10 +77,7 @@ internal class UnregisteredIssuePurger : IHandler
                 continue;
             }
 
-            using (new IssueFinalizeAuthorityGuard())
-            {
-                issue.IssueFinalized();
-            }
+            issue.IssueFinalized();
             removed++;
         }
 

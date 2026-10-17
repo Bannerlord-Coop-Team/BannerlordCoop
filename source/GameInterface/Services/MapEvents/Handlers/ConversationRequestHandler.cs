@@ -131,27 +131,17 @@ internal class ConversationRequestHandler : IHandler
         }
 
         if (PlayerPartyInteractionDialogState.HasActiveState)
-        {
-            NotifyRestartRejected(request.RequestId);
             return;
-        }
 
         var now = DateTime.UtcNow;
         if (now - lastRequestSentUtc < RequestCooldown)
-        {
-            NotifyRestartRejected(request.RequestId);
             return; // drop: at most one request per cooldown window
-        }
 
-        if (!objectManager.TryGetIdWithLogging(request.DefenderParty, out var defenderId) ||
-            !objectManager.TryGetIdWithLogging(request.AttackerParty, out var attackerId))
-        {
-            NotifyRestartRejected(request.RequestId);
-            return;
-        }
+        if (!objectManager.TryGetIdWithLogging(request.DefenderParty, out var defenderId)) return;
+        if (!objectManager.TryGetIdWithLogging(request.AttackerParty, out var attackerId)) return;
 
         lastRequestSentUtc = now;
-        var requestId = restartContextTracker.Capture(PlayerEncounter.Current, request.RequestId);
+        var requestId = restartContextTracker.Capture(PlayerEncounter.Current);
         pendingConversationRequestId = requestId;
         
         if (request.ArmyTalkEncounter)
@@ -645,7 +635,6 @@ internal class ConversationRequestHandler : IHandler
             {
                 ClearPendingConversationRequest(message.RequestId);
                 SendConversationEndedToServer(message.RequestId);
-                NotifyRestartRejected(message.RequestId);
                 return;
             }
 
@@ -653,7 +642,6 @@ internal class ConversationRequestHandler : IHandler
             {
                 ClearPendingConversationRequest(message.RequestId);
                 SendConversationEndedToServer(message.RequestId);
-                NotifyRestartRejected(message.RequestId);
                 return;
             }
 
@@ -668,8 +656,7 @@ internal class ConversationRequestHandler : IHandler
                 if (restartDecision == ConversationRestartDecision.Duplicate)
                 {
                     Logger.Debug("Ignoring duplicate conversation approval for the already-open encounter");
-                    if (ActivateConversationRequest(message.RequestId, observedActivationVersion))
-                        messageBroker.Publish(this, new ConversationRestartApproved(defender, attacker, message.RequestId));
+                    ActivateConversationRequest(message.RequestId, observedActivationVersion);
                     return;
                 }
 
@@ -678,7 +665,6 @@ internal class ConversationRequestHandler : IHandler
                     Logger.Warning("Ignoring stale conversation approval because the encounter changed after the request");
                     ClearPendingConversationRequest(message.RequestId);
                     SendConversationEndedToServer(message.RequestId);
-                    NotifyRestartRejected(message.RequestId);
                     return;
                 }
 
@@ -703,8 +689,7 @@ internal class ConversationRequestHandler : IHandler
                     approvedRestartDepth--;
                 }
 
-                if (ActivateConversationRequest(message.RequestId, observedActivationVersion))
-                    messageBroker.Publish(this, new ConversationRestartApproved(defender, attacker, message.RequestId));
+                ActivateConversationRequest(message.RequestId, observedActivationVersion);
             }
             catch (Exception e)
             {
@@ -713,7 +698,6 @@ internal class ConversationRequestHandler : IHandler
                 Logger.Error(e, "Failed to restart approved conversation encounter; releasing the server-side party hold");
                 ClearPendingConversationRequest(message.RequestId);
                 SendConversationEndedToServer(message.RequestId);
-                NotifyRestartRejected(message.RequestId);
             }
         }, context: nameof(Handle_NetworkAllowConversation));
     }
@@ -726,8 +710,6 @@ internal class ConversationRequestHandler : IHandler
         var pendingRequestId = pendingConversationRequestId;
         var activeRequestId = activeConversationRequestId;
         var hadActiveConversationRequest = hasActiveConversationRequest;
-
-        NotifyRestartRejected(pendingRequestId);
 
         pendingConversationRequestId = null;
         activeConversationRequestId = null;
@@ -786,7 +768,6 @@ internal class ConversationRequestHandler : IHandler
             restartContextTracker.Remove(message.RequestId);
             ClearPendingConversationRequest(message.RequestId);
             PlayerPartyInteractionDialogState.ClearInitiatingEncounter();
-            NotifyRestartRejected(message.RequestId);
 
             if (message.Reason == ConversationDeniedReason.PlayerUnavailable)
                 ConversationPartyHold.ShowPlayerUnavailableMessage();
@@ -795,27 +776,20 @@ internal class ConversationRequestHandler : IHandler
         }, context: nameof(Handle_NetworkConversationDenied));
     }
 
-    private bool ActivateConversationRequest(string requestId, long observedActivationVersion)
+    private void ActivateConversationRequest(string requestId, long observedActivationVersion)
     {
         if (conversationActivationVersion != observedActivationVersion)
         {
             Logger.Debug("Ignoring older conversation approval because a newer approval activated while it was waiting");
             ClearPendingConversationRequest(requestId);
             SendConversationEndedToServer(requestId);
-            NotifyRestartRejected(requestId);
-            return false;
+            return;
         }
 
         activeConversationRequestId = requestId;
         hasActiveConversationRequest = true;
         conversationActivationVersion++;
         ClearPendingConversationRequest(requestId);
-        return true;
-    }
-
-    private void NotifyRestartRejected(string requestId)
-    {
-        if (requestId != null) messageBroker.Publish(this, new ConversationRestartRejected(requestId));
     }
 
     private void ClearPendingConversationRequest(string requestId)

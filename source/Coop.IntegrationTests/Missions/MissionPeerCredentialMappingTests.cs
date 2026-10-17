@@ -477,8 +477,7 @@ public class MissionPeerCredentialMappingTests
                 try
                 {
                     Assert.True(deserializing.Wait(TimeSpan.FromSeconds(5)));
-                    // The receive poller is blocked deliberately; invalidation needs its own worker.
-                    invalidation = Task.Factory.StartNew(() =>
+                    invalidation = Task.Run(() =>
                     {
                         invalidating.Set();
                         switch (reason)
@@ -496,7 +495,7 @@ public class MissionPeerCredentialMappingTests
                                 fixture.Client.DisconnectPeers();
                                 break;
                         }
-                    }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+                    });
                     Assert.True(invalidating.Wait(TimeSpan.FromSeconds(5)));
                     Assert.True(invalidation.Wait(TimeSpan.FromSeconds(5)),
                         "Route invalidation blocked behind a receive handler.");

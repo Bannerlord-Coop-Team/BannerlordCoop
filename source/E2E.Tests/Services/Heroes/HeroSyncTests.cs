@@ -113,30 +113,6 @@ namespace E2E.Tests.Services.Heroes
             TestEnvironment.AssertField<Hero, int>(nameof(Hero.Level), 10, defaultValue: hero.Level);
         }
 
-        [Theory]
-        [InlineData(10f)]
-        [InlineData(-10f)]
-        public void Server_AddPower_ReplicatesToBothClients(float delta)
-        {
-            float expectedPower = 0;
-            Server.Call(() =>
-            {
-                Assert.True(Server.ObjectManager.TryGetObject(HeroId, out Hero hero));
-                expectedPower = hero.Power + delta;
-                hero.AddPower(delta);
-                Assert.Equal(expectedPower, hero.Power);
-            });
-
-            foreach (var client in Clients)
-            {
-                client.Call(() =>
-                {
-                    Assert.True(client.ObjectManager.TryGetObject(HeroId, out Hero hero));
-                    Assert.Equal(expectedPower, hero.Power);
-                });
-            }
-        }
-
         [Fact]
         public void Server_UpdateHomeSettlement_ReplicatesBackingCache()
         {

@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.UI.CoopOptions.Providers.UITab;
+﻿using GameInterface.Services.Clans;
+using GameInterface.Services.UI.CoopOptions.Providers.UITab;
 using Autofac;
 using Autofac.Core;
 using Autofac.Core.Registration;
@@ -113,15 +114,6 @@ public class GameInterfaceModule : Module
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<Services.Crime.CrimeRatingService>().As<Services.Crime.ICrimeRatingService>().InstancePerDependency();
         builder.RegisterType<PlayerManager>().As<IPlayerManager>().InstancePerLifetimeScope();
-        builder.RegisterType<Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons.GangLeaderWeaponsAcceptance>()
-            .As<Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons.IGangLeaderWeaponsAcceptance>()
-            .InstancePerLifetimeScope();
-        builder.RegisterType<Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons.GangLeaderWeaponsQuestActions>()
-            .As<Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons.IGangLeaderWeaponsQuestActions>()
-            .InstancePerDependency();
-        builder.RegisterType<Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons.GangLeaderWeaponsOwnerContext>()
-            .As<Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons.IGangLeaderWeaponsOwnerContext>()
-            .InstancePerDependency();
         builder.RegisterType<HideoutPreparation>().As<IHideoutPreparation>().InstancePerDependency();
         builder.RegisterType<BugReportService>().As<IBugReportService>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<BugReportOverlay>().As<IBugReportOverlay>().InstancePerLifetimeScope();
@@ -155,10 +147,6 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PeacePursuitCleaner>().As<IPeacePursuitCleaner>().InstancePerDependency();
         builder.RegisterType<PartyVisibilitySweep>().As<IPartyVisibilitySweep>().InstancePerDependency();
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().InstancePerLifetimeScope();
-        builder.RegisterType<Services.Issues.Generic.IssueConversationTracker>().As<Services.Issues.Generic.IIssueConversationTracker>().InstancePerLifetimeScope();
-        builder.RegisterType<Services.Issues.Generic.IssueOwnershipRegistry>().As<Services.Issues.Generic.IIssueOwnershipRegistry>().InstancePerLifetimeScope();
-        builder.RegisterType<Services.Issues.Generic.IssueGenerationRegistry>().As<Services.Issues.Generic.IIssueGenerationRegistry>().InstancePerLifetimeScope();
-        builder.RegisterType<Services.Issues.Interfaces.AwaitingAlternativeSolutionTroopsRegistry>().As<Services.Issues.Interfaces.IAwaitingAlternativeSolutionTroopsRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<LocationConversationAgentGuard>().As<ILocationConversationAgentGuard>().InstancePerDependency();
@@ -182,6 +170,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PlayerSiegeTargetScoring>().As<IPlayerSiegeTargetScoring>().InstancePerDependency();
         builder.RegisterType<ArmyFormationPositionConvergence>().As<IArmyFormationPositionConvergence>().InstancePerDependency();
         builder.RegisterType<MapEventLoadCleaner>().As<IMapEventLoadCleaner>().InstancePerDependency();
+        builder.RegisterType<LeaderlessClanResolver>().As<ILeaderlessClanResolver>().InstancePerDependency();
         builder.RegisterType<EmptyLordPartyResetter>().As<IEmptyLordPartyResetter>().InstancePerDependency();
         builder.RegisterType<EncounterMenuConditionRefresher>().As<IEncounterMenuConditionRefresher>().InstancePerDependency();
         builder.RegisterType<PartyScreenRosterRefresher>().As<IPartyScreenRosterRefresher>().InstancePerDependency();

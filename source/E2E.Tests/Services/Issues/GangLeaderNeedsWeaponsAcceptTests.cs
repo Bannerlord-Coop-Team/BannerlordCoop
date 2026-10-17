@@ -1,0 +1,306 @@
+using Common.Messaging;
+using Common.Util;
+using E2E.Tests.Environment;
+using E2E.Tests.Environment.Instance;
+using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encyclopedia;
+using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using Xunit.Abstractions;
+using Issue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue;
+
+namespace E2E.Tests.Services.Issues;
+
+/// <summary>
+/// The world around two gang leaders in two towns and two connected players, accepted through the framework's accept
+/// like every other quest.
+/// </summary>
+public abstract class GangLeaderNeedsWeaponsAcceptScenario : IDisposable
+{
+    protected const string ControllerA = "player-A";
+    protected const string ControllerB = "player-B";
+    protected const string FirstIssueId = "weapons_first";
+    protected const string SecondIssueId = "weapons_second";
+
+    private readonly string townClanId;
+    private readonly Player playerA;
+    private readonly Player playerB;
+
+    protected string FirstGiverId { get; }
+    protected string SecondGiverId { get; }
+
+    protected E2ETestEnvironment TestEnvironment { get; }
+    protected EnvironmentInstance Server => TestEnvironment.Server;
+    protected EnvironmentInstance ClientA => TestEnvironment.Clients.First();
+    protected EnvironmentInstance ClientB => TestEnvironment.Clients.Last();
+    protected EnvironmentInstance[] Instances => new[] { Server, ClientA, ClientB };
+    protected Player PlayerA => playerA;
+
+    protected GangLeaderNeedsWeaponsAcceptScenario(ITestOutputHelper output)
+    {
+        TestEnvironment = new E2ETestEnvironment(output);
+
+        townClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        FirstGiverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        SecondGiverId = TestEnvironment.CreateRegisteredObject<Hero>();
+
+        playerA = CreatePlayer(ControllerA);
+        playerB = CreatePlayer(ControllerB);
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.Resolve<IPlayerManager>().AddPlayer(playerA));
+                Assert.True(instance.Resolve<IPlayerManager>().AddPlayer(playerB));
+            });
+
+            AddIssue(instance, FirstGiverId, FirstIssueId);
+            AddIssue(instance, SecondGiverId, SecondIssueId);
+        }
+
+        Connect(ClientA, playerA);
+        Connect(ClientB, playerB);
+    }
+
+    public virtual void Dispose()
+    {
+        TestEnvironment.Dispose();
+    }
+
+    private Player CreatePlayer(string controllerId)
+    {
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        return new Player(controllerId, heroId, partyId, "", "");
+    }
+
+    private void Connect(EnvironmentInstance client, Player player)
+    {
+        TestEnvironment.ConnectRegisteredPlayer(client, player.ControllerId);
+        client.Resolve<IControllerIdProvider>().SetControllerId(player.ControllerId);
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
+            Game.Current.PlayerTroop = hero.CharacterObject;
+            Assert.Same(hero, Hero.MainHero);
+        });
+    }
+
+    private void AddIssue(EnvironmentInstance instance, string giverId, string issueId)
+    {
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(instance.ObjectManager.TryGetObject<Town>(townId, out var town));
+            Assert.True(instance.ObjectManager.TryGetObject<Clan>(townClanId, out var townClan));
+
+            using (new AllowedThread())
+            {
+                // The quest's dialogs read encyclopedia links
+                Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+                Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+
+                // A town the gang leader can stay alive in
+                settlement.SetSettlementComponent(town);
+                town.OwnerClan = townClan;
+                town.Loyalty = 50;
+                giver.StayingInSettlement = settlement;
+                giver.Occupation = Occupation.GangLeader;
+
+                foreach (var player in new[] { playerA, playerB })
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
+                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party));
+                    hero._partyBelongedTo = party;
+                }
+
+                var issue = new Issue(giver);
+                issue._averagePriceForItem = 250;
+                issue._requiredWeaponClassIndex = 0;
+                issue.StringId = issueId;
+                issue._issueState = IssueBase.IssueState.Ongoing;
+
+                Campaign.Current.IssueManager._issues.Add(giver, issue);
+                giver.OnIssueCreatedForHero(issue);
+            }
+        });
+    }
+
+    protected static void Accept(EnvironmentInstance client, string giverId)
+    {
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            giver.Issue.StartIssueWithQuest();
+        });
+    }
+
+    protected static bool CheckPreconditions(EnvironmentInstance client, string giverId)
+    {
+        var result = false;
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            result = giver.Issue.CheckPreconditions(giver, out _);
+        });
+
+        return result;
+    }
+
+    protected string? OwnerOnServer(string giverId, string issueId)
+    {
+        string? controllerId = null;
+
+        Server.Call(() =>
+        {
+            Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(giverId, issueId, out controllerId);
+        });
+
+        return controllerId;
+    }
+}
+
+/// <summary>
+/// Only the world requirements of taking the quest are stubbed (relations, the town's owner), the rules under test are real.
+/// </summary>
+public class GangLeaderNeedsWeaponsAcceptTests : GangLeaderNeedsWeaponsAcceptScenario
+{
+    private readonly StubIssuePreconditions preconditions = new(typeof(Issue));
+
+    public GangLeaderNeedsWeaponsAcceptTests(ITestOutputHelper output) : base(output)
+    {
+    }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+        preconditions.Dispose();
+    }
+
+    [Fact]
+    public void EachPlayer_CanHoldAWeaponsQuestAtTheSameTime()
+    {
+        Accept(ClientA, FirstGiverId);
+        Accept(ClientB, SecondGiverId);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Assert.Equal(ControllerA, OwnerOnServer(FirstGiverId, FirstIssueId));
+        Assert.Equal(ControllerB, OwnerOnServer(SecondGiverId, SecondIssueId));
+    }
+
+    [Fact]
+    public void ThePlayerHoldingAWeaponsQuest_IsRefusedASecondOne()
+    {
+        Accept(ClientA, FirstGiverId);
+        Accept(ClientA, SecondGiverId);
+
+        var rejected = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Assert.Equal(SecondIssueId, rejected.IssueId);
+        Assert.Null(OwnerOnServer(SecondGiverId, SecondIssueId));
+        Assert.Equal(ControllerA, OwnerOnServer(FirstGiverId, FirstIssueId));
+    }
+
+    [Fact]
+    public void ThePlayerHoldingAWeaponsQuest_IsRefusedASecondOneEvenWhenAnotherPlayerHoldsOneToo()
+    {
+        Accept(ClientA, FirstGiverId);
+        Accept(ClientB, SecondGiverId);
+
+        Assert.False(CheckPreconditions(ClientA, SecondGiverId));
+        Assert.False(CheckPreconditions(ClientB, FirstGiverId));
+    }
+
+    [Fact]
+    public void AnotherPlayersWeaponsQuest_DoesNotCountAgainstAPlayersOwnCheck()
+    {
+        Accept(ClientA, FirstGiverId);
+
+        Assert.True(CheckPreconditions(ClientB, SecondGiverId));
+    }
+}
+
+/// <summary>
+/// Nothing is stubbed: a player who can legitimately take the quest or send a companion passes the server's accept check.
+/// </summary>
+public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcceptScenario
+{
+    private const int SentTroops = 8;
+
+    public GangLeaderNeedsWeaponsEligibilityTests(ITestOutputHelper output) : base(output)
+    {
+    }
+
+    [Fact]
+    public void AnEligiblePlayer_IsNotRefusedTheQuest()
+    {
+        Accept(ClientA, FirstGiverId);
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+        Assert.Equal(ControllerA, accepted.ControllerId);
+        Assert.Equal(ControllerA, OwnerOnServer(FirstGiverId, FirstIssueId));
+    }
+
+    [Fact]
+    public void AnEligiblePlayer_IsNotRefusedTheCompanionMission()
+    {
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var playerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PlayerA.MobilePartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+
+            using (new AllowedThread())
+            {
+                troop.Level = 20;
+                playerHero.Gold = 100000;
+                party.MemberRoster.AddToCounts(playerHero.CharacterObject, 1);
+                party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+                party.MemberRoster.AddToCounts(troop, SentTroops);
+            }
+        });
+        TestEnvironment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+            Assert.True(ClientA.ObjectManager.TryGetObject<MobileParty>(PlayerA.MobilePartyId, out var party));
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.True(ClientA.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = party;
+                giver.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                giver.Issue.AlternativeSolutionSentTroops.AddToCounts(troop, SentTroops);
+            }
+
+            ClientA.Resolve<IMessageBroker>().Publish(this, new AlternativeSolutionAcceptRequested(giver.Issue));
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAcceptRejected>());
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+        Assert.Equal(ControllerA, accepted.ControllerId);
+        Assert.Equal(ControllerA, OwnerOnServer(FirstGiverId, FirstIssueId));
+    }
+}

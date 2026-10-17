@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Issues.Generic.Migrated.GangLeaderNeedsWeapons;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
@@ -62,7 +61,6 @@ internal class MapEventCreationCoordinator : IHandler
     private readonly IPlayerManager playerManager;
     private readonly INetworkConfig configuration;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
-    private readonly IGangLeaderWeaponsQuestActions weaponsQuestActions;
     private readonly ConcurrentDictionary<string, PendingRequest> pendingRequests = new ConcurrentDictionary<string, PendingRequest>();
 
     public MapEventCreationCoordinator(
@@ -71,8 +69,7 @@ internal class MapEventCreationCoordinator : IHandler
         IObjectManager objectManager,
         IPlayerManager playerManager,
         INetworkConfig configuration,
-        IVillageHostileActionInterface villageHostileActionInterface,
-        IGangLeaderWeaponsQuestActions weaponsQuestActions)
+        IVillageHostileActionInterface villageHostileActionInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -80,7 +77,6 @@ internal class MapEventCreationCoordinator : IHandler
         this.playerManager = playerManager;
         this.configuration = configuration;
         this.villageHostileActionInterface = villageHostileActionInterface;
-        this.weaponsQuestActions = weaponsQuestActions;
 
         Instance = this;
 
@@ -272,7 +268,7 @@ internal class MapEventCreationCoordinator : IHandler
             return false;
         }
 
-        var creationResult = CreateMapEvent(request, attacker, defender, player.ControllerId);
+        var creationResult = CreateMapEvent(request, attacker, defender);
         SendCreatedReply(requestingPeer, request, creationResult.Outcome, creationResult.MapEventId);
         return false;
     }
@@ -414,18 +410,12 @@ internal class MapEventCreationCoordinator : IHandler
     private (MapEventCreationOutcome Outcome, string MapEventId) CreateMapEvent(
         NetworkRequestCreateMapEvent request,
         PartyBase attacker,
-        PartyBase defender,
-        string controllerId)
+        PartyBase defender)
     {
         string mapEventId = null;
 
         var parties = GetMapEventParties(attacker, defender);
-        var questSettlement = !request.Flags.IsForced
-            ? weaponsQuestActions.GetApprovedBattleSettlement(controllerId, attacker, defender)
-            : null;
-        var mapEvent = questSettlement != null
-            ? MapEventBattleFactory.CreateSettlementQuestBattle(attacker, defender, questSettlement)
-            : MapEventBattleFactory.CreateMapEvent(parties.Attacker, parties.Defender, request.Flags);
+        var mapEvent = MapEventBattleFactory.CreateMapEvent(parties.Attacker, parties.Defender, request.Flags);
         if (mapEvent == null) return (MapEventCreationOutcome.Rejected, null);
 
         if (mapEvent.IsVillageHostileAction())
