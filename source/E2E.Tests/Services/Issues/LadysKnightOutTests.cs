@@ -27,6 +27,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.TournamentGames;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.Localization;
 using TaleWorlds.Core;
@@ -230,6 +231,25 @@ public class LadysKnightOutTests : IDisposable
     public void FrameworkAllowsSeparatePlayersButRefusesASecondQuestForTheSamePlayer(bool samePlayer)
     {
         Accept(scenario.ClientA);
+        AddSecondOffer();
+        var client = samePlayer ? scenario.ClientA : scenario.ClientB;
+        client.Call(() =>
+        {
+            var issue = client.GetRegisteredObject<Hero>(secondGiverId).Issue;
+            issue.StartIssueWithQuest();
+            if (!samePlayer) ((Quest)issue.IssueQuest).QuestAcceptedConsequences();
+        });
+        Assert.Equal(samePlayer ? 1 : 2, scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>().Count());
+        if (samePlayer) Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        else
+        {
+            scenario.ClientA.Call(() => Assert.Null(scenario.ClientA.GetRegisteredObject<Hero>(secondGiverId).Issue.IssueQuest));
+            scenario.ClientB.Call(() => Assert.Null(scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId).Issue.IssueQuest));
+        }
+    }
+
+    private void AddSecondOffer()
+    {
         foreach (var instance in Instances)
         {
             instance.Call(() =>
@@ -246,20 +266,6 @@ public class LadysKnightOutTests : IDisposable
                     giver.OnIssueCreatedForHero(issue);
                 }
             });
-        }
-        var client = samePlayer ? scenario.ClientA : scenario.ClientB;
-        client.Call(() =>
-        {
-            var issue = client.GetRegisteredObject<Hero>(secondGiverId).Issue;
-            issue.StartIssueWithQuest();
-            if (!samePlayer) ((Quest)issue.IssueQuest).QuestAcceptedConsequences();
-        });
-        Assert.Equal(samePlayer ? 1 : 2, scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>().Count());
-        if (samePlayer) Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
-        else
-        {
-            scenario.ClientA.Call(() => Assert.Null(scenario.ClientA.GetRegisteredObject<Hero>(secondGiverId).Issue.IssueQuest));
-            scenario.ClientB.Call(() => Assert.Null(scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId).Issue.IssueQuest));
         }
     }
 
@@ -285,11 +291,39 @@ public class LadysKnightOutTests : IDisposable
                 Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, 83);
             });
         Accept(scenario.ClientA);
-        scenario.Server.Call(() => scenario.Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(quest => quest.CriminalActionPerformedTowardsSettlement()));
+        AddSecondOffer();
+        Quest otherQuest = null!;
+        scenario.ClientB.Call(() =>
+        {
+            var issue = scenario.ClientB.GetRegisteredObject<Hero>(secondGiverId).Issue;
+            issue.StartIssueWithQuest();
+            otherQuest = (Quest)issue.IssueQuest;
+            otherQuest.QuestAcceptedConsequences();
+        });
+        int expectedXp = 0;
+        int expectedLevel = 0;
+        scenario.Server.Call(() => scenario.Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(quest =>
+        {
+            if (quest.QuestGiver != scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId)) return;
+            Campaign.Current.Models.CharacterDevelopmentModel.GetTraitLevelForTraitXp(Hero.MainHero, DefaultTraits.Honor,
+                83 - 50, out expectedLevel, out expectedXp);
+            quest.CriminalActionPerformedTowardsSettlement();
+        }));
         var penalty = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLadysKnightOutHonor>());
         Assert.Equal(QuestScenario.ControllerA, penalty.ControllerId);
-        scenario.ClientA.Call(() => Assert.Equal(penalty.Xp, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
-        scenario.ClientB.Call(() => Assert.Equal(83, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+        Assert.Equal(expectedXp, penalty.Xp);
+        Assert.Equal(expectedLevel, penalty.Level);
+        scenario.ClientA.Call(() =>
+        {
+            Assert.Equal(expectedXp, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+            Assert.Equal(expectedLevel, scenario.ClientA.GetRegisteredObject<Hero>(penalty.HeroId).GetTraitLevel(DefaultTraits.Honor));
+        });
+        scenario.ClientB.Call(() =>
+        {
+            Assert.Equal(83, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+            Assert.True(otherQuest.IsOngoing);
+            Assert.Single(otherQuest.JournalEntries);
+        });
         Assert.Equal(IssueOutcome.QuestFail, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
 
@@ -425,6 +459,59 @@ public class LadysKnightOutTests : IDisposable
             ControllerId = QuestScenario.ControllerA, StartLog = "accepted",
         });
         Assert.Equal(1, callback.CountFor(scenario.ClientA));
+    }
+
+    [Fact]
+    public void ADelayedLordAcceptanceAutomaticallyCompletesInMapStateOnce()
+    {
+        PrepareLordSolution();
+        var router = scenario.Server.Resolve<TestNetworkRouter>();
+        router.PauseLink(scenario.Server.NetPeer, scenario.ClientA.NetPeer);
+        IssueBase localIssue = null!;
+        scenario.ClientA.Call(() =>
+        {
+            localIssue = scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+            localIssue.StartIssueWithLordSolution();
+            Campaign.Current.ConversationManager.IsConversationInProgress = false;
+            var states = Game.Current.GameStateManager;
+            states._gameStates.Add(states.CreateState<MapState>());
+            Assert.Null(Campaign.Current.GameMenuManager.NextLocation);
+        });
+        router.ResumeLink(scenario.Server.NetPeer, scenario.ClientA.NetPeer);
+        router.RunUntilIdle();
+        scenario.ClientA.SimulateMessage(this, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLadysKnightOutLordAccepted>()));
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        environment.FlushCoalescer();
+        scenario.Server.Call(() =>
+        {
+            Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
+            Assert.Equal(85, scenario.Server.GetRegisteredObject<Hero>(player.HeroId).Clan.Influence);
+        });
+        scenario.ClientA.Call(() =>
+        {
+            Assert.Equal(2, localIssue.JournalEntries.Count);
+            Assert.Contains(localIssue.JournalEntries, log => log.LogText.ToString().Contains("in her honor"));
+        });
+        scenario.ClientB.Call(() => Assert.Empty(scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId).Issue?.JournalEntries ?? Enumerable.Empty<JournalLog>()));
+    }
+
+    [Fact]
+    public void AStaleDirectAcceptCannotOverwriteAKnownLordOwner()
+    {
+        PrepareLordSolution();
+        scenario.ClientA.Call(() => scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution());
+        scenario.ClientB.Call(() =>
+        {
+            var issue = scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+            Assert.False(issue.StartIssueWithQuest());
+            Assert.Null(issue.IssueQuest);
+            Assert.True(issue.IsSolvingWithLordSolution);
+            Assert.False(issue.IsTriedToSolveBefore);
+        });
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+        scenario.ClientA.Call(() => scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
     [Theory]
