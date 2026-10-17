@@ -53,7 +53,7 @@ public class ConquestQuestOwnershipTests : IDisposable
     }
 
     [Fact]
-    public void CompletedQuestVisibilitySurvivesSaveLoadWithFreshServices()
+    public void CompletedQuestVisibilitySurvivesLoadRegistrationWithFreshServices()
     {
         var quest = ObjectHelper.SkipConstructor<TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssueQuest>();
         quest.StringId = "coop_conquest_issue_31_quest";
@@ -68,11 +68,16 @@ public class ConquestQuestOwnershipTests : IDisposable
             new IssueOwnershipRegistry(),
             Mock.Of<IPlayerManager>(),
             ownerController.Object);
-        originalService.RecordLocalQuest(quest);
-        TheConquestOfSettlementService.SyncQuestOwners(new TestDataStore(isSaving: true, records));
 
-        TheConquestOfSettlementService.ResetQuestOwners();
-        TheConquestOfSettlementService.SyncQuestOwners(new TestDataStore(isSaving: false, records));
+        TheConquestOfSettlementPersistencePatches.CampaignOnInitializePrefix();
+        originalService.RecordLocalQuest(quest);
+        TheConquestOfSettlementPersistencePatches.SyncDataPostfix(
+            new TestDataStore(isSaving: true, records));
+
+        TheConquestOfSettlementPersistencePatches.CampaignOnInitializePrefix();
+        TheConquestOfSettlementPersistencePatches.SyncDataPostfix(
+            new TestDataStore(isSaving: false, records));
+        TheConquestOfSettlementPersistencePatches.RegisterEventsPostfix();
 
         var restoredOwnerService = new TheConquestOfSettlementService(
             Mock.Of<IObjectManager>(),
