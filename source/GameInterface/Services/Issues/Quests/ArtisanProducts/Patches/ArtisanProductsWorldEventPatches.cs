@@ -115,3 +115,25 @@ internal class ArtisanProductsServerEventPatch
     [HarmonyPrefix]
     private static bool Before() => ModInformation.IsServer;
 }
+
+[HarmonyPatch(typeof(IssueManager), nameof(IssueManager.TryToMakeTroopsReturn))]
+internal class ArtisanProductsTroopReturnPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(IssueBase issue)
+    {
+        if (ModInformation.IsClient || !(issue is Behavior.ArtisanCantSellProductsAtAFairPriceIssue)) return true;
+        return !ContainerProvider.TryResolve<IArtisanProductsTroopReturns>(out var returns) || !returns.TryDefer(issue);
+    }
+}
+
+[HarmonyPatch(typeof(IssueManager), nameof(IssueManager.HourlyTick))]
+internal class ArtisanProductsPendingTroopReturnPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix()
+    {
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<IArtisanProductsTroopReturns>(out var returns))
+            returns.ReturnPending();
+    }
+}

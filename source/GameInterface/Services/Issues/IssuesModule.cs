@@ -25,6 +25,7 @@ internal class IssuesModule : Module
         builder.RegisterType<AlternativeSolutionTroopValidator>().As<IAlternativeSolutionTroopValidator>().InstancePerDependency();
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
         builder.RegisterType<ArtisanProductsProgress>().As<IArtisanProductsProgress>().InstancePerDependency();
+        builder.RegisterType<ArtisanProductsTroopReturns>().As<IArtisanProductsTroopReturns>().InstancePerLifetimeScope();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)
