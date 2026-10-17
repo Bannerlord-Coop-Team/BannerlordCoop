@@ -24,6 +24,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Participation;
@@ -115,6 +116,7 @@ internal abstract class TestComponentBase
         RegisterMock<IModuleNameProvider>(builder);
         RegisterMock<IRegistryManager>(builder);
         RegisterMock<IMapEventLoadCleaner>(builder);
+        RegisterMock<IEmptyLordPartyResetter>(builder);
         RegisterMock<IHideoutResultEncounter>(builder);
         RegisterPlayerManagerMock(builder);
         RegisterMock<IPlayerPartyRestorer>(builder);
