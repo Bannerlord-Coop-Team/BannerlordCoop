@@ -32,6 +32,8 @@ namespace E2E.Tests.Services.MapEvents;
 public class SiegeDefenderVictoryLootTests : MapEventTestBase
 {
     private static int defenderVictoryPrompts;
+    private static int lootPartyScreens;
+    private static int lootInventoryScreens;
 
     public SiegeDefenderVictoryLootTests(ITestOutputHelper output) : base(output) { }
 
@@ -109,14 +111,7 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
             Assert.Equal(3, encounter.RosterToReceiveLootItems.Sum(item => item.Amount));
         }, MapEventDisabledMethods);
 
-        defenderVictoryPrompts = 0;
-        var harmony = new Harmony($"siege-defender-loot.{Guid.NewGuid()}");
-        harmony.Patch(AccessTools.Method(typeof(PartyScreenHelper), nameof(PartyScreenHelper.OpenScreenAsLoot)),
-            prefix: new HarmonyMethod(typeof(SiegeDefenderVictoryLootTests), nameof(OpenLootPartyScreen)));
-        harmony.Patch(AccessTools.Method(typeof(InventoryScreenHelper), nameof(InventoryScreenHelper.OpenScreenAsLoot)),
-            prefix: new HarmonyMethod(typeof(SiegeDefenderVictoryLootTests), nameof(OpenLootInventoryScreen)));
-        harmony.Patch(AccessTools.Method(typeof(SiegeEventInterface), nameof(SiegeEventInterface.PromptSiegeDefenderVictory)),
-            prefix: new HarmonyMethod(typeof(SiegeDefenderVictoryLootTests), nameof(CountDefenderVictoryPrompt)));
+        var harmony = PatchLootScreensAndPrompt();
         try
         {
             client.Call(() =>
@@ -124,31 +119,110 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
                 var states = Game.Current.GameStateManager;
                 var broker = client.Resolve<IMessageBroker>();
 
-                // Back on the map: the prisoner screen opens first, the siege-defeated menu waits.
+                // Back on the map, before the encounter menu resumes the encounter: the siege-defeated menu waits
+                // for the staged results and does not play them itself.
                 broker.Publish(this, new CampaignTick());
+                Assert.Equal(0, defenderVictoryPrompts);
+                Assert.Same(encounter, PlayerEncounter.Current);
+                Assert.Equal(PlayerEncounterState.CaptureHeroes, encounter.EncounterState);
+                Assert.IsType<MapState>(states.ActiveState);
+
+                // The encounter menu resumes the encounter (the field battle path): the prisoner screen opens.
+                PlayerEncounter.Update();
                 Assert.IsType<PartyState>(states.ActiveState);
+                Assert.Equal(PlayerEncounterState.LootInventory, encounter.EncounterState);
+                broker.Publish(this, new CampaignTick());
                 Assert.Equal(PlayerEncounterState.LootInventory, encounter.EncounterState);
                 Assert.Equal(0, defenderVictoryPrompts);
 
                 states._gameStates.RemoveAt(states._gameStates.Count - 1);
-                broker.Publish(this, new CampaignTick());
+                PlayerEncounter.Update();
                 Assert.IsType<InventoryState>(states.ActiveState);
+                broker.Publish(this, new CampaignTick());
                 Assert.Equal(0, defenderVictoryPrompts);
 
-                // Both loot screens closed: the defender moves on to the siege-defeated menu, once.
+                // Both loot screens closed: the normal flow finishes the encounter, then the defender moves on to
+                // the siege-defeated menu, once.
                 states._gameStates.RemoveAt(states._gameStates.Count - 1);
+                PlayerEncounter.Update();
+                Assert.Null(PlayerEncounter.Current);
+                Assert.Equal(0, defenderVictoryPrompts);
                 broker.Publish(this, new CampaignTick());
-                Assert.Equal(PlayerEncounterState.End, encounter.EncounterState);
                 Assert.Equal(1, defenderVictoryPrompts);
 
                 broker.Publish(this, new CampaignTick());
                 Assert.Equal(1, defenderVictoryPrompts);
+                Assert.Equal(1, lootPartyScreens);
+                Assert.Equal(1, lootInventoryScreens);
             }, MapEventDisabledMethods);
         }
         finally
         {
             harmony.UnpatchAll(harmony.Id);
         }
+    }
+
+    [Fact]
+    public void DefenderVictory_WithoutStagedResults_PromptsOnFirstMapTick()
+    {
+        var ctx = CreateServerMapEvent();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var client = Clients.First();
+        string? defenderPartyBaseId = null;
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(ctx.DefenderPartyId, out var party));
+            Campaign.Current.MainParty = party;
+            Assert.True(client.ObjectManager.TryGetId(party.Party, out defenderPartyBaseId));
+        }, MapEventDisabledMethods);
+
+        // The stale pre-assault siege encounter, with no results staged on it.
+        var encounter = SetMockPlayerEncounter(client);
+        client.Call(() =>
+        {
+            encounter.EncounterState = PlayerEncounterState.Begin;
+            var states = Game.Current.GameStateManager;
+            states._gameStates.Add(states.CreateState<MapState>());
+        }, MapEventDisabledMethods);
+
+        client.SimulateMessage(Server.NetPeer, new NetworkPromptSiegeDefenderVictory(
+            settlementId, new[] { defenderPartyBaseId! }));
+
+        var harmony = PatchLootScreensAndPrompt();
+        try
+        {
+            client.Call(() =>
+            {
+                var broker = client.Resolve<IMessageBroker>();
+                broker.Publish(this, new CampaignTick());
+                Assert.Equal(1, defenderVictoryPrompts);
+
+                broker.Publish(this, new CampaignTick());
+                Assert.Equal(1, defenderVictoryPrompts);
+                Assert.Equal(0, lootPartyScreens);
+                Assert.Equal(0, lootInventoryScreens);
+            }, MapEventDisabledMethods);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    private static Harmony PatchLootScreensAndPrompt()
+    {
+        defenderVictoryPrompts = 0;
+        lootPartyScreens = 0;
+        lootInventoryScreens = 0;
+        var harmony = new Harmony($"siege-defender-loot.{Guid.NewGuid()}");
+        harmony.Patch(AccessTools.Method(typeof(PartyScreenHelper), nameof(PartyScreenHelper.OpenScreenAsLoot)),
+            prefix: new HarmonyMethod(typeof(SiegeDefenderVictoryLootTests), nameof(OpenLootPartyScreen)));
+        harmony.Patch(AccessTools.Method(typeof(InventoryScreenHelper), nameof(InventoryScreenHelper.OpenScreenAsLoot)),
+            prefix: new HarmonyMethod(typeof(SiegeDefenderVictoryLootTests), nameof(OpenLootInventoryScreen)));
+        harmony.Patch(AccessTools.Method(typeof(SiegeEventInterface), nameof(SiegeEventInterface.PromptSiegeDefenderVictory)),
+            prefix: new HarmonyMethod(typeof(SiegeDefenderVictoryLootTests), nameof(CountDefenderVictoryPrompt)));
+        return harmony;
     }
 
     private static ItemObject GetItem(EnvironmentInstance instance, string itemId)
@@ -160,6 +234,7 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
 
     private static bool OpenLootPartyScreen()
     {
+        lootPartyScreens++;
         var states = Game.Current.GameStateManager;
         states._gameStates.Add(states.CreateState<PartyState>());
         return false;
@@ -168,6 +243,7 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
     private static bool OpenLootInventoryScreen(Dictionary<PartyBase, ItemRoster> itemRostersToLoot)
     {
         Assert.Equal(3, itemRostersToLoot[PartyBase.MainParty].Sum(item => item.Amount));
+        lootInventoryScreens++;
         var states = Game.Current.GameStateManager;
         states._gameStates.Add(states.CreateState<InventoryState>());
         return false;

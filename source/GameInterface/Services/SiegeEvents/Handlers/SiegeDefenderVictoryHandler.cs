@@ -1,21 +1,16 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Initialization;
-using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages;
-using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
-using SandBox.View.Map;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
-using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.SiegeEvents.Handlers;
 
@@ -31,21 +26,15 @@ internal class SiegeDefenderVictoryHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly ISiegeEventInterface siegeEventInterface;
-    private readonly IPlayerEncounterInterface playerEncounterInterface;
 
     // Game-thread only (armed inside a GameThread closure, drained on CampaignTick).
     private Settlement pendingSettlement;
 
-    public SiegeDefenderVictoryHandler(
-        IMessageBroker messageBroker,
-        IObjectManager objectManager,
-        ISiegeEventInterface siegeEventInterface,
-        IPlayerEncounterInterface playerEncounterInterface)
+    public SiegeDefenderVictoryHandler(IMessageBroker messageBroker, IObjectManager objectManager, ISiegeEventInterface siegeEventInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.siegeEventInterface = siegeEventInterface;
-        this.playerEncounterInterface = playerEncounterInterface;
 
         messageBroker.Subscribe<NetworkPromptSiegeDefenderVictory>(Handle_NetworkPromptSiegeDefenderVictory);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
@@ -72,25 +61,18 @@ internal class SiegeDefenderVictoryHandler : IHandler
         if (ModInformation.IsServer || pendingSettlement == null) return;
         // The mission screen is still up (or popping): re-establishing PlayerEncounter now is unsafe. Wait.
         if (MissionState.Current != null) return;
-
-        // Vanilla shows the battle's prisoner and loot screens before the siege-defeated menu. The server's
-        // results staged them on this encounter while the mission was up; play them out first, because the
-        // siege-defeated transition finishes the encounter and would drop the loot.
-        var encounter = PlayerEncounter.Current;
-        if (encounter != null && !encounter._leaveEncounter &&
-            MapEventInitializationBarrier.IsBattleResultEncounter(encounter))
-        {
-            if (PlayerEncounterPatches.ShouldDeferAfterBattle(
-                    Game.Current?.GameStateManager?.ActiveState,
-                    ScreenManager.TopScreen == MapScreen.Instance))
-                return;
-            if (!playerEncounterInterface.AdvanceBattleResults(encounter)) return;
-        }
+        // The battle results are still staged on this encounter. The normal after battle flow shows the prisoner
+        // and loot screens and finishes the encounter, as vanilla does before it ends the siege. Wait for it.
+        if (HasStagedBattleResults(PlayerEncounter.Current)) return;
 
         var settlement = pendingSettlement;
         pendingSettlement = null;
         siegeEventInterface.PromptSiegeDefenderVictory(settlement);
     }
+
+    private static bool HasStagedBattleResults(PlayerEncounter encounter) =>
+        encounter != null && !encounter._leaveEncounter &&
+        MapEventInitializationBarrier.IsBattleResultEncounter(encounter);
 
     public void Dispose()
     {
