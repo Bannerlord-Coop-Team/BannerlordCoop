@@ -1,10 +1,12 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using Common.Messaging;
+using Common.Network.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
+using GameInterface.Services.Issues.Framework.CreationCapture;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
@@ -21,6 +23,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssueQuest;
@@ -71,12 +74,23 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
                 }
             });
         }
+        Server.Call(() =>
+        {
+            foreach (var player in players) Party(Server, player.ControllerId).ItemRoster.Clear();
+        });
+        environment.FlushCoalescer();
     }
 
     public void Dispose()
     {
-        environment.Dispose();
-        randomSettlement.Dispose();
+        try
+        {
+            environment.Dispose();
+        }
+        finally
+        {
+            randomSettlement.Dispose();
+        }
     }
 
     [Fact]
@@ -100,6 +114,47 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         Assert.Empty(ClientB.NetworkSentMessages.GetMessages<RequestQuestSolutionAccept>());
     }
 
+    [Fact]
+    public void IssueCreation_ReplicasUseTheServersIdentityDestinationRecipientAndAnimal()
+    {
+        Server.Call(() =>
+        {
+            var giver = Object<Hero>(Server, scenario.NotableId);
+            giver.Issue.CompleteIssueWithCancel();
+            var potential = new PotentialIssueData((in PotentialIssueData _, Hero owner) => CreateIssue(Server, owner),
+                typeof(Issue), IssueBase.IssueFrequency.Common);
+            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in potential, giver));
+        });
+        var created = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
+        Assert.False(string.IsNullOrEmpty(created.IssueId));
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                var issue = Assert.IsType<Issue>(Object<Hero>(instance, scenario.NotableId).Issue);
+                Assert.Equal(created.IssueId, issue.StringId);
+                Assert.Same(Object<Settlement>(instance, townId), issue._targetSettlement);
+                Assert.Same(Object<Hero>(instance, targetId), issue._targetHero);
+                Assert.Same(Object<ItemObject>(instance, livestockId), issue._herdTypeToDeliver);
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData(DeclareWarAction.DeclareWarDetail.CausedByRebellion, IssueOutcome.QuestCancel)]
+    [InlineData(DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility, IssueOutcome.QuestFail)]
+    public void WarDeclaredOnServer_UsesTheOwnersFactionToChooseFailureOrCancel(DeclareWarAction.DeclareWarDetail detail, IssueOutcome expected)
+    {
+        Accept(ClientA);
+        Server.Call(() => DeclareWarAction.ApplyInternal(Object<Hero>(Server, scenario.NotableId).Clan,
+            PlayerHero(Server, QuestScenario.ControllerA).Clan, detail));
+        environment.FlushCoalescer();
+        Assert.Equal(expected, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        foreach (var instance in Instances)
+            instance.Call(() => Assert.Null(Object<Hero>(instance, scenario.NotableId).Issue));
+    }
+
     [Theory]
     [InlineData((byte)HeadmanHerdBranch.Deliver, IssueOutcome.QuestSuccess)]
     [InlineData((byte)HeadmanHerdBranch.Keep, IssueOutcome.QuestFail)]
@@ -108,6 +163,9 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         var branch = (HeadmanHerdBranch)proof;
         Accept(ClientA);
         MoveToDestination();
+        var gold = new Dictionary<EnvironmentInstance, (int Owner, int Other)>();
+        foreach (var instance in Instances)
+            instance.Call(() => gold[instance] = (PlayerHero(instance, QuestScenario.ControllerA).Gold, PlayerHero(instance, QuestScenario.ControllerB).Gold));
         ClientA.Call(() =>
         {
             using (OwnerScope(ClientA, QuestScenario.ControllerA))
@@ -116,6 +174,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
                 else accepted[ClientA].DeliverHerdRejectOnConsequence();
             }
         });
+        environment.FlushCoalescer();
 
         Assert.Equal(expected, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
@@ -125,6 +184,9 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             {
                 Assert.Null(Object<Hero>(instance, scenario.NotableId).Issue);
                 Assert.Empty(Campaign.Current.QuestManager.Quests);
+                Assert.Equal(gold[instance].Owner + (branch == HeadmanHerdBranch.Deliver ? accepted[Server]._rewardGold : 0),
+                    PlayerHero(instance, QuestScenario.ControllerA).Gold);
+                Assert.Equal(gold[instance].Other, PlayerHero(instance, QuestScenario.ControllerB).Gold);
                 Assert.Equal(branch == HeadmanHerdBranch.Deliver ? 0 : accepted[Server]._animalCountToDeliver,
                     Party(instance, QuestScenario.ControllerA).ItemRoster.GetItemNumber(Object<ItemObject>(instance, livestockId)));
             });
@@ -162,6 +224,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             if (outcome == IssueOutcome.QuestCancel) accepted[ClientA].CompleteQuestWithCancel();
             else accepted[ClientA].CompleteQuestWithTimeOut();
         });
+        environment.FlushCoalescer();
 
         Assert.Equal(outcome, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         foreach (var instance in Instances)
@@ -174,9 +237,44 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         Accept(ClientA);
         Server.Call(() => CampaignEventDispatcher.Instance.OnHeroKilled(Object<Hero>(Server, targetId), null,
             KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false));
+        environment.FlushCoalescer();
 
         Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        ClientA.Call(() => Assert.Contains(accepted[ClientA].JournalEntries, log => log.LogText.GetID() == "m41vdhSR"));
+        foreach (var instance in Instances)
+            instance.Call(() => Assert.Equal(0, Party(instance, QuestScenario.ControllerA).ItemRoster.GetItemNumber(Object<ItemObject>(instance, livestockId))));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GiverDeath_RemovesTheOfferOrCleansUpTheAcceptedHerd(bool takeQuest)
+    {
+        if (takeQuest) Accept(ClientA);
+        Server.Call(() => Campaign.Current.IssueManager.OnHeroKilled(Object<Hero>(Server, scenario.NotableId), null,
+            KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false));
+        environment.FlushCoalescer();
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.Null(Object<Hero>(instance, scenario.NotableId).Issue);
+                Assert.Equal(0, Party(instance, QuestScenario.ControllerA).ItemRoster.GetItemNumber(Object<ItemObject>(instance, livestockId)));
+            });
+        }
+    }
+
+    [Fact]
+    public void Disconnect_DismissesTheQuestAndRemovesOnlyItsOwnersHerd()
+    {
+        Accept(ClientA);
+        Server.Call(() => Server.Resolve<IPlayerManager>().ClearPeer(ClientA.NetPeer));
+        Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(ClientA.NetPeer, default)));
+        Server.PumpGameThread();
+        environment.FlushCoalescer();
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         foreach (var instance in Instances)
             instance.Call(() => Assert.Equal(0, Party(instance, QuestScenario.ControllerA).ItemRoster.GetItemNumber(Object<ItemObject>(instance, livestockId))));
     }
@@ -221,46 +319,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     [InlineData(true)]
     public void CompanionSolution_RunsOnServerAndReturnsOnlyTheOwnersTroops(bool fail)
     {
-        var companionId = environment.CreateRegisteredObject<Hero>();
-        var troopId = environment.CreateRegisteredObject<CharacterObject>();
-        foreach (var instance in Instances)
-        {
-            instance.Call(() =>
-            {
-                using (new AllowedThread())
-                {
-                    Object<CharacterObject>(instance, troopId).Level = 16;
-                    Object<Hero>(instance, companionId)._partyBelongedTo = Party(instance, QuestScenario.ControllerA);
-                }
-            });
-        }
-        Server.Call(() =>
-        {
-            var party = Party(Server, QuestScenario.ControllerA);
-            party.MemberRoster.AddToCounts(Object<Hero>(Server, companionId).CharacterObject, 1);
-            party.MemberRoster.AddToCounts(Object<CharacterObject>(Server, troopId), 40);
-        });
-        environment.FlushCoalescer();
-
-        ClientA.Call(() =>
-        {
-            using (OwnerScope(ClientA, QuestScenario.ControllerA))
-            {
-                var issue = Object<Hero>(ClientA, scenario.NotableId).Issue;
-                var companion = Object<Hero>(ClientA, companionId);
-                var troop = Object<CharacterObject>(ClientA, troopId);
-                using (new AllowedThread())
-                {
-                    Party(ClientA, QuestScenario.ControllerA).MemberRoster.AddToCounts(companion.CharacterObject, -1);
-                    Party(ClientA, QuestScenario.ControllerA).MemberRoster.AddToCounts(troop, -40);
-                    issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                    issue.AlternativeSolutionSentTroops.AddToCounts(troop, 40);
-                }
-                issue.StartIssueWithAlternativeSolution();
-            }
-        });
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
-        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+        var (companionId, troopId) = StartCompanions();
 
         Server.Call(() =>
         {
@@ -282,6 +341,96 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
                 Assert.Equal(0, Party(instance, QuestScenario.ControllerB).ItemRoster.GetItemNumber(Object<ItemObject>(instance, livestockId)));
             });
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CompanionGiverDeath_ReturnsTroopsOnce_AndWaitsForAnImprisonedOwner(bool imprisoned)
+    {
+        var (companionId, troopId) = StartCompanions();
+        Server.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                if (imprisoned) PlayerHero(Server, QuestScenario.ControllerA).ChangeState(Hero.CharacterStates.Prisoner);
+                Object<Hero>(Server, scenario.NotableId).ChangeState(Hero.CharacterStates.Dead);
+            }
+            Campaign.Current.IssueManager.OnHeroKilled(Object<Hero>(Server, scenario.NotableId), null,
+                KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false);
+            Assert.Equal(0, Campaign.Current.IssueManager._awaitingAlternativeSolutionTroops.TotalManCount);
+            if (imprisoned)
+            {
+                Assert.True(Object<Hero>(Server, scenario.NotableId).Issue.IsSolvingWithAlternative);
+                Object<Hero>(Server, scenario.NotableId).Issue.CompleteIssueWithAlternativeSolution();
+                Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+                using (new AllowedThread()) PlayerHero(Server, QuestScenario.ControllerA).ChangeState(Hero.CharacterStates.Active);
+                CampaignEventDispatcher.Instance.HourlyTick();
+            }
+        });
+        environment.FlushCoalescer();
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.Null(Object<Hero>(instance, scenario.NotableId).Issue);
+                Assert.Equal(40, Party(instance, QuestScenario.ControllerA).MemberRoster.GetTroopCount(Object<CharacterObject>(instance, troopId)));
+                Assert.True(Party(instance, QuestScenario.ControllerA).MemberRoster.Contains(Object<Hero>(instance, companionId).CharacterObject));
+            });
+        }
+    }
+
+    private (string CompanionId, string TroopId) StartCompanions()
+    {
+        var companionId = environment.CreateRegisteredObject<Hero>();
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    Object<CharacterObject>(instance, troopId).Level = 16;
+                    Object<Hero>(instance, companionId)._partyBelongedTo = Party(instance, QuestScenario.ControllerA);
+                }
+            });
+        }
+        Server.Call(() =>
+        {
+            var party = Party(Server, QuestScenario.ControllerA);
+            party.MemberRoster.AddToCounts(Object<Hero>(Server, companionId).CharacterObject, 1);
+            party.MemberRoster.AddToCounts(Object<CharacterObject>(Server, troopId), 40);
+        });
+        environment.FlushCoalescer();
+
+        // The party-picker's authoritative roster delta arrives before the accept request.
+        Server.Call(() =>
+        {
+            Party(Server, QuestScenario.ControllerA).MemberRoster.AddToCounts(Object<Hero>(Server, companionId).CharacterObject, -1);
+            Party(Server, QuestScenario.ControllerA).MemberRoster.AddToCounts(Object<CharacterObject>(Server, troopId), -40);
+        });
+        environment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            using (OwnerScope(ClientA, QuestScenario.ControllerA))
+            {
+                var issue = Object<Hero>(ClientA, scenario.NotableId).Issue;
+                var companion = Object<Hero>(ClientA, companionId);
+                var troop = Object<CharacterObject>(ClientA, troopId);
+                using (new AllowedThread())
+                {
+                    issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                    issue.AlternativeSolutionSentTroops.AddToCounts(troop, 40);
+                }
+                issue.StartIssueWithAlternativeSolution();
+            }
+        });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+
+        return (companionId, troopId);
     }
 
     private IssueBase CreateIssue(EnvironmentInstance instance, Hero giver)
@@ -310,6 +459,8 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             target.Occupation = Occupation.Merchant;
             item.Name = new TextObject("sheep");
             item.Value = 100;
+            item.ItemCategory = GameObjectCreator.CreateInitializedObject<ItemCategory>();
+            MBObjectManager.Instance.RegisterObject(item);
         }
         giver.StayingInSettlement = villageSettlement;
         giver.Occupation = Occupation.Headman;
@@ -332,6 +483,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
                 quest.QuestAcceptedConsequences();
             }
         });
+        environment.FlushCoalescer();
         Server.Call(() => accepted[Server] = (Quest)Object<Hero>(Server, scenario.NotableId).Issue.IssueQuest);
         client.Call(() => accepted[client] = (Quest)Object<Hero>(client, scenario.NotableId).Issue.IssueQuest);
     }
@@ -347,6 +499,9 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
 
     private MobileParty Party(EnvironmentInstance instance, string controller)
         => Object<MobileParty>(instance, players.Single(player => player.ControllerId == controller).MobilePartyId);
+
+    private Hero PlayerHero(EnvironmentInstance instance, string controller)
+        => Object<Hero>(instance, players.Single(player => player.ControllerId == controller).HeroId);
 
     private MainHeroSubstitutionScope OwnerScope(EnvironmentInstance instance, string controller)
         => new(Object<Hero>(instance, players.Single(player => player.ControllerId == controller).HeroId), Party(instance, controller));

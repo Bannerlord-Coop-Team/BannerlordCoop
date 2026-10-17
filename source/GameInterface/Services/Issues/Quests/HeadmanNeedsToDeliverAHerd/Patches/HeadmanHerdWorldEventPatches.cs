@@ -3,6 +3,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -26,12 +27,43 @@ internal class HeadmanHerdWorldEventPatches
         if (issue.IssueQuest == null && !issue.IsSolvingWithAlternative) return true;
         if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) || !owners.TryResolveOwnerHero(issue, out var owner)) return false;
         __state = new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo);
+        // Keep the owner on the issue until vanilla can return the troops without its global queue.
+        if (issue.IsSolvingWithAlternative && !Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return false;
         return true;
     }
 
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
     [HarmonyFinalizer]
     private static void GiverKilledFinalizer(IDisposable __state) => __state?.Dispose();
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
+    [HarmonyPostfix]
+    private static void RetryCanceledCompanionsPostfix()
+    {
+        if (ModInformation.IsClient) return;
+        foreach (var issue in Campaign.Current.IssueManager.Issues.Values.OfType<Issue>().Where(issue => issue.IsSolvingWithAlternative && !issue.IssueOwner.IsAlive).ToList())
+            TryCancelCompanions(issue);
+    }
+
+    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithAlternativeSolution))]
+    [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
+    private static bool CancelInsteadOfCompletingPrefix(IssueBase __instance)
+    {
+        if (!(__instance is Issue issue) || issue.IssueOwner.IsAlive) return true;
+        if (ModInformation.IsServer) TryCancelCompanions(issue);
+        return false;
+    }
+
+    private static void TryCancelCompanions(Issue issue)
+    {
+        if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) || !owners.TryResolveOwnerHero(issue, out var owner)) return;
+        using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+        {
+            if (Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution())
+                Campaign.Current.IssueManager.OnHeroKilled(issue.IssueOwner, null, KillCharacterAction.KillCharacterActionDetail.None, false);
+        }
+    }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
     [HarmonyPostfix]

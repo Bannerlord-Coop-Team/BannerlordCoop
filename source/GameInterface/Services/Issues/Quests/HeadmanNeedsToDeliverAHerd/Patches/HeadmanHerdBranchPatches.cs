@@ -29,30 +29,15 @@ internal class HeadmanHerdBranchPatches
     // The server already replicated the inventory, gold and settlement effects before this replay.
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnCompleteWithSuccess))]
     [HarmonyPrefix]
-    private static bool SuccessPrefix(Quest __instance)
-    {
-        if (ModInformation.IsServer) return true;
-        __instance.AddLog(__instance.SuccessQuestLogText);
-        return false;
-    }
+    private static bool SuccessPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnFailed))]
     [HarmonyPrefix]
-    private static bool FailurePrefix(Quest __instance)
-    {
-        if (ModInformation.IsServer) return true;
-        __instance.AddLog(__instance.FailByRejectQuestLogText);
-        return false;
-    }
+    private static bool FailurePrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
     [HarmonyPrefix]
-    private static bool TimeoutPrefix(Quest __instance)
-    {
-        if (ModInformation.IsServer) return true;
-        __instance.AddLog(__instance.FailByTimeOutQuestLogText);
-        return false;
-    }
+    private static bool TimeoutPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnCanceled))]
     [HarmonyPrefix]
