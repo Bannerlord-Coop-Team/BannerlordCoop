@@ -236,9 +236,11 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void LordCounterOffer_ChargesAndRewardsOnlyTheOwner(bool acceptMerchant)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void LordCounterOffer_ChargesAndRewardsOnlyTheOwner(bool acceptMerchant, bool leaveTown)
     {
         ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
@@ -247,6 +249,12 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
         var cost = 0;
         Server.Call(() => cost = Get<Hero>(Server, scenario.NotableId).Issue.NeededInfluenceForLordSolution);
+
+        if (leaveTown)
+        {
+            Server.Call(() => Get<MobileParty>(Server, scenario.OwnerPartyId).CurrentSettlement = null);
+            environment.FlushCoalescer();
+        }
 
         ClientA.Call(() =>
         {
@@ -262,6 +270,41 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Assert.Empty(observerIssue.JournalEntries);
         AssertEffects(acceptMerchant ? 195 : 210, acceptMerchant ? 100 : 90, acceptMerchant ? -5 : 5, acceptMerchant ? 5 : -10);
         Server.Call(() => Assert.Equal(acceptMerchant ? 100 : 100 - cost, Get<Clan>(Server, clanId).Influence));
+    }
+
+    [Fact]
+    public void LordSolution_CannotStartAfterLeavingTheArtisansTown()
+    {
+        Server.Call(() => Get<MobileParty>(Server, scenario.OwnerPartyId).CurrentSettlement = null);
+        environment.FlushCoalescer();
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<SendInformationMessage>());
+        Server.Call(() => Assert.True(Get<Hero>(Server, scenario.NotableId).Issue.IsOngoingWithoutQuest));
+        Assert.Null(scenario.OwnerOnServer());
+    }
+
+    [Fact]
+    public void LordCounterOffer_StillRequiresInfluenceToKeepTheDecreeAfterLeavingTown()
+    {
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        Server.Call(() =>
+        {
+            Get<MobileParty>(Server, scenario.OwnerPartyId).CurrentSettlement = null;
+            Get<Clan>(Server, clanId).Influence = 0;
+        });
+        environment.FlushCoalescer();
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<SendInformationMessage>());
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+        Server.Call(() =>
+        {
+            Assert.True(Get<Hero>(Server, scenario.NotableId).Issue.IsSolvingWithLordSolution);
+            Assert.Equal(10000, Get<Hero>(Server, scenario.OwnerHeroId).Gold);
+        });
     }
 
     [Fact]

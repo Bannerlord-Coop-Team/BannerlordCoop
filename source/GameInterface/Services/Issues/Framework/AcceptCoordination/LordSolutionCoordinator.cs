@@ -74,7 +74,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         {
             if (!resolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
                 !issue.IsThereLordSolution || !objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) ||
-                hero.PartyBelongedTo == null || hero.PartyBelongedTo.CurrentSettlement != issue.IssueOwner.CurrentSettlement)
+                hero.PartyBelongedTo == null)
             {
                 Reject(peer, data.Operation);
                 return;
@@ -84,7 +84,8 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
             {
                 if (data.Operation == LordSolutionOperation.Start)
                 {
-                    if (!issue.IsOngoingWithoutQuest || !preconditions.CanTake(issue, hero, player.ControllerId) ||
+                    if (hero.PartyBelongedTo.CurrentSettlement != issue.IssueOwner.CurrentSettlement ||
+                        !issue.IsOngoingWithoutQuest || !preconditions.CanTake(issue, hero, player.ControllerId) ||
                         !issue.LordSolutionCondition(out _) || Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution ||
                         !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
                     {
@@ -134,7 +135,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
     {
         var message = operation == LordSolutionOperation.Start
             ? "The decree could not be accepted. Check your influence and speak to the artisan again."
-            : "The decree decision could not be applied. Return to the artisan's town and check your influence.";
+            : "The decree decision could not be applied. Check your influence and speak to the merchant again.";
         network.Send(peer, new SendInformationMessage(message));
     }
 
