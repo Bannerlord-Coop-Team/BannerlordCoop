@@ -15,7 +15,7 @@ namespace Missions.Agents.Patches
     [HarmonyPatchCategory(MissionModule.WeaponDropPatchCategory)]
     public class AgentDropPatch
     {
-        private readonly struct DropState
+        internal readonly struct DropState
         {
             public HashSet<SpawnedItemEntity> ExistingItems { get; }
             public MissionWeapon Weapon { get; }
@@ -29,26 +29,19 @@ namespace Missions.Agents.Patches
             }
         }
 
+        // DropItem spawns its world item through the native drop callback, which announces the drop itself.
+        [System.ThreadStatic]
+        private static bool insideDropItem;
+
+        internal static bool IsInsideDropItem => insideDropItem;
+
         static void Prefix(
             EquipmentIndex itemIndex,
             Agent __instance,
             out DropState __state)
         {
-            if (AllowedThread.IsThisThreadAllowed())
-            {
-                __state = default;
-                return;
-            }
-
-            MissionWeapon weapon = default;
-            if (__instance != null &&
-                itemIndex >= EquipmentIndex.WeaponItemBeginSlot &&
-                itemIndex < EquipmentIndex.NumAllWeaponSlots)
-            {
-                weapon = __instance.Equipment[itemIndex];
-            }
-
-            __state = new DropState(WeaponDropItemTracker.Capture(), weapon);
+            insideDropItem = true;
+            __state = Capture(__instance, itemIndex);
         }
 
         static void Postfix(
@@ -56,15 +49,68 @@ namespace Missions.Agents.Patches
             Agent __instance,
             DropState __state)
         {
-            if (AllowedThread.IsThisThreadAllowed() || __state.ExistingItems == null) return;
+            Publish(__instance, itemIndex, __state);
+        }
 
-            SpawnedItemEntity droppedItem = WeaponDropItemTracker.FindDroppedItem(__state.ExistingItems);
+        static void Finalizer()
+        {
+            insideDropItem = false;
+        }
+
+        internal static DropState Capture(Agent agent, EquipmentIndex itemIndex)
+        {
+            if (AllowedThread.IsThisThreadAllowed()) return default;
+
+            MissionWeapon weapon = default;
+            if (agent != null &&
+                itemIndex >= EquipmentIndex.WeaponItemBeginSlot &&
+                itemIndex < EquipmentIndex.NumAllWeaponSlots)
+            {
+                weapon = agent.Equipment[itemIndex];
+            }
+
+            return new DropState(WeaponDropItemTracker.Capture(), weapon);
+        }
+
+        internal static void Publish(Agent agent, EquipmentIndex itemIndex, DropState state)
+        {
+            if (AllowedThread.IsThisThreadAllowed() || state.ExistingItems == null) return;
+
+            SpawnedItemEntity droppedItem = WeaponDropItemTracker.FindDroppedItem(state.ExistingItems);
             WeaponDropped message = new WeaponDropped(
-                __instance,
+                agent,
                 itemIndex,
-                __state.Weapon,
+                state.Weapon,
                 droppedItem);
-            MessageBroker.Instance.Publish(__instance, message);
+            MessageBroker.Instance.Publish(agent, message);
+        }
+    }
+
+    /// <summary>
+    /// Native death drops reach the engine's drop callback directly instead of going through
+    /// <see cref="Agent.DropItem"/>, so their world items would otherwise never receive the owner's canonical
+    /// identity. Patched on the Aux body the one-line callback forwards to, which the JIT cannot inline away.
+    /// </summary>
+    [HarmonyPatch(typeof(Mission), nameof(Mission.SpawnWeaponAsDropFromAgentAux))]
+    [HarmonyPatchCategory(MissionModule.WeaponDropPatchCategory)]
+    public class NativeAgentDropPatch
+    {
+        static void Prefix(
+            Agent agent,
+            EquipmentIndex equipmentIndex,
+            out AgentDropPatch.DropState __state)
+        {
+            __state = AgentDropPatch.IsInsideDropItem
+                ? default
+                : AgentDropPatch.Capture(agent, equipmentIndex);
+        }
+
+        static void Postfix(
+            Agent agent,
+            EquipmentIndex equipmentIndex,
+            AgentDropPatch.DropState __state)
+        {
+            AgentDropPatch.Publish(agent, equipmentIndex, __state);
         }
     }
 }

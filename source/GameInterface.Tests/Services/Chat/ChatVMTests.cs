@@ -57,7 +57,7 @@ public class ChatVMTests
     }
 
     [Fact]
-    public void Receive_DirectMessage_ShowsInClosedFeed_NotInAll()
+    public void Receive_DirectMessage_ShowsInClosedFeedAndMarksSenderUnread_NotInAll()
     {
         var vm = new ChatVM(_ => { }, () => "local");
 
@@ -72,7 +72,8 @@ public class ChatVMTests
         var all = vm.Channels.Single(channel => channel.IsAll);
         var direct = vm.Channels.Single(channel => channel.ControllerId == "other-controller");
         Assert.True(all.IsSelected);
-        Assert.False(direct.HasUnreadMessages);
+        // the fade feed is easy to miss, so the sender's tab shows it is unread (#3930)
+        Assert.True(direct.HasUnreadMessages);
         Assert.False(vm.IsOpen);
         Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[From Other Hero] Other Hero: meet me in Pravend"));
 
@@ -84,6 +85,49 @@ public class ChatVMTests
 
         Assert.False(direct.HasUnreadMessages);
         Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[From Other Hero] Other Hero: meet me in Pravend"));
+    }
+
+    [Fact]
+    public void Receive_DirectMessageWhileClosedOnThatTab_MarksUnreadUntilChatOpens()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.AddParticipant("other-controller", "Other Hero");
+        var direct = vm.Channels.Single(channel => channel.ControllerId == "other-controller");
+        vm.SetOpen(true);
+        direct.ExecuteSelection();
+        vm.SetOpen(false);
+
+        vm.Receive(new NetworkChatMessage(ChatChannel.Direct, "other-controller", "Other Hero", "local", "Local Hero", "still there?"));
+
+        // the tab stays selected while chat is closed, but nobody has seen the message yet
+        Assert.True(direct.IsSelected);
+        Assert.True(direct.HasUnreadMessages);
+
+        vm.SetOpen(true);
+
+        Assert.False(direct.HasUnreadMessages);
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("still there?"));
+    }
+
+    [Fact]
+    public void Receive_GlobalMessageWhileClosed_DoesNotMarkGlobalUnread()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+
+        vm.Receive(new NetworkChatMessage(ChatChannel.Global, "other-controller", "Other Hero", string.Empty, string.Empty, "hello all"));
+
+        Assert.False(vm.Channels.Single(channel => channel.ControllerId == ChatVM.GlobalChannelId).HasUnreadMessages);
+    }
+
+    [Fact]
+    public void Receive_OwnDirectMessageEchoWhileClosed_DoesNotMarkUnread()
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        vm.AddParticipant("other-controller", "Other Hero");
+
+        vm.Receive(new NetworkChatMessage(ChatChannel.Direct, "local", "Local Hero", "other-controller", "Other Hero", "on my way"));
+
+        Assert.False(vm.Channels.Single(channel => channel.ControllerId == "other-controller").HasUnreadMessages);
     }
 
     [Fact]
