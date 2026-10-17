@@ -1,9 +1,11 @@
 ﻿using Autofac;
+using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.VillageNeedsCraftingMaterials;
@@ -11,6 +13,7 @@ using GameInterface.Services.ItemRosters.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using Helpers;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
@@ -44,6 +47,13 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestCanceledWarDeclaredLogText)),
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.PlayerHasNeededItemsLogText)),
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestFailedWithTimeOutLogText)),
+    };
+
+    private static readonly MethodBase[] AlternativeSolutionLogTexts =
+    {
+        AccessTools.PropertyGetter(typeof(Issue), nameof(Issue.AlternativeSolutionStartLog)),
+        AccessTools.PropertyGetter(typeof(Issue), nameof(Issue.IssueAlternativeSolutionSuccessLog)),
+        AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)),
     };
 
     private readonly string notableId;
@@ -299,6 +309,102 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
     }
 
     [Fact]
+    public void AlternativeSolution_KeepsTheServersPromiseAndPaysItToTheOwnerOnce()
+    {
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var otherGoldBefore = 0;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(otherHeroId, out var otherHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+
+            ownerParty.MemberRoster.AddToCounts(ownerHero.CharacterObject, 1);
+            ownerParty.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+            ownerParty.MemberRoster.AddToCounts(troop, 6);
+
+            using (new AllowedThread())
+            {
+                ownerHero._partyBelongedTo = ownerParty;
+                ownerHero.Gold = 0;
+                otherHero.Gold = 50;
+            }
+
+            otherGoldBefore = otherHero.Gold;
+        });
+        TestEnvironment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            Assert.True(ClientA.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.True(ClientA.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            var issue = notable.Issue;
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = ownerParty;
+                ownerParty.MemberRoster.AddToCounts(companion.CharacterObject, -1);
+                ownerParty.MemberRoster.AddToCounts(troop, -6);
+                issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                issue.AlternativeSolutionSentTroops.AddToCounts(troop, 6);
+            }
+
+            ClientA.Resolve<IMessageBroker>().Publish(this, new AlternativeSolutionAcceptRequested(issue));
+        }, AlternativeSolutionLogTexts);
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+        Assert.Equal(ControllerA, OwnerOnServer());
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+                var issue = (Issue)notable.Issue;
+
+                // The accepting client quoted its own market price, the server's promise replaces it
+                Assert.True(issue.IsSolvingWithAlternative);
+                Assert.Equal(ServerPayment, issue._promisedPayment);
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            notable.Issue._failureChance = 0f;
+            notable.Issue.CompleteIssueWithAlternativeSolution();
+        }, AlternativeSolutionLogTexts);
+        TestEnvironment.FlushCoalescer();
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.Null(notable.Issue);
+                Assert.Equal(710f, settlement.Village.Hearth);
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(otherHeroId, out var otherHero));
+
+            Assert.Equal(ServerPayment, ownerHero.Gold);
+            Assert.Equal(otherGoldBefore, otherHero.Gold);
+        });
+    }
+
+    [Fact]
     public void OwnersClient_CountsMaterialsTheServerAddsToItsParty()
     {
         Accept();
@@ -475,6 +581,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
                 village.Bound = settlement;
                 village.Hearth = 650f;
                 notable.StayingInSettlement = settlement;
+                notable.Occupation = Occupation.RuralNotable;
 
                 // Gives the notable a map faction for the war tests
                 giverClan._kingdom = kingdom;
