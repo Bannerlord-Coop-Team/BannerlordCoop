@@ -1,10 +1,12 @@
 ﻿using Autofac;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.Resolvers;
 using GameInterface.Services.Issues.Framework.Visibility;
 using GameInterface.Services.Issues.Generic;
 using GameInterface.Services.Issues.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using Moq;
 using TaleWorlds.CampaignSystem;
@@ -58,6 +60,8 @@ public class IssueFrameworkIsolationTests
         builder.RegisterInstance(ownership.Object);
         builder.RegisterInstance(objects.Object);
         builder.RegisterInstance(controller.Object);
+        builder.RegisterInstance(new Mock<IPlayerManager>().Object);
+        builder.RegisterType<IssueOwnerResolver>().As<global::GameInterface.Services.Issues.Framework.Interface.IIssueOwnerResolver>();
         using var container = builder.Build();
         ContainerProvider.SetContainer(container);
         try

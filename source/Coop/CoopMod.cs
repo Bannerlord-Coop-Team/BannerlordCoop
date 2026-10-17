@@ -150,6 +150,7 @@ namespace Coop
             {
                 unsupportedModuleWarning = new UnsupportedModuleWarningHandler(
                     moduleInfoProvider,
+                    new TaleWorldsModuleNameProvider(),
                     new CoopOptionsStore(),
                     exception => Logger.Warning(
                         exception,

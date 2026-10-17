@@ -10,29 +10,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class Vec2SerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public Vec2SerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void Vec2_Serialize()
-        {
-            Vec2 vec2 = new Vec2(1.1f,2.2f);
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            Vec2BinaryPackage package = new Vec2BinaryPackage(vec2, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

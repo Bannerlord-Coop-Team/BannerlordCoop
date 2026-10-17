@@ -1,7 +1,6 @@
 ﻿using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -59,15 +58,13 @@ internal class QuestScreenIssueFilterPatch
                 || !legacyOwnership.IsLocalPeerOwner(issue.IssueOwner);
         }
 
-        if (!ContainerProvider.TryResolve<IIssueOwnershipRegistry>(out var ownership) ||
-            !ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
+        if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver) ||
             !ContainerProvider.TryResolve<IControllerIdProvider>(out var controllerIdProvider))
         {
             return false;
         }
 
-        return !(objectManager.TryGetId(issue.IssueOwner, out var issueOwnerId)
-            && ownership.TryGetOwner(issueOwnerId, issue.StringId, out var ownerControllerId)
+        return !(ownerResolver.TryGetOwnerControllerId(issue, out var ownerControllerId)
             && ownerControllerId == controllerIdProvider.ControllerId);
     }
 

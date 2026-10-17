@@ -9,7 +9,20 @@ using System.Reflection;
 
 namespace GameInterface.AutoSync;
 
-public class AutoSyncPatcher
+/// <summary>
+/// Installs the generated AutoSync patches and binds their apply-handlers to the current container.
+/// </summary>
+public interface IAutoSyncPatcher
+{
+    /// <summary>Builds the generated assembly once, patches it in and binds its handlers.</summary>
+    void PatchAll();
+
+    /// <summary>Rebinds the generated handlers without re-applying the patches.</summary>
+    void RebindHandlers();
+}
+
+/// <inheritdoc cref="IAutoSyncPatcher"/>
+public class AutoSyncPatcher : IAutoSyncPatcher
 {
     public static Assembly Assembly;
 

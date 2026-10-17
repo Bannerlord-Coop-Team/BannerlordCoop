@@ -305,6 +305,8 @@ internal class LordNeedsHorsesAlternativeCompletionPatch
     }
 }
 
+// SimilarCommitmentsGatePatch only hides issues whose owner IIssueOwnerResolver knows, and this quest's owners are in
+// the Generic ownership registry, so vanilla's similar commitments refusal and the per-player check below stay here.
 [HarmonyPatch(typeof(IssueBase), "get_IssueQuestCanBeDuplicated")]
 internal class LordNeedsHorsesDuplicateGatePatch
 {

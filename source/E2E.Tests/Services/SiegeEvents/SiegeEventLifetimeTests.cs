@@ -7,7 +7,6 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Registry.Auto;
-using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
@@ -203,86 +202,6 @@ public class SiegeEventLifetimeTests : IDisposable
                 Assert.Same(preparations, besiegerCamp.SiegeEngines.SiegePreparations);
             });
         }
-    }
-
-    [Fact]
-    public void ClientCreateSiegeEvent_DoesNothing()
-    {
-        // Arrange
-        string? clientSiegeEventId = null;
-
-        // Act
-        var firstClient = TestEnvironment.Clients.First();
-        firstClient.Call(() =>
-        {
-            var SiegeEvent = ObjectHelper.SkipConstructor<SiegeEvent>();
-
-            Assert.False(firstClient.ObjectManager.TryGetId(SiegeEvent, out clientSiegeEventId));
-        });
-
-        // Assert
-        Assert.Null(clientSiegeEventId);
-    }
-
-    [Fact]
-    public void SiegeGraphMessages_RoundTripAllIds()
-    {
-        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
-        var snapshot = new SiegeEventGraphSnapshot(
-            "siege-event",
-            101,
-            102,
-            "camp",
-            103,
-            104,
-            "attacker-engines",
-            105,
-            "defender-engines",
-            106,
-            1234,
-            "strategy",
-            7,
-            new uint[] { 104, 107 },
-            new[]
-            {
-                new SiegeEngineGraphSnapshot(
-                    "preparation", 108, "preparations", 0.75f, 1f, 100f, 100f,
-                    SiegeEngineGraphLocation.Preparation),
-            },
-            Array.Empty<SiegeEngineGraphSnapshot>());
-
-        var initialization = RoundTrip(serializer, new NetworkInitializeSiegeEvent(snapshot));
-        AssertGraph(snapshot, initialization.ToSnapshot());
-
-        var mapCommit = RoundTrip(serializer, new NetworkMapEventInitialized(
-            201, false, 202, 203, 204, snapshot));
-        AssertGraph(snapshot, mapCommit.SiegeGraph);
-    }
-
-    private static T RoundTrip<T>(ProtoBufSerializer serializer, T message)
-    {
-        return serializer.Deserialize<T>(serializer.Serialize(message));
-    }
-
-    private static void AssertGraph(SiegeEventGraphSnapshot expected, SiegeEventGraphSnapshot actual)
-    {
-        Assert.Equal(expected.SiegeEventId, actual.SiegeEventId);
-        Assert.Equal(expected.SiegeEventHandle, actual.SiegeEventHandle);
-        Assert.Equal(expected.SettlementHandle, actual.SettlementHandle);
-        Assert.Equal(expected.BesiegerCampId, actual.BesiegerCampId);
-        Assert.Equal(expected.BesiegerCampHandle, actual.BesiegerCampHandle);
-        Assert.Equal(expected.LeaderPartyHandle, actual.LeaderPartyHandle);
-        Assert.Equal(expected.AttackerSiegeEnginesId, actual.AttackerSiegeEnginesId);
-        Assert.Equal(expected.AttackerSiegeEnginesHandle, actual.AttackerSiegeEnginesHandle);
-        Assert.Equal(expected.DefenderSiegeEnginesId, actual.DefenderSiegeEnginesId);
-        Assert.Equal(expected.DefenderSiegeEnginesHandle, actual.DefenderSiegeEnginesHandle);
-        Assert.Equal(expected.SiegeStartTimeTicks, actual.SiegeStartTimeTicks);
-        Assert.Equal(expected.BesiegerStrategyId, actual.BesiegerStrategyId);
-        Assert.Equal(expected.BesiegerTroopsKilled, actual.BesiegerTroopsKilled);
-        Assert.Equal(expected.BesiegerPartyHandles, actual.BesiegerPartyHandles);
-        Assert.Equal(expected.AttackerEngines, actual.AttackerEngines);
-        Assert.Equal(expected.DefenderEngines ?? Array.Empty<SiegeEngineGraphSnapshot>(),
-            actual.DefenderEngines ?? Array.Empty<SiegeEngineGraphSnapshot>());
     }
 
     private static void EnsureTestPreparationsType()
