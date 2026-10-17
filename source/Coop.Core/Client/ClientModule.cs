@@ -49,14 +49,14 @@ public class ClientModule : CommonModule
         builder.RegisterType<OpusVoiceCodecFactory>().As<IVoiceCodecFactory>().InstancePerDependency();
         builder.RegisterType<WindowsVoiceDeviceFactory>().As<IVoiceDeviceFactory>().InstancePerDependency();
         builder.RegisterType<WindowsVoiceCaptureFactory>().As<IVoiceCaptureFactory>().InstancePerDependency();
-        builder.RegisterType<VoiceAudio>().As<IVoiceAudio>().InstancePerLifetimeScope();
+        builder.RegisterType<VoiceAudio>().As<IVoiceAudio>().SingleInstance();
         builder.RegisterType<VoiceClient>().As<IVoiceClient>()
 #if DEBUG
             .As<IVoiceSyntheticTest>()
 #endif
-            .InstancePerLifetimeScope();
+            .SingleInstance();
         builder.RegisterType<VoiceSpeakerNameResolver>().As<IVoiceSpeakerNameResolver>().InstancePerDependency();
-        builder.RegisterType<VoiceSpeakingOverlay>().As<IVoiceSpeakingOverlay>().InstancePerLifetimeScope();
+        builder.RegisterType<VoiceSpeakingOverlay>().As<IVoiceSpeakingOverlay>().SingleInstance();
         builder.RegisterType<VoiceOptionsTabProvider>().As<ICoopOptionsTabProvider>().InstancePerDependency();
 
 #if DEBUG
@@ -67,9 +67,9 @@ public class ClientModule : CommonModule
 #endif
 
         builder.RegisterModule<DiscordPresenceModule>();
-        builder.RegisterType<ClientContext>().AsSelf().InstancePerLifetimeScope();
-        builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
-        builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<IRelayNetwork>().As<INetEventListener>().InstancePerLifetimeScope();
+        builder.RegisterType<ClientContext>().AsSelf().SingleInstance();
+        builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().SingleInstance();
+        builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<IRelayNetwork>().As<INetEventListener>().SingleInstance();
         builder.RegisterType<PlayerPartyTroopXpBaselineApplier>()
             .As<IPlayerPartyTroopXpBaselineApplier>()
             .InstancePerDependency();
@@ -81,7 +81,7 @@ public class ClientModule : CommonModule
             .InstancePerDependency();
 
         // Policies
-        builder.RegisterType<ClientSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
+        builder.RegisterType<ClientSyncPolicy>().As<ISyncPolicy>().SingleInstance();
 
         // Steam registrations only when the boot probe found Steam, so tests and non-Steam installs never load Steamworks types.
         if (SessionDiscovery.SteamAvailable)
@@ -90,17 +90,17 @@ public class ClientModule : CommonModule
         }
         else
         {
-            builder.RegisterType<NoopSessionAdvertiser>().As<ISessionAdvertiser>().InstancePerLifetimeScope();
-            builder.RegisterType<NoopSessionTunnelHost>().As<ISessionTunnelHost>().InstancePerLifetimeScope();
+            builder.RegisterType<NoopSessionAdvertiser>().As<ISessionAdvertiser>().SingleInstance();
+            builder.RegisterType<NoopSessionTunnelHost>().As<ISessionTunnelHost>().SingleInstance();
         }
 
-        builder.RegisterType<ConfiguredSessionJoinInfoSource>().As<ISessionJoinInfoSource>().InstancePerLifetimeScope();
-        builder.RegisterType<SessionAdvertisementConfig>().AsSelf().InstancePerLifetimeScope();
+        builder.RegisterType<ConfiguredSessionJoinInfoSource>().As<ISessionJoinInfoSource>().SingleInstance();
+        builder.RegisterType<SessionAdvertisementConfig>().AsSelf().SingleInstance();
 
         // Keeps the module resolvable on its own; a session container registers the real intent.
         builder.Register(_ => JoinAttemptPresentation.For(JoinIntent.PlayerDirect))
             .AsSelf()
-            .InstancePerLifetimeScope();
+            .SingleInstance();
 
         RegisterAllTypesWithInterface<ClientModule, IHandler>(builder, autoInstantiate: true);
         RegisterAllTypesWithInterface<ClientModule, IPacketHandler>(builder, autoInstantiate: true);
@@ -118,11 +118,11 @@ public class ClientModule : CommonModule
         builder.RegisterType<SteamLobbyApi>()
             .As<ISteamLobbyApi>()
             .As<ISteamPublicLobbyApi>()
-            .InstancePerLifetimeScope();
-        builder.RegisterType<SteamLobbyAdvertiser>().As<ISessionAdvertiser>().InstancePerLifetimeScope();
-        builder.RegisterType<SessionLobbyMembershipHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
-        builder.RegisterType<SteamNetworkingTunnelTransport>().As<ISteamTunnelTransport>().InstancePerLifetimeScope();
-        builder.RegisterType<SteamTunnelHost>().As<ISessionTunnelHost>().InstancePerLifetimeScope();
-        builder.RegisterType<SteamMissionBridge>().As<ISteamMissionBridge>().InstancePerLifetimeScope();
+            .SingleInstance();
+        builder.RegisterType<SteamLobbyAdvertiser>().As<ISessionAdvertiser>().SingleInstance();
+        builder.RegisterType<SessionLobbyMembershipHandler>().AsSelf().SingleInstance().AutoActivate();
+        builder.RegisterType<SteamNetworkingTunnelTransport>().As<ISteamTunnelTransport>().SingleInstance();
+        builder.RegisterType<SteamTunnelHost>().As<ISessionTunnelHost>().SingleInstance();
+        builder.RegisterType<SteamMissionBridge>().As<ISteamMissionBridge>().SingleInstance();
     }
 }
