@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -25,7 +26,11 @@ internal class BeHostileActionPatches
         if (attackerParty.MobileParty != null && attackerParty.MobileParty.IsPlayerParty() && attackerParty.MapFaction != defenderParty.MapFaction && !FactionManager.IsAtWarAgainstFaction(attackerParty.MapFaction, defenderParty.MapFaction))
         {
             ChangeRelationAction.ApplyInternal(attackerParty.LeaderHero, defenderParty.MapFaction.Leader, -10, true, ChangeRelationAction.ChangeRelationDetail.Default);
-            DeclareWarAction.ApplyByPlayerHostility(attackerParty.MapFaction, defenderParty.MapFaction);
+            // Broken alliance and trade agreement penalties resolve the player through the main hero context
+            using (new MainHeroSubstitutionScope(attackerParty.LeaderHero, attackerParty.MobileParty))
+            {
+                DeclareWarAction.ApplyByPlayerHostility(attackerParty.MapFaction, defenderParty.MapFaction);
+            }
         }
     }
 }
