@@ -1,8 +1,12 @@
 ﻿using Common;
-using GameInterface.Policies;
+using Common.Messaging;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.Localization;
+using Issue = TaleWorlds.CampaignSystem.Issues.VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.VillageNeedsToolsIssueBehavior.VillageNeedsToolsIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.VillageNeedsTools.Patches;
@@ -11,6 +15,20 @@ namespace GameInterface.Services.Issues.Quests.VillageNeedsTools.Patches;
 [HarmonyPatch]
 internal class VillageNeedsToolsOutcomePatches
 {
+    [HarmonyPatch(typeof(Issue), nameof(Issue.AlternativeSolutionStartConsequence))]
+    [HarmonyPrefix]
+    private static bool FundingPrefix(Issue __instance)
+    {
+        if (ModInformation.IsClient) return false;
+
+        if (Hero.MainHero.Gold < __instance.CostOfToolsForAlternativeSolution)
+        {
+            throw new InvalidOperationException("The owner can no longer afford the tools");
+        }
+
+        return true;
+    }
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.FinishQuestSuccess1))]
     [HarmonyPrefix]
     private static bool FinishQuestSuccessPrefix(Quest __instance)
@@ -27,19 +45,25 @@ internal class VillageNeedsToolsOutcomePatches
     [HarmonyPrefix]
     private static bool TimeoutPrefix(Quest __instance)
     {
-        if (ModInformation.IsServer) return true;
+        if (ModInformation.IsServer)
+        {
+            // Run the timeout's mutations through the current sync patches.
+            __instance.AddLog(__instance.QuestTimeOutFailLog);
+            __instance.QuestGiver.AddPower(-10f);
+            __instance.QuestGiver.CurrentSettlement.Village.Hearth -= 30f;
+            ChangeRelationAction.ApplyPlayerRelation(__instance.QuestGiver, -5);
+        }
 
-        __instance.AddLog(__instance.QuestTimeOutFailLog);
         return false;
     }
 
-    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess))]
-    [HarmonyPrefix]
-    private static void SuccessLogPrefix(QuestBase __instance)
+    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddLog))]
+    [HarmonyPostfix]
+    private static void JournalPostfix(QuestBase __instance, TextObject text)
     {
-        if (ModInformation.IsClient && CallOriginalPolicy.IsOriginalAllowed() && __instance is Quest quest)
+        if (ModInformation.IsServer && __instance is Quest quest && text != null)
         {
-            quest.AddLog(quest.QuestSuccessLog);
+            MessageBroker.Instance.Publish(quest, new VillageNeedsToolsJournalAdded(quest, text.ToString()));
         }
     }
 }

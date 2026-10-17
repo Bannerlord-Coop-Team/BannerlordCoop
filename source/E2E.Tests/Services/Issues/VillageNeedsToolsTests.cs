@@ -5,6 +5,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
@@ -241,6 +242,49 @@ public class VillageNeedsToolsTests : IDisposable
         });
     }
 
+    [Fact]
+    public void CompanionFunding_RefusesWhenTheOwnerSpentTheQuotedFunds()
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+            {
+                owner.Gold = 0;
+                Assert.Throws<InvalidOperationException>(() => notable.Issue.AlternativeSolutionStartConsequence());
+                Assert.Equal(0, owner.Gold);
+                Assert.True(notable.Issue.IsOngoingWithoutQuest);
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ServerEnding_PreservesTheReasonInOnlyTheOwnersJournal(bool fail)
+    {
+        Accept();
+        var ownerQuest = QuestOf(ClientA);
+        var previousLogs = ownerQuest.JournalEntries.Count;
+        const string reason = "Polisia was raided. Your agreement was canceled.";
+
+        Server.Call(() =>
+        {
+            var quest = QuestOfHere(Server);
+            var text = new TaleWorlds.Localization.TextObject("{=!}" + reason);
+            if (fail) quest.CompleteQuestWithFail(text);
+            else quest.CompleteQuestWithCancel(text);
+        });
+
+        Assert.True(ownerQuest.IsFinalized);
+        Assert.Equal(previousLogs + 1, ownerQuest.JournalEntries.Count);
+        Assert.Equal(reason, ownerQuest.JournalEntries.Last().LogText.ToString());
+        var journal = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
+        Assert.Equal(ControllerA, journal.ControllerId);
+        ClientB.Call(() => Assert.Empty(Campaign.Current.QuestManager.Quests.OfType<Quest>()));
+    }
+
     [Theory]
     [InlineData(true, false, 0)]
     [InlineData(false, true, 0)]
@@ -375,7 +419,8 @@ public class VillageNeedsToolsTests : IDisposable
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
                 Assert.Null(notable.Issue);
                 // Only the server's -30 is applied
-                Assert.Equal(620f, settlement.Village.Hearth);
+                Assert.True(settlement.Village.Hearth == 620f,
+                    $"{(instance == Server ? "server" : instance == ClientA ? "owner" : "observer")} hearth was {settlement.Village.Hearth}");
             });
         }
     }
@@ -449,7 +494,8 @@ public class VillageNeedsToolsTests : IDisposable
                 issue.AlternativeSolutionSentTroops.AddToCounts(troop, 6);
             }
 
-            ClientA.Resolve<IMessageBroker>().Publish(this, new AlternativeSolutionAcceptRequested(issue));
+            issue.AlternativeSolutionStartConsequence();
+            issue.StartIssueWithAlternativeSolution();
         }, AlternativeSolutionLogTexts);
         TestEnvironment.FlushCoalescer();
 
@@ -663,7 +709,11 @@ public class VillageNeedsToolsTests : IDisposable
             mapEvent.MapEventSettlement = settlement;
             mapEvent._mapEventType = type;
             CampaignEventDispatcher.Instance.OnMapEventStarted(mapEvent, party.Party, settlement.Party);
-        }, QuestLogTexts.Concat(new[] { AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)) }));
+        }, QuestLogTexts.Concat(new[]
+        {
+            AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)),
+            AccessTools.PropertyGetter(typeof(Settlement), nameof(Settlement.EncyclopediaLinkWithName)),
+        }));
 
         var finalized = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>();
         if (fails) Assert.Equal(IssueOutcome.QuestFail, Assert.Single(finalized).Outcome);
@@ -771,6 +821,7 @@ public class VillageNeedsToolsTests : IDisposable
             {
                 settlement.SetSettlementComponent(village);
                 boundSettlement.SetSettlementComponent(town);
+                town._isCastle = true;
                 town.OwnerClan = giverClan;
                 village.Bound = boundSettlement;
                 village.Hearth = 650f;
