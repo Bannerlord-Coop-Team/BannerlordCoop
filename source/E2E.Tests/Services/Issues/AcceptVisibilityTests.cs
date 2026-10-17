@@ -168,7 +168,7 @@ public class AcceptVisibilityTests : IDisposable
             Assert.True(otherIssue.IsSolvingWithAlternative);
             Assert.False(otherIssue.IsTriedToSolveBefore);
             Assert.Equal(0, otherIssue.AlternativeSolutionSentTroops.TotalManCount);
-            Assert.All(otherIssue.JournalEntries, log => Assert.True(TextObject.IsNullOrEmpty(log.LogText)));
+            Assert.All(otherIssue.JournalEntries, log => Assert.True(string.IsNullOrEmpty(log.LogText?.ToString())));
             Assert.Equal(accepted.State.ReturnTimeTicks, otherIssue.AlternativeSolutionReturnTimeForTroops.NumTicks);
             Campaign.Current.IssueManager.DailyTick();
         });
