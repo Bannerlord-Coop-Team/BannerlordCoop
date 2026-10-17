@@ -18,7 +18,8 @@ internal class StartIssueWithQuestDispatchPatch
             !__instance.IsOngoingWithoutQuest && ContainerProvider.TryResolve<IQuestTypeRegistry>(out var registry) &&
             registry.TryGet(__instance.GetType(), out _))
         {
-            __result = false;
+            // IssueManager treats false as a failed offer and finalizes the existing issue.
+            __result = true;
             return false;
         }
         return true;
