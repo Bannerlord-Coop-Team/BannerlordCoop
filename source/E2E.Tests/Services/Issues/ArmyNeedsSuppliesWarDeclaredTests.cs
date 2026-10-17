@@ -34,6 +34,7 @@ public class ArmyNeedsSuppliesWarDeclaredTests : IDisposable
     private readonly string armyPartyId;
     private readonly string playerClanId;
     private readonly string ownerHeroId;
+    private readonly StubIssuePreconditions preconditions = new(typeof(Issue));
 
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
@@ -69,6 +70,7 @@ public class ArmyNeedsSuppliesWarDeclaredTests : IDisposable
     public void Dispose()
     {
         TestEnvironment.Dispose();
+        preconditions.Dispose();
     }
 
     [Theory]
