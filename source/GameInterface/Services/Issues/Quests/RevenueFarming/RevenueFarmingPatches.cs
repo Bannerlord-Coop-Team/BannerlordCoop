@@ -309,9 +309,6 @@ internal class RevenueFarmingSettlementPatch
     }
 }
 
-
-
-
 [HarmonyPatch]
 internal class RevenueFarmingFinalizationScopePatch
 {
