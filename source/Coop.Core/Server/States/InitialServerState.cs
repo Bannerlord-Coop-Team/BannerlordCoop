@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Registry;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Clans;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.MobileParties.Messages;
@@ -23,6 +24,7 @@ public class InitialServerState : ServerStateBase
     private readonly IMessageBroker messageBroker;
     private readonly IRegistryManager registryManager;
     private readonly IMapEventLoadCleaner mapEventLoadCleaner;
+    private readonly ILeaderlessClanResolver leaderlessClanResolver;
     private readonly IEmptyLordPartyResetter emptyLordPartyResetter;
     private readonly IModuleValidator moduleValidator;
     private readonly IGameStateInterface gameStateInterface;
@@ -34,6 +36,7 @@ public class InitialServerState : ServerStateBase
         IMessageBroker messageBroker,
         IRegistryManager registryManager,
         IMapEventLoadCleaner mapEventLoadCleaner,
+        ILeaderlessClanResolver leaderlessClanResolver,
         IEmptyLordPartyResetter emptyLordPartyResetter,
         IModuleInfoProvider moduleInfoProvider,
         IModuleValidator moduleValidator,
@@ -44,6 +47,7 @@ public class InitialServerState : ServerStateBase
         this.messageBroker = messageBroker;
         this.registryManager = registryManager;
         this.mapEventLoadCleaner = mapEventLoadCleaner;
+        this.leaderlessClanResolver = leaderlessClanResolver;
         this.emptyLordPartyResetter = emptyLordPartyResetter;
         this.moduleValidator = moduleValidator;
         this.gameStateInterface = gameStateInterface;
@@ -77,6 +81,7 @@ public class InitialServerState : ServerStateBase
         loadingInterface.SetLoadingMessage("Hosting Coop Server", "Applying synced object lifetimes...");
         registryManager.PatchLifetimes();
         mapEventLoadCleaner.FinalizePlayerMapEvents();
+        leaderlessClanResolver.RepairLoadedClans();
         emptyLordPartyResetter.ResetEmptyLordParties();
 
         Logic.SetState<ServerRunningState>();
