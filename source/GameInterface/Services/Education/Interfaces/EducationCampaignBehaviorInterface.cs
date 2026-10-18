@@ -226,10 +226,11 @@ public class EducationCampaignBehaviorInterface : IEducationCampaignBehaviorInte
 
                 // Earlier stages are completed randomly on schedule, only the current stage waits for an educator
                 educationBehavior.DoEducationUntil(clanHero, childAgeState);
-                if (clanHero.IsDisabled) continue;
 
                 // A stage the educator never finished was just done automatically, close its notice before sending the new one
                 CancelPendingNotifications((childKey, _) => childKey.Item1 == clanHero && childKey.Item2 < age);
+
+                if (clanHero.IsDisabled) continue;
 
                 var heroEducator = FindFirstSuitableHeroEducator(playerClan, clanHero);
                 if (heroEducator == null || !playerManager.TryGetPlayer(heroEducator, out var playerEducator)) continue;
