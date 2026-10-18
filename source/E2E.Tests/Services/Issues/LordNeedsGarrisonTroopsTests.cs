@@ -140,7 +140,6 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
         var partyId = testEnvironment.CreateRegisteredObject<MobileParty>();
         var townId = testEnvironment.CreateRegisteredObject<Town>();
 
-
         testEnvironment.Server.Call(() =>
         {
             Assert.True(testEnvironment.Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
@@ -189,5 +188,4 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
 
     private static CharacterObject DefaultPartyTroop() =>
         (CharacterObject)RuntimeHelpers.GetUninitializedObject(typeof(CharacterObject));
-
 }
