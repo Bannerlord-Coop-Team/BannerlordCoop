@@ -500,18 +500,25 @@ public class MerchantOutlawsTests : IDisposable
     {
         Accept();
         var ownerQuest = Quest(ClientA);
+        var logs = ownerQuest.JournalEntries.Count;
         var enemyId = environment.CreateRegisteredObject<Kingdom>();
         ClientA.Call(() =>
         {
             var clan = Get<Clan>(ClientA, playerClanId);
             var enemy = Get<Kingdom>(ClientA, enemyId);
             using (new AllowedThread())
+            {
+                Get<Hero>(ClientA, scenario.PlayerA.HeroId).Clan = clan;
+                DeclareWarAction.ApplyInternal(Get<Kingdom>(ClientA, kingdomId), enemy,
+                    DeclareWarAction.DeclareWarDetail.Default);
                 clan._kingdom = enemy;
+            }
             CampaignEventDispatcher.Instance.OnClanChangedKingdom(clan, null, enemy,
                 ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
         }, TextHelpers);
 
         Assert.True(ownerQuest.IsOngoing);
+        Assert.Equal(logs, ownerQuest.JournalEntries.Count);
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
