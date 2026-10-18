@@ -221,9 +221,9 @@ public class GangLeaderNeedsWeaponsTests : IDisposable
     }
 
     [Fact]
-    public void TheHeroFieldWritersAreInstalledBeforeTheirCallersCanInlineThem()
+    public void TheHeroPowerWriterIsInstalledBeforeItsCallersCanInlineIt()
     {
-        var category = Assert.Single(typeof(HeroFieldPatches).GetCustomAttributes(typeof(HarmonyPatchCategory), false));
+        var category = Assert.Single(typeof(HeroAddPowerPatch).GetCustomAttributes(typeof(HarmonyPatchCategory), false));
 
         Assert.Equal(global::GameInterface.GameInterface.HARMONY_STATIC_FIXES_CATEGORY, ((HarmonyPatchCategory)category).info.category);
     }

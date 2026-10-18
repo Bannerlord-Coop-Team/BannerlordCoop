@@ -55,8 +55,6 @@ namespace GameInterface.Services.Heroes.Patches
         }
     }
 
-    // Install field writers before patched callers can inline their original bodies.
-    [HarmonyPatchCategory(GameInterface.HARMONY_STATIC_FIXES_CATEGORY)]
     [HarmonyPatch]
     internal class HeroFieldPatches
     {
@@ -266,7 +264,7 @@ namespace GameInterface.Services.Heroes.Patches
         }
 
         [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> PowerTranspiler(IEnumerable<CodeInstruction> instructions)
+        internal static IEnumerable<CodeInstruction> PowerTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._power));
             var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(PowerIntercept));
@@ -375,6 +373,19 @@ namespace GameInterface.Services.Heroes.Patches
             MessageBroker.Instance.Publish(instance, new PregnantChanged(instance, isPregnant));
 
             instance.IsPregnant = isPregnant;
+        }
+    }
+
+    // Quest outcomes such as a hand-in raise a hero's power through AddPower, which a patched caller inlines when it is
+    // compiled before this writer is installed. Only AddPower is moved ahead; the rest of HeroFieldPatches stays where it was.
+    [HarmonyPatchCategory(GameInterface.HARMONY_STATIC_FIXES_CATEGORY)]
+    [HarmonyPatch(typeof(Hero), nameof(Hero.AddPower))]
+    internal class HeroAddPowerPatch
+    {
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+        {
+            return HeroFieldPatches.PowerTranspiler(instructions);
         }
     }
 }
