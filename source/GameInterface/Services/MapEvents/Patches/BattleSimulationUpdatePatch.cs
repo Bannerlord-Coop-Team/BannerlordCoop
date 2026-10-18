@@ -52,7 +52,8 @@ internal class MapEventSimulationRoundPatch
     [HarmonyPrefix]
     private static bool Prefix()
     {
-        // Village Leave calls the native round directly, bypassing BattleSimulation.Tick.
+        // Leaving any started encounter (village Leave included) runs one native round directly, bypassing
+        // BattleSimulation.Tick. Clients never simulate, so that parting round is skipped in co-op.
         return CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer;
     }
 }

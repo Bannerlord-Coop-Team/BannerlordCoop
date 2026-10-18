@@ -1,4 +1,5 @@
-﻿using Common.Util;
+﻿using Common.Network;
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
@@ -8,6 +9,7 @@ using GameInterface.Services.Issues.Framework.CreationCapture;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.LordWantsRivalCaptured;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
@@ -412,21 +414,133 @@ public class LordWantsRivalCapturedTests : IDisposable
         AssertFinalizedEverywhere(IssueOutcome.QuestCancel);
     }
 
+    [Theory]
+    [InlineData(DeclareWarAction.DeclareWarDetail.CausedByRebellion, IssueOutcome.QuestCancel)]
+    [InlineData(DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility, IssueOutcome.QuestFail)]
+    public void AWarBetweenTheGiverAndTheOwner_EndsTheQuest(DeclareWarAction.DeclareWarDetail detail, IssueOutcome outcome)
+    {
+        Accept(ClientA, giverId);
+
+        Server.Call(() =>
+        {
+            var kingdom = Get<Kingdom>(Server, kingdomId);
+            var clan = Get<Hero>(Server, playerA.HeroId).Clan;
+
+            using (new AllowedThread())
+            {
+                clan._kingdom = null;
+                FactionManager.DeclareWar(kingdom, clan);
+            }
+
+            CampaignEventDispatcher.Instance.OnWarDeclared(kingdom, clan, detail);
+        });
+
+        AssertFinalizedEverywhere(outcome);
+    }
+
     [Fact]
-    public void TheOwnersClient_LeavesWorldEventsToTheServer()
+    public void DeliveringToTheGiverInAMapConversation_GoesThroughTheServerOnce()
+    {
+        Accept(ClientA, giverId);
+        TakePrisonerOnServer(Get<MobileParty>(Server, playerA.MobilePartyId).Party);
+        MeetTheGiverOnTheMap(engage: true);
+        var gold = GoldOnServer(playerA);
+        var issueId = IssueIdOf(giverId);
+
+        RequestDeliveryToTheGiver(issueId);
+
+        Assert.Equal(gold + RewardGold, GoldOnServer(playerA));
+        Server.Call(() => Assert.Same(Get<Hero>(Server, giverId).PartyBelongedTo.Party, Get<Hero>(Server, targetId).PartyBelongedToAsPrisoner));
+        AssertFinalizedEverywhere(IssueOutcome.QuestSuccess);
+
+        // A repeated request finds no owned issue any more
+        RequestDeliveryToTheGiver(issueId);
+
+        Assert.Equal(gold + RewardGold, GoldOnServer(playerA));
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    [Fact]
+    public void DeliveringToTheGiverOnTheMap_IsRefusedWithoutAConversation()
+    {
+        Accept(ClientA, giverId);
+        TakePrisonerOnServer(Get<MobileParty>(Server, playerA.MobilePartyId).Party);
+        MeetTheGiverOnTheMap(engage: false);
+        var gold = GoldOnServer(playerA);
+
+        RequestDeliveryToTheGiver(IssueIdOf(giverId));
+
+        Assert.Equal(gold, GoldOnServer(playerA));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Server.Call(() => Assert.Same(Get<MobileParty>(Server, playerA.MobilePartyId).Party, Get<Hero>(Server, targetId).PartyBelongedToAsPrisoner));
+    }
+
+    [Fact]
+    public void TheOwnersClient_LeavesEveryWorldEventToTheServer()
     {
         Accept(ClientA, giverId);
 
         ClientA.Call(() =>
         {
             var quest = QuestOf(ClientA, giverId);
-            quest.OnHeroKilled(Get<Hero>(ClientA, targetId), Hero.MainHero, KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false);
+            var target = Get<Hero>(ClientA, targetId);
+            var kingdom = Get<Kingdom>(ClientA, kingdomId);
+            var clan = Hero.MainHero.Clan;
+
+            // Each of these would end the quest or change the world if it ran here
+            quest.OnHeroKilled(target, Hero.MainHero, KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false);
+            quest.OnPrisonerTaken(Get<Hero>(ClientA, giverId).PartyBelongedTo.Party, target);
+            quest.OnWarDeclared(kingdom, clan, DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
+            quest.OnClanChangedKingdom(clan, kingdom, null, ChangeKingdomAction.ChangeKingdomActionDetail.LeaveKingdom, false);
+            quest.OnMapEventStarted(null, null, null);
+            quest.OnPlayerBattleEventEnded(null);
 
             Assert.True(quest.IsOngoing);
         });
 
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
+    }
+
+    // The giver and the owner both leave the settlement, and the server holds the owner's map conversation with the giver's party when engaged
+    private void MeetTheGiverOnTheMap(bool engage)
+    {
+        Server.Call(() =>
+        {
+            var giver = Get<Hero>(Server, giverId);
+            var ownerParty = Get<MobileParty>(Server, playerA.MobilePartyId);
+
+            using (new AllowedThread())
+            {
+                giver.PartyBelongedTo.CurrentSettlement = null;
+                giver.StayingInSettlement = null;
+                ownerParty.CurrentSettlement = null;
+            }
+
+            Assert.Null(giver.CurrentSettlement);
+
+            if (!engage)
+            {
+                return;
+            }
+
+            Assert.True(Server.ObjectManager.TryGetId(ownerParty.Party, out var ownerPartyId));
+            Assert.True(Server.ObjectManager.TryGetId(giver.PartyBelongedTo.Party, out var giverPartyId));
+            Assert.True(ConversationPartyHold.TryEngage(
+                Server.Resolve<ConversationPartyTracker>(),
+                ClientA.NetPeer,
+                ownerPartyId,
+                giver.PartyBelongedTo,
+                giverPartyId,
+                engagerIsDefender: false));
+        });
+    }
+
+    // What the owner's client sends when the giver's delivery dialogue ends
+    private void RequestDeliveryToTheGiver(string issueId)
+    {
+        ClientA.Call(() => ClientA.Resolve<INetwork>().SendAll(
+            new RequestQuestBranch(giverId, issueId, (byte)LordWantsRivalCapturedBranch.DeliveredToGiver)));
     }
 
     private Player CreatePlayer(string controllerId)

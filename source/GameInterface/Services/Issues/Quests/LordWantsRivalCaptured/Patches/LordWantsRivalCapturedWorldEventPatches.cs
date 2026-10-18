@@ -56,7 +56,8 @@ internal class LordWantsRivalCapturedWorldEventPatches
 
     private static void RunAsOwners(Action<Quest> listener)
     {
-        if (!ModInformation.IsServer || !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+        // RunAsOwners does nothing on clients
+        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
         {
             return;
         }
