@@ -20,6 +20,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssue;
@@ -505,7 +506,8 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         AssertFinished(failure ? 2500 : 2530, 10000 - funding + (failure ? 0 : Payment));
         AssertEffects(failure ? 200 : 210, failure ? 100 : 90, failure ? 0 : 5, failure ? 0 : -10);
         Assert.True(ownerIssue.JournalEntries.Count >= 2);
-        Assert.Empty(observerIssue.JournalEntries);
+        // The observer keeps only the framework's blank placeholder for vanilla's daily tick, never the owner's text.
+        Assert.True(TextObject.IsNullOrEmpty(Assert.Single(observerIssue.JournalEntries).LogText));
         foreach (var instance in Instances)
         {
             instance.Call(() =>
