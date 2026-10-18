@@ -1,6 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
-using GameInterface.Services.MobileParties.Handlers;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using Helpers;
 using Serilog;
@@ -14,30 +14,18 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.MobileParties;
 
 /// <summary>
-/// Server repair for a land party left standing on a map spot its navigation cannot use, such as
-/// the water or settlement ground around a town, or a scrap of land cut off from the rest of the
-/// map. Native movement never leaves such a spot: the path search fails and every straight step is
-/// refused because it crosses into another navigation island, so the server copy freezes while the
-/// client keeps walking.
+/// Server repair for a land party standing on a map spot native movement can never leave.
 /// </summary>
 internal interface IPartyNavigationRepair
 {
     /// <summary>
-    /// Moves a free land party (with the parties attached to it when it leads an army) standing on an
-    /// unusable map spot to the closest usable one, clears the path state computed from the bad spot
-    /// and force-syncs the new positions to every client.
+    /// Moves the party (and its attached parties) to the closest usable spot and force-syncs it.
     /// </summary>
-    /// <param name="previousPosition">The server position before the repair.</param>
-    /// <returns>True when the party was moved.</returns>
     bool TryRepair(MobileParty party, out CampaignVec2 previousPosition);
 
     /// <summary>
-    /// The repair a movement order runs. Unusable terrain is always repaired, but valid land on a
-    /// navigation island without a settlement gate is still navigable within itself, so the party
-    /// is only moved off it when its order targets a spot it cannot reach from there: another
-    /// island or an unusable spot.
+    /// Same repair for a movement order, but leaves valid gate free land alone when the target is on that island.
     /// </summary>
-    /// <returns>True when the party was moved.</returns>
     bool TryRepairForOrder(MobileParty party);
 }
 
@@ -45,6 +33,9 @@ internal interface IPartyNavigationRepair
 internal class PartyNavigationRepair : IPartyNavigationRepair
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PartyNavigationRepair>();
+
+    // Only free land parties are repaired, so every check uses land navigation.
+    private const MobileParty.NavigationType Navigation = MobileParty.NavigationType.Default;
 
     private readonly IMessageBroker messageBroker;
 
@@ -74,18 +65,17 @@ internal class PartyNavigationRepair : IPartyNavigationRepair
             party.Party?.MapEvent != null || party.BesiegerCamp != null || party.AttachedTo != null)
             return false;
 
-        const MobileParty.NavigationType navigation = MobileParty.NavigationType.Default;
-        var islands = GetReachableIslands(navigation);
+        var islands = GetReachableIslands();
         // Without a usable gate there is nothing to tell the connected map from a cut off island.
         if (islands.Count == 0) return false;
-        if (IsUsable(previousPosition, navigation, islands)) return false;
+        if (IsUsable(previousPosition, islands)) return false;
         // Valid land without a gate is still navigable within its island, so an order only moves
         // the party off it when the order cannot be followed from there.
-        if (forOrder && NavigationHelper.IsPositionValidForNavigationType(previousPosition, navigation) &&
-            CanReachOrderTarget(party, previousPosition, navigation))
+        if (forOrder && NavigationHelper.IsPositionValidForNavigationType(previousPosition, Navigation) &&
+            CanReachOrderTarget(party, previousPosition))
             return false;
 
-        if (!TryFindUsablePosition(previousPosition, navigation, islands, out var destination))
+        if (!TryFindUsablePosition(previousPosition, islands, out var destination))
         {
             Logger.Error(
                 "Party {PartyId} stands on an unusable map spot at {Position} and no usable spot was found to move it to",
@@ -97,12 +87,12 @@ internal class PartyNavigationRepair : IPartyNavigationRepair
         // with every attached party, so the army is not left split across both spots.
         List<MobileParty> attachedParties = null;
         if (party.Army?.LeaderParty == party)
-            attachedParties = MobilePartyBehaviorHandler.ApplyServerForcedPosition(party, destination, party.IsCurrentlyAtSea);
+            attachedParties = party.ApplyForcedPositionWithAttachedParties(destination, party.IsCurrentlyAtSea);
         else
             party.Position = destination;
 
         // Drop the path cached from the bad spot so the next tick computes one from the new spot.
-        ResetPath(party);
+        party.ResetPath();
 
         Logger.Warning(
             "Moved party {PartyId} from an unusable map spot at {Previous} to {Position}",
@@ -113,7 +103,7 @@ internal class PartyNavigationRepair : IPartyNavigationRepair
         {
             foreach (var attachedParty in attachedParties)
             {
-                ResetPath(attachedParty);
+                attachedParty.ResetPath();
                 PublishForcedPosition(attachedParty);
             }
         }
@@ -128,34 +118,21 @@ internal class PartyNavigationRepair : IPartyNavigationRepair
             isCurrentlyAtSea: party.IsCurrentlyAtSea));
     }
 
-    private static void ResetPath(MobileParty party)
-    {
-        party._pathMode = false;
-        party.PathLastFace = PathFaceRecord.NullFaceRecord;
-        party.PathBegin = 0;
-        party._lastComputedPathNavigationType = MobileParty.NavigationType.None;
-    }
-
     /// <summary>
-    /// A spot is usable when its terrain allows the navigation and its face lies on a navigation
-    /// island that also holds a usable settlement gate. Native movement never steps from one island
-    /// into another, so valid terrain on a cut off island still leaves the party frozen.
+    /// Valid terrain on a navigation island that holds a usable settlement gate.
     /// </summary>
-    private static bool IsUsable(CampaignVec2 position, MobileParty.NavigationType navigation, HashSet<int> islands)
+    private static bool IsUsable(CampaignVec2 position, HashSet<int> islands)
     {
-        if (!NavigationHelper.IsPositionValidForNavigationType(position, navigation)) return false;
+        if (!NavigationHelper.IsPositionValidForNavigationType(position, Navigation)) return false;
 
         var island = position.Face.FaceIslandIndex;
         return island >= 0 && islands.Contains(island);
     }
 
     /// <summary>
-    /// Whether a party on valid land can follow its current order from there. A hold order or a
-    /// target on the same island is reachable, since native movement within one island works; a
-    /// target on another island or on an unusable spot never is, as native movement never crosses
-    /// islands.
+    /// A hold order or a target on the party's own island, since native movement never crosses islands.
     /// </summary>
-    private static bool CanReachOrderTarget(MobileParty party, CampaignVec2 position, MobileParty.NavigationType navigation)
+    private static bool CanReachOrderTarget(MobileParty party, CampaignVec2 position)
     {
         CampaignVec2 target;
         if (party.PartyMoveMode == MoveModeType.Point)
@@ -165,11 +142,11 @@ internal class PartyNavigationRepair : IPartyNavigationRepair
         else
             return true;
 
-        if (!NavigationHelper.IsPositionValidForNavigationType(target, navigation)) return false;
+        if (!NavigationHelper.IsPositionValidForNavigationType(target, Navigation)) return false;
         return target.Face.FaceIslandIndex == position.Face.FaceIslandIndex;
     }
 
-    private HashSet<int> GetReachableIslands(MobileParty.NavigationType navigation)
+    private HashSet<int> GetReachableIslands()
     {
         var scene = Campaign.Current.MapSceneWrapper;
         if (reachableIslands != null && ReferenceEquals(scene, reachableIslandsScene)) return reachableIslands;
@@ -178,7 +155,7 @@ internal class PartyNavigationRepair : IPartyNavigationRepair
         foreach (var settlement in Settlement.All)
         {
             var gate = settlement.GatePosition;
-            if (!NavigationHelper.IsPositionValidForNavigationType(gate, navigation)) continue;
+            if (!NavigationHelper.IsPositionValidForNavigationType(gate, Navigation)) continue;
 
             var island = gate.Face.FaceIslandIndex;
             if (island >= 0) islands.Add(island);
@@ -194,25 +171,20 @@ internal class PartyNavigationRepair : IPartyNavigationRepair
     }
 
     /// <summary>
-    /// The closest usable navigation face, the way native map-change repair finds one, else the
-    /// nearest usable settlement gate, which by definition lies on a reachable island.
+    /// The closest usable face center, else the nearest usable settlement gate.
     /// </summary>
-    private static bool TryFindUsablePosition(
-        CampaignVec2 position,
-        MobileParty.NavigationType navigation,
-        HashSet<int> islands,
-        out CampaignVec2 destination)
+    private static bool TryFindUsablePosition(CampaignVec2 position, HashSet<int> islands, out CampaignVec2 destination)
     {
-        var invalidTerrains = Campaign.Current.Models.PartyNavigationModel.GetInvalidTerrainTypesForNavigationType(navigation);
+        var invalidTerrains = Campaign.Current.Models.PartyNavigationModel.GetInvalidTerrainTypesForNavigationType(Navigation);
         destination = NavigationHelper.GetClosestNavMeshFaceCenterPositionForPosition(position, invalidTerrains);
-        if (IsUsable(destination, navigation, islands)) return true;
+        if (IsUsable(destination, islands)) return true;
 
         var nearestDistance = float.MaxValue;
         var found = false;
         foreach (var settlement in Settlement.All)
         {
             var gate = settlement.GatePosition;
-            if (!IsUsable(gate, navigation, islands)) continue;
+            if (!IsUsable(gate, islands)) continue;
 
             var distance = gate.Distance(position);
             if (distance >= nearestDistance) continue;

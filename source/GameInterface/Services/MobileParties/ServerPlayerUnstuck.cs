@@ -156,19 +156,10 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
         }
 
         // Last, so a party the exits above just freed is checked at its final spot.
-        try
-        {
-            if (partyNavigationRepair.TryRepair(party, out var previousPosition))
-            {
-                actions.Add($"Moved the party from {Format(previousPosition)}, a map spot it could not move from, " +
-                    $"to {Format(party.Position)}.");
-            }
-        }
-        catch (Exception e)
-        {
-            Logger.Error(e, "Unstuck step {Step} failed", "map position repair");
-            actions.Add($"Failed map position repair: {e.GetType().Name} ({e.Message}).");
-        }
+        TryStep(actions, "map position repair", () =>
+            partyNavigationRepair.TryRepair(party, out var previousPosition)
+                ? $"Moved the party from {Format(previousPosition)}, a map spot it could not move from, to {Format(party.Position)}."
+                : null);
 
         if (actions.Count == 0)
         {
@@ -207,7 +198,9 @@ internal class ServerPlayerUnstuck : IServerPlayerUnstuck
     {
         try
         {
-            actions.Add(apply());
+            // A step returning null had nothing to apply.
+            var line = apply();
+            if (line != null) actions.Add(line);
         }
         catch (Exception e)
         {

@@ -188,6 +188,28 @@ public class UnstuckMapPositionTests : MapEventTestBase
     public void Unstuck_ArmyLeaderOnUnusableSpot_MovesTheAttachedPartiesWithIt()
     {
         var partyId = PrepareConnectedPlayer(StuckSpot);
+        var memberId = AttachArmyMember(partyId);
+
+        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(partyId, null));
+
+        AssertArmyMovedTogether(partyId, memberId);
+    }
+
+    [Fact]
+    public void PlayerForcedMoveOrder_ArmyLeaderFromUnusableSpot_MovesTheAttachedPartiesWithIt()
+    {
+        var partyId = PrepareConnectedPlayer(StuckSpot);
+        var memberId = AttachArmyMember(partyId);
+
+        // A forced order also runs the handler's own attached parties loop before the repair.
+        SendMoveOrder(partyId, from: StuckSpot, to: VillageGate, forcePosition: true);
+
+        AssertArmyMovedTogether(partyId, memberId);
+    }
+
+    /// <summary>Creates a party at <see cref="StuckSpot"/> attached to the player's army on the server.</summary>
+    private string AttachArmyMember(string leaderId)
+    {
         var memberId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         foreach (var instance in Clients.Append(Server))
             instance.Call(() =>
@@ -198,7 +220,7 @@ public class UnstuckMapPositionTests : MapEventTestBase
         Server.Call(() =>
         {
             UseNavigationMesh(closestFaceCenter: ClosestUsableSpot);
-            var leader = Server.GetRegisteredObject<MobileParty>(partyId);
+            var leader = Server.GetRegisteredObject<MobileParty>(leaderId);
             var member = Server.GetRegisteredObject<MobileParty>(memberId);
             var army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), leader, Army.ArmyTypes.Patrolling);
             member.Army = army;
@@ -206,13 +228,15 @@ public class UnstuckMapPositionTests : MapEventTestBase
             member.IsActive = true;
             Assert.Contains(member, leader.AttachedParties);
         });
+        return memberId;
+    }
 
-        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(partyId, null));
-
+    private void AssertArmyMovedTogether(string leaderId, string memberId)
+    {
         foreach (var instance in Clients.Append(Server))
             instance.Call(() =>
             {
-                Assert.Equal(ClosestUsableSpot, instance.GetRegisteredObject<MobileParty>(partyId).Position);
+                Assert.Equal(ClosestUsableSpot, instance.GetRegisteredObject<MobileParty>(leaderId).Position);
                 Assert.Equal(ClosestUsableSpot, instance.GetRegisteredObject<MobileParty>(memberId).Position);
             });
         // One forced update for the leader and a separate one for the attached party.
@@ -224,7 +248,7 @@ public class UnstuckMapPositionTests : MapEventTestBase
     }
 
     /// <summary>The same publish the server's behavior request packet handler makes for a client move order.</summary>
-    private void SendMoveOrder(string partyId, CampaignVec2 from, CampaignVec2 to)
+    private void SendMoveOrder(string partyId, CampaignVec2 from, CampaignVec2 to, bool forcePosition = false)
     {
         Server.Call(() =>
         {
@@ -239,6 +263,7 @@ public class UnstuckMapPositionTests : MapEventTestBase
                 MobileParty.NavigationType.Default)
             {
                 OriginControllerId = ControllerId,
+                ForcePosition = forcePosition,
                 PartyMoveMode = MoveModeType.Point,
                 MoveTargetPoint = to,
             };

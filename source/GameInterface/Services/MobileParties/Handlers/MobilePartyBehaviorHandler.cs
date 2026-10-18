@@ -113,7 +113,7 @@ internal class MobilePartyBehaviorHandler : IHandler
             List<MobileParty> attachedParties = null;
             if (ModInformation.IsServer && data.ForcePosition)
             {
-                attachedParties = ApplyServerForcedPosition(party, data.PartyPosition, data.IsCurrentlyAtSea);
+                attachedParties = party.ApplyForcedPositionWithAttachedParties(data.PartyPosition, data.IsCurrentlyAtSea);
                 if (data.ResetMovementToHold)
                 {
                     party.SetMoveModeHold();
@@ -133,7 +133,7 @@ internal class MobilePartyBehaviorHandler : IHandler
                     return;
 
                 if (ModInformation.IsClient && data.ForcePosition)
-                    ApplyForcedPosition(party, data.PartyPosition, data.IsCurrentlyAtSea);
+                    party.ApplyForcedPosition(data.PartyPosition, data.IsCurrentlyAtSea);
 
                 if (ModInformation.IsClient && data.ResetMovementToHold)
                 {
@@ -183,38 +183,6 @@ internal class MobilePartyBehaviorHandler : IHandler
             apply();
         else
             GameThread.RunSafe(apply, context: nameof(MobilePartyBehaviorHandler));
-    }
-
-    private static void ApplyForcedPosition(MobileParty party, CampaignVec2 position, bool isCurrentlyAtSea)
-    {
-        party.Position = position;
-
-        if (party.IsCurrentlyAtSea != isCurrentlyAtSea)
-            party.ChangeIsCurrentlyAtSeaCheat();
-    }
-
-    internal static List<MobileParty> ApplyServerForcedPosition(
-        MobileParty party,
-        CampaignVec2 position,
-        bool isCurrentlyAtSea)
-    {
-        ApplyForcedPosition(party, position, isCurrentlyAtSea);
-
-        if (party.Army == null)
-            return null;
-
-        List<MobileParty> attachedParties = null;
-        foreach (var attachedParty in party.Army.LeaderParty.AttachedParties)
-        {
-            if (attachedParty == party)
-                continue;
-
-            attachedParty.Position = position;
-            attachedParties ??= new List<MobileParty>();
-            attachedParties.Add(attachedParty);
-        }
-
-        return attachedParties;
     }
 
     private void PublishForcedPosition(MobileParty party)
