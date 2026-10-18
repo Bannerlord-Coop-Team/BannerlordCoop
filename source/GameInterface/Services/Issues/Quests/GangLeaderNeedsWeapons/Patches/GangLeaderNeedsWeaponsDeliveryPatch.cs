@@ -32,7 +32,7 @@ internal class GangLeaderNeedsWeaponsDeliveryPatch
             return false;
         }
 
-        if (!ModInformation.IsServer)
+        if (ModInformation.IsClient)
         {
             return true;
         }
