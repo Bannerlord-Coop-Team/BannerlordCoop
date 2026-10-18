@@ -5,12 +5,14 @@ using GameInterface.Policies;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using HarmonyLib;
 using Serilog;
 using System;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
@@ -25,6 +27,28 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
 
     private sealed class OutcomeMarker
     {
+    }
+
+    private sealed class JournalMarker
+    {
+        public TextObject Text;
+    }
+
+    private static readonly ConditionalWeakTable<IssueBase, JournalMarker> LastJournalLogs = new();
+
+    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddLog), new[] { typeof(TextObject), typeof(bool) })]
+    private static class QuestLogCapturePatch
+    {
+        [HarmonyPostfix]
+        private static void Postfix(QuestBase __instance, JournalLog __result)
+        {
+            var issue = IssueManager.GetIssueOfQuest(__instance);
+            if (issue != null && __result != null)
+            {
+                LastJournalLogs.Remove(issue);
+                LastJournalLogs.Add(issue, new JournalMarker { Text = __result.LogText });
+            }
+        }
     }
 
     public OutcomeDispatcher(IMessageBroker messageBroker, IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver)
@@ -164,7 +188,12 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
             return;
         }
 
-        messageBroker.Publish(observed, new IssueOutcomeObserved(observed, outcome));
+        var journalLog = observed.IssueQuest?.JournalEntries.LastOrDefault()?.LogText;
+        if (journalLog == null && LastJournalLogs.TryGetValue(observed, out var marker))
+        {
+            journalLog = marker.Text;
+        }
+        messageBroker.Publish(observed, new IssueOutcomeObserved(observed, outcome, journalLog));
     }
 
     public void AfterAlternativeSolutionCompletion(IssueBase issue, IDisposable owner)

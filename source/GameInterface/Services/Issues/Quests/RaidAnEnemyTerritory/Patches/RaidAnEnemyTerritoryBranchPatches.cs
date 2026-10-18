@@ -1,11 +1,9 @@
 ﻿using Common;
-using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest;
 
 namespace GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory.Patches;
@@ -27,17 +25,6 @@ internal sealed class RaidAnEnemyTerritoryBranchPatches
 
         HandedOff.GetValue(__instance, _ => new object());
         return false;
-    }
-
-    [HarmonyPatch(typeof(FinalizationCoordinator), "Replay")]
-    [HarmonyPrefix]
-    private static void AddSuccessLogOnClientReplay(IssueBase issue, IssueOutcome outcome)
-    {
-        if (ModInformation.IsClient && outcome == IssueOutcome.QuestSuccess &&
-            issue?.IssueQuest is Quest quest && quest.IsOngoing)
-        {
-            quest.AddLog(new TextObject("{=gMvDCnlx}You have successfully raided enemy villages and distracted enemy forces as promised."));
-        }
     }
 
     [HarmonyPatch(typeof(Quest), "DailyTick")]

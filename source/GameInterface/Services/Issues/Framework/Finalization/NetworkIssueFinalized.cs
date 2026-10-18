@@ -15,10 +15,14 @@ public readonly struct NetworkIssueFinalized : IServerToClientCommand
     [ProtoMember(3)]
     public readonly IssueOutcome Outcome;
 
-    public NetworkIssueFinalized(string issueOwnerId, string issueId, IssueOutcome outcome)
+    [ProtoMember(4)]
+    public readonly TaleWorlds.Localization.TextObject JournalLog;
+
+    public NetworkIssueFinalized(string issueOwnerId, string issueId, IssueOutcome outcome, TaleWorlds.Localization.TextObject journalLog = null)
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
         Outcome = outcome;
+        JournalLog = journalLog;
     }
 }

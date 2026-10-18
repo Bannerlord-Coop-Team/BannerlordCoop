@@ -26,6 +26,12 @@ internal sealed class RaidAnEnemyTerritoryQuestEventPatches
             return true;
         }
 
+        if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver) ||
+            !ownerResolver.TryResolveOwnerHero(victim.Issue, out _))
+        {
+            return true;
+        }
+
         RunAsOwners(quest => quest.OnHeroKilled(victim, killer, detail, showNotification));
         return false;
     }

@@ -184,7 +184,7 @@ internal class FinalizationCoordinator : IHandler
 
         ownership.Remove(issueOwnerId);
 
-        network.SendAll(new NetworkIssueFinalized(issueOwnerId, issue.StringId, payload.What.Outcome));
+        network.SendAll(new NetworkIssueFinalized(issueOwnerId, issue.StringId, payload.What.Outcome, payload.What.JournalLog));
     }
 
     // Client only.
@@ -208,6 +208,11 @@ internal class FinalizationCoordinator : IHandler
 
             using (new AllowedThread())
             {
+                if (data.JournalLog != null && issue.IssueQuest != null)
+                {
+                    issue.IssueQuest.AddLog(data.JournalLog);
+                }
+
                 Replay(issue, data.Outcome);
             }
         }, context: nameof(FinalizationCoordinator));
