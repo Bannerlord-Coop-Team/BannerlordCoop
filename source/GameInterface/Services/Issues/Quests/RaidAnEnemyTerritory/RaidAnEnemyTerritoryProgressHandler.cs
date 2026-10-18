@@ -84,13 +84,18 @@ internal sealed class RaidAnEnemyTerritoryProgressHandler : IHandler
             {
                 quest._raidedVillages.Clear();
                 quest._raidedVillages.AddRange(villages);
-                quest._journalEntries.Clear();
-                foreach (var entry in data.Entries ?? Array.Empty<RaidAnEnemyTerritoryJournalEntry>())
+                var entries = data.Entries ?? Array.Empty<RaidAnEnemyTerritoryJournalEntry>();
+                if (entries.Length > 0)
                 {
-                    quest._journalEntries.Add(new JournalLog(entry.Time, entry.Text, entry.Task, entry.Progress, entry.Range, entry.Type));
+                    quest._journalEntries.Clear();
+                    foreach (var entry in entries)
+                    {
+                        quest._journalEntries.Add(new JournalLog(entry.Time, entry.Text, entry.Task, entry.Progress, entry.Range, entry.Type));
+                    }
                 }
 
-                quest._raidedVillagesTrackLog = quest.JournalEntries.FirstOrDefault(log => log.Type == LogType.Discreate);
+                quest._raidedVillagesTrackLog ??= quest.JournalEntries.FirstOrDefault(log => log.Type == LogType.Discreate);
+                quest._raidedVillagesTrackLog?.UpdateCurrentProgress(quest._raidedVillages.Count);
                 CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, true);
             }
         }, context: nameof(RaidAnEnemyTerritoryProgressHandler));

@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using System;
@@ -58,7 +59,7 @@ internal sealed class RaidAnEnemyTerritoryJournalCreationPatch
             return controllerId;
         }
 
-        return null;
+        return ContainerProvider.TryResolve<IControllerIdProvider>(out var controller) ? controller.ControllerId : null;
     }
 }
 
