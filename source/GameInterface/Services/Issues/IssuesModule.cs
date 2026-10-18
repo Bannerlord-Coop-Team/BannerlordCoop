@@ -27,6 +27,7 @@ internal class IssuesModule : Module
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
         builder.RegisterType<CaravanAmbushStatePublisher>().As<ICaravanAmbushStatePublisher>().InstancePerDependency();
         builder.RegisterType<CaravanAmbushEvents>().As<ICaravanAmbushEvents>().InstancePerDependency();
+        builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)
             .Where(IsQuestPiece)

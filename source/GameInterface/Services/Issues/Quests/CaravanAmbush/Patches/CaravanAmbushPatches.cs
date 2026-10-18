@@ -26,10 +26,6 @@ internal class CaravanAmbushPatches
     [HarmonyPrefix]
     private static bool LoadBehavior() => ModInformation.IsServer;
 
-    [HarmonyPatch(typeof(Issue), nameof(Issue.GenerateIssueQuest))]
-    [HarmonyPostfix]
-    private static void QuestId(string questId, QuestBase __result) => __result.StringId = questId;
-
     [HarmonyPatch(typeof(Quest), nameof(Quest.SetDialogs))]
     [HarmonyPrefix]
     private static bool Dialogs() => ModInformation.IsClient;
@@ -128,8 +124,6 @@ internal class CaravanAmbushServerListeners
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.MapEventEnded));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnSettlementEntered));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnBanditPartyRecruited));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared), new[] { typeof(IFaction), typeof(IFaction), typeof(TaleWorlds.CampaignSystem.Actions.DeclareWarAction.DeclareWarDetail) });
     }
 
     private static bool Prefix() => ModInformation.IsServer;
