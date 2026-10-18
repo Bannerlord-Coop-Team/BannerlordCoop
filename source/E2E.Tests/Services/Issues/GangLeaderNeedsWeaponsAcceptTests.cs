@@ -463,6 +463,8 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var startingGold = 0;
         var fee = 0;
+        var clientGoldBefore = 0;
+        var clientGoldAfter = 0;
 
         Server.Call(() =>
         {
@@ -500,10 +502,15 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
                 giver.Issue.AlternativeSolutionSentTroops.AddToCounts(troop, SentTroops);
             }
 
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var clientOwner));
+            clientGoldBefore = clientOwner.Gold;
+            giver.Issue.AlternativeSolutionStartConsequence();
+            clientGoldAfter = clientOwner.Gold;
             giver.Issue.StartIssueWithAlternativeSolution();
         });
         TestEnvironment.FlushCoalescer();
 
+        Assert.Equal(clientGoldBefore, clientGoldAfter);
         return (startingGold, fee);
     }
 }
