@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -14,6 +14,7 @@ using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
@@ -118,6 +119,7 @@ public class GangLeaderNeedsWeaponsTests : IDisposable
     {
         var axe = CreateAxe();
         var serversOwnPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var giverSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var completed = false;
 
         Server.Call(() =>
@@ -125,6 +127,8 @@ public class GangLeaderNeedsWeaponsTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(serversOwnPartyId, out var serversOwnParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(giverSettlementId, out var giverSettlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
             var previousMainParty = Campaign.Current.MainParty;
 
             using (new AllowedThread())
@@ -132,6 +136,8 @@ public class GangLeaderNeedsWeaponsTests : IDisposable
                 party.ItemRoster.Clear();
                 party.ItemRoster.AddToCounts(axe, carried);
                 ownerHero._partyBelongedTo = ownerHasParty ? party : null;
+                giver.StayingInSettlement = giverSettlement;
+                party.CurrentSettlement = giverSettlement;
 
                 // The server's own party carries every requested weapon, an owner without a party must not be answered with it
                 serversOwnParty.ItemRoster.Clear();
@@ -139,8 +145,7 @@ public class GangLeaderNeedsWeaponsTests : IDisposable
                 Campaign.Current.MainParty = serversOwnParty;
             }
 
-            var quest = Uninitialized<Quest>();
-            quest._requestedWeaponAmount = RequestedWeapons;
+            var quest = new Quest("weapons_test", giver, CampaignTime.Never, 500, 0, RequestedWeapons, 0.5f, 250);
             quest._requestedWeaponClass = WeaponClass.OneHandedAxe;
 
             try

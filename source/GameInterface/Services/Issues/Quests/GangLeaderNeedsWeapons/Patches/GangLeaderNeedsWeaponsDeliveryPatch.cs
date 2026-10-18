@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
@@ -41,6 +41,13 @@ internal class GangLeaderNeedsWeaponsDeliveryPatch
         if (Hero.MainHero?.PartyBelongedTo == null || Hero.MainHero.PartyBelongedTo != MobileParty.MainParty)
         {
             Logger.Warning("The owner of {quest} has no party to count the weapons in, not completing it", __instance.StringId);
+            return false;
+        }
+
+        var ownerParty = Hero.MainHero.PartyBelongedTo;
+        if (__instance.QuestGiver == null || ownerParty.CurrentSettlement == null || ownerParty.CurrentSettlement != __instance.QuestGiver.CurrentSettlement)
+        {
+            Logger.Warning("The owner of {quest} is not at the quest giver's settlement, not completing it", __instance.StringId);
             return false;
         }
 

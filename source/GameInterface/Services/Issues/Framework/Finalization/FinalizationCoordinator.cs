@@ -114,14 +114,14 @@ internal class FinalizationCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!TryResolveOwnedIssue(data.IssueOwnerId, data.IssueId, player, out var issue, out _, out var playerHero))
+            if (!TryResolveOwnedIssue(data.IssueOwnerId, data.IssueId, player, out var issue, out var descriptor, out var playerHero))
             {
                 return;
             }
 
             using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
             {
-                CompleteOnServer(issue, data.Outcome);
+                CompleteOnServer(issue, descriptor, data.Outcome);
             }
         }, context: nameof(FinalizationCoordinator));
     }
@@ -251,7 +251,7 @@ internal class FinalizationCoordinator : IHandler
         return objectManager.TryGetObjectWithLogging(player.HeroId, out playerHero);
     }
 
-    private void CompleteOnServer(IssueBase issue, IssueOutcome outcome)
+    private void CompleteOnServer(IssueBase issue, IQuestTypeDescriptor descriptor, IssueOutcome outcome)
     {
         if (!IsQuestOutcome(outcome))
         {
@@ -264,6 +264,12 @@ internal class FinalizationCoordinator : IHandler
         if (quest == null)
         {
             Logger.Error("{issue} has no quest to end with {outcome}", issue.StringId, outcome);
+            return;
+        }
+
+        if (outcome == IssueOutcome.QuestSuccess && descriptor.FinalizationProofStrategy != null)
+        {
+            Logger.Warning("Ignoring generic success for {issue}; its quest requires a finalization proof", issue.StringId);
             return;
         }
 

@@ -1,4 +1,4 @@
-using Common.Messaging;
+﻿using Common.Network;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -8,6 +8,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
@@ -242,9 +243,16 @@ public class GangLeaderNeedsWeaponsAcceptTests : GangLeaderNeedsWeaponsAcceptSce
 public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcceptScenario
 {
     private const int SentTroops = 8;
+    private readonly StubIssuePreconditions preconditions = new(typeof(Issue));
 
     public GangLeaderNeedsWeaponsEligibilityTests(ITestOutputHelper output) : base(output)
     {
+    }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+        preconditions.Dispose();
     }
 
     [Fact]
@@ -261,12 +269,91 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
     [Fact]
     public void AnEligiblePlayer_IsNotRefusedTheCompanionMission()
     {
-        AcceptTheCompanionMission();
+        var (startingGold, fee) = AcceptTheCompanionMission();
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAcceptRejected>());
         var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
         Assert.Equal(ControllerA, accepted.ControllerId);
         Assert.Equal(ControllerA, OwnerOnServer(FirstGiverId, FirstIssueId));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var owner));
+            Assert.Equal(startingGold - fee, owner.Gold);
+        });
+    }
+
+    [Fact]
+    public void ARejectedCompanionMissionDoesNotChargeTheOwner()
+    {
+        preconditions.Refuse(Server);
+        var (startingGold, _) = AcceptTheCompanionMission();
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAcceptRejected>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var owner));
+            Assert.Equal(startingGold, owner.Gold);
+        });
+    }
+
+    [Fact]
+    public void AForgedSuccessRequestDoesNotCompleteTheQuest()
+    {
+        Accept(ClientA, FirstGiverId);
+
+        ClientA.Call(() => ClientA.Resolve<INetwork>().SendAll(new RequestQuestOutcome(
+            FirstGiverId,
+            FirstIssueId,
+            IssueOutcome.QuestSuccess)));
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+            Assert.NotNull(giver.Issue);
+            Assert.NotNull(giver.Issue.IssueQuest);
+        });
+    }
+
+    [Fact]
+    public void TheDeliveryBranchIsRejectedAwayFromTheQuestGiversSettlement()
+    {
+        var axe = GangLeaderNeedsWeaponsTests.CreateAxe();
+
+        Accept(ClientA, FirstGiverId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PlayerA.MobilePartyId, out var party));
+            var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+
+            using (new AllowedThread())
+            {
+                owner._partyBelongedTo = party;
+                party.CurrentSettlement = null;
+                party.ItemRoster.Clear();
+                party.ItemRoster.AddToCounts(axe, quest._requestedWeaponAmount);
+            }
+        });
+
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+            Assert.IsType<Quest>(giver.Issue.IssueQuest).PlayerSuccessfullyDeliveredWeapons();
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+            Assert.NotNull(giver.Issue);
+        });
     }
 
     [Fact]
@@ -320,6 +407,7 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
             using (new AllowedThread())
             {
                 party.ItemRoster.Clear();
+                party.CurrentSettlement = carriesEnough ? giver.CurrentSettlement : null;
                 party.ItemRoster.AddToCounts(axe, carriesEnough ? needed : needed - 1);
             }
         });
@@ -369,10 +457,12 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
         }
     }
 
-    private void AcceptTheCompanionMission()
+    private (int StartingGold, int Fee) AcceptTheCompanionMission()
     {
         var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var startingGold = 0;
+        var fee = 0;
 
         Server.Call(() =>
         {
@@ -385,10 +475,14 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
             {
                 troop.Level = 20;
                 playerHero.Gold = 100000;
+                startingGold = playerHero.Gold;
                 party.MemberRoster.AddToCounts(playerHero.CharacterObject, 1);
                 party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
                 party.MemberRoster.AddToCounts(troop, SentTroops);
             }
+
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+            fee = (int)AccessTools.Property(typeof(Issue), "CompanionGoldNeedForAlternativeSolution").GetValue(giver.Issue)!;
         });
         TestEnvironment.FlushCoalescer();
 
@@ -406,8 +500,10 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
                 giver.Issue.AlternativeSolutionSentTroops.AddToCounts(troop, SentTroops);
             }
 
-            ClientA.Resolve<IMessageBroker>().Publish(this, new AlternativeSolutionAcceptRequested(giver.Issue));
+            giver.Issue.StartIssueWithAlternativeSolution();
         });
         TestEnvironment.FlushCoalescer();
+
+        return (startingGold, fee);
     }
 }
