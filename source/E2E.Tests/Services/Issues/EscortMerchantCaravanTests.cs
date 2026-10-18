@@ -9,6 +9,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.EscortMerchantCaravan;
+using GameInterface.Services.Issues.Quests.EscortMerchantCaravan.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
@@ -38,10 +39,19 @@ public class EscortMerchantCaravanTests : IDisposable
     private static int observedReroutes;
     private static MobileParty? observedMainParty;
     private static Hero? observedMainHero;
+    private static int observedKingdomCalls;
 
     private static void ObserveReroute()
     {
         observedReroutes++;
+        observedMainParty = MobileParty.MainParty;
+        observedMainHero = Hero.MainHero;
+    }
+
+    private static void ObserveKingdom()
+    {
+        if (!EscortQuestEventPatches.IsRunning) return;
+        observedKingdomCalls++;
         observedMainParty = MobileParty.MainParty;
         observedMainHero = Hero.MainHero;
     }
@@ -848,16 +858,35 @@ public class EscortMerchantCaravanTests : IDisposable
     public void ARelayKingdomChangeRunsTheEscortHandlerOnce()
     {
         Accept();
-        Server.NetworkSentMessages.Clear();
-        Server.Call(() =>
+        var harmony = new Harmony($"escort-relay-kingdom-{Guid.NewGuid()}");
+        var handler = AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
+        harmony.Patch(handler, postfix: new HarmonyMethod(typeof(EscortMerchantCaravanTests), nameof(ObserveKingdom)));
+        try
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
-            CampaignEventDispatcher.Instance.OnClanChangedKingdom(giver.Clan, null, null,
-                ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
-        });
+            observedKingdomCalls = 0;
+            observedMainParty = null;
+            observedMainHero = null;
+            Server.NetworkSentMessages.Clear();
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+                var ownerPlayer = Server.Resolve<IPlayerManager>().Players.Single(player => player.ControllerId == QuestScenario.ControllerA);
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerPlayer.HeroId, out var owner));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPlayer.MobilePartyId, out var ownerParty));
+                CampaignEventDispatcher.Instance.OnClanChangedKingdom(giver.Clan, null, null,
+                    ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+                Assert.Equal(1, observedKingdomCalls);
+                Assert.Same(ownerParty, observedMainParty);
+                Assert.Same(owner, observedMainHero);
+            });
 
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(),
-            message => message.Outcome == IssueOutcome.QuestCancel);
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(),
+                message => message.Outcome == IssueOutcome.QuestCancel);
+        }
+        finally
+        {
+            harmony.Unpatch(handler, HarmonyPatchType.Postfix, harmony.Id);
+        }
     }
 
     [Theory]
