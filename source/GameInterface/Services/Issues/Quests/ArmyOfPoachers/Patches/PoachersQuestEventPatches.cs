@@ -7,6 +7,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -86,10 +87,12 @@ internal class PoachersQuestEventPatches
             if (__instance._poachersParty?.IsActive == true)
                 DestroyPartyAction.Apply(null, __instance._poachersParty);
 
-            var issue = __instance.QuestGiver.Issue;
-            if (issue != null && ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) &&
-                owners.TryResolveOwnerHero(issue, out var hero) && hero.IsPrisoner)
-                EndCaptivityAction.ApplyByPeace(hero);
+            // Endings run as the owner, where the captivity handler would take them for the server's own main hero
+            if (TryGetOwner(__instance, out var hero) && hero.IsPrisoner)
+                GameThread.EnqueueSafe(() =>
+                {
+                    if (hero.IsPrisoner) EndCaptivityAction.ApplyByPeace(hero);
+                }, context: nameof(PoachersQuestEventPatches));
         }
         else if (PlayerEncounter.Current != null &&
             Campaign.Current.CurrentMenuContext?.GameMenu.StringId == "army_of_poachers_village")
@@ -129,6 +132,15 @@ internal class PoachersQuestEventPatches
     {
         if (!__runOriginal || !__instance.IsFinalized || __state == null || __state.Count == 0) return;
 
+        // An owner the poachers hold is released before failing removes them, outside the owner's scope
+        foreach (var outcome in __state)
+        {
+            var quest = outcome.Key;
+            if (outcome.Value == false && TryGetOwner(quest, out var owner) && owner.IsPrisoner &&
+                owner.PartyBelongedToAsPrisoner == quest._poachersParty?.Party)
+                EndCaptivityAction.ApplyByPeace(owner);
+        }
+
         RunAsOwners(quest =>
         {
             if (!__state.TryGetValue(quest, out var won)) return;
@@ -139,6 +151,22 @@ internal class PoachersQuestEventPatches
             else
                 quest.QuestFailWithPlayerDefeatedAgainstPoachers();
         });
+    }
+
+    // An issue that ends under its running quest, as a dismissed one does, would leave the poachers in the village
+    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
+    [HarmonyPrefix]
+    private static void IssueFinalizedPrefix(IssueBase __instance)
+    {
+        if (ModInformation.IsServer && __instance.IssueQuest is Quest quest && quest.IsOngoing) quest.OnFinalize();
+    }
+
+    private static bool TryGetOwner(Quest quest, out Hero owner)
+    {
+        owner = null;
+        var issue = quest.QuestGiver.Issue;
+        return issue?.IssueQuest == quest && ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) &&
+            owners.TryResolveOwnerHero(issue, out owner);
     }
 
     private static void RunAsOwners(Action<Quest> listener)

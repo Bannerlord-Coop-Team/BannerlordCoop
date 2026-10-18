@@ -22,7 +22,10 @@ internal class PoachersJournalPatch
     [HarmonyPostfix]
     private static void AlternativeLogPostfix(IssueBase __instance, JournalLog log)
     {
-        if (__instance is Issue && __instance.IsSolvingWithAlternative && ContainerProvider.TryResolve<PoachersJournalHandler>(out var journals))
+        // The owner's own daily tick already adds the returning log
+        if (__instance is Issue && __instance.IsSolvingWithAlternative &&
+            log.LogText?.Value != __instance.AlternativeSolutionEndLogDefault.Value &&
+            ContainerProvider.TryResolve<PoachersJournalHandler>(out var journals))
             journals.SendLog(__instance, log.LogText);
     }
 

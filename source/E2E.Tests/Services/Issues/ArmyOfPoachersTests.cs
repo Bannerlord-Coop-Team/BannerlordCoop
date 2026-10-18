@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -14,6 +15,7 @@ using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using LiteNetLib;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -200,10 +202,92 @@ public class ArmyOfPoachersTests : IDisposable
     public void TimeoutRunsPenaltyOnTheServerAndReplaysWithoutRepeatingIt()
     {
         Accept();
-        Owner.Call(() => QuestOf(Owner).CompleteQuestWithTimeOut());
+        var quest = QuestOf(Owner);
+        Owner.Call(() => quest.CompleteQuestWithTimeOut());
 
         AssertOutcome(false, -5f, -30f);
         Assert.Equal(IssueOutcome.QuestTimeOut, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        // The replay only ends the owner's quest, the penalty and its log came from the server
+        Owner.Call(() =>
+        {
+            Assert.Equal(0, quest.RelationshipChangeWithQuestGiver);
+            Assert.Equal(2, quest.JournalEntries.Count);
+        });
+    }
+
+    [Fact]
+    public void ACaptiveOwnerIsReleasedOnlyAfterTheirScopeEnds()
+    {
+        Accept();
+        var captorId = environment.CreateRegisteredObject<MobileParty>();
+        Hero owner = null!;
+        Server.Call(() =>
+        {
+            owner = Get<Hero>(Server, playerA.HeroId);
+            MakePrisoner(owner, Get<MobileParty>(Server, captorId).Party);
+        });
+
+        WithRecordedReleases(() =>
+        {
+            Owner.Call(() => QuestOf(Owner).CompleteQuestWithTimeOut());
+            Assert.Empty(releases);
+
+            Server.PumpGameThread();
+            var release = Assert.Single(releases);
+            Assert.Same(owner, release.Prisoner);
+            // Inside the owner's scope the server would take the owner for its own main hero and grant captivity XP
+            Assert.NotSame(owner.CharacterObject, release.PlayerTroop);
+        });
+    }
+
+    [Fact]
+    public void OwnerTakenByThePoachersIsReleasedOutsideTheirScopeBeforeTheQuestFails()
+    {
+        Accept();
+        AttachParty();
+        Hero owner = null!;
+
+        WithRecordedReleases(() =>
+        {
+            Server.Call(() =>
+            {
+                owner = Get<Hero>(Server, playerA.HeroId);
+                var poachers = Get<MobileParty>(Server, poachersId);
+                var battle = MapEventBattleFactory.CreateMapEvent(owner.PartyBelongedTo.Party, poachers.Party, default);
+                Assert.NotNull(battle);
+                // The server takes a defeated player prisoner when it applies the battle's result
+                MakePrisoner(owner, poachers.Party);
+                battle.BattleState = BattleState.DefenderVictory;
+                battle.FinalizeEvent();
+            }, new[] { AccessTools.Method(typeof(MapEvent), nameof(MapEvent.MovePartyToSuitablePositionOnMapEventFinalize)) });
+
+            var release = Assert.Single(releases);
+            Assert.Same(owner, release.Prisoner);
+            Assert.NotSame(owner.CharacterObject, release.PlayerTroop);
+        });
+        AssertOutcome(false, -5, -30);
+    }
+
+    [Fact]
+    public void TheOwnerLeavingRemovesThePoachersOfTheDismissedQuest()
+    {
+        Accept();
+        AttachParty();
+        MobileParty poachers = null!;
+
+        Server.Call(() =>
+        {
+            poachers = Get<MobileParty>(Server, poachersId);
+            Server.Resolve<IPlayerManager>().ClearPeer(Owner.NetPeer);
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(Owner.NetPeer, default(DisconnectInfo)));
+        });
+
+        Server.Call(() =>
+        {
+            Assert.Null(IssueOf(Server));
+            Assert.False(poachers.IsActive);
+        });
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
 
     [Theory]
@@ -367,6 +451,51 @@ public class ArmyOfPoachersTests : IDisposable
     [InlineData(false, 3)]
     public void CompanionSolutionUsesTheFrameworkAndAppliesTheOwnersOutcome(bool success, int casualties)
     {
+        var (companionId, troopId) = SendCompanion();
+        IssueBase clientIssue = null!;
+        Owner.Call(() => clientIssue = IssueOf(Owner));
+        Server.Call(() =>
+        {
+            var issue = IssueOf(Server);
+            Assert.True(issue.IsSolvingWithAlternative);
+            issue._failureChance = success ? -1 : 1;
+            issue._alternativeSolutionCasualtyCount = casualties;
+            issue.CompleteIssueWithAlternativeSolution();
+            var roster = Get<MobileParty>(Server, playerA.MobilePartyId).MemberRoster;
+            Assert.Equal(40 - casualties, roster.GetTroopCount(Get<CharacterObject>(Server, troopId)));
+            Assert.Contains(roster.GetTroopRoster(), troop => troop.Character == Get<Hero>(Server, companionId).CharacterObject);
+            Assert.DoesNotContain(Get<MobileParty>(Server, playerB.MobilePartyId).MemberRoster.GetTroopRoster(),
+                troop => troop.Character == Get<Hero>(Server, companionId).CharacterObject);
+        });
+
+        AssertOutcome(success, success ? 0 : -5, success ? 50 : -30);
+        Assert.Equal(IssueOutcome.AlternativeSolution, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Owner.Call(() =>
+        {
+            var history = Campaign.Current.LogEntryHistory.GetGameActionLogs((JournalLogEntry entry) => entry.IsRelatedTo(clientIssue));
+            var journal = Assert.Single(history);
+            Assert.True(journal.GetEntries().Count() > 1);
+            Assert.True(journal.IsEnded());
+            Assert.Equal(!success, journal.IsEndedUnsuccessfully());
+        });
+    }
+
+    [Fact]
+    public void TheOwnersDailyTickKeepsTheOnlyReturningLog()
+    {
+        SendCompanion();
+        var entries = 0;
+        Owner.Call(() => entries = IssueOf(Owner).JournalEntries.Count);
+
+        // Both the owner's and the server's daily tick reach the day the troops start returning
+        Owner.Call(() => IssueOf(Owner).OnAlternativeSolutionSolvedAndTroopsAreReturning());
+        Server.Call(() => IssueOf(Server).OnAlternativeSolutionSolvedAndTroopsAreReturning());
+
+        Owner.Call(() => Assert.Equal(entries + 1, IssueOf(Owner).JournalEntries.Count));
+    }
+
+    private (string CompanionId, string TroopId) SendCompanion()
+    {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
         foreach (var instance in Instances)
@@ -398,32 +527,47 @@ public class ArmyOfPoachersTests : IDisposable
         });
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
-        IssueBase clientIssue = null!;
-        Owner.Call(() => clientIssue = IssueOf(Owner));
-        Server.Call(() =>
-        {
-            var issue = IssueOf(Server);
-            Assert.True(issue.IsSolvingWithAlternative);
-            issue._failureChance = success ? -1 : 1;
-            issue._alternativeSolutionCasualtyCount = casualties;
-            issue.CompleteIssueWithAlternativeSolution();
-            var roster = Get<MobileParty>(Server, playerA.MobilePartyId).MemberRoster;
-            Assert.Equal(40 - casualties, roster.GetTroopCount(Get<CharacterObject>(Server, troopId)));
-            Assert.Contains(roster.GetTroopRoster(), troop => troop.Character == Get<Hero>(Server, companionId).CharacterObject);
-            Assert.DoesNotContain(Get<MobileParty>(Server, playerB.MobilePartyId).MemberRoster.GetTroopRoster(),
-                troop => troop.Character == Get<Hero>(Server, companionId).CharacterObject);
-        });
+        return (companionId, troopId);
+    }
 
-        AssertOutcome(success, success ? 0 : -5, success ? 50 : -30);
-        Assert.Equal(IssueOutcome.AlternativeSolution, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
-        Owner.Call(() =>
+    private static readonly List<(Hero Prisoner, BasicCharacterObject? PlayerTroop)> releases = new();
+
+    // Records who the server took for its main hero, then frees the prisoner the way the captivity handler does
+    private static bool RecordRelease(Hero prisoner)
+    {
+        releases.Add((prisoner, Game.Current?.PlayerTroop));
+        using (new AllowedThread())
         {
-            var history = Campaign.Current.LogEntryHistory.GetGameActionLogs((JournalLogEntry entry) => entry.IsRelatedTo(clientIssue));
-            var journal = Assert.Single(history);
-            Assert.True(journal.GetEntries().Count() > 1);
-            Assert.True(journal.IsEnded());
-            Assert.Equal(!success, journal.IsEndedUnsuccessfully());
-        });
+            prisoner.PartyBelongedToAsPrisoner = null;
+            prisoner.ChangeState(Hero.CharacterStates.Active);
+        }
+        return false;
+    }
+
+    private static void WithRecordedReleases(Action test)
+    {
+        var harmony = new Harmony($"poachers-release-{Guid.NewGuid()}");
+        harmony.Patch(AccessTools.Method(typeof(EndCaptivityAction), nameof(EndCaptivityAction.ApplyInternal)),
+            prefix: new HarmonyMethod(typeof(ArmyOfPoachersTests), nameof(RecordRelease)) { priority = Priority.First });
+        releases.Clear();
+        try
+        {
+            test();
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            releases.Clear();
+        }
+    }
+
+    private static void MakePrisoner(Hero hero, PartyBase captor)
+    {
+        using (new AllowedThread())
+        {
+            hero.ChangeState(Hero.CharacterStates.Prisoner);
+            hero.PartyBelongedToAsPrisoner = captor;
+        }
     }
 
     private IssueBase CreateIssue(EnvironmentInstance instance, Hero giver)
