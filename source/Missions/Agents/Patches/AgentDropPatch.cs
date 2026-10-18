@@ -1,9 +1,10 @@
 ﻿using Common.Messaging;
 using Common.Util;
+using GameInterface;
 using HarmonyLib;
 using Missions.Agents.Messages;
-using System.Collections.Generic;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Agents.Patches
@@ -15,72 +16,77 @@ namespace Missions.Agents.Patches
     [HarmonyPatchCategory(MissionModule.WeaponDropPatchCategory)]
     public class AgentDropPatch
     {
+        /// <summary>The weapon a registered agent is about to drop, captured before the slot empties.</summary>
         internal readonly struct DropState
         {
-            public HashSet<SpawnedItemEntity> ExistingItems { get; }
+            public bool IsCaptured { get; }
             public MissionWeapon Weapon { get; }
 
-            public DropState(
-                HashSet<SpawnedItemEntity> existingItems,
-                MissionWeapon weapon)
+            public DropState(MissionWeapon weapon)
             {
-                ExistingItems = existingItems;
+                IsCaptured = true;
                 Weapon = weapon;
             }
         }
 
-        // DropItem spawns its world item through the native drop callback, which announces the drop itself.
-        [System.ThreadStatic]
-        private static bool insideDropItem;
-
-        internal static bool IsInsideDropItem => insideDropItem;
-
+        // DropItem spawns its world item through the native drop callback, which hands the item back here.
         static void Prefix(
             EquipmentIndex itemIndex,
             Agent __instance,
             out DropState __state)
         {
-            insideDropItem = true;
             __state = Capture(__instance, itemIndex);
+            if (__state.IsCaptured) WeaponDropItemTracker.Begin();
         }
 
+        // Announces the drop with the world item the native callback reported.
         static void Postfix(
             EquipmentIndex itemIndex,
             Agent __instance,
             DropState __state)
         {
-            Publish(__instance, itemIndex, __state);
+            if (!__state.IsCaptured) return;
+
+            Publish(__instance, itemIndex, __state.Weapon, WeaponDropItemTracker.End());
         }
 
-        static void Finalizer()
+        // Stops waiting for the world item even when DropItem throws.
+        static void Finalizer(DropState __state)
         {
-            insideDropItem = false;
+            if (__state.IsCaptured) WeaponDropItemTracker.End();
         }
 
+        // Captures the dropped slot's weapon for a registered agent; anything else is never announced.
         internal static DropState Capture(Agent agent, EquipmentIndex itemIndex)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return default;
+            if (agent == null || AllowedThread.IsThisThreadAllowed()) return default;
+            if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry) ||
+                !registry.TryGetAgentInfo(agent, out _))
+            {
+                return default;
+            }
 
             MissionWeapon weapon = default;
-            if (agent != null &&
-                itemIndex >= EquipmentIndex.WeaponItemBeginSlot &&
+            if (itemIndex >= EquipmentIndex.WeaponItemBeginSlot &&
                 itemIndex < EquipmentIndex.NumAllWeaponSlots)
             {
                 weapon = agent.Equipment[itemIndex];
             }
 
-            return new DropState(WeaponDropItemTracker.Capture(), weapon);
+            return new DropState(weapon);
         }
 
-        internal static void Publish(Agent agent, EquipmentIndex itemIndex, DropState state)
+        // Announces a captured drop together with the world item it spawned, if any.
+        internal static void Publish(
+            Agent agent,
+            EquipmentIndex itemIndex,
+            MissionWeapon weapon,
+            SpawnedItemEntity droppedItem)
         {
-            if (AllowedThread.IsThisThreadAllowed() || state.ExistingItems == null) return;
-
-            SpawnedItemEntity droppedItem = WeaponDropItemTracker.FindDroppedItem(state.ExistingItems);
             WeaponDropped message = new WeaponDropped(
                 agent,
                 itemIndex,
-                state.Weapon,
+                weapon,
                 droppedItem);
             MessageBroker.Instance.Publish(agent, message);
         }
@@ -95,22 +101,70 @@ namespace Missions.Agents.Patches
     [HarmonyPatchCategory(MissionModule.WeaponDropPatchCategory)]
     public class NativeAgentDropPatch
     {
+        /// <summary>What the native drop callback needs to hand its spawned world item to the right owner.</summary>
+        internal readonly struct NativeDropState
+        {
+            public bool RecordsForCaller { get; }
+            public AgentDropPatch.DropState Drop { get; }
+            public WeakGameEntity WeaponEntity { get; }
+
+            public NativeDropState(
+                bool recordsForCaller,
+                AgentDropPatch.DropState drop,
+                WeakGameEntity weaponEntity)
+            {
+                RecordsForCaller = recordsForCaller;
+                Drop = drop;
+                WeaponEntity = weaponEntity;
+            }
+        }
+
+        // Captures the weapon entity before the callback turns it into a world item.
         static void Prefix(
             Agent agent,
             EquipmentIndex equipmentIndex,
-            out AgentDropPatch.DropState __state)
+            out NativeDropState __state)
         {
-            __state = AgentDropPatch.IsInsideDropItem
-                ? default
-                : AgentDropPatch.Capture(agent, equipmentIndex);
+            __state = Capture(agent, equipmentIndex);
         }
 
+        // Reads the world item off the captured entity instead of scanning mission objects.
         static void Postfix(
             Agent agent,
             EquipmentIndex equipmentIndex,
-            AgentDropPatch.DropState __state)
+            NativeDropState __state)
         {
-            AgentDropPatch.Publish(agent, equipmentIndex, __state);
+            Publish(agent, equipmentIndex, __state);
+        }
+
+        // Captures the slot's weapon entity, which the callback turns into the world item, only when someone needs it.
+        internal static NativeDropState Capture(Agent agent, EquipmentIndex equipmentIndex)
+        {
+            bool recordsForCaller = WeaponDropItemTracker.IsCapturing;
+            AgentDropPatch.DropState drop = recordsForCaller
+                ? default
+                : AgentDropPatch.Capture(agent, equipmentIndex);
+            if (agent == null || (!recordsForCaller && !drop.IsCaptured)) return default;
+
+            return new NativeDropState(
+                recordsForCaller,
+                drop,
+                agent.GetWeaponEntityFromEquipmentSlot(equipmentIndex));
+        }
+
+        // Hands the spawned world item to the caller waiting on it, or announces the death drop itself.
+        internal static void Publish(Agent agent, EquipmentIndex equipmentIndex, NativeDropState state)
+        {
+            if (!state.RecordsForCaller && !state.Drop.IsCaptured) return;
+
+            SpawnedItemEntity droppedItem = WeaponDropItemTracker.FindDroppedItem(state.WeaponEntity);
+            if (state.RecordsForCaller)
+            {
+                WeaponDropItemTracker.Record(droppedItem);
+                return;
+            }
+
+            AgentDropPatch.Publish(agent, equipmentIndex, state.Drop.Weapon, droppedItem);
         }
     }
 }
