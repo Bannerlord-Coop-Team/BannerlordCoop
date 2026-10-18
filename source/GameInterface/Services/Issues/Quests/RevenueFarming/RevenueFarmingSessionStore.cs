@@ -15,6 +15,7 @@ using Quest = RevenueFarmingIssueBehavior.RevenueFarmingIssueQuest;
 internal interface IRevenueFarmingSessionStore
 {
     RevenueFarmingSession Get(Quest quest);
+    RevenueFarmingSession Get(IssueBase issue);
     RevenueFarmingSession Get(Hero questGiver, string questId);
     RevenueFarmingSession Register(Quest quest, Hero playerHero, string controllerId);
     Quest FindOngoing(Hero playerHero);
@@ -39,6 +40,9 @@ internal sealed class RevenueFarmingSessionStore : IRevenueFarmingSessionStore
         session.ControllerId == controller.ControllerId;
 
     public RevenueFarmingSession Get(Quest quest) => sessions.FirstOrDefault(session => session.Quest == quest);
+
+    public RevenueFarmingSession Get(IssueBase issue) => sessions.FirstOrDefault(session =>
+        session.Quest.QuestGiver == issue.IssueOwner && session.Quest.QuestGiver?.Issue == issue);
 
     public RevenueFarmingSession Get(Hero questGiver, string questId) => sessions.FirstOrDefault(session =>
         session.Quest.QuestGiver == questGiver && session.Quest.StringId == questId);

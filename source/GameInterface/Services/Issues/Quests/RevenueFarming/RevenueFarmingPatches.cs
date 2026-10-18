@@ -26,7 +26,7 @@ internal class RevenueFarmingOfferAuthorityPatch
     private static bool Prefix() => ModInformation.IsServer;
 }
 
-[HarmonyPatch(typeof(RevenueFarmingIssueBehavior), "get_Instance")]
+[HarmonyPatch(typeof(RevenueFarmingIssueBehavior), nameof(RevenueFarmingIssueBehavior.Instance), MethodType.Getter)]
 internal class RevenueFarmingInstancePatch
 {
     private static bool Prefix(ref Quest __result)
@@ -47,7 +47,7 @@ internal class RevenueFarmingSavePatch
     }
 }
 
-[HarmonyPatch(typeof(IssuesCampaignBehavior), "OnIssueUpdated")]
+[HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.OnIssueUpdated))]
 internal class RevenueFarmingIssueEffectsPatch
 {
     private static bool Prefix(IssueBase issue) => issue is not RevenueFarmingIssueBehavior.RevenueFarmingIssue || ModInformation.IsServer;
@@ -58,7 +58,8 @@ internal class RevenueFarmingCallbackPatch
 {
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        foreach (var name in new[] { "HourlyTick", "OnWarDeclared", "OnClanChangedKingdom", "OnVillageRaid", "OnMapEventStarted", "OnMapEventEnded", "OnSettlementOwnerChanged" })
+        foreach (var name in new[] { nameof(Quest.HourlyTick), nameof(Quest.OnWarDeclared), nameof(Quest.OnClanChangedKingdom),
+            nameof(Quest.OnVillageRaid), nameof(Quest.OnMapEventStarted), nameof(Quest.OnMapEventEnded), nameof(Quest.OnSettlementOwnerChanged) })
             yield return AccessTools.Method(typeof(Quest), name);
     }
 
@@ -89,7 +90,7 @@ internal class RevenueFarmingCallbackPatch
     private static void Finalizer(RevenueFarmingExecutionScope __state) => __state?.Dispose();
 }
 
-[HarmonyPatch(typeof(QuestBase), "FinalizeQuest")]
+[HarmonyPatch(typeof(QuestBase), nameof(QuestBase.FinalizeQuest))]
 internal class RevenueFarmingTerminalStatePatch
 {
     private static void Prefix(QuestBase __instance)
@@ -104,7 +105,7 @@ internal class RevenueFarmingTerminalStatePatch
     }
 }
 
-[HarmonyPatch(typeof(Quest), "OnBeforeTimedOut")]
+[HarmonyPatch(typeof(Quest), nameof(Quest.OnBeforeTimedOut))]
 internal class RevenueFarmingTimeoutPatch
 {
     private static bool Prefix(ref bool doNotResolveTheQuest)
@@ -117,13 +118,13 @@ internal class RevenueFarmingTimeoutPatch
     }
 }
 
-[HarmonyPatch(typeof(Quest), "OnTimedOut")]
+[HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
 internal class RevenueFarmingTimeoutLogPatch
 {
     private static bool Prefix() => ModInformation.IsServer;
 }
 
-[HarmonyPatch(typeof(Quest), "ShowQuestResolvePopUp")]
+[HarmonyPatch(typeof(Quest), nameof(Quest.ShowQuestResolvePopUp))]
 internal class RevenueFarmingPaymentPromptPatch
 {
     private static bool Prefix(Quest __instance)
@@ -137,7 +138,7 @@ internal class RevenueFarmingPaymentPromptPatch
     }
 }
 
-[HarmonyPatch(typeof(Quest), "OnPlayerDeserted")]
+[HarmonyPatch(typeof(Quest), nameof(Quest.OnPlayerDeserted))]
 internal class RevenueFarmingDesertionPatch
 {
     private static bool Prefix(Quest __instance)
@@ -148,7 +149,7 @@ internal class RevenueFarmingDesertionPatch
     }
 }
 
-[HarmonyPatch(typeof(Quest), "QuestAcceptedConsequences")]
+[HarmonyPatch(typeof(Quest), nameof(Quest.QuestAcceptedConsequences))]
 internal class RevenueFarmingAcceptedPatch
 {
     private static bool Prefix(Quest __instance)
@@ -170,8 +171,8 @@ internal class RevenueFarmingPaymentActionPatch
 {
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        yield return AccessTools.Method(typeof(Quest), "QuestCompletedWithSuccess");
-        yield return AccessTools.Method(typeof(Quest), "QuestCompletedWithBetray");
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.QuestCompletedWithSuccess));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.QuestCompletedWithBetray));
     }
 
     private static bool Prefix(Quest __instance, MethodBase __originalMethod)
@@ -193,9 +194,9 @@ internal class RevenueFarmingMenuActionPatch
 {
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        yield return AccessTools.Method(typeof(RevenueFarmingIssueBehavior), "collect_revenue_menu_consequence");
-        yield return AccessTools.Method(typeof(RevenueFarmingIssueBehavior), "leave_consequence");
-        yield return AccessTools.Method(typeof(RevenueFarmingIssueBehavior), "talk_to_steward_on_consequence");
+        yield return AccessTools.Method(typeof(RevenueFarmingIssueBehavior), nameof(RevenueFarmingIssueBehavior.collect_revenue_menu_consequence));
+        yield return AccessTools.Method(typeof(RevenueFarmingIssueBehavior), nameof(RevenueFarmingIssueBehavior.leave_consequence));
+        yield return AccessTools.Method(typeof(RevenueFarmingIssueBehavior), nameof(RevenueFarmingIssueBehavior.talk_to_steward_on_consequence));
     }
 
     private static bool Prefix(MethodBase __originalMethod)
@@ -214,7 +215,7 @@ internal class RevenueFarmingMenuActionPatch
     }
 }
 
-[HarmonyPatch(typeof(RevenueFarmingIssueBehavior), "AddVillageEventMenus")]
+[HarmonyPatch(typeof(RevenueFarmingIssueBehavior), nameof(RevenueFarmingIssueBehavior.AddVillageEventMenus))]
 internal class RevenueFarmingIncidentOptionsPatch
 {
     private static void Prefix(RevenueFarmingIssueBehavior.VillageEvent villageEvent)
@@ -234,7 +235,7 @@ internal class RevenueFarmingIncidentOptionsPatch
     }
 }
 
-[HarmonyPatch(typeof(RevenueFarmingIssueBehavior), "collecting_menu_on_init")]
+[HarmonyPatch(typeof(RevenueFarmingIssueBehavior), nameof(RevenueFarmingIssueBehavior.collecting_menu_on_init))]
 internal class RevenueFarmingCollectionMenuPatch
 {
     private static bool Prefix(MenuCallbackArgs args)
@@ -289,14 +290,14 @@ internal class RevenueFarmingConversationEndPatch
     }
 }
 
-[HarmonyPatch(typeof(Campaign), "set_TimeControlMode")]
+[HarmonyPatch(typeof(Campaign), nameof(Campaign.TimeControlMode), MethodType.Setter)]
 internal class RevenueFarmingTimeControlPatch
 {
     [HarmonyPriority(Priority.First)]
     private static bool Prefix() => ModInformation.IsClient || RevenueFarmingExecutionScope.Current == null;
 }
 
-[HarmonyPatch(typeof(Settlement), "get_CurrentSettlement")]
+[HarmonyPatch(typeof(Settlement), nameof(Settlement.CurrentSettlement), MethodType.Getter)]
 internal class RevenueFarmingSettlementPatch
 {
     [HarmonyPriority(Priority.First)]

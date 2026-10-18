@@ -1,9 +1,9 @@
 ﻿using Common;
 using HarmonyLib;
-using GameInterface.Services.Issues.Framework.Finalization;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Library;
@@ -13,14 +13,25 @@ namespace GameInterface.Services.Issues.Quests.RevenueFarming;
 
 using Quest = RevenueFarmingIssueBehavior.RevenueFarmingIssueQuest;
 
-[HarmonyPatch(typeof(FinalizationCoordinator), "Replay")]
+[HarmonyPatch]
 internal class RevenueFarmingDetachedDialoguePatch
 {
-    private static void Prefix(IssueBase issue)
+    private static IEnumerable<MethodBase> TargetMethods()
     {
-        if (ModInformation.IsClient && issue.IssueQuest is Quest quest &&
-            !Campaign.Current.QuestManager.Quests.Contains(quest))
-            Campaign.Current.ConversationManager.RemoveRelatedLines(quest);
+        yield return AccessTools.Method(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithQuest));
+        yield return AccessTools.Method(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithFail));
+        yield return AccessTools.Method(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithBetrayal));
+        yield return AccessTools.Method(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithCancel));
+        yield return AccessTools.Method(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithTimedOut));
+    }
+
+    private static void Prefix(IssueBase __instance)
+    {
+        if (!ModInformation.IsClient ||
+            !ContainerProvider.TryResolve<IRevenueFarmingSessionStore>(out var sessions) ||
+            sessions.Get(__instance) is not { } session ||
+            Campaign.Current.QuestManager.Quests.Contains(session.Quest)) return;
+        Campaign.Current.ConversationManager.RemoveRelatedLines(session.Quest);
     }
 }
 
@@ -32,7 +43,7 @@ internal class RevenueFarmingRemoveTrackingPatch
         => __instance is not Quest || __instance.IsTracked(trackedObject);
 }
 
-[HarmonyPatch(typeof(Quest), "OnFinalize")]
+[HarmonyPatch(typeof(Quest), nameof(Quest.OnFinalize))]
 internal class RevenueFarmingFinalizationMenuPatch
 {
     private static bool Prefix(Quest __instance) => ModInformation.IsClient &&
@@ -40,7 +51,7 @@ internal class RevenueFarmingFinalizationMenuPatch
         sessions.IsLocal(__instance);
 }
 
-[HarmonyPatch(typeof(GauntletQueryManager), "OnLateTick")]
+[HarmonyPatch(typeof(GauntletQueryManager), nameof(GauntletQueryManager.OnLateTick))]
 internal class RevenueFarmingPaymentInquiryCleanupPatch
 {
     private static void Prefix(object ____activeQueryData, ref Queue<Tuple<Type, object, bool, bool>> ____inquiryQueue)
