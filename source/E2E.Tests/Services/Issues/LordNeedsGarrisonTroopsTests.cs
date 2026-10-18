@@ -1,15 +1,19 @@
-﻿using Autofac;
+using Autofac;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.LordNeedsGarrisonTroops;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
 using System.Runtime.CompilerServices;
 using System.IO;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
@@ -22,14 +26,12 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
 {
     private const string IssueName = "LordNeedsGarrisonTroopsIssue";
     private readonly E2ETestEnvironment testEnvironment;
-    private readonly string giverId;
     private readonly string settlementId;
     private readonly string troopId;
 
     public LordNeedsGarrisonTroopsTests(ITestOutputHelper output)
     {
         testEnvironment = new E2ETestEnvironment(output);
-        giverId = testEnvironment.CreateRegisteredObject<Hero>();
         settlementId = testEnvironment.CreateRegisteredObject<Settlement>();
         troopId = testEnvironment.CreateRegisteredObject<CharacterObject>();
     }
@@ -57,7 +59,6 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
         {
             Assert.True(testEnvironment.Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
             Assert.True(testEnvironment.Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
-
             var issue = Uninitialized<Issue>();
             issue._settlement = settlement;
             issue._neededTroopType = troop;
@@ -66,15 +67,14 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
 
         testEnvironment.Clients.First().Call(() =>
         {
-            Assert.True(testEnvironment.Clients.First().ObjectManager.TryGetObject<Hero>(giverId, out var giver));
             Assert.True(testEnvironment.Clients.First().ObjectManager.TryGetObject<Settlement>(settlementId, out var expectedSettlement));
             Assert.True(testEnvironment.Clients.First().ObjectManager.TryGetObject<CharacterObject>(troopId, out var expectedTroop));
             Assert.True(testEnvironment.Clients.First().ObjectManager.TryGetId(expectedSettlement, out var expectedSettlementId));
             Assert.True(testEnvironment.Clients.First().ObjectManager.TryGetId(expectedTroop, out var expectedTroopObjectId));
 
-            // This assertion exercises the object-id based creation path without relying on local random picks.
             var strategy = (LordNeedsGarrisonTroopsCreationCaptureStrategy)Descriptor(testEnvironment.Clients.First()).CreationCaptureStrategy;
-            Assert.ThrowsAny<Exception>(() => strategy.CreateIssue(giver, Array.Empty<byte>()));
+            // This assertion exercises the object-id based creation path without relying on local random picks.
+            Assert.ThrowsAny<Exception>(() => strategy.CreateIssue(Hero.MainHero, Array.Empty<byte>()));
             using (var stream = new MemoryStream(captured))
             using (var reader = new BinaryReader(stream))
             {
@@ -92,6 +92,7 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
             var accepting = Uninitialized<Quest>();
             accepting._requestedTroopAmount = 17;
             accepting._rewardGold = 2345;
+            AccessTools.Field(typeof(QuestBase), nameof(QuestBase.RewardGold)).SetValue(accepting, 3456);
             accepting.QuestDueTime = CampaignTime.DaysFromNow(29f);
 
             var stale = Uninitialized<Quest>();
@@ -109,6 +110,7 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
 
             Assert.Equal(17, stale._requestedTroopAmount);
             Assert.Equal(2345, stale._rewardGold);
+            Assert.Equal(3456, stale.RewardGold);
             Assert.Equal(accepting.QuestDueTime, stale.QuestDueTime);
         });
     }
@@ -125,6 +127,50 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
             var strategy = (LordNeedsGarrisonTroopsFinalizationProofStrategy)Descriptor(testEnvironment.Server).FinalizationProofStrategy;
             Assert.False(strategy.TryRunBranch(quest, 0));
             Assert.True(strategy.TryRunBranch(quest, (byte)LordNeedsGarrisonTroopsBranch.TroopsDelivered));
+        });
+    }
+
+    [Fact]
+    public void DeliveryProofRunsVanillaHandInWhenTheOwnerCarriesTheTroops()
+    {
+        using var tracking = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.PlayerTransferredTroopsToGarrisonCommander)));
+        var partyId = testEnvironment.CreateRegisteredObject<MobileParty>();
+        var townId = testEnvironment.CreateRegisteredObject<Town>();
+
+
+        testEnvironment.Server.Call(() =>
+        {
+            Assert.True(testEnvironment.Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(testEnvironment.Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(testEnvironment.Server.ObjectManager.TryGetObject<Town>(townId, out var town));
+            Assert.True(testEnvironment.Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+
+            settlement.Town = town;
+            settlement.SetSettlementComponent(town);
+            GarrisonPartyComponent.CreateGarrisonParty("test-garrison", settlement);
+            party.CurrentSettlement = settlement;
+            party.MemberRoster.AddToCounts(troop, 5);
+
+            var quest = Uninitialized<Quest>();
+            quest._questState = QuestBase.QuestStates.Ongoing;
+            quest._settlement = settlement;
+            quest._requestedTroopType = troop;
+            quest._requestedTroopAmount = 5;
+            AccessTools.Field(typeof(QuestBase), "_questGiver").SetValue(quest, Hero.MainHero);
+            quest.QuestDueTime = CampaignTime.DaysFromNow(1f);
+
+            var previousMainParty = Campaign.Current.MainParty;
+            Campaign.Current.MainParty = party;
+            try
+            {
+                Assert.True(Descriptor(testEnvironment.Server).FinalizationProofStrategy.TryRunBranch(
+                    quest, (byte)LordNeedsGarrisonTroopsBranch.TroopsDelivered));
+                Assert.Equal(1, tracking.CountFor(testEnvironment.Server));
+            }
+            finally
+            {
+                Campaign.Current.MainParty = previousMainParty;
+            }
         });
     }
 

@@ -1,6 +1,8 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Interface;
+using HarmonyLib;
 using System;
 using System.IO;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using Quest = TaleWorlds.CampaignSystem.Issues.LordNeedsGarrisonTroopsIssueQuestBehavior.LordNeedsGarrisonTroopsIssueQuest;
@@ -9,6 +11,8 @@ namespace GameInterface.Services.Issues.Quests.LordNeedsGarrisonTroops;
 
 internal class LordNeedsGarrisonTroopsQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
 {
+    private static readonly FieldInfo RewardGoldField = AccessTools.Field(typeof(QuestBase), nameof(QuestBase.RewardGold));
+
     public byte[] Capture(IssueBase issue)
     {
         if (!(issue.IssueQuest is Quest quest))
@@ -21,6 +25,7 @@ internal class LordNeedsGarrisonTroopsQuestSolutionAcceptStrategy : IQuestSoluti
         {
             writer.Write(quest._requestedTroopAmount);
             writer.Write(quest._rewardGold);
+            writer.Write(quest.RewardGold);
             writer.Write(quest.QuestDueTime.NumTicks);
             writer.Flush();
             return stream.ToArray();
@@ -39,6 +44,7 @@ internal class LordNeedsGarrisonTroopsQuestSolutionAcceptStrategy : IQuestSoluti
         {
             quest._requestedTroopAmount = reader.ReadInt32();
             quest._rewardGold = reader.ReadInt32();
+            RewardGoldField.SetValue(quest, reader.ReadInt32());
             quest.QuestDueTime = new CampaignTime(reader.ReadInt64());
         }
     }

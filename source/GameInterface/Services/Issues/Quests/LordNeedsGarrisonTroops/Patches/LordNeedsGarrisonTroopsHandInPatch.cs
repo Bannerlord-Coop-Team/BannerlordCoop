@@ -1,5 +1,8 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+using Common;
+using GameInterface.Policies;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using Quest = TaleWorlds.CampaignSystem.Issues.LordNeedsGarrisonTroopsIssueQuestBehavior.LordNeedsGarrisonTroopsIssueQuest;
 
@@ -17,5 +20,18 @@ internal class LordNeedsGarrisonTroopsHandInPatch
         }
 
         return dispatcher.BeforeQuestBranch(__instance, (byte)LordNeedsGarrisonTroopsBranch.TroopsDelivered);
+    }
+}
+
+[HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess))]
+internal class LordNeedsGarrisonTroopsSuccessJournalPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(QuestBase __instance)
+    {
+        if (ModInformation.IsClient && CallOriginalPolicy.IsOriginalAllowed() && __instance is Quest quest)
+        {
+            quest.AddLog(quest.SuccessQuestLogText);
+        }
     }
 }

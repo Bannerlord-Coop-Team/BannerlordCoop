@@ -54,13 +54,6 @@ internal class LordNeedsGarrisonTroopsCreationCaptureStrategy : ICreationCapture
 
         foreach (var settlement in issueOwner.Clan.Settlements)
         {
-            var garrison = settlement.Town?.GarrisonParty;
-            var limit = settlement.IsCastle ? 120 : settlement.IsTown ? 150 : 0;
-            if (garrison == null || limit == 0 || garrison.MemberRoster.TotalHealthyCount >= limit)
-            {
-                continue;
-            }
-
             var issue = new Issue(issueOwner, settlement);
             if (!issue.IssueStayAliveConditions())
             {
