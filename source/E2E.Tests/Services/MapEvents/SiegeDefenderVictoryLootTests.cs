@@ -12,6 +12,7 @@ using GameInterface.Services.TroopRosters.Data;
 using HarmonyLib;
 using Helpers;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -35,6 +36,7 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
     private static int defenderVictoryPrompts;
     private static int lootPartyScreens;
     private static int lootInventoryScreens;
+    private static int capturedLordConversations;
 
     public SiegeDefenderVictoryLootTests(ITestOutputHelper output) : base(output) { }
 
@@ -121,6 +123,60 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
         }
 
         Assert.Empty(client.InternalMessages.GetMessages<PartyLeaveSettlementAttempted>());
+    }
+
+    [Fact]
+    public void DefenderVictory_CapturedLord_OpensTheConversationOnceBeforeLoot()
+    {
+        var (client, encounter, _) = StageDefenderVictory(insideTown: false);
+        var lordId = TestEnvironment.CreateRegisteredObject<Hero>();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(lordId, out var lord));
+            encounter.RosterToReceiveLootPrisoners.AddToCounts(lord.CharacterObject, 1);
+        }, MapEventDisabledMethods);
+
+        var harmony = PatchLootScreensAndPrompt();
+        try
+        {
+            client.Call(() =>
+            {
+                var states = Game.Current.GameStateManager;
+                var broker = client.Resolve<IMessageBroker>();
+                var conversations = Campaign.Current.ConversationManager;
+
+                // The conversation opens once and nothing else runs while it is in progress.
+                for (var i = 0; i < 3; i++)
+                    broker.Publish(this, new CampaignTick());
+                Assert.Equal(1, capturedLordConversations);
+                Assert.Equal(PlayerEncounterState.CaptureHeroes, encounter.EncounterState);
+                Assert.IsType<MapState>(states.ActiveState);
+                Assert.Equal(0, defenderVictoryPrompts);
+
+                // Ending it runs vanilla's one shot that drops the lord, then the loot screens and the prompt follow.
+                var endOneShot = AccessTools.Field(typeof(ConversationManager), "ConversationEndOneShot");
+                var onEnd = (Action)endOneShot.GetValue(conversations)!;
+                endOneShot.SetValue(conversations, null);
+                onEnd();
+                SetConversationInProgress(conversations, false);
+
+                broker.Publish(this, new CampaignTick());
+                Assert.IsType<PartyState>(states.ActiveState);
+                states._gameStates.RemoveAt(states._gameStates.Count - 1);
+                broker.Publish(this, new CampaignTick());
+                Assert.IsType<InventoryState>(states.ActiveState);
+                states._gameStates.RemoveAt(states._gameStates.Count - 1);
+                broker.Publish(this, new CampaignTick());
+
+                Assert.Null(PlayerEncounter.Current);
+                Assert.Equal(1, capturedLordConversations);
+                Assert.Equal(1, defenderVictoryPrompts);
+            }, MapEventDisabledMethods);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
     }
 
     [Fact]
@@ -267,7 +323,11 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
         defenderVictoryPrompts = 0;
         lootPartyScreens = 0;
         lootInventoryScreens = 0;
+        capturedLordConversations = 0;
         var harmony = new Harmony($"siege-defender-loot.{Guid.NewGuid()}");
+        // CampaignMapConversation.OpenConversation is small enough to be inlined, so stub one level down.
+        harmony.Patch(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)),
+            prefix: new HarmonyMethod(typeof(SiegeDefenderVictoryLootTests), nameof(OpenCapturedLordConversation)));
         harmony.Patch(AccessTools.Method(typeof(PartyScreenHelper), nameof(PartyScreenHelper.OpenScreenAsLoot)),
             prefix: new HarmonyMethod(typeof(SiegeDefenderVictoryLootTests), nameof(OpenLootPartyScreen)));
         harmony.Patch(AccessTools.Method(typeof(InventoryScreenHelper), nameof(InventoryScreenHelper.OpenScreenAsLoot)),
@@ -300,6 +360,17 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
         states._gameStates.Add(states.CreateState<InventoryState>());
         return false;
     }
+
+    private static bool OpenCapturedLordConversation(ConversationManager __instance)
+    {
+        capturedLordConversations++;
+        SetConversationInProgress(__instance, true);
+        return false;
+    }
+
+    private static void SetConversationInProgress(ConversationManager conversations, bool inProgress) =>
+        AccessTools.Property(typeof(ConversationManager), nameof(ConversationManager.IsConversationInProgress))
+            .SetValue(conversations, inProgress);
 
     private static bool CountDefenderVictoryPrompt()
     {

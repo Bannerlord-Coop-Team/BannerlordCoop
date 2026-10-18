@@ -16,20 +16,14 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.SiegeEvents.Handlers;
 
 /// <summary>
-/// Client-side deferred siege-defeated transition for a winning inside defender. On a defender assault victory
-/// the server replicates the SiegeEvent/MapEvent teardown, which bypasses vanilla's local siege-end routing, so
-/// the winner would otherwise fall through to the settlement arrival menu. The server sends
-/// <see cref="NetworkPromptSiegeDefenderVictory"/> after the finalize; this parks the transition and runs it on
-/// the next CampaignTick once the mission has fully popped, mirroring <see cref="SiegeCaptureTransitionRetryHandler"/>.
+/// Once the mission pops, plays a winning siege defender's staged loot flow, then opens the siege-defeated menu
+/// that the server's replicated teardown skips.
 /// </summary>
 internal class SiegeDefenderVictoryHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly ISiegeEventInterface siegeEventInterface;
-
-    // Game-thread only (armed inside a GameThread closure, drained on CampaignTick).
-    private Settlement pendingSettlement;
 
     public SiegeDefenderVictoryHandler(IMessageBroker messageBroker, IObjectManager objectManager, ISiegeEventInterface siegeEventInterface)
     {
@@ -53,21 +47,17 @@ internal class SiegeDefenderVictoryHandler : IHandler
             if (Array.IndexOf(obj.DefenderPartyIds ?? Array.Empty<string>(), localPartyId) < 0) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
 
-            pendingSettlement = settlement;
-            // Finishing the staged encounter must not take the defender out of this town.
             SiegeDefenderFinishPatch.PendingDefenderVictorySettlement = settlement;
         });
     }
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
-        if (ModInformation.IsServer || pendingSettlement == null) return;
+        var settlement = SiegeDefenderFinishPatch.PendingDefenderVictorySettlement;
+        if (ModInformation.IsServer || settlement == null) return;
         // The mission screen is still up (or popping): re-establishing PlayerEncounter now is unsafe. Wait.
         if (MissionState.Current != null) return;
-        // The battle results are still staged on this encounter. Vanilla shows the prisoner and loot screens and
-        // finishes the encounter before it ends the siege. The encounter menu only resumes it if it reopens while
-        // the destroyed event is still attached, so resume it here, like hideout results (HideoutResultUpdatePatch).
-        // PlayerEncounter.Update runs the same after battle flow and waits while a loot screen is open.
+        // The encounter menu only resumes the staged encounter while the destroyed event is still attached.
         if (HasStagedBattleResults(PlayerEncounter.Current))
         {
             // A capture conversation is still open; updating now would reopen it every tick.
@@ -76,8 +66,6 @@ internal class SiegeDefenderVictoryHandler : IHandler
             if (PlayerEncounter.Current != null) return;
         }
 
-        var settlement = pendingSettlement;
-        pendingSettlement = null;
         SiegeDefenderFinishPatch.PendingDefenderVictorySettlement = null;
         siegeEventInterface.PromptSiegeDefenderVictory(settlement);
     }
@@ -90,7 +78,6 @@ internal class SiegeDefenderVictoryHandler : IHandler
     {
         messageBroker.Unsubscribe<NetworkPromptSiegeDefenderVictory>(Handle_NetworkPromptSiegeDefenderVictory);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
-        pendingSettlement = null;
         SiegeDefenderFinishPatch.PendingDefenderVictorySettlement = null;
     }
 }

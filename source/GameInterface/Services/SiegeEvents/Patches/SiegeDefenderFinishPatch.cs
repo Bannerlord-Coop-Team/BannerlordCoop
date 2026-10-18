@@ -8,11 +8,7 @@ using TaleWorlds.Core;
 namespace GameInterface.Services.SiegeEvents.Patches;
 
 /// <summary>
-/// Keeps a winning inside siege defender in its town when the after battle flow finishes its encounter. That flow
-/// ends with <c>PlayerEncounter.Finish(true)</c>, which (after finalizing the battle) leaves the settlement the
-/// main party is in. On a client that leave goes to the server, which ejects the defender and closes the siege
-/// defeated menu. The server keeps the winner inside, and SiegeDefenderVictoryHandler seats it on
-/// siege_attacker_defeated once the encounter is finished.
+/// Keeps a winning inside siege defender in its town when the after battle flow finishes its encounter.
 /// </summary>
 [HarmonyPatch(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish))]
 internal static class SiegeDefenderFinishPatch
