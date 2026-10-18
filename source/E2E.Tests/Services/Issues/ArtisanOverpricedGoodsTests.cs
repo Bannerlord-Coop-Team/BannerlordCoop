@@ -12,7 +12,9 @@ using GameInterface.Services.Issues.Quests.ArtisanOverpricedGoods;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encyclopedia;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -344,6 +346,53 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Assert.Equal(1, menu.CountFor(ClientA));
         Assert.Equal(0, menu.CountFor(ClientB));
         Assert.Equal(0, menu.CountFor(Server));
+    }
+
+    [Fact]
+    public void LordStartResponse_LeavesTheMerchantForTheMenuAfterTheArtisanConversation()
+    {
+        using var menu = new MethodCallRecorder(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.BeforeGameMenuOpened)));
+        ClientA.Call(() => Campaign.Current.ConversationManager.IsConversationInProgress = true);
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        ClientA.Call(() => Campaign.Current.ConversationManager.IsConversationInProgress = false);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
+        ClientA.Call(() => Assert.True(Get<Hero>(ClientA, scenario.NotableId).Issue.IsSolvingWithLordSolution));
+        Assert.Equal(0, menu.CountFor(ClientA));
+    }
+
+    [Fact]
+    public void CounterOfferDecision_DoesNotReopenTheMerchantConversationBeforeTheServerReplies()
+    {
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        // The refusal leaves the owner's copy exactly as it is while a decision is in flight.
+        Server.Call(() => Get<Clan>(Server, clanId).Influence = 0);
+        environment.FlushCoalescer();
+        // CampaignMapConversation.OpenConversation is small enough to be inlined, so record one level down.
+        using var conversations = new MethodCallRecorder(
+            AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
+
+        ClientA.Call(() =>
+        {
+            var states = Game.Current.GameStateManager;
+            var map = states.CreateState<MapState>();
+            states._gameStates.Add(map);
+            try
+            {
+                var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+                issue.BeforeGameMenuOpened(null);
+                issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
+                Assert.True(issue.IsSolvingWithLordSolution);
+                issue.BeforeGameMenuOpened(null);
+            }
+            finally
+            {
+                states._gameStates.Remove(map);
+            }
+        });
+
+        Assert.Equal(1, conversations.CountFor(ClientA));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
     [Fact]

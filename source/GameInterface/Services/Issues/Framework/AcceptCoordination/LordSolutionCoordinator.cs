@@ -12,6 +12,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -20,6 +21,9 @@ namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 internal interface ILordSolutionCoordinator
 {
     bool Before(IssueBase issue, LordSolutionOperation operation);
+
+    /// <summary>The owner's counter-offer decision is waiting for the server, so the merchant must not ask again.</summary>
+    bool IsDecisionPending(IssueBase issue);
 }
 
 /// <summary>The server accepts a decree and applies its counter-offer as the owning player.</summary>
@@ -33,6 +37,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
     private readonly IPlayerManager players;
     private readonly IIssueAcceptPreconditions preconditions;
     private readonly IControllerIdProvider controller;
+    private readonly HashSet<IssueBase> pendingDecisions = new HashSet<IssueBase>();
 
     public LordSolutionCoordinator(IMessageBroker broker, INetwork network, IObjectManager objects,
         IIssueResolver resolver, IIssueOwnershipRegistry ownership, IPlayerManager players,
@@ -62,9 +67,13 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         if (objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId))
         {
             network.SendAll(new RequestLordSolution(giverId, issue.StringId, operation));
+            // Vanilla decides when the merchant conversation ends, then reopens the menu before the server replies.
+            if (operation != LordSolutionOperation.Start) pendingDecisions.Add(issue);
         }
         return false;
     }
+
+    public bool IsDecisionPending(IssueBase issue) => pendingDecisions.Contains(issue);
 
     private void HandleRequest(MessagePayload<RequestLordSolution> payload)
     {
@@ -155,8 +164,11 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
             }
             issue._issueDifficultyMultiplier = data.Difficulty;
             issue.IsTriedToSolveBefore = data.ControllerId == controller.ControllerId;
-            // The conversation's menu event may have passed while acceptance waited for the server.
-            if (data.ControllerId == controller.ControllerId) issue.BeforeGameMenuOpened(null);
+            pendingDecisions.Remove(issue);
+            // The conversation's menu event may have passed while acceptance waited for the server. While the
+            // artisan is still talking, the menu event after that conversation brings the merchant, as in vanilla.
+            if (data.ControllerId == controller.ControllerId && Campaign.Current.ConversationManager?.IsConversationInProgress != true)
+                issue.BeforeGameMenuOpened(null);
         }, context: nameof(LordSolutionCoordinator));
     }
 }
