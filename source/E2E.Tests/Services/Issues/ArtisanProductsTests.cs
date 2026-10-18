@@ -467,7 +467,7 @@ public class ArtisanProductsTests : IDisposable
     }
 
     [Fact]
-    public void FinalizedLordIssue_IsNotReturnedAsCounterOffer()
+    public void FinalizedLordIssue_DoesNotStartAnotherCounterOfferConversation()
     {
         Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution());
         Owner.Call(() =>
@@ -479,10 +479,35 @@ public class ArtisanProductsTests : IDisposable
             Assert.NotNull(lookup!.Invoke(new IssuesCampaignBehavior(), null));
             using (new AllowedThread()) issue.IssueFinalized();
 
+            var selectorType = AccessTools.TypeByName("GameInterface.Services.Issues.Quests.ArtisanProducts.Patches.ArtisanProductsCounterOfferPatch");
+            Assert.NotNull(selectorType);
+            var selector = AccessTools.Method(selectorType, "FindCounterOffer");
+            Assert.NotNull(selector);
+            Assert.Null(selector!.Invoke(null, null));
+
+            var conversationType = selectorType!.Assembly.GetType("GameInterface.Services.Issues.Quests.ArtisanProducts.Patches.ArtisanProductsCounterOfferConversationPatch");
+            Assert.True(conversationType != null, string.Join(";", selectorType!.Assembly.GetTypes().Where(type => type.Name.Contains("CounterOffer"))));
+            var prefix = AccessTools.Method(conversationType, "Prefix");
+            Assert.NotNull(prefix);
+            Assert.False((bool)prefix!.Invoke(null, null)!);
+
             var behavior = new IssuesCampaignBehavior();
-            var condition = AccessTools.Method(typeof(IssuesCampaignBehavior), "issue_counter_offer_2_condition");
-            Assert.NotNull(condition);
-            Assert.False((bool)condition!.Invoke(behavior, null)!);
+            foreach (var name in new[]
+            {
+                "issue_counter_offer_2_condition",
+                "issue_counter_offer_player_accept_condition",
+                "issue_counter_offer_player_reject_condition",
+                "issue_counter_offer_accepted_condition",
+                "issue_counter_offer_reject_condition",
+                "issue_counter_offer_accepted_consequence",
+                "issue_counter_offer_reject_consequence",
+            })
+            {
+                var method = AccessTools.Method(typeof(IssuesCampaignBehavior), name);
+                Assert.NotNull(method);
+                var result = method!.Invoke(behavior, null);
+                if (method.ReturnType == typeof(bool)) Assert.False((bool)result!);
+            }
         });
     }
 
