@@ -129,6 +129,10 @@ internal class MerchantOutlawsEventPatches
     [HarmonyPrefix]
     private static bool RaidedPrefix() => ModInformation.IsServer;
 
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnClanChangedKingdom))]
+    [HarmonyPrefix]
+    private static bool KingdomPrefix() => ModInformation.IsServer;
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventStarted))]
     [HarmonyPrefix]
     private static bool MapEventPrefix() => ModInformation.IsServer;

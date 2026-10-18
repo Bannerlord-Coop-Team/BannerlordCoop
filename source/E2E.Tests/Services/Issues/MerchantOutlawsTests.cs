@@ -496,6 +496,27 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Fact]
+    public void AKingdomChangeSeenOnTheOwnersClientLeavesTheQuestToTheServer()
+    {
+        Accept();
+        var ownerQuest = Quest(ClientA);
+        var enemyId = environment.CreateRegisteredObject<Kingdom>();
+        ClientA.Call(() =>
+        {
+            var clan = Get<Clan>(ClientA, playerClanId);
+            var enemy = Get<Kingdom>(ClientA, enemyId);
+            using (new AllowedThread())
+                clan._kingdom = enemy;
+            CampaignEventDispatcher.Instance.OnClanChangedKingdom(clan, null, enemy,
+                ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+        }, TextHelpers);
+
+        Assert.True(ownerQuest.IsOngoing);
+        Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    [Fact]
     public void CoercingTheGiversVillageFailsOnlyTheCoercingOwnersQuest()
     {
         Accept();
