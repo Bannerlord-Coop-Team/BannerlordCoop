@@ -15,6 +15,7 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
 internal interface IHeadmanHerdCleanup : IGameAbstraction
 {
     void Remember(IssueBase issue, MobileParty party);
+    void RemoveRemaining(Quest quest);
     void Finalize(IssueBase issue);
     void SyncData(IDataStore dataStore);
 }
@@ -27,7 +28,14 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
 
     public void Finalize(IssueBase issue)
     {
-        if (parties.TryGetValue(issue.StringId, out var party) && party != null && issue.IssueQuest is Quest quest && quest.IsOngoing)
+        if (issue.IssueQuest is Quest quest && quest.IsOngoing)
+            RemoveRemaining(quest);
+        parties.Remove(issue.StringId);
+    }
+
+    public void RemoveRemaining(Quest quest)
+    {
+        if (parties.TryGetValue(IssueManager.GetIssueOfQuest(quest)?.StringId ?? string.Empty, out var party) && party != null)
         {
             var remaining = quest._animalCountToDeliver;
             foreach (var element in party.ItemRoster.ToArray())
@@ -39,7 +47,6 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
                 if (remaining == 0) break;
             }
         }
-        parties.Remove(issue.StringId);
     }
 
     public void SyncData(IDataStore dataStore)
@@ -59,14 +66,3 @@ internal class HeadmanHerdCleanupSavePatch
     }
 }
 
-public sealed class HeadmanHerdCleanupSaveDefiner : SaveableTypeDefiner
-{
-    public HeadmanHerdCleanupSaveDefiner() : base(44_376_300)
-    {
-    }
-
-    public override void DefineContainerDefinitions()
-    {
-        ConstructContainerDefinition(typeof(Dictionary<string, MobileParty>));
-    }
-}

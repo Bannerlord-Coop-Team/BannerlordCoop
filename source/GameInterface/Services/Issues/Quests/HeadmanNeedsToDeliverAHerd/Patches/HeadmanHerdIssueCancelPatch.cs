@@ -2,11 +2,9 @@
 using GameInterface.Services.Issues.Framework.Interface;
 using Common;
 using GameInterface.Policies;
-using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Issues;
 using Issue = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssue;
-using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd.Patches;
 

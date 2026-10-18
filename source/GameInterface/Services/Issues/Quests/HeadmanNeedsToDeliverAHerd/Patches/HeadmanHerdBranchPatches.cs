@@ -39,6 +39,16 @@ internal class HeadmanHerdBranchPatches
     [HarmonyPrefix]
     private static bool TimeoutPrefix() => ModInformation.IsServer;
 
+    [HarmonyPatch(typeof(Quest), nameof(Quest.RemoveRemainingHorses))]
+    [HarmonyPrefix]
+    private static bool RemoveRemainingPrefix(Quest __instance)
+    {
+        if (ModInformation.IsClient) return true;
+        if (!ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var cleanup)) return true;
+        cleanup.RemoveRemaining(__instance);
+        return false;
+    }
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnCanceled))]
     [HarmonyPrefix]
     private static bool CanceledPrefix(Quest __instance)

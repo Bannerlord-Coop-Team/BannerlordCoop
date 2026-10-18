@@ -220,10 +220,14 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     [Theory]
     [InlineData(IssueOutcome.QuestCancel)]
     [InlineData(IssueOutcome.QuestTimeOut)]
-    public void CancelAndTimeout_RemoveTheRemainingHerdOnce(IssueOutcome outcome)
+    [InlineData(IssueOutcome.QuestCancel, true)]
+    [InlineData(IssueOutcome.QuestTimeOut, true)]
+    public void CancelAndTimeout_RemoveTheRemainingHerdOnce(IssueOutcome outcome, bool imprisoned = false)
     {
         Accept(ClientA);
         Server.Call(() => Party(Server, QuestScenario.ControllerA).ItemRoster.AddToCounts(Object<ItemObject>(Server, livestockId), -2));
+        if (imprisoned)
+            Server.Call(() => PlayerHero(Server, QuestScenario.ControllerA).ChangeState(Hero.CharacterStates.Prisoner));
         ClientA.Call(() =>
         {
             if (outcome == IssueOutcome.QuestCancel) accepted[ClientA].CompleteQuestWithCancel();

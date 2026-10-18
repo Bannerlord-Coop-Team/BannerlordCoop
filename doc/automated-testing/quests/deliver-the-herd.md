@@ -4,7 +4,7 @@ Live testing is pending. This port uses the framework from development at 7743a0
 
 ## Installed source
 
-The complete installed `HeadmanNeedsToDeliverAHerdIssueBehavior`, `IssueBase`, `QuestBase`, `IssueManager`, `QuestManager` and `QuestHelper` were decompiled into `artifacts/3763-framework/` for this port. Owning assembly: `TaleWorlds.CampaignSystem.dll`, SHA-256 `1F8E33E2ED73E6EC653D7629180AFB70649DDC6E5BD1657A802A264EFDA1C3AE`, file version `1.0.0.0`. Installed Native module version: `v1.4.8`.
+The port was checked against the installed `HeadmanNeedsToDeliverAHerdIssueBehavior`, `IssueBase`, `QuestBase`, `IssueManager`, `QuestManager` and `QuestHelper`. Owning assembly: `TaleWorlds.CampaignSystem.dll`, SHA-256 `1F8E33E2ED73E6EC653D7629180AFB70649DDC6E5BD1657A802A264EFDA1C3AE`, file version `1.0.0.0`. Installed Native module version: `v1.4.8`.
 
 ## Live flows to run
 
@@ -28,7 +28,7 @@ Use independent issues for mutually exclusive endings. Record exact giver, recip
 | Force supplies or recruits at giver's village | `Quest.OnMapEventStarted`, `QuestHelper.CheckMinorMajorCoercion` | Only the attacking owner's quest fails; normal failure effects plus vanilla coercion relation/power penalties | Owner's quest ends; other player's state stays unchanged |
 | Companion selection, picker cancellation and invalid troops | `IssueBase.StartIssueWithAlternativeSolution`, framework troop validator | Accepts valid companion with tier-2-or-better troops, or refuses and returns selection through framework | Owner alone gets companion journal; no personal herd is granted |
 | Companion completion, wounds/XP/reward and troop return | `IssueBase.CompleteIssueWithAlternativeSolution`, `AlternativeSolutionEndWithSuccess` | Server rolls and completes once as owner; pays owner, giver power +5, relation +5, hearth +50; returns companion and troops | Both see returned troops and owner gold; bystander gets no personal journal or reward |
-| Save/reload and owner disconnect/reconnect | Framework ownership save and active-issue dismissal | The framework cancels personal quests on disconnect or server restart; remaining quest animals are removed once | Reconnecting does not revive or grant the canceled herd; bystander remains unaffected |
+| Save/reload and owner disconnect/reconnect | The framework cancels personal quests on disconnect or server restart; the herd's original-party cleanup map is saved and remaining quest animals are removed once | Reconnecting does not revive or grant the canceled herd; bystander remains unaffected |
 | Character replacement or player removal | Framework lifecycle plus quest cancellation | Confirm old quest cleanup uses its original owner's inventory | No retained herd quest from replaced character and no bystander cleanup |
 
 ## Source limits and shared framework behavior
