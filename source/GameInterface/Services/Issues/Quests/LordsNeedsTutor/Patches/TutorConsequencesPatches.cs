@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
@@ -44,12 +45,23 @@ internal class TutorConsequencesPatches
 
     [HarmonyPatch(nameof(Quest.OnFinalize))]
     [HarmonyPrefix]
-    private static bool FinalizePrefix(Quest __instance)
+    private static bool FinalizePrefix(Quest __instance, out IDisposable __state)
     {
+        __state = null;
         if (ModInformation.IsClient) return false;
         if (ContainerProvider.TryResolve<ITutorJournal>(out var journal)) journal.Send(__instance);
-        return __instance._startQuestLog != null;
+        if (__instance._startQuestLog == null) return false;
+        // Vanilla cancels a dead giver's quest outside any owner scope, but the pupil cleanup checks the owner's clan.
+        var issue = IssueManager.GetIssueOfQuest(__instance);
+        if (issue != null && ContainerProvider.TryResolve<IIssueOwnerResolver>(out var resolver) &&
+            resolver.TryResolveOwnerHero(issue, out var owner) && owner != Hero.MainHero)
+            __state = new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo);
+        return true;
     }
+
+    [HarmonyPatch(nameof(Quest.OnFinalize))]
+    [HarmonyFinalizer]
+    private static void FinalizeFinalizer(IDisposable __state) => __state?.Dispose();
 
     [HarmonyPatch(nameof(Quest.OnTimedOut))]
     [HarmonyPrefix]

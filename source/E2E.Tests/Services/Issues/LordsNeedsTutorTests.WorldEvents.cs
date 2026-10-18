@@ -50,7 +50,9 @@ public sealed partial class LordsNeedsTutorTests
         return second;
     }
 
-    private void KillPupil()
+    private void KillPupil() => Kill(pupilId);
+
+    private void Kill(string heroId)
     {
         var method = AccessTools.Method(typeof(Hero), nameof(Hero.ChangeState));
         var shim = Assert.Single(Harmony.GetPatchInfo(method).Prefixes, patch => patch.owner == "Coop.Testing");
@@ -58,13 +60,46 @@ public sealed partial class LordsNeedsTutorTests
         bootstrap.Unpatch(method, shim.PatchMethod);
         try
         {
-            Server.Call(() => KillCharacterAction.ApplyByMurder(Get<Hero>(Server, pupilId), showNotification: false));
+            Server.Call(() => KillCharacterAction.ApplyByMurder(Get<Hero>(Server, heroId), showNotification: false));
         }
         finally
         {
             bootstrap.Patch(method, prefix: new HarmonyMethod(shim.PatchMethod));
         }
-        Server.Call(() => Assert.False(Get<Hero>(Server, pupilId).IsAlive));
+        Server.Call(() => Assert.False(Get<Hero>(Server, heroId).IsAlive));
+    }
+
+    [Fact]
+    public void GiverDeathCancelsOnlyItsQuestAndReturnsThePupil()
+    {
+        Accept();
+        var second = AcceptObserversQuest();
+        // A clan leader's death can make the pupil the new leader, which is the separate leader flow.
+        var leaderId = environment.CreateRegisteredObject<Hero>();
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    var giver = Get<Hero>(instance, giverId);
+                    var leader = Get<Hero>(instance, leaderId);
+                    leader.Clan = giver.Clan;
+                    giver.Clan.SetLeader(leader);
+                }
+            });
+        Kill(giverId);
+        environment.FlushCoalescer();
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                var pupil = Get<Hero>(instance, pupilId);
+                Assert.Null(Get<Hero>(instance, giverId).Issue);
+                Assert.Null(pupil.CompanionOf);
+                Assert.Equal(0, Get<MobileParty>(instance, partyIds[0]).MemberRoster.GetTroopCount(pupil.CharacterObject));
+                foreach (var skill in Skills.All) Assert.Equal(originalFocus[skill.StringId], pupil.HeroDeveloper.GetFocus(skill));
+                Assert.True(second.QuestOf(Server).IsOngoing);
+            });
     }
 
     [Theory]

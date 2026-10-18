@@ -34,6 +34,7 @@ For every row retain server and both clients' before/after pupil clan, companion
 | `OnFinalize` | Success, timeout, fail and cancellation cleanup | Living pupil leaves companion/party, original clan restored unless marriage requires retaining it; focus bonuses removed once. Spouse/children follow the pupil's final clan where vanilla requires. |
 | `OnTimedOut`, `QuestManager.HourlyTick` | Before/equal/after due time; free map vs settlement/encounter/battle | Strictly past deadline ends the quest, -10 giver relation, failure journal; map farewell only in a safe owner map state. Server never opens a conversation. |
 | `OnHeroKilled` | Pupil dies | Fail journal, -40 giver relation, no gift; no dereference of the dead developer during cleanup. |
+| `IssueManager.OnHeroKilled` | Giver who is not the clan leader dies in battle or is executed from a party screen by either player | Owner's quest is cancelled with the giver-death journal line; pupil leaves the owner's clan and party and focus bonuses are removed; the other player's quest continues. |
 | `OnCompanionRemoved` | Pupil dismissed | Fail journal and cleanup once; unrelated companion removal leaves it running. |
 | `OnClanLeaderChanged` | Pupil becomes a clan leader | Failure journal and cleanup. |
 | `OnHeroesMarried` | Owner marries pupil; unrelated marriage | Owner marriage cancels while preserving marriage clan membership; unrelated marriage does not cancel. |
