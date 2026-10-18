@@ -366,19 +366,23 @@ public class VillageNeedsToolsTests : IDisposable
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
 
+        TestEnvironment.FlushCoalescer();
         foreach (var instance in Instances)
         {
             instance.Call(() =>
             {
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
                 Assert.Null(notable.Issue);
+                // The server's hearth and giver power rewards reach every machine
+                Assert.True(settlement.Village.Hearth == (exchange ? 690f : 670f), $"{Describe(instance)} hearth was {settlement.Village.Hearth}");
+                Assert.True(notable.Power == 10f, $"{Describe(instance)} power was {notable.Power}");
             });
         }
 
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(otherHeroId, out var otherHero));
 
@@ -386,7 +390,6 @@ public class VillageNeedsToolsTests : IDisposable
             Assert.Equal(otherGoldBefore, otherHero.Gold);
             Assert.Equal(0, ownerParty.ItemRoster.GetItemNumber(DefaultItems.Tools));
             Assert.Equal(exchange ? 12 : 0, ownerParty.ItemRoster.GetItemNumber(DefaultItems.Grain));
-            Assert.Equal(exchange ? 690f : 670f, settlement.Village.Hearth);
             Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out _));
         });
 
@@ -419,8 +422,8 @@ public class VillageNeedsToolsTests : IDisposable
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
                 Assert.Null(notable.Issue);
                 // Only the server's -30 is applied
-                Assert.True(settlement.Village.Hearth == 620f,
-                    $"{(instance == Server ? "server" : instance == ClientA ? "owner" : "observer")} hearth was {settlement.Village.Hearth}");
+                Assert.True(settlement.Village.Hearth == 620f, $"{Describe(instance)} hearth was {settlement.Village.Hearth}");
+                Assert.True(notable.Power == -10f, $"{Describe(instance)} power was {notable.Power}");
             });
         }
     }
@@ -603,12 +606,16 @@ public class VillageNeedsToolsTests : IDisposable
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(outcome, finalized.Outcome);
 
+        TestEnvironment.FlushCoalescer();
         foreach (var instance in Instances)
         {
             instance.Call(() =>
             {
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
                 Assert.Null(notable.Issue);
+                // A failure costs the giver power once, on every machine
+                var power = outcome == IssueOutcome.QuestFail ? -10f : 0f;
+                Assert.True(notable.Power == power, $"{Describe(instance)} power was {notable.Power}");
             });
         }
     }
@@ -768,6 +775,11 @@ public class VillageNeedsToolsTests : IDisposable
         });
 
         return controllerId;
+    }
+
+    private string Describe(EnvironmentInstance instance)
+    {
+        return instance == Server ? "server" : instance == ClientA ? "owner" : "observer";
     }
 
     private IQuestTypeDescriptor Descriptor(EnvironmentInstance instance)
