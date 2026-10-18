@@ -80,7 +80,7 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
     public void InsufficientTroops_RejectsWithoutSacrifice(int available)
     {
         var troop = AddRegularTroops(available);
-        action.Setup(service => service.GetRequiredCasualties(party)).Returns(5);
+        action.Setup(service => service.GetRequiredCasualties(party, false)).Returns(5);
 
         Send("insufficient");
 
@@ -102,7 +102,7 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
         Assert.Equal(3, Results().Length);
         Assert.All(Results(), result => Assert.True(result.Approved));
         Assert.Equal(0, party.MemberRoster.TotalRegulars);
-        action.Verify(service => service.GetRequiredCasualties(party), Times.Once);
+        action.Verify(service => service.GetRequiredCasualties(party, false), Times.Once);
         action.Verify(service => service.ApplySacrifice(party, 5, out It.Ref<int>.IsAny), Times.Once);
     }
 
@@ -121,7 +121,7 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
 
         Assert.Equal(new[] { false, true, true }, Results().Select(result => result.Approved));
         Assert.Equal(0, party.MemberRoster.TotalRegulars);
-        action.Verify(service => service.GetRequiredCasualties(party), Times.Exactly(2));
+        action.Verify(service => service.GetRequiredCasualties(party, false), Times.Exactly(2));
         action.Verify(service => service.ApplySacrifice(party, 5, out It.Ref<int>.IsAny), Times.Once);
     }
 
@@ -136,7 +136,7 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
 
     private void SetRequiredSacrifice(CharacterObject troop, int losses)
     {
-        action.Setup(service => service.GetRequiredCasualties(party)).Returns(losses);
+        action.Setup(service => service.GetRequiredCasualties(party, false)).Returns(losses);
         action.Setup(service => service.ApplySacrifice(party, losses, out It.Ref<int>.IsAny))
             .Returns((MobileParty current, int required, out int armyLosses) =>
             {
@@ -167,6 +167,33 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
         GameThread.Run(() => broker.Publish(this, new SettlementEncounterLeaveApplied(party, settlement)), blocking: true);
         GameThread.Run(() => broker.Publish(this, new SettlementEncounterLeaveApplied(party, settlement)), blocking: true);
         action.Verify(service => service.ProtectAfterLeave(party, settlement), Times.Once);
+    }
+
+    [Fact]
+    public void PortBreakOut_AppliesPortLossesWithoutGateProtection()
+    {
+        var troop = AddRegularTroops(10);
+        action.Setup(service => service.GetRequiredCasualties(party, true)).Returns(3);
+        action.Setup(service => service.ApplySacrifice(party, 3, out It.Ref<int>.IsAny))
+            .Returns((MobileParty current, int required, out int armyLosses) =>
+            {
+                armyLosses = -1;
+                current.MemberRoster.AddToCounts(troop, -required);
+                var casualties = TroopRoster.CreateDummyTroopRoster();
+                casualties.AddToCounts(troop, required);
+                return casualties;
+            });
+
+        broker.Publish(peer, new NetworkRequestBreakOut("port", 1, 2, 3, true));
+        GameThread.Run(() => { }, blocking: true);
+        AccessTools.Field(typeof(SiegeEvent), nameof(SiegeEvent.BesiegedSettlement)).SetValue(siege, settlement);
+        AccessTools.Field(typeof(MobileParty), "_currentSettlement").SetValue(party, null);
+        GameThread.Run(() => broker.Publish(this, new SettlementEncounterLeaveApplied(party, settlement)), blocking: true);
+
+        Assert.True(Assert.Single(Results()).Approved);
+        Assert.Equal(7, party.MemberRoster.TotalRegulars);
+        action.Verify(service => service.GetRequiredCasualties(party, false), Times.Never);
+        action.Verify(service => service.ProtectAfterLeave(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
     }
 
     [Fact]
@@ -234,7 +261,7 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
 
     private void Send(string requestId)
     {
-        broker.Publish(peer, new NetworkRequestBreakOut(requestId, 1, 2, 3));
+        broker.Publish(peer, new NetworkRequestBreakOut(requestId, 1, 2, 3, false));
         GameThread.Run(() => { }, blocking: true);
     }
 

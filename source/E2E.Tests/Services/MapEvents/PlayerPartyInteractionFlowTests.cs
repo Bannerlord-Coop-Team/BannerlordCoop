@@ -2993,6 +2993,119 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void BreakIn_ServerAppliesTroopLossesSoClientAndServerTotalsMatch()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+        PrepareClientSiegeEncounter(
+            client,
+            playerPartyId,
+            siege.SettlementId,
+            enterSettlement: false);
+        var troops = AddRegularTroops(playerMobilePartyId, 200);
+        Server.Call(() => Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(40));
+
+        client.Call(() => InvokeMenuConsequence("break_in_menu_accept_on_consequence"), MapEventDisabledMethods);
+
+        AssertRegularTroops(playerMobilePartyId, troops - 40);
+        client.Call(() =>
+        {
+            var behavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
+            Assert.Equal(40, behavior._breakInOutCasualties.TotalManCount);
+        });
+    }
+
+    [Fact]
+    public void PortBreakOut_ServerAppliesTroopLossesSoClientAndServerTotalsMatch()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareClientSiegeEncounter(client, playerPartyId, siege.SettlementId);
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(siege.SettlementId, out var settlement));
+                using (new AllowedThread())
+                    party._currentSettlement = settlement;
+            });
+        }
+        var troops = AddRegularTroops(playerMobilePartyId, 200);
+        Server.Call(() => Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(30));
+
+        client.Call(() =>
+        {
+            Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>()._isBreakingOutFromPort = true;
+            InvokeMenuConsequence("break_out_menu_accept_on_consequence");
+        }, MapEventDisabledMethods);
+
+        AssertRegularTroops(playerMobilePartyId, troops - 30);
+        client.Call(() =>
+        {
+            var behavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
+            Assert.Equal(30, behavior._breakInOutCasualties.TotalManCount);
+            Assert.True(behavior._isBreakingOutFromPort);
+        });
+    }
+
+    private sealed class FixedTroopSacrificeModel : DefaultTroopSacrificeModel
+    {
+        private readonly int losses;
+
+        public FixedTroopSacrificeModel(int losses) => this.losses = losses;
+
+        public override ExplainedNumber GetLostTroopCountForBreakingInBesiegedSettlement(MobileParty party, SiegeEvent siegeEvent) =>
+            new ExplainedNumber(losses);
+
+        public override ExplainedNumber GetLostTroopCountForBreakingOutOfBesiegedSettlement(MobileParty party, SiegeEvent siegeEvent, bool isBreakingOutFromPort) =>
+            new ExplainedNumber(isBreakingOutFromPort ? losses : 0);
+    }
+
+    private static void InvokeMenuConsequence(string methodName)
+    {
+        var method = AccessTools.Method(typeof(EncounterGameMenuBehavior), methodName);
+        Assert.NotNull(method);
+        method.Invoke(Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>(), new object?[] { null });
+    }
+
+    private int AddRegularTroops(string mobilePartyId, int count)
+    {
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var total = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            party.MemberRoster.AddToCounts(troop, count);
+            total = party.MemberRoster.TotalRegulars;
+        });
+        TestEnvironment.FlushCoalescer();
+        AssertRegularTroops(mobilePartyId, total);
+        return total;
+    }
+
+    private void AssertRegularTroops(string mobilePartyId, int expected)
+    {
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+                Assert.Equal(expected, party.MemberRoster.TotalRegulars);
+            });
+        }
+    }
+
+    [Fact]
     public void BreakInContinuation_PendingRequestSuppressesDuplicateAttempt()
     {
         var (client, _, playerPartyId, _) = CreateTwoPlayerParties();

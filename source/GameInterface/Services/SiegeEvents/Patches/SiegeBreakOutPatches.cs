@@ -4,6 +4,7 @@ using GameInterface.Services.SiegeEvents.Messages;
 using HarmonyLib;
 using Helpers;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
@@ -17,8 +18,17 @@ internal class SiegeBreakOutPatches
     [HarmonyPrefix]
     private static bool AcceptPrefix(EncounterGameMenuBehavior __instance)
     {
-        if (ModInformation.IsServer || __instance._isBreakingOutFromPort) return true;
-        MessageBroker.Instance.Publish(null, new BreakOutAttempted(MobileParty.MainParty));
+        if (ModInformation.IsServer) return true;
+        MessageBroker.Instance.Publish(null, new BreakOutAttempted(MobileParty.MainParty, __instance._isBreakingOutFromPort));
+        return false;
+    }
+
+    [HarmonyPatch(typeof(EncounterGameMenuBehavior), "break_in_menu_accept_on_consequence")]
+    [HarmonyPrefix]
+    private static bool BreakInAcceptPrefix()
+    {
+        if (ModInformation.IsServer) return true;
+        MessageBroker.Instance.Publish(null, new BreakInAttempted(MobileParty.MainParty, PlayerEncounter.EncounterSettlement));
         return false;
     }
 

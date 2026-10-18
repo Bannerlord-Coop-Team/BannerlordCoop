@@ -54,7 +54,7 @@ internal class ClientSiegeBreakOutHandler : IHandler
 
     private void HandleAttempt(MessagePayload<BreakOutAttempted> payload)
     {
-        if (pending != null && pending.IsCurrent())
+        if (pending != null && pending.IsCurrent() && pending.Request.IsFromPort == payload.What.IsFromPort)
         {
             network.SendAll(pending.Request);
             return;
@@ -70,7 +70,7 @@ internal class ClientSiegeBreakOutHandler : IHandler
 
         pending = new Pending
         {
-            Request = new NetworkRequestBreakOut(Guid.NewGuid().ToString(), partyId, settlementId, siegeId),
+            Request = new NetworkRequestBreakOut(Guid.NewGuid().ToString(), partyId, settlementId, siegeId, payload.What.IsFromPort),
             Party = party,
             Settlement = settlement,
             Siege = siege,
@@ -101,7 +101,7 @@ internal class ClientSiegeBreakOutHandler : IHandler
                 if (!objectManager.TryGetObjectWithLogging<CharacterObject>(result.CharacterIds[index], out var character)) return;
                 casualties.AddToCounts(character, result.Counts[index]);
             }
-            breakOut.ShowDebrief(casualties, result.ArmyCasualties);
+            breakOut.ShowDebrief(casualties, result.ArmyCasualties, attempt.Request.IsFromPort);
         }, context: nameof(NetworkBreakOutResult));
     }
 

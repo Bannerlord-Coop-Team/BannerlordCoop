@@ -35,6 +35,7 @@ internal class ServerSiegeBreakOutHandler : IHandler
     private sealed class Receipt
     {
         public SiegeEvent Siege;
+        public bool IsFromPort;
         public NetworkBreakOutResult Result;
     }
 
@@ -80,7 +81,7 @@ internal class ServerSiegeBreakOutHandler : IHandler
                     try
                     {
                         var parties = party.Army?.LeaderParty == party ? party.Army.Parties.ToArray() : new[] { party };
-                        int losses = breakOut.GetRequiredCasualties(party);
+                        int losses = breakOut.GetRequiredCasualties(party, request.IsFromPort);
                         if (losses > parties.Sum(member => member.MemberRoster.TotalRegulars))
                         {
                             network.Send(peer, result);
@@ -95,7 +96,7 @@ internal class ServerSiegeBreakOutHandler : IHandler
                                     throw new InvalidOperationException("Breakout troop is not registered");
                         }
                         // Cache only once mutation can begin; affordability and registrations may recover on retry.
-                        receipt = new Receipt { Siege = siege, Result = result };
+                        receipt = new Receipt { Siege = siege, IsFromPort = request.IsFromPort, Result = result };
                         receipts[party] = receipt;
                         var casualties = breakOut.ApplySacrifice(party, losses, out var armyCasualties);
                         var elements = casualties.GetTroopRoster();
@@ -132,7 +133,8 @@ internal class ServerSiegeBreakOutHandler : IHandler
         var party = payload.What.Party;
         if (!receipts.TryGetValue(party, out var receipt)) return;
         receipts.Remove(party);
-        if (!receipt.Result.Approved || party.CurrentSettlement != null ||
+        // A port break out sails away from the port, so it keeps the position vanilla gives it.
+        if (!receipt.Result.Approved || receipt.IsFromPort || party.CurrentSettlement != null ||
             payload.What.Settlement != receipt.Siege.BesiegedSettlement) return;
 
         breakOut.ProtectAfterLeave(party, payload.What.Settlement);
