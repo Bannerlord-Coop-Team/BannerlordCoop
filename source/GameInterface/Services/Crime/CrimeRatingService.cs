@@ -44,30 +44,23 @@ internal class CrimeRatingService : ICrimeRatingService
 
     private Hero CurrentHero => ModInformation.IsServer ? ResolvedMainHeroContext.ResolvedMainHero : Hero.MainHero;
 
-    private bool TryGetPlayer(Hero hero, out Player player)
-    {
-        player = null;
-        return hero != null && PlayerManager.TryGetControlledObjectInfo(hero, out var control)
-            && players.TryGetPlayer(control.ObjectControllerId, out player);
-    }
-
     public float Get(IFaction faction)
     {
-        return TryGetPlayer(CurrentHero, out var player) && objects.TryGetId(faction, out var id)
+        return players.TryGetPlayer(CurrentHero, out var player) && objects.TryGetId(faction, out var id)
             && player.CrimeRatings.TryGetValue(id, out var rating) ? rating : 0f;
     }
 
     public void Set(IFaction faction, float value)
     {
         if (!ModInformation.IsServer || float.IsNaN(value) || float.IsInfinity(value)) return;
-        if (!TryGetPlayer(CurrentHero, out var player) || !objects.TryGetIdWithLogging(faction, out var id)) return;
+        if (!players.TryGetPlayer(CurrentHero, out var player) || !objects.TryGetIdWithLogging(faction, out var id)) return;
         player.CrimeRatings[id] = value;
         network.SendAll(new NetworkCrimeRatingChanged(player.ControllerId, player.HeroId, id, value));
     }
 
     public void Apply(Hero hero, IFaction faction, float delta, bool showNotification)
     {
-        if (!ModInformation.IsServer || faction == null || !TryGetPlayer(hero, out _)
+        if (!ModInformation.IsServer || faction == null || !players.TryGetPlayer(hero, out _)
             || float.IsNaN(delta) || float.IsInfinity(delta)) return;
         using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
             ChangeCrimeRatingAction.Apply(faction, delta, showNotification);
@@ -75,7 +68,7 @@ internal class CrimeRatingService : ICrimeRatingService
 
     public void Notify(IFaction faction, float previousRating)
     {
-        if (!ModInformation.IsServer || !TryGetPlayer(CurrentHero, out var player)
+        if (!ModInformation.IsServer || !players.TryGetPlayer(CurrentHero, out var player)
             || !objects.TryGetIdWithLogging(faction, out var id)) return;
         var rating = Get(faction);
         network.SendAll(new NetworkCrimeRatingNotification(player.ControllerId, player.HeroId, id, rating, rating - previousRating));
@@ -99,7 +92,7 @@ internal class CrimeRatingService : ICrimeRatingService
 
     public bool Pay(Hero hero, Settlement settlement, CrimeModel.PaymentMethod method)
     {
-        if (!ModInformation.IsServer || !TryGetPlayer(hero, out _) || !hero.IsAlive || hero.IsPrisoner
+        if (!ModInformation.IsServer || !players.TryGetPlayer(hero, out _) || !hero.IsAlive || hero.IsPrisoner
             || hero.PartyBelongedTo == null || settlement == null || !settlement.IsFortification
             || hero.PartyBelongedTo.CurrentSettlement != settlement || hero.PartyBelongedTo.MapEvent != null)
             return false;
@@ -166,7 +159,7 @@ internal class CrimeRatingService : ICrimeRatingService
 
     public void HeroDied(Hero hero)
     {
-        if (!TryGetPlayer(hero, out _)) return;
+        if (!players.TryGetPlayer(hero, out _)) return;
         using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
             foreach (var faction in Factions) Set(faction, 0f);
     }
