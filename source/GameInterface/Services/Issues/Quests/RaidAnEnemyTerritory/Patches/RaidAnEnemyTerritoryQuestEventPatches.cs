@@ -4,6 +4,7 @@ using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Settlements;
 using Quest = TaleWorlds.CampaignSystem.Issues.RaidAnEnemyTerritoryIssueBehavior.RaidAnEnemyTerritoryQuest;
 
@@ -12,11 +13,22 @@ namespace GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory.Patches;
 [HarmonyPatch]
 internal sealed class RaidAnEnemyTerritoryQuestEventPatches
 {
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
-    [HarmonyPostfix]
-    private static void OnHeroKilledPostfix(object[] __args) =>
-        RunAsOwners(quest => quest.OnHeroKilled(
-            (Hero)__args[0], (Hero)__args[1], (KillCharacterAction.KillCharacterActionDetail)__args[2], (bool)__args[3]));
+    [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
+    [HarmonyPrefix]
+    private static bool IssueManagerOnHeroKilledPrefix(
+        Hero victim,
+        Hero killer,
+        KillCharacterAction.KillCharacterActionDetail detail,
+        bool showNotification = true)
+    {
+        if (ModInformation.IsClient || victim?.Issue?.IssueQuest is not Quest)
+        {
+            return true;
+        }
+
+        RunAsOwners(quest => quest.OnHeroKilled(victim, killer, detail, showNotification));
+        return false;
+    }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementOwnerChanged))]
     [HarmonyPostfix]
@@ -46,7 +58,17 @@ internal sealed class RaidAnEnemyTerritoryQuestEventPatches
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.DailyTick))]
     [HarmonyPostfix]
-    private static void DailyTickPostfix() => RunAsOwners(quest => quest.DailyTick());
+    private static void DailyTickPostfix()
+    {
+        RunAsOwners(quest =>
+        {
+            quest.DailyTick();
+            if (quest.IsOngoing && quest.QuestDueTime.IsPast)
+            {
+                quest.CompleteQuestWithTimeOut();
+            }
+        });
+    }
 
     [HarmonyPatch(typeof(Quest), "OnHeroKilled")]
     [HarmonyPrefix]
