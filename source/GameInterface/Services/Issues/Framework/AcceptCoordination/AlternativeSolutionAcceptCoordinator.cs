@@ -206,7 +206,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             {
                 issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
                 ApplyState(issue, data.State);
-                AddReturnDaysLog(issue);
+                AddPlaceholderLog(issue);
                 return;
             }
 
@@ -246,23 +246,20 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         }, context: nameof(AlternativeSolutionAcceptCoordinator));
     }
 
-    // Vanilla's daily tick advances the first journal entry of every issue solved by an alternative, which only
-    // the start adds. It has no text and skips the log event, so the accept is not shown to a player who does not own the issue.
-    private static void AddReturnDaysLog(IssueBase issue)
+    // Vanilla's daily tick reads the first log entry, which only the starting machine has
+    private static void AddPlaceholderLog(IssueBase issue)
     {
         if (issue.JournalEntries.Count > 0)
         {
             return;
         }
 
-        var returnDays = new JournalLog(
+        issue._journalEntries.Add(new JournalLog(
             CampaignTime.Now,
-            TextObject.GetEmpty(),
+            new TextObject(string.Empty),
             new TextObject("{=VFO7rMzK}Return Days"),
             0,
-            issue.AlternativeSolutionBaseDurationInDaysInternal);
-
-        issue._journalEntries.Add(returnDays);
+            issue.AlternativeSolutionBaseDurationInDaysInternal));
     }
 
     private static AlternativeSolutionVanillaState CaptureState(IssueBase issue)

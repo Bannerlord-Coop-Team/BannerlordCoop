@@ -59,6 +59,8 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         AccessTools.PropertyGetter(typeof(Issue), nameof(Issue.AlternativeSolutionStartLog)),
         AccessTools.PropertyGetter(typeof(Issue), nameof(Issue.IssueAlternativeSolutionSuccessLog)),
         AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)),
+        // Development patches the alternative solution end, so Harmony inlines SetCharacterProperties into it
+        AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.GetCharacterProperties)),
     };
 
     private readonly string notableId;
@@ -543,11 +545,18 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
 
             switch (listener)
             {
+                // War and kingdom changes reach a client as replays, where the framework drops any ending they cause
                 case "war":
-                    quest.OnWarDeclared(kingdom, playerClan, DeclareWarAction.DeclareWarDetail.CausedByRebellion);
+                    using (new AllowedThread())
+                    {
+                        quest.OnWarDeclared(kingdom, playerClan, DeclareWarAction.DeclareWarDetail.CausedByRebellion);
+                    }
                     break;
                 case "kingdom":
-                    quest.OnClanChangedKingdom(playerClan, null, null, ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+                    using (new AllowedThread())
+                    {
+                        quest.OnClanChangedKingdom(playerClan, null, null, ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+                    }
                     break;
                 case "raid":
                     var raid = (RaidEventComponent)RuntimeHelpers.GetUninitializedObject(typeof(RaidEventComponent));
