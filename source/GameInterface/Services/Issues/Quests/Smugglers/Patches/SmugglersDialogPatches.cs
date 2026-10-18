@@ -1,4 +1,7 @@
-﻿using HarmonyLib;
+﻿using Common.Logging;
+using HarmonyLib;
+using Serilog;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
@@ -13,8 +16,19 @@ namespace GameInterface.Services.Issues.Quests.Smugglers.Patches;
 [HarmonyPatch]
 internal class SmugglersDialogPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<SmugglersDialogPatches>();
+
     [HarmonyPrepare]
-    private static bool Prepare() => FindLeaderCondition() != null;
+    private static bool Prepare()
+    {
+        if (FindLeaderCondition() != null)
+        {
+            return true;
+        }
+
+        Logger.Warning("The smugglers' leader dialog condition was not found, their dialog opens for every smugglers' party");
+        return false;
+    }
 
     [HarmonyTargetMethod]
     private static MethodBase TargetMethod() => FindLeaderCondition();
@@ -35,11 +49,16 @@ internal class SmugglersDialogPatches
     }
 
     // The condition is a compiler generated lambda inside GetSmugglerPartyDialog, so it has no name to bind to
-    private static MethodInfo FindLeaderCondition()
+    internal static MethodInfo FindLeaderCondition()
     {
-        return AccessTools.FirstMethod(typeof(Quest), method =>
-            method.Name.StartsWith("<" + nameof(Quest.GetSmugglerPartyDialog) + ">") &&
-            method.ReturnType == typeof(bool) &&
-            method.GetParameters().Length == 0);
+        var conditions = AccessTools.GetDeclaredMethods(typeof(Quest))
+            .Where(method =>
+                method.Name.StartsWith("<" + nameof(Quest.GetSmugglerPartyDialog) + ">") &&
+                method.ReturnType == typeof(bool) &&
+                method.GetParameters().Length == 0)
+            .ToList();
+
+        // Another bool lambda there would make the match ambiguous
+        return conditions.Count == 1 ? conditions[0] : null;
     }
 }

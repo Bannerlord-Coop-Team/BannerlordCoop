@@ -8,6 +8,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.Smugglers;
+using GameInterface.Services.Issues.Quests.Smugglers.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
@@ -257,16 +258,25 @@ public class SmugglersTests : IDisposable
                 quest._smugglerParty = party;
             }
 
-            var leaderCondition = AccessTools.FirstMethod(typeof(Quest), method =>
-                method.Name.StartsWith("<" + nameof(Quest.GetSmugglerPartyDialog) + ">") && method.ReturnType == typeof(bool));
+            var leaderCondition = SmugglersDialogPatches.FindLeaderCondition();
+            Assert.NotNull(leaderCondition);
 
-            conversation._conversationParty = otherParty;
-            Assert.False((bool)leaderCondition.Invoke(quest, null));
+            try
+            {
+                conversation._conversationParty = otherParty;
+                Assert.False((bool)leaderCondition.Invoke(quest, null));
 
-            conversation._conversationParty = party;
-            Assert.True((bool)leaderCondition.Invoke(quest, null));
+                conversation._conversationParty = party;
+                Assert.True((bool)leaderCondition.Invoke(quest, null));
 
-            conversation._conversationParty = null;
+                // With no known conversation party vanilla's own check decides
+                conversation._conversationParty = null;
+                Assert.True((bool)leaderCondition.Invoke(quest, null));
+            }
+            finally
+            {
+                conversation._conversationParty = null;
+            }
         });
     }
 
