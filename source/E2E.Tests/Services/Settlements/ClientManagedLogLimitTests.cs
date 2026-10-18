@@ -72,7 +72,7 @@ public sealed class ClientManagedLogLimitTests : IDisposable
         });
 
         var alleyLog = Assert.Single(GetCapturedLogs(), log =>
-            log.Contains("Client created managed") && log.Contains(typeof(Alley).FullName!));
+            log.Contains("Client created managed") && log.Contains(typeof(Alley).FullName!) && log.Contains("caller="));
         Assert.Contains("caller=", alleyLog);
         Assert.Contains(nameof(ClientManagedLogLimitTests), alleyLog);
     }

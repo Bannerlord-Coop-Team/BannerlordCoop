@@ -29,7 +29,9 @@ public class GarrisonWagePaymentLimitSettlementPatch
 
         if (ModInformation.IsClient)
         {
-            LogClientChange(__instance, value);
+            ClientCallSites.Log(Logger,
+                "Client changed managed {Settlement} GarrisonWagePaymentLimit to {Value}; caller={Caller}", new object[] { __instance.StringId, value },
+                "Client changed managed GarrisonWagePaymentLimit {Count} more times from callers already logged");
             return true;
         }
 
@@ -46,19 +48,6 @@ public class GarrisonWagePaymentLimitSettlementPatch
     // on a client, so an error per call floods the log. The first call from each caller is logged with the
     // stack trace and repeats are summed periodically.
     private static readonly CallSiteLogLimiter ClientCallSites = new(64, TimeSpan.FromSeconds(10));
-
-    private static void LogClientChange(Settlement settlement, int value)
-    {
-        var site = CallSiteLogLimiter.GetCallSite(2, 6);
-        if (ClientCallSites.ShouldLogFull(site, out int suppressed))
-        {
-            Logger.Error("Client changed managed {Settlement} GarrisonWagePaymentLimit to {Value}; caller={Caller}", settlement?.StringId, value, Environment.StackTrace);
-        }
-        else if (suppressed > 0)
-        {
-            Logger.Warning("Client changed managed GarrisonWagePaymentLimit {Count} more times from callers already logged", suppressed);
-        }
-    }
 
     //client side sync TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.ClanFinanceExpenseItemVM.OnCurrentWageLimitUpdated(int) : void @0600185A
     //client side sync TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement.ClanFinanceExpenseItemVM.OnUnlimitedWageToggled(bool) : void @0600185B
