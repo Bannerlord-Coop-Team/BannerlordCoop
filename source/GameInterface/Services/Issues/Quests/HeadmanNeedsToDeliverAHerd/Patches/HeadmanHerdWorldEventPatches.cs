@@ -130,6 +130,7 @@ internal class HeadmanHerdWorldEventPatches
         }
         if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) ||
             !owners.TryResolveOwnerHero(issue, out var owner)) return;
+        if (owner.PartyBelongedTo == null && !owner.IsPrisoner) return;
 
         using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
         {
