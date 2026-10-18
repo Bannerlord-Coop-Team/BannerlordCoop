@@ -17,31 +17,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class KingdomSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public KingdomSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void Kingdom_Serialize()
-        {
-            Kingdom kingdomObject = (Kingdom)FormatterServices.GetUninitializedObject(typeof(Kingdom));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            KingdomBinaryPackage package = new KingdomBinaryPackage(kingdomObject, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

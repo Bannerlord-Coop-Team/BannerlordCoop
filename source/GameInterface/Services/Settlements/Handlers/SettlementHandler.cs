@@ -41,91 +41,8 @@ public class SettlementHandler : IHandler
 
         messageBroker.Subscribe<ChangeSettlementLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
 
-        messageBroker.Subscribe<ChangeLordConversationCampaignBehaviorPlayerClaim>(HandleLordConversationCampaignBehaviorPlayerClaim);
-        //other clients ChangeLordConversationCampaignBehaviorPlayerClaimOthers
-        messageBroker.Subscribe<ChangeLordConversationCampaignBehaviorPlayerClaimOthers>(HandleLordConversationCampaignBehaviorPlayerClaimOthers);
-
-        //server claimvalue behave
-        messageBroker.Subscribe<ChangeLordConversationCampaignBehaviourPlayerClaimValue>(HandleLordConversationCampaignBehaviorPlayerClaimValue);
-        //other clients
-        messageBroker.Subscribe<ChangeLordConversationCampaignBehaviorPlayerClaimValueOthers>(HandleLordConversationCampaignBehaviorPlayerClaimValueOthers);
-
-        //Settlement.CanBeClaimed
-        messageBroker.Subscribe<ChangeSettlementClaimantCanBeClaimed>(HandleSettlementClaimaintCanBeClaimed);
-
         messageBroker.Subscribe<NewGarrisonParty>(HandleNewGarrisonParty);
         messageBroker.Subscribe<NetworkNewGarrisonParty>(HandleNetworkNewGarrisonParty);
-    }
-
-    private void HandleSettlementClaimaintCanBeClaimed(MessagePayload<ChangeSettlementClaimantCanBeClaimed> payload)
-    {
-        var obj = payload.What;
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
-        {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
-            return;
-        }
-
-        //SettlementClaimantCampaignBehaviorOnOwnerChangedPatch.RunCanBeClaimed(settlement, obj.CanBeClaimed);
-    }
-
-    private void HandleLordConversationCampaignBehaviorPlayerClaimValueOthers(MessagePayload<ChangeLordConversationCampaignBehaviorPlayerClaimValueOthers> payload)
-    {
-        var obj = payload.What;
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
-        {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
-            return;
-        }
-        //ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedValue(settlement, obj.ClaimValue);
-    }
-
-    private void HandleLordConversationCampaignBehaviorPlayerClaimValue(MessagePayload<ChangeLordConversationCampaignBehaviourPlayerClaimValue> payload)
-    {
-        var obj = payload.What;
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
-        {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
-            return;
-        }
-
-        //ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedValue(settlement, obj.ClaimValue);
-    }
-
-    private void HandleLordConversationCampaignBehaviorPlayerClaimOthers(MessagePayload<ChangeLordConversationCampaignBehaviorPlayerClaimOthers> payload)
-    {
-        var obj = payload.What;
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
-        {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
-            return;
-        }
-
-        if (objectManager.TryGetObject<Hero>(obj.HeroId, out var hero) == false)
-        {
-            Logger.Error("Unable to find Settlement ({HeroId})", obj.HeroId);
-            return;
-        }
-
-        //ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedBy(settlement, hero);
-    }
-
-    private void HandleLordConversationCampaignBehaviorPlayerClaim(MessagePayload<ChangeLordConversationCampaignBehaviorPlayerClaim> payload)
-    {
-        var obj = payload.What;
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
-        {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
-            return;
-        }
-
-        if (objectManager.TryGetObject<Hero>(obj.HeroId, out var hero) == false)
-        {
-            Logger.Error("Unable to find Settlement ({HeroId})", obj.HeroId);
-            return;
-        }
-
-        //ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedBy(settlement, hero);
     }
 
     private void HandleLastVisitTimeOfOwner(MessagePayload<ChangeSettlementLastVisitTimeOfOwner> payload)
@@ -291,16 +208,6 @@ public class SettlementHandler : IHandler
         messageBroker.Unsubscribe<ChangeMobileParty>(HandleMobileParty);
         messageBroker.Unsubscribe<ChangeSettlementWallHitPointsRatio>(HandleHitPointsRatio);
         messageBroker.Unsubscribe<ChangeSettlementLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
-
-
-        messageBroker.Unsubscribe<ChangeLordConversationCampaignBehaviorPlayerClaim>(HandleLordConversationCampaignBehaviorPlayerClaim);
-        //other clients ChangeLordConversationCampaignBehaviorPlayerClaimOthers
-        messageBroker.Unsubscribe<ChangeLordConversationCampaignBehaviorPlayerClaimOthers>(HandleLordConversationCampaignBehaviorPlayerClaimOthers);
-
-        messageBroker.Unsubscribe<ChangeLordConversationCampaignBehaviourPlayerClaimValue>(HandleLordConversationCampaignBehaviorPlayerClaimValue);
-        messageBroker.Unsubscribe<ChangeLordConversationCampaignBehaviorPlayerClaimValueOthers>(HandleLordConversationCampaignBehaviorPlayerClaimValueOthers);
-
-        messageBroker.Unsubscribe<ChangeSettlementClaimantCanBeClaimed>(HandleSettlementClaimaintCanBeClaimed);
 
         messageBroker.Unsubscribe<NewGarrisonParty>(HandleNewGarrisonParty);
         messageBroker.Unsubscribe<NetworkNewGarrisonParty>(HandleNetworkNewGarrisonParty);
