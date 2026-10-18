@@ -1,4 +1,6 @@
-﻿using Common.Util;
+﻿using Common.Messaging;
+using Common.Network.Messages;
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -9,6 +11,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using Helpers;
+using LiteNetLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -606,6 +609,35 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Equal(State.DesertersMovingToSettlement, quest._currentState);
         });
         Assert.Equal(0, flight.Count);
+    }
+
+    [Fact]
+    public void OwnerLeaving_ReleasesTheDesertersAndRemovesTheDefendersOfTheDismissedQuest()
+    {
+        Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        using var destruction = new MethodCallRecorder(Priority.Last,
+            AccessTools.Method(typeof(DestroyPartyAction), nameof(DestroyPartyAction.Apply)));
+        MobileParty deserters = null!;
+        Server.Call(() =>
+        {
+            deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            quest._deserterMobileParty = deserters;
+            quest._defenderMobileParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            deserters.SetPartyUsedByQuest(true);
+            Server.Resolve<IPlayerManager>().ClearPeer(Owner.NetPeer);
+            Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(Owner.NetPeer, default(DisconnectInfo)));
+        });
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
+            Assert.Null(notable.Issue);
+            Assert.False(deserters.IsCurrentlyUsedByAQuest);
+            Assert.Null(quest._defenderMobileParty);
+        });
+        Assert.Equal(1, destruction.CountFor(Server));
+        Assert.Equal(IssueOutcome.QuestCancel,
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
 
     private string AddSecondIssue()

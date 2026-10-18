@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -71,6 +72,14 @@ internal class ExtortionByDesertersPartyPatches
             Request(__instance, ExtortionByDesertersBranch.BattleCleanup);
         }
         return false;
+    }
+
+    // Dismissing an issue drops its running quest unfinished, which would leave the deserters and defenders on the map
+    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
+    [HarmonyPrefix]
+    private static void IssueFinalizedPrefix(IssueBase __instance)
+    {
+        if (ModInformation.IsServer && __instance.IssueQuest is Quest quest && quest.IsOngoing) quest.OnFinalize();
     }
 
     private static void Request(Quest quest, ExtortionByDesertersBranch branch)
