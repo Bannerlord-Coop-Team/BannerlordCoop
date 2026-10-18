@@ -3,7 +3,6 @@ using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -94,21 +93,6 @@ internal class MerchantOutlawsEventPatches
         });
     }
 
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
-    [HarmonyPostfix]
-    private static void WarPostfix(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail)
-    {
-        RunAsOwners(quest => quest.OnWarDeclared(faction1, faction2, declareWarDetail));
-    }
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
-    [HarmonyPostfix]
-    private static void KingdomPostfix(Clan clan, Kingdom oldKingdom, Kingdom newKingdom,
-        ChangeKingdomAction.ChangeKingdomActionDetail actionDetail, bool showNotification)
-    {
-        RunAsOwners(quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
-    }
-
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnVillageBeingRaided))]
     [HarmonyPostfix]
     private static void RaidedPostfix(Village village) => RunAsOwners(quest => quest.OnVillageRaided(village));
@@ -140,14 +124,6 @@ internal class MerchantOutlawsEventPatches
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementLeft))]
     [HarmonyPrefix]
     private static bool LeftPrefix() => ModInformation.IsServer;
-
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnWarDeclared))]
-    [HarmonyPrefix]
-    private static bool WarPrefix() => ModInformation.IsServer;
-
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnClanChangedKingdom))]
-    [HarmonyPrefix]
-    private static bool KingdomPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnVillageRaided))]
     [HarmonyPrefix]

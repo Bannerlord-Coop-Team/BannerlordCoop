@@ -206,8 +206,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             {
                 issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
                 ApplyState(issue, data.State);
-                // Vanilla's daily tick reads the first log even for another player's mission.
-                if (issue.JournalEntries.Count == 0) issue._journalEntries.Add(new JournalLog(CampaignTime.Now, new TextObject("{=!}")));
+                AddPlaceholderLog(issue);
                 return;
             }
 
@@ -245,6 +244,22 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
             troopValidator.ReturnToMainParty(issue);
         }, context: nameof(AlternativeSolutionAcceptCoordinator));
+    }
+
+    // Vanilla's daily tick reads the first log entry, which only the starting machine has
+    private static void AddPlaceholderLog(IssueBase issue)
+    {
+        if (issue.JournalEntries.Count > 0)
+        {
+            return;
+        }
+
+        issue._journalEntries.Add(new JournalLog(
+            CampaignTime.Now,
+            new TextObject(string.Empty),
+            new TextObject("{=VFO7rMzK}Return Days"),
+            0,
+            issue.AlternativeSolutionBaseDurationInDaysInternal));
     }
 
     private static AlternativeSolutionVanillaState CaptureState(IssueBase issue)
