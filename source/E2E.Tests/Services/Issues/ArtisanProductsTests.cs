@@ -34,6 +34,8 @@ public class ArtisanProductsTests : IDisposable
     private readonly string clanId;
     private readonly string townId;
     private readonly Harmony encyclopedia = new("artisan-products-test-encyclopedia");
+    private readonly Harmony conversation = new("artisan-products-test-conversation");
+    private static Hero? conversationHero;
 
     private EnvironmentInstance Server => scenario.Server;
     private EnvironmentInstance Owner => scenario.ClientA;
@@ -47,6 +49,8 @@ public class ArtisanProductsTests : IDisposable
             prefix: new HarmonyMethod(typeof(ArtisanProductsTests), nameof(EncyclopediaLink)));
         encyclopedia.Patch(AccessTools.PropertyGetter(typeof(Settlement), nameof(Settlement.EncyclopediaLink)),
             prefix: new HarmonyMethod(typeof(ArtisanProductsTests), nameof(EncyclopediaLink)));
+        conversation.Patch(AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.OneToOneConversationHero)),
+            prefix: new HarmonyMethod(typeof(ArtisanProductsTests), nameof(ConversationHero)));
         originId = environment.CreateRegisteredObject<Settlement>();
         destinationId = environment.CreateRegisteredObject<Settlement>();
         merchantId = environment.CreateRegisteredObject<Hero>();
@@ -66,11 +70,19 @@ public class ArtisanProductsTests : IDisposable
     {
         environment.Dispose();
         encyclopedia.UnpatchAll(encyclopedia.Id);
+        conversation.UnpatchAll(conversation.Id);
+        conversationHero = null;
     }
 
     private static bool EncyclopediaLink(ref string __result)
     {
         __result = "test-hero";
+        return false;
+    }
+
+    private static bool ConversationHero(ref Hero __result)
+    {
+        __result = conversationHero;
         return false;
     }
 
@@ -452,6 +464,26 @@ public class ArtisanProductsTests : IDisposable
         });
         Other.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(log => log.IsRelatedTo(otherIssue))));
         Server.Call(() => Assert.True(Campaign.Current.IssueManager.HasIssueCoolDown(typeof(Issue), Server.GetRegisteredObject<Hero>(scenario.NotableId))));
+    }
+
+    [Fact]
+    public void FinalizedLordIssue_IsNotReturnedAsCounterOffer()
+    {
+        Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution());
+        Owner.Call(() =>
+        {
+            var issue = (Issue)Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+            conversationHero = Owner.GetRegisteredObject<Hero>(merchantId);
+            var lookup = AccessTools.Method(typeof(IssuesCampaignBehavior), "GetCounterOfferersIssue");
+            Assert.NotNull(lookup);
+            Assert.NotNull(lookup!.Invoke(new IssuesCampaignBehavior(), null));
+            using (new AllowedThread()) issue.IssueFinalized();
+
+            var behavior = new IssuesCampaignBehavior();
+            var condition = AccessTools.Method(typeof(IssuesCampaignBehavior), "issue_counter_offer_2_condition");
+            Assert.NotNull(condition);
+            Assert.False((bool)condition!.Invoke(behavior, null)!);
+        });
     }
 
     [Fact]
