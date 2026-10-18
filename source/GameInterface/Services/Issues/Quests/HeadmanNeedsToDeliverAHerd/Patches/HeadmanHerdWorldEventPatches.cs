@@ -19,6 +19,7 @@ internal class HeadmanHerdWorldEventPatches
 {
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
     [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
     private static bool GiverKilledPrefix(Hero victim, out IDisposable __state)
     {
         __state = null;
