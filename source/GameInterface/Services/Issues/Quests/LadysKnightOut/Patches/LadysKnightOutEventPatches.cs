@@ -38,11 +38,6 @@ internal class LadysKnightOutEventPatches
         ChangeKingdomAction.ChangeKingdomActionDetail actionDetail, bool showNotification) =>
         Run(quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
 
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
-    [HarmonyPostfix]
-    private static void DeathPostfix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification) =>
-        Run(quest => quest.OnHeroKilled(victim, killer, detail, showNotification));
-
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementLeft))]
     [HarmonyPostfix]
     private static void DeparturePostfix(MobileParty party, Settlement settlement) =>

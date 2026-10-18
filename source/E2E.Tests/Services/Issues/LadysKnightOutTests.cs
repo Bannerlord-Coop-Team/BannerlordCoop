@@ -464,17 +464,24 @@ public class LadysKnightOutTests : IDisposable
     }
 
     [Fact]
-    public void SharedCoercionHelperKeepsItsHonorPenaltyWithTheOwner()
+    public void SharedCoercionHelperStillSyncsTheGiversPower()
     {
         var quest = Accept(scenario.ClientA);
+        float before = 0;
+        float after = 0;
         scenario.Server.Call(() => scenario.Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(serverQuest =>
         {
             var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
             using (new AllowedThread()) mapEvent.MapEventSettlement = serverQuest.QuestGiver.CurrentSettlement;
+            before = serverQuest.QuestGiver.Power;
             QuestHelper.ApplyGenericMinorMajorCoercionConsequences(serverQuest, mapEvent);
+            after = serverQuest.QuestGiver.Power;
         }));
         Assert.Equal(IssueOutcome.QuestFail, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
-        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLadysKnightOutHonor>());
+        Assert.Equal(before - 10, after);
+        environment.FlushCoalescer();
+        foreach (var client in environment.Clients)
+            client.Call(() => Assert.Equal(after, client.GetRegisteredObject<Hero>(scenario.NotableId).Power));
         scenario.ClientA.Call(() => Assert.Equal(2, quest.JournalEntries.Count));
     }
 
@@ -642,6 +649,26 @@ public class LadysKnightOutTests : IDisposable
         Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         foreach (var instance in Instances)
             instance.Call(() => Assert.Null(instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
+    }
+
+    [Fact]
+    public void GiverDeathCancelsAPendingLordSolutionOnEveryMachine()
+    {
+        PrepareLordSolution();
+        IssueBase localIssue = null!;
+        scenario.ClientA.Call(() =>
+        {
+            localIssue = scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+            localIssue.StartIssueWithLordSolution();
+        });
+        scenario.ClientA.Call(() => Assert.True(localIssue.IsSolvingWithLordSolution));
+        scenario.Server.Call(() => CampaignEventDispatcher.Instance.OnHeroKilled(
+            scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId), null,
+            KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge, false));
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        foreach (var instance in Instances)
+            instance.Call(() => Assert.Null(instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
+        scenario.ClientA.Call(() => Assert.Equal(2, localIssue.JournalEntries.Count));
     }
 
     private void PrepareLordSolution()
