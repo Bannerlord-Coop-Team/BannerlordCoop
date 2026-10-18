@@ -25,6 +25,7 @@ internal class IssuesModule : Module
         builder.RegisterType<AlternativeSolutionTroopValidator>().As<IAlternativeSolutionTroopValidator>().InstancePerDependency();
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
+        builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
         builder.RegisterType<LadysKnightOutTournamentProgress>().As<ILadysKnightOutTournamentProgress>().InstancePerLifetimeScope();
         builder.RegisterType<LadysKnightOutHonorProgress>().As<ILadysKnightOutHonorProgress>().InstancePerLifetimeScope();
 
