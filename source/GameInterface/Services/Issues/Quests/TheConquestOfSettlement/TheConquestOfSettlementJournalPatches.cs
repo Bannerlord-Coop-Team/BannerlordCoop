@@ -89,7 +89,12 @@ internal static class TheConquestOfSettlementNotificationPatches
 {
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        foreach (var name in new[] { "OnQuestStarted", "OnQuestLogAdded", "OnQuestCompleted" })
+        foreach (var name in new[]
+        {
+            nameof(DefaultNotificationsCampaignBehavior.OnQuestStarted),
+            nameof(DefaultNotificationsCampaignBehavior.OnQuestLogAdded),
+            nameof(DefaultNotificationsCampaignBehavior.OnQuestCompleted)
+        })
         {
             var method = AccessTools.DeclaredMethod(typeof(DefaultNotificationsCampaignBehavior), name);
             if (method != null) yield return method;

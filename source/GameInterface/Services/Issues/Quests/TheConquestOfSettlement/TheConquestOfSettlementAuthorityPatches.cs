@@ -25,7 +25,15 @@ internal static class TheConquestOfSettlementEventPatches
 
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        foreach (var name in new[] { "OnWarDeclared", "OnClanChangedKingdom", "OnMapEventStarted", "OnSiegeCompleted", "OnSettlementOwnerChanged", "OnPeaceDeclared" })
+        foreach (var name in new[]
+        {
+            nameof(Quest.OnWarDeclared),
+            nameof(Quest.OnClanChangedKingdom),
+            nameof(Quest.OnMapEventStarted),
+            nameof(Quest.OnSiegeCompleted),
+            nameof(Quest.OnSettlementOwnerChanged),
+            nameof(Quest.OnPeaceDeclared)
+        })
         {
             var method = AccessTools.DeclaredMethod(typeof(Quest), name);
             if (method != null) yield return method;
@@ -74,7 +82,7 @@ internal static class TheConquestOfSettlementWarInitiatorPatch
     }
 }
 
-[HarmonyPatch(typeof(IssuesCampaignBehavior), "OnIssueUpdated")]
+[HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.OnIssueUpdated))]
 internal static class TheConquestOfSettlementRewardPatch
 {
     [HarmonyPrefix]
@@ -87,7 +95,7 @@ internal static class TheConquestOfSettlementRewardPatch
     }
 }
 
-[HarmonyPatch(typeof(Quest), "OnTimedOut")]
+[HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
 internal static class TheConquestOfSettlementTimeoutPatch
 {
     [HarmonyPrefix]

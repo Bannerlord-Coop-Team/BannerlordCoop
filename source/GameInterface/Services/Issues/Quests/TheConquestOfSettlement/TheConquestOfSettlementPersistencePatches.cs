@@ -7,7 +7,7 @@ namespace GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 [HarmonyPatch]
 internal static class TheConquestOfSettlementPersistencePatches
 {
-    [HarmonyPatch(typeof(Campaign), "OnInitialize")]
+[HarmonyPatch(typeof(Campaign), nameof(Campaign.OnInitialize))]
     [HarmonyPrefix]
     internal static void CampaignOnInitializePrefix()
     {

@@ -65,11 +65,7 @@ internal sealed class IssueConversationHandler : IHandler
             !IsEligible(giver.Issue)) return;
 
         if (ModInformation.IsServer)
-        {
-            if (ContainerProvider.TryResolve<IControllerIdProvider>(out var controller))
-                TryRegister(payload.What.IssueOwnerId, controller.ControllerId, giver);
             return;
-        }
 
         network.SendAll(new RequestIssueConversationOpened(payload.What.IssueOwnerId));
     }
