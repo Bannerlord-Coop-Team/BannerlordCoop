@@ -15,6 +15,7 @@ using HarmonyLib;
 using SandBox.GauntletUI.Map;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -234,9 +235,46 @@ public class SmugglersTests : IDisposable
     [Fact]
     public void SmugglersWinningWithoutTheOwner_KeepTheQuest()
     {
+        using var failQuest = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.FailQuest)));
+
         EndBattleAgainstTheSmugglers(BattleState.DefenderVictory);
 
         Assert.Equal(0, cancelQuest.CountFor(Server));
+        Assert.Equal(0, failQuest.CountFor(Server));
+    }
+
+    [Fact]
+    public void OwnerCapturedByTheirSmugglers_IsReleasedAndFailsTheQuest()
+    {
+        using var failQuest = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.FailQuest)));
+        using var release = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(EndCaptivityAction), nameof(EndCaptivityAction.ApplyByReleasedAfterBattle)));
+
+        CaptureOwnerBySmugglers();
+        EndBattleAgainstTheSmugglers(BattleState.DefenderVictory);
+
+        Assert.Equal(1, release.CountFor(Server));
+        Assert.Equal(1, failQuest.CountFor(Server));
+        Assert.Equal(0, cancelQuest.CountFor(Server));
+    }
+
+    [Fact]
+    public void DismissedIssue_RemovesTheRunningQuestsSmugglers()
+    {
+        using var destroyParty = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(DestroyPartyAction), nameof(DestroyPartyAction.Apply)));
+
+        FinalizeIssueWithSmugglers(questFinished: false);
+
+        Assert.Equal(1, destroyParty.CountFor(Server));
+    }
+
+    [Fact]
+    public void FinishedQuestsIssue_LeavesTheSmugglersToTheQuest()
+    {
+        using var destroyParty = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(DestroyPartyAction), nameof(DestroyPartyAction.Apply)));
+
+        FinalizeIssueWithSmugglers(questFinished: true);
+
+        Assert.Equal(0, destroyParty.CountFor(Server));
     }
 
     [Fact]
@@ -344,6 +382,45 @@ public class SmugglersTests : IDisposable
 
             CampaignEventDispatcher.Instance.OnMapEventEnded(mapEvent);
         }, disabledMethods);
+    }
+
+    private void CaptureOwnerBySmugglers()
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(ControllerA, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(owner.HeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var smugglers));
+
+            using (new AllowedThread())
+            {
+                ownerHero.ChangeState(Hero.CharacterStates.Prisoner);
+                ownerHero.PartyBelongedToAsPrisoner = smugglers.Party;
+            }
+        });
+    }
+
+    private void FinalizeIssueWithSmugglers(bool questFinished)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var smugglers));
+            var issue = IssueOf(Server);
+            var quest = QuestOf(Server);
+
+            using (new AllowedThread())
+            {
+                smugglers.IsActive = true;
+                quest._smugglerParty = smugglers;
+
+                if (questFinished)
+                {
+                    quest._questState = QuestBase.QuestStates.Finalized;
+                }
+            }
+
+            issue.IssueFinalized();
+        });
     }
 
     private void SendPartyCreated(string controllerId)

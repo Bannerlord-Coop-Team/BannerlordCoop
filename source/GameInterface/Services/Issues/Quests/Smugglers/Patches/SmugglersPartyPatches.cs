@@ -1,5 +1,7 @@
 ﻿using Common;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using Quest = TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior.SmugglersIssueQuest;
 
@@ -28,4 +30,21 @@ internal class SmugglersPartyPatches
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnFinalize))]
     [HarmonyPrefix]
     private static bool OnFinalizePrefix() => ModInformation.IsServer;
+
+    // Dismissing an issue drops its running quest without finishing it, which would leave the smugglers on the map
+    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
+    [HarmonyPrefix]
+    private static void IssueFinalizedPrefix(IssueBase __instance)
+    {
+        if (ModInformation.IsClient || !(__instance.IssueQuest is Quest quest) || !quest.IsOngoing)
+        {
+            return;
+        }
+
+        var party = quest._smugglerParty;
+        if (party != null && party.IsActive)
+        {
+            DestroyPartyAction.Apply(null, party);
+        }
+    }
 }

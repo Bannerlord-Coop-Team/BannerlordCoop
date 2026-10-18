@@ -51,7 +51,7 @@ internal class SmugglersCreationCaptureStrategy : ICreationCaptureStrategy
             return false;
         }
 
-        // Same settlement pair vanilla picks, without its relation check against the player
+        // A town the lord owns and its nearest other town, like vanilla but without its random pick and player checks
         var targetSettlement = issueOwner.Clan.Settlements.FirstOrDefault(settlement => settlement.IsTown && settlement.Owner == issueOwner);
         if (targetSettlement == null)
         {

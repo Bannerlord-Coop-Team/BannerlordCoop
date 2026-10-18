@@ -39,8 +39,25 @@ internal class SmugglersQuestEventPatches
             }
 
             quest.OnMapEventEnded(mapEvent);
+            FailIfOwnerWasCaptured(quest, mapEvent);
             CancelIfDefeatedWithoutOwner(quest, mapEvent);
         });
+    }
+
+    // The server takes a defeated owner prisoner before the battle ends, so vanilla no longer sees the owner's party in it
+    private static void FailIfOwnerWasCaptured(Quest quest, MapEvent mapEvent)
+    {
+        var owner = Hero.MainHero;
+        var smugglers = quest._smugglerParty.Party;
+        if (!quest.IsOngoing || owner == null || !owner.IsPrisoner || owner.PartyBelongedToAsPrisoner != smugglers ||
+            !mapEvent.InvolvedParties.Contains(smugglers))
+        {
+            return;
+        }
+
+        // Failing removes the smugglers, and removing a party frees every hero prisoner except the main hero
+        EndCaptivityAction.ApplyByReleasedAfterBattle(owner);
+        quest.FailQuest();
     }
 
     // Vanilla only expects the owner to fight the smugglers, another player beating them leaves the quest unwinnable
