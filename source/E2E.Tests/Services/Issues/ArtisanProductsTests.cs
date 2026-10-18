@@ -477,21 +477,38 @@ public class ArtisanProductsTests : IDisposable
             var lookup = AccessTools.Method(typeof(IssuesCampaignBehavior), "GetCounterOfferersIssue");
             Assert.NotNull(lookup);
             Assert.NotNull(lookup!.Invoke(new IssuesCampaignBehavior(), null));
-            using (new AllowedThread()) issue.IssueFinalized();
 
             var selectorType = AccessTools.TypeByName("GameInterface.Services.Issues.Quests.ArtisanProducts.Patches.ArtisanProductsCounterOfferPatch");
             Assert.NotNull(selectorType);
+            var conversationType = selectorType!.Assembly.GetType("GameInterface.Services.Issues.Quests.ArtisanProducts.Patches.ArtisanProductsCounterOfferConversationPatch");
+            Assert.NotNull(conversationType);
+            var prefix = AccessTools.Method(conversationType, "Prefix");
+            Assert.NotNull(prefix);
+            Assert.True((bool)prefix!.Invoke(null, null)!);
+
+            var behavior = new IssuesCampaignBehavior();
+            foreach (var name in new[]
+            {
+                "issue_counter_offer_2_condition",
+                "issue_counter_offer_player_accept_condition",
+                "issue_counter_offer_player_reject_condition",
+                "issue_counter_offer_accepted_condition",
+                "issue_counter_offer_reject_condition",
+            })
+            {
+                var method = AccessTools.Method(typeof(IssuesCampaignBehavior), name);
+                Assert.NotNull(method);
+                Assert.True((bool)method!.Invoke(behavior, null)!);
+            }
+
+            using (new AllowedThread()) issue.IssueFinalized();
+
             var selector = AccessTools.Method(selectorType, "FindCounterOffer");
             Assert.NotNull(selector);
             Assert.Null(selector!.Invoke(null, null));
 
-            var conversationType = selectorType!.Assembly.GetType("GameInterface.Services.Issues.Quests.ArtisanProducts.Patches.ArtisanProductsCounterOfferConversationPatch");
-            Assert.True(conversationType != null, string.Join(";", selectorType!.Assembly.GetTypes().Where(type => type.Name.Contains("CounterOffer"))));
-            var prefix = AccessTools.Method(conversationType, "Prefix");
-            Assert.NotNull(prefix);
             Assert.False((bool)prefix!.Invoke(null, null)!);
 
-            var behavior = new IssuesCampaignBehavior();
             foreach (var name in new[]
             {
                 "issue_counter_offer_2_condition",

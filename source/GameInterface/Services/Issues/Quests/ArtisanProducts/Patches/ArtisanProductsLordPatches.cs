@@ -99,8 +99,7 @@ internal class ArtisanProductsCounterOfferConversationPatch
             "issue_counter_offer_reject_consequence",
         })
         {
-            var method = AccessTools.Method(typeof(IssuesCampaignBehavior), name);
-            if (method != null) yield return method;
+            yield return AccessTools.Method(typeof(IssuesCampaignBehavior), name);
         }
     }
 
