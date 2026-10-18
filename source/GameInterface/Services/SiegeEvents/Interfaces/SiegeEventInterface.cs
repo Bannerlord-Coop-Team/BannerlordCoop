@@ -197,8 +197,9 @@ public interface ISiegeEventInterface : IGameAbstraction
     /// Sends a local army member of a won siege to the settlement-taken menu, where they see the leader's
     /// aftermath and continue, like vanilla <c>PlayerEncounter.DoEnd</c>. Finishes the local encounter itself.
     /// </summary>
-    /// <returns>True when the local player was such an army member and was routed.</returns>
-    bool TryRouteArmyMemberToAftermath();
+    /// <param name="endingBattleSettlement">The ending encounter's <c>_mapEvent?.MapEventSettlement</c>.</param>
+    /// <returns>True when the local player was such an army member of a siege at that settlement and was routed.</returns>
+    bool TryRouteArmyMemberToAftermath(Settlement endingBattleSettlement);
 
     /// <summary>
     /// Builds/deploys a siege engine at a slot for one side, mirroring the map production popup.
@@ -829,12 +830,13 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         SwitchLocalPartyToSettlementTaken(settlement);
     }
 
-    public bool TryRouteArmyMemberToAftermath()
+    public bool TryRouteArmyMemberToAftermath(Settlement endingBattleSettlement)
     {
-        // Consumed by the first encounter End after the won siege, routed or not, so it can't reach a later one.
+        // Consumed by the next encounter End, routed or not. Only the won siege's own End routes, like vanilla
+        // DoEnd keying off its _mapEvent, otherwise a value left by a skipped End would route a later battle.
         var settlement = pendingArmyMemberAftermathSettlement;
         pendingArmyMemberAftermathSettlement = null;
-        if (settlement == null) return false;
+        if (settlement == null || settlement != endingBattleSettlement) return false;
 
         SwitchLocalPartyToSettlementTaken(settlement, asArmyMember: true);
         return true;
