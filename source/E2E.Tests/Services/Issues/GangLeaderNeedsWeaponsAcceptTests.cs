@@ -282,10 +282,13 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
             // Vanilla's daily tick reads the first entry of every running mission
             Campaign.Current.IssueManager.DailyTick();
             var entry = Assert.Single(giver.Issue.JournalEntries);
-            Assert.Equal(((Issue)giver.Issue).AlternativeSolutionBaseDurationInDaysInternal, entry.Range);
+            var range = ((Issue)giver.Issue).AlternativeSolutionBaseDurationInDaysInternal;
+            Assert.Equal(range, entry.Range);
+            Assert.Equal(Math.Min(1, range), entry.CurrentProgress);
 
             Campaign.Current.IssueManager.DailyTick();
-            Assert.Single(giver.Issue.JournalEntries);
+            Assert.Same(entry, Assert.Single(giver.Issue.JournalEntries));
+            Assert.Equal(Math.Min(2, range), entry.CurrentProgress);
         });
     }
 
@@ -298,6 +301,7 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
         var needed = 0;
         var rewardGold = 0;
         var goldBefore = 0;
+        var powerBefore = 0f;
 
         Accept(ClientA, FirstGiverId);
 
@@ -311,6 +315,7 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
             needed = quest._requestedWeaponAmount;
             rewardGold = quest.RewardGold;
             goldBefore = owner.Gold;
+            powerBefore = giver.Power;
 
             using (new AllowedThread())
             {
@@ -341,6 +346,7 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
                 Assert.Equal(0, party.ItemRoster.GetItemNumber(axe));
                 Assert.Null(giver.Issue);
                 Assert.Single(finished, message => message.Outcome == IssueOutcome.QuestSuccess);
+                Assert.Equal(powerBefore + 10f, giver.Power);
             }
             else
             {
@@ -348,8 +354,19 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
                 Assert.Equal(needed - 1, party.ItemRoster.GetItemNumber(axe));
                 Assert.NotNull(giver.Issue.IssueQuest);
                 Assert.Empty(finished);
+                Assert.Equal(powerBefore, giver.Power);
             }
         });
+
+        // The giver's power is a hero field, so the clients must end up with the server's value as well
+        foreach (var client in new[] { ClientA, ClientB })
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+                Assert.Equal(carriesEnough ? powerBefore + 10f : powerBefore, giver.Power);
+            });
+        }
     }
 
     private void AcceptTheCompanionMission()

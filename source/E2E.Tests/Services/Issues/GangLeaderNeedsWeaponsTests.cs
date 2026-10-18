@@ -117,30 +117,50 @@ public class GangLeaderNeedsWeaponsTests : IDisposable
     public void TheServerOnlyCompletesTheHandInWhenTheOwnerCarriesTheWeapons(int carried, bool ownerHasParty, bool completes)
     {
         var axe = CreateAxe();
+        var serversOwnPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var completed = false;
 
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(serversOwnPartyId, out var serversOwnParty));
+            var previousMainParty = Campaign.Current.MainParty;
 
             using (new AllowedThread())
             {
                 party.ItemRoster.Clear();
                 party.ItemRoster.AddToCounts(axe, carried);
                 ownerHero._partyBelongedTo = ownerHasParty ? party : null;
+
+                // The server's own party carries every requested weapon, an owner without a party must not be answered with it
+                serversOwnParty.ItemRoster.Clear();
+                serversOwnParty.ItemRoster.AddToCounts(axe, RequestedWeapons);
+                Campaign.Current.MainParty = serversOwnParty;
             }
 
             var quest = Uninitialized<Quest>();
             quest._requestedWeaponAmount = RequestedWeapons;
             quest._requestedWeaponClass = WeaponClass.OneHandedAxe;
 
-            // What FinalizationCoordinator does before it runs a branch
-            using (new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo))
+            try
             {
-                completed = (bool)AccessTools.Method(typeof(GangLeaderNeedsWeaponsDeliveryPatch), "Prefix")
-                    .Invoke(null, new object[] { quest })!;
+                // What FinalizationCoordinator does before it runs a branch
+                using (new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo))
+                {
+                    completed = (bool)AccessTools.Method(typeof(GangLeaderNeedsWeaponsDeliveryPatch), "Prefix")
+                        .Invoke(null, new object[] { quest })!;
+                }
             }
+            finally
+            {
+                using (new AllowedThread())
+                {
+                    Campaign.Current.MainParty = previousMainParty;
+                }
+            }
+
+            Assert.Equal(RequestedWeapons, serversOwnParty.ItemRoster.GetItemNumber(axe));
         });
 
         Assert.Equal(completes, completed);
@@ -190,6 +210,22 @@ public class GangLeaderNeedsWeaponsTests : IDisposable
     {
         AssertPatched(typeof(Quest), nameof(Quest.PlayerSuccessfullyDeliveredWeapons), nameof(GangLeaderNeedsWeaponsDeliveryPatch));
         AssertPatched(typeof(Quest), nameof(Quest.OnSettlementEnter), nameof(GangLeaderNeedsWeaponsGuardsPatch));
+    }
+
+    [Fact]
+    public void TheGuardsPatchSkipsVanillasSettlementEntry()
+    {
+        var prefix = AccessTools.Method(typeof(GangLeaderNeedsWeaponsGuardsPatch), "Prefix");
+
+        Assert.False((bool)prefix.Invoke(null, null)!);
+    }
+
+    [Fact]
+    public void TheHeroFieldWritersAreInstalledBeforeTheirCallersCanInlineThem()
+    {
+        var category = Assert.Single(typeof(HeroFieldPatches).GetCustomAttributes(typeof(HarmonyPatchCategory), false));
+
+        Assert.Equal(global::GameInterface.GameInterface.HARMONY_STATIC_FIXES_CATEGORY, ((HarmonyPatchCategory)category).info.category);
     }
 
     private static void AssertPatched(Type type, string method, string patchClass)
