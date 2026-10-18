@@ -23,6 +23,7 @@ internal class RevenueFarmingDetachedDialoguePatch
         yield return AccessTools.Method(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithBetrayal));
         yield return AccessTools.Method(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithCancel));
         yield return AccessTools.Method(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithTimedOut));
+        yield return AccessTools.Method(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithStayAliveConditionsFailed));
     }
 
     private static void Prefix(IssueBase __instance)
