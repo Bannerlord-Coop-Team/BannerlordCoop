@@ -158,6 +158,10 @@ Before any `gh pr edit`, re-fetch the live PR (`gh pr view --json title,body`) a
 
 Every PR must retain an exact `## Bot Changelog Entry` heading. For War Sails updates, leave that section empty because we are not officially supporting War Sails yet. Do not add a changelog bullet just to populate the section.
 
+### Codex-Only Contributions Are Not Accepted
+
+We do not accept tests or implementations created solely by Codex, because they add too much technical debt. Codex output may assist, but every change must be designed, reviewed, and owned by a human contributor who can explain and maintain it. Maintainers may close PRs whose code or tests were produced only by Codex.
+
 ### Review Comments & PR Prose (use the established maintainer voice)
 
 GitHub review comments, inline PR comments, and PR descriptions should match the established style below. A separate register should not be introduced.
