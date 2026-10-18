@@ -27,6 +27,7 @@ internal class IssuesModule : Module
         builder.RegisterType<ArtisanProductsProgress>().As<IArtisanProductsProgress>().InstancePerDependency();
         builder.RegisterType<ArtisanProductsTroopReturns>().As<IArtisanProductsTroopReturns>().InstancePerLifetimeScope();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
+        builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)
             .Where(IsQuestPiece)

@@ -167,6 +167,7 @@ public class AcceptVisibilityTests : IDisposable
             Assert.True(otherIssue.IsSolvingWithAlternative);
             Assert.False(otherIssue.IsTriedToSolveBefore);
             Assert.Equal(0, otherIssue.AlternativeSolutionSentTroops.TotalManCount);
+            // Only the placeholder the daily tick reads, the sender's real entry is not copied
             Assert.Single(otherIssue.JournalEntries);
             Assert.Equal(accepted.State.ReturnTimeTicks, otherIssue.AlternativeSolutionReturnTimeForTroops.NumTicks);
 

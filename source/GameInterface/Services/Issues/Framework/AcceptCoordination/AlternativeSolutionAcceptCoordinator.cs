@@ -246,19 +246,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         }, context: nameof(AlternativeSolutionAcceptCoordinator));
     }
 
-    private static AlternativeSolutionVanillaState CaptureState(IssueBase issue)
-    {
-        return new AlternativeSolutionVanillaState(
-            issue._issueDifficultyMultiplier,
-            issue._failureChance,
-            issue._alternativeSolutionCasualtyCount,
-            issue._companionRewardSkill?.StringId ?? string.Empty,
-            issue._totalTroopXpAmount,
-            issue.AlternativeSolutionReturnTimeForTroops.NumTicks,
-            issue.AlternativeSolutionIssueEffectClearTime.NumTicks,
-            issue.IssueDueTime.NumTicks);
-    }
-
+    // Vanilla's daily tick reads the first log entry, which only the starting machine has
     private static void AddPlaceholderLog(IssueBase issue)
     {
         if (issue.JournalEntries.Count > 0)
@@ -272,6 +260,19 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             new TextObject("{=VFO7rMzK}Return Days"),
             0,
             issue.AlternativeSolutionBaseDurationInDaysInternal));
+    }
+
+    private static AlternativeSolutionVanillaState CaptureState(IssueBase issue)
+    {
+        return new AlternativeSolutionVanillaState(
+            issue._issueDifficultyMultiplier,
+            issue._failureChance,
+            issue._alternativeSolutionCasualtyCount,
+            issue._companionRewardSkill?.StringId ?? string.Empty,
+            issue._totalTroopXpAmount,
+            issue.AlternativeSolutionReturnTimeForTroops.NumTicks,
+            issue.AlternativeSolutionIssueEffectClearTime.NumTicks,
+            issue.IssueDueTime.NumTicks);
     }
 
     private static void ApplyState(IssueBase issue, AlternativeSolutionVanillaState state)

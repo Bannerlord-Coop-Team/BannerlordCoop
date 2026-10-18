@@ -46,17 +46,6 @@ internal class ArtisanProductsWorldEventPatches
         return false;
     }
 
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
-    [HarmonyPostfix]
-    private static void War(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail)
-        => Run(quest => quest.OnWarDeclared(faction1, faction2, declareWarDetail));
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
-    [HarmonyPostfix]
-    private static void Kingdom(Clan clan, Kingdom oldKingdom, Kingdom newKingdom,
-        ChangeKingdomAction.ChangeKingdomActionDetail actionDetail, bool showNotification)
-        => Run(quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
-
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
     [HarmonyPostfix]
     private static void Death(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification)
@@ -107,8 +96,6 @@ internal class ArtisanProductsServerEventPatch
     [HarmonyTargetMethods]
     private static IEnumerable<MethodBase> Targets()
     {
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnHeroKilled));
     }
 
