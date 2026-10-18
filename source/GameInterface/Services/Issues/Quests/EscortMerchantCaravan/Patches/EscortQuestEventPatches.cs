@@ -1,0 +1,108 @@
+﻿using Common;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Heroes.Patches;
+using HarmonyLib;
+using System;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
+using Quest = TaleWorlds.CampaignSystem.Issues.EscortMerchantCaravanIssueBehavior.EscortMerchantCaravanIssueQuest;
+
+namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan.Patches;
+
+[HarmonyPatch]
+internal class EscortQuestEventPatches
+{
+    [ThreadStatic] internal static Quest CurrentQuest;
+    [ThreadStatic] internal static bool IsRunning;
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementEntered))]
+    [HarmonyPostfix]
+    private static void Entered(MobileParty party, Settlement settlement, Hero hero)
+        => Run(quest => quest.OnSettlementEntered(party, settlement, hero));
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementLeft))]
+    [HarmonyPostfix]
+    private static void Left(MobileParty party, Settlement settlement)
+        => Run(quest => quest.OnSettlementLeft(party, settlement));
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventEnded))]
+    [HarmonyPostfix]
+    private static void Battle(MapEvent mapEvent)
+        => Run(quest => quest.OnMapEventEnded(mapEvent));
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementOwnerChanged))]
+    [HarmonyPostfix]
+    private static void Owner(Settlement settlement, bool openToClaim, Hero newOwner, Hero oldOwner,
+        Hero capturerHero, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
+        => Run(quest => quest.OnSettlementOwnerChanged(settlement, openToClaim, newOwner, oldOwner, capturerHero, detail));
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTickParty))]
+    [HarmonyPostfix]
+    private static void PartyTick(MobileParty mobileParty)
+        => Run(quest => quest.OnPartyHourlyTick(mobileParty));
+
+    [HarmonyPatch(typeof(QuestManager), nameof(QuestManager.HourlyTick))]
+    [HarmonyPostfix]
+    private static void Hourly()
+    {
+        Run(quest =>
+        {
+            if (quest.QuestDueTime.IsPast) quest.CompleteQuestWithTimeOut();
+            else if (quest._questCaravanMobileParty.IsCaravan) quest.CompleteQuestWithCancel();
+            else quest.HourlyTick();
+        });
+    }
+
+    [HarmonyPatch(typeof(QuestManager), nameof(QuestManager.DailyTick))]
+    [HarmonyPostfix]
+    private static void Daily() => Run(quest => quest.DailyTick());
+
+    internal static bool RunOwned(Quest quest, Action<Quest> action)
+    {
+        if (ModInformation.IsClient || quest._questCaravanMobileParty == null) return false;
+        if (!ContainerProvider.TryResolve<IEscortOwnerParty>(out var parties) ||
+            !parties.TryGet(IssueManager.GetIssueOfQuest(quest), out var party))
+        {
+            quest.CompleteQuestWithCancel(new TextObject("Your caravan escort ended because your party is no longer available."));
+            return false;
+        }
+
+        var previous = CurrentQuest;
+        var previousRunning = IsRunning;
+        CurrentQuest = quest;
+        var before = Progress(quest);
+        using (new MainHeroSubstitutionScope(Hero.MainHero, party))
+        {
+            try
+            {
+                IsRunning = true;
+                action(quest);
+                if (quest.IsOngoing && !before.Equals(Progress(quest)) &&
+                    ContainerProvider.TryResolve<IEscortProgress>(out var progress))
+                    progress.Publish(quest);
+            }
+            finally
+            {
+                IsRunning = previousRunning;
+                CurrentQuest = previous;
+            }
+        }
+        return true;
+    }
+
+    private static void Run(Action<Quest> action)
+    {
+        if (ModInformation.IsClient || !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher)) return;
+        dispatcher.RunAsOwners<Quest>(quest => RunOwned(quest, action));
+    }
+
+    private static object Progress(Quest quest) => (quest._daysSpentForEscorting,
+        quest._visitedSettlements.Count, quest.JournalEntries.Count, quest._questBanditMobileParty,
+        quest._otherBanditParty, quest._isPlayerNotifiedForDanger,
+        Campaign.Current.QuestManager.GetAllTrackedObjectsOfAQuest(quest).Count);
+}

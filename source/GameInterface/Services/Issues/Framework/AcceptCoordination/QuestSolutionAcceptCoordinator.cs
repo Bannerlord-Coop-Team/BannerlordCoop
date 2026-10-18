@@ -126,6 +126,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             return;
         }
 
+        var previousDueTime = issue.IssueDueTime;
+        var previouslyTried = issue.IsTriedToSolveBefore;
         try
         {
             // Creates the quest object the owner's outcomes run on, it is never started so it registers no events
@@ -142,6 +144,20 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         catch (Exception e)
         {
             Logger.Error(e, "Starting the quest of {issue} failed", data.IssueId);
+            var failedQuest = issue.IssueQuest;
+            issue.IssueQuest = null;
+            try
+            {
+                using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
+                    failedQuest?.CompleteQuestWithCancel();
+            }
+            catch (Exception cleanupError)
+            {
+                Logger.Error(cleanupError, "Cleaning up the rejected quest of {issue} failed", data.IssueId);
+            }
+            issue._issueState = IssueBase.IssueState.Ongoing;
+            issue.IssueDueTime = previousDueTime;
+            issue.IsTriedToSolveBefore = previouslyTried;
             ownership.Remove(data.IssueOwnerId);
             Reject(peer, data);
             return;
@@ -157,7 +173,9 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
     private void Reject(NetPeer peer, RequestQuestSolutionAccept data)
     {
-        network.Send(peer, new NetworkQuestSolutionAcceptRejected(data.IssueOwnerId, data.IssueId));
+        var available = issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) && issue.IsOngoingWithoutQuest;
+        network.Send(peer, new NetworkQuestSolutionAcceptRejected(data.IssueOwnerId, data.IssueId,
+            available, issue?.IssueDueTime.NumTicks ?? 0, issue?.IsTriedToSolveBefore ?? false));
     }
 
     private void Handle_NetworkQuestSolutionAccepted(MessagePayload<NetworkQuestSolutionAccepted> payload)
@@ -221,6 +239,12 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             using (new AllowedThread())
             {
                 strayQuest.CompleteQuestWithCancel();
+            }
+            if (data.Available)
+            {
+                issue._issueState = IssueBase.IssueState.Ongoing;
+                issue.IssueDueTime = new CampaignTime(data.DueTimeTicks);
+                issue.IsTriedToSolveBefore = data.PreviouslyTried;
             }
         }, context: nameof(QuestSolutionAcceptCoordinator));
     }
