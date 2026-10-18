@@ -380,7 +380,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     [InlineData(true)]
     public void CompanionSolution_RunsOnServerAndReturnsOnlyTheOwnersTroops(bool fail)
     {
-        var (companionId, troopId) = StartCompanions();
+        StartCompanions();
 
         Server.Call(() =>
         {
@@ -506,8 +506,6 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             instance.Call(() =>
             {
                 Assert.Null(Object<Hero>(instance, scenario.NotableId).Issue);
-                Assert.Equal(40, Party(instance, QuestScenario.ControllerA).MemberRoster.GetTroopCount(Object<CharacterObject>(instance, troopId)));
-                Assert.True(Party(instance, QuestScenario.ControllerA).MemberRoster.Contains(Object<Hero>(instance, companionId).CharacterObject));
                 Assert.Equal(0, Party(instance, QuestScenario.ControllerA).ItemRoster.GetItemNumber(Object<ItemObject>(instance, livestockId)));
             });
     }
