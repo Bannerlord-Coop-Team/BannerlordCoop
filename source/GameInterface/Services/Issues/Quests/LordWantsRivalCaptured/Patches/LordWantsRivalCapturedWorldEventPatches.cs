@@ -2,8 +2,6 @@
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
-using System.Collections.Generic;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -67,22 +65,30 @@ internal class LordWantsRivalCapturedWorldEventPatches
 }
 
 // The owner's client leaves the listeners that end the quest or change the world to the server
-[HarmonyPatch]
+[HarmonyPatch(typeof(Quest))]
 internal class LordWantsRivalCapturedClientListenerPatches
 {
-    private static IEnumerable<MethodBase> TargetMethods()
-    {
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnHeroKilled));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnPrisonerTaken));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnMapEventStarted));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnPlayerBattleEventEnded));
-    }
-
+    [HarmonyPatch(nameof(Quest.OnHeroKilled))]
     [HarmonyPrefix]
-    private static bool Prefix()
-    {
-        return ModInformation.IsServer;
-    }
+    private static bool OnHeroKilledPrefix() => ModInformation.IsServer;
+
+    [HarmonyPatch(nameof(Quest.OnPrisonerTaken))]
+    [HarmonyPrefix]
+    private static bool OnPrisonerTakenPrefix() => ModInformation.IsServer;
+
+    [HarmonyPatch(nameof(Quest.OnWarDeclared))]
+    [HarmonyPrefix]
+    private static bool OnWarDeclaredPrefix() => ModInformation.IsServer;
+
+    [HarmonyPatch(nameof(Quest.OnClanChangedKingdom))]
+    [HarmonyPrefix]
+    private static bool OnClanChangedKingdomPrefix() => ModInformation.IsServer;
+
+    [HarmonyPatch(nameof(Quest.OnMapEventStarted))]
+    [HarmonyPrefix]
+    private static bool OnMapEventStartedPrefix() => ModInformation.IsServer;
+
+    [HarmonyPatch(nameof(Quest.OnPlayerBattleEventEnded))]
+    [HarmonyPrefix]
+    private static bool OnPlayerBattleEventEndedPrefix() => ModInformation.IsServer;
 }
