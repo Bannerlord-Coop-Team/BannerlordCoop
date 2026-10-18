@@ -134,6 +134,22 @@ public class ExtortionByDesertersTests : IDisposable
         });
     }
 
+    [Fact]
+    public void WarDeclaredOnTheServer_ReachesTheQuestOnce()
+    {
+        Accept();
+        var firstId = environment.CreateRegisteredObject<Kingdom>();
+        var secondId = environment.CreateRegisteredObject<Kingdom>();
+        using var calls = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared)));
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(firstId, out var first));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(secondId, out var second));
+            CampaignEventDispatcher.Instance.OnWarDeclared(first, second, DeclareWarAction.DeclareWarDetail.Default);
+        }, TextLinks);
+        Assert.Equal(1, calls.CountFor(Server));
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
@@ -570,6 +586,36 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Null(ownerQuest._defenderMobileParty);
             Assert.Equal(State.DesertersAreDefeated, ownerQuest._currentState);
         });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RaidRepelledWithoutTheOwner_CancelsOnlyWhenTheDesertersAreGone(bool desertersSurvive)
+    {
+        Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        Server.Call(() =>
+        {
+            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            quest._deserterMobileParty = deserters;
+            deserters.SetPartyUsedByQuest(true);
+            var raid = CreateBattle(deserters, quest.QuestSettlement.Party, true);
+            raid._battleState = BattleState.DefenderVictory;
+            deserters.IsActive = desertersSurvive;
+            CampaignEventDispatcher.Instance.OnMapEventEnded(raid);
+            Assert.Equal(desertersSurvive, quest.IsOngoing);
+            Assert.Equal(State.DesertersMovingToSettlement, quest._currentState);
+        }, TextLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
+        if (desertersSurvive)
+        {
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        }
+        else
+        {
+            Assert.Equal(IssueOutcome.QuestCancel,
+                Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        }
     }
 
     private static MapEvent CreateBattle(MobileParty attacker, PartyBase defender, bool raid)

@@ -63,16 +63,10 @@ internal class ExtortionByDesertersPartyPatches
     [HarmonyPrefix]
     private static bool OnBattleStartedPrefix() => false;
 
+    // The server cleans up the battle parties in its FinalizeEventAux postfix, the only caller of OnMapEventEnded
     [HarmonyPatch(typeof(Quest), nameof(Quest.GameMenuOpened))]
     [HarmonyPrefix]
-    private static bool GameMenuOpenedPrefix(Quest __instance, MenuCallbackArgs mArgs)
-    {
-        if (ModInformation.IsClient && mArgs.MenuContext.GameMenu.StringId == "encounter")
-        {
-            Request(__instance, ExtortionByDesertersBranch.BattleCleanup);
-        }
-        return false;
-    }
+    private static bool GameMenuOpenedPrefix() => false;
 
     // Dismissing an issue drops its running quest unfinished, which would leave the deserters and defenders on the map
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
@@ -80,14 +74,6 @@ internal class ExtortionByDesertersPartyPatches
     private static void IssueFinalizedPrefix(IssueBase __instance)
     {
         if (ModInformation.IsServer && __instance.IssueQuest is Quest quest && quest.IsOngoing) quest.OnFinalize();
-    }
-
-    private static void Request(Quest quest, ExtortionByDesertersBranch branch)
-    {
-        if (ContainerProvider.TryResolve<Framework.Interface.IOutcomeDispatcher>(out var dispatcher))
-        {
-            dispatcher.BeforeQuestBranch(quest, (byte)branch);
-        }
     }
 }
 

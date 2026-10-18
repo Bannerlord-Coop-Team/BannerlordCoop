@@ -98,9 +98,9 @@ internal class ExtortionByDesertersWorldPatches
         var ownerWasCaptured = captor?.MapEvent == mapEvent && mapEvent.WinningSide == captor.Side;
         if (!ownerWasCaptured && (owner == null || !mapEvent.InvolvedParties.Contains(owner)))
         {
-            // Another player's victory must not leave a quest pointing at a destroyed party.
-            if (mapEvent.WinningSide != BattleSideEnum.None && mapEvent.WinningSide != deserters.Party.Side)
-                __instance.CompleteQuestWithCancel();
+            // Another player's victory must not leave a quest pointing at a destroyed party,
+            // but deserters who survive a fight without the owner, such as the village militia's, keep raiding as in vanilla.
+            if (!deserters.IsActive) __instance.CompleteQuestWithCancel();
             return false;
         }
 
