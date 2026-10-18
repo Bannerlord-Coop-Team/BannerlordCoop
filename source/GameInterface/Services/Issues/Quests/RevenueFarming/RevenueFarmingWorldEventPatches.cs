@@ -30,17 +30,6 @@ internal class RevenueFarmingWorldEventPatches
         });
     }
 
-    [HarmonyPatch(typeof(DeclareWarAction), nameof(DeclareWarAction.ApplyInternal))]
-    [HarmonyPostfix]
-    private static void WarPostfix(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail)
-        => Run(quest => quest.OnWarDeclared(faction1, faction2, declareWarDetail));
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
-    [HarmonyPostfix]
-    private static void KingdomPostfix(Clan clan, Kingdom oldKingdom, Kingdom newKingdom,
-        ChangeKingdomAction.ChangeKingdomActionDetail actionDetail, bool showNotification)
-        => Run(quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
-
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnVillageBeingRaided))]
     [HarmonyPostfix]
     private static void RaidPostfix(Village village) => Run(quest => quest.OnVillageRaid(village));
@@ -64,12 +53,4 @@ internal class RevenueFarmingWorldEventPatches
     {
         if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher)) dispatcher.RunAsOwners(action);
     }
-}
-
-[HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut))]
-internal class RevenueFarmingTimeoutAuthorityPatch
-{
-    [HarmonyPriority(Priority.First)]
-    private static bool Prefix(QuestBase __instance)
-        => __instance is not Quest || ModInformation.IsServer || AllowedThread.IsThisThreadAllowed();
 }
