@@ -1,7 +1,9 @@
 using Common;
 using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
@@ -20,5 +22,42 @@ internal static class IssueManagerClientLifecyclePatches
     }
 
     [HarmonyPrefix]
-    private static bool Prefix() => ModInformation.IsServer;
+    private static bool Prefix(IssueManager __instance, MethodBase __originalMethod)
+    {
+        if (ModInformation.IsServer)
+        {
+            return true;
+        }
+
+        if (__originalMethod.Name == nameof(IssueManager.DailyTick))
+        {
+            AdvanceAlternativeSolutionJournalProgress(__instance);
+        }
+
+        return false;
+    }
+
+    private static void AdvanceAlternativeSolutionJournalProgress(IssueManager issueManager)
+    {
+        foreach (var issue in issueManager.Issues.Values)
+        {
+            if (!issue.IsSolvingWithAlternative || issue.AlternativeSolutionReturnTimeForTroops.IsPast)
+            {
+                continue;
+            }
+
+            if ((int)issue.AlternativeSolutionIssueEffectClearTime.ToDays == (int)CampaignTime.Now.ToDays)
+            {
+                issue.OnAlternativeSolutionSolvedAndTroopsAreReturning();
+            }
+
+            if (issue.JournalEntries.Count == 0)
+            {
+                continue;
+            }
+
+            var journalLog = issue.JournalEntries[0];
+            journalLog.UpdateCurrentProgress(Math.Min(journalLog.CurrentProgress + 1, journalLog.Range));
+        }
+    }
 }

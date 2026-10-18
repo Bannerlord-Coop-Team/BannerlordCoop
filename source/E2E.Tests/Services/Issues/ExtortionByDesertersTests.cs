@@ -170,23 +170,38 @@ public class ExtortionByDesertersTests : IDisposable
     [Fact]
     public void ClientIssueLifecycle_DoesNotPurgeAnIssueWhenSecurityChanges()
     {
+        var otherHeroId = string.Empty;
         var otherPartyId = string.Empty;
         Server.Call(() =>
         {
-            otherPartyId = Server.Resolve<IPlayerManager>().Players
-                .Single(player => player.ControllerId == QuestScenario.ControllerB).MobilePartyId;
+            var player = Server.Resolve<IPlayerManager>().Players
+                .Single(player => player.ControllerId == QuestScenario.ControllerB);
+            otherHeroId = player.HeroId;
+            otherPartyId = player.MobilePartyId;
         });
         Other.Call(() =>
         {
             Assert.True(Other.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
+            Assert.True(Other.ObjectManager.TryGetObject<Hero>(otherHeroId, out var otherHero));
             Assert.True(Other.ObjectManager.TryGetObject<Town>(townComponentId, out var town));
             Assert.True(Other.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var party));
             var settlement = notable.CurrentSettlement;
             Assert.NotNull(settlement);
-            using (new AllowedThread())
+            var previousSettlement = party.CurrentSettlement;
+            party.CurrentSettlement = settlement;
+            try
             {
-                town.Security = 90;
-                Campaign.Current.IssueManager.OnSettlementEntered(party, settlement, Hero.MainHero);
+                using (new MainHeroSubstitutionScope(otherHero, party))
+                using (new AllowedThread())
+                {
+                    town.Security = 90;
+                    Campaign.Current.IssueManager.OnSettlementEntered(party, settlement, otherHero);
+                    Campaign.Current.IssueManager.DailyTick();
+                }
+            }
+            finally
+            {
+                party.CurrentSettlement = previousSettlement;
             }
             Assert.NotNull(notable.Issue);
         });
