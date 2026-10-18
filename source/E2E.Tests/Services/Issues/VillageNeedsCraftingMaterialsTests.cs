@@ -34,6 +34,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
 {
     private const string IssueName = "VillageNeedsCraftingMaterialsIssue";
     private const string IssueId = "issue_village_needs_crafting_materials";
+    private const string SecondIssueId = "issue_village_needs_crafting_materials_second";
     private const string ControllerA = "player-A";
     private const string ControllerB = "player-B";
     private const int ServerPayment = 900;
@@ -52,6 +53,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestGiverVillageRaidedLogText)),
         AccessTools.PropertyGetter(typeof(Settlement), nameof(Settlement.EncyclopediaLinkWithName)),
         AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)),
+        AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.GetCharacterProperties)),
     };
 
     private static readonly MethodBase[] AlternativeSolutionLogTexts =
@@ -64,6 +66,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
     };
 
     private readonly string notableId;
+    private readonly string secondNotableId;
     private readonly string settlementId;
     private readonly string villageId;
     private readonly string boundTownSettlementId;
@@ -86,6 +89,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         TestEnvironment = new E2ETestEnvironment(output);
 
         notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        secondNotableId = TestEnvironment.CreateRegisteredObject<Hero>();
         settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         villageId = TestEnvironment.CreateRegisteredObject<Village>();
         boundTownSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
@@ -335,6 +339,55 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
     }
 
     [Fact]
+    public void RaidAtOneOwnersVillage_CancelsThatQuestOnceAndLeavesTheOtherOwnerQuestOngoing()
+    {
+        foreach (var instance in Instances)
+        {
+            GiveTheNotableTheIssue(instance, secondNotableId, SecondIssueId, ServerPayment);
+        }
+
+        Accept();
+        Accept(ClientB, secondNotableId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(boundTownSettlementId, out var otherGiverSettlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(secondNotableId, out var secondNotable));
+
+            // Keep the second owner's giver away from the raided village so the test isolates owner dispatch.
+            secondNotable.Issue.IssueQuest.QuestGiver.StayingInSettlement = otherGiverSettlement;
+
+            var raid = (RaidEventComponent)RuntimeHelpers.GetUninitializedObject(typeof(RaidEventComponent));
+            raid.MapEvent = VillageMapEvent(Server, settlementId, MapEvent.BattleTypes.Raid);
+            var previousMainParty = Campaign.Current.MainParty;
+            Campaign.Current.MainParty = null;
+
+            try
+            {
+                CampaignEventDispatcher.Instance.RaidCompleted(BattleSideEnum.Attacker, raid);
+            }
+            finally
+            {
+                Campaign.Current.MainParty = previousMainParty;
+            }
+        }, QuestLogTexts);
+
+        var finalized = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>();
+        Assert.Single(finalized, message => message.IssueOwnerId == notableId && message.IssueId == IssueId);
+        Assert.DoesNotContain(finalized, message => message.IssueOwnerId == secondNotableId && message.IssueId == SecondIssueId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(secondNotableId, out var secondNotable));
+            Assert.Null(notable.Issue);
+            Assert.True(secondNotable.Issue.IssueQuest.IsOngoing);
+        });
+    }
+
+    [Fact]
     public void AlternativeSolution_KeepsTheServersPromiseAndPaysItToTheOwnerOnce()
     {
         var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -560,13 +613,13 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
                     break;
                 case "raid":
                     var raid = (RaidEventComponent)RuntimeHelpers.GetUninitializedObject(typeof(RaidEventComponent));
-                    raid.MapEvent = VillageMapEvent(MapEvent.BattleTypes.Raid);
+                    raid.MapEvent = VillageMapEvent(ClientA, settlementId, MapEvent.BattleTypes.Raid);
                     quest.OnRaidCompleted(BattleSideEnum.Attacker, raid);
                     break;
                 case "coercion":
                     var village = Assert.IsType<Settlement>(quest.QuestGiver.CurrentSettlement);
                     village._notablesCache.Add(quest.QuestGiver);
-                    quest.OnMapEventStarted(VillageMapEvent(MapEvent.BattleTypes.IsForcingSupplies), PartyBase.MainParty, null);
+                    quest.OnMapEventStarted(VillageMapEvent(ClientA, settlementId, MapEvent.BattleTypes.IsForcingSupplies), PartyBase.MainParty, null);
                     break;
             }
 
@@ -586,9 +639,9 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
     }
 
     // A map event at the giver's village, so the quest's vanilla listener would act on it
-    private MapEvent VillageMapEvent(MapEvent.BattleTypes type)
+    private MapEvent VillageMapEvent(EnvironmentInstance instance, string targetSettlementId, MapEvent.BattleTypes type)
     {
-        Assert.True(ClientA.ObjectManager.TryGetObject<Settlement>(settlementId, out var village));
+        Assert.True(instance.ObjectManager.TryGetObject<Settlement>(targetSettlementId, out var village));
 
         var mapEvent = (MapEvent)RuntimeHelpers.GetUninitializedObject(typeof(MapEvent));
         mapEvent._mapEventType = type;
@@ -598,17 +651,31 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
 
     private void Accept()
     {
-        ClientA.Call(() =>
+        Accept(ClientA, notableId);
+    }
+
+    private void Accept(EnvironmentInstance client, string targetNotableId)
+    {
+        client.Call(() =>
         {
-            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(targetNotableId, out var notable));
             notable.Issue.StartIssueWithQuest();
         }, QuestLogTexts);
     }
 
     private Quest QuestOf(EnvironmentInstance instance)
     {
+        return QuestOf(instance, notableId);
+    }
+
+    private Quest QuestOf(EnvironmentInstance instance, string targetNotableId)
+    {
         Quest quest = null!;
-        instance.Call(() => quest = QuestOfHere(instance));
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(targetNotableId, out var notable));
+            quest = Assert.IsType<Quest>(notable.Issue.IssueQuest);
+        });
         return quest;
     }
 
@@ -667,9 +734,14 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
 
     private void GiveTheNotableTheIssue(EnvironmentInstance instance, int payment)
     {
+        GiveTheNotableTheIssue(instance, notableId, IssueId, payment);
+    }
+
+    private void GiveTheNotableTheIssue(EnvironmentInstance instance, string targetNotableId, string targetIssueId, int payment)
+    {
         instance.Call(() =>
         {
-            Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(targetNotableId, out var notable));
             Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
             Assert.True(instance.ObjectManager.TryGetObject<Village>(villageId, out var village));
             Assert.True(instance.ObjectManager.TryGetObject<Clan>(giverClanId, out var giverClan));
@@ -695,7 +767,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
                 var issue = new Issue(notable);
                 RequestedItemField.SetValue(issue, DefaultItems.IronIngot1);
                 issue._promisedPayment = payment;
-                issue.StringId = IssueId;
+                issue.StringId = targetIssueId;
                 issue._issueState = IssueBase.IssueState.Ongoing;
 
                 Campaign.Current.IssueManager._issues.Add(notable, issue);
