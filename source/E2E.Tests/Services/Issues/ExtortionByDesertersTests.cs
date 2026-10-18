@@ -167,6 +167,31 @@ public class ExtortionByDesertersTests : IDisposable
         Assert.True(quest.IsOngoing);
     }
 
+    [Fact]
+    public void ClientIssueLifecycle_DoesNotPurgeAnIssueWhenSecurityChanges()
+    {
+        var otherPartyId = string.Empty;
+        Server.Call(() =>
+        {
+            otherPartyId = Server.Resolve<IPlayerManager>().Players
+                .Single(player => player.ControllerId == QuestScenario.ControllerB).MobilePartyId;
+        });
+        Other.Call(() =>
+        {
+            Assert.True(Other.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
+            Assert.True(Other.ObjectManager.TryGetObject<Town>(townComponentId, out var town));
+            Assert.True(Other.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var party));
+            var settlement = notable.CurrentSettlement;
+            Assert.NotNull(settlement);
+            using (new AllowedThread())
+            {
+                town.Security = 90;
+                Campaign.Current.IssueManager.OnSettlementEntered(party, settlement, Hero.MainHero);
+            }
+            Assert.NotNull(notable.Issue);
+        });
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(255)]
