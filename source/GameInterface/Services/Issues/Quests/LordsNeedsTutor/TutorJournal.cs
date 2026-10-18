@@ -46,8 +46,15 @@ internal sealed class TutorJournal : ITutorJournal
     {
         if (ModInformation.IsClient || quest._startQuestLog == null) return;
         var issue = TaleWorlds.CampaignSystem.Issues.IssueManager.GetIssueOfQuest(quest);
-        if (issue == null || !objects.TryGetId(quest.QuestGiver, out var giverId) ||
-            !ownerResolver.TryGetOwnerControllerId(issue, out var controller) || !players.TryGetPeer(controller, out var peer)) return;
+        if (issue == null || !objects.TryGetId(quest.QuestGiver, out var giverId)) return;
+        if (!ownerResolver.TryGetOwnerControllerId(issue, out var controller))
+        {
+            var owner = quest._youngHero.CompanionOf?.Leader;
+            if (owner == null || !objects.TryGetId(owner, out var ownerId)) return;
+            controller = players.Players.FirstOrDefault(player => player.HeroId == ownerId)?.ControllerId;
+            if (controller == null) return;
+        }
+        if (!players.TryGetPeer(controller, out var peer)) return;
         network.Send(peer, new NetworkTutorJournal
         {
             GiverId = giverId, IssueId = issue.StringId,

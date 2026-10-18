@@ -98,6 +98,8 @@ public sealed partial class LordsNeedsTutorTests
         Kill(giverId);
         environment.FlushCoalescer();
         Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        var journal = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkTutorJournal>());
+        Assert.Contains(journal.Entries, entry => entry.Text.ToString().Contains("died"));
         foreach (var instance in Instances)
             instance.Call(() =>
             {
