@@ -3,7 +3,6 @@ using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
-using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -18,7 +17,6 @@ namespace GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 
 internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
 {
-    private static readonly System.Reflection.FieldInfo RewardGoldField = AccessTools.Field(typeof(QuestBase), nameof(QuestBase.RewardGold));
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IIssueOwnerResolver ownerResolver;
@@ -43,7 +41,6 @@ internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolut
             return Array.Empty<byte>();
         }
 
-        var issueOwner = issue.IssueOwner;
         var capturedParty = quest._lesserNobleParty;
         if (capturedParty != null && capturedParty == MobileParty.MainParty) capturedParty = null;
         return Write(
@@ -67,7 +64,8 @@ internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolut
             return;
         }
 
-        Read(captured, out var nobleId, out var reward, out var dialogueReward, out var due, out var persuasion,
+        // Only the server applies a capture to a quest object, and it keeps its own rewards.
+        Read(captured, out var nobleId, out _, out _, out var due, out var persuasion,
             out var firstTalk, out var waiting, out var departure, out var notification, out var suitable, out var visited);
 
         if (!string.IsNullOrEmpty(nobleId) &&
@@ -77,8 +75,6 @@ internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolut
         }
 
         quest.QuestDueTime = new CampaignTime(due);
-        RewardGoldField.SetValue(quest, reward);
-        quest._rewardGold = dialogueReward;
         quest._persuasionTriedOnce = persuasion;
         quest._firstTalkIsDone = firstTalk;
         quest._checkForEventEnd = waiting;

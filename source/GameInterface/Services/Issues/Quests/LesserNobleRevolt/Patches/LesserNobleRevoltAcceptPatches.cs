@@ -1,9 +1,12 @@
 ﻿using Common;
+using GameInterface.Policies;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.LesserNobleRevoltIssueBehavior.LesserNobleRevoltIssueQuest;
 using Issue = TaleWorlds.CampaignSystem.Issues.LesserNobleRevoltIssueBehavior.LesserNobleRevoltIssue;
 
@@ -12,29 +15,9 @@ namespace GameInterface.Services.Issues.Quests.LesserNobleRevolt.Patches;
 [HarmonyPatch]
 internal static class LesserNobleRevoltAcceptPatches
 {
-    [HarmonyPatch(typeof(Issue), nameof(Issue.GenerateIssueQuest))]
-    [HarmonyPrefix]
-    private static bool GenerateQuest(Issue __instance, ref QuestBase __result)
-    {
-        return true;
-    }
-
     [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddDialogs))]
     [HarmonyPrefix]
-    private static bool AddDialogs(QuestBase __instance)
-    {
-        if (__instance is not Quest quest)
-        {
-            return true;
-        }
-
-        if (ModInformation.IsServer)
-        {
-            return false;
-        }
-
-        return true;
-    }
+    private static bool AddDialogs(QuestBase __instance) => __instance is not Quest || ModInformation.IsClient;
 
     [HarmonyPatch(typeof(Quest), MethodType.Constructor,
         new[] { typeof(string), typeof(Hero), typeof(CampaignTime), typeof(int), typeof(TextObject) })]
@@ -51,16 +34,15 @@ internal static class LesserNobleRevoltAcceptPatches
     [HarmonyPrefix]
     private static bool SpawnParty() => ModInformation.IsServer;
 
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnCanHeroBecomePrisonerInfoIsRequested))]
+    // Runs before TakePrisonerActionPatches, whose later prefix is then skipped, so a protected owner is
+    // neither captured nor parked through its PrisonerTaken postfix.
+    [HarmonyPatch(typeof(TakePrisonerAction), nameof(TakePrisonerAction.ApplyInternal))]
     [HarmonyPrefix]
-    private static bool CanBecomePrisoner(Quest __instance, Hero hero, ref bool result)
+    [HarmonyPriority(Priority.First)]
+    private static bool ProtectOwnerFromCapture(Hero prisonerCharacter)
     {
-        // The revolt owner must stay in the field while its battle is pending.
-        if (hero == Hero.MainHero && __instance._checkForEventEnd)
-        {
-            result = false;
-        }
-
-        return false;
+        return CallOriginalPolicy.IsOriginalAllowed() ||
+            ModInformation.IsClient ||
+            !LesserNobleRevoltWorldEventPatches.IsProtectedHero(prisonerCharacter);
     }
 }

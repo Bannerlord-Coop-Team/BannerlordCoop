@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using TaleWorlds.Localization;
 using TaleWorlds.CampaignSystem.Party;
 using Quest = TaleWorlds.CampaignSystem.Issues.LesserNobleRevoltIssueBehavior.LesserNobleRevoltIssueQuest;
 
@@ -41,7 +42,7 @@ internal sealed class LesserNobleRevoltPartyCreatedHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
-                !(issue.IssueQuest is Quest quest) ||
+                !(issue.IssueQuest is Quest quest) || !quest.IsOngoing ||
                 !objectManager.TryGetObjectWithLogging<MobileParty>(data.PartyId, out var party))
             {
                 return;
@@ -51,6 +52,17 @@ internal sealed class LesserNobleRevoltPartyCreatedHandler : IHandler
             if (!quest.IsTracked(party))
             {
                 quest.AddTrackedObject(party);
+            }
+
+            if (quest._discreteLog == null && quest._journalEntries != null)
+            {
+                var taskName = new TextObject("{=Y2Z6F5Fj}Support level of {MALE_LESSER_NOBLE_NAME}");
+                taskName.SetTextVariable("MALE_LESSER_NOBLE_NAME", quest._lesserNobleName);
+                quest._discreteLog = quest.AddDiscreteLog(
+                    quest.QuestStartedLogText,
+                    taskName,
+                    quest._visitedVillagesList.Count,
+                    20);
             }
 
             if (quest._suitableVillagesToVisitList.Count > 1 &&

@@ -1,6 +1,6 @@
-﻿using Common;
-using GameInterface.Policies;
+﻿using GameInterface.Policies;
 using HarmonyLib;
+using Common;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.GameState;

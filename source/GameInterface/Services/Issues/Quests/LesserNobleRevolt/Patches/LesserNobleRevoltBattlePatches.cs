@@ -17,7 +17,7 @@ internal static class LesserNobleRevoltBattlePatches
     [HarmonyPrefix]
     private static void PrepareMission(MapEventSide __instance)
     {
-        if (ModInformation.IsServer && ContainerProvider.TryResolve<IOutcomeDispatcher>(out _))
+        if (ModInformation.IsServer)
         {
             Prepare(__instance.MapEvent);
         }
@@ -44,7 +44,7 @@ internal static class LesserNobleRevoltBattlePatches
         {
             if (!quest.IsOngoing || quest._lesserNobleParty == null ||
                 !battle.InvolvedParties.Contains(quest._lesserNobleParty.Party) ||
-                !battle.InvolvedParties.Contains(quest.QuestGiver.PartyBelongedTo?.Party))
+                !battle.InvolvedParties.Contains(MobileParty.MainParty?.Party))
             {
                 return;
             }

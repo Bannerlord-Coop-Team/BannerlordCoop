@@ -19,11 +19,33 @@ internal static class LesserNobleRevoltConsequencePatches
     [HarmonyPrefix]
     private static bool FinalizeParty(Quest __instance)
     {
-        if (ModInformation.IsServer && __instance._lesserNobleParty?.IsActive == true)
+        ReleaseQuest(__instance);
+        return false;
+    }
+
+    // Dismissing a quest whose player left calls IssueFinalized, which drops IssueQuest without
+    // finalizing the quest, so the revolt party and its battle record are released here instead.
+    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
+    [HarmonyPrefix]
+    private static void ReleaseDismissedQuest(IssueBase __instance)
+    {
+        if (__instance is Issue && __instance.IssueQuest is Quest quest)
         {
-            DestroyPartyAction.Apply(null, __instance._lesserNobleParty);
+            ReleaseQuest(quest);
+        }
+    }
+
+    internal static void ReleaseQuest(Quest quest)
+    {
+        if (ModInformation.IsClient)
+        {
+            return;
         }
 
-        return false;
+        LesserNobleRevoltWorldEventPatches.ForgetOwnerBattle(quest);
+        if (quest._lesserNobleParty?.IsActive == true)
+        {
+            DestroyPartyAction.Apply(null, quest._lesserNobleParty);
+        }
     }
 }
