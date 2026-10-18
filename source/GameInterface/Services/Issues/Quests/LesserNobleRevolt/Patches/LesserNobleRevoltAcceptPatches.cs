@@ -1,5 +1,6 @@
 ﻿using Common;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Issues;
@@ -35,9 +36,20 @@ internal static class LesserNobleRevoltAcceptPatches
         return true;
     }
 
+    [HarmonyPatch(typeof(Quest), MethodType.Constructor,
+        new[] { typeof(string), typeof(Hero), typeof(CampaignTime), typeof(int), typeof(TextObject) })]
+    [HarmonyPrefix]
+    private static void UseClientPartyPlaceholder(Quest __instance)
+    {
+        if (ModInformation.IsClient)
+        {
+            // Vanilla dereferences this field after spawning. The real server party is attached by the handoff message.
+            __instance._lesserNobleParty = MobileParty.MainParty;
+        }
+    }
     [HarmonyPatch(typeof(Quest), nameof(Quest.SpawnLesserNobleParty))]
     [HarmonyPrefix]
-    private static bool SpawnParty() => true;
+    private static bool SpawnParty() => ModInformation.IsServer;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnCanHeroBecomePrisonerInfoIsRequested))]
     [HarmonyPrefix]

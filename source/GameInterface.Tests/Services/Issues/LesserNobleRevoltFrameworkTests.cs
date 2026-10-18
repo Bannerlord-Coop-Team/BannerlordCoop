@@ -1,9 +1,14 @@
 ﻿using Common.Util;
+using Common.Network;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.ObjectManager;
+using System.Collections.Generic;
 using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using Moq;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Localization;
 using Xunit;
 using Issue = TaleWorlds.CampaignSystem.Issues.LesserNobleRevoltIssueBehavior.LesserNobleRevoltIssue;
@@ -29,6 +34,28 @@ public class LesserNobleRevoltFrameworkTests
         Assert.Equal(issue.IssueDueTime, CampaignTime.Days(26f));
     }
 
+    [Fact]
+    public void AcceptCapture_RestoresDueTimeWhenTheServerPartyIsNotInTheClientCapture()
+    {
+        var issue = ObjectHelper.SkipConstructor<Issue>();
+        var quest = ObjectHelper.SkipConstructor<TaleWorlds.CampaignSystem.Issues.LesserNobleRevoltIssueBehavior.LesserNobleRevoltIssueQuest>();
+        quest._suitableVillagesToVisitList = new List<Settlement>();
+        quest._visitedVillagesList = new List<Settlement>();
+        quest.QuestDueTime = CampaignTime.Days(12f);
+        issue.IssueQuest = quest;
+
+        var strategy = new LesserNobleRevoltQuestSolutionAcceptStrategy(
+            new Mock<IObjectManager>().Object,
+            new Mock<INetwork>().Object,
+            new Mock<IIssueOwnerResolver>().Object,
+            new Mock<IIssueOwnershipRegistry>().Object);
+        var captured = strategy.Capture(issue);
+
+        quest.QuestDueTime = CampaignTime.Never;
+        strategy.Apply(issue, captured);
+
+        Assert.Equal(CampaignTime.Days(12f), quest.QuestDueTime);
+    }
     [Fact]
     public void BranchProofValues_AreStableForEveryVanillaEnding()
     {

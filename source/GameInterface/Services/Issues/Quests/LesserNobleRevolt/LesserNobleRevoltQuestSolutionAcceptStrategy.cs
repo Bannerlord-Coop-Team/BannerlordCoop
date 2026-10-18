@@ -1,4 +1,7 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+﻿using Common;
+using Common.Network;
+using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using System;
@@ -17,10 +20,20 @@ internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolut
 {
     private static readonly System.Reflection.FieldInfo RewardGoldField = AccessTools.Field(typeof(QuestBase), nameof(QuestBase.RewardGold));
     private readonly IObjectManager objectManager;
+    private readonly INetwork network;
+    private readonly IIssueOwnerResolver ownerResolver;
+    private readonly IIssueOwnershipRegistry ownership;
 
-    public LesserNobleRevoltQuestSolutionAcceptStrategy(IObjectManager objectManager)
+    public LesserNobleRevoltQuestSolutionAcceptStrategy(
+        IObjectManager objectManager,
+        INetwork network,
+        IIssueOwnerResolver ownerResolver,
+        IIssueOwnershipRegistry ownership)
     {
         this.objectManager = objectManager;
+        this.network = network;
+        this.ownerResolver = ownerResolver;
+        this.ownership = ownership;
     }
 
     public byte[] Capture(IssueBase issue)
@@ -31,8 +44,10 @@ internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolut
         }
 
         var issueOwner = issue.IssueOwner;
+        var capturedParty = quest._lesserNobleParty;
+        if (capturedParty != null && capturedParty == MobileParty.MainParty) capturedParty = null;
         return Write(
-            Id(quest._lesserNobleParty),
+            Id(capturedParty),
             quest.RewardGold,
             quest._rewardGold,
             quest.QuestDueTime.NumTicks,
@@ -55,12 +70,13 @@ internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolut
         Read(captured, out var nobleId, out var reward, out var dialogueReward, out var due, out var persuasion,
             out var firstTalk, out var waiting, out var departure, out var notification, out var suitable, out var visited);
 
-        if (!objectManager.TryGetObjectWithLogging<MobileParty>(nobleId, out var noble))
+        if (!string.IsNullOrEmpty(nobleId) &&
+            objectManager.TryGetObjectWithLogging<MobileParty>(nobleId, out var noble))
         {
-            return;
+            quest._lesserNobleParty = noble;
         }
 
-        quest._lesserNobleParty = noble;
+        quest.QuestDueTime = new CampaignTime(due);
         RewardGoldField.SetValue(quest, reward);
         quest._rewardGold = dialogueReward;
         quest._persuasionTriedOnce = persuasion;
@@ -70,6 +86,17 @@ internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolut
         quest._giveNotificationAfterHoursCounter = notification;
         quest._suitableVillagesToVisitList = Resolve(suitable);
         quest._visitedVillagesList = Resolve(visited);
+
+        if (ModInformation.IsClient || quest._lesserNobleParty == null ||
+            !ownerResolver.TryResolveOwnerHero(issue, out _) ||
+            !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var issueOwnerId) ||
+            !objectManager.TryGetIdWithLogging(quest._lesserNobleParty, out var partyId) ||
+            !ownership.TryGetOwner(issueOwnerId, issue.StringId, out var controllerId))
+        {
+            return;
+        }
+
+        network.SendAll(new NetworkLesserNobleRevoltPartyCreated(issueOwnerId, issue.StringId, controllerId, partyId));
     }
 
     private string Id(object value)
