@@ -166,14 +166,7 @@ internal static class LesserNobleRevoltWorldEventPatches
     [HarmonyPrefix]
     private static bool GameMenuOpenedPrefix() => ModInformation.IsServer;
 
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnWarDeclared))]
-    [HarmonyPrefix]
-    private static bool WarDeclaredPrefix() => ModInformation.IsServer;
-
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnClanChangedKingdom))]
-    [HarmonyPrefix]
-    private static bool ClanChangedKingdomPrefix() => ModInformation.IsServer;
-
+    // The server fails the quest when it times out, a client replaying the timeout only ends its copy
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
     [HarmonyPrefix]
     private static bool TimedOutPrefix() => ModInformation.IsServer;

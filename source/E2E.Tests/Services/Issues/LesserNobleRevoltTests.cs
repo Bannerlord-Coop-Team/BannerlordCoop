@@ -163,6 +163,31 @@ public sealed class LesserNobleRevoltTests : IDisposable
     }
 
     [Fact]
+    public void AWarAndAKingdomChangeReachTheOwnersQuestOnceOnTheServer()
+    {
+        const string issueId = "issue_lesser_noble";
+        const string controllerId = "player-A";
+        var server = testEnvironment.Server;
+
+        RegisterPlayer(controllerId);
+        AddIssueWithQuest(server, issueId);
+        server.Call(() => Assert.True(server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(giverId, issueId, controllerId)));
+        using var wars = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared)));
+        using var kingdoms = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom)));
+
+        // The framework relay runs the quest's own listeners as its owner, the quest adds no copy of its own.
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            CampaignEventDispatcher.Instance.OnWarDeclared(giver.MapFaction, giver.MapFaction, DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
+            CampaignEventDispatcher.Instance.OnClanChangedKingdom(giver.Clan, null, null, ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+        });
+
+        Assert.Equal(1, wars.CountFor(server));
+        Assert.Equal(1, kingdoms.CountFor(server));
+    }
+
+    [Fact]
     public void OwnerInARevoltBattle_IsNeitherCapturedNorParked()
     {
         // The guard must run before coop's capture prefix whatever order the patches were applied in.
