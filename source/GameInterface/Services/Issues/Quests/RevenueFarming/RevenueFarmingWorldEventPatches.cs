@@ -49,6 +49,10 @@ internal class RevenueFarmingWorldEventPatches
     [HarmonyPostfix]
     private static void BattleEndedPostfix(MapEvent mapEvent) => Run(quest => quest.OnMapEventEnded(mapEvent));
 
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnPlayerDesertedBattle))]
+    [HarmonyPostfix]
+    private static void PlayerDesertedPostfix(int sacrificedMenCount) => Run(quest => quest.OnPlayerDeserted(sacrificedMenCount));
+
     private static void Run(Action<Quest> action)
     {
         if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher)) dispatcher.RunAsOwners(action);
