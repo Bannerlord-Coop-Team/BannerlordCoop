@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Network;
-using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using System;
@@ -45,8 +44,6 @@ internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolut
         if (capturedParty != null && capturedParty == MobileParty.MainParty) capturedParty = null;
         return Write(
             Id(capturedParty),
-            quest.RewardGold,
-            quest._rewardGold,
             quest.QuestDueTime.NumTicks,
             quest._persuasionTriedOnce,
             quest._firstTalkIsDone,
@@ -65,7 +62,7 @@ internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolut
         }
 
         // Only the server applies a capture to a quest object, and it keeps its own rewards.
-        Read(captured, out var nobleId, out _, out _, out var due, out var persuasion,
+        Read(captured, out var nobleId, out var due, out var persuasion,
             out var firstTalk, out var waiting, out var departure, out var notification, out var suitable, out var visited);
 
         if (!string.IsNullOrEmpty(nobleId) &&
@@ -115,8 +112,6 @@ internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolut
 
     private byte[] Write(
         string nobleId,
-        int reward,
-        int dialogueReward,
         long due,
         bool persuasion,
         bool firstTalk,
@@ -130,8 +125,6 @@ internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolut
         using (var writer = new BinaryWriter(stream))
         {
             writer.Write(nobleId);
-            writer.Write(reward);
-            writer.Write(dialogueReward);
             writer.Write(due);
             writer.Write(persuasion);
             writer.Write(firstTalk);
@@ -154,8 +147,6 @@ internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolut
     private static void Read(
         byte[] captured,
         out string nobleId,
-        out int reward,
-        out int dialogueReward,
         out long due,
         out bool persuasion,
         out bool firstTalk,
@@ -169,8 +160,6 @@ internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolut
         using (var reader = new BinaryReader(stream))
         {
             nobleId = reader.ReadString();
-            reward = reader.ReadInt32();
-            dialogueReward = reader.ReadInt32();
             due = reader.ReadInt64();
             persuasion = reader.ReadBoolean();
             firstTalk = reader.ReadBoolean();

@@ -19,7 +19,7 @@ internal static class LesserNobleRevoltBattlePatches
     {
         if (ModInformation.IsServer)
         {
-            Prepare(__instance.MapEvent);
+            StripMilitia(__instance.MapEvent);
         }
     }
 
@@ -29,13 +29,15 @@ internal static class LesserNobleRevoltBattlePatches
     {
         if (ModInformation.IsServer)
         {
-            Prepare(__instance);
+            StripMilitia(__instance);
         }
     }
 
-    private static void Prepare(MapEvent battle)
+    private static void StripMilitia(MapEvent battle)
     {
-        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+        // AI battles are simulated every tick, so only a battle with a quest party looks for a revolt.
+        if (!battle.InvolvedParties.Any(party => party.IsMobile && party.MobileParty.IsCurrentlyUsedByAQuest) ||
+            !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
         {
             return;
         }

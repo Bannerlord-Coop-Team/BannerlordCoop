@@ -1,14 +1,14 @@
 ﻿using Common;
 using GameInterface.Policies;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using System.Linq;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.LesserNobleRevoltIssueBehavior.LesserNobleRevoltIssueQuest;
-using Issue = TaleWorlds.CampaignSystem.Issues.LesserNobleRevoltIssueBehavior.LesserNobleRevoltIssue;
 
 namespace GameInterface.Services.Issues.Quests.LesserNobleRevolt.Patches;
 
@@ -30,6 +30,7 @@ internal static class LesserNobleRevoltAcceptPatches
             __instance._lesserNobleParty = MobileParty.MainParty;
         }
     }
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.SpawnLesserNobleParty))]
     [HarmonyPrefix]
     private static bool SpawnParty() => ModInformation.IsServer;
@@ -39,10 +40,27 @@ internal static class LesserNobleRevoltAcceptPatches
     [HarmonyPatch(typeof(TakePrisonerAction), nameof(TakePrisonerAction.ApplyInternal))]
     [HarmonyPrefix]
     [HarmonyPriority(Priority.First)]
-    private static bool ProtectOwnerFromCapture(Hero prisonerCharacter)
+    private static bool ProtectOwnerFromCapture(PartyBase capturerParty, Hero prisonerCharacter)
     {
         return CallOriginalPolicy.IsOriginalAllowed() ||
             ModInformation.IsClient ||
-            !LesserNobleRevoltWorldEventPatches.IsProtectedHero(prisonerCharacter);
+            !(LesserNobleRevoltWorldEventPatches.IsProtectedHero(prisonerCharacter) ||
+              IsOwnRevoltParty(capturerParty, prisonerCharacter));
+    }
+
+    // Vanilla never lets the revolt party hold its owner, and destroying it later inside the owner's
+    // scope would strand them, so the owner is not captured even in a battle another player started.
+    internal static bool IsOwnRevoltParty(PartyBase capturerParty, Hero prisoner)
+    {
+        if (capturerParty == null || prisoner == null || Campaign.Current?.IssueManager == null ||
+            !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver))
+        {
+            return false;
+        }
+
+        return Campaign.Current.IssueManager.Issues.Values.Any(issue =>
+            issue.IssueQuest is Quest quest && quest.IsOngoing &&
+            quest._lesserNobleParty?.Party == capturerParty &&
+            ownerResolver.TryResolveOwnerHero(issue, out var owner) && owner == prisoner);
     }
 }

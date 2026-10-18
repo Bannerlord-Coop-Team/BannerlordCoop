@@ -69,6 +69,12 @@ internal static class LesserNobleRevoltWorldEventPatches
     [HarmonyPostfix]
     private static void SettlementEntered(MobileParty party, Settlement settlement, Hero hero)
     {
+        // Vanilla only reacts to its own revolt party, which is marked as used by a quest.
+        if (party?.IsCurrentlyUsedByAQuest != true)
+        {
+            return;
+        }
+
         RunAsOwners(quest =>
         {
             if (IsRevoltPartyVisit(quest, party))
@@ -198,7 +204,11 @@ internal static class LesserNobleRevoltWorldEventPatches
         var revoltWon = hasWinner &&
             mapEvent.GetMapEventSide(mapEvent.WinningSide).Parties.Any(entry => entry.Party == revoltParty);
 
-        var end = ClassifyBattleEnd(ownerStarted, ownerInvolved, hasWinner, revoltWon);
+        ApplyBattleEnd(quest, ClassifyBattleEnd(ownerStarted, ownerInvolved, hasWinner, revoltWon));
+    }
+
+    internal static void ApplyBattleEnd(Quest quest, RevoltBattleEnd end)
+    {
         if (end == RevoltBattleEnd.Ignored)
         {
             return;

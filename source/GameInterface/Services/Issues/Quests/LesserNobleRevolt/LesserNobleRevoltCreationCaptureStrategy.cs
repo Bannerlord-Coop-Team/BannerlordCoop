@@ -1,5 +1,4 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.ObjectManager;
 using System.IO;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -10,13 +9,6 @@ namespace GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 
 internal sealed class LesserNobleRevoltCreationCaptureStrategy : ICreationCaptureStrategy
 {
-    private readonly IObjectManager objectManager;
-
-    public LesserNobleRevoltCreationCaptureStrategy(IObjectManager objectManager)
-    {
-        this.objectManager = objectManager;
-    }
-
     public byte[] Capture(IssueBase issue)
     {
         var revolt = (Issue)issue;

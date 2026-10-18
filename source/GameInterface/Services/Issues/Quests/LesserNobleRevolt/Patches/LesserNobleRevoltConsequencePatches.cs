@@ -11,10 +11,6 @@ namespace GameInterface.Services.Issues.Quests.LesserNobleRevolt.Patches;
 [HarmonyPatch]
 internal static class LesserNobleRevoltConsequencePatches
 {
-    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.AlternativeSolutionStartConsequence))]
-    [HarmonyPrefix]
-    private static bool AlternativeStart(IssueBase __instance) => __instance is not Issue || ModInformation.IsServer;
-
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnFinalize))]
     [HarmonyPrefix]
     private static bool FinalizeParty(Quest __instance)
