@@ -422,6 +422,27 @@ public sealed class RevenueFarmingTests : IDisposable
         });
     }
 
+    [Fact]
+    public void UnchangedWorldCallbackDoesNotAdvanceRevisionOrRepublishState()
+    {
+        Accept();
+        int revision = 0;
+        int messages = 0;
+        Server.Call(() =>
+        {
+            revision = Session(Server).Revision;
+            messages = Server.NetworkSentMessages.GetMessages<NetworkRevenueFarmingState>().Count();
+            var settlement = Quest(Server).RevenueVillages[0].Village.Settlement;
+            CampaignEventDispatcher.Instance.OnSettlementOwnerChanged(settlement, false, null, null, null,
+                ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.ByRebellion);
+        });
+        Server.Call(() =>
+        {
+            Assert.Equal(revision, Session(Server).Revision);
+            Assert.Equal(messages, Server.NetworkSentMessages.GetMessages<NetworkRevenueFarmingState>().Count());
+        });
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

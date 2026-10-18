@@ -18,6 +18,7 @@ using System.IO;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
 using Xunit;
 
@@ -101,7 +102,9 @@ public class RevenueFarmingTests
         {
             var quest = ObjectHelper.SkipConstructor<Quest>();
             quest._questState = QuestBase.QuestStates.Ongoing;
-            var session = new RevenueFarmingSession(quest, ObjectHelper.SkipConstructor<Hero>(), "owner") { Revision = 9 };
+            var hero = ObjectHelper.SkipConstructor<Hero>();
+            hero.PartyBelongedTo = ObjectHelper.SkipConstructor<MobileParty>();
+            var session = new RevenueFarmingSession(quest, hero, "owner") { Revision = 9 };
             var sessions = new RevenueFarmingSessionStore(Mock.Of<IControllerIdProvider>());
             var actions = new RevenueFarmingActions(sessions, Mock.Of<IObjectManager>(),
                 Mock.Of<INetwork>());
