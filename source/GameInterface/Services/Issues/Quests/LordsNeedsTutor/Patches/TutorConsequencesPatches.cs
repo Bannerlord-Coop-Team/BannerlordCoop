@@ -53,8 +53,11 @@ internal class TutorConsequencesPatches
         if (__instance._startQuestLog == null) return false;
         // Vanilla cancels a dead giver's quest outside any owner scope, but the pupil cleanup checks the owner's clan.
         var issue = IssueManager.GetIssueOfQuest(__instance);
-        if (issue != null && ContainerProvider.TryResolve<IIssueOwnerResolver>(out var resolver) &&
-            resolver.TryResolveOwnerHero(issue, out var owner) && owner != Hero.MainHero)
+        Hero owner = null;
+        if (issue != null && ContainerProvider.TryResolve<IIssueOwnerResolver>(out var resolver))
+            resolver.TryResolveOwnerHero(issue, out owner);
+        if (owner == null) owner = __instance._youngHero.CompanionOf?.Leader;
+        if (owner != null && owner != Hero.MainHero)
             __state = new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo);
         return true;
     }

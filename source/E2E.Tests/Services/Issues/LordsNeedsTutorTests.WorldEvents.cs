@@ -96,6 +96,7 @@ public sealed partial class LordsNeedsTutorTests
                 var pupil = Get<Hero>(instance, pupilId);
                 Assert.Null(Get<Hero>(instance, giverId).Issue);
                 Assert.Null(pupil.CompanionOf);
+                Assert.Same(Get<Hero>(instance, giverId).Clan, pupil.Clan);
                 Assert.Equal(0, Get<MobileParty>(instance, partyIds[0]).MemberRoster.GetTroopCount(pupil.CharacterObject));
                 foreach (var skill in Skills.All) Assert.Equal(originalFocus[skill.StringId], pupil.HeroDeveloper.GetFocus(skill));
                 if (instance == Owner)
@@ -156,6 +157,7 @@ public sealed partial class LordsNeedsTutorTests
                 var pupil = Get<Hero>(instance, pupilId);
                 Assert.Null(Get<Hero>(instance, giverId).Issue);
                 Assert.Null(pupil.CompanionOf);
+                Assert.Same(Get<Hero>(instance, giverId).Clan, pupil.Clan);
                 Assert.Equal(0, Get<MobileParty>(instance, partyIds[0]).MemberRoster.GetTroopCount(pupil.CharacterObject));
                 foreach (var skill in Skills.All) Assert.Equal(originalFocus[skill.StringId], pupil.HeroDeveloper.GetFocus(skill));
                 Assert.NotNull(Get<Hero>(instance, second.NotableId).Issue);
