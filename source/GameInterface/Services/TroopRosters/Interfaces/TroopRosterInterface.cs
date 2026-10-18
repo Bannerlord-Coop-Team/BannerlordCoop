@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
@@ -350,14 +351,25 @@ internal class TroopRosterInterface : ITroopRosterInterface
             return;
         }
 
+        var mainHero = mobileParty.LeaderHero;
+
         // Commit recruitment
+        bool hasPerk = mainHero.GetPerkValue(DefaultPerks.Leadership.FamousCommander);
         foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
         {
             hero.VolunteerTypes[index] = null;
             MessageBroker.Instance.Publish(this, new VolunteerTypesArrayUpdated(hero, null, index));
 
             mobileParty.MemberRoster.AddToCounts(characterObject, 1, false, 0, 0, true, -1);
-            CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
+            if (hasPerk)
+            {
+                mobileParty.MemberRoster.AddXpToTroop(characterObject, (int)DefaultPerks.Leadership.FamousCommander.SecondaryBonus * 1);
+            }
+            SkillLevelingManager.OnTroopRecruited(mainHero, 1, characterObject.Tier);
+            if (characterObject.Occupation == Occupation.Bandit)
+            {
+                SkillLevelingManager.OnBanditsRecruited(mobileParty, characterObject, 1);
+            }
         }
 
         GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, cost, false);
