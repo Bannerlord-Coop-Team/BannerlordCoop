@@ -58,7 +58,7 @@ internal class HeadmanHerdWorldEventPatches
     private static void GiverDeathStartedPrefix(Hero victim, out Issue __state)
     {
         __state = null;
-        if (!ModInformation.IsServer || !(victim.Issue is Issue issue) || !issue.IsSolvingWithAlternative)
+        if (!ModInformation.IsServer || !victim.IsAlive || !(victim.Issue is Issue issue) || !issue.IsSolvingWithAlternative)
             return;
 
         pendingGiverDeaths.Add(issue);
@@ -67,10 +67,16 @@ internal class HeadmanHerdWorldEventPatches
 
     [HarmonyPatch(typeof(KillCharacterAction), nameof(KillCharacterAction.ApplyInternal))]
     [HarmonyPostfix]
-    private static void GiverDeathCompletedPostfix(Issue __state)
+    private static void GiverDeathCompletedPostfix(Hero victim, Issue __state)
     {
-        if (__state != null)
-            TryCancelCompanions(__state);
+        if (__state == null) return;
+        if (victim.IsAlive)
+        {
+            pendingGiverDeaths.Remove(__state);
+            return;
+        }
+
+        TryCancelCompanions(__state);
     }
 
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.TryToMakeTroopsReturn))]
@@ -110,6 +116,12 @@ internal class HeadmanHerdWorldEventPatches
 
     private static void TryCancelCompanions(Issue issue)
     {
+        if (issue.IssueOwner.IsAlive)
+        {
+            pendingGiverDeaths.Remove(issue);
+            return;
+        }
+
         if (!ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var cleanup)) return;
         if (!cleanup.HasRememberedParty(issue))
         {

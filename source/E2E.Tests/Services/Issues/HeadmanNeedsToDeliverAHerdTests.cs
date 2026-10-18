@@ -442,6 +442,26 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         }
     }
 
+    [Fact]
+    public void GiverDeathActionThatDoesNotKill_DoesNotCancelTheCompanionMission()
+    {
+        StartCompanions();
+        Server.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                var giver = Object<Hero>(Server, scenario.NotableId);
+                giver.ChangeState(Hero.CharacterStates.Dead);
+                giver.AddDeathMark(null, KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge);
+                KillCharacterAction.ApplyByDeathMarkForced(giver, false);
+            }
+        });
+        environment.FlushCoalescer();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Server.Call(() => Assert.True(Object<Hero>(Server, scenario.NotableId).Issue.IsSolvingWithAlternative));
+    }
+
     private (string CompanionId, string TroopId) StartCompanions()
     {
         var companionId = environment.CreateRegisteredObject<Hero>();

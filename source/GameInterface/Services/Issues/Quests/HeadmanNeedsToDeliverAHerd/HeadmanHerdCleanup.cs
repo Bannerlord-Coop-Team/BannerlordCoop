@@ -35,11 +35,11 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
             questIssueIds[issue.IssueQuest.StringId] = issue.StringId;
     }
 
-    public bool HasRememberedParty(IssueBase issue) => parties.ContainsKey(issue.StringId);
+    public bool HasRememberedParty(IssueBase issue) => !string.IsNullOrEmpty(issue.StringId) && parties.ContainsKey(issue.StringId);
 
     public bool ReturnAlternativeTroops(IssueBase issue)
     {
-        if (!parties.TryGetValue(issue.StringId, out var party) || party == null)
+        if (string.IsNullOrEmpty(issue.StringId) || !parties.TryGetValue(issue.StringId, out var party) || party == null)
             return false;
 
         foreach (var element in issue.AlternativeSolutionSentTroops.GetTroopRoster())
@@ -64,7 +64,7 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
     public void RemoveRemaining(Quest quest)
     {
         var issueId = IssueManager.GetIssueOfQuest(quest)?.StringId;
-        if (issueId == null)
+        if (issueId == null && !string.IsNullOrEmpty(quest.StringId))
             questIssueIds.TryGetValue(quest.StringId, out issueId);
 
         if (parties.TryGetValue(issueId ?? string.Empty, out var party) && party != null)
