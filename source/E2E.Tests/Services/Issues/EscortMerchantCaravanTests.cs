@@ -36,8 +36,15 @@ public class EscortMerchantCaravanTests : IDisposable
     private static MobileParty? observedHourlyParty;
     private static PartyBase? observedAttacker;
     private static int observedReroutes;
+    private static MobileParty? observedMainParty;
+    private static Hero? observedMainHero;
 
-    private static void ObserveReroute() => observedReroutes++;
+    private static void ObserveReroute()
+    {
+        observedReroutes++;
+        observedMainParty = MobileParty.MainParty;
+        observedMainHero = Hero.MainHero;
+    }
     private static readonly MethodBase[] WithoutWorldSetup =
     {
         AccessTools.Method(typeof(Quest), nameof(Quest.SpawnCaravan)),
@@ -810,15 +817,20 @@ public class EscortMerchantCaravanTests : IDisposable
         {
             Server.NetworkSentMessages.Clear();
             observedReroutes = 0;
+            observedMainParty = null;
+            observedMainHero = null;
             Server.Call(() =>
             {
                 var quest = QuestOn(Server);
                 quest._questCaravanMobileParty = Server.GetRegisteredObject<MobileParty>(caravanId);
-                Assert.True(Server.ObjectManager.TryGetObject<Hero>(Server.Resolve<IPlayerManager>().Players
-                    .Single(player => player.ControllerId == QuestScenario.ControllerA).HeroId, out var owner));
+                var ownerPlayer = Server.Resolve<IPlayerManager>().Players.Single(player => player.ControllerId == QuestScenario.ControllerA);
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerPlayer.HeroId, out var owner));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPlayer.MobilePartyId, out var ownerParty));
                 CampaignEventDispatcher.Instance.OnWarDeclared(owner.MapFaction, owner.MapFaction,
                     DeclareWarAction.DeclareWarDetail.CausedByRebellion);
                 Assert.True(quest.IsOngoing);
+                Assert.Same(ownerParty, observedMainParty);
+                Assert.Same(owner, observedMainHero);
             });
 
             Assert.Equal(1, observedReroutes);
