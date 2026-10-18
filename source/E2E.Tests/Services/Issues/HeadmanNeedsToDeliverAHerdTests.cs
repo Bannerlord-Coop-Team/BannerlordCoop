@@ -380,7 +380,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     [InlineData(true)]
     public void CompanionSolution_RunsOnServerAndReturnsOnlyTheOwnersTroops(bool fail)
     {
-        StartCompanions();
+        var (companionId, troopId) = StartCompanions();
 
         Server.Call(() =>
         {
@@ -490,7 +490,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     [Fact]
     public void FinalizationAfterGiverRegistryRemoval_StillReachesClients()
     {
-        var (companionId, troopId) = StartCompanions();
+        StartCompanions();
         Server.Call(() =>
         {
             var giver = Object<Hero>(Server, scenario.NotableId);
