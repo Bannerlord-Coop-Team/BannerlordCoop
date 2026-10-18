@@ -10,8 +10,10 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.LordWantsRivalCaptured;
 using GameInterface.Services.MapEvents;
+using HarmonyLib;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.TroopRosters.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encyclopedia;
@@ -218,6 +220,7 @@ public class LordWantsRivalCapturedTests : IDisposable
     public void TheFirstCounterOffer_MakesTheTargetTheOwnersPrisonerOnTheServer()
     {
         Accept(ClientA, giverId);
+        AllocateTargetPrisonerLoot();
 
         ClientA.Call(() =>
         {
@@ -234,6 +237,38 @@ public class LordWantsRivalCapturedTests : IDisposable
             Assert.Same(Get<MobileParty>(Server, playerA.MobilePartyId).Party, target.PartyBelongedToAsPrisoner);
             Assert.True(QuestOf(Server, giverId)._firstCounterOfferMade);
         });
+    }
+
+    [Fact]
+    public void AValidOwnerCannotCaptureAFreeTargetWithoutAnAllocatedCapture()
+    {
+        Accept(ClientA, giverId);
+        var gold = GoldOnServer(playerA);
+        string[] journal = null;
+        MobileParty targetParty = null;
+
+        Server.Call(() =>
+        {
+            var target = Get<Hero>(Server, targetId);
+            targetParty = target.PartyBelongedTo;
+            journal = QuestOf(Server, giverId).JournalEntries.Select(log => log.LogText.ToString()).ToArray();
+        });
+
+        ClientA.Call(() => QuestOf(ClientA, giverId).FirstCounterOfferFinished());
+
+        Server.Call(() =>
+        {
+            var target = Get<Hero>(Server, targetId);
+            Assert.False(target.IsPrisoner);
+            Assert.Null(target.PartyBelongedToAsPrisoner);
+            Assert.Equal(1, targetParty.MemberRoster.GetTroopCount(target.CharacterObject));
+            Assert.Equal(gold, Get<Hero>(Server, playerA.HeroId).Gold);
+            Assert.Equal(journal, QuestOf(Server, giverId).JournalEntries.Select(log => log.LogText.ToString()).ToArray());
+            Assert.True(QuestOf(Server, giverId).IsOngoing);
+            Assert.False(QuestOf(Server, giverId)._firstCounterOfferMade);
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
     [Fact]
@@ -502,6 +537,18 @@ public class LordWantsRivalCapturedTests : IDisposable
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
     }
 
+    [Theory]
+    [InlineData(nameof(CampaignEventDispatcher.OnWarDeclared))]
+    [InlineData(nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
+    public void WarAndKingdomChange_AreLeftToTheFrameworkRelay(string dispatcherEvent)
+    {
+        // The framework's QuestEventRelay already runs the quest's own listener, a quest postfix would run it twice
+        var patches = Harmony.GetPatchInfo(AccessTools.Method(typeof(CampaignEventDispatcher), dispatcherEvent));
+        Assert.NotNull(patches);
+        Assert.DoesNotContain(patches.Postfixes, patch => patch.PatchMethod.DeclaringType?.Namespace?.Contains("LordWantsRivalCaptured") == true);
+        Assert.Contains(patches.Postfixes, patch => patch.PatchMethod.DeclaringType?.Name == "QuestWorldEventRelayPatches");
+    }
+
     // The giver and the owner both leave the settlement, and the server holds the owner's map conversation with the giver's party when engaged
     private void MeetTheGiverOnTheMap(bool engage)
     {
@@ -659,6 +706,17 @@ public class LordWantsRivalCapturedTests : IDisposable
         {
             TakePrisonerAction.Apply(captor, Get<Hero>(Server, targetId));
             Assert.Same(captor, Get<Hero>(Server, targetId).PartyBelongedToAsPrisoner);
+        });
+    }
+
+    private void AllocateTargetPrisonerLoot()
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetHandle(Get<Hero>(Server, targetId).CharacterObject, out var targetHandle));
+            Server.Resolve<LordWantsRivalCapturedFinalizationProofStrategy>().RecordPendingCaptures(
+                playerA,
+                new TroopRosterData(new[] { new TroopRosterElementData(targetHandle, 1, 0, 0) }));
         });
     }
 

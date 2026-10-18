@@ -1,9 +1,14 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using Quest = TaleWorlds.CampaignSystem.Issues.LordWantsRivalCapturedIssueBehavior.LordWantsRivalCapturedIssueQuest;
@@ -11,8 +16,8 @@ using Quest = TaleWorlds.CampaignSystem.Issues.LordWantsRivalCapturedIssueBehavi
 namespace GameInterface.Services.Issues.Quests.LordWantsRivalCaptured.Patches;
 
 /// <summary>
-/// The server's copy of the quest is never started, and kills and captures do not run on clients, so the
-/// server runs the quest's world event listeners as each owning player.
+/// The server runs the world event listeners the framework's QuestEventRelay does not cover as each owning player:
+/// kills, the quest's own prisoner listener (named OnPrisonerTaken, not OnHeroPrisonerTaken) and map events.
 /// </summary>
 [HarmonyPatch(typeof(CampaignEventDispatcher))]
 internal class LordWantsRivalCapturedWorldEventPatches
@@ -29,20 +34,6 @@ internal class LordWantsRivalCapturedWorldEventPatches
     private static void HeroPrisonerTakenPostfix(PartyBase capturer, Hero prisoner)
     {
         RunAsOwners(quest => quest.OnPrisonerTaken(capturer, prisoner));
-    }
-
-    [HarmonyPatch(nameof(CampaignEventDispatcher.OnWarDeclared))]
-    [HarmonyPostfix]
-    private static void WarDeclaredPostfix(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail)
-    {
-        RunAsOwners(quest => quest.OnWarDeclared(faction1, faction2, declareWarDetail));
-    }
-
-    [HarmonyPatch(nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
-    [HarmonyPostfix]
-    private static void ClanChangedKingdomPostfix(Clan clan, Kingdom oldKingdom, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail actionDetail, bool showNotification)
-    {
-        RunAsOwners(quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
     }
 
     [HarmonyPatch(nameof(CampaignEventDispatcher.OnMapEventStarted))]
@@ -91,4 +82,77 @@ internal class LordWantsRivalCapturedClientListenerPatches
     [HarmonyPatch(nameof(Quest.OnPlayerBattleEventEnded))]
     [HarmonyPrefix]
     private static bool OnPlayerBattleEventEndedPrefix() => ModInformation.IsServer;
+}
+
+[HarmonyPatch(typeof(Quest))]
+internal static class LordWantsRivalCapturedCaptureLifecyclePatches
+{
+    [HarmonyPatch(nameof(Quest.OnHeroPrisonerReleased))]
+    [HarmonyPrefix]
+    private static void OnHeroPrisonerReleasedPrefix(Hero prisoner)
+    {
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<LordWantsRivalCapturedFinalizationProofStrategy>(out var strategy))
+        {
+            strategy.ClearTargetPendingCaptures(prisoner);
+        }
+    }
+
+    [HarmonyPatch(nameof(Quest.OnPrisonerTaken))]
+    [HarmonyPrefix]
+    private static void OnPrisonerTakenPrefix(Hero prisoner)
+    {
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<LordWantsRivalCapturedFinalizationProofStrategy>(out var strategy))
+        {
+            strategy.ClearTargetPendingCaptures(prisoner);
+        }
+    }
+}
+
+[HarmonyPatch(typeof(MakeHeroFugitiveAction), nameof(MakeHeroFugitiveAction.Apply))]
+internal static class LordWantsRivalCapturedFugitivePatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(Hero fugitive)
+    {
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<LordWantsRivalCapturedFinalizationProofStrategy>(out var strategy))
+        {
+            strategy.ClearTargetPendingCaptures(fugitive);
+        }
+    }
+}
+
+[HarmonyPatch]
+internal static class LordWantsRivalCapturedFinalizationCleanupPatch
+{
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        yield return AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess));
+        yield return AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithFail));
+        yield return AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithCancel));
+        yield return AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithBetrayal));
+        yield return AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut));
+    }
+
+    [HarmonyPrefix]
+    private static void Prefix(QuestBase __instance)
+    {
+        if (__instance is Quest quest && ContainerProvider.TryResolve<LordWantsRivalCapturedFinalizationProofStrategy>(out var strategy))
+        {
+            strategy.ClearPendingCapture(quest);
+        }
+    }
+}
+
+[HarmonyPatch(typeof(PlayerManager), nameof(PlayerManager.ReplacePlayer))]
+internal static class LordWantsRivalCapturedPlayerReplacementPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(Player registeredPlayer, bool __result)
+    {
+        if (__result && ModInformation.IsServer &&
+            ContainerProvider.TryResolve<LordWantsRivalCapturedFinalizationProofStrategy>(out var strategy))
+        {
+            strategy.ClearPlayerPendingCaptures(registeredPlayer.ControllerId);
+        }
+    }
 }
