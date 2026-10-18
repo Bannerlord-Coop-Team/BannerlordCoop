@@ -58,7 +58,8 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
             RemoveRemaining(quest);
         if (!string.IsNullOrEmpty(issue.IssueQuest?.StringId))
             questIssueIds.Remove(issue.IssueQuest.StringId);
-        parties.Remove(issue.StringId);
+        if (!string.IsNullOrEmpty(issue.StringId))
+            parties.Remove(issue.StringId);
     }
 
     public void RemoveRemaining(Quest quest)
