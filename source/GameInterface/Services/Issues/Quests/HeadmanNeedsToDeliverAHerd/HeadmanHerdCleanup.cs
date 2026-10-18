@@ -25,8 +25,15 @@ internal interface IHeadmanHerdCleanup : IGameAbstraction
 internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
 {
     private Dictionary<string, MobileParty> parties = new Dictionary<string, MobileParty>();
+    private Dictionary<string, string> questIssueIds = new Dictionary<string, string>();
 
-    public void Remember(IssueBase issue, MobileParty party) => parties[issue.StringId] = party;
+    public void Remember(IssueBase issue, MobileParty party)
+    {
+        if (string.IsNullOrEmpty(issue.StringId)) return;
+        parties[issue.StringId] = party;
+        if (!string.IsNullOrEmpty(issue.IssueQuest?.StringId))
+            questIssueIds[issue.IssueQuest.StringId] = issue.StringId;
+    }
 
     public bool HasRememberedParty(IssueBase issue) => parties.ContainsKey(issue.StringId);
 
@@ -49,12 +56,18 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
     {
         if (issue.IssueQuest is Quest quest && quest.IsOngoing)
             RemoveRemaining(quest);
+        if (!string.IsNullOrEmpty(issue.IssueQuest?.StringId))
+            questIssueIds.Remove(issue.IssueQuest.StringId);
         parties.Remove(issue.StringId);
     }
 
     public void RemoveRemaining(Quest quest)
     {
-        if (parties.TryGetValue(IssueManager.GetIssueOfQuest(quest)?.StringId ?? string.Empty, out var party) && party != null)
+        var issueId = IssueManager.GetIssueOfQuest(quest)?.StringId;
+        if (issueId == null)
+            questIssueIds.TryGetValue(quest.StringId, out issueId);
+
+        if (parties.TryGetValue(issueId ?? string.Empty, out var party) && party != null)
         {
             var remaining = quest._animalCountToDeliver;
             foreach (var element in party.ItemRoster.ToArray())
@@ -71,7 +84,9 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
     public void SyncData(IDataStore dataStore)
     {
         dataStore.SyncData("coop_herd_cleanup_parties", ref parties);
+        dataStore.SyncData("coop_herd_cleanup_quest_issue_ids", ref questIssueIds);
         if (parties == null || ModInformation.IsClient) parties = new Dictionary<string, MobileParty>();
+        if (questIssueIds == null || ModInformation.IsClient) questIssueIds = new Dictionary<string, string>();
     }
 }
 

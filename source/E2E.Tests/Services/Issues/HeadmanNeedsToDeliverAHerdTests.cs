@@ -575,14 +575,23 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
 
     private sealed class CleanupDataStore : IDataStore
     {
-        private Dictionary<string, MobileParty>? saved;
+        private Dictionary<string, MobileParty>? savedParties;
+        private Dictionary<string, string>? savedQuestIssueIds;
         public bool IsLoading { get; set; }
         public bool IsSaving => !IsLoading;
 
         public bool SyncData<T>(string key, ref T data)
         {
-            if (IsLoading) data = (T)(object)(saved ?? new Dictionary<string, MobileParty>());
-            else saved = new Dictionary<string, MobileParty>((Dictionary<string, MobileParty>)(object)data!);
+            if (key == "coop_herd_cleanup_parties")
+            {
+                if (IsLoading) data = (T)(object)(savedParties ?? new Dictionary<string, MobileParty>());
+                else savedParties = new Dictionary<string, MobileParty>((Dictionary<string, MobileParty>)(object)data!);
+            }
+            else if (key == "coop_herd_cleanup_quest_issue_ids")
+            {
+                if (IsLoading) data = (T)(object)(savedQuestIssueIds ?? new Dictionary<string, string>());
+                else savedQuestIssueIds = new Dictionary<string, string>((Dictionary<string, string>)(object)data!);
+            }
             return true;
         }
     }
