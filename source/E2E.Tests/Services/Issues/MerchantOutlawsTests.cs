@@ -18,15 +18,18 @@ using Helpers;
 using LiteNetLib;
 using Moq;
 using System.Reflection;
+using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.ViewModelCollection;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit.Abstractions;
@@ -237,6 +240,82 @@ public class MerchantOutlawsTests : IDisposable
         Assert.Empty(ClientB.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
     }
 
+    [Fact]
+    public void OnlyTheOwnerIsToldAboutEachBandItHunts()
+    {
+        using var notices = new MethodCallRecorder(AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)));
+        Accept();
+        var targets = TargetIds();
+        Assert.True(Quest(Server)._totalPartyCount > 1);
+
+        Destroy(targets[0], scenario.PlayerB);
+        Assert.Equal(0, notices.Count);
+
+        Destroy(targets[1], scenario.PlayerA);
+        Assert.Equal(1, notices.CountFor(ClientA));
+        Assert.Equal(1, notices.Count);
+    }
+
+    [Fact]
+    public void TargetChangesMarkOnlyTheOwnersMap()
+    {
+        Accept();
+        var targetId = TargetIds().First();
+        var otherHideoutId = environment.CreateRegisteredObject<Hideout>();
+        var otherSettlementId = environment.CreateRegisteredObject<Settlement>();
+        Server.Call(() =>
+        {
+            using (new AllowedThread()) Get<Settlement>(Server, otherSettlementId).SetSettlementComponent(Get<Hideout>(Server, otherHideoutId));
+        });
+
+        Server.Call(() => CampaignEventDispatcher.Instance.OnSettlementLeft(
+            Get<MobileParty>(Server, targetId), Get<Settlement>(Server, hideoutSettlementId)), TextHelpers);
+        Assert.DoesNotContain(targetId, TargetIds());
+        ClientA.Call(() => Assert.DoesNotContain(Get<MobileParty>(ClientA, targetId), Quest(ClientA)._validPartiesList));
+
+        // Traffic through another hideout changes no target, so the owner is not sent anything.
+        var updates = Server.NetworkSentMessages.GetMessages<NetworkMerchantOutlawsProgress>().Count();
+        Server.Call(() =>
+        {
+            var party = Get<MobileParty>(Server, targetId);
+            var other = Get<Settlement>(Server, otherSettlementId);
+            CampaignEventDispatcher.Instance.OnSettlementEntered(party, other, null);
+            CampaignEventDispatcher.Instance.OnSettlementLeft(party, other);
+        }, TextHelpers);
+        Assert.DoesNotContain(targetId, TargetIds());
+        Assert.Equal(updates, Server.NetworkSentMessages.GetMessages<NetworkMerchantOutlawsProgress>().Count());
+
+        Server.Call(() =>
+        {
+            var party = Get<MobileParty>(Server, targetId);
+            using (new AllowedThread())
+            {
+                party.ActualClan.IsBanditFaction = true;
+                party.CurrentSettlement = Get<Settlement>(Server, settlementId);
+            }
+
+            CampaignEventDispatcher.Instance.HourlyTickParty(party);
+        }, TextHelpers);
+
+        Server.Call(() =>
+        {
+            var party = Get<MobileParty>(Server, targetId);
+            var quest = Quest(Server);
+            Assert.Contains(party, quest._validPartiesList);
+            Assert.True(quest.IsTracked(party));
+            // Joining clients load both managers with the save, so the server's targeting must not mark anything there.
+            Assert.False(Campaign.Current.VisualTrackerManager.CheckTracked(party));
+            Assert.Empty(CampaignUIHelper.GetQuestsRelatedToParty(party));
+        });
+        ClientA.Call(() =>
+        {
+            var party = Get<MobileParty>(ClientA, targetId);
+            Assert.Contains(party, Quest(ClientA)._validPartiesList);
+            Assert.True(Campaign.Current.VisualTrackerManager.CheckTracked(party));
+        });
+        ClientB.Call(() => Assert.False(Campaign.Current.VisualTrackerManager.CheckTracked(Get<MobileParty>(ClientB, targetId))));
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
@@ -363,45 +442,92 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Fact]
-    public void AnotherPlayerCanAcceptTheSameTypeFromAnotherGiver()
+    public void JoiningAKingdomAtWarWithTheGiverCancelsTheOwnersQuest()
     {
         Accept();
-        var giverId = environment.CreateRegisteredObject<Hero>();
+        var ownerQuest = Quest(ClientA);
+        var enemyId = environment.CreateRegisteredObject<Kingdom>();
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread()) Get<Hero>(instance, scenario.PlayerA.HeroId).Clan = Get<Clan>(instance, playerClanId);
+            });
+        }
+
+        Server.Call(() => DeclareWarAction.ApplyInternal(Get<Kingdom>(Server, kingdomId), Get<Kingdom>(Server, enemyId),
+            DeclareWarAction.DeclareWarDetail.Default), TextHelpers);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+
         Server.Call(() =>
         {
-            var giver = Get<Hero>(Server, giverId);
-            using (new AllowedThread())
-            {
-                giver.StayingInSettlement = Get<Settlement>(Server, settlementId);
-                giver.Occupation = Occupation.Merchant;
-                giver.Clan = Get<Clan>(Server, giverClanId);
-            }
-            var potential = new PotentialIssueData((in PotentialIssueData _, Hero owner) =>
-                new Issue(owner, Get<Hideout>(Server, hideoutId)), typeof(Issue), IssueBase.IssueFrequency.VeryCommon);
-            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in potential, giver));
-        });
-        foreach (var client in new[] { ClientA, ClientB })
+            var clan = Get<Clan>(Server, playerClanId);
+            var enemy = Get<Kingdom>(Server, enemyId);
+            using (new AllowedThread()) clan._kingdom = enemy;
+            CampaignEventDispatcher.Instance.OnClanChangedKingdom(clan, null, enemy,
+                ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+        }, TextHelpers);
+
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Assert.Contains(ownerQuest.JournalEntries, log => log.LogText?.ToString().Contains("now at war") == true);
+        AssertEndedEverywhere();
+    }
+
+    [Fact]
+    public void CoercingTheGiversVillageFailsOnlyTheCoercingOwnersQuest()
+    {
+        Accept();
+        var otherGiverId = AcceptFromAnotherGiver();
+        var ownerQuest = Quest(ClientA);
+        var villageId = environment.CreateRegisteredObject<Village>();
+        var boundId = environment.CreateRegisteredObject<Settlement>();
+        var boundTownId = environment.CreateRegisteredObject<Town>();
+        foreach (var instance in Instances)
         {
-            client.Call(() =>
+            instance.Call(() =>
             {
                 using (new AllowedThread())
                 {
-                    var giver = Get<Hero>(client, giverId);
-                    giver.StayingInSettlement = Get<Settlement>(client, settlementId);
-                    giver.Clan = Get<Clan>(client, giverClanId);
+                    var bound = Get<Settlement>(instance, boundId);
+                    bound.SetSettlementComponent(Get<Town>(instance, boundTownId));
+                    Get<Town>(instance, boundTownId).OwnerClan = Get<Clan>(instance, giverClanId);
+                    Get<Village>(instance, villageId)._bound = bound;
+                    var settlement = Get<Settlement>(instance, settlementId);
+                    settlement.SetSettlementComponent(Get<Village>(instance, villageId));
+                    settlement.CollectNotablesToCache();
                 }
             });
         }
-        ClientB.Call(() =>
+
+        var power = 0f;
+        Server.Call(() =>
         {
-            var player = Get<Hero>(ClientB, scenario.PlayerB.HeroId);
-            using (new MainHeroSubstitutionScope(player, player.PartyBelongedTo))
-            {
-                var issue = Get<Hero>(ClientB, giverId).Issue;
-                issue.StartIssueWithQuest();
-                Assert.IsType<Quest>(issue.IssueQuest).QuestAcceptedConsequences();
-            }
+            var giver = Get<Hero>(Server, scenario.NotableId);
+            power = giver.Power;
+            var forcing = (MapEvent)FormatterServices.GetUninitializedObject(typeof(MapEvent));
+            forcing._mapEventType = MapEvent.BattleTypes.IsForcingSupplies;
+            forcing.MapEventSettlement = Get<Settlement>(Server, settlementId);
+            CampaignEventDispatcher.Instance.OnMapEventStarted(forcing, Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).Party, null);
         }, TextHelpers);
+
+        Assert.Equal(IssueOutcome.QuestFail, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Assert.Contains(ownerQuest.JournalEntries, log => log.LogText?.ToString().Contains("no longer trusts you") == true);
+        Server.Call(() =>
+        {
+            var giver = Get<Hero>(Server, scenario.NotableId);
+            Assert.Equal(-5, giver.GetRelation(Get<Hero>(Server, scenario.PlayerA.HeroId)));
+            Assert.Equal(0, giver.GetRelation(Get<Hero>(Server, scenario.PlayerB.HeroId)));
+            Assert.Equal(power - 10f, giver.Power);
+            Assert.True(Get<Hero>(Server, otherGiverId).Issue.IssueQuest.IsOngoing);
+        });
+        ClientB.Call(() => Assert.Contains(Get<Hero>(ClientB, otherGiverId).Issue.IssueQuest, Campaign.Current.QuestManager.Quests));
+    }
+
+    [Fact]
+    public void AnotherPlayerCanAcceptTheSameTypeFromAnotherGiver()
+    {
+        Accept();
+        AcceptFromAnotherGiver();
 
         Assert.Equal(2, Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>().Count());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
@@ -545,6 +671,47 @@ public class MerchantOutlawsTests : IDisposable
             }
         }, TextHelpers);
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+    }
+
+    private string AcceptFromAnotherGiver()
+    {
+        var giverId = environment.CreateRegisteredObject<Hero>();
+        Server.Call(() =>
+        {
+            var giver = Get<Hero>(Server, giverId);
+            using (new AllowedThread())
+            {
+                giver.StayingInSettlement = Get<Settlement>(Server, settlementId);
+                giver.Occupation = Occupation.Merchant;
+                giver.Clan = Get<Clan>(Server, giverClanId);
+            }
+            var potential = new PotentialIssueData((in PotentialIssueData _, Hero owner) =>
+                new Issue(owner, Get<Hideout>(Server, hideoutId)), typeof(Issue), IssueBase.IssueFrequency.VeryCommon);
+            Assert.True(Campaign.Current.IssueManager.CreateNewIssue(in potential, giver));
+        });
+        foreach (var client in new[] { ClientA, ClientB })
+        {
+            client.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    var giver = Get<Hero>(client, giverId);
+                    giver.StayingInSettlement = Get<Settlement>(client, settlementId);
+                    giver.Clan = Get<Clan>(client, giverClanId);
+                }
+            });
+        }
+        ClientB.Call(() =>
+        {
+            var player = Get<Hero>(ClientB, scenario.PlayerB.HeroId);
+            using (new MainHeroSubstitutionScope(player, player.PartyBelongedTo))
+            {
+                var issue = Get<Hero>(ClientB, giverId).Issue;
+                issue.StartIssueWithQuest();
+                Assert.IsType<Quest>(issue.IssueQuest).QuestAcceptedConsequences();
+            }
+        }, TextHelpers);
+        return giverId;
     }
 
     private string[] TargetIds()

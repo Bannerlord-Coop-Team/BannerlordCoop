@@ -137,6 +137,9 @@ internal class QuestSolutionAcceptCoordinator : IHandler
                 }
             }
 
+            // Joining clients load this quest with the save, so nothing it tracks may show up as their quest
+            issue.IssueQuest.IsTrackEnabled = false;
+
             descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
         }
         catch (Exception e)

@@ -8,6 +8,7 @@ using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssueQuest;
 
@@ -57,6 +58,9 @@ internal class MerchantOutlawsProgressHandler : IHandler
 
             if (!(issue.IssueQuest is Quest quest)) return;
 
+            var hunted = data.Destroyed + data.Recruited;
+            // The server's progress step skips vanilla's per-band notice, the last band gets the success journal instead.
+            var announce = hunted > quest._questPartyProgress && hunted < quest._totalPartyCount;
             quest._destroyedPartyCount = data.Destroyed;
             quest._recruitedPartyCount = data.Recruited;
             foreach (var party in quest._validPartiesList)
@@ -72,7 +76,15 @@ internal class MerchantOutlawsProgressHandler : IHandler
                 if (!quest.IsTracked(party)) quest.AddTrackedObject(party);
             }
 
-            quest._questProgressLogTest?.UpdateCurrentProgress(data.Destroyed + data.Recruited);
+            quest._questProgressLogTest?.UpdateCurrentProgress(hunted);
+            if (announce)
+            {
+                var notice = new TextObject("{=xbVCRbUu}You hunted {CURRENT_COUNT}/{TOTAL_COUNT} gang of brigands.");
+                notice.SetTextVariable("CURRENT_COUNT", hunted);
+                notice.SetTextVariable("TOTAL_COUNT", quest._totalPartyCount);
+                MBInformationManager.AddQuickInformation(notice);
+            }
+
             if (!string.IsNullOrEmpty(data.FinalLog)) quest.AddLog(new TextObject("{=!}" + data.FinalLog));
         }, context: nameof(MerchantOutlawsProgressHandler));
     }

@@ -77,7 +77,7 @@ internal class MerchantOutlawsEventPatches
         {
             if (quest._validPartiesList.Contains(party)) return;
             quest.OnSettlementEntered(party, settlement, hero);
-            Send(quest);
+            if (quest._validPartiesList.Contains(party)) Send(quest);
         });
     }
 
@@ -88,8 +88,9 @@ internal class MerchantOutlawsEventPatches
         if (!settlement.IsHideout) return;
         RunAsOwners(quest =>
         {
+            if (!quest._validPartiesList.Contains(party)) return;
             quest.OnSettlementLeft(party, settlement);
-            Send(quest);
+            if (!quest._validPartiesList.Contains(party)) Send(quest);
         });
     }
 
