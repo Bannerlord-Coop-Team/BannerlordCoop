@@ -51,7 +51,12 @@ internal class RevenueFarmingWorldEventPatches
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnPlayerDesertedBattle))]
     [HarmonyPostfix]
-    private static void PlayerDesertedPostfix(int sacrificedMenCount) => Run(quest => quest.OnPlayerDeserted(sacrificedMenCount));
+    private static void PlayerDesertedPostfix(int sacrificedMenCount) => Run(quest =>
+    {
+        if (!ContainerProvider.TryResolve<IRevenueFarmingSessionStore>(out var sessions) ||
+            sessions.Get(quest) is not { } session) return;
+        using (new RevenueFarmingExecutionScope(session)) quest.OnPlayerDeserted(sacrificedMenCount);
+    });
 
     private static void Run(Action<Quest> action)
     {

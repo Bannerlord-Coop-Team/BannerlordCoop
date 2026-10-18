@@ -145,7 +145,7 @@ internal class RevenueFarmingDesertionPatch
     {
         if (ModInformation.IsClient && ContainerProvider.TryResolve<IRevenueFarmingActions>(out var actions))
             actions.Request(__instance, RevenueFarmingAction.Leave);
-        return false;
+        return ModInformation.IsServer && RevenueFarmingExecutionScope.Current?.Session.Quest == __instance;
     }
 }
 
