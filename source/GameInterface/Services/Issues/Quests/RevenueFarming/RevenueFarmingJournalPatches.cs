@@ -27,7 +27,7 @@ internal class RevenueFarmingDetachedDialoguePatch
 
     private static void Prefix(IssueBase __instance)
     {
-        if (!ModInformation.IsClient ||
+        if (ModInformation.IsServer ||
             !ContainerProvider.TryResolve<IRevenueFarmingSessionStore>(out var sessions) ||
             sessions.Get(__instance) is not { } session ||
             Campaign.Current.QuestManager.Quests.Contains(session.Quest)) return;
