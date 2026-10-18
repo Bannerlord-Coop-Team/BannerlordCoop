@@ -72,7 +72,6 @@ internal class EscortQuestPatches
     private static bool War(Quest __instance, IFaction faction1, IFaction faction2,
         TaleWorlds.CampaignSystem.Actions.DeclareWarAction.DeclareWarDetail detail)
     {
-        if (EscortQuestEventPatches.IsRunning) return true;
         EscortQuestEventPatches.RunOwned(__instance, quest =>
         {
             var caravan = quest._questCaravanMobileParty;

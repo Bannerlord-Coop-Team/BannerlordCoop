@@ -215,6 +215,7 @@ internal sealed class EscortProgressHandler : IHandler
                 quest._customPartyComponent = null;
                 quest._visitedSettlements = visited;
                 quest._daysSpentForEscorting = state.Days;
+                quest.QuestDueTime = new CampaignTime(state.DueTimeTicks);
                 quest._journalEntries.Clear();
                 quest._journalEntries.AddRange(logs);
                 quest._playerStartsQuestLog = logs.FirstOrDefault();
