@@ -21,6 +21,7 @@ internal class TutorWorldEventPatches
     [HarmonyPostfix]
     private static void OnHeroKilledPostfix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification) => Run(quest => quest.OnHeroKilled(victim, killer, detail, showNotification));
 
+    // War and kingdom changes reach the quest through QuestEventRelay, which looks for OnHeroPrisonerTaken and so misses this quest's OnPrisonerTaken
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroPrisonerTaken))]
     [HarmonyPostfix]
     private static void OnHeroPrisonerTakenPostfix(PartyBase capturer, Hero prisoner) => Run(quest => quest.OnPrisonerTaken(capturer, prisoner));
@@ -29,17 +30,9 @@ internal class TutorWorldEventPatches
     [HarmonyPostfix]
     private static void OnHeroGainedSkillPostfix(Hero hero, SkillObject skill, int change, bool shouldNotify) => Run(quest => quest.OnHeroGainedSkill(hero, skill, change, shouldNotify));
 
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
-    [HarmonyPostfix]
-    private static void OnWarDeclaredPostfix(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail) => Run(quest => quest.OnWarDeclared(faction1, faction2, declareWarDetail));
-
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnClanLeaderChanged))]
     [HarmonyPostfix]
     private static void OnClanLeaderChangedPostfix(Hero oldLeader, Hero newLeader) => Run(quest => quest.OnClanLeaderChanged(oldLeader, newLeader));
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
-    [HarmonyPostfix]
-    private static void OnClanChangedKingdomPostfix(Clan clan, Kingdom oldKingdom, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail actionDetail, bool showNotification) => Run(quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnCompanionRemoved))]
     [HarmonyPostfix]

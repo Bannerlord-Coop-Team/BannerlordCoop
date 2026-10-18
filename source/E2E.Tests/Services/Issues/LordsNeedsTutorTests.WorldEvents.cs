@@ -2,6 +2,7 @@
 using Common.Util;
 using E2E.Tests.Util;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.LordsNeedsTutor;
@@ -53,7 +54,7 @@ public sealed partial class LordsNeedsTutorTests
 
     private void KillPupil() => Kill(pupilId);
 
-    private void Kill(string heroId)
+    private void Kill(string heroId, int? killerPlayer = null)
     {
         var method = AccessTools.Method(typeof(Hero), nameof(Hero.ChangeState));
         var shim = Assert.Single(Harmony.GetPatchInfo(method).Prefixes, patch => patch.owner == "Coop.Testing");
@@ -61,7 +62,14 @@ public sealed partial class LordsNeedsTutorTests
         bootstrap.Unpatch(method, shim.PatchMethod);
         try
         {
-            Server.Call(() => KillCharacterAction.ApplyByMurder(Get<Hero>(Server, heroId), showNotification: false));
+            Server.Call(() =>
+            {
+                // An execution from a party screen runs on the server as the executing player
+                using var scope = killerPlayer is int i
+                    ? new MainHeroSubstitutionScope(Get<Hero>(Server, heroIds[i]), Get<MobileParty>(Server, partyIds[i]))
+                    : null;
+                KillCharacterAction.ApplyByMurder(Get<Hero>(Server, heroId), showNotification: false);
+            });
         }
         finally
         {
@@ -71,9 +79,10 @@ public sealed partial class LordsNeedsTutorTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void GiverDeathCancelsOnlyItsQuestAndReturnsThePupil(bool serverRestart)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void GiverDeathCancelsOnlyItsQuestAndReturnsThePupil(bool ownershipLost, bool observerKills)
     {
         Accept();
         var second = AcceptObserversQuest();
@@ -90,16 +99,20 @@ public sealed partial class LordsNeedsTutorTests
                     giver.Clan.SetLeader(leader);
                 }
             });
-        if (serverRestart)
+        // Only the ownership entry is dropped: a real restart also dismisses every active quest, covered by DismissalCleansUpThePupilWhenOwnerOrServerLeaves
+        if (ownershipLost)
             Server.Call(() =>
             {
                 Server.Resolve<IIssueOwnershipRegistry>().Remove(giverId);
             });
-        Kill(giverId);
+        Kill(giverId, observerKills ? 1 : null);
         environment.FlushCoalescer();
         Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         var journal = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkTutorJournal>());
         Assert.Contains(journal.Entries, entry => entry.Text.ToString().Contains("died"));
+        var received = Assert.Single(Owner.InternalMessages.GetMessages<NetworkTutorJournal>());
+        Assert.Contains(received.Entries, entry => entry.Text.ToString().Contains("died"));
+        Assert.Empty(Observer.InternalMessages.GetMessages<NetworkTutorJournal>());
         foreach (var instance in Instances)
             instance.Call(() =>
             {
