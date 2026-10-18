@@ -18,11 +18,11 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue;
@@ -49,6 +49,9 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestCanceledWarDeclaredLogText)),
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.PlayerHasNeededItemsLogText)),
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestFailedWithTimeOutLogText)),
+        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestGiverVillageRaidedLogText)),
+        AccessTools.PropertyGetter(typeof(Settlement), nameof(Settlement.EncyclopediaLinkWithName)),
+        AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)),
     };
 
     private static readonly MethodBase[] AlternativeSolutionLogTexts =
@@ -414,6 +417,19 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
             Assert.True(notable.Issue._areIssueEffectsResolved);
         }, AlternativeSolutionLogTexts);
 
+        // The owner still hears its troops are on their way back
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            var entriesBefore = notable.Issue.JournalEntries.Count;
+
+            notable.Issue.AlternativeSolutionIssueEffectClearTime = CampaignTime.Now;
+            Campaign.Current.IssueManager.DailyTick();
+
+            Assert.Equal(entriesBefore + 1, notable.Issue.JournalEntries.Count);
+            Assert.True(notable.Issue._areIssueEffectsResolved);
+        }, AlternativeSolutionLogTexts);
+
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
@@ -534,12 +550,14 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
                     quest.OnClanChangedKingdom(playerClan, null, null, ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
                     break;
                 case "raid":
-                    quest.OnRaidCompleted(BattleSideEnum.Attacker, (RaidEventComponent)RuntimeHelpers.GetUninitializedObject(typeof(RaidEventComponent)));
+                    var raid = (RaidEventComponent)RuntimeHelpers.GetUninitializedObject(typeof(RaidEventComponent));
+                    raid.MapEvent = VillageMapEvent(MapEvent.BattleTypes.Raid);
+                    quest.OnRaidCompleted(BattleSideEnum.Attacker, raid);
                     break;
                 case "coercion":
-                    var mapEvent = (MapEvent)RuntimeHelpers.GetUninitializedObject(typeof(MapEvent));
-                    mapEvent._mapEventType = MapEvent.BattleTypes.IsForcingSupplies;
-                    quest.OnMapEventStarted(mapEvent, PartyBase.MainParty, null);
+                    var village = Assert.IsType<Settlement>(quest.QuestGiver.CurrentSettlement);
+                    village._notablesCache.Add(quest.QuestGiver);
+                    quest.OnMapEventStarted(VillageMapEvent(MapEvent.BattleTypes.IsForcingSupplies), PartyBase.MainParty, null);
                     break;
             }
 
@@ -556,6 +574,17 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
                 Assert.NotNull(notable.Issue);
             });
         }
+    }
+
+    // A map event at the giver's village, so the quest's vanilla listener would act on it
+    private MapEvent VillageMapEvent(MapEvent.BattleTypes type)
+    {
+        Assert.True(ClientA.ObjectManager.TryGetObject<Settlement>(settlementId, out var village));
+
+        var mapEvent = (MapEvent)RuntimeHelpers.GetUninitializedObject(typeof(MapEvent));
+        mapEvent._mapEventType = type;
+        mapEvent.MapEventSettlement = village;
+        return mapEvent;
     }
 
     private void Accept()
