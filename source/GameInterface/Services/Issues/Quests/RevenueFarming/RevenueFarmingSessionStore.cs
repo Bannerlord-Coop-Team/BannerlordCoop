@@ -42,7 +42,7 @@ internal sealed class RevenueFarmingSessionStore : IRevenueFarmingSessionStore
     public RevenueFarmingSession Get(Quest quest) => sessions.FirstOrDefault(session => session.Quest == quest);
 
     public RevenueFarmingSession Get(IssueBase issue) => sessions.FirstOrDefault(session =>
-        session.Quest.QuestGiver == issue.IssueOwner && session.IssueId == issue.StringId);
+        session.Quest.QuestGiver == issue.IssueOwner && session.IssueId != null && session.IssueId == issue.StringId);
 
     public RevenueFarmingSession Get(Hero questGiver, string questId) => sessions.FirstOrDefault(session =>
         session.Quest.QuestGiver == questGiver && session.Quest.StringId == questId);
@@ -63,7 +63,8 @@ internal sealed class RevenueFarmingSessionStore : IRevenueFarmingSessionStore
         {
             if (session.PlayerHero != playerHero || session.ControllerId != controllerId)
                 throw new InvalidOperationException("Revenue Farming quest already has another owner.");
-            if (session.IssueId == null) session.IssueId = quest.QuestGiver?.Issue?.StringId;
+            if (session.IssueId == null && quest.QuestGiver?.Issue?.IssueQuest == quest)
+                session.IssueId = quest.QuestGiver.Issue.StringId;
             return session;
         }
 

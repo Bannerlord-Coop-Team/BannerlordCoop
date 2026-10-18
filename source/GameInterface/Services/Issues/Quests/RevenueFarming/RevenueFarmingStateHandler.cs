@@ -190,12 +190,12 @@ internal sealed class RevenueFarmingStateHandler : IHandler
             Settlement menuSettlement = null;
             if (state.MenuSettlementId != null &&
                 !objects.TryGetObjectWithLogging(state.MenuSettlementId, out menuSettlement)) return;
-            var villages = state.Villages.Select(value =>
+            var villages = new RevenueFarmingIssueBehavior.RevenueVillage[state.Villages.Length];
+            for (var i = 0; i < state.Villages.Length; i++)
             {
-                if (!objects.TryGetObjectWithLogging<Settlement>(value.SettlementId, out var settlement))
-                    throw new InvalidOperationException("Revenue Farming state references a missing village.");
-                return quest.RevenueVillages.Single(village => village.Village.Settlement == settlement);
-            }).ToArray();
+                if (!objects.TryGetObjectWithLogging<Settlement>(state.Villages[i].SettlementId, out var settlement)) return;
+                villages[i] = quest.RevenueVillages.Single(village => village.Village.Settlement == settlement);
+            }
             var newLog = state.Journal.Length > quest.JournalEntries.Count;
             var newPrompt = state.AwaitingPayment && (!session.AwaitingPayment || state.RefreshPresentation);
             using (new AllowedThread())
