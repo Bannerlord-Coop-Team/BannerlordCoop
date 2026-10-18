@@ -53,25 +53,7 @@ public class UnstuckMapPositionTests : MapEventTestBase
         var partyId = PrepareConnectedPlayer(StuckSpot);
         Server.Call(() => UseNavigationMesh(closestFaceCenter: ClosestUsableSpot));
 
-        // The same publish the server's behavior request packet handler makes for a client order.
-        Server.Call(() =>
-        {
-            var order = new PartyBehaviorUpdateData(
-                Compact(partyId, typeof(MobileParty)),
-                AiBehavior.GoToPoint,
-                null,
-                VillageGate,
-                StuckSpot,
-                AiBehavior.GoToPoint,
-                VillageGate,
-                MobileParty.NavigationType.Default)
-            {
-                OriginControllerId = ControllerId,
-                PartyMoveMode = MoveModeType.Point,
-                MoveTargetPoint = VillageGate,
-            };
-            Server.Resolve<IMessageBroker>().Publish(this, new UpdatePartyBehavior(ref order, alreadyOnGameThread: true));
-        });
+        SendMoveOrder(partyId, from: StuckSpot, to: VillageGate);
 
         Server.Call(() =>
         {
@@ -80,6 +62,47 @@ public class UnstuckMapPositionTests : MapEventTestBase
             Assert.Equal(MoveModeType.Point, party.PartyMoveMode);
             Assert.Equal(VillageGate, party.MoveTargetPoint);
             Assert.Equal(MobileParty.NavigationType.None, party._lastComputedPathNavigationType);
+        });
+        Client.Call(() => Assert.Equal(ClosestUsableSpot, Client.GetRegisteredObject<MobileParty>(partyId).Position));
+        AssertForcedPositionSent();
+    }
+
+    [Fact]
+    public void PlayerMoveOrder_WithinValidLandWithoutAGate_LeavesThePartyToMoveThere()
+    {
+        var partyId = PrepareConnectedPlayer(StuckSpot);
+        // The party stands on plain land of the gate free island that also holds the target.
+        Server.Call(() => UseNavigationMesh(closestFaceCenter: ClosestUsableSpot, stuckFace: CutOffLandFace));
+
+        SendMoveOrder(partyId, from: StuckSpot, to: CutOffSpot);
+
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(partyId);
+            Assert.Equal(StuckSpot, party.Position);
+            Assert.Equal(MoveModeType.Point, party.PartyMoveMode);
+            Assert.Equal(CutOffSpot, party.MoveTargetPoint);
+        });
+        Client.Call(() => Assert.Equal(StuckSpot, Client.GetRegisteredObject<MobileParty>(partyId).Position));
+        Assert.DoesNotContain(
+            Server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>(),
+            update => update.BehaviorUpdateData.ForcePosition);
+    }
+
+    [Fact]
+    public void PlayerMoveOrder_FromValidLandWithoutAGateToAnotherIsland_FreesTheServerCopy()
+    {
+        var partyId = PrepareConnectedPlayer(StuckSpot);
+        // The target lies on the main land, which native movement never reaches from this island.
+        Server.Call(() => UseNavigationMesh(closestFaceCenter: ClosestUsableSpot, stuckFace: CutOffLandFace));
+
+        SendMoveOrder(partyId, from: StuckSpot, to: VillageGate);
+
+        Server.Call(() =>
+        {
+            var party = Server.GetRegisteredObject<MobileParty>(partyId);
+            Assert.Equal(ClosestUsableSpot, party.Position);
+            Assert.Equal(VillageGate, party.MoveTargetPoint);
         });
         Client.Call(() => Assert.Equal(ClosestUsableSpot, Client.GetRegisteredObject<MobileParty>(partyId).Position));
         AssertForcedPositionSent();
@@ -198,6 +221,29 @@ public class UnstuckMapPositionTests : MapEventTestBase
             .Select(update => update.BehaviorUpdateData.MobilePartyId)
             .Distinct();
         Assert.Equal(2, forcedPartyIds.Count());
+    }
+
+    /// <summary>The same publish the server's behavior request packet handler makes for a client move order.</summary>
+    private void SendMoveOrder(string partyId, CampaignVec2 from, CampaignVec2 to)
+    {
+        Server.Call(() =>
+        {
+            var order = new PartyBehaviorUpdateData(
+                Compact(partyId, typeof(MobileParty)),
+                AiBehavior.GoToPoint,
+                null,
+                to,
+                from,
+                AiBehavior.GoToPoint,
+                to,
+                MobileParty.NavigationType.Default)
+            {
+                OriginControllerId = ControllerId,
+                PartyMoveMode = MoveModeType.Point,
+                MoveTargetPoint = to,
+            };
+            Server.Resolve<IMessageBroker>().Publish(this, new UpdatePartyBehavior(ref order, alreadyOnGameThread: true));
+        });
     }
 
     /// <summary>Registers a connected player whose party stands at <paramref name="position"/> on every instance.</summary>

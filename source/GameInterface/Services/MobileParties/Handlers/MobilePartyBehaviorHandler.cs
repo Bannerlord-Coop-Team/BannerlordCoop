@@ -169,7 +169,7 @@ internal class MobilePartyBehaviorHandler : IHandler
                 PublishAuthoritativeBehavior(party, data);
 
                 // A player order is the moment a frozen server copy shows: free it before it is ticked.
-                partyNavigationRepair.TryRepair(party, out _);
+                partyNavigationRepair.TryRepairForOrder(party);
             }
 
             if (attachedParties != null)

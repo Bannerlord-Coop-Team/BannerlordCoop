@@ -30,6 +30,15 @@ internal interface IPartyNavigationRepair
     /// <param name="previousPosition">The server position before the repair.</param>
     /// <returns>True when the party was moved.</returns>
     bool TryRepair(MobileParty party, out CampaignVec2 previousPosition);
+
+    /// <summary>
+    /// The repair a movement order runs. Unusable terrain is always repaired, but valid land on a
+    /// navigation island without a settlement gate is still navigable within itself, so the party
+    /// is only moved off it when its order targets a spot it cannot reach from there: another
+    /// island or an unusable spot.
+    /// </summary>
+    /// <returns>True when the party was moved.</returns>
+    bool TryRepairForOrder(MobileParty party);
 }
 
 /// <inheritdoc cref="IPartyNavigationRepair"/>
@@ -48,7 +57,13 @@ internal class PartyNavigationRepair : IPartyNavigationRepair
         this.messageBroker = messageBroker;
     }
 
-    public bool TryRepair(MobileParty party, out CampaignVec2 previousPosition)
+    public bool TryRepair(MobileParty party, out CampaignVec2 previousPosition) =>
+        TryRepair(party, forOrder: false, out previousPosition);
+
+    public bool TryRepairForOrder(MobileParty party) =>
+        TryRepair(party, forOrder: true, out _);
+
+    private bool TryRepair(MobileParty party, bool forOrder, out CampaignVec2 previousPosition)
     {
         previousPosition = party.Position;
 
@@ -64,6 +79,11 @@ internal class PartyNavigationRepair : IPartyNavigationRepair
         // Without a usable gate there is nothing to tell the connected map from a cut off island.
         if (islands.Count == 0) return false;
         if (IsUsable(previousPosition, navigation, islands)) return false;
+        // Valid land without a gate is still navigable within its island, so an order only moves
+        // the party off it when the order cannot be followed from there.
+        if (forOrder && NavigationHelper.IsPositionValidForNavigationType(previousPosition, navigation) &&
+            CanReachOrderTarget(party, previousPosition, navigation))
+            return false;
 
         if (!TryFindUsablePosition(previousPosition, navigation, islands, out var destination))
         {
@@ -127,6 +147,26 @@ internal class PartyNavigationRepair : IPartyNavigationRepair
 
         var island = position.Face.FaceIslandIndex;
         return island >= 0 && islands.Contains(island);
+    }
+
+    /// <summary>
+    /// Whether a party on valid land can follow its current order from there. A hold order or a
+    /// target on the same island is reachable, since native movement within one island works; a
+    /// target on another island or on an unusable spot never is, as native movement never crosses
+    /// islands.
+    /// </summary>
+    private static bool CanReachOrderTarget(MobileParty party, CampaignVec2 position, MobileParty.NavigationType navigation)
+    {
+        CampaignVec2 target;
+        if (party.PartyMoveMode == MoveModeType.Point)
+            target = party.MoveTargetPoint;
+        else if (party.MoveTargetParty != null)
+            target = party.MoveTargetParty.Position;
+        else
+            return true;
+
+        if (!NavigationHelper.IsPositionValidForNavigationType(target, navigation)) return false;
+        return target.Face.FaceIslandIndex == position.Face.FaceIslandIndex;
     }
 
     private HashSet<int> GetReachableIslands(MobileParty.NavigationType navigation)
