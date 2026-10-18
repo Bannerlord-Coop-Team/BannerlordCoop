@@ -84,21 +84,36 @@ internal class ScoutEnemyGarrisonsCreationCaptureStrategy : ICreationCaptureStra
             return false;
         }
 
-        using (var stream = new MemoryStream(captured))
+        try
         {
-            using (var reader = new BinaryReader(stream))
+            using (var stream = new MemoryStream(captured))
             {
-                for (var i = 0; i < TargetCount; i++)
+                using (var reader = new BinaryReader(stream))
                 {
-                    if (stream.Position >= stream.Length ||
-                        !objectManager.TryGetObjectWithLogging<Settlement>(reader.ReadString(), out var target))
+                    for (var i = 0; i < TargetCount; i++)
                     {
-                        return false;
-                    }
+                        if (stream.Position >= stream.Length ||
+                            !objectManager.TryGetObjectWithLogging<Settlement>(reader.ReadString(), out var target))
+                        {
+                            return false;
+                        }
 
-                    targets.Add(target);
+                        targets.Add(target);
+                    }
                 }
             }
+        }
+        catch (EndOfStreamException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (FormatException)
+        {
+            return false;
         }
 
         return true;

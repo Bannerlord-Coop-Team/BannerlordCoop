@@ -93,6 +93,37 @@ public class ScoutEnemyGarrisonsTests : IDisposable
     }
 
     [Fact]
+    public void CreationCapture_RefusesATargetCaptureCutAfterTheLengthPrefix()
+    {
+        var targetIds = CreateTargets();
+        byte[] captured = null!;
+
+        Server.Call(() => captured = Descriptor(Server).CreationCaptureStrategy.Capture(IssueWithTargets(Resolve(Server, targetIds))));
+
+        Client.Call(() =>
+        {
+            Assert.False(((ScoutEnemyGarrisonsCreationCaptureStrategy)Descriptor(Client).CreationCaptureStrategy).TryReadTargets(
+                captured.Take(StringLengthPrefixSize(captured)).ToArray(), out _));
+        });
+    }
+
+    [Fact]
+    public void CreationCapture_RefusesATargetCaptureCutInsideAString()
+    {
+        var targetIds = CreateTargets();
+        byte[] captured = null!;
+
+        Server.Call(() => captured = Descriptor(Server).CreationCaptureStrategy.Capture(IssueWithTargets(Resolve(Server, targetIds))));
+
+        Client.Call(() =>
+        {
+            var truncated = captured.Take(StringLengthPrefixSize(captured) + 1).ToArray();
+
+            Assert.False(((ScoutEnemyGarrisonsCreationCaptureStrategy)Descriptor(Client).CreationCaptureStrategy).TryReadTargets(truncated, out _));
+        });
+    }
+
+    [Fact]
     public void AcceptCapture_ForcesTheAccepterTargetsOntoTheMirror()
     {
         var accepterTargetIds = CreateTargets();
@@ -375,6 +406,16 @@ public class ScoutEnemyGarrisonsTests : IDisposable
         TestEnvironment.CreateRegisteredObject<Settlement>(),
         TestEnvironment.CreateRegisteredObject<Settlement>(),
     };
+
+    private static int StringLengthPrefixSize(byte[] captured)
+    {
+        var prefixSize = 0;
+        while ((captured[prefixSize++] & 0x80) != 0)
+        {
+        }
+
+        return prefixSize;
+    }
 
     private static Settlement[] Resolve(EnvironmentInstance instance, string[] ids) => ids
         .Select(id =>
