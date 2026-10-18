@@ -25,7 +25,6 @@ public class LordNeedsHorsesTests : IDisposable
     private const string IssueName = "LordNeedsHorsesIssue";
     private const string IssueId = "issue_lord_needs_horses";
     private const string ControllerId = "player-A";
-    private const int RequestedMounts = 4;
 
     private readonly string giverId;
     private readonly string ownerHeroId;
@@ -107,45 +106,6 @@ public class LordNeedsHorsesTests : IDisposable
 
             Assert.False(Descriptor().CreationCaptureStrategy.TryBuildDebugCapture(giver, out _));
         });
-    }
-
-    [Theory]
-    [InlineData(RequestedMounts - 1, false)]
-    [InlineData(RequestedMounts, true)]
-    public void TheServerOnlyCompletesTheHandInWhenTheOwnerCarriesTheMounts(int carried, bool completes)
-    {
-        var mount = DefaultItems.Grain;
-        var completed = false;
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
-
-            using (new AllowedThread())
-            {
-                party.ItemRoster.Clear();
-                party.ItemRoster.AddToCounts(mount, carried);
-            }
-
-            var quest = Uninitialized<Quest>();
-            AccessTools.Field(typeof(Quest), nameof(Quest._numMountsToBeDelivered)).SetValue(quest, RequestedMounts);
-            AccessTools.Field(typeof(Quest), nameof(Quest._mountObjectToBeDelivered)).SetValue(quest, mount);
-
-            var previousMainParty = Campaign.Current.MainParty;
-            Campaign.Current.MainParty = party;
-
-            try
-            {
-                completed = (bool)AccessTools.Method("GameInterface.Services.Issues.Quests.LordNeedsHorses.Patches.LordNeedsHorsesHandInPatch:Prefix")
-                    .Invoke(null, new object[] { quest })!;
-            }
-            finally
-            {
-                Campaign.Current.MainParty = previousMainParty;
-            }
-        });
-
-        Assert.Equal(completes, completed);
     }
 
     [Fact]

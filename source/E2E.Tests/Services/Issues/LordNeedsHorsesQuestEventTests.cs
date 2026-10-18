@@ -108,6 +108,48 @@ public class LordNeedsHorsesQuestEventTests : IDisposable
     }
 
     [Fact]
+    public void AHandInMovesTheMountsOnTheServerAndTheOwnersReplayDoesNotMoveThemAgain()
+    {
+        var mount = DefaultItems.Grain;
+        SetUpHandIn(mount, carried: 2 * Requested);
+
+        RequestSuccessFromClientA();
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(), message => message.Outcome == IssueOutcome.QuestSuccess);
+        Assert.Equal(Requested, MountsOf(Server, player.MobilePartyId, mount));
+        Assert.Equal(Requested, MountsOf(Server, captorPartyId, mount));
+        // The client's replay leaves the roster to the server's sync, which these test rosters are not registered for
+        Assert.Equal(2 * Requested, MountsOf(ClientA, player.MobilePartyId, mount));
+
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.Null(giver.Issue);
+        });
+    }
+
+    [Fact]
+    public void AHandInWithoutTheMountsIsRefusedOnTheServer()
+    {
+        var mount = DefaultItems.Grain;
+        SetUpHandIn(mount, carried: Requested - 1);
+
+        RequestSuccessFromClientA();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(Requested - 1, MountsOf(Server, player.MobilePartyId, mount));
+
+        foreach (var instance in new[] { Server, ClientA })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                Assert.True(giver.Issue.IssueQuest.IsOngoing);
+            });
+        }
+    }
+
+    [Fact]
     public void TheStartGoldComesOffOnlyOnTheServer()
     {
         const int Gold = 100000;
@@ -219,6 +261,78 @@ public class LordNeedsHorsesQuestEventTests : IDisposable
         }, LogTexts);
 
         Assert.Equal(1, calls.CountFor(Server));
+    }
+
+    // The issue asks for the mount, the owner carries some, and its quest runs on client A and the server
+    private void SetUpHandIn(ItemObject mount, int carried)
+    {
+        var clanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(player.HeroId, out var owner));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var ownerParty));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var giverParty));
+
+                using (new AllowedThread())
+                {
+                    owner.Clan = clan;
+                    giver._partyBelongedTo = giverParty;
+                    giverParty.ItemRoster.Clear();
+                    ownerParty.ItemRoster.Clear();
+                    ownerParty.ItemRoster.AddToCounts(mount, carried);
+
+                    if (instance == ClientA)
+                    {
+                        Campaign.Current.MainParty = ownerParty;
+                    }
+
+                    var issue = (Issue)giver.Issue;
+                    AccessTools.Field(typeof(Issue), nameof(Issue._mountObjectToBeDelivered)).SetValue(issue, mount);
+                    issue._numMountsToBeDelivered = Requested;
+                }
+            });
+        }
+
+        StartQuestOnClientA();
+        TestEnvironment.FlushCoalescer();
+
+        // The accept dialog's consequence starts the quest on the owner's machine
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            giver.Issue.IssueQuest.StartQuest();
+            Assert.Contains(giver.Issue.IssueQuest, Campaign.Current.QuestManager.Quests);
+        });
+    }
+
+    // What the hand-in dialog does on the owner's machine
+    private void RequestSuccessFromClientA()
+    {
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            giver.Issue.IssueQuest.CompleteQuestWithSuccess();
+        });
+
+        TestEnvironment.FlushCoalescer();
+    }
+
+    private static int MountsOf(EnvironmentInstance instance, string partyId, ItemObject mount)
+    {
+        var count = 0;
+
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            count = party.ItemRoster.GetItemNumber(mount);
+        });
+
+        return count;
     }
 
     private void StartQuestOnClientA()

@@ -64,10 +64,17 @@ internal class LordNeedsHorsesCreationCaptureStrategy : ICreationCaptureStrategy
     {
         captured = null;
 
+        if (issueOwner.PartyBelongedTo == null || issueOwner.Clan == null)
+        {
+            return false;
+        }
+
+        // Only rolls the mount and amount, the issue itself is created from the capture
         var issue = new Issue(issueOwner);
+        CampaignEventDispatcher.Instance.RemoveListeners(issue);
 
         // Only a clan or kingdom leader with few mounts keeps the issue alive past the next daily tick
-        if (issueOwner.PartyBelongedTo == null || !issue.IssueStayAliveConditions())
+        if (!issue.IssueStayAliveConditions())
         {
             return false;
         }
