@@ -209,11 +209,12 @@ public class SmugglersTests : IDisposable
     }
 
     [Fact]
-    public void SmugglersRoute_IsRunOnTheServersQuest()
+    public void SmugglersRoute_RunsOncePerHourOnTheServersQuest()
     {
         TickParty(Server, usedByQuest: true);
+        TickParty(Server, usedByQuest: true);
 
-        Assert.Equal(1, hourlyTickParty.CountFor(Server));
+        Assert.Equal(2, hourlyTickParty.CountFor(Server));
     }
 
     [Fact]
