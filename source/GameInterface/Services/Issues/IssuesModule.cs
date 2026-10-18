@@ -27,6 +27,7 @@ internal class IssuesModule : Module
         builder.RegisterType<EscortProgress>().As<IEscortProgress>().InstancePerDependency();
         builder.RegisterType<EscortOwnerParty>().As<IEscortOwnerParty>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
+        builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)
             .Where(IsQuestPiece)

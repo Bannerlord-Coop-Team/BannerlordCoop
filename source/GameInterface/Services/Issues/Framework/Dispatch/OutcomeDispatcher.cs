@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
@@ -32,13 +33,16 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
     {
         observed = null;
 
-        if (CallOriginalPolicy.IsOriginalAllowed())
+        var issue = IssueManager.GetIssueOfQuest(quest);
+        var registered = issue != null && registry.IsRegistered(issue.GetType());
+
+        // A vanilla listener replayed on a client can end a quest there, only the server's ending may
+        if (registered && ModInformation.IsClient && AllowedThread.IsThisThreadAllowed() && !QuestEndingReplay.IsActive)
         {
-            return true;
+            return false;
         }
 
-        var issue = IssueManager.GetIssueOfQuest(quest);
-        if (issue == null || !registry.IsRegistered(issue.GetType()))
+        if (CallOriginalPolicy.IsOriginalAllowed() || !registered)
         {
             return true;
         }
