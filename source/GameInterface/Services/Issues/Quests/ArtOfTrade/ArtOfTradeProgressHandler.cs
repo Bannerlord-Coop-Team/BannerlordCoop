@@ -127,9 +127,11 @@ internal sealed class ArtOfTradeProgressHandler : IHandler
         if (ModInformation.IsClient || !objects.TryGetIdWithLogging(quest.QuestGiver, out var giverId)) return;
         var issue = IssueManager.GetIssueOfQuest(quest);
         if (issue == null || !ownership.TryGetOwner(giverId, issue.StringId, out var owner)) return;
-        network.SendAll(new NetworkArtOfTradeJournal(giverId, issue.StringId, owner,
-            quest.JournalEntries.Skip(quest._soldItemAmountLog == null ? 0 : 5)
-                .Select(log => new ArtOfTradeJournalEntry(log)).ToArray()));
+        var entries = quest.JournalEntries.Skip(quest._soldItemAmountLog == null ? 0 : 5)
+            .Select(log => new ArtOfTradeJournalEntry(log)).ToArray();
+        // An ending without its own log has nothing new for the owner, and an empty array would arrive as null
+        if (entries.Length == 0) return;
+        network.SendAll(new NetworkArtOfTradeJournal(giverId, issue.StringId, owner, entries));
     }
 
     private void ReceiveJournal(MessagePayload<NetworkArtOfTradeJournal> payload)

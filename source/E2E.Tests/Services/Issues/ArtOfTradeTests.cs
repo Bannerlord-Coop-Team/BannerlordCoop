@@ -116,17 +116,21 @@ public class ArtOfTradeTests : IDisposable
     public void BuyingChecksTheOwnersGoldBeforeGrantingGoods(bool canPay, bool completes)
     {
         Accept();
-        var price = QuestOf(Owner)._targetDenarsToAchieve;
+        var quest = QuestOf(Owner);
+        var price = quest._targetDenarsToAchieve;
         SetGold(canPay ? price + 10 : price - 1);
         WithPlayer(Owner, () =>
         {
-            QuestOf(Owner).StartQuest();
-            QuestOf(Owner).QuestFinishedPlayerBoughtTheGoods();
+            quest.StartQuest();
+            quest.QuestFinishedPlayerBoughtTheGoods();
         });
         Assert.Equal(completes ? 1 : 0, Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>().Count());
         WithPlayer(Server, () => Assert.Equal(canPay ? 10 : price - 1, Hero.MainHero.Gold));
         if (completes) AssertFinished(IssueOutcome.QuestSuccess);
         else foreach (var instance in Instances) instance.Call(() => Assert.True(IssueOf(instance).IsOngoingWithoutQuest));
+        AssertEverywhere("owner renown", instance => Get<Clan>(instance, playerClanId).Renown, completes ? 1f : 0f);
+        WithPlayer(Owner, () => Assert.Equal(completes ? quest._selectedItemObjectCount : 0, MobileParty.MainParty.ItemRoster.GetItemNumber(Item(Owner))));
+        if (completes) Assert.Single(quest.JournalEntries, log => log.LogText.Value.StartsWith("{=rYt43AWk}"));
     }
 
     [Fact]
@@ -221,6 +225,8 @@ public class ArtOfTradeTests : IDisposable
         Assert.Equal(serverQuest.JournalEntries.Last().LogText.Value, ownerQuest.JournalEntries.Last().LogText.Value);
         Assert.Equal(expected == IssueOutcome.QuestSuccess ? 5 : -10 - ((price - payment) / 10), serverQuest.RelationshipChangeWithQuestGiver);
         Other.Call(() => Assert.Empty(Campaign.Current.QuestManager.Quests.OfType<Quest>()));
+        AssertGiverPower(expected == IssueOutcome.QuestFail ? -5f : 0f);
+        AssertEverywhere("owner renown", instance => Get<Clan>(instance, playerClanId).Renown, expected == IssueOutcome.QuestSuccess ? 1f : 0f);
     }
 
     [Fact]
@@ -277,7 +283,7 @@ public class ArtOfTradeTests : IDisposable
         var quest = QuestOf(Owner);
         WithPlayer(Owner, () => quest.CompleteQuestWithTimeOut());
         AssertFinished(IssueOutcome.QuestTimeOut);
-        Assert.Contains(quest.JournalEntries, log => log.LogText?.Value?.StartsWith("{=PQt8lfTX}") == true);
+        Assert.Single(quest.JournalEntries, log => log.LogText?.Value?.StartsWith("{=PQt8lfTX}") == true);
     }
 
     [Fact]
@@ -408,6 +414,7 @@ public class ArtOfTradeTests : IDisposable
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
             Assert.True(QuestOf(Owner).IsOngoing);
         }
+        AssertGiverPower(ownerAttacks ? -10f : 0f);
     }
 
     [Theory]
@@ -445,11 +452,21 @@ public class ArtOfTradeTests : IDisposable
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
         var serverIssue = IssueOf(Server);
         var ownerIssue = IssueOf(Owner);
+        foreach (var instance in new[] { Server, Owner })
+        {
+            instance.Call(() =>
+            {
+                using var allowed = new AllowedThread();
+                IssueOf(instance).AlternativeSolutionIssueEffectClearTime = CampaignTime.Now;
+            });
+        }
         if (clientFirst) WithPlayer(Owner, () => Campaign.Current.IssueManager.DailyTick());
         Server.Call(() => Campaign.Current.IssueManager.DailyTick(), NativePresentation);
         if (!clientFirst) WithPlayer(Owner, () => Campaign.Current.IssueManager.DailyTick());
         Assert.Equal(serverIssue.JournalEntries[0].CurrentProgress, ownerIssue.JournalEntries[0].CurrentProgress);
         Assert.Equal(1, ownerIssue.JournalEntries[0].CurrentProgress);
+        Assert.Single(ownerIssue.JournalEntries, log => log.LogText.Value.StartsWith("{=xbvQzR2B}"));
+        Assert.Equal(serverIssue.JournalEntries.Select(log => log.LogText.Value), ownerIssue.JournalEntries.Select(log => log.LogText.Value));
         int reward = 0;
         int otherGold = 0;
         int originalTroops = 0;
@@ -516,6 +533,7 @@ public class ArtOfTradeTests : IDisposable
         Commission();
         Server.Call(() => IssueOf(Server).CompleteIssueWithCancel(), NativePresentation);
         AssertFinished(IssueOutcome.QuestCancel);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkArtOfTradeJournal>());
     }
 
     private void Accept() => WithPlayer(Owner, () => IssueOf(Owner).StartIssueWithQuest());
@@ -542,6 +560,18 @@ public class ArtOfTradeTests : IDisposable
     {
         Assert.Equal(expected, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         foreach (var instance in Instances) instance.Call(() => Assert.Null(Giver(instance).Issue));
+    }
+
+    private void AssertGiverPower(float power) => AssertEverywhere("giver power", instance => Giver(instance).Power, power);
+
+    private void AssertEverywhere(string what, Func<EnvironmentInstance, float> read, float expected)
+    {
+        environment.FlushCoalescer();
+        foreach (var instance in Instances)
+        {
+            var name = instance == Server ? "server" : instance == Owner ? "owner" : "other";
+            instance.Call(() => Assert.True(read(instance) == expected, $"{name} {what} was {read(instance)}"));
+        }
     }
 
     private void WithPlayer(EnvironmentInstance instance, Action action, string controllerId = QuestScenario.ControllerA)

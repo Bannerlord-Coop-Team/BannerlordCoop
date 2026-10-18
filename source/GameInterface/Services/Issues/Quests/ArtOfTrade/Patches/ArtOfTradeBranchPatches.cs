@@ -1,9 +1,12 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using Helpers;
+using System.Collections.Generic;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
 using Quest = TaleWorlds.CampaignSystem.Issues.LandLordTheArtOfTheTradeIssueBehavior.LandLordTheArtOfTheTradeIssueQuest;
@@ -52,6 +55,25 @@ internal class ArtOfTradeBranchPatches
     [HarmonyPatch(typeof(Quest), nameof(Quest.QuestFailedPlayerBrokeTheAgreement))]
     [HarmonyPrefix]
     private static bool Break(Quest __instance) => BeforeBranch(__instance, ArtOfTradeBranch.BreakAgreement);
+
+    // Compiled when patched, before the hero field sync exists, so an inlined AddPower would only change the server's giver
+    [HarmonyPatch(typeof(Quest), nameof(Quest.QuestFailedPlayerBrokeTheAgreement))]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> BreakPower(IEnumerable<CodeInstruction> instructions)
+    {
+        var addPower = AccessTools.Method(typeof(Hero), nameof(Hero.AddPower));
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(addPower))
+            {
+                instruction.opcode = OpCodes.Call;
+                instruction.operand = AccessTools.Method(typeof(ArtOfTradeBranchPatches), nameof(AddPower));
+            }
+            yield return instruction;
+        }
+    }
+
+    private static void AddPower(Hero hero, float power) => HeroFieldPatches.PowerIntercept(hero, hero.Power + power);
 
     private static bool BeforeBranch(Quest quest, ArtOfTradeBranch branch)
     {

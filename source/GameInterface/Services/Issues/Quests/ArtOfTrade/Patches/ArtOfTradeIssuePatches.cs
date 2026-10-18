@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
@@ -43,6 +44,17 @@ internal class ArtOfTradeIssuePatches
             if (issue is Issue && issue.IsSolvingWithAlternative && issue.JournalEntries.Contains(__instance)) return false;
         }
         return true;
+    }
+
+    // The owner gets the returning log and resolved effects with the server's daily journal, adding them here too repeats the log
+    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.OnAlternativeSolutionSolvedAndTroopsAreReturning))]
+    [HarmonyPrefix]
+    private static bool TroopsReturning(IssueBase __instance)
+    {
+        if (!(__instance is Issue) || ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
+        return !(ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) &&
+            ContainerProvider.TryResolve<IControllerIdProvider>(out var controller) &&
+            owners.TryGetOwnerControllerId(__instance, out var owner) && owner == controller.ControllerId);
     }
 
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithCancel))]
