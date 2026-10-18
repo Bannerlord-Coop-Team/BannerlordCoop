@@ -165,6 +165,12 @@ public sealed class LesserNobleRevoltTests : IDisposable
     [Fact]
     public void OwnerInARevoltBattle_IsNeitherCapturedNorParked()
     {
+        // The guard must run before coop's capture prefix whatever order the patches were applied in.
+        var prefixes = Harmony.GetPatchInfo(
+            AccessTools.Method(typeof(TakePrisonerAction), nameof(TakePrisonerAction.ApplyInternal))).Prefixes;
+        var guard = Assert.Single(prefixes, prefix => prefix.PatchMethod.Name == "ProtectOwnerFromCapture");
+        Assert.All(prefixes.Where(prefix => prefix != guard), prefix => Assert.True(guard.priority > prefix.priority));
+
         var server = testEnvironment.Server;
         AddIssueWithQuest(server, "issue_lesser_noble");
         var quest = QuestOf(server);

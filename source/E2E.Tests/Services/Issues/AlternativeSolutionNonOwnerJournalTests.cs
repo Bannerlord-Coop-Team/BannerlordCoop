@@ -1,12 +1,9 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.TroopRosters.Data;
-using System;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
-using Xunit;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Issues;
@@ -38,9 +35,12 @@ public class AlternativeSolutionNonOwnerJournalTests : IDisposable
         scenario.ClientB.Call(() =>
         {
             Assert.True(scenario.ClientB.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
+
             Assert.True(notable.Issue.IsSolvingWithAlternative);
             Assert.Single(notable.Issue.JournalEntries);
+
             Campaign.Current.IssueManager.DailyTick();
+
             Assert.True(notable.Issue.IsSolvingWithAlternative);
         });
     }

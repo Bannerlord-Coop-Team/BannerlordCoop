@@ -23,6 +23,9 @@ internal static class LesserNobleRevoltWorldEventPatches
     private static readonly Dictionary<Quest, (Hero Owner, MapEvent Battle)> ActiveOwnerBattles =
         new Dictionary<Quest, (Hero Owner, MapEvent Battle)>();
 
+    // The owner client's own record of the revolt battle it started, for its dialogue state only.
+    private static readonly Dictionary<Quest, MapEvent> ClientOwnerBattles = new Dictionary<Quest, MapEvent>();
+
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTickParty))]
     [HarmonyPostfix]
     private static void HourlyTickParty(MobileParty mobileParty)
@@ -130,6 +133,7 @@ internal static class LesserNobleRevoltWorldEventPatches
             defenderParty == __instance._lesserNobleParty.Party)
         {
             __instance._checkForEventEnd = true;
+            ClientOwnerBattles[__instance] = mapEvent;
         }
 
         return false;
@@ -140,14 +144,21 @@ internal static class LesserNobleRevoltWorldEventPatches
     private static bool MapEventEndedPrefix(Quest __instance, MapEvent obj)
     {
         if (ModInformation.IsClient && __instance._checkForEventEnd &&
-            __instance._lesserNobleParty != null &&
-            obj.InvolvedParties.Contains(__instance._lesserNobleParty.Party))
+            IsClientOwnerBattleEnd(__instance, obj))
         {
             __instance._firstTalkIsDone = true;
             __instance._checkForEventEnd = false;
+            ClientOwnerBattles.Remove(__instance);
         }
 
         return false;
+    }
+
+    // Matches the server's EndOwnerBattle, which also resets when the revolt party left the battle.
+    internal static bool IsClientOwnerBattleEnd(Quest quest, MapEvent mapEvent)
+    {
+        return (ClientOwnerBattles.TryGetValue(quest, out var battle) && battle == mapEvent) ||
+            (quest._lesserNobleParty != null && mapEvent.InvolvedParties.Contains(quest._lesserNobleParty.Party));
     }
 
     // The server strips militia from the owner's battle in LesserNobleRevoltBattlePatches.
@@ -256,7 +267,11 @@ internal static class LesserNobleRevoltWorldEventPatches
         return party != null && party == quest._lesserNobleParty && party != MobileParty.MainParty;
     }
 
-    internal static void ForgetOwnerBattle(Quest quest) => ActiveOwnerBattles.Remove(quest);
+    internal static void ForgetOwnerBattle(Quest quest)
+    {
+        ActiveOwnerBattles.Remove(quest);
+        ClientOwnerBattles.Remove(quest);
+    }
 
     internal static void RecordOwnerBattle(Quest quest, Hero owner, MapEvent battle) =>
         ActiveOwnerBattles[quest] = (owner, battle);

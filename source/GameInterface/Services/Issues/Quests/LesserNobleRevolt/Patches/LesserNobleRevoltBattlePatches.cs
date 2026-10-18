@@ -42,9 +42,9 @@ internal static class LesserNobleRevoltBattlePatches
 
         dispatcher.RunAsOwners<Quest>(quest =>
         {
+            // Like vanilla, for any player's battle with the revolt party: AI parties ignore it.
             if (!quest.IsOngoing || quest._lesserNobleParty == null ||
-                !battle.InvolvedParties.Contains(quest._lesserNobleParty.Party) ||
-                !battle.InvolvedParties.Contains(MobileParty.MainParty?.Party))
+                !battle.InvolvedParties.Contains(quest._lesserNobleParty.Party))
             {
                 return;
             }
