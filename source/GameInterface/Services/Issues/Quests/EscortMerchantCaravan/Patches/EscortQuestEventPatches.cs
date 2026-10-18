@@ -18,6 +18,7 @@ namespace GameInterface.Services.Issues.Quests.EscortMerchantCaravan.Patches;
 internal class EscortQuestEventPatches
 {
     [ThreadStatic] internal static Quest CurrentQuest;
+    [ThreadStatic] internal static bool IsRunning;
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementEntered))]
     [HarmonyPostfix]
@@ -33,17 +34,6 @@ internal class EscortQuestEventPatches
     [HarmonyPostfix]
     private static void Battle(MapEvent mapEvent)
         => Run(quest => quest.OnMapEventEnded(mapEvent));
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
-    [HarmonyPostfix]
-    private static void War(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail)
-        => Run(quest => quest.OnWarDeclared(faction1, faction2, declareWarDetail));
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
-    [HarmonyPostfix]
-    private static void Kingdom(Clan clan, Kingdom oldKingdom, Kingdom newKingdom,
-        ChangeKingdomAction.ChangeKingdomActionDetail actionDetail, bool showNotification)
-        => Run(quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementOwnerChanged))]
     [HarmonyPostfix]
@@ -72,36 +62,43 @@ internal class EscortQuestEventPatches
     [HarmonyPostfix]
     private static void Daily() => Run(quest => quest.DailyTick());
 
+    internal static bool RunOwned(Quest quest, Action<Quest> action)
+    {
+        if (ModInformation.IsClient || quest._questCaravanMobileParty == null) return false;
+        if (!ContainerProvider.TryResolve<IEscortOwnerParty>(out var parties) ||
+            !parties.TryGet(IssueManager.GetIssueOfQuest(quest), out var party))
+        {
+            quest.CompleteQuestWithCancel(new TextObject("Your caravan escort ended because your party is no longer available."));
+            return false;
+        }
+
+        var previous = CurrentQuest;
+        var previousRunning = IsRunning;
+        CurrentQuest = quest;
+        var before = Progress(quest);
+        using (new MainHeroSubstitutionScope(Hero.MainHero, party))
+        {
+            try
+            {
+                IsRunning = true;
+                action(quest);
+                if (quest.IsOngoing && !before.Equals(Progress(quest)) &&
+                    ContainerProvider.TryResolve<IEscortProgress>(out var progress))
+                    progress.Publish(quest);
+            }
+            finally
+            {
+                IsRunning = previousRunning;
+                CurrentQuest = previous;
+            }
+        }
+        return true;
+    }
+
     private static void Run(Action<Quest> action)
     {
         if (ModInformation.IsClient || !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher)) return;
-        dispatcher.RunAsOwners<Quest>(quest =>
-        {
-            if (quest._questCaravanMobileParty == null) return;
-            if (!ContainerProvider.TryResolve<IEscortOwnerParty>(out var parties) ||
-                !parties.TryGet(IssueManager.GetIssueOfQuest(quest), out var party))
-            {
-                quest.CompleteQuestWithCancel(new TextObject("Your caravan escort ended because your party is no longer available."));
-                return;
-            }
-            var previous = CurrentQuest;
-            CurrentQuest = quest;
-            var before = Progress(quest);
-            using (new MainHeroSubstitutionScope(Hero.MainHero, party))
-            {
-                try
-                {
-                    action(quest);
-                    if (quest.IsOngoing && !before.Equals(Progress(quest)) &&
-                        ContainerProvider.TryResolve<IEscortProgress>(out var progress))
-                        progress.Publish(quest);
-                }
-                finally
-                {
-                    CurrentQuest = previous;
-                }
-            }
-        });
+        dispatcher.RunAsOwners<Quest>(quest => RunOwned(quest, action));
     }
 
     private static object Progress(Quest quest) => (quest._daysSpentForEscorting,

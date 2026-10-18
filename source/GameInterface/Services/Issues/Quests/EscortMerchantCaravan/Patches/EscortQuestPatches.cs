@@ -72,17 +72,31 @@ internal class EscortQuestPatches
     private static bool War(Quest __instance, IFaction faction1, IFaction faction2,
         TaleWorlds.CampaignSystem.Actions.DeclareWarAction.DeclareWarDetail detail)
     {
-        if (ModInformation.IsClient || __instance._questCaravanMobileParty == null) return false;
-        var caravan = __instance._questCaravanMobileParty;
-        if (detail == TaleWorlds.CampaignSystem.Actions.DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility &&
-            (faction1 == caravan.MapFaction || faction2 == caravan.MapFaction) &&
-            EscortHostilityPatch.Attacker == TaleWorlds.CampaignSystem.Party.PartyBase.MainParty)
-            __instance.FailByPlayerHostileConsequences();
-        else
-            __instance.CheckWarDeclaration();
-        if (__instance.IsOngoing && (caravan.TargetSettlement == null ||
-            caravan.TargetSettlement.MapFaction.IsAtWarWith(caravan.MapFaction)))
-            __instance.TryToFindAndSetTargetToNextSettlement();
+        if (EscortQuestEventPatches.IsRunning) return true;
+        EscortQuestEventPatches.RunOwned(__instance, quest =>
+        {
+            var caravan = quest._questCaravanMobileParty;
+            if (detail == TaleWorlds.CampaignSystem.Actions.DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility &&
+                (faction1 == caravan.MapFaction || faction2 == caravan.MapFaction) &&
+                EscortHostilityPatch.Attacker == TaleWorlds.CampaignSystem.Party.PartyBase.MainParty)
+                quest.FailByPlayerHostileConsequences();
+            else
+                quest.CheckWarDeclaration();
+            if (quest.IsOngoing && (caravan.TargetSettlement == null ||
+                caravan.TargetSettlement.MapFaction.IsAtWarWith(caravan.MapFaction)))
+                quest.TryToFindAndSetTargetToNextSettlement();
+        });
+        return false;
+    }
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnClanChangedKingdom))]
+    [HarmonyPrefix]
+    private static bool Kingdom(Quest __instance, Clan clan, Kingdom oldKingdom, Kingdom newKingdom,
+        TaleWorlds.CampaignSystem.Actions.ChangeKingdomAction.ChangeKingdomActionDetail actionDetail, bool showNotification)
+    {
+        if (EscortQuestEventPatches.IsRunning) return true;
+        EscortQuestEventPatches.RunOwned(__instance,
+            quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
         return false;
     }
 

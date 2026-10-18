@@ -35,6 +35,11 @@ public class EscortMerchantCaravanTests : IDisposable
     private readonly struct DeferredPartyRegistration : IEvent { }
     private static MobileParty? observedHourlyParty;
     private static PartyBase? observedAttacker;
+    private static int observedReroutes;
+    private static int observedKingdomHandlers;
+
+    private static void ObserveReroute() => observedReroutes++;
+    private static void ObserveKingdomHandler() => observedKingdomHandlers++;
     private static readonly MethodBase[] WithoutWorldSetup =
     {
         AccessTools.Method(typeof(Quest), nameof(Quest.SpawnCaravan)),
@@ -794,6 +799,67 @@ public class EscortMerchantCaravanTests : IDisposable
             Assert.True(ownerQuest.IsFinalized);
             Assert.Contains(ownerQuest.JournalEntries, log => log.LogText.GetID() == "KhNkBd9O");
         });
+    }
+
+    [Fact]
+    public void ARelayWarRunsTheEscortHandlerOnceWithItsOwnerScope()
+    {
+        Accept();
+        var harmony = new Harmony($"escort-relay-war-{Guid.NewGuid()}");
+        var reroute = AccessTools.Method(typeof(Quest), nameof(Quest.TryToFindAndSetTargetToNextSettlement));
+        harmony.Patch(reroute, postfix: new HarmonyMethod(typeof(EscortMerchantCaravanTests), nameof(ObserveReroute)));
+        try
+        {
+            Server.NetworkSentMessages.Clear();
+            observedReroutes = 0;
+            Server.Call(() =>
+            {
+                var quest = QuestOn(Server);
+                quest._questCaravanMobileParty = Server.GetRegisteredObject<MobileParty>(caravanId);
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(Server.Resolve<IPlayerManager>().Players
+                    .Single(player => player.ControllerId == QuestScenario.ControllerA).HeroId, out var owner));
+                CampaignEventDispatcher.Instance.OnWarDeclared(owner.MapFaction, owner.MapFaction,
+                    DeclareWarAction.DeclareWarDetail.CausedByRebellion);
+                Assert.True(quest.IsOngoing);
+            });
+
+            Assert.Equal(1, observedReroutes);
+            var progress = Server.NetworkSentMessages.GetMessages<NetworkEscortProgress>().ToArray();
+            Assert.Single(progress, state => state.Notice != null);
+            Assert.Single(progress, state => state.Notice == null);
+        }
+        finally
+        {
+            harmony.Unpatch(reroute, HarmonyPatchType.Postfix, harmony.Id);
+        }
+    }
+
+    [Fact]
+    public void ARelayKingdomChangeRunsTheEscortHandlerOnceAsTheOwner()
+    {
+        Accept();
+        var harmony = new Harmony($"escort-relay-kingdom-{Guid.NewGuid()}");
+        var handler = AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
+        harmony.Patch(handler, postfix: new HarmonyMethod(typeof(EscortMerchantCaravanTests), nameof(ObserveKingdomHandler)));
+        try
+        {
+            Server.NetworkSentMessages.Clear();
+            observedKingdomHandlers = 0;
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+                CampaignEventDispatcher.Instance.OnClanChangedKingdom(giver.Clan, null, null,
+                    ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+            });
+
+            Assert.Equal(1, observedKingdomHandlers);
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(),
+                message => message.Outcome == IssueOutcome.QuestCancel);
+        }
+        finally
+        {
+            harmony.Unpatch(handler, HarmonyPatchType.Postfix, harmony.Id);
+        }
     }
 
     [Theory]
