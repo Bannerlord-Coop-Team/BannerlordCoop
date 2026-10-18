@@ -206,14 +206,17 @@ internal class FinalizationCoordinator : IHandler
                 return;
             }
 
+            var quest = issue.IssueQuest;
+            var journalEntryCount = quest?.JournalEntries.Count ?? 0;
+
             using (new AllowedThread())
             {
-                if (data.JournalLog != null && issue.IssueQuest != null)
-                {
-                    issue.IssueQuest.AddLog(data.JournalLog);
-                }
-
                 Replay(issue, data.Outcome);
+
+                if (data.JournalLog != null && quest != null && quest.JournalEntries.Count == journalEntryCount)
+                {
+                    quest.AddLog(data.JournalLog);
+                }
             }
         }, context: nameof(FinalizationCoordinator));
     }

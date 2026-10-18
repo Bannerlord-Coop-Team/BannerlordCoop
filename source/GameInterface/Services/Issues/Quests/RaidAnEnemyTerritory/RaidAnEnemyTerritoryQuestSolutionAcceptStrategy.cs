@@ -19,7 +19,6 @@ internal sealed class RaidAnEnemyTerritoryQuestSolutionAcceptStrategy : IQuestSo
         using (var stream = new MemoryStream())
         using (var writer = new BinaryWriter(stream))
         {
-            writer.Write(quest.StringId ?? string.Empty);
             writer.Write(quest.QuestDueTime.NumTicks);
             writer.Flush();
             return stream.ToArray();
@@ -36,7 +35,6 @@ internal sealed class RaidAnEnemyTerritoryQuestSolutionAcceptStrategy : IQuestSo
         using (var stream = new MemoryStream(captured))
         using (var reader = new BinaryReader(stream))
         {
-            quest.StringId = reader.ReadString();
             quest.ChangeQuestDueTime(new CampaignTime(reader.ReadInt64()));
         }
     }

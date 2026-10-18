@@ -40,7 +40,8 @@ internal sealed class RaidAnEnemyTerritoryHeirSelectionHandler : IHandler
         foreach (var issue in issues)
         {
             if (issue.IssueQuest is Quest quest && quest.IsOngoing &&
-                ownerResolver.TryResolveOwnerHero(issue, out var ownerHero) && ownerHero == payload.What.OriginalHero)
+                ownerResolver.TryResolveOwnerHero(issue, out var ownerHero) &&
+                (ownerHero == payload.What.OriginalHero || ownerHero == payload.What.Heir))
             {
                 quest.CompleteQuestWithCancel(new TextObject("{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan."));
             }
