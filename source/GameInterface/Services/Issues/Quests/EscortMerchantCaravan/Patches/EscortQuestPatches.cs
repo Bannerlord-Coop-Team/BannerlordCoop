@@ -91,11 +91,11 @@ internal class EscortQuestPatches
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnClanChangedKingdom))]
     [HarmonyPrefix]
     private static bool Kingdom(Quest __instance, Clan clan, Kingdom oldKingdom, Kingdom newKingdom,
-        TaleWorlds.CampaignSystem.Actions.ChangeKingdomAction.ChangeKingdomActionDetail actionDetail, bool showNotification)
+        TaleWorlds.CampaignSystem.Actions.ChangeKingdomAction.ChangeKingdomActionDetail detail, bool showNotification)
     {
         if (EscortQuestEventPatches.CurrentQuest == __instance && EscortQuestEventPatches.IsRunning) return true;
         EscortQuestEventPatches.RunOwned(__instance,
-            quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
+            quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, detail, showNotification));
         return false;
     }
 
