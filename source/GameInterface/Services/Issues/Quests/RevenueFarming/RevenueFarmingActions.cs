@@ -77,6 +77,9 @@ internal sealed class RevenueFarmingActions : IRevenueFarmingActions
                     if (session.CollectionSettlement == null || session.CollectionSettlement != Settlement.CurrentSettlement) return false;
                     behavior.leave_consequence(args);
                     return true;
+                case RevenueFarmingAction.Desert:
+                    session.Quest.CollectingRevenues = false;
+                    return true;
                 case RevenueFarmingAction.ResolveIncident:
                     if (session.AwaitingPayment || session.Incident == null || request.Incident != session.Incident ||
                         session.CollectionSettlement != Settlement.CurrentSettlement || hero.PartyBelongedTo.MapEvent != null ||

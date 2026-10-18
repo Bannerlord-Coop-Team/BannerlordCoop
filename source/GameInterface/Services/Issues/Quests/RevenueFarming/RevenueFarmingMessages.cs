@@ -16,6 +16,7 @@ internal enum RevenueFarmingAction
     BetrayGiver,
     BetrayDemand,
     Refresh,
+    Desert,
 }
 
 [ProtoContract]

@@ -144,7 +144,7 @@ internal class RevenueFarmingDesertionPatch
     private static bool Prefix(Quest __instance)
     {
         if (ModInformation.IsClient && ContainerProvider.TryResolve<IRevenueFarmingActions>(out var actions))
-            actions.Request(__instance, RevenueFarmingAction.Leave);
+            actions.Request(__instance, RevenueFarmingAction.Desert);
         return false;
     }
 }

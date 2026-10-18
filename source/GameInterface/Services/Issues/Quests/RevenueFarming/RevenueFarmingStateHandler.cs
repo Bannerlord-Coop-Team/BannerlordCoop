@@ -74,7 +74,8 @@ internal sealed class RevenueFarmingStateHandler : IHandler
         {
             var request = payload.What;
             if (request.Action != RevenueFarmingAction.Collect && request.Action != RevenueFarmingAction.Leave &&
-                request.Action != RevenueFarmingAction.ResolveIncident && request.Action != RevenueFarmingAction.Refresh) return;
+                request.Action != RevenueFarmingAction.ResolveIncident && request.Action != RevenueFarmingAction.Refresh &&
+                request.Action != RevenueFarmingAction.Desert) return;
             if (!players.TryGetPlayer(peer, out var player) ||
                 !objects.TryGetObjectWithLogging<Hero>(request.GiverId, out var giver) ||
                 giver.Issue?.IssueQuest is not Quest quest || quest.StringId != request.QuestId ||
