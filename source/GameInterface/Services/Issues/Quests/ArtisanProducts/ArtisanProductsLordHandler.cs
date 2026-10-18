@@ -175,6 +175,10 @@ internal class ArtisanProductsLordHandler : IHandler
                             issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(text)));
                     ownership.Remove(data.OwnerId);
                     issue.IssueFinalized();
+                    // Ends the owner's journal entry, the issue rewards themselves only run on the server
+                    CampaignEventDispatcher.Instance.OnIssueUpdated(issue, data.Action == ArtisanProductsLordAction.AcceptMerchant ?
+                        IssueBase.IssueUpdateDetails.IssueFinishedWithBetrayal : IssueBase.IssueUpdateDetails.IssueFinishedWithSuccess,
+                        localOwner ? Hero.MainHero : null);
                 }
             }
         }, context: nameof(ArtisanProductsLordHandler));

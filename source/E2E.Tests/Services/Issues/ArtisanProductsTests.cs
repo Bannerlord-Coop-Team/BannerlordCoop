@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -417,6 +418,40 @@ public class ArtisanProductsTests : IDisposable
         Server.Call(() => Assert.Equal(takenByCompanions ? 0.75f : 0f,
             Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue._issueDifficultyMultiplier));
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkArtisanProductsLord>());
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void LordChoice_EndsOnlyTheOwnersJournalAndLeavesTheIssueRewardsToTheServer(bool acceptMerchant)
+    {
+        foreach (var instance in new[] { Owner, Other })
+            instance.Call(() =>
+            {
+                // The headless campaign has no journal behavior or information manager
+                Campaign.Current.CampaignInformationManager ??= new CampaignInformationManager();
+                new JournalLogsCampaignBehavior().RegisterEvents();
+            });
+        IssueBase ownerIssue = null!;
+        IssueBase otherIssue = null!;
+        Owner.Call(() => ownerIssue = Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
+        Other.Call(() => otherIssue = Other.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
+        Owner.Call(() => ownerIssue.StartIssueWithLordSolution());
+        LeaveOrigin();
+        Owner.Call(() =>
+        {
+            if (acceptMerchant) ownerIssue.CompleteIssueWithLordSolutionWithAcceptCounterOffer();
+            else ownerIssue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
+        });
+        Owner.Call(() =>
+        {
+            var journal = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(log => log.IsRelatedTo(ownerIssue)));
+            Assert.True(journal.IsEnded());
+            Assert.Equal(acceptMerchant, journal.IsEndedUnsuccessfully());
+            Assert.False(Campaign.Current.IssueManager.HasIssueCoolDown(typeof(Issue), Owner.GetRegisteredObject<Hero>(scenario.NotableId)));
+        });
+        Other.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(log => log.IsRelatedTo(otherIssue))));
+        Server.Call(() => Assert.True(Campaign.Current.IssueManager.HasIssueCoolDown(typeof(Issue), Server.GetRegisteredObject<Hero>(scenario.NotableId))));
     }
 
     [Fact]
