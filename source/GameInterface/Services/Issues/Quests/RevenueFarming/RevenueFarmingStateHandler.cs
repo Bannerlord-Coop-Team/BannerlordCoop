@@ -64,7 +64,7 @@ internal sealed class RevenueFarmingStateHandler : IHandler
         if (ModInformation.IsClient) return;
         // QuestManager's player-change callback is client-only in co-op; cancel only the old owner's agreement.
         sessions.FindOngoing(payload.What.OriginalHero)?.CompleteQuestWithCancel(new TextObject(
-            "{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan.\""));
+            "{=bYdhYidf}The quest was canceled because your clan leader, who made the original agreement, is no longer head of the clan."));
     }
 
     private void HandleRequest(MessagePayload<RequestRevenueFarmingAction> payload)
