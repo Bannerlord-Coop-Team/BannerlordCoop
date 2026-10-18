@@ -1,4 +1,6 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Issues;
+using GameInterface.Services.Issues.Framework.Interface;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -10,18 +12,24 @@ namespace GameInterface.Tests.Services.Issues;
 
 public class IssuesLayoutTests
 {
-    private const string IssuesNamespace = "GameInterface.Services.Issues";
-    private const string InterfaceNamespace = "GameInterface.Services.Issues.Framework.Interface";
+    private static readonly string IssuesNamespace = typeof(IssuesModule).Namespace;
+    private static readonly string InterfaceNamespace = typeof(IQuestTypeDescriptor).Namespace;
 
-    private static IEnumerable<Type> IssueTypes()
+    private static List<Type> IssueTypes()
     {
-        return typeof(GameInterface).Assembly.GetTypes()
+        var types = typeof(GameInterface).Assembly.GetTypes()
             .Where(type => type.Namespace != null &&
-                (type.Namespace == IssuesNamespace || type.Namespace.StartsWith(IssuesNamespace + ".")));
+                (type.Namespace == IssuesNamespace || type.Namespace.StartsWith(IssuesNamespace + ".")))
+            .ToList();
+
+        Assert.NotEmpty(types);
+
+        return types;
     }
 
     private static bool IsReadOnly(Type type)
     {
+        // netstandard2.0 has no IsReadOnlyAttribute, so the compiler embeds its own copy in GameInterface.
         return type.CustomAttributes.Any(attribute =>
             attribute.AttributeType.FullName == "System.Runtime.CompilerServices.IsReadOnlyAttribute");
     }

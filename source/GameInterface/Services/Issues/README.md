@@ -4,7 +4,7 @@ Vanilla issues and quests assume one player. This folder is the shared code that
 use them in one campaign. Only quest types that have been wired up here run. Every other vanilla issue
 stays switched off.
 
-How it works, how to add a quest type and what is known not to work are in [AGENTS.md](AGENTS.md).
+How it works and how to add a quest type are in [AGENTS.md](AGENTS.md).
 
 ## What players get
 

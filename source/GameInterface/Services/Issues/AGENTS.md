@@ -19,10 +19,8 @@ Scope: everything under `source/GameInterface/Services/Issues/`. The repo root `
 1. The server runs vanilla outcome code as the owning player inside
    `using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))`. Clients replay what the
    server announced and never roll or pay anything again.
-2. The server reruns what vanilla's dialog or UI checked before it runs an ending a client asked for (location,
-   items, persuasion or battle result, the troop return date), because the client's state can be stale by then.
-   A descriptor with a `FinalizationProofStrategy` must end through its branch, a generic `QuestSuccess` skips
-   the branch method where vanilla pays. `FinalizationCoordinator` does not do this yet, see Known gaps.
+2. A quest with a `FinalizationProofStrategy` ends through its branch, not a generic `QuestSuccess`, which skips
+   the branch method where vanilla pays.
 3. The first accepter owns the issue, decided by `IIssueOwnershipRegistry.TrySetOwner` on the server. Clients
    keep a mirror of the registry, filled from accept messages and the join snapshot and emptied on
    `NetworkIssueFinalized`. `Framework/Gating/SimilarCommitmentsGatePatch.cs` reads it inside
@@ -90,22 +88,7 @@ Keep patches thin. Owner lookups, issue scans and main hero swaps belong in a DI
   in `Coop.Tests`.
 - To test the owner's side of `Replay` in E2E, start the quest with `StartQuest()` under `AllowedThread` on the
   client, otherwise `Replay` drops it (rule 5).
-- Run each flow through its real UI on a server and two clients: accept, success and fail, sending troops and
-  their return, endings from a war or capture, the non-owner's view, and a rejoin. Use
+- Run the flows the change touches through their real UI on a server and two clients: accept, success and fail,
+  sending troops and their return, endings from a war or capture, the non-owner's view, and a rejoin. Use
   `coop.debug.issues.complete` only for endings, it skips the branch methods. In the PR list each flow as
   in-process only, live on the exact head commit sha, or not run.
-
-## Known gaps (do not claim these work)
-
-- The server does not recheck an owner's ending request (rule 2). A generic `QuestSuccess` runs
-  `CompleteQuestWithSuccess()` for any quest the requester owns.
-- Quests are transient (`Framework/Dismissal/ActiveIssueDismisser.cs`): sent troops are lost on a server
-  restart, and vanilla endings that bypass the dispatch patches on an issue without a quest are not announced.
-- Only wars, kingdom changes and captures are relayed. GangLeader's `OnSettlementOwnerChanged` cancel is not, and
-  if a settlement owner change is replayed under `AllowedThread`, rule 8 drops the ending and nothing ends it.
-- A kingdom change ends a relayed quest twice: the server's relay and the owner's own request, which should be
-  dropped with a "does not own" warning.
-- Endings sent as a request or replayed drop vanilla's log line, so the journal shows no reason.
-- A war is judged against the server's own `MainHeroCrimeRating` (rule 6), so the owner can get a cancel where
-  vanilla would fail the quest.
-- Lord Solution quests are not supported. Quest rewards give no trait XP.

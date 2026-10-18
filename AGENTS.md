@@ -51,7 +51,7 @@ Run from the repo root on Windows; the repo expects `mb2` to be a junction to th
 
 `DeployToGame` in `Deploy.targets` runs after every successful build of a project that imports it (`Coop.csproj`, `MissionTestMod.csproj`), including a full `Coop.sln` build, whenever `mb2\Modules` exists. Clearing `PostBuildEvent` doesn't stop it. For compile-only checks, pass an empty global `-p:ModName=`, which turns off `DeployToGame`.
 
-CI builds Release and runs `source\CoopUnitTests.slnf` plus the E2E shards in `.github/workflows/pull_request.yml`. Debug has extra local-only failures, so after touching Coop.Core or Autofac registrations run all of `Coop.Tests` with `-c Release`. `--no-restore` fails on the first build in a fresh worktree, so restore once first.
+CI builds Release and runs `source\CoopUnitTests.slnf` plus the E2E shards in `.github/workflows/pull_request.yml`. After touching Coop.Core or Autofac registrations, run all of `Coop.Tests` with `-c Release`. `--no-restore` fails on the first build in a fresh worktree, so restore once first.
 
 ### Licensing & Authorized Agent Use
 
