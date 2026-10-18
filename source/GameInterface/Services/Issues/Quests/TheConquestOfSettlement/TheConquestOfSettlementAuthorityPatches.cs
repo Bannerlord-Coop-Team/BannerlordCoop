@@ -36,7 +36,9 @@ internal static class TheConquestOfSettlementEventPatches
     private static bool Prefix(Quest __instance, out (IDisposable Scope, bool WasApplying, Hero PreviousTrigger) __state)
     {
         __state = (null, IsApplying, TriggeringHero);
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        // Not IsOriginalAllowed: clients replay the server's wars and ownership changes under AllowedThread,
+        // and the quest must then wait for the server's outcome instead of deciding one locally
+        if (CallOriginalPolicy.IsOriginalAllowedForOwnershipGate()) return true;
         var issue = IssueManager.GetIssueOfQuest(__instance);
         var triggeringHero = ResolvedMainHeroContext.ResolvedMainHero;
         if (ModInformation.IsClient || !__instance.IsOngoing ||

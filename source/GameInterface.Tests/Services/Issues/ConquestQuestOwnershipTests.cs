@@ -33,7 +33,7 @@ public class ConquestQuestOwnershipTests : IDisposable
     [Theory]
     [InlineData("player-A", true)]
     [InlineData("player-B", false)]
-    public void QuestVisibilityKeepsItsOwnerAfterIssueCleanupAndSaveRestore(string localController, bool visible)
+    public void QuestVisibilityFollowsTheLocalOwnerClaim(string localController, bool visible)
     {
         var quest = ObjectHelper.SkipConstructor<TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssueQuest>();
         quest.StringId = "coop_conquest_issue_31_quest";
@@ -49,7 +49,6 @@ public class ConquestQuestOwnershipTests : IDisposable
             service.RecordLocalQuest(quest);
         }
 
-        Assert.Equal(visible, service.IsVisible(quest));
         Assert.Equal(visible, service.IsVisible(quest));
     }
 

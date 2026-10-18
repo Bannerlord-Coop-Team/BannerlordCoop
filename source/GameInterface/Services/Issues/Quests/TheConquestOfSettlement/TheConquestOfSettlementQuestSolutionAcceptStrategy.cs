@@ -26,15 +26,11 @@ internal sealed class TheConquestOfSettlementQuestSolutionAcceptStrategy : IQues
         }
 
         service.RecordLocalQuest(quest);
-        var startTicks = quest.JournalEntries.Count == 0
-            ? CampaignTime.Now.NumTicks
-            : quest.JournalEntries[0].LogTime.NumTicks;
 
         using var stream = new MemoryStream();
         using var writer = new BinaryWriter(stream);
         writer.Write(quest.StringId ?? string.Empty);
         writer.Write(quest.QuestDueTime.NumTicks);
-        writer.Write(startTicks);
         return stream.ToArray();
     }
 
@@ -49,17 +45,11 @@ internal sealed class TheConquestOfSettlementQuestSolutionAcceptStrategy : IQues
         using var reader = new BinaryReader(stream);
         var questId = reader.ReadString();
         var dueTicks = reader.ReadInt64();
-        var startTicks = reader.ReadInt64();
 
         using (new Common.Util.AllowedThread())
         {
             quest.StringId = questId;
             quest.ChangeQuestDueTime(new CampaignTime(dueTicks));
-            if (quest.JournalEntries.Count != 0)
-            {
-                quest._journalEntries[0] = new JournalLog(
-                    new CampaignTime(startTicks), quest.JournalEntries[0].LogText);
-            }
         }
 
         service.RecordQuest(quest);

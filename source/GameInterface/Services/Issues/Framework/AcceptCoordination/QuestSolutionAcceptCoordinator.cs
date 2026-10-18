@@ -134,7 +134,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         try
         {
-            // Creates the quest object the owner's outcomes run on, it is never started so it registers no events
+            // Creates the quest object the owner's outcomes run on, unless its accept strategy starts it, it registers no events
             using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
             {
                 using (new IssueDifficultyOverride(data.DifficultyMultiplier))
@@ -223,6 +223,15 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
             // set to null first so cancelling the quest does not finalize the issue the winner owns
             issue.IssueQuest = null;
+
+            // This player never held the issue, so its ending must not be credited to them
+            issue.IsTriedToSolveBefore = false;
+
+            // With no winner the server still offers the issue, so undo the local accept
+            if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _))
+            {
+                issue._issueState = IssueBase.IssueState.Ongoing;
+            }
 
             using (new AllowedThread())
             {

@@ -168,7 +168,36 @@ public sealed class TheConquestOfSettlementIssueTests : IDisposable
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(issueOwnerId, out var giver));
                 Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(issueOwnerId, giver.Issue.StringId, out _));
                 Assert.Null(giver.Issue.IssueQuest);
+                Assert.True(giver.Issue.IsOngoingWithoutQuest);
+                Assert.False(giver.Issue.IsTriedToSolveBefore);
             });
+    }
+
+    [Fact]
+    public void OwnersClientWaitsForTheServerWhenItReplaysAnOwnershipChange()
+    {
+        var owner = environment.Clients.First();
+        AcceptMapOffer();
+
+        // Clients replay the server's ownership changes under AllowedThread; the quest must not decide an outcome there
+        owner.Call(() =>
+        {
+            Assert.True(owner.ObjectManager.TryGetObject<Hero>(issueOwnerId, out var giver));
+            Assert.True(owner.ObjectManager.TryGetObject<Settlement>(targetSettlementId, out var target));
+            var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+            using (new AllowedThread())
+            {
+                AccessTools.Method(typeof(Quest), "OnSettlementOwnerChanged").Invoke(quest, new object?[]
+                {
+                    target, false, Hero.MainHero, giver, null, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.ByBarter,
+                });
+            }
+
+            Assert.True(quest.IsOngoing);
+            Assert.True(giver.Issue.IsSolvingWithQuest);
+        });
+
+        Assert.Empty(owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
     }
 
     [Fact]
@@ -262,11 +291,25 @@ public sealed class TheConquestOfSettlementIssueTests : IDisposable
             }
             var ownerGold = ownerHero.Gold;
             var otherGold = otherHero.Gold;
+            var ownerRelation = giver.GetRelation(ownerHero);
+            var otherRelation = giver.GetRelation(otherHero);
 
-            CampaignEventDispatcher.Instance.SiegeCompleted(target, ownerParty, victory, MapEvent.BattleTypes.Siege);
+            // The harness campaign has no behaviors; vanilla applies the quest's relation change from this one
+            var issues = new IssuesCampaignBehavior();
+            issues.RegisterEvents();
+            try
+            {
+                CampaignEventDispatcher.Instance.SiegeCompleted(target, ownerParty, victory, MapEvent.BattleTypes.Siege);
+            }
+            finally
+            {
+                CampaignEvents.Instance.RemoveListeners(issues);
+            }
 
             Assert.Equal(victory ? ownerGold + quest.RewardGold : ownerGold, ownerHero.Gold);
             Assert.Equal(otherGold, otherHero.Gold);
+            Assert.Equal(victory ? ownerRelation + 5 : ownerRelation, giver.GetRelation(ownerHero));
+            Assert.Equal(otherRelation, giver.GetRelation(otherHero));
             Assert.Equal(victory, quest.IsFinalized);
         });
 
