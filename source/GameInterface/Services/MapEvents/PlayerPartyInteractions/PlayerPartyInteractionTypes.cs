@@ -38,7 +38,9 @@ public enum PlayerPartyInteractionOption
     ProposeMarriage,
     PatrilinealMarriage,
     MatrilinealMarriage,
-    CancelMarriage
+    CancelMarriage,
+    RequestMapTracking,
+    StopMapTracking
 }
 
 public enum PlayerPartyInteractionVassalUnavailableReason
@@ -73,7 +75,8 @@ public enum PlayerPartyInteractionProposal
     Mercenary,
     HostileDemand,
     PatrilinealMarriage,
-    MatrilinealMarriage
+    MatrilinealMarriage,
+    MapTracking
 }
 
 public enum PlayerPartyInteractionOutcomeType
@@ -95,7 +98,10 @@ public enum PlayerPartyInteractionOutcomeType
     ClanLeft,
     ClanMemberRemoved,
     MarriageAccepted,
-    MarriageDeclined
+    MarriageDeclined,
+    MapTrackingAccepted,
+    MapTrackingDeclined,
+    MapTrackingStopped
 }
 
 public enum PlayerPartyInteractionDeniedReason

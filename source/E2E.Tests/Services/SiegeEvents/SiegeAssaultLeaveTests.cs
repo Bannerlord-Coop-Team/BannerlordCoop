@@ -137,8 +137,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             AssertPartyState(instance, partyId, expectMapEvent: false, expectCamp: false);
     }
 
+    // No-camp attacker is covered by SiegeDisconnectTests.BreakSiegeRequest_WithNoCampDuringAssault_*.
     [Theory]
-    [InlineData(false, false, false)]
     [InlineData(true, false, false)]
     [InlineData(false, true, false)]
     [InlineData(true, true, false)]

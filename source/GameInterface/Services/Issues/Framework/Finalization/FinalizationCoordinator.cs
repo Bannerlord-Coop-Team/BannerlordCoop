@@ -207,6 +207,7 @@ internal class FinalizationCoordinator : IHandler
             }
 
             using (new AllowedThread())
+            using (new QuestEndingReplay())
             {
                 Replay(issue, data.Outcome);
             }
@@ -287,6 +288,11 @@ internal class FinalizationCoordinator : IHandler
         }
 
         TryCompleteIssue(issue, outcome);
+
+        if (quest != null && quest.IsOngoing)
+        {
+            quest.CompleteQuestWithCancel();
+        }
     }
 
     private static bool IsQuestOutcome(IssueOutcome outcome)
