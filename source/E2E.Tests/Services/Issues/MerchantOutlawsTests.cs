@@ -442,6 +442,28 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Fact]
+    public void AWarSeenOnTheOwnersClientLeavesTheQuestToTheServer()
+    {
+        Accept();
+        var ownerQuest = Quest(ClientA);
+        var logs = ownerQuest.JournalEntries.Count;
+        ClientA.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                Get<Hero>(ClientA, scenario.PlayerA.HeroId).Clan = Get<Clan>(ClientA, playerClanId);
+                DeclareWarAction.ApplyInternal(Get<Kingdom>(ClientA, kingdomId), Get<Clan>(ClientA, playerClanId),
+                    DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
+            }
+        }, TextHelpers);
+
+        Assert.True(ownerQuest.IsOngoing);
+        Assert.Equal(logs, ownerQuest.JournalEntries.Count);
+        Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    [Fact]
     public void JoiningAKingdomAtWarWithTheGiverCancelsTheOwnersQuest()
     {
         Accept();
