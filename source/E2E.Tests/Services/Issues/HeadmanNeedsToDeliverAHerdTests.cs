@@ -490,7 +490,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     [Fact]
     public void FinalizationAfterGiverRegistryRemoval_StillReachesClients()
     {
-        Accept(ClientA);
+        var (companionId, troopId) = StartCompanions();
         Server.Call(() =>
         {
             var giver = Object<Hero>(Server, scenario.NotableId);
@@ -506,6 +506,8 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             instance.Call(() =>
             {
                 Assert.Null(Object<Hero>(instance, scenario.NotableId).Issue);
+                Assert.Equal(40, Party(instance, QuestScenario.ControllerA).MemberRoster.GetTroopCount(Object<CharacterObject>(instance, troopId)));
+                Assert.True(Party(instance, QuestScenario.ControllerA).MemberRoster.Contains(Object<Hero>(instance, companionId).CharacterObject));
                 Assert.Equal(0, Party(instance, QuestScenario.ControllerA).ItemRoster.GetItemNumber(Object<ItemObject>(instance, livestockId)));
             });
     }
