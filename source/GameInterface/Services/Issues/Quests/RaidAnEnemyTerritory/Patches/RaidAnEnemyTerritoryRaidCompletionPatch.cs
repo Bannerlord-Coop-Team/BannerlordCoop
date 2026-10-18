@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -122,7 +123,13 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
 
         if (quest._raidedVillages.Count >= 3)
         {
-            quest.MainHeroRaidedAllVillages();
+            if (ownerResolver.TryResolveOwnerHero(quest.QuestGiver?.Issue, out var ownerHero))
+            {
+                using (new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo))
+                {
+                    quest.MainHeroRaidedAllVillages();
+                }
+            }
         }
     }
 }
