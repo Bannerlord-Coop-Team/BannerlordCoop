@@ -486,6 +486,23 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         }
     }
 
+    [Fact]
+    public void FinalizationAfterGiverRegistryRemoval_StillReachesClients()
+    {
+        Accept(ClientA);
+        Server.Call(() =>
+        {
+            var giver = Object<Hero>(Server, scenario.NotableId);
+            var issue = giver.Issue;
+            Assert.True(Server.ObjectManager.Remove(giver));
+            issue.CompleteIssueWithCancel();
+        });
+
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        foreach (var instance in new[] { ClientA, ClientB })
+            instance.Call(() => Assert.Null(Object<Hero>(instance, scenario.NotableId).Issue));
+    }
+
     private (string CompanionId, string TroopId) StartCompanions()
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
