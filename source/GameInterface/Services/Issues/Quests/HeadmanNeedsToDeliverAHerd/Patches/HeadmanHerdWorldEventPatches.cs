@@ -31,6 +31,9 @@ internal class HeadmanHerdWorldEventPatches
         if (issue.IssueQuest == null && !issue.IsSolvingWithAlternative) return true;
         if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) || !owners.TryResolveOwnerHero(issue, out var owner)) return false;
         if (owner.PartyBelongedTo == null && !owner.IsPrisoner) return false;
+        if (issue.IsSolvingWithAlternative && owner.PartyBelongedTo != null &&
+            ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var cleanup))
+            cleanup.Remember(issue, owner.PartyBelongedTo);
         __state = new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo);
         // Keep the owner on the issue until vanilla can return the troops without its global queue.
         if (issue.IsSolvingWithAlternative && !Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return false;
