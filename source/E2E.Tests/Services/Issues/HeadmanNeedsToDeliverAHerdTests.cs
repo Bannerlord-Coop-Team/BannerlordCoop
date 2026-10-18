@@ -462,6 +462,30 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         Server.Call(() => Assert.True(Object<Hero>(Server, scenario.NotableId).Issue.IsSolvingWithAlternative));
     }
 
+    [Fact]
+    public void GiverDeathAction_ReturnsCompanionTroopsAndCancelsTheMission()
+    {
+        var (companionId, troopId) = StartCompanions();
+        Server.Call(() =>
+        {
+            var giver = Object<Hero>(Server, scenario.NotableId);
+            giver.AddDeathMark(null, KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge);
+            KillCharacterAction.ApplyByDeathMarkForced(giver);
+        });
+        environment.FlushCoalescer();
+
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.Null(Object<Hero>(instance, scenario.NotableId).Issue);
+                Assert.Equal(40, Party(instance, QuestScenario.ControllerA).MemberRoster.GetTroopCount(Object<CharacterObject>(instance, troopId)));
+                Assert.True(Party(instance, QuestScenario.ControllerA).MemberRoster.Contains(Object<Hero>(instance, companionId).CharacterObject));
+            });
+        }
+    }
+
     private (string CompanionId, string TroopId) StartCompanions()
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
