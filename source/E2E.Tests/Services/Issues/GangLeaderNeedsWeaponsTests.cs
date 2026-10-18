@@ -6,6 +6,8 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
+using GameInterface.Services.Issues.Quests.GangLeaderNeedsWeapons.Patches;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using System.Runtime.CompilerServices;
@@ -109,38 +111,35 @@ public class GangLeaderNeedsWeaponsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(RequestedWeapons - 1, false)]
-    [InlineData(RequestedWeapons, true)]
-    public void TheServerOnlyCompletesTheHandInWhenTheOwnerCarriesTheWeapons(int carried, bool completes)
+    [InlineData(RequestedWeapons - 1, true, false)]
+    [InlineData(RequestedWeapons, true, true)]
+    [InlineData(RequestedWeapons, false, false)]
+    public void TheServerOnlyCompletesTheHandInWhenTheOwnerCarriesTheWeapons(int carried, bool ownerHasParty, bool completes)
     {
         var axe = CreateAxe();
         var completed = false;
 
         Server.Call(() =>
         {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
 
             using (new AllowedThread())
             {
                 party.ItemRoster.Clear();
                 party.ItemRoster.AddToCounts(axe, carried);
+                ownerHero._partyBelongedTo = ownerHasParty ? party : null;
             }
 
             var quest = Uninitialized<Quest>();
             quest._requestedWeaponAmount = RequestedWeapons;
             quest._requestedWeaponClass = WeaponClass.OneHandedAxe;
 
-            var previousMainParty = Campaign.Current.MainParty;
-            Campaign.Current.MainParty = party;
-
-            try
+            // What FinalizationCoordinator does before it runs a branch
+            using (new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo))
             {
-                completed = (bool)AccessTools.Method("GameInterface.Services.Issues.Quests.GangLeaderNeedsWeapons.Patches.GangLeaderNeedsWeaponsDeliveryPatch:Prefix")
+                completed = (bool)AccessTools.Method(typeof(GangLeaderNeedsWeaponsDeliveryPatch), "Prefix")
                     .Invoke(null, new object[] { quest })!;
-            }
-            finally
-            {
-                Campaign.Current.MainParty = previousMainParty;
             }
         });
 
@@ -155,17 +154,50 @@ public class GangLeaderNeedsWeaponsTests : IDisposable
     }
 
     [Fact]
-    public void TheGuardsDoNotAppearWhenThePlayerEntersTheTown()
+    public void TheDeliveryBranchRunsTheHandInOfItsQuest()
     {
-        var ran = true;
+        var harmony = new Harmony("test-3769-delivery-branch");
+        var target = AccessTools.Method(typeof(Quest), nameof(Quest.PlayerSuccessfullyDeliveredWeapons));
+        var recorder = new HarmonyMethod(typeof(GangLeaderNeedsWeaponsTests), nameof(RecordHandIn)) { priority = Priority.First };
+        ranHandIn = null;
 
-        ClientA.Call(() =>
+        // The hand-in itself needs a whole quest, so only the call is recorded and vanilla's body is skipped
+        harmony.Patch(target, prefix: recorder);
+
+        try
         {
-            ran = (bool)AccessTools.Method("GameInterface.Services.Issues.Quests.GangLeaderNeedsWeapons.Patches.GangLeaderNeedsWeaponsGuardsPatch:Prefix")
-                .Invoke(null, Array.Empty<object>())!;
-        });
+            var quest = Uninitialized<Quest>();
 
-        Assert.False(ran);
+            Assert.True(Descriptor().FinalizationProofStrategy!.TryRunBranch(quest, proof: 1));
+            Assert.Same(quest, ranHandIn);
+        }
+        finally
+        {
+            harmony.Unpatch(target, HarmonyPatchType.Prefix, harmony.Id);
+        }
+    }
+
+    private static Quest? ranHandIn;
+
+    private static bool RecordHandIn(Quest __instance)
+    {
+        ranHandIn = __instance;
+        return false;
+    }
+
+    [Fact]
+    public void ThePatchesAreAppliedToTheMethodsTheyAreMeantFor()
+    {
+        AssertPatched(typeof(Quest), nameof(Quest.PlayerSuccessfullyDeliveredWeapons), nameof(GangLeaderNeedsWeaponsDeliveryPatch));
+        AssertPatched(typeof(Quest), nameof(Quest.OnSettlementEnter), nameof(GangLeaderNeedsWeaponsGuardsPatch));
+    }
+
+    private static void AssertPatched(Type type, string method, string patchClass)
+    {
+        var info = Harmony.GetPatchInfo(AccessTools.Method(type, method));
+
+        Assert.NotNull(info);
+        Assert.Contains(info.Prefixes, patch => patch.PatchMethod.DeclaringType!.Name == patchClass);
     }
 
     [Fact]
@@ -222,35 +254,6 @@ public class GangLeaderNeedsWeaponsTests : IDisposable
 
         Assert.Equal(membersBefore + 1 + SentTroops, OwnersMembers());
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(), message => message.Outcome == IssueOutcome.AlternativeSolution);
-    }
-
-    [Fact]
-    public void AClientThatDidNotStartTheMissionStillTicksItsDay()
-    {
-        ClientB.Call(() =>
-        {
-            Assert.True(ClientB.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
-
-            using (new AllowedThread())
-            {
-                var issue = new Issue(giver);
-                issue._averagePriceForItem = 250;
-                issue._requiredWeaponClassIndex = 0;
-                issue.StringId = IssueId;
-
-                // What the accept does on a client that is not the owner
-                issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
-                issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.DaysFromNow(3f);
-                issue.AlternativeSolutionIssueEffectClearTime = CampaignTime.DaysFromNow(2f);
-
-                Campaign.Current.IssueManager._issues.Add(giver, issue);
-                giver.OnIssueCreatedForHero(issue);
-            }
-
-            Campaign.Current.IssueManager.DailyTick();
-
-            Assert.True(giver.Issue.IsSolvingWithAlternative);
-        });
     }
 
     // The success texts read the companion's encyclopedia link and the success consequence the giver's town, which these test
@@ -324,7 +327,7 @@ public class GangLeaderNeedsWeaponsTests : IDisposable
     }
 
     // The test world has no weapons, the quest only looks at the weapon class
-    private static ItemObject CreateAxe()
+    internal static ItemObject CreateAxe()
     {
         var axe = new ItemObject("test_axe");
         var component = new WeaponComponent(axe);

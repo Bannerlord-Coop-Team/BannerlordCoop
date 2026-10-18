@@ -4,6 +4,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -15,6 +16,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue;
+using Quest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssueQuest;
 
 namespace E2E.Tests.Services.Issues;
 
@@ -259,6 +261,99 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
     [Fact]
     public void AnEligiblePlayer_IsNotRefusedTheCompanionMission()
     {
+        AcceptTheCompanionMission();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAcceptRejected>());
+        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+        Assert.Equal(ControllerA, accepted.ControllerId);
+        Assert.Equal(ControllerA, OwnerOnServer(FirstGiverId, FirstIssueId));
+    }
+
+    [Fact]
+    public void AClientThatDidNotStartTheMission_TicksItsDayWithOneQuietLogEntry()
+    {
+        AcceptTheCompanionMission();
+
+        ClientB.Call(() =>
+        {
+            Assert.True(ClientB.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+            Assert.True(giver.Issue.IsSolvingWithAlternative);
+
+            // Vanilla's daily tick reads the first entry of every running mission
+            Campaign.Current.IssueManager.DailyTick();
+            var entry = Assert.Single(giver.Issue.JournalEntries);
+            Assert.Equal(((Issue)giver.Issue).AlternativeSolutionBaseDurationInDaysInternal, entry.Range);
+
+            Campaign.Current.IssueManager.DailyTick();
+            Assert.Single(giver.Issue.JournalEntries);
+        });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TheHandIn_PaysTheOwnerAndTakesTheWeaponsOnlyWhenTheyAreCarried(bool carriesEnough)
+    {
+        var axe = GangLeaderNeedsWeaponsTests.CreateAxe();
+        var needed = 0;
+        var rewardGold = 0;
+        var goldBefore = 0;
+
+        Accept(ClientA, FirstGiverId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PlayerA.MobilePartyId, out var party));
+            var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+
+            needed = quest._requestedWeaponAmount;
+            rewardGold = quest.RewardGold;
+            goldBefore = owner.Gold;
+
+            using (new AllowedThread())
+            {
+                party.ItemRoster.Clear();
+                party.ItemRoster.AddToCounts(axe, carriesEnough ? needed : needed - 1);
+            }
+        });
+        TestEnvironment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+            Assert.IsType<Quest>(giver.Issue.IssueQuest).PlayerSuccessfullyDeliveredWeapons();
+        });
+        TestEnvironment.FlushCoalescer();
+
+        var finished = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PlayerA.MobilePartyId, out var party));
+
+            if (carriesEnough)
+            {
+                Assert.Equal(goldBefore + rewardGold, owner.Gold);
+                Assert.Equal(0, party.ItemRoster.GetItemNumber(axe));
+                Assert.Null(giver.Issue);
+                Assert.Single(finished, message => message.Outcome == IssueOutcome.QuestSuccess);
+            }
+            else
+            {
+                Assert.Equal(goldBefore, owner.Gold);
+                Assert.Equal(needed - 1, party.ItemRoster.GetItemNumber(axe));
+                Assert.NotNull(giver.Issue.IssueQuest);
+                Assert.Empty(finished);
+            }
+        });
+    }
+
+    private void AcceptTheCompanionMission()
+    {
         var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
 
@@ -297,10 +392,5 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
             ClientA.Resolve<IMessageBroker>().Publish(this, new AlternativeSolutionAcceptRequested(giver.Issue));
         });
         TestEnvironment.FlushCoalescer();
-
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAcceptRejected>());
-        var accepted = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
-        Assert.Equal(ControllerA, accepted.ControllerId);
-        Assert.Equal(ControllerA, OwnerOnServer(FirstGiverId, FirstIssueId));
     }
 }

@@ -60,8 +60,17 @@ internal class GangLeaderNeedsWeaponsCreationCaptureStrategy : ICreationCaptureS
 
         var issue = new Issue(issueOwner);
 
+        // The issue only exists to be read, vanilla's constructor listens to settlement owner changes for it
+        CampaignEvents.OnSettlementOwnerChangedEvent.ClearListeners(issue);
+
         // No market sells the weapon, so the quest would ask for nothing
         if (issue._averagePriceForItem <= 0)
+        {
+            return false;
+        }
+
+        // A town the player owns or one that is too loyal would lose the issue on the next daily tick
+        if (!issue.IssueStayAliveConditions())
         {
             return false;
         }
