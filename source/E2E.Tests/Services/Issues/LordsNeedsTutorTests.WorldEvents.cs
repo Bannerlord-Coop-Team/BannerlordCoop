@@ -98,7 +98,10 @@ public sealed partial class LordsNeedsTutorTests
                 Assert.Null(pupil.CompanionOf);
                 Assert.Equal(0, Get<MobileParty>(instance, partyIds[0]).MemberRoster.GetTroopCount(pupil.CharacterObject));
                 foreach (var skill in Skills.All) Assert.Equal(originalFocus[skill.StringId], pupil.HeroDeveloper.GetFocus(skill));
-                Assert.True(second.QuestOf(Server).IsOngoing);
+                if (instance == Owner)
+                    Assert.Null(Get<Hero>(instance, second.NotableId).Issue.IssueQuest);
+                else
+                    Assert.True(second.QuestOf(instance).IsOngoing);
             });
     }
 
