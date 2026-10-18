@@ -8,6 +8,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using Serilog;
 using System;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -20,6 +21,11 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
     private readonly IMessageBroker messageBroker;
     private readonly IQuestTypeRegistry registry;
     private readonly IIssueOwnerResolver ownerResolver;
+    private readonly ConditionalWeakTable<IssueBase, OutcomeMarker> observedOutcomes = new();
+
+    private sealed class OutcomeMarker
+    {
+    }
 
     public OutcomeDispatcher(IMessageBroker messageBroker, IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver)
     {
@@ -145,6 +151,15 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         }
 
         if (observed.IssueOwner.Issue == observed)
+        {
+            return;
+        }
+
+        if (!observedOutcomes.TryGetValue(observed, out _) && outcome == IssueOutcome.QuestSuccess)
+        {
+            observedOutcomes.Add(observed, new OutcomeMarker());
+        }
+        else if (observedOutcomes.TryGetValue(observed, out _))
         {
             return;
         }

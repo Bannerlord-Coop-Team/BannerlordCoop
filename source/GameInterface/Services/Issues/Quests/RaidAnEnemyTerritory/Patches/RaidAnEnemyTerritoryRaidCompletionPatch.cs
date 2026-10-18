@@ -96,6 +96,12 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
             return;
         }
 
+        var issueId = quest.QuestGiver?.Issue?.StringId;
+        if (string.IsNullOrEmpty(issueId))
+        {
+            return;
+        }
+
         var villageIds = new List<string>();
         foreach (var raidedVillage in quest._raidedVillages)
         {
@@ -116,7 +122,7 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
 
         MessageBroker.Instance.Publish(quest, new RaidAnEnemyTerritoryProgressReady(
             giverId,
-            quest.StringId,
+            issueId,
             villageIds.ToArray(),
             entries));
 
