@@ -459,10 +459,13 @@ public class ArtisanProductsTests : IDisposable
     {
         Accept();
         LeaveOrigin();
+        var power = 0f;
+        Server.Call(() => power = Server.GetRegisteredObject<Hero>(merchantId).Power);
         Owner.Call(() => ((Quest)scenario.QuestOf(Owner)).RefuseCounterOfferConsequences());
         Owner.Call(() => ((Quest)scenario.QuestOf(Owner)).RefuseCounterOfferConsequences());
         Owner.Call(() => Assert.True(((Quest)scenario.QuestOf(Owner))._counterOfferRefused));
         Server.Call(() => Assert.True(((Quest)scenario.QuestOf(Server))._counterOfferRefused));
+        Server.Call(() => Assert.Equal(power - 10f, Server.GetRegisteredObject<Hero>(merchantId).Power));
     }
 
     [Fact]
@@ -563,6 +566,40 @@ public class ArtisanProductsTests : IDisposable
             foreach (var instance in new[] { Server, Owner })
                 instance.Call(() => Assert.Equal(9, OwnerParty(instance).MemberRoster.GetTroopCount(instance.GetRegisteredObject<CharacterObject>(troopId))));
     }
+
+    [Fact]
+    public void GiverDeath_WhileTheOwnerIsCaptiveReturnsTheTroopsOnceTheOwnerIsFree()
+    {
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        foreach (var instance in new[] { Server, Owner, Other })
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    var issue = instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+                    issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                    instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(scenario.NotableId, issue.StringId, QuestScenario.ControllerA);
+                    if (instance != Other)
+                        issue.AlternativeSolutionSentTroops.AddToCounts(instance.GetRegisteredObject<CharacterObject>(troopId), 9);
+                }
+            });
+        SetOwnerStateOnServer(Hero.CharacterStates.Prisoner);
+        Server.Call(() => CampaignEventDispatcher.Instance.OnHeroKilled(Server.GetRegisteredObject<Hero>(scenario.NotableId), null,
+            KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false));
+        Server.Call(() => Campaign.Current.IssueManager.HourlyTick());
+        Server.Call(() => Assert.Equal(0, OwnerParty(Server).MemberRoster.GetTroopCount(Server.GetRegisteredObject<CharacterObject>(troopId))));
+        SetOwnerStateOnServer(Hero.CharacterStates.Active);
+        Server.Call(() => Campaign.Current.IssueManager.HourlyTick());
+        environment.FlushCoalescer();
+        foreach (var instance in new[] { Server, Owner })
+            instance.Call(() => Assert.Equal(9, OwnerParty(instance).MemberRoster.GetTroopCount(instance.GetRegisteredObject<CharacterObject>(troopId))));
+    }
+
+    private void SetOwnerStateOnServer(Hero.CharacterStates state) => Server.Call(() =>
+    {
+        Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
+        Server.GetRegisteredObject<Hero>(player.HeroId)._heroState = state;
+    });
 
     [Theory]
     [InlineData(DeclareWarAction.DeclareWarDetail.CausedByRebellion, IssueOutcome.QuestCancel)]
