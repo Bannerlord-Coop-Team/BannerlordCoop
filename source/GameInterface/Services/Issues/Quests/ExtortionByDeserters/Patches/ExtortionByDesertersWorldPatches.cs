@@ -57,17 +57,6 @@ internal class ExtortionByDesertersWorldPatches
         });
     }
 
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
-    [HarmonyPostfix]
-    private static void WarPostfix(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail) =>
-        Run(quest => quest.OnWarDeclared(faction1, faction2, declareWarDetail));
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
-    [HarmonyPostfix]
-    private static void ClanPostfix(Clan clan, Kingdom oldKingdom, Kingdom newKingdom,
-        ChangeKingdomAction.ChangeKingdomActionDetail actionDetail, bool showNotification) =>
-        Run(quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
-
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
     [HarmonyPostfix]
     private static void MapStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty) =>
