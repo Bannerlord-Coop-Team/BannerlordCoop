@@ -302,6 +302,7 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
     public void AForgedSuccessRequestDoesNotCompleteTheQuest()
     {
         Accept(ClientA, FirstGiverId);
+        Assert.Equal(ControllerA, OwnerOnServer(FirstGiverId, FirstIssueId));
 
         ClientA.Call(() => ClientA.Resolve<INetwork>().SendAll(new RequestQuestOutcome(
             FirstGiverId,
@@ -324,6 +325,7 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
         var axe = GangLeaderNeedsWeaponsTests.CreateAxe();
 
         Accept(ClientA, FirstGiverId);
+        Assert.Equal(ControllerA, OwnerOnServer(FirstGiverId, FirstIssueId));
 
         Server.Call(() =>
         {
@@ -504,6 +506,9 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
 
             Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var clientOwner));
             clientGoldBefore = clientOwner.Gold;
+            var prefix = AccessTools.Method(AccessTools.TypeByName("GameInterface.Services.Issues.Quests.GangLeaderNeedsWeapons.Patches.GangLeaderNeedsWeaponsStartConsequencePatch"), "Prefix");
+            Assert.NotNull(prefix);
+            Assert.False((bool)prefix!.Invoke(null, null)!);
             giver.Issue.AlternativeSolutionStartConsequence();
             clientGoldAfter = clientOwner.Gold;
             giver.Issue.StartIssueWithAlternativeSolution();
