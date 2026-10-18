@@ -3,6 +3,7 @@ using Common.Util;
 using E2E.Tests.Util;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.LordsNeedsTutor;
 using GameInterface.Services.Players;
 using HarmonyLib;
@@ -69,8 +70,10 @@ public sealed partial class LordsNeedsTutorTests
         Server.Call(() => Assert.False(Get<Hero>(Server, heroId).IsAlive));
     }
 
-    [Fact]
-    public void GiverDeathCancelsOnlyItsQuestAndReturnsThePupil()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GiverDeathCancelsOnlyItsQuestAndReturnsThePupil(bool serverRestart)
     {
         Accept();
         var second = AcceptObserversQuest();
@@ -86,6 +89,11 @@ public sealed partial class LordsNeedsTutorTests
                     leader.Clan = giver.Clan;
                     giver.Clan.SetLeader(leader);
                 }
+            });
+        if (serverRestart)
+            Server.Call(() =>
+            {
+                Server.Resolve<IIssueOwnershipRegistry>().Remove(giverId);
             });
         Kill(giverId);
         environment.FlushCoalescer();
@@ -118,6 +126,13 @@ public sealed partial class LordsNeedsTutorTests
     {
         Accept();
         var second = AcceptObserversQuest();
+        if (trigger == "marriage")
+            foreach (var instance in Instances)
+                instance.Call(() =>
+                {
+                    using (new AllowedThread())
+                        Get<Hero>(instance, pupilId).Clan = Get<Hero>(instance, heroIds[0]).Clan;
+                });
         Server.Call(() =>
         {
             var owner = Get<Hero>(Server, heroIds[0]);
@@ -157,7 +172,8 @@ public sealed partial class LordsNeedsTutorTests
                 var pupil = Get<Hero>(instance, pupilId);
                 Assert.Null(Get<Hero>(instance, giverId).Issue);
                 Assert.Null(pupil.CompanionOf);
-                Assert.Same(Get<Hero>(instance, giverId).Clan, pupil.Clan);
+                if (trigger == "marriage") Assert.Same(Get<Hero>(instance, heroIds[0]).Clan, pupil.Clan);
+                else Assert.Same(Get<Hero>(instance, giverId).Clan, pupil.Clan);
                 Assert.Equal(0, Get<MobileParty>(instance, partyIds[0]).MemberRoster.GetTroopCount(pupil.CharacterObject));
                 foreach (var skill in Skills.All) Assert.Equal(originalFocus[skill.StringId], pupil.HeroDeveloper.GetFocus(skill));
                 Assert.NotNull(Get<Hero>(instance, second.NotableId).Issue);
