@@ -42,7 +42,7 @@ internal sealed class RevenueFarmingSessionStore : IRevenueFarmingSessionStore
     public RevenueFarmingSession Get(Quest quest) => sessions.FirstOrDefault(session => session.Quest == quest);
 
     public RevenueFarmingSession Get(IssueBase issue) => sessions.FirstOrDefault(session =>
-        session.Quest.QuestGiver == issue.IssueOwner && session.Quest.QuestGiver?.Issue == issue);
+        session.Quest.QuestGiver == issue.IssueOwner && session.IssueId == issue.StringId);
 
     public RevenueFarmingSession Get(Hero questGiver, string questId) => sessions.FirstOrDefault(session =>
         session.Quest.QuestGiver == questGiver && session.Quest.StringId == questId);
@@ -63,10 +63,11 @@ internal sealed class RevenueFarmingSessionStore : IRevenueFarmingSessionStore
         {
             if (session.PlayerHero != playerHero || session.ControllerId != controllerId)
                 throw new InvalidOperationException("Revenue Farming quest already has another owner.");
+            if (session.IssueId == null) session.IssueId = quest.QuestGiver?.Issue?.StringId;
             return session;
         }
 
-        session = new RevenueFarmingSession(quest, playerHero, controllerId);
+        session = new RevenueFarmingSession(quest, playerHero, controllerId, quest.QuestGiver?.Issue?.StringId);
         sessions.Add(session);
         return session;
     }
@@ -89,15 +90,17 @@ internal sealed class RevenueFarmingSession
     [SaveableField(6)] internal Settlement CollectionSettlement;
     [SaveableField(7)] internal MobileParty PlayerParty;
     [SaveableField(8)] internal string ControllerId;
+    [SaveableField(9)] internal string IssueId;
 
     private RevenueFarmingSession() { }
 
-    internal RevenueFarmingSession(Quest quest, Hero playerHero, string controllerId)
+    internal RevenueFarmingSession(Quest quest, Hero playerHero, string controllerId, string issueId)
     {
         Quest = quest;
         PlayerHero = playerHero;
         PlayerParty = playerHero.PartyBelongedTo;
         ControllerId = controllerId;
+        IssueId = issueId;
     }
 }
 
