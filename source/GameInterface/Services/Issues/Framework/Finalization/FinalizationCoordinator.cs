@@ -225,6 +225,7 @@ internal class FinalizationCoordinator : IHandler
             }
 
             using (new AllowedThread())
+            using (new QuestEndingReplay())
             {
                 Replay(issue, data.Outcome);
             }
