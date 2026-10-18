@@ -224,6 +224,37 @@ public class SmugglersTests : IDisposable
         Assert.Equal(0, hourlyTickParty.CountFor(Server));
     }
 
+    // The framework relays wars and kingdom changes to every registered quest, a relay of Smugglers' own would run them twice
+    [Fact]
+    public void War_ReachesTheServersQuestOnce()
+    {
+        using var calls = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared)));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(issueOwnerId, out var giver));
+
+            CampaignEventDispatcher.Instance.OnWarDeclared(giver.MapFaction, giver.MapFaction, DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
+        });
+
+        Assert.Equal(1, calls.CountFor(Server));
+    }
+
+    [Fact]
+    public void KingdomChange_ReachesTheServersQuestOnce()
+    {
+        using var calls = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom)));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(issueOwnerId, out var giver));
+
+            CampaignEventDispatcher.Instance.OnClanChangedKingdom(giver.Clan, null, null, ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+        });
+
+        Assert.Equal(1, calls.CountFor(Server));
+    }
+
     [Fact]
     public void SmugglersBeatenWithoutTheOwner_CancelTheQuest()
     {

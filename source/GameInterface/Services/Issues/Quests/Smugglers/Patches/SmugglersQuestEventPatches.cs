@@ -15,8 +15,9 @@ using Quest = TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior.SmugglersI
 namespace GameInterface.Services.Issues.Quests.Smugglers.Patches;
 
 /// <summary>
-/// The fight with the smugglers, the wars that cancel the quest and the smugglers' route are decided on the
-/// server, so its quest object runs these listeners as the owning player and the owner's client skips them.
+/// The fight with the smugglers, the town owner change that cancels the quest and the smugglers' route are decided
+/// on the server, so its quest object runs these listeners as the owning player and the owner's client skips them.
+/// Wars and kingdom changes are relayed by the framework.
 /// </summary>
 [HarmonyPatch]
 internal class SmugglersQuestEventPatches
@@ -112,25 +113,6 @@ internal class SmugglersQuestEventPatches
         quest.CompleteQuestWithCancel();
     }
 
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
-    [HarmonyPostfix]
-    private static void OnWarDeclaredPostfix(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail)
-    {
-        RunAsOwners(quest => quest.OnWarDeclared(faction1, faction2, declareWarDetail));
-    }
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
-    [HarmonyPostfix]
-    private static void OnClanChangedKingdomPostfix(
-        Clan clan,
-        Kingdom oldKingdom,
-        Kingdom newKingdom,
-        ChangeKingdomAction.ChangeKingdomActionDetail actionDetail,
-        bool showNotification)
-    {
-        RunAsOwners(quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
-    }
-
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementOwnerChanged))]
     [HarmonyPostfix]
     private static void OnSettlementOwnerChangedPostfix(
@@ -160,14 +142,6 @@ internal class SmugglersQuestEventPatches
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventEnded))]
     [HarmonyPrefix]
     private static bool OnMapEventEndedPrefix() => ModInformation.IsServer;
-
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnWarDeclared))]
-    [HarmonyPrefix]
-    private static bool OnWarDeclaredPrefix() => ModInformation.IsServer;
-
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnClanChangedKingdom))]
-    [HarmonyPrefix]
-    private static bool OnClanChangedKingdomPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementOwnerChanged))]
     [HarmonyPrefix]
