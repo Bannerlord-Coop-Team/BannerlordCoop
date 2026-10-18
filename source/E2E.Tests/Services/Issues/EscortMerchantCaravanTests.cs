@@ -239,6 +239,7 @@ public class EscortMerchantCaravanTests : IDisposable
     public void TheServerPublishesCaravanAndVisitedSettlementProgressOnlyToTheOwner()
     {
         Accept();
+        CampaignTime due = default;
         Server.Call(() =>
         {
             var quest = QuestOn(Server);
@@ -247,6 +248,8 @@ public class EscortMerchantCaravanTests : IDisposable
             quest._daysSpentForEscorting = 4;
             quest._visitedSettlements.Add(quest.QuestGiver.CurrentSettlement);
             quest.UpdateQuestTaskStage(quest._playerStartsQuestLog, 1);
+            due = CampaignTime.Now + CampaignTime.Days(7);
+            quest.QuestDueTime = due;
             Server.Resolve<IEscortProgress>().Publish(quest);
         });
         Owner.Call(() =>
@@ -257,6 +260,7 @@ public class EscortMerchantCaravanTests : IDisposable
             Assert.Equal(4, quest._daysSpentForEscorting);
             Assert.Single(quest._visitedSettlements);
             Assert.Equal(1, quest._playerStartsQuestLog.CurrentProgress);
+            Assert.Equal(due.NumTicks, quest.QuestDueTime.NumTicks);
         });
         Other.Call(() =>
         {
@@ -725,6 +729,71 @@ public class EscortMerchantCaravanTests : IDisposable
             Assert.True(quest.IsFinalized);
         });
         Owner.Call(() => Assert.True(ownerQuest.IsFinalized));
+    }
+
+    [Fact]
+    public void TheServerTimesOutAnOverdueEscortOnceAsItsOwner()
+    {
+        Accept();
+        var ownerQuest = QuestOn(Owner);
+        Server.Call(() =>
+        {
+            var quest = QuestOn(Server);
+            var town = quest.QuestGiver.CurrentSettlement.Town;
+            var prosperity = town.Prosperity;
+            quest._questCaravanMobileParty = Server.GetRegisteredObject<MobileParty>(caravanId);
+            quest.QuestDueTime = CampaignTime.Now - CampaignTime.Hours(1);
+            Campaign.Current.QuestManager.HourlyTick();
+            Campaign.Current.QuestManager.HourlyTick();
+            Assert.True(quest.IsFinalized);
+            Assert.Equal(prosperity - 20, town.Prosperity);
+        });
+        Assert.Equal(IssueOutcome.QuestTimeOut, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Owner.Call(() =>
+        {
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Contains(ownerQuest.JournalEntries, log => log.LogText.GetID() == "pUrSIed8");
+        });
+    }
+
+    [Fact]
+    public void AWarWithTheMerchantsTownCancelsTheEscortOnTheServerAsItsOwner()
+    {
+        var kingdomId = environment.CreateRegisteredObject<Kingdom>();
+        var playerClanId = environment.CreateRegisteredObject<Clan>();
+        var owner = Server.Resolve<IPlayerManager>().Players.Single(p => p.ControllerId == QuestScenario.ControllerA);
+        foreach (var instance in new[] { Server, Owner, Other })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(owner.HeroId, out var ownerHero));
+                using (new AllowedThread())
+                {
+                    giver.Clan._kingdom = instance.GetRegisteredObject<Kingdom>(kingdomId);
+                    giver.CurrentSettlement.Town._ownerClan = giver.Clan;
+                    giver.CurrentSettlement.SettlementComponent = giver.CurrentSettlement.Town;
+                    ownerHero.Clan = instance.GetRegisteredObject<Clan>(playerClanId);
+                }
+            });
+        }
+        Accept();
+        var ownerQuest = QuestOn(Owner);
+        Server.Call(() =>
+        {
+            var quest = QuestOn(Server);
+            quest._questCaravanMobileParty = Server.GetRegisteredObject<MobileParty>(caravanId);
+            DeclareWarAction.ApplyInternal(Server.GetRegisteredObject<Kingdom>(kingdomId),
+                Server.GetRegisteredObject<Clan>(playerClanId), DeclareWarAction.DeclareWarDetail.CausedByRebellion);
+            Assert.True(quest.IsFinalized);
+        });
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        Owner.Call(() =>
+        {
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Contains(ownerQuest.JournalEntries, log => log.LogText.GetID() == "KhNkBd9O");
+        });
     }
 
     [Theory]
