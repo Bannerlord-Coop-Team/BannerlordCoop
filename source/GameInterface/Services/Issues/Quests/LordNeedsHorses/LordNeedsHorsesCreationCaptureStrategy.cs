@@ -1,4 +1,4 @@
-using GameInterface.Services.Issues.Framework.Interface;
+﻿using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System.IO;
 using System.Reflection;
@@ -64,12 +64,15 @@ internal class LordNeedsHorsesCreationCaptureStrategy : ICreationCaptureStrategy
     {
         captured = null;
 
-        if (issueOwner.PartyBelongedTo == null || issueOwner.Clan == null)
+        var issue = new Issue(issueOwner);
+
+        // Only a clan or kingdom leader with few mounts keeps the issue alive past the next daily tick
+        if (issueOwner.PartyBelongedTo == null || !issue.IssueStayAliveConditions())
         {
             return false;
         }
 
-        captured = Capture(new Issue(issueOwner));
+        captured = Capture(issue);
         return true;
     }
 }

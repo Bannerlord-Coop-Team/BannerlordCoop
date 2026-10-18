@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using HarmonyLib;
 using Serilog;
@@ -20,7 +20,7 @@ internal class LordNeedsHorsesHandInPatch
     [HarmonyPrefix]
     private static bool Prefix(QuestBase __instance)
     {
-        if (!ModInformation.IsServer || !(__instance is Quest quest))
+        if (ModInformation.IsClient || !(__instance is Quest quest))
         {
             return true;
         }

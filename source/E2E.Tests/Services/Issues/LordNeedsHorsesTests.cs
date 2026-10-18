@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -205,29 +205,44 @@ public class LordNeedsHorsesTests : IDisposable
     }
 
     [Fact]
-    public void AClientThatDidNotStartTheMissionStillTicksItsDay()
+    public void DebugCapture_IsRefusedForAGiverWhoIsNotAClanLeader()
     {
-        ClientB.Call(() =>
+        Server.Call(() =>
         {
-            Assert.True(ClientB.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
 
             using (new AllowedThread())
             {
-                var issue = new Issue(giver);
-                issue.StringId = IssueId;
-
-                // What the accept does on a client that is not the owner
-                issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
-                issue.AlternativeSolutionReturnTimeForTroops = CampaignTime.DaysFromNow(3f);
-                issue.AlternativeSolutionIssueEffectClearTime = CampaignTime.DaysFromNow(2f);
-
-                Campaign.Current.IssueManager._issues.Add(giver, issue);
-                giver.OnIssueCreatedForHero(issue);
+                giver._partyBelongedTo = party;
             }
 
-            Campaign.Current.IssueManager.DailyTick();
+            Assert.False(Descriptor().CreationCaptureStrategy.TryBuildDebugCapture(giver, out _));
+        });
+    }
 
-            Assert.True(giver.Issue.IsSolvingWithAlternative);
+    [Fact]
+    public void DebugCapture_IsBuiltForAClanLeaderWithFewMounts()
+    {
+        var clanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+
+            using (new AllowedThread())
+            {
+                giver.Clan = clan;
+                clan.SetLeader(giver);
+                giver._partyBelongedTo = party;
+                party.MemberRoster.AddToCounts(troop, 20);
+            }
+
+            Assert.True(Descriptor().CreationCaptureStrategy.TryBuildDebugCapture(giver, out var captured));
+            Assert.NotEmpty(captured);
         });
     }
 
