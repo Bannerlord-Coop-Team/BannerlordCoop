@@ -193,7 +193,7 @@ internal class MobilePartyBehaviorHandler : IHandler
             party.ChangeIsCurrentlyAtSeaCheat();
     }
 
-    private static List<MobileParty> ApplyServerForcedPosition(
+    internal static List<MobileParty> ApplyServerForcedPosition(
         MobileParty party,
         CampaignVec2 position,
         bool isCurrentlyAtSea)

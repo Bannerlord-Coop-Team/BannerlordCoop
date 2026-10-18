@@ -36,6 +36,12 @@ public class UnstuckMapPositionTests : MapEventTestBase
     private static readonly CampaignVec2 StuckSpot = Position(405.195f, 292.296f);
     private static readonly CampaignVec2 ClosestUsableSpot = Position(406.047f, 292.602f);
     private static readonly CampaignVec2 VillageGate = Position(416.539f, 309.282f);
+    // A scrap of plain land on its own navigation island, with no settlement gate on it.
+    private static readonly CampaignVec2 CutOffSpot = Position(400f, 290f);
+
+    private static readonly PathFaceRecord WaterFace = new(5636, 10, -1);
+    private static readonly PathFaceRecord CutOffLandFace = new(7001, 1, 4);
+    private static readonly PathFaceRecord MainLandFace = new(12990, 1, 9);
 
     private EnvironmentInstance Client => Clients.First();
 
@@ -102,7 +108,6 @@ public class UnstuckMapPositionTests : MapEventTestBase
         {
             // The closest face center lies in the same water.
             UseNavigationMesh(closestFaceCenter: Position(405.5f, 292.3f));
-            CreateTown(VillageGate);
             CreateTown(Position(450f, 350f));
         });
 
@@ -130,6 +135,71 @@ public class UnstuckMapPositionTests : MapEventTestBase
         Assert.Contains("No server-side stuck state found (captivity, map event, army, siege camp, settlement, map position).", result.Actions);
     }
 
+    [Fact]
+    public void Unstuck_OnValidLandCutOffFromEveryGate_MovesToTheClosestReachableSpot()
+    {
+        var partyId = PrepareConnectedPlayer(StuckSpot);
+        // Plain terrain passes the native terrain check, but no gate shares its navigation island.
+        Server.Call(() => UseNavigationMesh(closestFaceCenter: ClosestUsableSpot, stuckFace: CutOffLandFace));
+
+        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(partyId, null));
+
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() => Assert.Equal(ClosestUsableSpot, instance.GetRegisteredObject<MobileParty>(partyId).Position));
+        AssertForcedPositionSent();
+    }
+
+    [Fact]
+    public void Unstuck_WhenTheClosestFaceIsValidLandCutOffFromEveryGate_MovesToTheNearestUsableGate()
+    {
+        var partyId = PrepareConnectedPlayer(StuckSpot);
+        Server.Call(() => UseNavigationMesh(closestFaceCenter: CutOffSpot));
+
+        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(partyId, null));
+
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() => Assert.Equal(VillageGate, instance.GetRegisteredObject<MobileParty>(partyId).Position));
+    }
+
+    [Fact]
+    public void Unstuck_ArmyLeaderOnUnusableSpot_MovesTheAttachedPartiesWithIt()
+    {
+        var partyId = PrepareConnectedPlayer(StuckSpot);
+        var memberId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                    instance.GetRegisteredObject<MobileParty>(memberId).Position = StuckSpot;
+            });
+        Server.Call(() =>
+        {
+            UseNavigationMesh(closestFaceCenter: ClosestUsableSpot);
+            var leader = Server.GetRegisteredObject<MobileParty>(partyId);
+            var member = Server.GetRegisteredObject<MobileParty>(memberId);
+            var army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), leader, Army.ArmyTypes.Patrolling);
+            member.Army = army;
+            member.AttachedTo = leader;
+            member.IsActive = true;
+            Assert.Contains(member, leader.AttachedParties);
+        });
+
+        Server.SimulateMessage(Client.NetPeer, new NetworkRequestPlayerUnstuck(partyId, null));
+
+        foreach (var instance in Clients.Append(Server))
+            instance.Call(() =>
+            {
+                Assert.Equal(ClosestUsableSpot, instance.GetRegisteredObject<MobileParty>(partyId).Position);
+                Assert.Equal(ClosestUsableSpot, instance.GetRegisteredObject<MobileParty>(memberId).Position);
+            });
+        // One forced update for the leader and a separate one for the attached party.
+        var forcedPartyIds = Server.NetworkSentMessages.GetMessages<NetworkUpdatePartyBehavior>()
+            .Where(update => update.BehaviorUpdateData.ForcePosition)
+            .Select(update => update.BehaviorUpdateData.MobilePartyId)
+            .Distinct();
+        Assert.Equal(2, forcedPartyIds.Count());
+    }
+
     /// <summary>Registers a connected player whose party stands at <paramref name="position"/> on every instance.</summary>
     private string PrepareConnectedPlayer(CampaignVec2 position)
     {
@@ -151,23 +221,27 @@ public class UnstuckMapPositionTests : MapEventTestBase
     }
 
     /// <summary>
-    /// Gives the server a navigation mesh that is water outside every island within a unit of
-    /// <see cref="StuckSpot"/> and usable land elsewhere, with <paramref name="closestFaceCenter"/>
-    /// as the closest face center the native lookup returns.
+    /// Gives the server a navigation mesh where <see cref="StuckSpot"/> lies on
+    /// <paramref name="stuckFace"/> (water outside every island unless given), the land around
+    /// <see cref="CutOffSpot"/> is its own island and the rest is the main land holding the town gate
+    /// at <see cref="VillageGate"/>, with <paramref name="closestFaceCenter"/> as the closest face
+    /// center the native lookup returns.
     /// </summary>
-    private static void UseNavigationMesh(CampaignVec2 closestFaceCenter)
+    private static void UseNavigationMesh(CampaignVec2 closestFaceCenter, PathFaceRecord? stuckFace = null)
     {
+        var faceAtStuckSpot = stuckFace ?? WaterFace;
         var mapScene = new Mock<IMapScene>();
         mapScene.Setup(scene => scene.GetFaceIndex(in It.Ref<CampaignVec2>.IsAny))
             .Returns(new FaceIndexLookup((in CampaignVec2 position) =>
-                position.ToVec2().Distance(StuckSpot.ToVec2()) < 0.5f
-                    ? new PathFaceRecord(5636, 10, -1)
-                    : new PathFaceRecord(12990, 1, 9)));
+                position.ToVec2().Distance(StuckSpot.ToVec2()) < 0.5f ? faceAtStuckSpot :
+                position.ToVec2().Distance(CutOffSpot.ToVec2()) < 0.5f ? CutOffLandFace :
+                MainLandFace));
         mapScene.Setup(scene => scene.GetFaceTerrainType(It.IsAny<PathFaceRecord>()))
-            .Returns<PathFaceRecord>(face => face.FaceIslandIndex < 0 ? TerrainType.Water : TerrainType.Plain);
+            .Returns<PathFaceRecord>(face => face.FaceIndex == WaterFace.FaceIndex ? TerrainType.Water : TerrainType.Plain);
         mapScene.Setup(scene => scene.GetNearestFaceCenterForPosition(in It.Ref<CampaignVec2>.IsAny, It.IsAny<int[]>()))
             .Returns(new NearestFaceCenterLookup((in CampaignVec2 position, int[] excludedFaceIds) => closestFaceCenter));
         Campaign.Current._mapSceneWrapper = mapScene.Object;
+        CreateTown(VillageGate);
     }
 
     private static void CreateTown(CampaignVec2 gate)
