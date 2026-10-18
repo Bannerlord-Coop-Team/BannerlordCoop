@@ -9,18 +9,18 @@ public readonly struct EducationStageUpdated : IEvent
 {
     public readonly Hero Child;
     public readonly short Target;
-    public readonly List<CharacterAttribute> Attributes;
+    public readonly List<string> ChosenOptions;
     public readonly List<SkillObject> Skills;
 
     public EducationStageUpdated(
         Hero child,
         short target,
-        List<CharacterAttribute> attributes,
+        List<string> chosenOptions,
         List<SkillObject> skills)
     {
         Child = child;
         Target = target;
-        Attributes = attributes;
+        ChosenOptions = chosenOptions;
         Skills = skills;
     }
 }

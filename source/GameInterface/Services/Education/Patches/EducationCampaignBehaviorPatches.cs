@@ -66,19 +66,18 @@ internal class EducationCampaignBehaviorPatches
             // Clean up previous educations on client
             __instance._previousEducations.Remove(child);
 
-            var attributes = new List<CharacterAttribute>();
+            // Skills are sent alongside the keys because Year8 rolls a random skill each time the stage is built
             var skills = new List<SkillObject>();
             foreach (string optionKey in chosenOptions)
             {
                 var option = stage.GetOption(optionKey);
                 if (option == null) continue;
 
-                attributes.AddRange(option.Attributes);
                 skills.AddRange(option.Skills);
             }
 
             short target = (short)stage.Target;
-            MessageBroker.Instance.Publish(__instance, new EducationStageUpdated(child, target, attributes, skills));
+            MessageBroker.Instance.Publish(__instance, new EducationStageUpdated(child, target, chosenOptions, skills));
 
             __instance._activeStage = null;
             __instance._activeChild = null;

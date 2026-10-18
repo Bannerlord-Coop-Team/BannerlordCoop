@@ -137,14 +137,6 @@ internal class EducationCampaignBehaviorHandler : IHandler
 
         if (!objectManager.TryGetHandleWithLogging(data.Child, out var childHandle)) return;
 
-        var attributeIds = new List<string>();
-        foreach (var attribute in data.Attributes)
-        {
-            if (!objectManager.TryGetIdWithLogging(attribute, out var attributeId)) continue;
-
-            attributeIds.Add(attributeId);
-        }
-
         var skillIds = new List<string>();
         foreach (var skill in data.Skills)
         {
@@ -153,7 +145,7 @@ internal class EducationCampaignBehaviorHandler : IHandler
             skillIds.Add(skillId);
         }
 
-        network.SendAll(new NetworkEducationStageUpdated(childHandle, data.Target, attributeIds, skillIds));
+        network.SendAll(new NetworkEducationStageUpdated(childHandle, data.Target, data.ChosenOptions, skillIds));
     }
 
     private void Handle_NetworkEducationStageUpdated(MessagePayload<NetworkEducationStageUpdated> obj)
@@ -163,14 +155,6 @@ internal class EducationCampaignBehaviorHandler : IHandler
         GameThread.RunSafe(() =>
         {
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ChildHandle, out var child)) return;
-
-            var attributes = new List<CharacterAttribute>();
-            foreach (var attributeId in data.AttributeIds ?? new List<string>())
-            {
-                if (!objectManager.TryGetObjectWithLogging<CharacterAttribute>(attributeId, out var attribute)) continue;
-
-                attributes.Add(attribute);
-            }
 
             var skills = new List<SkillObject>();
             foreach (var skillId in data.SkillIds ?? new List<string>())
@@ -182,7 +166,7 @@ internal class EducationCampaignBehaviorHandler : IHandler
 
             var sender = (NetPeer)obj.Who;
             if (playerManager.TryGetPlayer(sender, out var senderPlayer)
-                && educationInterface.UpdateEducationStage(child, data.Target, attributes, skills, senderPlayer.ControllerId)) return;
+                && educationInterface.UpdateEducationStage(child, data.Target, data.ChosenOptions ?? new List<string>(), skills, senderPlayer.ControllerId)) return;
 
             network.Send(sender, new NetworkEducationStageRejected(data.ChildHandle));
         });
