@@ -9,9 +9,9 @@ using TaleWorlds.CampaignSystem.Issues;
 namespace GameInterface.Services.Issues.Framework.Visibility;
 
 /// <summary>
-/// A client only marks another player's troops mission as taken, it never starts it, so the issue has no journal
-/// there. Vanilla's daily tick advances the first journal entry of every troops mission and would throw on it every
-/// day, so the client leaves those missions out of the tick. The server completes them.
+/// A client only marks another player's troops mission as taken, it never starts it, so the issue usually has no
+/// journal there. Vanilla's daily tick advances the first journal entry of every troops mission and would throw on it
+/// every day, so the client leaves other players' missions out of the tick. The server completes them.
 /// </summary>
 [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]
 internal class ForeignTroopsMissionDailyTickPatch
@@ -26,8 +26,10 @@ internal class ForeignTroopsMissionDailyTickPatch
             return;
         }
 
+        // A client that joined later loaded the server's journal for it, ticking that would mark a hidden quest as updated
         __state = __instance.Issues.Values
-            .Where(issue => issue.IsSolvingWithAlternative && issue.JournalEntries.Count == 0)
+            .Where(issue => issue.IsSolvingWithAlternative &&
+                (issue.JournalEntries.Count == 0 || QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(issue)))
             .ToList();
 
         // A taken state the daily tick has nothing to do for
