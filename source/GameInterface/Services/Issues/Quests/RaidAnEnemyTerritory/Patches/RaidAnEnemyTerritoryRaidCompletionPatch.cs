@@ -125,6 +125,5 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
             issueId,
             villageIds.ToArray(),
             entries));
-
     }
 }
