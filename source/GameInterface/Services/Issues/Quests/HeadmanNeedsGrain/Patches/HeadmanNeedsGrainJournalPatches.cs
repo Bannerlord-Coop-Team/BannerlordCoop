@@ -14,6 +14,7 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 [HarmonyPatch]
 internal class HeadmanNeedsGrainJournalPatches
 {
+    // A client whose own daily tick misses the clearing day still clears the village's effects
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.DailyTick))]
     [HarmonyPostfix]
     private static void DailyTickPostfix()
@@ -22,10 +23,9 @@ internal class HeadmanNeedsGrainJournalPatches
             !ContainerProvider.TryResolve<INetwork>(out var network)) return;
         foreach (var issue in Campaign.Current.IssueManager.Issues.Values.OfType<Issue>())
         {
-            if (issue.IsSolvingWithAlternative && issue.JournalEntries.Count > 0 &&
+            if (issue.IsSolvingWithAlternative && issue._areIssueEffectsResolved &&
                 objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId))
-                network.SendAll(new NetworkHeadmanNeedsGrainProgress(giverId, issue.StringId,
-                    issue.JournalEntries[0].CurrentProgress, issue._areIssueEffectsResolved));
+                network.SendAll(new NetworkHeadmanNeedsGrainEffectsResolved(giverId, issue.StringId));
         }
     }
 
@@ -41,8 +41,9 @@ internal class HeadmanNeedsGrainJournalPatches
     [HarmonyPostfix]
     private static void IssueLogPostfix(IssueBase __instance, JournalLog log)
     {
-        // The owner's accept replay already creates the first, discrete return-days log.
-        if (ModInformation.IsServer && __instance is Issue && __instance.JournalEntries.Count > 1)
+        // The owner's accept replay and its own daily tick already add the return-days and returning logs.
+        if (ModInformation.IsServer && __instance is Issue && __instance.JournalEntries.Count > 1 &&
+            log.LogText?.Value != __instance.AlternativeSolutionEndLogDefault.Value)
             Publish(__instance, log.LogText, false);
     }
 

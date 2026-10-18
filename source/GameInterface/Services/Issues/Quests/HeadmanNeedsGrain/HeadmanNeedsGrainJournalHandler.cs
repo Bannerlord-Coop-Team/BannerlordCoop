@@ -10,19 +10,15 @@ using TaleWorlds.Localization;
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkHeadmanNeedsGrainProgress : IServerToClientCommand
+internal readonly struct NetworkHeadmanNeedsGrainEffectsResolved : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
-    [ProtoMember(3)] public readonly int Progress;
-    [ProtoMember(4)] public readonly bool EffectsResolved;
 
-    public NetworkHeadmanNeedsGrainProgress(string giverId, string issueId, int progress, bool effectsResolved)
+    public NetworkHeadmanNeedsGrainEffectsResolved(string giverId, string issueId)
     {
         GiverId = giverId;
         IssueId = issueId;
-        Progress = progress;
-        EffectsResolved = effectsResolved;
     }
 }
 
@@ -74,17 +70,17 @@ internal class HeadmanNeedsGrainJournalHandler : IHandler
         this.controller = controller;
         broker.Subscribe<NetworkHeadmanNeedsGrainLog>(Handle);
         broker.Subscribe<NetworkHeadmanNeedsGrainAiCompleted>(HandleAi);
-        broker.Subscribe<NetworkHeadmanNeedsGrainProgress>(HandleProgress);
+        broker.Subscribe<NetworkHeadmanNeedsGrainEffectsResolved>(HandleEffectsResolved);
     }
 
     public void Dispose()
     {
         broker.Unsubscribe<NetworkHeadmanNeedsGrainLog>(Handle);
         broker.Unsubscribe<NetworkHeadmanNeedsGrainAiCompleted>(HandleAi);
-        broker.Unsubscribe<NetworkHeadmanNeedsGrainProgress>(HandleProgress);
+        broker.Unsubscribe<NetworkHeadmanNeedsGrainEffectsResolved>(HandleEffectsResolved);
     }
 
-    private void HandleProgress(MessagePayload<NetworkHeadmanNeedsGrainProgress> payload)
+    private void HandleEffectsResolved(MessagePayload<NetworkHeadmanNeedsGrainEffectsResolved> payload)
     {
         if (ModInformation.IsServer) return;
         var data = payload.What;
@@ -94,10 +90,7 @@ internal class HeadmanNeedsGrainJournalHandler : IHandler
             var issue = giver.Issue;
             if (!(issue is TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue) ||
                 issue.StringId != data.IssueId || !issue.IsSolvingWithAlternative) return;
-            issue._areIssueEffectsResolved = data.EffectsResolved;
-            if (!ownership.TryGetOwner(data.GiverId, data.IssueId, out var owner) || owner != controller.ControllerId ||
-                issue.JournalEntries.Count == 0) return;
-            issue.JournalEntries[0].UpdateCurrentProgress(data.Progress);
+            issue._areIssueEffectsResolved = true;
         }, context: nameof(HeadmanNeedsGrainJournalHandler));
     }
 

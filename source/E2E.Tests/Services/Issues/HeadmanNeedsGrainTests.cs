@@ -404,25 +404,7 @@ public class HeadmanNeedsGrainTests : IDisposable
         Accept();
         var secondGiverId = environment.CreateRegisteredObject<Hero>();
         const string secondIssueId = "grain_second_issue";
-        foreach (var instance in Instances)
-        {
-            instance.Call(() =>
-            {
-                using (new AllowedThread())
-                {
-                    var giver = Get<Hero>(instance, secondGiverId);
-                    ConfigureGiver(instance, giver);
-                    var issue = new Issue(giver)
-                    {
-                        StringId = secondIssueId,
-                        _issueState = IssueBase.IssueState.Ongoing,
-                        _nearbySuitableSettlementCache = Get<Settlement>(instance, townSettlementId),
-                    };
-                    Campaign.Current.IssueManager._issues.Add(giver, issue);
-                    giver.OnIssueCreatedForHero(issue);
-                }
-            });
-        }
+        AddIssue(secondGiverId, secondIssueId);
 
         var acceptingClient = samePlayer ? ClientA : ClientB;
         Quest secondQuest = null!;
@@ -467,6 +449,54 @@ public class HeadmanNeedsGrainTests : IDisposable
             Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
             Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
             Assert.Same(secondQuest, Get<Hero>(ClientB, secondGiverId).Issue.IssueQuest);
+        });
+    }
+
+    [Fact]
+    public void Crime_CancelsTheOtherOwnersQuestWhenBothShareTheResponsiblePlayersKingdom()
+    {
+        Accept();
+        var secondGiverId = environment.CreateRegisteredObject<Hero>();
+        var playerKingdomId = environment.CreateRegisteredObject<Kingdom>();
+        const string secondIssueId = "grain_second_issue";
+        AddIssue(secondGiverId, secondIssueId);
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    foreach (var clanId in new[] { playerClanId, otherPlayerClanId })
+                        Get<Clan>(instance, clanId)._kingdom = Get<Kingdom>(instance, playerKingdomId);
+                }
+            });
+        }
+        Quest secondQuest = null!;
+        ClientB.Call(() =>
+        {
+            var giver = Get<Hero>(ClientB, secondGiverId);
+            giver.Issue.StartIssueWithQuest();
+            secondQuest = (Quest)giver.Issue.IssueQuest;
+            secondQuest.QuestAcceptedConsequences();
+        }, Texts);
+
+        Server.Call(() =>
+        {
+            var hero = Get<Hero>(Server, scenario.PlayerA.HeroId);
+            using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+                DeclareWarAction.ApplyInternal(Get<Kingdom>(Server, kingdomId), hero.MapFaction,
+                    DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange);
+        }, Texts);
+
+        var outcomes = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>().ToDictionary(m => m.IssueId, m => m.Outcome);
+        Assert.Equal(IssueOutcome.QuestFail, outcomes[QuestScenario.IssueId]);
+        Assert.Equal(IssueOutcome.QuestCancel, outcomes[secondIssueId]);
+        ClientA.Call(() => Assert.Equal(-50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+        ClientB.Call(() =>
+        {
+            Assert.False(secondQuest.IsOngoing);
+            Assert.Single(secondQuest.JournalEntries.Where(log => log.LogText.Value == secondQuest.CancelLogOnWarDeclared.Value));
+            Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
         });
     }
 
@@ -533,15 +563,22 @@ public class HeadmanNeedsGrainTests : IDisposable
             instance.Call(() => Assert.Equal(villageGold + funding, Get<Village>(instance, villageId).Gold));
 
         var ownerIssue = (Issue)GetIssue(ClientA);
+        foreach (var instance in new[] { Server, ClientA })
+            instance.Call(() => IssueHere(instance).AlternativeSolutionIssueEffectClearTime = CampaignTime.Now);
         var progress = 0;
         Server.Call(() =>
         {
-            IssueHere(Server).AlternativeSolutionIssueEffectClearTime = CampaignTime.Now;
             Campaign.Current.IssueManager.DailyTick();
             progress = IssueHere(Server).JournalEntries[0].CurrentProgress;
             Assert.True(progress > 0);
         }, Texts);
-        ClientA.Call(() => Assert.Equal(progress, ownerIssue.JournalEntries[0].CurrentProgress));
+        // The owner's client runs its own daily tick on the same day
+        ClientA.Call(() =>
+        {
+            Campaign.Current.IssueManager.DailyTick();
+            Assert.Equal(progress, ownerIssue.JournalEntries[0].CurrentProgress);
+            Assert.Single(ownerIssue.JournalEntries.Where(log => log.LogText.Value == ownerIssue.AlternativeSolutionEndLogDefault.Value));
+        }, Texts);
         ClientB.Call(() => Assert.Empty(IssueHere(ClientB).JournalEntries));
         foreach (var instance in Instances)
             instance.Call(() =>
@@ -611,6 +648,29 @@ public class HeadmanNeedsGrainTests : IDisposable
             IssueHere(ClientA).StartIssueWithQuest();
             if (start) QuestHere(ClientA).QuestAcceptedConsequences();
         }, Texts);
+    }
+
+    private void AddIssue(string giverId, string issueId)
+    {
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    var giver = Get<Hero>(instance, giverId);
+                    ConfigureGiver(instance, giver);
+                    var issue = new Issue(giver)
+                    {
+                        StringId = issueId,
+                        _issueState = IssueBase.IssueState.Ongoing,
+                        _nearbySuitableSettlementCache = Get<Settlement>(instance, townSettlementId),
+                    };
+                    Campaign.Current.IssueManager._issues.Add(giver, issue);
+                    giver.OnIssueCreatedForHero(issue);
+                }
+            });
+        }
     }
 
     private void StageDelivery(bool atVillage, bool enoughGrain)
