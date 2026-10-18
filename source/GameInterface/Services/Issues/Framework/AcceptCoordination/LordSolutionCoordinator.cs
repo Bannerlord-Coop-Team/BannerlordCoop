@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Registry.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
@@ -53,12 +54,16 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         this.controller = controller;
         broker.Subscribe<RequestLordSolution>(HandleRequest);
         broker.Subscribe<NetworkLordSolutionStarted>(HandleStarted);
+        broker.Subscribe<NetworkIssueFinalized>(HandleFinalized);
+        broker.Subscribe<AllGameObjectsRegistered>(HandleSessionLoaded);
     }
 
     public void Dispose()
     {
         broker.Unsubscribe<RequestLordSolution>(HandleRequest);
         broker.Unsubscribe<NetworkLordSolutionStarted>(HandleStarted);
+        broker.Unsubscribe<NetworkIssueFinalized>(HandleFinalized);
+        broker.Unsubscribe<AllGameObjectsRegistered>(HandleSessionLoaded);
     }
 
     public bool Before(IssueBase issue, LordSolutionOperation operation)
@@ -74,6 +79,17 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
     }
 
     public bool IsDecisionPending(IssueBase issue) => pendingDecisions.Contains(issue);
+
+    private void HandleFinalized(MessagePayload<NetworkIssueFinalized> payload)
+    {
+        if (ModInformation.IsServer) return;
+        var issueId = payload.What.IssueId;
+        GameThread.RunSafe(() => pendingDecisions.RemoveWhere(issue => issue.StringId == issueId),
+            context: nameof(LordSolutionCoordinator));
+    }
+
+    private void HandleSessionLoaded(MessagePayload<AllGameObjectsRegistered> payload) =>
+        GameThread.RunSafe(pendingDecisions.Clear, context: nameof(LordSolutionCoordinator));
 
     private void HandleRequest(MessagePayload<RequestLordSolution> payload)
     {

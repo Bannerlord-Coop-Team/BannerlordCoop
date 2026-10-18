@@ -272,6 +272,7 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Assert.Empty(observerIssue.JournalEntries);
         AssertEffects(acceptMerchant ? 195 : 210, acceptMerchant ? 100 : 90, acceptMerchant ? -5 : 5, acceptMerchant ? 5 : -10);
         Server.Call(() => Assert.Equal(acceptMerchant ? 100 : 100 - cost, Get<Clan>(Server, clanId).Influence));
+        ClientA.Call(() => Assert.False(ClientA.Resolve<ILordSolutionCoordinator>().IsDecisionPending(ownerIssue)));
     }
 
     [Fact]
@@ -351,14 +352,23 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     [Fact]
     public void LordStartResponse_LeavesTheMerchantForTheMenuAfterTheArtisanConversation()
     {
-        using var menu = new MethodCallRecorder(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.BeforeGameMenuOpened)));
-        ClientA.Call(() => Campaign.Current.ConversationManager.IsConversationInProgress = true);
-        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
-        ClientA.Call(() => Campaign.Current.ConversationManager.IsConversationInProgress = false);
+        using (var menu = new MethodCallRecorder(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.BeforeGameMenuOpened))))
+        {
+            ClientA.Call(() => Campaign.Current.ConversationManager.IsConversationInProgress = true);
+            ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+            ClientA.Call(() => Campaign.Current.ConversationManager.IsConversationInProgress = false);
 
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
-        ClientA.Call(() => Assert.True(Get<Hero>(ClientA, scenario.NotableId).Issue.IsSolvingWithLordSolution));
-        Assert.Equal(0, menu.CountFor(ClientA));
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
+            ClientA.Call(() => Assert.True(Get<Hero>(ClientA, scenario.NotableId).Issue.IsSolvingWithLordSolution));
+            Assert.Equal(0, menu.CountFor(ClientA));
+        }
+
+        // CampaignMapConversation.OpenConversation is small enough to be inlined, so record one level down.
+        using var conversations = new MethodCallRecorder(
+            AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
+        OnMapAfterConversation(ClientA, () => CampaignEventDispatcher.Instance.BeforeGameMenuOpened(null));
+
+        Assert.Equal(1, conversations.CountFor(ClientA));
     }
 
     [Fact]
@@ -372,27 +382,38 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         using var conversations = new MethodCallRecorder(
             AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
 
-        ClientA.Call(() =>
+        OnMapAfterConversation(ClientA, () =>
         {
-            var states = Game.Current.GameStateManager;
-            var map = states.CreateState<MapState>();
-            states._gameStates.Add(map);
-            try
-            {
-                var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
-                issue.BeforeGameMenuOpened(null);
-                issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
-                Assert.True(issue.IsSolvingWithLordSolution);
-                issue.BeforeGameMenuOpened(null);
-            }
-            finally
-            {
-                states._gameStates.Remove(map);
-            }
+            var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+            issue.BeforeGameMenuOpened(null);
+            issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
+            Assert.True(issue.IsSolvingWithLordSolution);
+            issue.BeforeGameMenuOpened(null);
         });
 
         Assert.Equal(1, conversations.CountFor(ClientA));
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    private static void OnMapAfterConversation(EnvironmentInstance client, Action act)
+    {
+        client.Call(() =>
+        {
+            // Vanilla's menu callback reads the global state manager, which the harness leaves unset.
+            var previous = GameStateManager.Current;
+            var states = GameStateManager.Current = Game.Current.GameStateManager;
+            var map = states.CreateState<MapState>();
+            states._gameStates.Add(map);
+            try
+            {
+                act();
+            }
+            finally
+            {
+                states._gameStates.Remove(map);
+                GameStateManager.Current = previous;
+            }
+        });
     }
 
     [Fact]

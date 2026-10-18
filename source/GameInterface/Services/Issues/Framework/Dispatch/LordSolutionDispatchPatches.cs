@@ -30,8 +30,9 @@ internal class LordSolutionDispatchPatches
     private static bool BeforeMenuPrefix(IssueBase __instance)
     {
         if (!IsRegistered(__instance)) return true;
-        return ModInformation.IsClient && IsLocalOwner(__instance) &&
-            !(ContainerProvider.TryResolve<ILordSolutionCoordinator>(out var coordinator) && coordinator.IsDecisionPending(__instance));
+        // Without a merchant, vanilla decides on this menu event itself, so only the merchant waits for the server.
+        return ModInformation.IsClient && IsLocalOwner(__instance) && !(__instance.CounterOfferHero != null &&
+            ContainerProvider.TryResolve<ILordSolutionCoordinator>(out var coordinator) && coordinator.IsDecisionPending(__instance));
     }
 
     [HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.GetCounterOfferersIssue))]
