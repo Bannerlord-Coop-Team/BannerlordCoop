@@ -4,6 +4,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -32,8 +33,9 @@ public readonly struct RequestArtisanProductsLord : ICommand
     [ProtoMember(1)] public readonly string OwnerId;
     [ProtoMember(2)] public readonly string IssueId;
     [ProtoMember(3)] public readonly ArtisanProductsLordAction Action;
-    public RequestArtisanProductsLord(string ownerId, string issueId, ArtisanProductsLordAction action)
-    { OwnerId = ownerId; IssueId = issueId; Action = action; }
+    [ProtoMember(4)] public readonly float Difficulty;
+    public RequestArtisanProductsLord(string ownerId, string issueId, ArtisanProductsLordAction action, float difficulty)
+    { OwnerId = ownerId; IssueId = issueId; Action = action; Difficulty = difficulty; }
 }
 
 [ProtoContract(SkipConstructor = true)]
@@ -82,7 +84,8 @@ internal class ArtisanProductsLordHandler : IHandler
     private void Request(MessagePayload<ArtisanProductsLordRequested> payload)
     {
         if (ModInformation.IsServer || !objects.TryGetIdWithLogging(payload.What.Issue.IssueOwner, out var ownerId)) return;
-        network.SendAll(new RequestArtisanProductsLord(ownerId, payload.What.Issue.StringId, payload.What.Action));
+        network.SendAll(new RequestArtisanProductsLord(ownerId, payload.What.Issue.StringId, payload.What.Action,
+            Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier()));
     }
 
     internal void SendJournal(Issue issue)
@@ -106,11 +109,14 @@ internal class ArtisanProductsLordHandler : IHandler
                 if (data.Action == ArtisanProductsLordAction.Start)
                 {
                     if (hero.PartyBelongedTo.CurrentSettlement != issue.IssueOwner.CurrentSettlement) return;
-                    issue._issueDifficultyMultiplier = Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier();
-                    if (!issue.IsOngoingWithoutQuest || !preconditions.CanTake(issue, hero, player.ControllerId) ||
-                        !issue.LordSolutionCondition(out _) || Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution ||
-                        !ownership.TrySetOwner(data.OwnerId, data.IssueId, player.ControllerId)) return;
-                    issue.StartIssueWithLordSolution();
+                    // The decree costs and pays what the player's own dialogue quoted, the server's progress is not theirs
+                    using (new IssueDifficultyOverride(data.Difficulty))
+                    {
+                        if (!issue.IsOngoingWithoutQuest || !preconditions.CanTake(issue, hero, player.ControllerId) ||
+                            !issue.LordSolutionCondition(out _) || Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution ||
+                            !ownership.TrySetOwner(data.OwnerId, data.IssueId, player.ControllerId)) return;
+                        issue.StartIssueWithLordSolution();
+                    }
                 }
                 else
                 {

@@ -378,6 +378,48 @@ public class ArtisanProductsTests : IDisposable
     }
 
     [Fact]
+    public void LordDecree_CostsAndPaysWhatTheRequestingPlayersDialogueQuoted()
+    {
+        // Every machine keeps its own player progress, the server's is not the requesting player's
+        Server.Call(() => Campaign.Current.PlayerProgress = 0.25f);
+        Owner.Call(() => Campaign.Current.PlayerProgress = 0.5f);
+        var gold = OwnerGold();
+        Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution());
+        Server.Call(() => Assert.Equal(0.5f, Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue._issueDifficultyMultiplier));
+        LeaveOrigin();
+        Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+        Assert.Equal(gold + 1250, OwnerGold());
+        Server.Call(() => Assert.Equal(970f, Server.GetRegisteredObject<Clan>(clanId).Influence));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void LordDecree_RefusedByTheServerLeavesTheIssuesDifficultyAlone(bool takenByCompanions)
+    {
+        Server.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                Campaign.Current.PlayerProgress = 0.25f;
+                var issue = Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+                // Another player's companions took it before this client heard, or the decree is no longer affordable.
+                // A stored difficulty outranks the next accepting player's own, so a refusal must not leave one.
+                if (takenByCompanions)
+                {
+                    issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                    issue._issueDifficultyMultiplier = 0.75f;
+                }
+                else Server.GetRegisteredObject<Clan>(clanId).Influence = 0f;
+            }
+        });
+        Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution());
+        Server.Call(() => Assert.Equal(takenByCompanions ? 0.75f : 0f,
+            Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue._issueDifficultyMultiplier));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkArtisanProductsLord>());
+    }
+
+    [Fact]
     public void MerchantRefusal_AppliesOnceAndAcknowledgesTheOwnersDialogueState()
     {
         Accept();
