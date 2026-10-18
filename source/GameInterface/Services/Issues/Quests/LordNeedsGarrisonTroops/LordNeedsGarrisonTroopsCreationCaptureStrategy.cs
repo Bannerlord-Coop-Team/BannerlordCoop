@@ -54,6 +54,13 @@ internal class LordNeedsGarrisonTroopsCreationCaptureStrategy : ICreationCapture
 
         foreach (var settlement in issueOwner.Clan.Settlements)
         {
+            var garrison = settlement.Town?.GarrisonParty;
+            var limit = settlement.IsCastle ? 120 : settlement.IsTown ? 150 : 0;
+            if (garrison == null || limit == 0 || garrison.MemberRoster.TotalHealthyCount >= limit)
+            {
+                continue;
+            }
+
             var issue = new Issue(issueOwner, settlement);
             if (!issue.IssueStayAliveConditions())
             {
@@ -72,7 +79,7 @@ internal class LordNeedsGarrisonTroopsCreationCaptureStrategy : ICreationCapture
         return value != null && objectManager.TryGetIdWithLogging(value, out var id) ? id : string.Empty;
     }
 
-    private bool TryRead(byte[] captured, out Settlement settlement, out CharacterObject troop)
+    internal bool TryRead(byte[] captured, out Settlement settlement, out CharacterObject troop)
     {
         settlement = null;
         troop = null;

@@ -73,7 +73,10 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
             Assert.True(testEnvironment.Clients.First().ObjectManager.TryGetId(expectedTroop, out var expectedTroopObjectId));
 
             var strategy = (LordNeedsGarrisonTroopsCreationCaptureStrategy)Descriptor(testEnvironment.Clients.First()).CreationCaptureStrategy;
-            // This assertion exercises the object-id based creation path without relying on local random picks.
+            Assert.True(strategy.TryRead(captured, out var decodedSettlement, out var decodedTroop));
+            Assert.Same(expectedSettlement, decodedSettlement);
+            Assert.Same(expectedTroop, decodedTroop);
+            // Invalid creation data is rejected instead of producing a partially populated issue.
             Assert.ThrowsAny<Exception>(() => strategy.CreateIssue(Hero.MainHero, Array.Empty<byte>()));
             using (var stream = new MemoryStream(captured))
             using (var reader = new BinaryReader(stream))
