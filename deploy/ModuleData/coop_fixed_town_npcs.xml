@@ -818,4 +818,34 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_32770a02"
+    name="{=!}maraba"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.empire"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_EN1"
+    coop_location="house_1"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="marabanın marbası"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_vlandia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.brass_aserai_helmet_b_closed" />
+        <equipment slot="Cape" id="Item.aserai_scale_shoulder_a" />
+        <equipment slot="Body" id="Item.sturgia_cavalry_armor" />
+        <equipment slot="Gloves" id="Item.decorated_imperial_gauntlets" />
+        <equipment slot="Leg" id="Item.strapped_shoes" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>
