@@ -20,25 +20,24 @@ internal class LifetimePatches<T>
 
         if (ModInformation.IsClient)
         {
-            if (typeof(T) == typeof(Equipment))
-                LogClientEquipmentCreated(__instance);
-            else
-                Logger.Error("Client created managed {name}", __instance.GetType());
+            LogClientCreated(__instance);
             return;
         }
 
         MessageBroker.Instance.Publish(__instance, new InstanceCreated<T>(__instance));
     }
 
-    // Trade and inventory screens build hundreds of Equipment copies on a client, so a full stack trace per
-    // copy floods the log and stalls weak machines. The stack trace is there to find which caller creates
-    // managed equipment, so it is logged once per distinct call site and repeats are summed periodically.
-    private static readonly CallSiteLogLimiter EquipmentCallSites = new(256, TimeSpan.FromSeconds(10));
+    // Trade and inventory screens build hundreds of Equipment copies on a client, and a hot caller can build
+    // any other managed type just as often, so an error per instance floods the log and stalls weak machines.
+    // The stack trace is there to find which caller creates the managed object, so it is logged once per
+    // distinct call site and repeats are summed periodically. The field lives in a generic class, so every
+    // managed type has its own limiter and a noisy type cannot use up the sites of another.
+    private static readonly CallSiteLogLimiter ClientCallSites = new(256, TimeSpan.FromSeconds(10));
 
-    private static void LogClientEquipmentCreated(T instance)
+    private static void LogClientCreated(T instance)
     {
         var site = CallSiteLogLimiter.GetCallSite(2, 6);
-        if (EquipmentCallSites.ShouldLogFull(site, out int suppressed))
+        if (ClientCallSites.ShouldLogFull(site, out int suppressed))
         {
             Logger.Error("Client created managed {name}; caller={Caller}", instance.GetType(), Environment.StackTrace);
         }
