@@ -102,12 +102,42 @@ namespace GameInterface.Services.Banners.Handlers
                     // banner edit, so force the affected nameplates to refresh their banner here.
                     RefreshClanNameplateBanners(clan);
                 }
+
+                if (ModInformation.IsServer)
+                {
+                    UpdateKingdomBannerColors(clan);
+                }
             });
 
             if (ModInformation.IsServer)
             {
                 network.SendAll(new NetworkUpdatePlayerBanner(payload.BannerCode, payload.ClanId, payload.Color, payload.Color2));
                 messageBroker.Publish(this, new ClanManagementChanged(clan, ClanManagementRefresh.Identity));
+            }
+        }
+
+        /// <summary>
+        /// Stores a ruler's edited banner colours on the kingdom, otherwise every save load repaints the
+        /// kingdom's old colours through <see cref="Clan.UpdateBannerColorsAccordingToKingdom"/>.
+        /// </summary>
+        private void UpdateKingdomBannerColors(Clan clan)
+        {
+            var kingdom = clan.Kingdom;
+            if (kingdom?.RulingClan != clan) return;
+
+            // Patches stay live here so the AutoSync setters replicate the colours to every client.
+            kingdom.PrimaryBannerColor = clan.Banner.GetPrimaryColor();
+            kingdom.SecondaryBannerColor = clan.Banner.GetFirstIconColor();
+
+            // Repaint the member clans now instead of on the next load.
+            foreach (var kingdomClan in kingdom.Clans)
+            {
+                kingdomClan.UpdateBannerColorsAccordingToKingdom();
+
+                if (kingdomClan != clan)
+                {
+                    messageBroker.Publish(this, new PlayerBannerChanged(kingdomClan));
+                }
             }
         }
 
