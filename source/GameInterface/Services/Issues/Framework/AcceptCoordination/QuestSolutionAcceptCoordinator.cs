@@ -132,6 +132,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             return;
         }
 
+        var dueTime = issue.IssueDueTime;
+
         try
         {
             // Creates the quest object the owner's outcomes run on, unless its accept strategy starts it, it registers no events
@@ -149,6 +151,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         {
             Logger.Error(e, "Starting the quest of {issue} failed", data.IssueId);
             ownership.Remove(data.IssueOwnerId);
+            OfferAgain(issue, dueTime);
             Reject(peer, data);
             return;
         }
@@ -159,6 +162,33 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             player.ControllerId,
             data.DifficultyMultiplier,
             data.Captured));
+    }
+
+    // Undoes a half-finished accept on the server, so the refused client's reopened offer can still be taken
+    private static void OfferAgain(IssueBase issue, CampaignTime dueTime)
+    {
+        try
+        {
+            var strayQuest = issue.IssueQuest;
+
+            // set to null first so cancelling the quest does not finalize the issue
+            issue.IssueQuest = null;
+            issue._issueState = IssueBase.IssueState.Ongoing;
+            issue.IsTriedToSolveBefore = false;
+            issue.IssueDueTime = dueTime;
+
+            if (strayQuest != null && strayQuest.IsOngoing)
+            {
+                using (new AllowedThread())
+                {
+                    strayQuest.CompleteQuestWithCancel();
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Offering {issue} again after a failed accept failed", issue.StringId);
+        }
     }
 
     private void Reject(NetPeer peer, RequestQuestSolutionAccept data)

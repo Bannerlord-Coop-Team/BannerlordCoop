@@ -174,6 +174,47 @@ public sealed class TheConquestOfSettlementIssueTests : IDisposable
     }
 
     [Fact]
+    public void ServerOffersTheIssueAgainWhenStartingTheQuestFails()
+    {
+        var owner = environment.Clients.First();
+        var other = environment.Clients.Last();
+        var harmony = new Harmony($"{nameof(ServerOffersTheIssueAgainWhenStartingTheQuestFails)}.{Guid.NewGuid():N}");
+        var apply = AccessTools.Method(typeof(TheConquestOfSettlementQuestSolutionAcceptStrategy), nameof(TheConquestOfSettlementQuestSolutionAcceptStrategy.Apply));
+        FailingApplyContainer = Server.Container;
+        harmony.Patch(apply, prefix: new HarmonyMethod(typeof(TheConquestOfSettlementIssueTests), nameof(FailOnTheServer)));
+        try
+        {
+            AcceptMapOffer();
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+            FailingApplyContainer = null;
+        }
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        foreach (var instance in new[] { Server, owner, other })
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(issueOwnerId, out var giver));
+                Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(issueOwnerId, giver.Issue.StringId, out _));
+                Assert.Null(giver.Issue.IssueQuest);
+                Assert.True(giver.Issue.IsOngoingWithoutQuest);
+                Assert.False(giver.Issue.IsTriedToSolveBefore);
+            });
+        Server.Call(() => Assert.DoesNotContain(Campaign.Current.QuestManager.Quests, quest => quest is Quest && quest.IsOngoing));
+    }
+
+    private static object? FailingApplyContainer;
+
+    private static void FailOnTheServer()
+    {
+        if (GameInterface.ContainerProvider.TryGetContainer(out var container) && container == FailingApplyContainer)
+            throw new InvalidOperationException("Stubbed accept failure");
+    }
+
+    [Fact]
     public void OwnersClientWaitsForTheServerWhenItReplaysAnOwnershipChange()
     {
         var owner = environment.Clients.First();
