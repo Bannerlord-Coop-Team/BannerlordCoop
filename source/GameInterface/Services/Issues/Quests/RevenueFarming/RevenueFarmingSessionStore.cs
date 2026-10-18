@@ -94,7 +94,7 @@ internal sealed class RevenueFarmingSession
 
     private RevenueFarmingSession() { }
 
-    internal RevenueFarmingSession(Quest quest, Hero playerHero, string controllerId, string issueId)
+    internal RevenueFarmingSession(Quest quest, Hero playerHero, string controllerId, string issueId = null)
     {
         Quest = quest;
         PlayerHero = playerHero;
