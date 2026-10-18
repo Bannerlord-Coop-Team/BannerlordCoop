@@ -37,6 +37,7 @@ public class EscortMerchantCaravanTests : IDisposable
     private static MobileParty? observedHourlyParty;
     private static PartyBase? observedAttacker;
     private static int observedReroutes;
+    private static int observedWarCalls;
     private static MobileParty? observedMainParty;
     private static Hero? observedMainHero;
     private static int observedKingdomCalls;
@@ -47,6 +48,8 @@ public class EscortMerchantCaravanTests : IDisposable
         observedMainParty = MobileParty.MainParty;
         observedMainHero = Hero.MainHero;
     }
+
+    private static void ObserveWar() => observedWarCalls++;
 
     private static void ObserveKingdom()
     {
@@ -822,11 +825,14 @@ public class EscortMerchantCaravanTests : IDisposable
         Accept();
         var harmony = new Harmony($"escort-relay-war-{Guid.NewGuid()}");
         var reroute = AccessTools.Method(typeof(Quest), nameof(Quest.TryToFindAndSetTargetToNextSettlement));
+        var handler = AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared));
         harmony.Patch(reroute, postfix: new HarmonyMethod(typeof(EscortMerchantCaravanTests), nameof(ObserveReroute)));
+        harmony.Patch(handler, postfix: new HarmonyMethod(typeof(EscortMerchantCaravanTests), nameof(ObserveWar)));
         try
         {
             Server.NetworkSentMessages.Clear();
             observedReroutes = 0;
+            observedWarCalls = 0;
             observedMainParty = null;
             observedMainHero = null;
             Server.Call(() =>
@@ -844,6 +850,7 @@ public class EscortMerchantCaravanTests : IDisposable
             });
 
             Assert.Equal(1, observedReroutes);
+            Assert.Equal(1, observedWarCalls);
             var progress = Server.NetworkSentMessages.GetMessages<NetworkEscortProgress>().ToArray();
             Assert.Single(progress, state => state.Notice != null);
             Assert.Single(progress, state => state.Notice == null);
@@ -851,6 +858,7 @@ public class EscortMerchantCaravanTests : IDisposable
         finally
         {
             harmony.Unpatch(reroute, HarmonyPatchType.Postfix, harmony.Id);
+            harmony.Unpatch(handler, HarmonyPatchType.Postfix, harmony.Id);
         }
     }
 

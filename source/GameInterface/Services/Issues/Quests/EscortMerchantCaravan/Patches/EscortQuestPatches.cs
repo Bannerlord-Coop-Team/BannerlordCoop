@@ -93,7 +93,7 @@ internal class EscortQuestPatches
     private static bool Kingdom(Quest __instance, Clan clan, Kingdom oldKingdom, Kingdom newKingdom,
         TaleWorlds.CampaignSystem.Actions.ChangeKingdomAction.ChangeKingdomActionDetail actionDetail, bool showNotification)
     {
-        if (EscortQuestEventPatches.IsRunning) return true;
+        if (EscortQuestEventPatches.CurrentQuest == __instance && EscortQuestEventPatches.IsRunning) return true;
         EscortQuestEventPatches.RunOwned(__instance,
             quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
         return false;
