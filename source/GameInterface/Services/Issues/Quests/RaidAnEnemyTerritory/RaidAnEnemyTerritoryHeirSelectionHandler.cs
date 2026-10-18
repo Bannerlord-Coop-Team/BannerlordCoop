@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.Issues.Framework.Interface;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
@@ -30,7 +31,13 @@ internal sealed class RaidAnEnemyTerritoryHeirSelectionHandler : IHandler
             return;
         }
 
+        var issues = new List<IssueBase>();
         foreach (var issue in Campaign.Current.IssueManager.Issues.Values)
+        {
+            issues.Add(issue);
+        }
+
+        foreach (var issue in issues)
         {
             if (issue.IssueQuest is Quest quest && quest.IsOngoing &&
                 ownerResolver.TryResolveOwnerHero(issue, out var ownerHero) && ownerHero == payload.What.OriginalHero)
