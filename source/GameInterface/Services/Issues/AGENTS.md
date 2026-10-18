@@ -86,6 +86,8 @@ Keep patches thin. Owner lookups, issue scans and main hero swaps belong in a DI
 - `dotnet test source\E2E.Tests\E2E.Tests.csproj -c Debug -p:NuGetAudit=false -p:ModName= --filter "FullyQualifiedName~E2E.Tests.Services.Issues|FullyQualifiedName~E2E.Tests.Services.UI"`
 - After adding patches or registrations also run `PatchTest` in `GameInterface.Tests` and `ContainerBuildTests`
   in `Coop.Tests`.
+- Quest debug commands (`coop.debug.issues.*`, including `Quests/<QuestName>/Commands/`) are dev tools and it
+  doesnt matter if they break. Dont write tests for them or raise review findings on them.
 - To test the owner's side of `Replay` in E2E, start the quest with `StartQuest()` under `AllowedThread` on the
   client, otherwise `Replay` drops it (rule 5).
 - Run the flows the change touches through their real UI on a server and two clients: accept, success and fail,
