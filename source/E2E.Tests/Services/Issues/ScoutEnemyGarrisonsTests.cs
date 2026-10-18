@@ -7,10 +7,12 @@ using E2E.Tests.Util;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons;
+using GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Messages;
 using GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Patches;
 using HarmonyLib;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsIssue;
@@ -168,7 +170,7 @@ public class ScoutEnemyGarrisonsTests : IDisposable
     }
 
     [Fact]
-    public void HandedOffEnding_StopsTheQuestListenersOnlyOnTheClient()
+    public void ForwardedEnding_MarksTheQuestHandedOffOnlyOnTheClient()
     {
         var targetIds = CreateTargets();
         var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -283,6 +285,87 @@ public class ScoutEnemyGarrisonsTests : IDisposable
 
             Assert.Equal(1, logs.CountFor(Client));
             Assert.Equal(0, logs.CountFor(Server));
+        }
+    }
+
+    [Fact]
+    public void ClientOfferedIssue_StaysAliveWithoutRerollingItsTargets()
+    {
+        var targetIds = CreateTargets();
+
+        Client.Call(() =>
+        {
+            var targets = Resolve(Client, targetIds);
+            var issue = IssueWithTargets(targets);
+
+            // Vanilla would reroll from the issue owner's position, which this issue does not have
+            Assert.True(issue.IssueStayAliveConditions());
+            Assert.Equal(targets, new[] { issue._settlement1, issue._settlement2, issue._settlement3 });
+        });
+    }
+
+    [Fact]
+    public void ServerReroll_ReachesOfferedIssuesAndLeavesTakenOnes()
+    {
+        var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var oldTargetIds = CreateTargets();
+        var newTargetIds = CreateTargets();
+        var offering = TestEnvironment.Clients.First();
+        var taken = TestEnvironment.Clients.Last();
+
+        foreach (var instance in new[] { Server, offering, taken })
+        {
+            instance.Call(() => AddOfferedIssue(instance, giverId, Resolve(instance, oldTargetIds)));
+        }
+
+        taken.Call(() =>
+        {
+            Assert.True(taken.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+
+            using (new AllowedThread())
+            {
+                giver.Issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+            }
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            var issue = (Issue)giver.Issue;
+            var newTargets = Resolve(Server, newTargetIds);
+            issue._settlement1 = newTargets[0];
+            issue._settlement2 = newTargets[1];
+            issue._settlement3 = newTargets[2];
+
+            ScoutEnemyGarrisonsStayAlivePatches.TryToUpdateSettlementsPostfix(issue, true);
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkScoutEnemyGarrisonsTargetsChanged>());
+
+        foreach (var (instance, expectedIds) in new[] { (offering, newTargetIds), (taken, oldTargetIds) })
+        {
+            instance.PumpGameThread();
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                var issue = (Issue)giver.Issue;
+                Assert.Equal(Resolve(instance, expectedIds), new[] { issue._settlement1, issue._settlement2, issue._settlement3 });
+            });
+        }
+    }
+
+    private static void AddOfferedIssue(EnvironmentInstance instance, string giverId, Settlement[] targets)
+    {
+        Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+        var issue = IssueWithTargets(targets);
+
+        using (new AllowedThread())
+        {
+            issue.IssueOwner = giver;
+            issue.StringId = "issue_scout_reroll";
+            issue._issueState = IssueBase.IssueState.Ongoing;
+            Campaign.Current.IssueManager._issues.Add(giver, issue);
+            giver.OnIssueCreatedForHero(issue);
         }
     }
 

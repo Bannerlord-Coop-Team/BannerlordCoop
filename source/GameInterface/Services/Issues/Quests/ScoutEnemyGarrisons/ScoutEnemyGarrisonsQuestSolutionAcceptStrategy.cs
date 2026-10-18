@@ -7,8 +7,8 @@ using QuestSettlement = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssu
 namespace GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons;
 
 /// <summary>
-/// Every machine rerolls an offered issue's targets on its own once they stop being enemies, so the targets
-/// the accepting player was given are forced onto the server's quest object and the other clients' issue.
+/// The server's accept check runs vanilla's stay-alive conditions, which can reroll the targets after the accepting
+/// player was given them, so the accepter's targets are forced onto the server's quest object and the other clients' issue.
 /// </summary>
 internal class ScoutEnemyGarrisonsQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
 {
