@@ -1,8 +1,10 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using System.Linq;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using Quest = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble.Patches;
@@ -45,8 +47,15 @@ internal class LandLordCompanyOfTroubleFinalizePatches
             return;
         }
 
-        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) ||
+            !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver))
         {
+            return;
+        }
+
+        if (!ownerResolver.TryResolveOwnerHero(__instance, out _))
+        {
+            RemoveLeftovers(quest);
             return;
         }
 
@@ -57,5 +66,22 @@ internal class LandLordCompanyOfTroubleFinalizePatches
                 ownedQuest.OnFinalize();
             }
         });
+    }
+
+    private static void RemoveLeftovers(Quest quest)
+    {
+        foreach (var party in MobileParty.All.ToList())
+        {
+            var count = party.MemberRoster.GetTroopCount(quest._troubleCharacterObject);
+            if (party != quest._companyOfTroubleParty && count > 0)
+            {
+                party.MemberRoster.AddToCounts(quest._troubleCharacterObject, -count);
+            }
+        }
+
+        if (quest._companyOfTroubleParty?.IsActive == true)
+        {
+            DestroyPartyAction.Apply(null, quest._companyOfTroubleParty);
+        }
     }
 }

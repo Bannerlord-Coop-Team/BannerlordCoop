@@ -300,6 +300,66 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         Assert.False(company.IsActive);
     }
 
+    [Fact]
+    public void TheCompanyDestroyedBySomeoneElse_FailsTheQuest()
+    {
+        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var otherPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        SetOwner();
+        Quest quest = null!;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var other));
+            quest = CompanyTurnedHostile(companyPartyId);
+
+            CampaignEventDispatcher.Instance.OnMobilePartyDestroyed(quest._companyOfTroubleParty, other.Party);
+        });
+
+        Assert.Equal(-2, quest.RelationshipChangeWithQuestGiver);
+        Assert.Equal(1, questEndings.Count);
+    }
+
+    [Fact]
+    public void TheOwnerDestroyingTheCompany_LeavesTheEndingToTheBattle()
+    {
+        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        SetOwner();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            var quest = CompanyTurnedHostile(companyPartyId);
+
+            CampaignEventDispatcher.Instance.OnMobilePartyDestroyed(quest._companyOfTroubleParty, ownerParty.Party);
+        });
+
+        Assert.Equal(0, questEndings.Count);
+    }
+
+    [Fact]
+    public void DismissingAQuestNobodyOwns_RemovesTheMercenariesAndTheCompany()
+    {
+        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        GiveMercenaries(4);
+        MobileParty company = null!;
+
+        Server.Call(() =>
+        {
+            var quest = CompanyTurnedHostile(companyPartyId);
+            company = quest._companyOfTroubleParty;
+
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(lordId, out var lord));
+            lord.Issue.IssueFinalized();
+        });
+        Server.PumpGameThread();
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Equal(0, MercenariesIn(Server));
+        Assert.Equal(0, MercenariesIn(Owner));
+        Assert.False(company.IsActive);
+    }
+
     private Quest CompanyTurnedHostile(string companyPartyId)
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(companyPartyId, out var company));
