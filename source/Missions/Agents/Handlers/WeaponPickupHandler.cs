@@ -6,6 +6,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
+using Missions.Missiles;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -207,6 +208,7 @@ namespace Missions.Agents.Handlers
         readonly IMessageBroker messageBroker;
         readonly IObjectManager objectManager;
         readonly IControllerIdProvider controllerIdProvider;
+        readonly IMissilePickupArbiter missilePickupArbiter;
         readonly Dictionary<SpawnedItemEntity, Queue<PendingIdentityPickup>> pendingIdentityPickups =
             new Dictionary<SpawnedItemEntity, Queue<PendingIdentityPickup>>();
         readonly HashSet<SpawnedItemEntity> pendingWorldItemIdentities =
@@ -248,6 +250,25 @@ namespace Missions.Agents.Handlers
             IMessageBroker messageBroker,
             IObjectManager objectManager,
             IControllerIdProvider controllerIdProvider)
+            : this(
+                networkAgentRegistry,
+                worldItemRegistry,
+                network,
+                messageBroker,
+                objectManager,
+                controllerIdProvider,
+                new MissilePickupArbiter())
+        {
+        }
+
+        public WeaponPickupHandler(
+            INetworkAgentRegistry networkAgentRegistry,
+            INetworkWorldItemRegistry worldItemRegistry,
+            IBattleNetwork network,
+            IMessageBroker messageBroker,
+            IObjectManager objectManager,
+            IControllerIdProvider controllerIdProvider,
+            IMissilePickupArbiter missilePickupArbiter)
         {
             this.networkAgentRegistry = networkAgentRegistry;
             this.worldItemRegistry = worldItemRegistry;
@@ -255,6 +276,7 @@ namespace Missions.Agents.Handlers
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.controllerIdProvider = controllerIdProvider;
+            this.missilePickupArbiter = missilePickupArbiter;
 
             messageBroker.Subscribe<WeaponPickedup>(WeaponPickupSend);
             messageBroker.Subscribe<LadderForkGranted>(HandleLadderForkGranted);
@@ -598,7 +620,16 @@ namespace Missions.Agents.Handlers
                 originalWorldItemWeapon.RawDataForNetwork,
                 hasWorldItemDataValue: true,
                 worldItemModifierId: worldItemModifierId,
-                pickupId: pickupId);
+                pickupId: pickupId,
+                isStuckMissile: payload.WorldItem.IsStuckMissile(),
+                previousSlotEmpty: payload.PreviousSlotWeapon.IsEmpty);
+
+            if (!TryClaimMissilePickup(message))
+            {
+                // A peer's pickup of the same missile already won here, so this one is taken back unsent.
+                RevertMissilePickup(message);
+                return;
+            }
 
             if (recordLocalPickup)
             {
@@ -795,6 +826,12 @@ namespace Missions.Agents.Handlers
                 return;
             }
 
+            if (!TryClaimMissilePickup(message))
+            {
+                TrackResolvedPickup(message.PickupId);
+                return;
+            }
+
             // Preserve reliable-order equipment transitions across deferred agent registration.
             RetryPendingSiegeGrant(message.AgentId);
             if (canApplyResultingState)
@@ -831,6 +868,71 @@ namespace Missions.Agents.Handlers
                     pickupId: message.PickupId));
             TrackResolvedPickup(message.PickupId);
             RetryPendingNetworkPickups(message.WorldItemId);
+        }
+
+        // [Game thread] Ranks a pickup that consumed a stuck missile against the others of that missile and takes back
+        // the earlier winner it beat. False when this pickup lost and must not be applied.
+        private bool TryClaimMissilePickup(NetworkWeaponPickedup pickup)
+        {
+            if (!pickup.IsStuckMissile || !pickup.WorldItemConsumed) return true;
+
+            if (!missilePickupArbiter.TryClaim(pickup, out NetworkWeaponPickedup displaced))
+            {
+                Logger.Debug(
+                    "Ignored missile pickup that lost to an earlier ranked pickup agent={AgentId} worldItem={WorldItemId}",
+                    pickup.AgentId,
+                    pickup.WorldItemId);
+                return false;
+            }
+
+            if (displaced != null)
+                RevertMissilePickup(displaced);
+            return true;
+        }
+
+        // [Game thread] Takes a lost missile pickup back out of the picker's slot, keeping ammo the slot gained since.
+        private void RevertMissilePickup(NetworkWeaponPickedup pickup)
+        {
+            EquipmentIndex slot = pickup.EquipmentIndex;
+            if (slot < EquipmentIndex.WeaponItemBeginSlot ||
+                slot >= EquipmentIndex.NumAllWeaponSlots ||
+                !networkAgentRegistry.TryGetAgentInfo(pickup.AgentId, out CoopAgentInfo agentInfo) ||
+                agentInfo.Agent == null)
+            {
+                Logger.Warning(
+                    "Could not take back lost missile pickup agent={AgentId} worldItem={WorldItemId}",
+                    pickup.AgentId,
+                    pickup.WorldItemId);
+                return;
+            }
+
+            Agent agent = agentInfo.Agent;
+            MissionWeapon current = agent.Equipment[slot];
+            if (current.IsEmpty ||
+                !objectManager.TryGetObject(pickup.ResultingSlotItemObjectId, out ItemObject resultingItem) ||
+                !ReferenceEquals(current.Item, resultingItem))
+            {
+                Logger.Warning(
+                    "Lost missile pickup no longer matches the slot agent={AgentId} worldItem={WorldItemId}",
+                    pickup.AgentId,
+                    pickup.WorldItemId);
+                return;
+            }
+
+            int pickedAmount = Math.Max(0, pickup.ResultingSlotAmount - pickup.PreviousSlotAmount);
+            short remaining = (short)Math.Max(0, current.Amount - pickedAmount);
+            using (new AllowedThread())
+            {
+                if (remaining == 0 && pickup.PreviousSlotEmpty)
+                    agent.RemoveEquippedWeapon(slot);
+                else
+                    agent.SetWeaponAmountInSlot(slot, remaining, enforcePrimaryItem: true);
+            }
+            agentInfo.RecordAuthoritativeEquipment(new AgentEquipmentData(agent));
+            Logger.Information(
+                "Took back missile pickup that lost to an earlier ranked pickup agent={AgentId} worldItem={WorldItemId}",
+                pickup.AgentId,
+                pickup.WorldItemId);
         }
 
         private void RejectPendingIdentityPickups(

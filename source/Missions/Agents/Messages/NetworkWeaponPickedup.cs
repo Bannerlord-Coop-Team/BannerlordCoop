@@ -74,6 +74,12 @@ namespace Missions.Agents.Messages
         [ProtoMember(21)]
         public Guid PickupId { get; }
 
+        [ProtoMember(22)]
+        public bool IsStuckMissile { get; }
+
+        [ProtoMember(23)]
+        public bool PreviousSlotEmpty { get; }
+
         public NetworkWeaponPickedup(
             Guid agentId, 
             EquipmentIndex equipmentIndex,
@@ -95,7 +101,9 @@ namespace Missions.Agents.Messages
             short worldItemDataValue = 0,
             bool hasWorldItemDataValue = false,
             string worldItemModifierId = null,
-            Guid pickupId = default)
+            Guid pickupId = default,
+            bool isStuckMissile = false,
+            bool previousSlotEmpty = false)
         {
             AgentId = agentId;
             EquipmentIndex = equipmentIndex;
@@ -118,6 +126,8 @@ namespace Missions.Agents.Messages
             HasWorldItemDataValue = hasWorldItemDataValue;
             WorldItemModifierId = worldItemModifierId;
             PickupId = pickupId;
+            IsStuckMissile = isStuckMissile;
+            PreviousSlotEmpty = previousSlotEmpty;
         }
     }
 }

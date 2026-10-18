@@ -1034,6 +1034,93 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void ShieldBouncedMissile_AfterItsPuppetHitReadTheShot_StillSharesTheShotIdentity()
+    {
+        RunWithStuckMissileClients((clients, picker, shooter, itemObject, weapon) =>
+        {
+            clients.Peer.RecordShot(missileIndex: 11, clients.ShooterId);
+
+            // The routed hit on a puppet's shield reads the shot before the missile bounces off into a world item.
+            Assert.True(clients.Peer.Missiles.TryGetLocalShot(11, out _, out _));
+            SpawnedItemEntity bounced = clients.Peer.DropMissile(null, shooter, weapon, missileIndex: 11, sceneId: 105);
+
+            Assert.True(clients.Peer.Items.TryGetId(bounced, out Guid bouncedId));
+            Assert.Equal(MissileHandler.CreateMissileItemId(clients.ShooterId, 4242), bouncedId);
+        });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void StuckMissilePickedUpOnTwoClientsAtOnce_OnlyTheBetterRankedPickerKeepsIt(bool pickerRanksFirst)
+    {
+        RunWithStuckMissileClients((clients, picker, shooter, itemObject, weapon) =>
+        {
+            MissionWeapon round = StuckRound(weapon);
+            picker.Equipment[EquipmentIndex.Weapon0] = round;
+            Agent rival = AddPicker(clients, round);
+            Guid pickerPickupId = pickerRanksFirst ? FirstRankedPickupId : SecondRankedPickupId;
+            Guid rivalPickupId = pickerRanksFirst ? SecondRankedPickupId : FirstRankedPickupId;
+            SpawnedItemEntity pickerCopy = clients.Picker.LandMissile(shooter, weapon, missileIndex: 7, sceneId: 101);
+            SpawnedItemEntity rivalCopy = clients.Peer.LandMissile(shooter, weapon, missileIndex: 11, sceneId: 102);
+
+            // Each client picks up its own copy before it hears about the other pickup.
+            clients.Picker.Broker.Publish(this,
+                CreateRankedMissilePickup(picker, pickerCopy, itemObject, round, pickerPickupId));
+            clients.Peer.Broker.Publish(this,
+                CreateRankedMissilePickup(rival, rivalCopy, itemObject, round, rivalPickupId));
+            NetworkWeaponPickedup pickerSent = SentPickup(clients, pickerPickupId);
+            NetworkWeaponPickedup rivalSent = SentPickup(clients, rivalPickupId);
+            Assert.True(pickerSent.IsStuckMissile);
+            Assert.Equal(pickerSent.WorldItemId, rivalSent.WorldItemId);
+
+            clients.Picker.Broker.Publish(this, rivalSent);
+            clients.Peer.Broker.Publish(this, pickerSent);
+            Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+            Agent winner = pickerRanksFirst ? picker : rival;
+            Agent loser = pickerRanksFirst ? rival : picker;
+            Assert.Equal(1, winner.Equipment[EquipmentIndex.Weapon0].Amount);
+            Assert.True(loser.Equipment[EquipmentIndex.Weapon0].IsEmpty);
+        });
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ContestedStuckMissilePickups_ReachingABystanderInEitherOrder_LeaveOnlyTheWinnerHoldingIt(
+        bool winnerArrivesFirst)
+    {
+        RunWithStuckMissileClients((clients, picker, shooter, itemObject, weapon) =>
+        {
+            MissionWeapon round = StuckRound(weapon);
+            Agent winner = AddPicker(clients, default);
+            Agent loser = AddPicker(clients, default);
+            SpawnedItemEntity winnerCopy = clients.Picker.LandMissile(shooter, weapon, missileIndex: 7, sceneId: 103);
+            SpawnedItemEntity loserCopy = clients.Peer.LandMissile(shooter, weapon, missileIndex: 11, sceneId: 104);
+            clients.Picker.Broker.Publish(this,
+                CreateRankedMissilePickup(winner, winnerCopy, itemObject, round, FirstRankedPickupId));
+            clients.Peer.Broker.Publish(this,
+                CreateRankedMissilePickup(loser, loserCopy, itemObject, round, SecondRankedPickupId));
+            NetworkWeaponPickedup winnerSent = SentPickup(clients, FirstRankedPickupId);
+            NetworkWeaponPickedup loserSent = SentPickup(clients, SecondRankedPickupId);
+            Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+            // The bystander saw neither pickup and only hears about them, in either order.
+            clients.Bystander.Broker.Publish(this, winnerArrivesFirst ? winnerSent : loserSent);
+            Common.GameThread.Instance.Update(TimeSpan.Zero);
+            clients.Bystander.Broker.Publish(this, winnerArrivesFirst ? loserSent : winnerSent);
+            Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+            Assert.Equal(1, winner.Equipment[EquipmentIndex.Weapon0].Amount);
+            Assert.True(loser.Equipment[EquipmentIndex.Weapon0].IsEmpty);
+        });
+    }
+
+    private static readonly Guid FirstRankedPickupId = new("00000000-0000-0000-0000-000000000001");
+    private static readonly Guid SecondRankedPickupId = new("00000000-0000-0000-0000-000000000002");
+
     private delegate void StuckMissileTest(
         StuckMissileClients clients, Agent picker, Agent shooter, ItemObject itemObject, MissionWeapon weapon);
 
@@ -1076,12 +1163,47 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
             0, 1, 1, 0, true, weapon);
 
+    // Picks a single stuck round into an empty slot under a chosen pickup id, which decides who wins a contested pickup.
+    private static WeaponPickedup CreateRankedMissilePickup(
+        Agent picker,
+        SpawnedItemEntity copy,
+        ItemObject itemObject,
+        MissionWeapon round,
+        Guid pickupId) =>
+        new(picker, copy, EquipmentIndex.Weapon0, itemObject, null, null,
+            new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+            0, 1, 1, 0, true, round, default, default, pickupId);
+
+    // Registers another locally simulated picker holding the given weapon in its first slot.
+    private static Agent AddPicker(StuckMissileClients clients, MissionWeapon held)
+    {
+        Agent agent = ObjectHelper.SkipConstructor<Agent>();
+        AgentEquipmentShim.Track(agent, CreateEquipment(held));
+        Assert.True(clients.Agents.TryRegisterAgent("observer", Guid.NewGuid(), agent));
+        return agent;
+    }
+
+    // Returns the single round a stuck missile item holds.
+    private static MissionWeapon StuckRound(MissionWeapon weapon)
+    {
+        MissionWeapon round = weapon;
+        round.Amount = 1;
+        return round;
+    }
+
+    // Finds the pickup broadcast under the given pickup id.
+    private static NetworkWeaponPickedup SentPickup(StuckMissileClients clients, Guid pickupId) =>
+        Assert.Single(clients.Network.NetworkSentMessages.GetMessages<NetworkWeaponPickedup>()
+            .Where(message => message.PickupId == pickupId));
+
     private sealed class StuckMissileClients : IDisposable
     {
         public Guid ShooterId { get; } = Guid.NewGuid();
         public MockBattleNetwork Network { get; }
+        public INetworkAgentRegistry Agents { get; }
         public StuckMissileClient Picker { get; }
         public StuckMissileClient Peer { get; }
+        public StuckMissileClient Bystander { get; }
 
         public StuckMissileClients(
             EnvironmentInstance observer,
@@ -1090,15 +1212,18 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             MockBattleNetwork network)
         {
             Network = network;
-            // The picker replayed the shot; the peer is the shooter's own client.
+            Agents = agentRegistry;
+            // The picker replayed the shot; the peer is the shooter's own client; the bystander only watches.
             Picker = new StuckMissileClient(observer, agentRegistry, objectManager, network, "reconstructedShots");
             Peer = new StuckMissileClient(observer, agentRegistry, objectManager, network, "localShots");
+            Bystander = new StuckMissileClient(observer, agentRegistry, objectManager, network, "reconstructedShots");
         }
 
         public void Dispose()
         {
             Picker.Dispose();
             Peer.Dispose();
+            Bystander.Dispose();
         }
     }
 
@@ -1114,6 +1239,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         public MessageBroker Broker { get; } = new();
         public NetworkWorldItemRegistry Items { get; } = new();
         public RecordingWorldItemSpawner Spawner { get; } = new();
+        public IMissileHandler Missiles => missiles;
 
         public StuckMissileClient(
             EnvironmentInstance observer,
@@ -1165,6 +1291,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
             stuck.Amount = 1;
             SpawnedItemEntity item = Spawner.AddPresent(stuck);
             item.Id = new MissionObjectId(sceneId, true);
+            item.SpawnFlags = Mission.WeaponSpawnFlags.AsMissile | Mission.WeaponSpawnFlags.WithStaticPhysics;
             Broker.Publish(this, new MissileItemDropped(missileIndex, missile, visualShooter, item));
             return item;
         }
