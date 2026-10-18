@@ -16,18 +16,13 @@ internal readonly struct NetworkEducationStageUpdated : ICommand
     [ProtoMember(3)]
     public readonly List<string> ChosenOptions;
 
-    [ProtoMember(4)]
-    public readonly List<string> SkillIds;
-
     public NetworkEducationStageUpdated(
         uint childHandle,
         short target,
-        List<string> chosenOptions,
-        List<string> skillIds)
+        List<string> chosenOptions)
     {
         ChildHandle = childHandle;
         Target = target;
         ChosenOptions = chosenOptions;
-        SkillIds = skillIds;
     }
 }

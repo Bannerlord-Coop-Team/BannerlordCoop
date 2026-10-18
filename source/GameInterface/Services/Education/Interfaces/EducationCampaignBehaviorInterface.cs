@@ -98,7 +98,7 @@ public interface IEducationCampaignBehaviorInterface : IGameAbstraction
     /// Server method
     /// Client finalized education, applies its chosen options after checking them against the stage. Returns false when nothing was applied
     /// </summary>
-    bool UpdateEducationStage(Hero child, short target, List<string> chosenOptions, List<SkillObject> sentSkills, string senderControllerId);
+    bool UpdateEducationStage(Hero child, short target, List<string> chosenOptions, string senderControllerId);
 
     /// <summary>
     /// Server method
@@ -298,7 +298,7 @@ public class EducationCampaignBehaviorInterface : IEducationCampaignBehaviorInte
         CancelPendingNotifications((childKey, controllerId) => childKey.Item1 == victim || controllerId == victimPlayer?.ControllerId);
     }
 
-    public bool UpdateEducationStage(Hero child, short target, List<string> chosenOptions, List<SkillObject> sentSkills, string senderControllerId)
+    public bool UpdateEducationStage(Hero child, short target, List<string> chosenOptions, string senderControllerId)
     {
         if (!TryGetEducationBehavior(out var educationBehavior)) return false;
 
@@ -309,25 +309,15 @@ public class EducationCampaignBehaviorInterface : IEducationCampaignBehaviorInte
             return false;
         }
 
+        // EducationStageSeedPatch makes this the same stage the client built
         var stage = educationBehavior.GetStage(child, (EducationCampaignBehavior.ChildAgeState)target);
-        if (!TryGetStageRewards(stage, chosenOptions, sentSkills, out var attributes, out var skills))
+        if (!IsAvailableStagePath(stage, chosenOptions))
         {
             Logger.Warning($"Education stage for key ({childKey.child.StringId}, {childKey.Item2}) sent choices the stage doesn't allow. Education changes not applied.");
             return false;
         }
 
-        foreach (var attribute in attributes)
-        {
-            child.HeroDeveloper.AddAttribute(attribute, 1, false);
-        }
-
-        foreach (var skill in skills)
-        {
-            child.HeroDeveloper.AddFocus(skill, 1, false);
-            child.HeroDeveloper.ChangeSkillLevel(skill, 15);
-        }
-
-        educationBehavior._previousEducations[child] = target;
+        OnFinalize(child, target, stage, chosenOptions);
         RemovePendingNotification(childKey);
         return true;
     }
@@ -337,52 +327,23 @@ public class EducationCampaignBehaviorInterface : IEducationCampaignBehaviorInte
         pendingNotifications.Remove(childKey);
     }
 
-    // Walks one chosen option per page, attributes come from the server's options and skills from the client's
-    private static bool TryGetStageRewards(
-        EducationCampaignBehavior.EducationStage stage,
-        List<string> chosenOptions,
-        List<SkillObject> sentSkills,
-        out List<CharacterAttribute> attributes,
-        out List<SkillObject> skills)
+    // Replays the education screen's page to check each choice is an available option vanilla would show
+    private static bool IsAvailableStagePath(EducationCampaignBehavior.EducationStage stage, List<string> chosenOptions)
     {
-        attributes = new List<CharacterAttribute>();
-        skills = new List<SkillObject>();
         if (chosenOptions.Count != stage.PageCount) return false;
 
-        var previousOptions = new List<EducationCampaignBehavior.EducationOption>();
-        int sentSkillIndex = 0;
-
-        for (int pageIndex = 0; pageIndex < chosenOptions.Count; pageIndex++)
+        var previousKeys = new List<string>();
+        foreach (var optionKey in chosenOptions)
         {
-            // Keys are "page;variant;option"
-            string[] keyParts = chosenOptions[pageIndex].Split(';');
-            if (keyParts.Length != 3 || !int.TryParse(keyParts[0], out var keyPage) || keyPage != pageIndex) return false;
-            if (!int.TryParse(keyParts[1], out var variant) || variant < 0 || variant >= stage._superPages[pageIndex].Count) return false;
+            var page = stage.GetPage(previousKeys);
+            if (page == null) return false;
 
-            // Page conditions only depend on earlier choices, option conditions use RandomValue and can't be checked here
-            var page = stage._superPages[pageIndex][variant];
-            if (page.Condition != null && !page.Condition(page, previousOptions)) return false;
+            if (!page.GetAvailableOptions(stage.StringIdToEducationOption(previousKeys)).Contains(optionKey)) return false;
 
-            var option = page.GetOption(chosenOptions[pageIndex]);
-            if (option == null) return false;
-
-            attributes.AddRange(option.Attributes);
-
-            foreach (var skill in option.Skills)
-            {
-                if (sentSkillIndex >= sentSkills.Count) return false;
-
-                // Year8's alternative skill is rolled per stage build, but always from this page's skills
-                var sentSkill = sentSkills[sentSkillIndex++];
-                if (sentSkill != skill && !page.Options.Any(pageOption => pageOption.Skills.Contains(sentSkill))) return false;
-
-                skills.Add(sentSkill);
-            }
-
-            previousOptions.Add(option);
+            previousKeys.Add(optionKey);
         }
 
-        return sentSkillIndex == sentSkills.Count;
+        return true;
     }
 
     public void OnFinalize(Hero child, short target, EducationCampaignBehavior.EducationStage stage, List<string> chosenOptions)
