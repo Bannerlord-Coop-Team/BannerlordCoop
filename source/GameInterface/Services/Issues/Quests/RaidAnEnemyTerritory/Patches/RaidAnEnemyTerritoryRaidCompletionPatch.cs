@@ -119,5 +119,10 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
             quest.StringId,
             villageIds.ToArray(),
             entries));
+
+        if (quest._raidedVillages.Count >= 3)
+        {
+            quest.MainHeroRaidedAllVillages();
+        }
     }
 }
