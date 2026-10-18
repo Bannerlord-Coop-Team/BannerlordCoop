@@ -55,7 +55,7 @@ internal class ArtisanProductsLordPatches
 internal class ArtisanProductsCounterOfferPatch
 {
     [HarmonyTargetMethod]
-    private static MethodBase Target() => AccessTools.Method(typeof(IssuesCampaignBehavior), "GetCounterOfferersIssue");
+    private static MethodBase Target() => AccessTools.Method(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.GetCounterOfferersIssue));
 
     [HarmonyPrefix]
     private static bool Prefix(ref IssueBase __result)
@@ -90,13 +90,13 @@ internal class ArtisanProductsCounterOfferConversationPatch
     {
         foreach (var name in new[]
         {
-            "issue_counter_offer_2_condition",
-            "issue_counter_offer_player_accept_condition",
-            "issue_counter_offer_player_reject_condition",
-            "issue_counter_offer_accepted_condition",
-            "issue_counter_offer_reject_condition",
-            "issue_counter_offer_accepted_consequence",
-            "issue_counter_offer_reject_consequence",
+            nameof(IssuesCampaignBehavior.issue_counter_offer_2_condition),
+            nameof(IssuesCampaignBehavior.issue_counter_offer_player_accept_condition),
+            nameof(IssuesCampaignBehavior.issue_counter_offer_player_reject_condition),
+            nameof(IssuesCampaignBehavior.issue_counter_offer_accepted_condition),
+            nameof(IssuesCampaignBehavior.issue_counter_offer_reject_condition),
+            nameof(IssuesCampaignBehavior.issue_counter_offer_accepted_consequence),
+            nameof(IssuesCampaignBehavior.issue_counter_offer_reject_consequence),
         })
         {
             yield return AccessTools.Method(typeof(IssuesCampaignBehavior), name);
