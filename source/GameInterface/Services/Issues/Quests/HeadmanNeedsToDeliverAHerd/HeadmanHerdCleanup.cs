@@ -15,6 +15,7 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
 internal interface IHeadmanHerdCleanup : IGameAbstraction
 {
     void Remember(IssueBase issue, MobileParty party);
+    bool HasRememberedParty(IssueBase issue);
     bool ReturnAlternativeTroops(IssueBase issue);
     void RemoveRemaining(Quest quest);
     void Finalize(IssueBase issue);
@@ -26,6 +27,8 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
     private Dictionary<string, MobileParty> parties = new Dictionary<string, MobileParty>();
 
     public void Remember(IssueBase issue, MobileParty party) => parties[issue.StringId] = party;
+
+    public bool HasRememberedParty(IssueBase issue) => parties.ContainsKey(issue.StringId);
 
     public bool ReturnAlternativeTroops(IssueBase issue)
     {
