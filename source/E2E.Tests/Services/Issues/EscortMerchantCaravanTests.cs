@@ -147,6 +147,28 @@ public class EscortMerchantCaravanTests : IDisposable
 
     private Quest QuestOn(EnvironmentInstance instance) => Assert.IsType<Quest>(scenario.QuestOf(instance));
 
+    private void PrepareWarState()
+    {
+        var kingdomId = environment.CreateRegisteredObject<Kingdom>();
+        var playerClanId = environment.CreateRegisteredObject<Clan>();
+        var owner = Server.Resolve<IPlayerManager>().Players.Single(p => p.ControllerId == QuestScenario.ControllerA);
+        foreach (var instance in new[] { Server, Owner, Other })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(owner.HeroId, out var ownerHero));
+                using (new AllowedThread())
+                {
+                    giver.Clan._kingdom = instance.GetRegisteredObject<Kingdom>(kingdomId);
+                    giver.CurrentSettlement.Town._ownerClan = giver.Clan;
+                    giver.CurrentSettlement.SettlementComponent = giver.CurrentSettlement.Town;
+                    ownerHero.Clan = instance.GetRegisteredObject<Clan>(playerClanId);
+                }
+            });
+        }
+    }
+
     [Fact]
     public void RealAcceptKeepsTheQuestOnItsOwnerAndSpawnsOnlyOnTheServer()
     {
@@ -822,6 +844,7 @@ public class EscortMerchantCaravanTests : IDisposable
     [Fact]
     public void ARelayWarRunsTheEscortHandlerOnce()
     {
+        PrepareWarState();
         Accept();
         var harmony = new Harmony($"escort-relay-war-{Guid.NewGuid()}");
         var reroute = AccessTools.Method(typeof(Quest), nameof(Quest.TryToFindAndSetTargetToNextSettlement));
@@ -866,6 +889,7 @@ public class EscortMerchantCaravanTests : IDisposable
     public void ARelayKingdomChangeRunsTheEscortHandlerOnce()
     {
         var changedClanId = environment.CreateRegisteredObject<Clan>();
+        PrepareWarState();
         Accept();
         var harmony = new Harmony($"escort-relay-kingdom-{Guid.NewGuid()}");
         var handler = AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
