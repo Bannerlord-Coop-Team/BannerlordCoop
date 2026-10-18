@@ -125,14 +125,20 @@ public class CapturedByBountyHuntersTests : IDisposable
     [Fact]
     public void AnIssueTheServerCreatesCanBeAcceptedByAClientOutsideASettlement()
     {
-        var created = CreateIssueOnServer();
-        Assert.False(string.IsNullOrEmpty(created.IssueId));
+        // The server also names issues it never sends, so its next id is ahead of the clients' own
+        Server.Call(() => Campaign.Current.IssueManager._nextIssueUniqueIndex = 7);
 
-        Server.Call(() =>
+        var created = CreateIssueOnServer();
+        Assert.Equal("issue_7", created.IssueId);
+
+        foreach (var instance in Instances)
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(gangLeaderId, out var gangLeader));
-            Assert.Equal(created.IssueId, gangLeader.Issue.StringId);
-        });
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(gangLeaderId, out var gangLeader));
+                Assert.Equal(created.IssueId, gangLeader.Issue.StringId);
+            });
+        }
 
         AcceptOnClientA(created.IssueId);
 
@@ -305,6 +311,23 @@ public class CapturedByBountyHuntersTests : IDisposable
         AssertTheQuestIsStillRunning();
     }
 
+    // Held by a party winning another battle elsewhere while another player's assault on the hideout fails
+    [Fact]
+    public void AnOwnerHeldByAPartyInAnotherBattleKeepsTheQuestWhenTheAssaultFails()
+    {
+        GiveTheGangLeaderTheIssue();
+        AcceptOnClientA();
+        PutBanditsInTheHideout();
+        var captorPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        EndBattleOnTheServer(
+            BattleState.DefenderVictory,
+            new[] { otherPartyId },
+            capture: new OwnerCapture(captorPartyId, CaptorInThisBattle: false));
+
+        AssertTheQuestIsStillRunning();
+    }
+
     [Fact]
     public void AnOwnerCapturedInABattleElsewhereKeepsTheQuest()
     {
@@ -453,6 +476,7 @@ public class CapturedByBountyHuntersTests : IDisposable
             }
 
             Assert.True(quest.IsOngoing);
+            Assert.Single(quest.JournalEntries);
         }, OutcomeLogTexts);
 
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
@@ -529,7 +553,8 @@ public class CapturedByBountyHuntersTests : IDisposable
             {
                 Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(capture.CaptorPartyId, out captor));
                 Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
-                captor.Party._mapEventSide = SideOf(mapEvent, capture.CaptorSide);
+                var captorBattle = capture.CaptorInThisBattle ? mapEvent : HideoutBattle(Server, result);
+                captor.Party._mapEventSide = SideOf(captorBattle, capture.CaptorSide);
 
                 using (new AllowedThread())
                 {
@@ -573,7 +598,11 @@ public class CapturedByBountyHuntersTests : IDisposable
         }, OutcomeLogTexts);
     }
 
-    private sealed record OwnerCapture(string CaptorPartyId, BattleSideEnum CaptorSide = BattleSideEnum.Defender, bool BeforeBattle = false);
+    private sealed record OwnerCapture(
+        string CaptorPartyId,
+        BattleSideEnum CaptorSide = BattleSideEnum.Defender,
+        bool BeforeBattle = false,
+        bool CaptorInThisBattle = true);
 
     private static MapEventSide SideOf(MapEvent mapEvent, BattleSideEnum side)
     {
@@ -583,7 +612,7 @@ public class CapturedByBountyHuntersTests : IDisposable
         return mapEventSide;
     }
 
-    // The hideout has no parties left, as after the bounty hunters were beaten
+    // The hideout has no parties in it, which on the server is the case from the battle after the clear
     private MapEvent HideoutBattle(EnvironmentInstance instance, BattleState result, string? settlementId = null)
     {
         Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId ?? hideoutId, out var settlement));

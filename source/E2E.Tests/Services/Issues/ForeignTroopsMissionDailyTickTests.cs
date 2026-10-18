@@ -74,6 +74,22 @@ public class ForeignTroopsMissionDailyTickTests : IDisposable
         });
     }
 
+    // The server completes every player's troops mission, so it ticks all of them
+    [Fact]
+    public void TheServersDailyTickStillAdvancesAPlayersTroopsMission()
+    {
+        scenario.Server.Call(() =>
+        {
+            var issue = SendTroops(scenario.Server, owner: QuestScenario.ControllerA, withJournal: true, troopsStartReturningToday: false);
+
+            Campaign.Current.IssueManager.DailyTick();
+
+            Assert.True(issue.IsSolvingWithAlternative);
+            var journal = Assert.Single(issue.JournalEntries);
+            Assert.Equal(1, journal.CurrentProgress);
+        });
+    }
+
     private IssueBase SendTroops(EnvironmentInstance client, string owner, bool withJournal, bool troopsStartReturningToday)
     {
         Assert.True(client.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));

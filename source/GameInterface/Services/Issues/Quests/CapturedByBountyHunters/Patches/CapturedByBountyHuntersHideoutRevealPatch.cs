@@ -5,7 +5,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.CapturedByBountyHuntersIssueBehav
 
 namespace GameInterface.Services.Issues.Quests.CapturedByBountyHunters.Patches;
 
-// Only the owner's client runs the quest, so the hideout its scouts mark stays on that player's map
+// The hideout's spotted state is server managed, the owner's client marks its quest hideout for itself on purpose
 [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementLeft))]
 internal class CapturedByBountyHuntersHideoutRevealPatch
 {
