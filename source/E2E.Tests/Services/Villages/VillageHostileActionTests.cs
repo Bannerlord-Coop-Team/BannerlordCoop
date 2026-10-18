@@ -1697,6 +1697,38 @@ public class VillageHostileActionTests : MapEventTestBase
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMapEventLockChanged>());
     }
 
+    [Theory]
+    [InlineData(0.5f, Village.VillageStates.Normal)]
+    [InlineData(0f, Village.VillageStates.Looted)]
+    public void CleanUpLoadedMapEvents_EndedAiRaid_ResetsVillageState(float hitPoints, Village.VillageStates expectedState)
+    {
+        // a save where an AI raid already left the map event manager but still links its parties
+        var aiRaiderMobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var target = CreateVillageTarget();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(aiRaiderMobilePartyId, out var aiRaiderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            settlement.SettlementHitPoints = hitPoints;
+
+            var mapEvent = CreateHostileActionMapEvent(aiRaiderParty.Party, settlement.Party, VillageHostileAction.Raid);
+            Campaign.Current.MapEventManager._mapEvents.Remove(mapEvent);
+            Assert.Equal(Village.VillageStates.BeingRaided, settlement.Village.VillageState);
+
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+
+            Assert.True(mapEvent.IsFinalized);
+            Assert.Null(aiRaiderParty.Party.MapEventSide);
+            Assert.False(settlement.IsUnderRaid);
+        }, MapEventDisabledMethods);
+
+        foreach (var instance in Clients.Append(Server))
+        {
+            AssertVillageStateAndHitPoints(instance, target.SettlementId, target.VillageId, expectedState, hitPoints);
+        }
+    }
+
     [Fact]
     public void ActiveSlowRaidMapEvent_SecondPlayerConversationIsAllowed()
     {

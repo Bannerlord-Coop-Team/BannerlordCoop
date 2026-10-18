@@ -20,7 +20,8 @@ namespace GameInterface.Services.MapEvents;
 
 public interface IMapEventLoadCleaner
 {
-    void FinalizePlayerMapEvents();
+    // Finalizes loaded player battles and releases every party still linked to a battle that already ended.
+    void CleanUpLoadedMapEvents();
 }
 
 internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
@@ -45,7 +46,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         this.armyDisbander = armyDisbander;
     }
 
-    public void FinalizePlayerMapEvents()
+    public void CleanUpLoadedMapEvents()
     {
         if (Campaign.Current?.MapEventManager == null)
             return;
@@ -121,17 +122,15 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             .ToArray();
 
         var endedMapEvents = parties
-            .Select(party => party.MapEventSide?.MapEvent)
-            .Where(mapEvent => mapEvent != null &&
-                (mapEvent.IsFinalized || !liveMapEvents.Contains(mapEvent)))
-            .Distinct()
+            .Where(party => party.MapEventSide?.MapEvent != null)
+            .GroupBy(party => party.MapEventSide.MapEvent)
+            .Where(group => group.Key.IsFinalized || !liveMapEvents.Contains(group.Key))
             .ToArray();
 
-        foreach (var mapEvent in endedMapEvents)
+        foreach (var group in endedMapEvents)
         {
-            var linkedParties = parties
-                .Where(party => ReferenceEquals(party.MapEventSide?.MapEvent, mapEvent))
-                .ToArray();
+            var mapEvent = group.Key;
+            var linkedParties = group.ToArray();
 
             logger.Warning(
                 "Releasing {PartyCount} parties from ended map event {MapEventId} after load",
@@ -141,7 +140,10 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             // The battle already ended, so mark it finalized before detaching. Removing the last
             // party then cannot run FinalizeEvent again and replay its results.
             if (!mapEvent.IsFinalized)
+            {
+                ResetRaidedVillage(mapEvent);
                 mapEvent.State = MapEventState.WaitingRemoval;
+            }
 
             RepairPartySideLinks(mapEvent);
             DetachFromFinalizedEvent(mapEvent);
@@ -157,6 +159,20 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                     mobileParty.ResetNavigationToHold();
             }
         }
+    }
+
+    // WaitingRemoval skips the component's OnBeforeFinalize, which for a raid moves the village off
+    // BeingRaided. Apply only that village state change, not its RaidCompleted event.
+    private static void ResetRaidedVillage(MapEvent mapEvent)
+    {
+        var settlement = mapEvent.MapEventSettlement;
+        if (!mapEvent.IsRaid || settlement?.Village?.VillageState != Village.VillageStates.BeingRaided)
+            return;
+
+        if (settlement.SettlementHitPoints <= 1E-05f)
+            ChangeVillageStateAction.ApplyBySettingToLooted(settlement, mapEvent.AttackerSide?.LeaderParty?.MobileParty);
+        else
+            ChangeVillageStateAction.ApplyBySettingToNormal(settlement);
     }
 
     private void RepairPartySideLinks(MapEvent mapEvent)
@@ -245,7 +261,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         if (repairedLinks > 0 || removedEntries > 0)
         {
             logger.Warning(
-                "Repaired {RepairedLinkCount} party-side links and removed {RemovedEntryCount} stale or duplicate participants from loaded player map event {MapEventId} before finalization",
+                "Repaired {RepairedLinkCount} party-side links and removed {RemovedEntryCount} stale or duplicate participants from loaded map event {MapEventId} before finalization",
                 repairedLinks,
                 removedEntries,
                 mapEvent.StringId);
