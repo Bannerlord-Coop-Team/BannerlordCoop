@@ -2,6 +2,7 @@
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -30,6 +31,8 @@ internal class SmugglersQuestEventPatches
             return;
         }
 
+        var capturedOwners = new List<(Quest Quest, Hero Owner)>();
+
         RunAsOwners(quest =>
         {
             // Vanilla reads the party without a null check, it is only missing when spawning it failed
@@ -39,25 +42,57 @@ internal class SmugglersQuestEventPatches
             }
 
             quest.OnMapEventEnded(mapEvent);
-            FailIfOwnerWasCaptured(quest, mapEvent);
-            CancelIfDefeatedWithoutOwner(quest, mapEvent);
+
+            if (IsOwnerCapturedInTheFight(quest, mapEvent))
+            {
+                capturedOwners.Add((quest, Hero.MainHero));
+            }
+            else
+            {
+                CancelIfDefeatedWithoutOwner(quest, mapEvent);
+            }
         });
+
+        FailForCapturedOwners(capturedOwners);
     }
 
-    // The server takes a defeated owner prisoner before the battle ends, so vanilla no longer sees the owner's party in it
-    private static void FailIfOwnerWasCaptured(Quest quest, MapEvent mapEvent)
+    // The server takes a defeated owner prisoner before the battle ends, so vanilla no longer sees the owner's party in it.
+    // The captor can be a party that joined the smugglers, and an owner taken before this battle did not fight in it.
+    private static bool IsOwnerCapturedInTheFight(Quest quest, MapEvent mapEvent)
     {
         var owner = Hero.MainHero;
         var smugglers = quest._smugglerParty.Party;
-        if (!quest.IsOngoing || owner == null || !owner.IsPrisoner || owner.PartyBelongedToAsPrisoner != smugglers ||
-            !mapEvent.InvolvedParties.Contains(smugglers))
+        var captor = owner?.PartyBelongedToAsPrisoner;
+
+        return quest.IsOngoing && captor != null && owner.IsPrisoner && mapEvent.InvolvedParties.Contains(smugglers) &&
+            mapEvent.InvolvedParties.Contains(captor) && captor.Side == smugglers.Side &&
+            owner.CaptivityStartTime >= mapEvent.BattleStartTime;
+    }
+
+    private static void FailForCapturedOwners(List<(Quest Quest, Hero Owner)> capturedOwners)
+    {
+        if (capturedOwners.Count == 0)
         {
             return;
         }
 
-        // Failing removes the smugglers, and removing a party frees every hero prisoner except the main hero
-        EndCaptivityAction.ApplyByReleasedAfterBattle(owner);
-        quest.FailQuest();
+        // Failing removes the smugglers and removing a party frees every hero prisoner except the main hero, so an owner
+        // they hold is released first, outside the owner's scope where the server would take them for its own main hero
+        foreach (var (quest, owner) in capturedOwners)
+        {
+            if (owner.PartyBelongedToAsPrisoner == quest._smugglerParty.Party)
+            {
+                EndCaptivityAction.ApplyByReleasedAfterBattle(owner);
+            }
+        }
+
+        RunAsOwners(quest =>
+        {
+            if (quest.IsOngoing && capturedOwners.Exists(captured => ReferenceEquals(captured.Quest, quest)))
+            {
+                quest.FailQuest();
+            }
+        });
     }
 
     // Vanilla only expects the owner to fight the smugglers, another player beating them leaves the quest unwinnable

@@ -246,14 +246,65 @@ public class SmugglersTests : IDisposable
     [Fact]
     public void OwnerCapturedByTheirSmugglers_IsReleasedAndFailsTheQuest()
     {
+        var releaseMethod = AccessTools.Method(typeof(EndCaptivityAction), nameof(EndCaptivityAction.ApplyByReleasedAfterBattle));
+        using var failQuest = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.FailQuest)));
+        using var release = new MethodCallRecorder(Priority.Last, releaseMethod);
+        var harmony = new Harmony($"smugglers-release-{Guid.NewGuid()}");
+        harmony.Patch(releaseMethod, prefix: new HarmonyMethod(typeof(SmugglersTests), nameof(RecordPlayerTroopAtRelease)) { priority = Priority.First });
+        playerTroopAtRelease = null;
+
+        try
+        {
+            var ownerCharacter = CaptureOwnerBy(partyId);
+            EndBattleAgainstTheSmugglers(BattleState.DefenderVictory);
+
+            Assert.Equal(1, release.CountFor(Server));
+            Assert.Equal(1, failQuest.CountFor(Server));
+            Assert.Equal(0, cancelQuest.CountFor(Server));
+
+            // Inside the owner's scope the server would take the owner for its own main hero and grant it captivity XP
+            Assert.NotSame(ownerCharacter, playerTroopAtRelease);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    private static BasicCharacterObject? playerTroopAtRelease;
+
+    private static void RecordPlayerTroopAtRelease() => playerTroopAtRelease = Game.Current?.PlayerTroop;
+
+    [Fact]
+    public void OwnerCapturedByAPartyThatJoinedTheSmugglers_FailsTheQuestWithoutReleasingThem()
+    {
+        var joinedPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         using var failQuest = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.FailQuest)));
         using var release = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(EndCaptivityAction), nameof(EndCaptivityAction.ApplyByReleasedAfterBattle)));
 
-        CaptureOwnerBySmugglers();
-        EndBattleAgainstTheSmugglers(BattleState.DefenderVictory);
+        CaptureOwnerBy(joinedPartyId);
+        EndBattleAgainstTheSmugglers(BattleState.DefenderVictory, mapEvent =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(joinedPartyId, out var joinedParty));
+            joinedParty.Party.MapEventSide = mapEvent.DefenderSide;
+        });
 
-        Assert.Equal(1, release.CountFor(Server));
         Assert.Equal(1, failQuest.CountFor(Server));
+        Assert.Equal(0, release.CountFor(Server));
+    }
+
+    [Fact]
+    public void OwnerHeldBeforeTheBattle_KeepsTheQuest()
+    {
+        using var failQuest = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.FailQuest)));
+        using var release = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(EndCaptivityAction), nameof(EndCaptivityAction.ApplyByReleasedAfterBattle)));
+
+        CaptureOwnerBy(partyId);
+        // The test campaign has no time model, so durations are zero and the battle starts one raw tick after the capture
+        EndBattleAgainstTheSmugglers(BattleState.DefenderVictory, mapEvent => mapEvent._mapEventStartTime = new CampaignTime(CampaignTime.Now.NumTicks + 1));
+
+        Assert.Equal(0, failQuest.CountFor(Server));
+        Assert.Equal(0, release.CountFor(Server));
         Assert.Equal(0, cancelQuest.CountFor(Server));
     }
 
@@ -357,7 +408,7 @@ public class SmugglersTests : IDisposable
     }
 
     // Another party attacks the smugglers, the owner is not in the battle
-    private void EndBattleAgainstTheSmugglers(BattleState battleState)
+    private void EndBattleAgainstTheSmugglers(BattleState battleState, Action<MapEvent>? beforeEnd = null)
     {
         // The map event visual needs a render context, its constructor is skipped and its Initialize turned off
         var disabledMethods = new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) };
@@ -379,25 +430,33 @@ public class SmugglersTests : IDisposable
             mapEvent.Initialize(attacker.Party, smugglers.Party, new FieldBattleEventComponent(mapEvent), MapEvent.BattleTypes.FieldBattle);
             mapEvent.MapEventVisual = null;
             mapEvent.BattleState = battleState;
+            beforeEnd?.Invoke(mapEvent);
 
             CampaignEventDispatcher.Instance.OnMapEventEnded(mapEvent);
         }, disabledMethods);
     }
 
-    private void CaptureOwnerBySmugglers()
+    private CharacterObject CaptureOwnerBy(string captorPartyId)
     {
+        CharacterObject ownerCharacter = null!;
+
         Server.Call(() =>
         {
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(ControllerA, out var owner));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(owner.HeroId, out var ownerHero));
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var smugglers));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(captorPartyId, out var captor));
 
             using (new AllowedThread())
             {
                 ownerHero.ChangeState(Hero.CharacterStates.Prisoner);
-                ownerHero.PartyBelongedToAsPrisoner = smugglers.Party;
+                ownerHero.PartyBelongedToAsPrisoner = captor.Party;
+                ownerHero.CaptivityStartTime = CampaignTime.Now;
             }
+
+            ownerCharacter = ownerHero.CharacterObject;
         });
+
+        return ownerCharacter;
     }
 
     private void FinalizeIssueWithSmugglers(bool questFinished)
