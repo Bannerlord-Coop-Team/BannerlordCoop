@@ -29,8 +29,8 @@ internal sealed class RevenueFarmingExecutionScope : IDisposable
         if (ModInformation.IsServer)
         {
             if (session.PlayerParty == null) throw new InvalidOperationException("Revenue Farming owner has no recorded party.");
-            ownerScope = new MainHeroSubstitutionScope(session.PlayerHero, session.PlayerParty);
             initialFingerprint = Fingerprint();
+            ownerScope = new MainHeroSubstitutionScope(session.PlayerHero, session.PlayerParty);
         }
         Current = this;
     }
