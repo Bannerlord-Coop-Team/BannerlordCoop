@@ -37,6 +37,30 @@ internal class HeadmanHerdWorldEventPatches
     [HarmonyFinalizer]
     private static void GiverKilledFinalizer(IDisposable __state) => __state?.Dispose();
 
+    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.StartIssueWithAlternativeSolution))]
+    [HarmonyPostfix]
+    private static void AlternativeSolutionStartedPostfix(IssueBase __instance)
+    {
+        if (ModInformation.IsClient || !(__instance is Issue) ||
+            !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) ||
+            !owners.TryResolveOwnerHero(__instance, out var owner) || owner.PartyBelongedTo == null ||
+            !ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var cleanup))
+            return;
+
+        cleanup.Remember(__instance, owner.PartyBelongedTo);
+    }
+
+    [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.TryToMakeTroopsReturn))]
+    [HarmonyPrefix]
+    private static bool ReturnAlternativeTroopsPrefix(IssueBase issue)
+    {
+        if (ModInformation.IsClient || !(issue is Issue) ||
+            !ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var cleanup))
+            return true;
+
+        return !cleanup.ReturnAlternativeTroops(issue);
+    }
+
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
     [HarmonyPostfix]
     private static void RetryCanceledCompanionsPostfix()

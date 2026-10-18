@@ -15,6 +15,7 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
 internal interface IHeadmanHerdCleanup : IGameAbstraction
 {
     void Remember(IssueBase issue, MobileParty party);
+    bool ReturnAlternativeTroops(IssueBase issue);
     void RemoveRemaining(Quest quest);
     void Finalize(IssueBase issue);
     void SyncData(IDataStore dataStore);
@@ -25,6 +26,21 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
     private Dictionary<string, MobileParty> parties = new Dictionary<string, MobileParty>();
 
     public void Remember(IssueBase issue, MobileParty party) => parties[issue.StringId] = party;
+
+    public bool ReturnAlternativeTroops(IssueBase issue)
+    {
+        if (!parties.TryGetValue(issue.StringId, out var party) || party == null)
+            return false;
+
+        foreach (var element in issue.AlternativeSolutionSentTroops.GetTroopRoster())
+        {
+            if (element.Character.IsHero)
+                element.Character.HeroObject.ChangeState(Hero.CharacterStates.Active);
+        }
+
+        party.MemberRoster.Add(issue.AlternativeSolutionSentTroops);
+        return true;
+    }
 
     public void Finalize(IssueBase issue)
     {
