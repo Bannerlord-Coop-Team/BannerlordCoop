@@ -865,6 +865,7 @@ public class EscortMerchantCaravanTests : IDisposable
     [Fact]
     public void ARelayKingdomChangeRunsTheEscortHandlerOnce()
     {
+        var changedClanId = environment.CreateRegisteredObject<Clan>();
         Accept();
         var harmony = new Harmony($"escort-relay-kingdom-{Guid.NewGuid()}");
         var handler = AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
@@ -877,19 +878,18 @@ public class EscortMerchantCaravanTests : IDisposable
             Server.NetworkSentMessages.Clear();
             Server.Call(() =>
             {
-                Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(changedClanId, out var changedClan));
+                var quest = QuestOn(Server);
                 var ownerPlayer = Server.Resolve<IPlayerManager>().Players.Single(player => player.ControllerId == QuestScenario.ControllerA);
                 Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerPlayer.HeroId, out var owner));
                 Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPlayer.MobilePartyId, out var ownerParty));
-                CampaignEventDispatcher.Instance.OnClanChangedKingdom(giver.Clan, null, null,
+                CampaignEventDispatcher.Instance.OnClanChangedKingdom(changedClan, null, null,
                     ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
                 Assert.Equal(1, observedKingdomCalls);
                 Assert.Same(ownerParty, observedMainParty);
                 Assert.Same(owner, observedMainHero);
+                Assert.True(quest.IsOngoing);
             });
-
-            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(),
-                message => message.Outcome == IssueOutcome.QuestCancel);
         }
         finally
         {
