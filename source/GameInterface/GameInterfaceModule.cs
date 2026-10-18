@@ -66,6 +66,7 @@ using HarmonyLib;
 using Serilog;
 using System.Linq;
 using System.Threading;
+using GameInterface.Services.TroopRosters.Interfaces;
 
 namespace GameInterface;
 
@@ -213,6 +214,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<MapEventInitializationBarrierBinding>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<RetreatedMapEventPartyTracker>().As<IRetreatedMapEventPartyTracker>().InstancePerLifetimeScope();
         builder.RegisterType<MapTrackerProviderHolder>().As<IMapTrackerProviderHolder>().InstancePerLifetimeScope();
+        builder.RegisterType<UnitRecruitedEffects>().As<IUnitRecruitedEffects>().InstancePerDependency();
 
 #if DEBUG
         builder.RegisterModule<global::GameInterface.Services.LiveTesting.LiveTestUiModule>();

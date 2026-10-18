@@ -5,7 +5,7 @@ using Common.Network;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.UI.Notifications.Messages;
+using GameInterface.Services.TroopRosters.Interfaces;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -14,7 +14,6 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Core;
 
 namespace GameInterface.Services.MobileParties.Handlers;
 
@@ -29,15 +28,18 @@ internal class MercenaryHireHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IUnitRecruitedEffects unitRecruitedEffects;
 
     public MercenaryHireHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IUnitRecruitedEffects unitRecruitedEffects)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.unitRecruitedEffects = unitRecruitedEffects;
 
         messageBroker.Subscribe<MercenariesHired>(Handle_MercenariesHired);
         messageBroker.Subscribe<HireMercenaries>(Handle_HireMercenaries);
@@ -137,20 +139,9 @@ internal class MercenaryHireHandler : IHandler
         mainParty.AddElementToMemberRoster(mercenaryTroop, data.Count);
         GiveGoldAction.ApplyBetweenCharacters(mainHero, null, goldAmount, false);
 
-        // The recruitment side effects of the hire. This is the host-safe equivalent of
-        // vanilla CampaignEventDispatcher.OnUnitRecruited, whose listener reads Hero.MainHero /
-        // MobileParty.MainParty (neither of which the dedicated host has); it runs against the
-        // resolved hero/party instead, with patches live so the troop XP and the hero's
-        // recruitment skill XP replicate to every client.
-        if (mainHero.GetPerkValue(DefaultPerks.Leadership.FamousCommander))
-        {
-            mainParty.MemberRoster.AddXpToTroop(mercenaryTroop, (int)DefaultPerks.Leadership.FamousCommander.SecondaryBonus * data.Count);
-        }
-        SkillLevelingManager.OnTroopRecruited(mainHero, data.Count, mercenaryTroop.Tier);
-        if (mercenaryTroop.Occupation == Occupation.Bandit)
-        {
-            SkillLevelingManager.OnBanditsRecruited(mainParty, mercenaryTroop, data.Count);
-        }
+        bool hasPerk = mainHero.GetPerkValue(DefaultPerks.Leadership.FamousCommander);
+
+        unitRecruitedEffects.Apply(mainHero, mainParty, mercenaryTroop, data.Count, hasPerk);
 
         mercenaryData.ChangeMercenaryCount(-data.Count);
         RecruitmentCampaignBehaviorPatch.PublishMercenaryStock(recruitmentBehavior, town);

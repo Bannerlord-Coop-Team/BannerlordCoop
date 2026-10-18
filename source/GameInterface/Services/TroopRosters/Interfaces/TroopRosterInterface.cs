@@ -69,13 +69,16 @@ internal class TroopRosterInterface : ITroopRosterInterface
     private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterInterface>();
     private readonly IObjectManager objectManager;
     private readonly ITroopRosterLogger troopRosterLogger;
+    private readonly IUnitRecruitedEffects unitRecruitedEffects;
 
     public TroopRosterInterface(
         IObjectManager objectManager,
-        ITroopRosterLogger troopRosterLogger)
+        ITroopRosterLogger troopRosterLogger,
+        IUnitRecruitedEffects unitRecruitedEffects)
     {
         this.objectManager = objectManager;
         this.troopRosterLogger = troopRosterLogger;
+        this.unitRecruitedEffects = unitRecruitedEffects;
     }
 
     public TroopRosterData PackTroopRosterData(TroopRoster troopRoster)
@@ -322,6 +325,8 @@ internal class TroopRosterInterface : ITroopRosterInterface
     {
         if (!objectManager.TryGetObjectWithLogging(mobilePartyId, out MobileParty mobileParty)) return;
 
+        var leader = mobileParty.LeaderHero;
+
         List<(Hero, CharacterObject, int)> herosValidated = new();
 
         // Validate troops before committing to recruiting
@@ -341,38 +346,28 @@ internal class TroopRosterInterface : ITroopRosterInterface
         var cost = 0;
         foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
         {
-            cost += Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(characterObject, mobileParty.LeaderHero).RoundedResultNumber;
+            cost += Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(characterObject, leader).RoundedResultNumber;
         }
 
         // Do not apply recruitment if the player does not have enough gold
-        if (cost > mobileParty.LeaderHero.Gold)
+        if (cost > leader.Gold)
         {
             Logger.Warning("Attempted to recruit troops that cost more than the player had");
             return;
         }
 
-        var mainHero = mobileParty.LeaderHero;
-
         // Commit recruitment
-        bool hasPerk = mainHero.GetPerkValue(DefaultPerks.Leadership.FamousCommander);
+        bool hasPerk = leader.GetPerkValue(DefaultPerks.Leadership.FamousCommander);
         foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
         {
             hero.VolunteerTypes[index] = null;
             MessageBroker.Instance.Publish(this, new VolunteerTypesArrayUpdated(hero, null, index));
 
             mobileParty.MemberRoster.AddToCounts(characterObject, 1, false, 0, 0, true, -1);
-            if (hasPerk)
-            {
-                mobileParty.MemberRoster.AddXpToTroop(characterObject, (int)DefaultPerks.Leadership.FamousCommander.SecondaryBonus * 1);
-            }
-            SkillLevelingManager.OnTroopRecruited(mainHero, 1, characterObject.Tier);
-            if (characterObject.Occupation == Occupation.Bandit)
-            {
-                SkillLevelingManager.OnBanditsRecruited(mobileParty, characterObject, 1);
-            }
+            unitRecruitedEffects.Apply(leader, mobileParty, characterObject, 1, hasPerk);
         }
 
-        GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, cost, false);
+        GiveGoldAction.ApplyBetweenCharacters(leader, null, cost, false);
     }
 
     public TroopRosterOrderData PackTroopRosterOrderData(TroopRoster roster)
