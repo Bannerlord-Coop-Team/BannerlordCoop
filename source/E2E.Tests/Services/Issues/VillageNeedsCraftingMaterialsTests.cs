@@ -53,6 +53,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestGiverVillageRaidedLogText)),
         AccessTools.PropertyGetter(typeof(Settlement), nameof(Settlement.EncyclopediaLinkWithName)),
         AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)),
+        // The patched quest text inlines this helper on the server.
         AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.GetCharacterProperties)),
     };
 
@@ -349,14 +350,16 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         Accept();
         Accept(ClientB, secondNotableId);
 
+        Assert.True(QuestOf(Server).IsOngoing);
+        Assert.True(QuestOf(Server, secondNotableId).IsOngoing);
+
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(boundTownSettlementId, out var otherGiverSettlement));
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(secondNotableId, out var secondNotable));
 
-            // Keep the second owner's giver away from the raided village so the test isolates owner dispatch.
+            // Keep the second owner's giver away from the raided village so only the first quest matches.
             secondNotable.Issue.IssueQuest.QuestGiver.StayingInSettlement = otherGiverSettlement;
 
             var raid = (RaidEventComponent)RuntimeHelpers.GetUninitializedObject(typeof(RaidEventComponent));
@@ -374,17 +377,35 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
             }
         }, QuestLogTexts);
 
-        var finalized = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>();
-        Assert.Single(finalized, message => message.IssueOwnerId == notableId && message.IssueId == IssueId);
-        Assert.DoesNotContain(finalized, message => message.IssueOwnerId == secondNotableId && message.IssueId == SecondIssueId);
+        var finalized = Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(),
+            message => message.IssueOwnerId == notableId && message.IssueId == IssueId);
+        Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
+        Assert.DoesNotContain(
+            Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(),
+            message => message.IssueOwnerId == secondNotableId && message.IssueId == SecondIssueId);
 
-        Server.Call(() =>
+        foreach (var instance in Instances)
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(secondNotableId, out var secondNotable));
-            Assert.Null(notable.Issue);
-            Assert.True(secondNotable.Issue.IssueQuest.IsOngoing);
-        });
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(secondNotableId, out var secondNotable));
+                Assert.Null(notable.Issue);
+                Assert.NotNull(secondNotable.Issue);
+                Assert.True(secondNotable.Issue.IsSolvingWithQuest);
+
+                if (ReferenceEquals(instance, Server) || ReferenceEquals(instance, ClientB))
+                {
+                    Assert.NotNull(secondNotable.Issue.IssueQuest);
+                    Assert.True(secondNotable.Issue.IssueQuest.IsOngoing);
+                }
+                else
+                {
+                    Assert.Null(secondNotable.Issue.IssueQuest);
+                }
+            });
+        }
     }
 
     [Fact]
