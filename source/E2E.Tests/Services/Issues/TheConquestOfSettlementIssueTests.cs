@@ -16,6 +16,7 @@ using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using Helpers;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Actions;
@@ -35,6 +36,9 @@ public sealed class TheConquestOfSettlementIssueTests : IDisposable
     private readonly E2ETestEnvironment environment;
     private readonly string issueOwnerId;
     private readonly string targetSettlementId;
+    private string giverClanId = null!;
+    private string ownerPartyId = null!;
+    private string otherPartyId = null!;
 
     private EnvironmentInstance Server => environment.Server;
 
@@ -47,11 +51,12 @@ public sealed class TheConquestOfSettlementIssueTests : IDisposable
 
     public void Dispose() => environment.Dispose();
 
-    private void CreateIssue()
+    private void CreateIssue(string? giverId = null)
     {
+        giverId ??= issueOwnerId;
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(issueOwnerId, out var issueOwner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var issueOwner));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(targetSettlementId, out var target));
 
             var potential = new PotentialIssueData(
@@ -166,6 +171,74 @@ public sealed class TheConquestOfSettlementIssueTests : IDisposable
             });
     }
 
+    [Fact]
+    public void ServerRefusesASecondConquestOnlyForThePlayerWhoHoldsOne()
+    {
+        var owner = environment.Clients.First();
+        var other = environment.Clients.Last();
+        AcceptMapOffer(otherInGiversKingdom: true);
+        var secondGiverId = AddSecondGiver();
+        var secondGiverPartyId = PlaceGiverOnMap(secondGiverId);
+        CreateIssue(secondGiverId);
+
+        RequestQuest(owner, ownerPartyId, secondGiverId, secondGiverPartyId);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(secondGiverId, out var giver));
+            Assert.True(giver.Issue.IsOngoingWithoutQuest);
+            Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(secondGiverId, giver.Issue.StringId, out _));
+        });
+
+        RequestQuest(other, otherPartyId, secondGiverId, secondGiverPartyId);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Assert.Equal(new[] { "owner", "other" },
+            Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>().Select(m => m.ControllerId));
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(secondGiverId, out var giver));
+            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(secondGiverId, giver.Issue.StringId, out var controller));
+            Assert.Equal("other", controller);
+        });
+    }
+
+    [Fact]
+    public void TimeoutPenalizesOnlyTheOwnersRelationWithTheGiver()
+    {
+        AcceptMapOffer();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(issueOwnerId, out var giver));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("owner", out var player));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("other", out var observer));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(observer.HeroId, out var otherHero));
+            var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
+            var ownerRelation = giver.GetRelation(ownerHero);
+            var otherRelation = giver.GetRelation(otherHero);
+
+            // The harness campaign has no behaviors; vanilla applies the quest's relation change from this one
+            var issues = new IssuesCampaignBehavior();
+            issues.RegisterEvents();
+            try
+            {
+                quest.CompleteQuestWithTimeOut();
+            }
+            finally
+            {
+                CampaignEvents.Instance.RemoveListeners(issues);
+            }
+
+            Assert.True(quest.IsFinalized);
+            Assert.Equal(ownerRelation - 10, giver.GetRelation(ownerHero));
+            Assert.Equal(otherRelation, giver.GetRelation(otherHero));
+        });
+
+        Assert.Equal(IssueOutcome.QuestTimeOut, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -236,16 +309,15 @@ public sealed class TheConquestOfSettlementIssueTests : IDisposable
         });
     }
 
-    private void AcceptMapOffer(bool ownerInGiversKingdom = true)
+    private void AcceptMapOffer(bool ownerInGiversKingdom = true, bool otherInGiversKingdom = false)
     {
         var owner = environment.Clients.First();
         var other = environment.Clients.Last();
-        var ownerPartyId = RegisterPlayer(owner, "owner");
-        RegisterPlayer(other, "other");
-        MakeOwnerEligible(ownerInGiversKingdom);
+        ownerPartyId = RegisterPlayer(owner, "owner");
+        otherPartyId = RegisterPlayer(other, "other");
+        MakeOwnerEligible(ownerInGiversKingdom, otherInGiversKingdom);
         var giverPartyId = PlaceGiverOnMap();
         CreateIssue();
-        BeginEngagement(owner, ownerPartyId, giverPartyId);
         foreach (var instance in new[] { Server }.Concat(environment.Clients))
             instance.Call(() =>
             {
@@ -253,30 +325,63 @@ public sealed class TheConquestOfSettlementIssueTests : IDisposable
                 Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
             });
 
-        owner.Call(() => owner.Resolve<IMessageBroker>().Publish(this, new IssueConversationOpenedLocally(issueOwnerId)));
-        owner.Call(() =>
+        RequestQuest(owner, ownerPartyId, issueOwnerId, giverPartyId);
+    }
+
+    // Meets the giver's party on the map, opens its issue conversation and accepts the quest on that client
+    private void RequestQuest(EnvironmentInstance client, string playerPartyId, string giverId, string giverPartyId)
+    {
+        // A party is engaged by one player at a time, so drop any earlier engagements first
+        Server.Call(() =>
         {
-            Assert.True(owner.ObjectManager.TryGetObject<Hero>(issueOwnerId, out var giver));
+            foreach (var peer in environment.Clients.Select(c => c.NetPeer))
+                Server.Resolve<ConversationPartyTracker>().TryEndEngagement(peer, out _, out _);
+        });
+        BeginEngagement(client, playerPartyId, giverPartyId);
+        client.Call(() => client.Resolve<IMessageBroker>().Publish(this, new IssueConversationOpenedLocally(giverId)));
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
             Assert.True(giver.Issue.StartIssueWithQuest());
             Assert.IsType<Quest>(giver.Issue.IssueQuest).QuestAcceptedConsequences();
         });
+    }
 
+    // Another lord of the first giver's clan, so the same kingdom, war and fortification make it eligible
+    private string AddSecondGiver()
+    {
+        var giverId = environment.CreateRegisteredObject<Hero>();
+        foreach (var instance in new[] { Server }.Concat(environment.Clients))
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(giverClanId, out var clan));
+                using (new AllowedThread())
+                {
+                    giver.Clan = clan;
+                }
+            });
+        return giverId;
     }
 
     // The server runs vanilla's take conditions as the owner, so the giver's kingdom must be at war with the
     // target's, still hold a fortification, and count the owner's clan among its own
-    private void MakeOwnerEligible(bool ownerInGiversKingdom)
+    private void MakeOwnerEligible(bool ownerInGiversKingdom, bool otherInGiversKingdom)
     {
         string ownerHeroId = null!;
+        string otherHeroId = null!;
         Server.Call(() =>
         {
             Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("owner", out var player));
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer("other", out var observer));
             ownerHeroId = player.HeroId;
+            otherHeroId = observer.HeroId;
         });
 
         var giverKingdomId = environment.CreateRegisteredObject<Kingdom>();
-        var giverClanId = environment.CreateRegisteredObject<Clan>();
+        giverClanId = environment.CreateRegisteredObject<Clan>();
         var ownerClanId = environment.CreateRegisteredObject<Clan>();
+        var otherClanId = environment.CreateRegisteredObject<Clan>();
         var enemyKingdomId = environment.CreateRegisteredObject<Kingdom>();
         var enemyClanId = environment.CreateRegisteredObject<Clan>();
         var giverFortId = environment.CreateRegisteredObject<Settlement>();
@@ -295,6 +400,7 @@ public sealed class TheConquestOfSettlementIssueTests : IDisposable
                 var giverKingdom = Get<Kingdom>(giverKingdomId);
                 var giverClan = Get<Clan>(giverClanId);
                 var ownerClan = Get<Clan>(ownerClanId);
+                var otherClan = Get<Clan>(otherClanId);
                 var enemyKingdom = Get<Kingdom>(enemyKingdomId);
                 var enemyClan = Get<Clan>(enemyClanId);
                 var giverTown = Get<Town>(giverTownId);
@@ -304,9 +410,11 @@ public sealed class TheConquestOfSettlementIssueTests : IDisposable
                 {
                     giverClan._kingdom = giverKingdom;
                     ownerClan._kingdom = ownerInGiversKingdom ? giverKingdom : null;
+                    otherClan._kingdom = otherInGiversKingdom ? giverKingdom : null;
                     enemyClan._kingdom = enemyKingdom;
                     Get<Hero>(issueOwnerId).Clan = giverClan;
                     Get<Hero>(ownerHeroId).Clan = ownerClan;
+                    Get<Hero>(otherHeroId).Clan = otherClan;
 
                     Get<Settlement>(giverFortId).SetSettlementComponent(giverTown);
                     giverTown._ownerClan = giverClan;
@@ -332,13 +440,14 @@ public sealed class TheConquestOfSettlementIssueTests : IDisposable
         return partyId;
     }
 
-    private string PlaceGiverOnMap()
+    private string PlaceGiverOnMap(string? giverId = null)
     {
+        giverId ??= issueOwnerId;
         var partyId = environment.CreateRegisteredObject<MobileParty>();
         foreach (var instance in new[] { Server }.Concat(environment.Clients))
             instance.Call(() =>
             {
-                Assert.True(instance.ObjectManager.TryGetObject<Hero>(issueOwnerId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
                 using (new AllowedThread())
                 {

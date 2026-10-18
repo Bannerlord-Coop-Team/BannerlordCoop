@@ -91,3 +91,22 @@ internal static class TheConquestOfSettlementTimeoutPatch
     [HarmonyPrefix]
     private static bool Prefix() => CallOriginalPolicy.IsOriginalAllowedForOwnershipGate() || ModInformation.IsServer;
 }
+
+// The server times the quest out from its own tick, so the relation penalty needs the owner as the main hero
+[HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut))]
+internal static class TheConquestOfSettlementTimeoutOwnerPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(QuestBase __instance, out IDisposable __state)
+    {
+        __state = null;
+        if (__instance is Quest && ModInformation.IsServer && __instance.IsOngoing &&
+            ContainerProvider.TryResolve<ITheConquestOfSettlementService>(out var service))
+        {
+            service.TryOpenOwnerScope(IssueManager.GetIssueOfQuest(__instance), out __state);
+        }
+    }
+
+    [HarmonyFinalizer]
+    private static void Finalizer(IDisposable __state) => __state?.Dispose();
+}
