@@ -26,13 +26,13 @@ internal class VillageNeedsCraftingMaterialsFinalizationProofStrategy : IFinaliz
 
         if (MobileParty.MainParty.CurrentSettlement != village)
         {
-            Logger.Warning("The owner of {quest} is not in {settlement}", quest.StringId, village?.StringId);
+            Logger.Warning("The owner of {giver}'s quest is not in {settlement}", craftingQuest.QuestGiver.StringId, village?.StringId);
             return true;
         }
 
         if (PartyBase.MainParty.ItemRoster.GetItemNumber(craftingQuest._requestedItem) < craftingQuest._requestedItemAmount)
         {
-            Logger.Warning("The owner of {quest} does not carry the requested materials", quest.StringId);
+            Logger.Warning("The owner of {giver}'s quest does not carry the requested materials", craftingQuest.QuestGiver.StringId);
             return true;
         }
 

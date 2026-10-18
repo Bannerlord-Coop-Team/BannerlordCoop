@@ -21,6 +21,8 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssue;
@@ -59,6 +61,8 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
     private readonly string notableId;
     private readonly string settlementId;
     private readonly string villageId;
+    private readonly string boundTownSettlementId;
+    private readonly string boundTownId;
     private readonly string giverClanId;
     private readonly string kingdomId;
     private readonly string playerClanId;
@@ -79,6 +83,8 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         notableId = TestEnvironment.CreateRegisteredObject<Hero>();
         settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         villageId = TestEnvironment.CreateRegisteredObject<Village>();
+        boundTownSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        boundTownId = TestEnvironment.CreateRegisteredObject<Town>();
         giverClanId = TestEnvironment.CreateRegisteredObject<Clan>();
         kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         playerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
@@ -222,6 +228,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
 
         var amount = QuestOf(Server)._requestedItemAmount;
         var otherGoldBefore = 0;
+        var encounterSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
 
         Server.Call(() =>
         {
@@ -242,11 +249,23 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
             otherGoldBefore = otherHero.Gold;
         });
 
+        // Another player's encounter is what Settlement.CurrentSettlement reads first on the server
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(encounterSettlementId, out var encounterSettlement));
+
+            var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            encounter.EncounterSettlementAux = encounterSettlement;
+            Campaign.Current.PlayerEncounter = encounter;
+        });
+
         ClientA.Call(() =>
         {
             var quest = (Quest)QuestOfHere(ClientA);
             quest.Success();
         }, QuestLogTexts);
+
+        Server.Call(() => Campaign.Current.PlayerEncounter = null);
 
         var request = Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
         Assert.Equal((byte)VillageNeedsCraftingMaterialsBranch.SuccessByHandingOverMaterials, request.Proof);
@@ -274,6 +293,8 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
             Assert.Equal(otherGoldBefore, otherHero.Gold);
             Assert.Equal(0, ownerParty.ItemRoster.GetItemNumber(DefaultItems.IronIngot1));
             Assert.Equal(amount, settlement.Party.ItemRoster.GetItemNumber(DefaultItems.IronIngot1));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(encounterSettlementId, out var encounterSettlement));
+            Assert.Equal(0, encounterSettlement.Party.ItemRoster.GetItemNumber(DefaultItems.IronIngot1));
             Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out _));
         });
     }
@@ -384,6 +405,13 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
             Campaign.Current.IssueManager.DailyTick();
 
             Assert.True(notable.Issue.IsSolvingWithAlternative);
+
+            // The day before the troops return vanilla logs it, which only the owner may see
+            notable.Issue.AlternativeSolutionIssueEffectClearTime = CampaignTime.Now;
+            Campaign.Current.IssueManager.DailyTick();
+
+            Assert.Single(notable.Issue.JournalEntries);
+            Assert.True(notable.Issue._areIssueEffectsResolved);
         }, AlternativeSolutionLogTexts);
 
         Server.Call(() =>
@@ -474,8 +502,12 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         }
     }
 
-    [Fact]
-    public void AWarReplayedOnTheOwnersClientLeavesTheQuestToTheServer()
+    [Theory]
+    [InlineData("war")]
+    [InlineData("kingdom")]
+    [InlineData("raid")]
+    [InlineData("coercion")]
+    public void AWorldEventReplayedOnTheOwnersClientLeavesTheQuestToTheServer(string listener)
     {
         Accept();
         PutThePlayersInTheirOwnClan();
@@ -486,10 +518,29 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
             Assert.True(ClientA.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
             var quest = (Quest)QuestOfHere(ClientA);
 
+            // Vanilla reads the local main hero, which must be at war with the giver for the war listeners to act
             using (new AllowedThread())
             {
+                Hero.MainHero.Clan = playerClan;
                 FactionManager.DeclareWar(kingdom, playerClan);
-                quest.OnWarDeclared(kingdom, playerClan, DeclareWarAction.DeclareWarDetail.CausedByRebellion);
+            }
+
+            switch (listener)
+            {
+                case "war":
+                    quest.OnWarDeclared(kingdom, playerClan, DeclareWarAction.DeclareWarDetail.CausedByRebellion);
+                    break;
+                case "kingdom":
+                    quest.OnClanChangedKingdom(playerClan, null, null, ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+                    break;
+                case "raid":
+                    quest.OnRaidCompleted(BattleSideEnum.Attacker, (RaidEventComponent)RuntimeHelpers.GetUninitializedObject(typeof(RaidEventComponent)));
+                    break;
+                case "coercion":
+                    var mapEvent = (MapEvent)RuntimeHelpers.GetUninitializedObject(typeof(MapEvent));
+                    mapEvent._mapEventType = MapEvent.BattleTypes.IsForcingSupplies;
+                    quest.OnMapEventStarted(mapEvent, PartyBase.MainParty, null);
+                    break;
             }
 
             Assert.True(quest.IsOngoing);
@@ -585,11 +636,16 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
             Assert.True(instance.ObjectManager.TryGetObject<Village>(villageId, out var village));
             Assert.True(instance.ObjectManager.TryGetObject<Clan>(giverClanId, out var giverClan));
             Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(instance.ObjectManager.TryGetObject<Settlement>(boundTownSettlementId, out var boundTownSettlement));
+            Assert.True(instance.ObjectManager.TryGetObject<Town>(boundTownId, out var boundTown));
 
             using (new AllowedThread())
             {
+                // The village's map faction is its bound town's, which belongs to the giver's kingdom
+                boundTownSettlement.SetSettlementComponent(boundTown);
+                boundTown._ownerClan = giverClan;
                 settlement.SetSettlementComponent(village);
-                village.Bound = settlement;
+                village.Bound = boundTownSettlement;
                 village.Hearth = 650f;
                 notable.StayingInSettlement = settlement;
                 notable.Occupation = Occupation.RuralNotable;
