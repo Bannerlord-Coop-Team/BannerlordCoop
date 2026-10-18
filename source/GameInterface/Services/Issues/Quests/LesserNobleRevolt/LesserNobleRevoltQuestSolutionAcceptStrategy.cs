@@ -1,0 +1,170 @@
+﻿using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using Quest = TaleWorlds.CampaignSystem.Issues.LesserNobleRevoltIssueBehavior.LesserNobleRevoltIssueQuest;
+
+namespace GameInterface.Services.Issues.Quests.LesserNobleRevolt;
+
+internal sealed class LesserNobleRevoltQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
+{
+    private static readonly System.Reflection.FieldInfo RewardGoldField = AccessTools.Field(typeof(QuestBase), nameof(QuestBase.RewardGold));
+    private readonly IObjectManager objectManager;
+
+    public LesserNobleRevoltQuestSolutionAcceptStrategy(IObjectManager objectManager)
+    {
+        this.objectManager = objectManager;
+    }
+
+    public byte[] Capture(IssueBase issue)
+    {
+        if (!(issue.IssueQuest is Quest quest))
+        {
+            return Array.Empty<byte>();
+        }
+
+        var issueOwner = issue.IssueOwner;
+        return Write(
+            Id(quest._lesserNobleParty),
+            quest.RewardGold,
+            quest._rewardGold,
+            quest.QuestDueTime.NumTicks,
+            quest._persuasionTriedOnce,
+            quest._firstTalkIsDone,
+            quest._checkForEventEnd,
+            quest._goOutFromSettlementAfterHoursCounter,
+            quest._giveNotificationAfterHoursCounter,
+            quest._suitableVillagesToVisitList,
+            quest._visitedVillagesList);
+    }
+
+    public void Apply(IssueBase issue, byte[] captured)
+    {
+        if (!(issue.IssueQuest is Quest quest) || captured == null || captured.Length == 0)
+        {
+            return;
+        }
+
+        Read(captured, out var nobleId, out var reward, out var dialogueReward, out var due, out var persuasion,
+            out var firstTalk, out var waiting, out var departure, out var notification, out var suitable, out var visited);
+
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(nobleId, out var noble))
+        {
+            return;
+        }
+
+        quest._lesserNobleParty = noble;
+        RewardGoldField.SetValue(quest, reward);
+        quest._rewardGold = dialogueReward;
+        quest._persuasionTriedOnce = persuasion;
+        quest._firstTalkIsDone = firstTalk;
+        quest._checkForEventEnd = waiting;
+        quest._goOutFromSettlementAfterHoursCounter = departure;
+        quest._giveNotificationAfterHoursCounter = notification;
+        quest._suitableVillagesToVisitList = Resolve(suitable);
+        quest._visitedVillagesList = Resolve(visited);
+    }
+
+    private string Id(object value)
+    {
+        return value != null && objectManager.TryGetIdWithLogging(value, out var id) ? id : string.Empty;
+    }
+
+    private string[] Ids(IEnumerable<Settlement> values)
+    {
+        return values?.Select(Id).Where(id => !string.IsNullOrEmpty(id)).ToArray() ?? Array.Empty<string>();
+    }
+
+    private List<Settlement> Resolve(string[] ids)
+    {
+        return (ids ?? Array.Empty<string>())
+            .Select(id => objectManager.TryGetObjectWithLogging<Settlement>(id, out var settlement) ? settlement : null)
+            .Where(settlement => settlement != null)
+            .ToList();
+    }
+
+    private byte[] Write(
+        string nobleId,
+        int reward,
+        int dialogueReward,
+        long due,
+        bool persuasion,
+        bool firstTalk,
+        bool waiting,
+        int departure,
+        int notification,
+        IEnumerable<Settlement> suitable,
+        IEnumerable<Settlement> visited)
+    {
+        using (var stream = new MemoryStream())
+        using (var writer = new BinaryWriter(stream))
+        {
+            writer.Write(nobleId);
+            writer.Write(reward);
+            writer.Write(dialogueReward);
+            writer.Write(due);
+            writer.Write(persuasion);
+            writer.Write(firstTalk);
+            writer.Write(waiting);
+            writer.Write(departure);
+            writer.Write(notification);
+            WriteIds(writer, Ids(suitable));
+            WriteIds(writer, Ids(visited));
+            writer.Flush();
+            return stream.ToArray();
+        }
+    }
+
+    private static void WriteIds(BinaryWriter writer, string[] ids)
+    {
+        writer.Write(ids.Length);
+        foreach (var id in ids) writer.Write(id);
+    }
+
+    private static void Read(
+        byte[] captured,
+        out string nobleId,
+        out int reward,
+        out int dialogueReward,
+        out long due,
+        out bool persuasion,
+        out bool firstTalk,
+        out bool waiting,
+        out int departure,
+        out int notification,
+        out string[] suitable,
+        out string[] visited)
+    {
+        using (var stream = new MemoryStream(captured))
+        using (var reader = new BinaryReader(stream))
+        {
+            nobleId = reader.ReadString();
+            reward = reader.ReadInt32();
+            dialogueReward = reader.ReadInt32();
+            due = reader.ReadInt64();
+            persuasion = reader.ReadBoolean();
+            firstTalk = reader.ReadBoolean();
+            waiting = reader.ReadBoolean();
+            departure = reader.ReadInt32();
+            notification = reader.ReadInt32();
+            suitable = ReadIds(reader);
+            visited = ReadIds(reader);
+        }
+    }
+
+    private static string[] ReadIds(BinaryReader reader)
+    {
+        var count = reader.ReadInt32();
+        if (count < 0 || count > 1000) throw new InvalidDataException("Invalid Lesser Noble Revolt settlement count.");
+        var ids = new string[count];
+        for (var i = 0; i < count; i++) ids[i] = reader.ReadString();
+        return ids;
+    }
+}
