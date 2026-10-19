@@ -35,11 +35,15 @@ internal static class IssueManagerClientLifecyclePatches
                 return false;
             }
 
-            if (victim?.Issue == null ||
-                !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver) ||
-                !ownerResolver.TryResolveOwnerHero(victim.Issue, out var ownerHero))
+            if (victim?.Issue == null)
             {
                 return false;
+            }
+
+            if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver) ||
+                !ownerResolver.TryResolveOwnerHero(victim.Issue, out var ownerHero))
+            {
+                return true;
             }
 
             __state = new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo);
