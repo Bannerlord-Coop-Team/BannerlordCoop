@@ -7,20 +7,24 @@ namespace GameInterface.Services.Barters.Messages;
 public readonly struct RansomOfferAccepted : IEvent
 {
     public readonly Hero MainHero;
+    public readonly Hero RansomHero;
 
-    public RansomOfferAccepted(Hero mainHero)
+    public RansomOfferAccepted(Hero mainHero, Hero ransomHero)
     {
         MainHero = mainHero;
+        RansomHero = ransomHero;
     }
 }
 
 public readonly struct RansomOfferDeclined : IEvent
 {
     public readonly Hero MainHero;
+    public readonly Hero RansomHero;
 
-    public RansomOfferDeclined(Hero mainHero)
+    public RansomOfferDeclined(Hero mainHero, Hero ransomHero)
     {
         MainHero = mainHero;
+        RansomHero = ransomHero;
     }
 }
 
@@ -30,9 +34,13 @@ internal readonly struct NetworkRansomOfferAccepted : ICommand
     [ProtoMember(1)]
     public readonly string MainHeroId;
 
-    public NetworkRansomOfferAccepted(string mainHeroId)
+    [ProtoMember(2)]
+    public readonly string RansomHeroId;
+
+    public NetworkRansomOfferAccepted(string mainHeroId, string ransomHeroId)
     {
         MainHeroId = mainHeroId;
+        RansomHeroId = ransomHeroId;
     }
 }
 
@@ -42,9 +50,13 @@ internal readonly struct NetworkRansomOfferDeclined : ICommand
     [ProtoMember(1)]
     public readonly string MainHeroId;
 
-    public NetworkRansomOfferDeclined(string mainHeroId)
+    [ProtoMember(2)]
+    public readonly string RansomHeroId;
+
+    public NetworkRansomOfferDeclined(string mainHeroId, string ransomHeroId)
     {
         MainHeroId = mainHeroId;
+        RansomHeroId = ransomHeroId;
     }
 }
 

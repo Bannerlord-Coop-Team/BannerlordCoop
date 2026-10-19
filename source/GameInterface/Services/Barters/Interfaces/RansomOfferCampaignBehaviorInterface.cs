@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.CoopSessionData;
@@ -9,6 +10,7 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using LiteNetLib;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,11 +27,11 @@ public interface IRansomOfferCampaignBehaviorInterface : IGameAbstraction
 {
     void ConsiderRansomPrisoner(Hero hero);
     void HandleDeclineRansomOffer(Hero victim);
-    void AcceptRansomOffer(string playerHeroId);
-    void DeclineRansomOffer(string playerHeroId, bool fromServer = true);
+    void AcceptRansomOffer(string playerHeroId, string ransomHeroId);
+    void DeclineRansomOffer(string playerHeroId, string playerRespondedRansomHeroId = null);
     void OnPrisonersChangeInSettlement(FlattenedTroopRoster roster, Hero prisoner, bool takenFromDungeon);
     void HourlyTick();
-    void AddNewPlayerHeroId(string playerHeroId);
+    void AddNewPlayerHeroId(string playerHeroId, NetPeer peer);
     void SetClientRansomPrice(int ransomPrice);
     int GetClientRansomPrice();
 }
@@ -126,10 +128,14 @@ public class RansomOfferCampaignBehaviorInterface : IRansomOfferCampaignBehavior
         }
     }
 
-    public void AcceptRansomOffer(string playerHeroId)
+    public void AcceptRansomOffer(string playerHeroId, string ransomHeroId)
     {
         if (!TryGetRansomOfferBehavior(out var ransomOfferBehavior)) return;
         if (!ValidatePlayerHeroId(playerHeroId, out var playerData, out _)) return;
+
+        // The offer the player answered expired or was replaced before the response arrived
+        if (playerData.CurrentRansomHeroId != ransomHeroId) return;
+
         if (!TryGetCurrentRansomHero(playerHeroId, out var currentRansomHero)) return;
         if (!TryGetCurrentRansomPayer(playerHeroId, out var currentRansomPayer)) return;
 
@@ -168,14 +174,19 @@ public class RansomOfferCampaignBehaviorInterface : IRansomOfferCampaignBehavior
         //}
     }
 
-    public void DeclineRansomOffer(string playerHeroId, bool fromServer = true)
+    public void DeclineRansomOffer(string playerHeroId, string playerRespondedRansomHeroId = null)
     {
         if (!ValidatePlayerHeroId(playerHeroId, out var playerData, out _)) return;
+
+        // Skip a player's decline for an offer that expired or was replaced before the response arrived
+        bool fromPlayer = playerRespondedRansomHeroId != null;
+        if (fromPlayer && playerData.CurrentRansomHeroId != playerRespondedRansomHeroId) return;
+
         if (!TryGetCurrentRansomHero(playerHeroId, out var currentRansomHero)) return;
 
         // Vanilla fires this event on every DeclineRansomOffer call except for directly from player input.
         // Only publish the cancel message when coming from the server decline path.
-        if (fromServer)
+        if (!fromPlayer)
         {
             network.SendAll(new NetworkRansomOfferCancelled(playerHeroId, playerData.CurrentRansomHeroId));
         } 
@@ -226,14 +237,14 @@ public class RansomOfferCampaignBehaviorInterface : IRansomOfferCampaignBehavior
         }
     }
 
-    public void AddNewPlayerHeroId(string playerHeroId)
+    public void AddNewPlayerHeroId(string playerHeroId, NetPeer peer)
     {
         if (PlayerRansomOfferData.TryGetValue(playerHeroId, out var playerData))
         {
             // The offer notification only lives on the client, so a rejoining player needs a pending offer sent again
-            if (playerData.CurrentRansomHeroId != null)
+            if (ModInformation.IsServer && peer != null && playerData.CurrentRansomHeroId != null)
             {
-                network.SendAll(new NetworkRansomOfferSent(playerHeroId, playerData.CurrentRansomHeroId, playerData.CurrentRansomPrice));
+                network.Send(peer, new NetworkRansomOfferSent(playerHeroId, playerData.CurrentRansomHeroId, playerData.CurrentRansomPrice));
             }
             return;
         }

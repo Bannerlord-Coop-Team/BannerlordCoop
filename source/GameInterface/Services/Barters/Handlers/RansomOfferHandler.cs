@@ -4,6 +4,7 @@ using Common.Network;
 using GameInterface.Services.Barters.Interfaces;
 using GameInterface.Services.Barters.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -16,17 +17,20 @@ internal class RansomOfferHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
     private readonly IRansomOfferCampaignBehaviorInterface ransomOfferCampaignBehaviorInterface;
 
     public RansomOfferHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
+        IPlayerManager playerManager,
         IRansomOfferCampaignBehaviorInterface ransomOfferCampaignBehaviorInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
         this.ransomOfferCampaignBehaviorInterface = ransomOfferCampaignBehaviorInterface;
 
         messageBroker.Subscribe<RansomOfferAccepted>(Handle_RansomOfferAccepted);
@@ -58,8 +62,9 @@ internal class RansomOfferHandler : IHandler
         var data = obj.What;
 
         if (!objectManager.TryGetIdWithLogging(data.MainHero, out var mainHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.RansomHero, out var ransomHeroId)) return;
 
-        network.SendAll(new NetworkRansomOfferAccepted(mainHeroId));
+        network.SendAll(new NetworkRansomOfferAccepted(mainHeroId, ransomHeroId));
     }
 
     private void Handle_NetworkRansomOfferAccepted(MessagePayload<NetworkRansomOfferAccepted> obj)
@@ -68,9 +73,10 @@ internal class RansomOfferHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
 
-            ransomOfferCampaignBehaviorInterface.AcceptRansomOffer(data.MainHeroId);
+            ransomOfferCampaignBehaviorInterface.AcceptRansomOffer(data.MainHeroId, data.RansomHeroId);
         });
     }
 
@@ -79,8 +85,9 @@ internal class RansomOfferHandler : IHandler
         var data = obj.What;
 
         if (!objectManager.TryGetIdWithLogging(data.MainHero, out var mainHeroId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.RansomHero, out var ransomHeroId)) return;
 
-        network.SendAll(new NetworkRansomOfferDeclined(mainHeroId));
+        network.SendAll(new NetworkRansomOfferDeclined(mainHeroId, ransomHeroId));
     }
 
     private void Handle_NetworkRansomOfferDeclined(MessagePayload<NetworkRansomOfferDeclined> obj)
@@ -89,9 +96,10 @@ internal class RansomOfferHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
 
-            ransomOfferCampaignBehaviorInterface.DeclineRansomOffer(data.MainHeroId, false);
+            ransomOfferCampaignBehaviorInterface.DeclineRansomOffer(data.MainHeroId, data.RansomHeroId);
         });
     }
 

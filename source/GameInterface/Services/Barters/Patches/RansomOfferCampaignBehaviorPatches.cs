@@ -42,6 +42,14 @@ internal class RansomOfferCampaignBehaviorPatches
     }
 
     [HarmonyPatch(nameof(RansomOfferCampaignBehavior.OnRansomOffered))]
+    [HarmonyPrefix]
+    public static void OnRansomOfferedPrefix(RansomOfferCampaignBehavior __instance, Hero captiveHero)
+    {
+        // Track the offer the open inquiry is for, so the response can't apply to a newer offer the server sent meanwhile
+        __instance._currentRansomHero = captiveHero;
+    }
+
+    [HarmonyPatch(nameof(RansomOfferCampaignBehavior.OnRansomOffered))]
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> OnRansomOfferedTranspiler(IEnumerable<CodeInstruction> instructions)
     {
@@ -69,7 +77,7 @@ internal class RansomOfferCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool AcceptRansomOfferPrefix(RansomOfferCampaignBehavior __instance, int ransomPrice)
     {
-        MessageBroker.Instance.Publish(__instance, new RansomOfferAccepted(Hero.MainHero));
+        MessageBroker.Instance.Publish(__instance, new RansomOfferAccepted(Hero.MainHero, __instance._currentRansomHero));
 
         return false;
     }
@@ -79,7 +87,7 @@ internal class RansomOfferCampaignBehaviorPatches
     public static bool DeclineRansomOfferPrefix(RansomOfferCampaignBehavior __instance)
     {
         // Server path uses RansomOfferCampaignBehaviorInterface.DeclineRansomOffer directly instead.
-        MessageBroker.Instance.Publish(__instance, new RansomOfferDeclined(Hero.MainHero));
+        MessageBroker.Instance.Publish(__instance, new RansomOfferDeclined(Hero.MainHero, __instance._currentRansomHero));
 
         return false;
     }

@@ -7,6 +7,7 @@ using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Inventory.TradeSkills.Interfaces;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
 using GameInterface.Services.ObjectManager;
+using LiteNetLib;
 using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -80,7 +81,7 @@ internal class TradeDataInitializationHandler : IHandler
         GameThread.RunSafe(() =>
         {
             sessionTradePlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
-            ransomOfferCampaignBehaviorInterface.AddNewPlayerHeroId(obj.What.PlayerHeroId);
+            ransomOfferCampaignBehaviorInterface.AddNewPlayerHeroId(obj.What.PlayerHeroId, obj.Who as NetPeer);
         });
     }
 
