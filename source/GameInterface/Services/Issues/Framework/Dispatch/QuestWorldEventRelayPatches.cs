@@ -33,6 +33,13 @@ internal class QuestWorldEventRelayPatches
             clan, oldKingdom, newKingdom, actionDetail, showNotification);
     }
 
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnArmyDispersed))]
+    [HarmonyPostfix]
+    private static void OnArmyDispersedPostfix(Army army, Army.ArmyDispersionReason reason, bool isPlayersArmy)
+    {
+        Relay("OnArmyDispersed", new[] { typeof(Army), typeof(Army.ArmyDispersionReason), typeof(bool) }, army, reason, isPlayersArmy);
+    }
+
     private static void Relay(string listenerName, System.Type[] parameterTypes, params object[] arguments)
     {
         if (!ContainerProvider.TryResolve<IQuestEventRelay>(out var relay))
