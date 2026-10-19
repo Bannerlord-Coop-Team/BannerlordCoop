@@ -1086,6 +1086,38 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void LostStuckMissilePickup_ThatReplacedAnotherWeapon_TakesTheWholeProjectileBack()
+    {
+        RunWithStuckMissileClients((clients, picker, shooter, itemObject, weapon) =>
+        {
+            MissionWeapon round = StuckRound(weapon);
+            picker.Equipment[EquipmentIndex.Weapon0] = round;
+            Agent rival = AddPicker(clients, round);
+            ItemObject replacedItem = ObjectHelper.SkipConstructor<ItemObject>();
+            replacedItem.AddWeapon(new WeaponComponentData(null, WeaponClass.Arrow, default), null);
+            MissionWeapon replaced = new MissionWeapon(replacedItem, null, null);
+            replaced.Amount = 5;
+            SpawnedItemEntity pickerCopy = clients.Picker.LandMissile(shooter, weapon, missileIndex: 7, sceneId: 106);
+            SpawnedItemEntity rivalCopy = clients.Peer.LandMissile(shooter, weapon, missileIndex: 11, sceneId: 107);
+
+            // The picker's pickup dropped a quiver of 5 other arrows to equip the single round in its place.
+            clients.Picker.Broker.Publish(this, new WeaponPickedup(picker, pickerCopy, EquipmentIndex.Weapon0,
+                itemObject, null, null, new AgentEquipmentData(EquipmentIndex.Weapon0, EquipmentIndex.None, 0),
+                5, 1, 1, 0, true, round, replaced, default, SecondRankedPickupId));
+            clients.Peer.Broker.Publish(this,
+                CreateRankedMissilePickup(rival, rivalCopy, itemObject, round, FirstRankedPickupId));
+            NetworkWeaponPickedup pickerSent = SentPickup(clients, SecondRankedPickupId);
+            Assert.False(pickerSent.StackedOntoSlot);
+
+            clients.Picker.Broker.Publish(this, SentPickup(clients, FirstRankedPickupId));
+            Common.GameThread.Instance.Update(TimeSpan.Zero);
+
+            Assert.True(picker.Equipment[EquipmentIndex.Weapon0].IsEmpty);
+            Assert.Equal(1, rival.Equipment[EquipmentIndex.Weapon0].Amount);
+        });
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

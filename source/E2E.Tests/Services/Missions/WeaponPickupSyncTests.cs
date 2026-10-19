@@ -91,7 +91,7 @@ public class WeaponPickupSyncTests
             worldItemModifierId: "ItemModifier_world_item",
             pickupId: pickupId,
             isStuckMissile: true,
-            previousSlotEmpty: true);
+            stackedOntoSlot: true);
         PropertyInfo? property = typeof(NetworkWeaponPickedup).GetProperty(
             nameof(NetworkWeaponPickedup.CurrentEquipment));
         Assert.NotNull(property);
@@ -134,7 +134,7 @@ public class WeaponPickupSyncTests
         Assert.Equal("ItemModifier_world_item", received.WorldItemModifierId);
         Assert.Equal(pickupId, received.PickupId);
         Assert.True(received.IsStuckMissile);
-        Assert.True(received.PreviousSlotEmpty);
+        Assert.True(received.StackedOntoSlot);
     }
 
     [Fact]

@@ -78,7 +78,7 @@ namespace Missions.Agents.Messages
         public bool IsStuckMissile { get; }
 
         [ProtoMember(23)]
-        public bool PreviousSlotEmpty { get; }
+        public bool StackedOntoSlot { get; }
 
         public NetworkWeaponPickedup(
             Guid agentId, 
@@ -103,7 +103,7 @@ namespace Missions.Agents.Messages
             string worldItemModifierId = null,
             Guid pickupId = default,
             bool isStuckMissile = false,
-            bool previousSlotEmpty = false)
+            bool stackedOntoSlot = false)
         {
             AgentId = agentId;
             EquipmentIndex = equipmentIndex;
@@ -127,7 +127,7 @@ namespace Missions.Agents.Messages
             WorldItemModifierId = worldItemModifierId;
             PickupId = pickupId;
             IsStuckMissile = isStuckMissile;
-            PreviousSlotEmpty = previousSlotEmpty;
+            StackedOntoSlot = stackedOntoSlot;
         }
     }
 }

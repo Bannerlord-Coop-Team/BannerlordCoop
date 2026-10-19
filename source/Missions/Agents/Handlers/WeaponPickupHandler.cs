@@ -622,7 +622,7 @@ namespace Missions.Agents.Handlers
                 worldItemModifierId: worldItemModifierId,
                 pickupId: pickupId,
                 isStuckMissile: payload.WorldItem.IsStuckMissile(),
-                previousSlotEmpty: payload.PreviousSlotWeapon.IsEmpty);
+                stackedOntoSlot: StackedOntoSlot(payload));
 
             if (!TryClaimMissilePickup(message))
             {
@@ -919,11 +919,14 @@ namespace Missions.Agents.Handlers
                 return;
             }
 
-            int pickedAmount = Math.Max(0, pickup.ResultingSlotAmount - pickup.PreviousSlotAmount);
+            // A weapon the pickup replaced stays where vanilla dropped it, since that drop already synced as its own world item.
+            int pickedAmount = pickup.StackedOntoSlot
+                ? Math.Max(0, pickup.ResultingSlotAmount - pickup.PreviousSlotAmount)
+                : pickup.ResultingSlotAmount;
             short remaining = (short)Math.Max(0, current.Amount - pickedAmount);
             using (new AllowedThread())
             {
-                if (remaining == 0 && pickup.PreviousSlotEmpty)
+                if (remaining == 0 && !pickup.StackedOntoSlot)
                     agent.RemoveEquippedWeapon(slot);
                 else
                     agent.SetWeaponAmountInSlot(slot, remaining, enforcePrimaryItem: true);
@@ -934,6 +937,12 @@ namespace Missions.Agents.Handlers
                 pickup.AgentId,
                 pickup.WorldItemId);
         }
+
+        // True when the pickup added its rounds to the ammo already in the slot instead of equipping in place of it.
+        private static bool StackedOntoSlot(WeaponPickedup payload) =>
+            !payload.PreviousSlotWeapon.IsEmpty &&
+            ReferenceEquals(payload.PreviousSlotWeapon.Item, payload.ResultingSlotWeapon.Item) &&
+            payload.ResultingSlotAmount > payload.PreviousSlotAmount;
 
         private void RejectPendingIdentityPickups(
             Queue<PendingIdentityPickup> pending,
