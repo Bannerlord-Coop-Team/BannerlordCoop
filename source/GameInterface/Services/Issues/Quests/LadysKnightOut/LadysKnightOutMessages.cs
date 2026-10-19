@@ -5,7 +5,7 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Quests.LadysKnightOut;
 
-internal sealed class LadysKnightOutLordTriggered : IEvent
+public readonly struct LadysKnightOutLordTriggered : IEvent
 {
     public IssueBase Issue { get; }
     public bool Complete { get; }
@@ -48,14 +48,14 @@ public readonly struct NetworkLadysKnightOutLordAccepted : ICommand
     }
 }
 
-internal sealed class LadysKnightOutLogAdded : IEvent
+public readonly struct LadysKnightOutLogAdded : IEvent
 {
     public QuestBase Quest { get; }
     public JournalLog Log { get; }
     public LadysKnightOutLogAdded(QuestBase quest, JournalLog log) { Quest = quest; Log = log; }
 }
 
-internal sealed class LadysKnightOutIssueLogAdded : IEvent
+public readonly struct LadysKnightOutIssueLogAdded : IEvent
 {
     public IssueBase Issue { get; }
     public LadysKnightOutIssueLogAdded(IssueBase issue) { Issue = issue; }
