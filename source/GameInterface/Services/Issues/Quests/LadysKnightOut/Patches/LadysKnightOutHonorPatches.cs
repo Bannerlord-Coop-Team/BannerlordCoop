@@ -13,11 +13,21 @@ internal class LadysKnightOutHonorPatches
 {
     [HarmonyPatch(typeof(Quest), nameof(Quest.CriminalActionPerformedTowardsSettlement))]
     [HarmonyPrefix]
-    private static bool CrimePrefix(Quest __instance)
+    private static bool CrimePrefix(out int __state)
     {
-        if (ModInformation.IsClient) return false;
+        __state = ModInformation.IsClient || Campaign.Current?.PlayerTraitDeveloper == null
+            ? 0
+            : Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor);
+        return true;
+    }
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.CriminalActionPerformedTowardsSettlement))]
+    [HarmonyPostfix]
+    private static void CrimePostfix(Quest __instance, int __state)
+    {
+        if (ModInformation.IsClient) return;
+        Campaign.Current.PlayerTraitDeveloper?.SetPropertyValue(DefaultTraits.Honor, __state);
         if (ContainerProvider.TryResolve<ILadysKnightOutHonorProgress>(out var honor)) honor.ApplyPenalty(__instance);
-        return false;
     }
 }
 
