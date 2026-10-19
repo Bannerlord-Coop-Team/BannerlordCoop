@@ -5,6 +5,7 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
+using GameInterface.Services.Missions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -83,6 +84,7 @@ namespace GameInterface.Services.Kingdoms
         private readonly IKingdomDecisionOutcomeResolver outcomeResolver;
         private readonly IKingdomDecisionOutcomeOrder outcomeOrder;
         private readonly IKingdomDecisionRoundPresentation roundPresentation;
+        private readonly IMissionMembershipRegistry missionMembership;
         private readonly Timer votingRoundTimer;
         private int isDisposed;
 
@@ -92,7 +94,8 @@ namespace GameInterface.Services.Kingdoms
             IMessageBroker messageBroker,
             IKingdomDecisionOutcomeResolver outcomeResolver,
             IKingdomDecisionOutcomeOrder outcomeOrder,
-            IKingdomDecisionRoundPresentation roundPresentation)
+            IKingdomDecisionRoundPresentation roundPresentation,
+            IMissionMembershipRegistry missionMembership = null)
         {
             this.playerManager = playerManager;
             this.objectManager = objectManager;
@@ -100,6 +103,8 @@ namespace GameInterface.Services.Kingdoms
             this.outcomeResolver = outcomeResolver;
             this.outcomeOrder = outcomeOrder;
             this.roundPresentation = roundPresentation;
+            // Only the server container registers mission membership, and only the server runs rounds.
+            this.missionMembership = missionMembership;
 
             if (ModInformation.IsServer)
             {
@@ -495,8 +500,7 @@ namespace GameInterface.Services.Kingdoms
             voteData = NormalizeVoteData(voteData);
             if (!TryGetDecision(voteData, out KingdomDecision decision)) return false;
             if (!playerManager.TryGetPlayer(controllerId, out Player player)) return false;
-            if (!TryGetVoterClan(player, decision.Kingdom, out Clan voterClan)) return false;
-            if (!TryGetClanId(voterClan, out string voterClanId)) return false;
+            if (!TryGetVoterClanId(player, decision.Kingdom, out Clan voterClan, out string voterClanId)) return false;
 
             KingdomDecisionVoteState state = GetOrCreateState(decision);
             RefreshEligibleClanIds(state, decision);
@@ -1524,12 +1528,9 @@ namespace GameInterface.Services.Kingdoms
             foreach (var player in playerManager.Players)
             {
                 if (ModInformation.IsServer && !playerManager.IsConnected(player)) continue;
-                if (!TryGetVoterClan(player, decision.Kingdom, out Clan clan)) continue;
+                if (!TryGetVoterClanId(player, decision.Kingdom, out _, out string clanId)) continue;
 
-                if (TryGetClanId(clan, out string clanId))
-                {
-                    eligibleClanIds.Add(clanId);
-                }
+                eligibleClanIds.Add(clanId);
             }
             return eligibleClanIds;
         }
@@ -1607,6 +1608,13 @@ namespace GameInterface.Services.Kingdoms
             clan = hero?.Clan;
 
             return clan != null && clan.Leader == hero && clan.Kingdom == kingdom && !clan.IsUnderMercenaryService;
+        }
+
+        // Resolves the player's voting clan in the kingdom together with its network id.
+        private bool TryGetVoterClanId(Player player, Kingdom kingdom, out Clan clan, out string clanId)
+        {
+            clanId = null;
+            return TryGetVoterClan(player, kingdom, out clan) && TryGetClanId(clan, out clanId);
         }
 
         private bool TryGetClan(string clanId, Kingdom kingdom, out Clan clan)
@@ -1785,7 +1793,10 @@ namespace GameInterface.Services.Kingdoms
 
         private bool TryResolveExpiredRound(KingdomDecisionVoteState state, DateTime utcNow)
         {
-            if (!state.RoundDeadlineUtc.HasValue || utcNow < state.RoundDeadlineUtc.Value) return false;
+            if (!state.RoundDeadlineUtc.HasValue) return false;
+
+            HoldRoundForVotersInMission(state, utcNow);
+            if (utcNow < state.RoundDeadlineUtc.Value) return false;
 
             DescribeDecision(state.Decision, out string decisionType, out string proposerClanId);
             Logger.Information(
@@ -1801,6 +1812,58 @@ namespace GameInterface.Services.Kingdoms
             ApplyMissingAbstentions(state);
             ResolveDecision(state);
             return true;
+        }
+
+        // A voter in a mission cannot open the kingdom screen, so the round waits for them and gives a full window on return.
+        private void HoldRoundForVotersInMission(KingdomDecisionVoteState state, DateTime utcNow)
+        {
+            if (TryGetOutstandingVoterInMission(state, out string heldClanId))
+            {
+                state.IsHeldForMission = true;
+                if (utcNow < state.RoundDeadlineUtc.Value) return;
+
+                state.SetRoundDeadline(utcNow + VotingRoundDuration);
+                LogRoundDeadlineMoved(state, $"extended because clan {heldClanId} is in a mission");
+                return;
+            }
+
+            if (!state.IsHeldForMission) return;
+
+            state.IsHeldForMission = false;
+            state.SetRoundDeadline(utcNow + VotingRoundDuration);
+            LogRoundDeadlineMoved(state, "restarted because no unvoted voter is in a mission");
+        }
+
+        // Finds a voter who has not submitted a final ballot and is currently in a mission.
+        private bool TryGetOutstandingVoterInMission(KingdomDecisionVoteState state, out string clanId)
+        {
+            clanId = null;
+            if (missionMembership == null) return false;
+
+            foreach (Player player in playerManager.Players)
+            {
+                if (!missionMembership.IsControllerInMission(player.ControllerId)) continue;
+                if (!TryGetVoterClanId(player, state.Decision.Kingdom, out _, out string voterClanId)) continue;
+                if (!state.EligibleClanIds.Contains(voterClanId) || state.FinalVotes.ContainsKey(voterClanId)) continue;
+
+                clanId = voterClanId;
+                return true;
+            }
+            return false;
+        }
+
+        // Records why a server round deadline moved so a decision that stays open can be traced in the server log.
+        private void LogRoundDeadlineMoved(KingdomDecisionVoteState state, string reason)
+        {
+            DescribeDecision(state.Decision, out string decisionType, out _);
+            Logger.Information(
+                "Kingdom decision voting round for {KingdomId} decision {DecisionIndex} ({DecisionType}) {Reason}; " +
+                "new deadline {DeadlineUtc}",
+                state.KingdomId,
+                state.DecisionIndex,
+                decisionType,
+                reason,
+                state.RoundDeadlineUtc);
         }
 
         private static bool IsDecisionUnresolved(KingdomDecision decision)
@@ -2132,6 +2195,7 @@ namespace GameInterface.Services.Kingdoms
             public KingdomDecisionRoundStatusData LastPublishedRoundStatus { get; set; }
             public DateTime? RoundDeadlineUtc { get; private set; }
             public bool IsResolved { get; set; }
+            public bool IsHeldForMission { get; set; }
             public bool HasRoundSnapshot => RoundClans.Count > 0;
 
             public bool HasAllVotes => EligibleClanIds.Count > 0 && EligibleClanIds.All(clanId => FinalVotes.ContainsKey(clanId));
@@ -2161,6 +2225,12 @@ namespace GameInterface.Services.Kingdoms
             {
                 KingdomId = kingdomId;
                 DecisionIndex = decisionIndex;
+            }
+
+            // Replaces the server round deadline.
+            public void SetRoundDeadline(DateTime deadlineUtc)
+            {
+                RoundDeadlineUtc = deadlineUtc;
             }
 
             public void RefreshEligibleClanIds(HashSet<string> eligibleClanIds)
