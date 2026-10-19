@@ -1,13 +1,9 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
-using Serilog;
-using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -21,25 +17,23 @@ namespace GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory.Patches;
 [HarmonyPatch]
 internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<RaidAnEnemyTerritoryRaidCompletionPatch>();
-
     [HarmonyPatch(typeof(Quest), "OnRaidCompleted")]
     [HarmonyPrefix]
     private static bool OnRaidCompletedPrefix() => false;
 
-    [HarmonyPatch(typeof(RaidAnEnemyTerritoryIssueBehavior), nameof(RaidAnEnemyTerritoryIssueBehavior.RegisterEvents))]
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.RaidCompleted))]
     [HarmonyPostfix]
-    private static void RegisterEventsPostfix(RaidAnEnemyTerritoryIssueBehavior __instance)
+    private static void RaidCompletedPostfix(BattleSideEnum winnerSide, RaidEventComponent raidEvent)
     {
-        if (ModInformation.IsClient)
+        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
         {
             return;
         }
 
-        CampaignEvents.RaidCompletedEvent.AddNonSerializedListener(__instance, OnRaidCompleted);
+        dispatcher.RunAsOwners<Quest>(quest => ResolveForOwner(quest, winnerSide, raidEvent));
     }
 
-    private static void OnRaidCompleted(BattleSideEnum winnerSide, RaidEventComponent raidEvent)
+    private static void ResolveForOwner(Quest quest, BattleSideEnum winnerSide, RaidEventComponent raidEvent)
     {
         if (winnerSide != BattleSideEnum.Attacker || raidEvent?.MapEvent?.MapEventSettlement?.IsVillage != true ||
             raidEvent.MapEvent.MapEventSettlement.SettlementHitPoints != 0f || Campaign.Current?.IssueManager == null)
@@ -47,23 +41,9 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
             return;
         }
 
-        var issues = new List<IssueBase>();
-        foreach (var issue in Campaign.Current.IssueManager.Issues.Values)
+        foreach (var party in raidEvent.MapEvent.AttackerSide.Parties)
         {
-            issues.Add(issue);
-        }
-
-        foreach (var issue in issues)
-        {
-            if (issue.IssueQuest is not Quest quest || quest.IsFinalized)
-            {
-                continue;
-            }
-
-            foreach (var party in raidEvent.MapEvent.AttackerSide.Parties)
-            {
-                Resolve(quest, raidEvent.MapEvent.MapEventSettlement, party.Party?.MobileParty);
-            }
+            Resolve(quest, raidEvent.MapEvent.MapEventSettlement, party.Party?.MobileParty);
         }
     }
 
