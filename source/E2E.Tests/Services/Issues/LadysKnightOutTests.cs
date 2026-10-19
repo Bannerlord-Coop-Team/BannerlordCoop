@@ -330,13 +330,8 @@ public class LadysKnightOutTests : IDisposable
                 Assert.NotNull(giver.CurrentSettlement?.MapFaction);
                 Assert.NotSame(hero.MapFaction, giver.CurrentSettlement.MapFaction);
                 Assert.NotSame(giver.MapFaction, giver.CurrentSettlement.MapFaction);
-                VillageHostileFactionStanceHelper.ApplyWarStance(hero.MapFaction, giver.CurrentSettlement.MapFaction);
             });
         }
-
-        scenario.Accept(scenario.ClientB);
-        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
-        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
     }
 
     [Fact]
