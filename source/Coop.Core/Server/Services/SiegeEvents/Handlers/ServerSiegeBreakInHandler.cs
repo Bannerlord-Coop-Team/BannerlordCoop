@@ -11,7 +11,6 @@ using GameInterface.Services.SiegeEvents;
 using LiteNetLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -32,23 +31,18 @@ internal class ServerSiegeBreakInHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ISiegeBreakOut breakOut;
     private readonly ISendCoalescer coalescer;
-    private readonly Dictionary<MobileParty, Receipt> receipts = new();
-
-    private sealed class Receipt
-    {
-        public string RequestId;
-        public NetworkBreakInResult Result;
-    }
+    private readonly BreakInReceipts receipts;
 
     public ServerSiegeBreakInHandler(IMessageBroker messageBroker, INetwork network,
         IObjectManager objectManager, IPlayerManager playerManager, ISiegeBreakOut breakOut,
-        ISendCoalescer coalescer = null)
+        BreakInReceipts receipts, ISendCoalescer coalescer = null)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.breakOut = breakOut;
+        this.receipts = receipts;
         this.coalescer = coalescer;
         messageBroker.Subscribe<NetworkRequestBreakIn>(Handle);
     }
@@ -73,14 +67,21 @@ internal class ServerSiegeBreakInHandler : IHandler
             return rejected;
         }
 
-        // A resent request gets the first answer instead of losing the troops twice.
-        if (receipts.TryGetValue(party, out var receipt) && receipt.RequestId == request.RequestId)
-            return receipt.Result;
-
         if (!objectManager.TryGetObjectWithLogging<Settlement>(request.SettlementId, out var settlement) ||
             !objectManager.TryGetObjectWithLogging<SiegeEvent>(request.SiegeId, out var siege) ||
-            settlement.SiegeEvent != siege ||
-            !breakOut.CanJoinDefenders(party, settlement, alreadyEntered: false))
+            settlement.SiegeEvent != siege)
+        {
+            Logger.Warning("Rejecting break in request {RequestId} for party {PartyId} and settlement {SettlementId}",
+                request.RequestId, request.PartyId, request.SettlementId);
+            return rejected;
+        }
+
+        // Asking again for the same siege, even after leaving the menu, gets the first answer instead of losing troops twice.
+        if (receipts.TryGet(party, siege, out var receipt))
+            return new NetworkBreakInResult(request.RequestId, receipt.Result.Approved,
+                receipt.Result.CharacterIds, receipt.Result.Counts, receipt.Result.ArmyCasualties);
+
+        if (!breakOut.CanJoinDefenders(party, settlement, alreadyEntered: false))
         {
             Logger.Warning("Rejecting break in request {RequestId} for party {PartyId} and settlement {SettlementId}",
                 request.RequestId, request.PartyId, request.SettlementId);
@@ -94,8 +95,8 @@ internal class ServerSiegeBreakInHandler : IHandler
         {
             int losses = breakOut.GetBreakInCasualties(party, siege);
             // Cache before mutating so a failure part way through is not retried as a second sacrifice.
-            receipt = new Receipt { RequestId = request.RequestId, Result = rejected };
-            receipts[party] = receipt;
+            receipt = new BreakInReceipts.Receipt { Siege = siege, Result = rejected };
+            receipts.Set(party, receipt);
             var casualties = breakOut.ApplySacrifice(party, losses, out var armyCasualties);
             var elements = casualties.GetTroopRoster();
             var ids = new uint[elements.Count];

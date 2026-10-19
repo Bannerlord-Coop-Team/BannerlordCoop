@@ -2928,11 +2928,13 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                         playerParty.Party,
                         BattleSideEnum.Defender));
 
+                    PayBreakIn(client, playerParty, settlement);
                     Server.SimulateMessage(client.NetPeer, breakInRequest);
                 },
                 MapEventDisabledMethods);
         }
 
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakInResult>()).Approved);
         var settlementEntry = Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkPartyEnterSettlement>());
         Assert.Equal(
@@ -3022,6 +3024,72 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void BreakIn_AcceptedAgainAfterTheMenuChanged_LosesTroopsOnce()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+        PrepareClientSiegeEncounter(
+            client,
+            playerPartyId,
+            siege.SettlementId,
+            enterSettlement: false);
+        var troops = AddRegularTroops(playerMobilePartyId, 200);
+        Server.Call(() => Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(40));
+
+        // The player leaves the menu before the answer lands, so the first reply is never used.
+        using (new ReliableMessageDeliveryBlocker<NetworkBreakInResult>())
+            client.Call(() => InvokeMenuConsequence("break_in_menu_accept_on_consequence"), MapEventDisabledMethods);
+        AssertRegularTroops(playerMobilePartyId, troops - 40);
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(siege.SettlementId, out var settlement));
+            var reopened = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            reopened.EncounterSettlementAux = settlement;
+            Campaign.Current.PlayerEncounter = reopened;
+        });
+
+        client.Call(() => InvokeMenuConsequence("break_in_menu_accept_on_consequence"), MapEventDisabledMethods);
+
+        AssertRegularTroops(playerMobilePartyId, troops - 40);
+        client.Call(() =>
+        {
+            var behavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
+            Assert.Equal(40, behavior._breakInOutCasualties.TotalManCount);
+        });
+    }
+
+    [Fact]
+    public void BreakInContinuation_WithoutAPaidBreakIn_DoesNotEnterTheSettlement()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+        Server.NetworkSentMessages.Clear();
+
+        Server.Call(
+            () => Server.SimulateMessage(
+                client.NetPeer,
+                new NetworkRequestBreakInContinuation("unpaid", playerMobilePartyId, siege.SettlementId)),
+            MapEventDisabledMethods);
+
+        Assert.False(Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkBreakInContinuationApproved>()).Approved);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyEnterSettlement>());
+        AssertPartyOutsideSettlement(Server, playerMobilePartyId);
+    }
+
+    [Fact]
     public void PortBreakOut_ServerAppliesTroopLossesSoClientAndServerTotalsMatch()
     {
         var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
@@ -3075,6 +3143,15 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         var method = AccessTools.Method(typeof(EncounterGameMenuBehavior), methodName);
         Assert.NotNull(method);
         method.Invoke(Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>(), new object?[] { null });
+    }
+
+    // Call inside Server.Call. Pays the break in troops, which the server needs before the party may enter.
+    private void PayBreakIn(EnvironmentInstance client, MobileParty party, Settlement settlement)
+    {
+        Assert.True(Server.ObjectManager.TryGetHandle(party, out var partyId));
+        Assert.True(Server.ObjectManager.TryGetHandle(settlement, out var settlementId));
+        Assert.True(Server.ObjectManager.TryGetHandle(settlement.SiegeEvent, out var siegeId));
+        Server.SimulateMessage(client.NetPeer, new NetworkRequestBreakIn("paid-break-in", partyId, settlementId, siegeId));
     }
 
     private int AddRegularTroops(string mobilePartyId, int count)

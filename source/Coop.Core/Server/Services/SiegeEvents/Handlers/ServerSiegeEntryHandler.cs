@@ -44,6 +44,7 @@ internal class ServerSiegeEntryHandler : IHandler
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ISettlementInterface settlementInterface;
     private readonly ISiegeBreakOut breakOut;
+    private readonly BreakInReceipts breakInReceipts;
 
     public ServerSiegeEntryHandler(
         IMessageBroker messageBroker,
@@ -53,7 +54,8 @@ internal class ServerSiegeEntryHandler : IHandler
         ISettlementEncounterDistanceValidator distanceValidator,
         ISiegeEventInterface siegeEventInterface,
         ISettlementInterface settlementInterface,
-        ISiegeBreakOut breakOut)
+        ISiegeBreakOut breakOut,
+        BreakInReceipts breakInReceipts)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -63,6 +65,7 @@ internal class ServerSiegeEntryHandler : IHandler
         this.siegeEventInterface = siegeEventInterface;
         this.settlementInterface = settlementInterface;
         this.breakOut = breakOut;
+        this.breakInReceipts = breakInReceipts;
         messageBroker.Subscribe<NetworkRequestBesiegeSettlement>(HandleBesiege);
         messageBroker.Subscribe<NetworkRequestJoinSiegeCamp>(HandleJoin);
         messageBroker.Subscribe<NetworkRequestBreakSiege>(HandleBreak);
@@ -111,7 +114,9 @@ internal class ServerSiegeEntryHandler : IHandler
             return false;
 
         var alreadyEntered = ReferenceEquals(party.CurrentSettlement, settlement);
-        if (!breakOut.CanJoinDefenders(party, settlement, alreadyEntered))
+        // Getting in needs the troops paid in the break in first; a party already inside only gets the entry resent.
+        if (!breakOut.CanJoinDefenders(party, settlement, alreadyEntered) ||
+            (!alreadyEntered && !breakInReceipts.IsPaid(party, settlement.SiegeEvent)))
         {
             Logger.Warning("Rejecting break-in request {RequestId} for party {PartyId} and settlement {SettlementId}",
                 request.RequestId, request.PartyId, request.SettlementId);
@@ -130,7 +135,9 @@ internal class ServerSiegeEntryHandler : IHandler
             settlementInterface.PartyEnterSettlement(party, settlement);
         }
 
-        return ReferenceEquals(party.CurrentSettlement, settlement);
+        if (!ReferenceEquals(party.CurrentSettlement, settlement)) return false;
+        breakInReceipts.Remove(party);
+        return true;
     }
 
     private bool DoesPeerControlParty(

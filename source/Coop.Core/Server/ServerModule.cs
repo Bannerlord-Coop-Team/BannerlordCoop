@@ -24,6 +24,7 @@ using Coop.Core.Server.Services.Session;
 using Coop.Core.Server.Services.Settlements;
 using Coop.Core.Server.Services.Shutdown;
 using Coop.Core.Server.Services.Shutdown.Commands;
+using Coop.Core.Server.Services.SiegeEvents;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Core.Server.Services.Time;
 using Coop.Core.Server.States;
@@ -95,6 +96,7 @@ public class ServerModule : CommonModule
         builder.RegisterType<SettlementEncounterDistanceValidator>()
             .As<ISettlementEncounterDistanceValidator>()
             .InstancePerDependency();
+        builder.RegisterType<BreakInReceipts>().AsSelf().InstancePerLifetimeScope();
 
         // Graceful restart, in Release too.
         builder.RegisterType<ServerAdmissionGate>().As<IServerAdmissionGate>().InstancePerLifetimeScope();

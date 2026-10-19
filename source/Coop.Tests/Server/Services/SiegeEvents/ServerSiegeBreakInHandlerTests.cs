@@ -2,6 +2,7 @@
 using Common.Tests.Utils;
 using Common.Util;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
+using Coop.Core.Server.Services.SiegeEvents;
 using Coop.Core.Server.Services.SiegeEvents.Handlers;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using Coop.Tests.Mocks;
@@ -35,6 +36,7 @@ public class ServerSiegeBreakInHandlerTests : IDisposable
     private readonly SiegeEvent siege = ObjectHelper.SkipConstructor<SiegeEvent>();
     private readonly CharacterObject troop = ObjectHelper.SkipConstructor<CharacterObject>();
     private readonly NetPeer peer;
+    private readonly BreakInReceipts receipts = new();
     private readonly ServerSiegeBreakInHandler handler;
 
     public ServerSiegeBreakInHandlerTests()
@@ -72,7 +74,7 @@ public class ServerSiegeBreakInHandlerTests : IDisposable
                 casualties.AddToCounts(troop, losses);
                 return casualties;
             });
-        handler = new ServerSiegeBreakInHandler(broker, network, objects.Object, players.Object, action.Object);
+        handler = new ServerSiegeBreakInHandler(broker, network, objects.Object, players.Object, action.Object, receipts);
     }
 
     [Fact]
@@ -99,6 +101,21 @@ public class ServerSiegeBreakInHandlerTests : IDisposable
         Assert.Equal(new[] { true, true }, Results().Select(result => result.Approved));
         Assert.All(Results(), result => Assert.Equal(new[] { 40 }, result.Counts));
         Assert.Equal(160, party.MemberRoster.TotalRegulars);
+        action.Verify(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Once);
+    }
+
+    [Fact]
+    public void AcceptingAgainAfterLeavingTheMenu_ReusesTheFirstLossesAndKeepsThemPaid()
+    {
+        Send("first");
+        // The first reply came too late for the menu, so the client asks again with a new request.
+        Send("after-reject");
+
+        Assert.Equal(new[] { "first", "after-reject" }, Results().Select(result => result.RequestId));
+        Assert.All(Results(), result => Assert.True(result.Approved));
+        Assert.All(Results(), result => Assert.Equal(new[] { 40 }, result.Counts));
+        Assert.Equal(160, party.MemberRoster.TotalRegulars);
+        Assert.True(receipts.IsPaid(party, siege));
         action.Verify(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Once);
     }
 
