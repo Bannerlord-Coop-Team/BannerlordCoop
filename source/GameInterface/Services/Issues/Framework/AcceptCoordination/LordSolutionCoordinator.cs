@@ -172,8 +172,11 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         if (ModInformation.IsServer) return;
 
         var data = payload.What;
-        GameThread.RunSafe(() => pendingDecisions.RemoveWhere(issue =>
-                issue.StringId == data.IssueId),
+        GameThread.RunSafe(() =>
+        {
+            if (!objects.TryGetObject<Hero>(data.IssueOwnerId, out var owner)) return;
+            pendingDecisions.RemoveWhere(issue => issue.StringId == data.IssueId && issue.IssueOwner == owner);
+        },
             context: nameof(LordSolutionCoordinator));
     }
 
