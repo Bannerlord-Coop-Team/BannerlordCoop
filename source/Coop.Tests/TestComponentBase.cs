@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.UI.PlayerList;
+﻿using GameInterface.Services.Clans;
+using GameInterface.Services.UI.PlayerList;
 using Autofac;
 using Common.Messaging;
 using Common.Network;
@@ -21,9 +22,11 @@ using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapTracking;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Education.Interfaces;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Participation;
@@ -112,8 +115,11 @@ internal abstract class TestComponentBase
         RegisterMock<IAutoSyncPatchCollector>(builder);
         RegisterMock<IHeroInterface>(builder);
         RegisterMock<IModuleInfoProvider>(builder);
+        RegisterMock<IModuleNameProvider>(builder);
         RegisterMock<IRegistryManager>(builder);
         RegisterMock<IMapEventLoadCleaner>(builder);
+        RegisterMock<ILeaderlessClanResolver>(builder);
+        RegisterMock<IEmptyLordPartyResetter>(builder);
         RegisterMock<IHideoutResultEncounter>(builder);
         RegisterPlayerManagerMock(builder);
         RegisterMock<IPlayerPartyRestorer>(builder);
@@ -155,6 +161,7 @@ internal abstract class TestComponentBase
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);
         RegisterMock<IIssueOwnershipRegistry>(builder);
+        RegisterMock<IEducationCampaignBehaviorInterface>(builder);
         RegisterMock<IServerOptionsProvider>(builder);
         RegisterMock<ISteamBanList>(builder);
         RegisterMock<ISaveNotificationInterface>(builder);

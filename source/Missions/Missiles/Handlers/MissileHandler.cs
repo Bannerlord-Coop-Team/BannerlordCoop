@@ -38,6 +38,7 @@ public class MissileHandler : IMissileHandler
     private readonly ConcurrentDictionary<(Guid AgentId, long ShotSequence), byte> pendingReconstructions = new();
     private readonly ConcurrentDictionary<(Guid AgentId, long ShotSequence), ImpactHint> impactHints = new();
     private readonly Dictionary<int, (Guid AgentId, long ShotSequence)> localShots = new();
+    private readonly Dictionary<int, (Mission.Missile Missile, Guid AgentId, long ShotSequence)> reconstructedShots = new();
     private long nextShotSequence = CreateShotSequenceSeed();
     private volatile bool disposed;
     private const int MaxReconstructionAttempts = 30;
@@ -64,6 +65,8 @@ public class MissileHandler : IMissileHandler
         this.networkAgentRegistry = networkAgentRegistry;
         messageBroker.Subscribe<AgentShoot>(AgentShootSend);
         messageBroker.Subscribe<NetworkAgentShoot>(AgentShootReceive);
+        messageBroker.Subscribe<MissileItemDropped>(Handle_MissileItemDropped);
+        messageBroker.Subscribe<MissileRemoved>(Handle_MissileRemoved);
     }
 
     ~MissileHandler() => Dispose();
@@ -76,9 +79,12 @@ public class MissileHandler : IMissileHandler
         disposed = true;
         messageBroker.Unsubscribe<AgentShoot>(AgentShootSend);
         messageBroker.Unsubscribe<NetworkAgentShoot>(AgentShootReceive);
+        messageBroker.Unsubscribe<MissileItemDropped>(Handle_MissileItemDropped);
+        messageBroker.Unsubscribe<MissileRemoved>(Handle_MissileRemoved);
         pendingReconstructions.Clear();
         impactHints.Clear();
         localShots.Clear();
+        reconstructedShots.Clear();
     }
 
     private void AgentShootSend(MessagePayload<AgentShoot> payload)
@@ -182,6 +188,55 @@ public class MissileHandler : IMissileHandler
         agentId = Guid.Empty;
         shotSequence = 0;
         return false;
+    }
+
+    // [Game thread] A stuck missile became a pickable world item. The shooter's client and every client that
+    // replayed the shot each hold their own copy, so the shot identity names all of them with one world-item id
+    // and a pickup on any client retires every copy instead of being rejected as an unknown runtime item.
+    private void Handle_MissileItemDropped(MessagePayload<MissileItemDropped> payload)
+    {
+        MissileItemDropped dropped = payload.What;
+        if (disposed || dropped.Item == null) return;
+
+        // The missile index is finishing now, so any other entry left at it belongs to an older missile.
+        bool hasLocal = localShots.TryGetValue(dropped.MissileIndex, out var localShot);
+        bool hasReconstructed = reconstructedShots.TryGetValue(dropped.MissileIndex, out var reconstructedShot);
+        localShots.Remove(dropped.MissileIndex);
+        reconstructedShots.Remove(dropped.MissileIndex);
+
+        // A replayed shot may fly from a stand-in shooter, so it is matched by the missile object it was replayed
+        // as. That still rejects an entry left behind by an older missile at the same index.
+        (Guid AgentId, long ShotSequence) shot;
+        if (hasReconstructed && dropped.Missile != null && ReferenceEquals(reconstructedShot.Missile, dropped.Missile))
+            shot = (reconstructedShot.AgentId, reconstructedShot.ShotSequence);
+        else if (hasLocal && networkAgentRegistry.TryGetAgentInfo(dropped.Shooter, out var shooterInfo)
+            && localShot.AgentId == shooterInfo.AgentId)
+            shot = localShot;
+        else
+            return;
+
+        messageBroker.Publish(this, new MissileItemIdentified(
+            dropped.Item,
+            CreateMissileItemId(shot.AgentId, shot.ShotSequence)));
+    }
+
+    // [Game thread] The engine removed a missile. Hits, vanished misses and drops all end here, so whatever is
+    // still kept for this index belongs to a missile that no longer exists and must not outlive it.
+    private void Handle_MissileRemoved(MessagePayload<MissileRemoved> payload)
+    {
+        if (disposed) return;
+
+        localShots.Remove(payload.What.MissileIndex);
+        reconstructedShots.Remove(payload.What.MissileIndex);
+    }
+
+    internal static Guid CreateMissileItemId(Guid agentId, long shotSequence)
+    {
+        byte[] input = new byte[24];
+        agentId.ToByteArray().CopyTo(input, 0);
+        BitConverter.GetBytes(shotSequence).CopyTo(input, 16);
+        using (var md5 = System.Security.Cryptography.MD5.Create())
+            return new Guid(md5.ComputeHash(input));
     }
 
     public void RecordImpactHint(Guid attackerAgentId, long shotSequence, Guid victimAgentId,
@@ -305,6 +360,7 @@ public class MissileHandler : IMissileHandler
         Mission.Missile missile = new Mission.Missile(mission, index, missileEntity, agent, missileWeapon, null);
         mission._missilesList.Add(missile);
         mission._missilesDictionary[index] = missile;
+        reconstructedShots[index] = (missile, shot.AgentId, shot.ShotSequence);
 
         Logger.Debug("Reconstructed missile sequence {sequence}, source {sourceIndex}, as local {localIndex}",
             shot.ShotSequence, shot.MissileIndex, index);

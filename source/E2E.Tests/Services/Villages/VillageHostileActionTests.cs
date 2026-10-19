@@ -10,13 +10,16 @@ using Coop.Core.Server.Services.Time.Messages;
 using Common.Util;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapEventComponents.Messages;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Conversation;
@@ -48,12 +51,15 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
+using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
@@ -247,92 +253,100 @@ public class VillageHostileActionTests : MapEventTestBase
         });
     }
 
+    // Runs every single-party denial against its own village on one environment.
     [Fact]
-    public void ClientRequestForceVolunteers_WithZeroHearth_IsRejected()
+    public void ClientRequestHostileAction_WithInvalidPrecondition_IsRejected()
     {
         var client = Clients.First();
         RegisterPeer(client, "PlayerOne");
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var target = CreateVillageTarget();
 
+        var zeroHearth = CreateVillageTarget();
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(zeroHearth.SettlementId, out var settlement));
             using (new AllowedThread())
             {
                 settlement.Village.Hearth = 0;
             }
         });
+        AssertHostileActionDenied(client, VillageHostileAction.ForceVolunteers, mobilePartyId, zeroHearth.SettlementId,
+            VillageHostileActionDeniedReason.HearthTooLow);
 
-        Server.NetworkSentMessages.Clear();
+        var onCooldown = CreateVillageTarget();
+        AddServerCooldown(onCooldown.SettlementId);
+        AssertHostileActionDenied(client, VillageHostileAction.ForceSupplies, mobilePartyId, onCooldown.SettlementId,
+            VillageHostileActionDeniedReason.Cooldown);
 
-        RequestHostileAction(client, VillageHostileAction.ForceVolunteers, mobilePartyId, target.SettlementId);
+        var nonVillageId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        AssertHostileActionDenied(client, VillageHostileAction.Raid, mobilePartyId, nonVillageId,
+            VillageHostileActionDeniedReason.NonVillageSettlement);
 
-        var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
-        Assert.Equal(VillageHostileActionDeniedReason.HearthTooLow, denied.Reason);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
-    }
-
-    [Theory]
-    [InlineData(VillageHostileAction.ForceVolunteers)]
-    [InlineData(VillageHostileAction.ForceSupplies)]
-    public void ClientRequestForceAction_OnCooldown_IsRejected(VillageHostileAction action)
-    {
-        var client = Clients.First();
-        RegisterPeer(client, "PlayerOne");
-        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var target = CreateVillageTarget();
-        AddServerCooldown(target.SettlementId);
-
-        Server.NetworkSentMessages.Clear();
-
-        RequestHostileAction(client, action, mobilePartyId, target.SettlementId);
-
-        var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
-        Assert.Equal(VillageHostileActionDeniedReason.Cooldown, denied.Reason);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
-    }
-
-    [Fact]
-    public void ClientRequestRaid_ForNonVillageSettlement_IsRejected()
-    {
-        var client = Clients.First();
-        RegisterPeer(client, "PlayerOne");
-        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-
-        Server.NetworkSentMessages.Clear();
-
-        RequestHostileAction(client, VillageHostileAction.Raid, mobilePartyId, settlementId);
-
-        var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
-        Assert.Equal(VillageHostileActionDeniedReason.NonVillageSettlement, denied.Reason);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
-    }
-
-    [Fact]
-    public void ClientRequestRaid_ForNonNormalVillage_IsRejected()
-    {
-        var client = Clients.First();
-        RegisterPeer(client, "PlayerOne");
-        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var target = CreateVillageTarget();
-
+        var looted = CreateVillageTarget();
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Village>(target.VillageId, out var village));
+            Assert.True(Server.ObjectManager.TryGetObject<Village>(looted.VillageId, out var village));
             using (new AllowedThread())
             {
                 village.VillageState = Village.VillageStates.Looted;
             }
         });
+        AssertHostileActionDenied(client, VillageHostileAction.Raid, mobilePartyId, looted.SettlementId,
+            VillageHostileActionDeniedReason.InvalidVillageState);
 
+        // Changes the requester's faction, so it runs after the checks that need a hostile requester.
+        var ownFaction = CreateVillageTarget();
+        var clanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(ownFaction.SettlementId, out var settlement));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+
+            var boundSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var boundTown = GameObjectCreator.CreateInitializedObject<Town>();
+
+            using (new AllowedThread())
+            {
+                mobileParty.ActualClan = clan;
+                boundSettlement.SetSettlementComponent(boundTown);
+                boundTown.OwnerClan = clan;
+                settlement.Village.Bound = boundSettlement;
+            }
+
+            Assert.Equal(clan, mobileParty.MapFaction);
+            Assert.Equal(clan, settlement.MapFaction);
+        });
+        AssertHostileActionDenied(client, VillageHostileAction.Raid, mobilePartyId, ownFaction.SettlementId,
+            VillageHostileActionDeniedReason.OwnFaction);
+
+        var inactiveTarget = CreateVillageTarget();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
+            using (new AllowedThread())
+            {
+                mobileParty.IsActive = false;
+            }
+        });
+        AssertHostileActionDenied(client, VillageHostileAction.Raid, mobilePartyId, inactiveTarget.SettlementId,
+            VillageHostileActionDeniedReason.InvalidRequester);
+    }
+
+    // Sends one hostile action request and asserts the server denied it with the given reason.
+    private void AssertHostileActionDenied(
+        EnvironmentInstance client,
+        VillageHostileAction action,
+        string mobilePartyId,
+        string settlementId,
+        VillageHostileActionDeniedReason expectedReason)
+    {
         Server.NetworkSentMessages.Clear();
 
-        RequestHostileAction(client, VillageHostileAction.Raid, mobilePartyId, target.SettlementId);
+        RequestHostileAction(client, action, mobilePartyId, settlementId);
 
         var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
-        Assert.Equal(VillageHostileActionDeniedReason.InvalidVillageState, denied.Reason);
+        Assert.Equal(expectedReason, denied.Reason);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
     }
 
@@ -358,45 +372,6 @@ public class VillageHostileActionTests : MapEventTestBase
 
         var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
         Assert.Equal(VillageHostileActionDeniedReason.AlreadyInMapEvent, denied.Reason);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
-    }
-
-    [Fact]
-    public void ClientRequestRaid_ForOwnFactionVillage_IsRejected()
-    {
-        var client = Clients.First();
-        RegisterPeer(client, "PlayerOne");
-        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var target = CreateVillageTarget();
-        var clanId = TestEnvironment.CreateRegisteredObject<Clan>();
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
-            Assert.True(Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
-
-            var boundSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-            var boundTown = GameObjectCreator.CreateInitializedObject<Town>();
-
-            using (new AllowedThread())
-            {
-                mobileParty.ActualClan = clan;
-                boundSettlement.SetSettlementComponent(boundTown);
-                boundTown.OwnerClan = clan;
-                settlement.Village.Bound = boundSettlement;
-            }
-
-            Assert.Equal(clan, mobileParty.MapFaction);
-            Assert.Equal(clan, settlement.MapFaction);
-        });
-
-        Server.NetworkSentMessages.Clear();
-
-        RequestHostileAction(client, VillageHostileAction.Raid, mobilePartyId, target.SettlementId);
-
-        var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
-        Assert.Equal(VillageHostileActionDeniedReason.OwnFaction, denied.Reason);
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
     }
 
@@ -493,50 +468,6 @@ public class VillageHostileActionTests : MapEventTestBase
             AssertForceSuppliesGoldAndHitPointsOutcome(client, mobilePartyId, target.SettlementId);
             AssertCooldownSynced(client, target.SettlementId);
         }
-    }
-
-    [Fact]
-    public void ClientRequestRaid_WithForgedRequesterParty_IsRejected()
-    {
-        var client = Clients.First();
-        RegisterPeer(client, "PlayerOne");
-        CreatePlayerHeroParty("PlayerOne");
-        var (_, forgedMobilePartyId) = CreatePlayerHeroParty("PlayerTwo");
-        var target = CreateVillageTarget();
-
-        Server.NetworkSentMessages.Clear();
-
-        RequestHostileAction(client, VillageHostileAction.Raid, forgedMobilePartyId, target.SettlementId);
-
-        var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
-        Assert.Equal(VillageHostileActionDeniedReason.InvalidRequester, denied.Reason);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
-    }
-
-    [Fact]
-    public void ClientRequestRaid_WithInactiveRequesterParty_IsRejected()
-    {
-        var client = Clients.First();
-        RegisterPeer(client, "PlayerOne");
-        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var target = CreateVillageTarget();
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
-            using (new AllowedThread())
-            {
-                mobileParty.IsActive = false;
-            }
-        });
-
-        Server.NetworkSentMessages.Clear();
-
-        RequestHostileAction(client, VillageHostileAction.Raid, mobilePartyId, target.SettlementId);
-
-        var denied = Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionDenied>().Single();
-        Assert.Equal(VillageHostileActionDeniedReason.InvalidRequester, denied.Reason);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkVillageHostileActionStarted>());
     }
 
     [Fact]
@@ -1085,6 +1016,198 @@ public class VillageHostileActionTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
+    [Theory]
+    [InlineData(VillageHostileAction.ForceSupplies)]
+    [InlineData(VillageHostileAction.ForceVolunteers)]
+    public void ClientLeavesForcedVillage_RequestsFinalizeAndReentryWithoutSimulating(VillageHostileAction action)
+    {
+        var client = Clients.First();
+        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        RegisterPeer(client, "PlayerOne");
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var target = CreateVillageTarget();
+        string? mapEventId = null;
+
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                using (new AllowedThread())
+                {
+                    party.MemberRoster.AddToCounts(troop, 2);
+                    settlement.Party.MemberRoster.AddToCounts(troop, 2);
+                    party.CurrentSettlement = settlement;
+                    party.Position = new CampaignVec2(default, isOnLand: true);
+                }
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            var mapEvent = CreateHostileActionMapEvent(party.Party, settlement.Party, action);
+            mapEvent.Position = new CampaignVec2(default, isOnLand: true);
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+        }, MapEventDisabledMethods);
+
+        TestEnvironment.FlushCoalescer();
+        EnableHeadlessEncounterFinish(client);
+        var encounter = SetMockPlayerEncounter(client, mapEventId: mapEventId);
+        var model = new SimulationRoundProbe();
+        var router = client.Resolve<TestNetworkRouter>();
+        client.NetworkSentMessages.Clear();
+        router.AutoDrainReady = false;
+        try
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
+                using (new AllowedThread())
+                {
+                    Campaign.Current.MainParty = party;
+                }
+                encounter._encounteredParty = settlement.Party;
+                encounter.EncounterSettlementAux = settlement;
+                InstallSimulationModels(client, model);
+
+                Assert.False(CallOriginalPolicy.IsOriginalAllowed());
+                Assert.Same(party.Party, mapEvent.AttackerSide.LeaderParty);
+                Assert.Single(mapEvent.AttackerSide.Parties);
+                var attackerHealthy = party.Party.NumberOfHealthyMembers;
+                var defenderHealthy = settlement.Party.NumberOfHealthyMembers;
+                Assert.True(attackerHealthy >= 2);
+                Assert.True(defenderHealthy >= 2);
+                Assert.Equal(attackerHealthy, mapEvent.GetNumberOfInvolvedMen(BattleSideEnum.Attacker));
+                Assert.Equal(BattleState.None, mapEvent.BattleState);
+                Assert.False(mapEvent.IsRaid);
+                Assert.False(mapEvent.IsNavalMapEvent);
+                Assert.False(party.IsCurrentlyAtSea);
+                Assert.False(mapEvent.IsFinalized);
+                var behavior = new EncounterGameMenuBehavior();
+                var args = new MenuCallbackArgs((MenuContext)null, TextObject.GetEmpty());
+                Assert.True(behavior.game_menu_encounter_leave_on_condition(args));
+
+                // Keep the real finalization request pending while native Leave finishes locally.
+                behavior.game_menu_encounter_leave_on_consequence(args);
+
+                Assert.Equal(2, model.ParticipatingCountCalls);
+                Assert.Equal(0, model.RoundCalls);
+                Assert.Equal(BattleState.None, mapEvent.BattleState);
+                Assert.False(mapEvent.IsFinalized);
+                Assert.Equal(attackerHealthy, party.Party.NumberOfHealthyMembers);
+                Assert.Equal(defenderHealthy, settlement.Party.NumberOfHealthyMembers);
+                Assert.Same(settlement, party.CurrentSettlement);
+                Assert.Null(PlayerEncounter.Current);
+                Assert.True(client.ObjectManager.TryGetHandle(party, out var partyHandle));
+                Assert.True(client.ObjectManager.TryGetHandle(settlement, out var settlementHandle));
+                var finalize = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkMapEventFinalizeAttempted>());
+                var reentry = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+                Assert.Equal(mapEventId, finalize.MapEventId);
+                Assert.Equal(partyHandle, reentry.PartyId);
+                Assert.Equal(settlementHandle, reentry.SettlementId);
+                var requests = client.NetworkSentMessages.Messages.ToList();
+                Assert.True(requests.FindIndex(message => message is NetworkMapEventFinalizeAttempted)
+                    < requests.FindIndex(message => message is NetworkRequestStartSettlementEncounter));
+                Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkTroopKilled>());
+                Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkTroopWounded>());
+                Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkTroopScoreHit>());
+            }, MapEventDisabledMethods.Append(
+                // The headless test uses the default spawn setting without loading BannerlordConfig.
+                AccessTools.PropertyGetter(typeof(MBGameManager), nameof(MBGameManager.UnitSpawnPrioritization))));
+        }
+        finally
+        {
+            router.AutoDrainReady = true;
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false, false, false)]
+    [InlineData(true, false, false, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, false, false, true)]
+    [InlineData(true, false, false, true)]
+    public void NativeSimulationRound_PreservesServerAndAllowedOriginalExecution(
+        bool isServer, bool allowedThread, bool allowNonSync, bool internalCaller)
+    {
+        var context = CreateServerMapEvent();
+        var instance = isServer ? Server : Clients.First();
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            var model = new SimulationRoundProbe();
+            InstallSimulationModels(instance, model);
+            var policy = (TestPolicy)instance.Resolve<ISyncPolicy>();
+            var previous = policy.AllowOriginals;
+            policy.AllowOriginals = allowNonSync;
+            try
+            {
+                using var originalScope = allowedThread ? new AllowedThread() : null;
+                Action simulate = internalCaller
+                    ? mapEvent.SimulateBattleRoundInternal
+                    : () => mapEvent.SimulateBattleRound(1, 0);
+                if (isServer || allowedThread || allowNonSync)
+                {
+                    var error = Assert.Throws<InvalidOperationException>(simulate);
+                    Assert.Equal(SimulationRoundProbe.RoundEntered, error.Message);
+                    Assert.Equal(1, model.RoundCalls);
+                }
+                else
+                {
+                    simulate();
+                    Assert.Equal(0, model.RoundCalls);
+                }
+            }
+            finally
+            {
+                policy.AllowOriginals = previous;
+            }
+        }, MapEventDisabledMethods);
+    }
+
+    private static void InstallSimulationModels(EnvironmentInstance instance, SimulationRoundProbe model)
+    {
+        // Existing models take precedence over these fallbacks.
+        var models = new List<GameModel>
+        {
+            new DefaultTroopSupplierProbabilityModel(),
+            new DefaultCharacterStatsModel(),
+        };
+        models.AddRange(Campaign.Current.Models.GetGameModels());
+        models.Add(model);
+        var gameModels = new GameModels(models);
+        instance.GameInstance.Game._gameModelManagers[typeof(GameModels)] = gameModels;
+        Campaign.Current._gameModels = gameModels;
+    }
+
+    private sealed class SimulationRoundProbe : DefaultCombatSimulationModel
+    {
+        public const string RoundEntered = "native simulation round reached";
+        public int RoundCalls { get; private set; }
+        public int ParticipatingCountCalls { get; private set; }
+
+        public override int GetParticipatingTroopCount(MapEventSide side)
+        {
+            ParticipatingCountCalls++;
+            return base.GetParticipatingTroopCount(side);
+        }
+
+        public override (int defenderRounds, int attackerRounds) GetSimulationTicksForBattleRound(MapEvent mapEvent) => (1, 0);
+
+        public override void GetBattleAdvantage(MapEvent mapEvent, out ExplainedNumber defenderAdvantage, out ExplainedNumber attackerAdvantage)
+        {
+            RoundCalls++;
+            throw new InvalidOperationException(RoundEntered);
+        }
+    }
+
     [Fact]
     public void RaidAttackerVictoryFinalizeRequest_ResetsPlayersToVillageAndPreservesProgress()
     {
@@ -1428,30 +1551,6 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Fact]
-    public void SlowRaidMapEvent_WithPlayerParty_ServerUpdateIsAllowed()
-    {
-        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
-        var target = CreateVillageTarget();
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
-            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
-
-            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent.MapEventVisual = MockMapEventVisual();
-            mapEvent.Initialize(
-                mobileParty.Party,
-                settlement.Party,
-                new RaidEventComponent(mapEvent),
-                MapEvent.BattleTypes.Raid);
-
-            Assert.True(mapEvent.IsActiveSlowVillageRaid());
-            Assert.True(InvokeMapEventUpdatePrefix(mapEvent));
-        }, MapEventDisabledMethods);
-    }
-
-    [Fact]
     public void ActiveSlowRaid_WithPlayerInDeployment_ServerUpdateIsBlockedUntilMissionExit()
     {
         var client = Clients.First();
@@ -1526,6 +1625,8 @@ public class VillageHostileActionTests : MapEventTestBase
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var defenderTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var target = CreateVillageTarget();
+        // an offline raider's battle is resolved by the server (#3864), so the raider stays connected here
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", Clients.First().NetPeer);
 
         Server.Call(() =>
         {
@@ -2499,10 +2600,9 @@ public class VillageHostileActionTests : MapEventTestBase
         }
     }
 
+    // Only multi-player non-raid starts are rejected, so one single-player non-raid row covers the accept path.
     [Theory]
-    [InlineData(VillageHostileAction.Raid)]
     [InlineData(VillageHostileAction.ForceVolunteers)]
-    [InlineData(VillageHostileAction.ForceSupplies)]
     public void SinglePlayerHostileAction_AttackMissionStart_IsAllowed(VillageHostileAction action)
     {
         var client = Clients.First();
@@ -2696,7 +2796,6 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(VillageHostileAction.ForceVolunteers)]
     [InlineData(VillageHostileAction.ForceSupplies)]
     public void MultiPlayerNonRaidHostileAction_AttackMissionStart_IsRejected(VillageHostileAction action)
     {
@@ -2761,7 +2860,6 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(VillageHostileAction.ForceVolunteers)]
     [InlineData(VillageHostileAction.ForceSupplies)]
     public void MultiPlayerNonRaidHostileAction_BattleSimulationStart_IsRejected(VillageHostileAction action)
     {
@@ -3072,17 +3170,6 @@ public class VillageHostileActionTests : MapEventTestBase
         foreach (var leftClient in Clients)
         {
             AssertHostileActionJoinerLeft(leftClient, hostileAction.MapEventId, hostileAction.AttackerPartyId, joinerPartyId);
-        }
-    }
-
-    [Fact]
-    public void VillageRecovery_RegisterEventsRunsOnlyOnServer()
-    {
-        Server.Call(() => Assert.True(InvokeVillageHealRegisterEventsPrefix()));
-
-        foreach (var client in Clients)
-        {
-            client.Call(() => Assert.False(InvokeVillageHealRegisterEventsPrefix()));
         }
     }
 
@@ -3509,15 +3596,6 @@ public class VillageHostileActionTests : MapEventTestBase
         Assert.NotNull(prefix);
 
         return (bool)prefix.Invoke(null, new object[] { originalMethod })!;
-    }
-
-    private static bool InvokeVillageHealRegisterEventsPrefix()
-    {
-        var patchType = AccessTools.TypeByName("GameInterface.Services.Villages.Patches.DisableVillageHealCampaignBehavior");
-        var prefix = AccessTools.Method(patchType, "Prefix");
-        Assert.NotNull(prefix);
-
-        return (bool)prefix.Invoke(null, Array.Empty<object>())!;
     }
 
     private void RegisterPeer(EnvironmentInstance client, string controllerId)

@@ -1050,12 +1050,15 @@ internal class SettlementCommands
         {
             new ExpectedArgs("settlementNameOrId", "The exact settlement name or id; quote names containing spaces."),
             new ExpectedArgs("heroId", "The hero id."),
+            new ExpectedArgs("transfer", "gift (default) or barter.", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
             if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
-
+            var transfer = strings.Count > 2 ? strings[2] : "gift";
+            if (transfer != "gift" && transfer != "barter")
+                return Failed("Transfer must be gift or barter.");
 
             StringBuilder stringBuilder = new StringBuilder();
             foreach (var settlement in Settlement.All)
@@ -1066,7 +1069,8 @@ internal class SettlementCommands
 
                     if (hero == null) return Failed($"Unable to find hero by id: {strings[1]}");
 
-                    ChangeOwnerOfSettlementAction.ApplyByGift(settlement, hero);
+                    if (transfer == "barter") ChangeOwnerOfSettlementAction.ApplyByBarter(hero, settlement);
+                    else ChangeOwnerOfSettlementAction.ApplyByGift(settlement, hero);
                     stringBuilder.AppendLine($"{settlement.Name} ({settlement.StringId}) transferred to {hero.Name} ({hero.StringId}).");
                 }
             }

@@ -44,19 +44,6 @@ public class CampaignStateTests : IDisposable
         clientLogic = container.Resolve<IClientLogic>()!;
     }
 
-    [Fact(Skip = "Mission state not implemented and may be removed")]
-    public void EnterMissionState_Publishes_EnterMissionState()
-    {
-        // Arrange
-        var campaignState = clientLogic.SetState<CampaignState>();
-
-        // Act
-        clientLogic.EnterMissionState();
-
-        // Assert
-        //Assert.Single(TestMessageBroker.GetMessagesFromType<EnterMissionState>());
-    }
-
     [Fact]
     public void ReplayBatchAcknowledgement_WaitsForEarlierGameThreadApplicationAndEchoesId()
     {
@@ -137,22 +124,6 @@ public class CampaignStateTests : IDisposable
         _ = clientLogic.SetState<MainMenuState>();
 
         Assert.Equal(previousLimitCount, GameThread.Instance.FrameDrainLimitCount);
-    }
-
-    [Fact]
-    public void MissionStateEntered_Transitions_MissionState()
-    {
-        // Arrange
-        var campaignState = clientLogic.SetState<CampaignState>();
-
-        var payload = new MessagePayload<MissionStateEntered>(
-            this, new MissionStateEntered());
-
-        // Act
-        campaignState.Handle_MissionStateEntered(payload);
-
-        // Assert
-        Assert.IsType<MissionState>(clientLogic.State);
     }
 
     [Fact]
@@ -331,21 +302,6 @@ public class CampaignStateTests : IDisposable
             requestsBefore + 1,
             JoinSignalCount(JoinSyncSignal.BaselineRequested));
         Assert.Equal(0, JoinSignalCount(JoinSyncSignal.FinalBaselineApplied));
-    }
-
-    [Fact]
-    public void EnteringCampaignFromMission_DoesNotWaitForJoinCatchUpMarker()
-    {
-        var loadingInterface = clientComponent.Container.Resolve<Mock<ILoadingInterface>>();
-        var mapTimeTracker = clientComponent.Container.Resolve<Mock<IMapTimeTrackerInterface>>();
-        _ = clientLogic.SetState<MissionState>();
-        loadingInterface.Reset();
-
-        _ = clientLogic.SetState<CampaignState>();
-
-        loadingInterface.Verify(m => m.HideLoadingScreen(), Times.Once);
-        mapTimeTracker.Verify(m => m.ResetForCampaignJoin(), Times.Never);
-        Assert.Single(TestMessageBroker.GetMessagesFromType<PlayerKillFeedColorResendRequested>());
     }
 
     private void PublishJoinSignal(JoinSyncSignal signal)

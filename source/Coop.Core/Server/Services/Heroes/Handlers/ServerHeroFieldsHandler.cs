@@ -22,16 +22,10 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
             this.objectManager = objectManager;
             messageBroker.Subscribe<LastTimeStampChanged>(Handle);
             messageBroker.Subscribe<CharacterObjectChanged>(Handle);
-            messageBroker.Subscribe<HairTagsChanged>(Handle);
-            messageBroker.Subscribe<BeardTagsChanged>(Handle);
-            messageBroker.Subscribe<TattooTagsChanged>(Handle);
             messageBroker.Subscribe<HeroStateChanged>(Handle);
-            messageBroker.Subscribe<HeroLevelChanged>(Handle);
-            messageBroker.Subscribe<SpcDaysInLocationChanged>(Handle);
             messageBroker.Subscribe<DefaultAgeChanged>(Handle);
             messageBroker.Subscribe<BirthDayChanged>(Handle);
             messageBroker.Subscribe<PowerChanged>(Handle);
-            messageBroker.Subscribe<CultureChanged>(Handle);
             messageBroker.Subscribe<HomeSettlementChanged>(Handle);
             messageBroker.Subscribe<PregnantChanged>(Handle);
         }
@@ -54,16 +48,6 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
             if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
 
             network.SendAll(new NetworkHomeSettlementChanged(settlementId, heroId));
-        }
-
-        private void Handle(MessagePayload<CultureChanged> payload)
-        {
-            var data = payload.What;
-
-            if (!objectManager.TryGetIdWithLogging(data.Culture, out var cultureId)) return;
-            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
-
-            network.SendAll(new NetworkCultureChanged(cultureId, heroId));
         }
 
         private void Handle(MessagePayload<PowerChanged> payload)
@@ -93,24 +77,6 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
             network.SendAll(new NetworkDefaultAgeChanged(data.Age, heroId));
         }
 
-        private void Handle(MessagePayload<SpcDaysInLocationChanged> payload)
-        {
-            var data = payload.What;
-
-            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
-
-            network.SendAll(new NetworkSpcDaysInLocationChanged(data.Days, heroId));
-        }
-
-        private void Handle(MessagePayload<HeroLevelChanged> payload)
-        {
-            var data = payload.What;
-
-            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
-
-            network.SendAll(new NetworkHeroLevelChanged(data.HeroLevel, heroId));
-        }
-
         private void Handle(MessagePayload<HeroStateChanged> payload)
         {
             var data = payload.What;
@@ -118,33 +84,6 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
             if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
 
             network.SendAll(new NetworkHeroStateChanged(data.HeroState, heroId));
-        }
-
-        private void Handle(MessagePayload<TattooTagsChanged> payload)
-        {
-            var data = payload.What;
-
-            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
-
-            network.SendAll(new NetworkTattooTagsChanged(data.TattooTags, heroId));
-        }
-
-        private void Handle(MessagePayload<BeardTagsChanged> payload)
-        {
-            var data = payload.What;
-
-            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
-
-            network.SendAll(new NetworkBeardTagsChanged(data.BeardTags, heroId));
-        }
-
-        private void Handle(MessagePayload<HairTagsChanged> payload)
-        {
-            var data = payload.What;
-
-            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
-
-            network.SendAll(new NetworkHairTagsChanged(data.HairTags, heroId));
         }
 
         private void Handle(MessagePayload<CharacterObjectChanged> payload)
@@ -170,16 +109,10 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
         {
             messageBroker.Unsubscribe<LastTimeStampChanged>(Handle);
             messageBroker.Unsubscribe<CharacterObjectChanged>(Handle);
-            messageBroker.Unsubscribe<HairTagsChanged>(Handle);
-            messageBroker.Unsubscribe<BeardTagsChanged>(Handle);
-            messageBroker.Unsubscribe<TattooTagsChanged>(Handle);
             messageBroker.Unsubscribe<HeroStateChanged>(Handle);
-            messageBroker.Unsubscribe<HeroLevelChanged>(Handle);
-            messageBroker.Unsubscribe<SpcDaysInLocationChanged>(Handle);
             messageBroker.Unsubscribe<DefaultAgeChanged>(Handle);
             messageBroker.Unsubscribe<BirthDayChanged>(Handle);
             messageBroker.Unsubscribe<PowerChanged>(Handle);
-            messageBroker.Unsubscribe<CultureChanged>(Handle);
             messageBroker.Unsubscribe<HomeSettlementChanged>(Handle);
             messageBroker.Unsubscribe<PregnantChanged>(Handle);
         }

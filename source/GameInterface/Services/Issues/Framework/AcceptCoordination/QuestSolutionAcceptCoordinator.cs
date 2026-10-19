@@ -32,6 +32,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IIssueConversationTracker conversationTracker;
+    private readonly IIssueAcceptPreconditions acceptPreconditions;
 
     public QuestSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -40,7 +42,9 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         IIssueResolver issueResolver,
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager,
-        IControllerIdProvider controllerIdProvider)
+        IControllerIdProvider controllerIdProvider,
+        IIssueConversationTracker conversationTracker,
+        IIssueAcceptPreconditions acceptPreconditions)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -49,6 +53,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         this.ownership = ownership;
         this.playerManager = playerManager;
         this.controllerIdProvider = controllerIdProvider;
+        this.conversationTracker = conversationTracker;
+        this.acceptPreconditions = acceptPreconditions;
 
         messageBroker.Subscribe<QuestSolutionAcceptTriggered>(Handle_QuestSolutionAcceptTriggered);
         messageBroker.Subscribe<RequestQuestSolutionAccept>(Handle_RequestQuestSolutionAccept);
@@ -116,15 +122,20 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor) ||
             !issue.IsOngoingWithoutQuest ||
+            (issue.GetType().Name == "TheConquestOfSettlementIssue" &&
+                !conversationTracker.TryGet(data.IssueOwnerId, player.ControllerId, data.IssueId)) ||
+            !acceptPreconditions.CanTake(issue, playerHero, player.ControllerId) ||
             !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
         {
             Reject(peer, data);
             return;
         }
 
+        var dueTime = issue.IssueDueTime;
+
         try
         {
-            // Creates the quest object the owner's outcomes run on, it is never started so it registers no events
+            // Creates the quest object the owner's outcomes run on, unless its accept strategy starts it, it registers no events
             using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
             {
                 using (new IssueDifficultyOverride(data.DifficultyMultiplier))
@@ -139,6 +150,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         {
             Logger.Error(e, "Starting the quest of {issue} failed", data.IssueId);
             ownership.Remove(data.IssueOwnerId);
+            OfferAgain(issue, dueTime);
             Reject(peer, data);
             return;
         }
@@ -149,6 +161,33 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             player.ControllerId,
             data.DifficultyMultiplier,
             data.Captured));
+    }
+
+    // Undoes a half-finished accept on the server, so the refused client's reopened offer can still be taken
+    private static void OfferAgain(IssueBase issue, CampaignTime dueTime)
+    {
+        try
+        {
+            var strayQuest = issue.IssueQuest;
+
+            // set to null first so cancelling the quest does not finalize the issue
+            issue.IssueQuest = null;
+            issue._issueState = IssueBase.IssueState.Ongoing;
+            issue.IsTriedToSolveBefore = false;
+            issue.IssueDueTime = dueTime;
+
+            if (strayQuest != null && strayQuest.IsOngoing)
+            {
+                using (new AllowedThread())
+                {
+                    strayQuest.CompleteQuestWithCancel();
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e, "Offering {issue} again after a failed accept failed", issue.StringId);
+        }
     }
 
     private void Reject(NetPeer peer, RequestQuestSolutionAccept data)
@@ -213,6 +252,15 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
             // set to null first so cancelling the quest does not finalize the issue the winner owns
             issue.IssueQuest = null;
+
+            // This player never held the issue, so its ending must not be credited to them
+            issue.IsTriedToSolveBefore = false;
+
+            // With no winner the server still offers the issue, so undo the local accept
+            if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _))
+            {
+                issue._issueState = IssueBase.IssueState.Ongoing;
+            }
 
             using (new AllowedThread())
             {

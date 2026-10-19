@@ -37,8 +37,6 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
     /// The core PVP leak: the local client fights as Defender, the retreater "A" fields its party on the
     /// Attacker team (exactly how <c>PuppetSpawner.ResolvePuppetTeam</c> places an opponent's puppets). A's
     /// graceful retreat must despawn its own-party troops here regardless of which side they fight on.
-    /// RED today: <c>agent.Team.Side (Attacker) != playerSide (Defender)</c> skips every one of them —
-    /// they stay registered to a controller that no longer answers (inert, effectively unkillable puppets).
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-051")]
@@ -266,8 +264,6 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
     /// The retreater's HERO puppet, whose origin party did not resolve at spawn: the ownership-based despawn
     /// must still identify it through the hero belt-check (<c>character.IsHero</c> +
     /// <c>character.HeroObject == the retreater's hero</c>, resolved via IPlayerManager/IObjectManager).
-    /// RED today: skipped by the same local-side filter (live evidence: hero puppet
-    /// CharacterObject_Player2865 remained on the host after testclient's retreat).
     /// </summary>
     [Fact]
     [Trait("Requirement", "BR-051")]

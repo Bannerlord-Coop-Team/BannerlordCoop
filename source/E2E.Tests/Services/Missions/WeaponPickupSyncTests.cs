@@ -368,6 +368,43 @@ public class WeaponPickupSyncTests
     }
 
     [Fact]
+    public void MissionModule_PatchesNativeWorldItemDropCallbacks()
+    {
+        HarmonyPatchCategoryRegistration registration = Assert.Single(
+            MissionModule.CreatePatchCategoryRegistrations(),
+            candidate => candidate.Category == MissionModule.WeaponDropPatchCategory);
+        var harmony = new Harmony(
+            $"{nameof(MissionModule_PatchesNativeWorldItemDropCallbacks)}.{System.Guid.NewGuid()}");
+        // Native death drops and stuck missiles create their world items through these callbacks.
+        MethodInfo[] targets =
+        {
+            AccessTools.Method(typeof(Mission), nameof(Mission.SpawnWeaponAsDropFromAgentAux)),
+            AccessTools.Method(typeof(Mission), nameof(Mission.SpawnWeaponAsDropFromMissile)),
+            // Every missile ends here, whether it dropped, stuck in an agent or vanished.
+            AccessTools.Method(typeof(Mission), nameof(Mission.OnMissileRemoved)),
+        };
+
+        try
+        {
+            registration.Apply(harmony);
+
+            foreach (MethodInfo target in targets)
+            {
+                Patches patches = Harmony.GetPatchInfo(target);
+                Assert.NotNull(patches);
+                Assert.Contains(
+                    patches.Postfixes,
+                    patch => patch.owner == harmony.Id &&
+                        patch.PatchMethod.DeclaringType.Assembly == typeof(AgentDropPatch).Assembly);
+            }
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    [Fact]
     public void MissionModule_RegistersWeaponPickupPatchCategory()
     {
         HarmonyPatchCategoryRegistration registration = Assert.Single(

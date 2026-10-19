@@ -427,6 +427,7 @@ public class ServerAdmissionGateTests
             Mock.Of<INetwork>(),
             Mock.Of<IModuleValidator>(),
             Mock.Of<IModuleInfoProvider>(),
+            Mock.Of<IModuleNameProvider>(),
             Mock.Of<IPlayerManager>(),
             Mock.Of<IPlayerPartyRestorer>(),
             Mock.Of<IPlayerCreationRollback>(),

@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
@@ -34,6 +35,7 @@ public class ArmyNeedsSuppliesWarDeclaredTests : IDisposable
     private readonly string armyPartyId;
     private readonly string playerClanId;
     private readonly string ownerHeroId;
+    private readonly StubIssuePreconditions preconditions = new(typeof(Issue));
 
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
@@ -69,6 +71,7 @@ public class ArmyNeedsSuppliesWarDeclaredTests : IDisposable
     public void Dispose()
     {
         TestEnvironment.Dispose();
+        preconditions.Dispose();
     }
 
     [Theory]
@@ -148,6 +151,21 @@ public class ArmyNeedsSuppliesWarDeclaredTests : IDisposable
                 Assert.NotNull(lord.Issue);
             });
         }
+    }
+
+    [Fact]
+    public void AKingdomChangeOnTheServerIsHandedToTheArmyQuest()
+    {
+        using var calls = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom)));
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(lordClanId, out var lordClan));
+
+            CampaignEventDispatcher.Instance.OnClanChangedKingdom(lordClan, null, null, ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+        }, WarLogTexts);
+
+        Assert.Equal(1, calls.CountFor(Server));
     }
 
     private string RegisterPlayer(EnvironmentInstance client, string controllerId)
