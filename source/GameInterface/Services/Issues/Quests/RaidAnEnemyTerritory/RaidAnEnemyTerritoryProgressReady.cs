@@ -2,7 +2,7 @@
 
 namespace GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory;
 
-internal readonly struct RaidAnEnemyTerritoryProgressReady : IEvent
+public readonly struct RaidAnEnemyTerritoryProgressReady : IEvent
 {
     public readonly string IssueOwnerId;
     public readonly string IssueId;
