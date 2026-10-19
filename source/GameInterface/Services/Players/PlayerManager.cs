@@ -72,6 +72,17 @@ public interface IPlayerManager
     bool TryGetPlayer(NetPeer peer, out Player player);
 
     /// <summary>
+    /// Resolves the Player controlling the given hero.
+    /// </summary>
+    bool TryGetPlayer(Hero hero, out Player player);
+
+    /// <summary>
+    /// Checks whether a message sender is the peer controlling the given hero, logging a warning
+    /// when it isn't, so a handler can ignore a request made for another player's hero.
+    /// </summary>
+    bool IsSenderControllingHero(object sender, string heroId);
+
+    /// <summary>
     /// Checks whether the given player has a connected peer.
     /// </summary>
     bool IsConnected(Player player);
@@ -372,6 +383,22 @@ public class PlayerManager : IPlayerManager
     {
         return peerToPlayer.TryGetValue(peer, out player);
     }
+
+    public bool TryGetPlayer(Hero hero, out Player player)
+    {
+        player = null;
+        return hero != null && TryGetControlledObjectInfo(hero, out var control)
+            && TryGetPlayer(control.ObjectControllerId, out player);
+    }
+
+    public bool IsSenderControllingHero(object sender, string heroId)
+    {
+        if (sender is NetPeer peer && TryGetPlayer(peer, out var player) && player.HeroId == heroId) return true;
+
+        logger.Warning("Ignoring a request for hero {HeroId} from a peer that does not control it", heroId);
+        return false;
+    }
+
     public bool IsConnected(Player player)
     {
         return peerToPlayer.Any(kvp =>

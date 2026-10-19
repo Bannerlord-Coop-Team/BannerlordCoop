@@ -1427,6 +1427,8 @@ public class VillageHostileActionTests : MapEventTestBase
         var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
         var defenderTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var target = CreateVillageTarget();
+        // an offline raider's battle is resolved by the server (#3864), so the raider stays connected here
+        Server.Resolve<IPlayerManager>().SetPeer("PlayerOne", Clients.First().NetPeer);
 
         Server.Call(() =>
         {

@@ -351,7 +351,7 @@ public class GauntletWidgetAdapterTests
         Assert.DoesNotContain("ContentTruncated", JsonSerializer.Serialize(snapshot));
         if (changeTail) text.RealText = prefix + "y";
         var error = Assert.Throws<UiAutomationException>(() => ui.Act(snapshot.Snapshot, element.Reference, "text", "replacement", null));
-        Assert.Equal("not_interactable", error.Code);
+        Assert.Equal(changeTail ? "stale_reference" : "not_interactable", error.Code);
         Assert.Equal(prefix + (changeTail ? "y" : "x"), text.RealText);
         Assert.Null(context.EventManager.FocusedWidget);
     }
@@ -549,7 +549,7 @@ public class GauntletWidgetAdapterTests
     }
 
     [Fact]
-    public void DynamicUpperModalDescendantsInvalidateSelectedSnapshotEvenAwayFromButton()
+    public void DynamicUpperModalDescendantAwayFromButtonDoesNotInvalidateSelectedSnapshot()
     {
         var context = Context();
         var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
@@ -558,18 +558,139 @@ public class GauntletWidgetAdapterTests
         using var screen = new TestScreenScope(context);
         var upper = Context();
         var parent = new Widget(upper) { DoNotAcceptEvents = true, Size = new Vector2(800, 800) };
-        var modal = new Widget(upper) { DoNotAcceptEvents = true, IsVisible = false, Size = new Vector2(40, 40), Left = 400 };
+        var modal = new Widget(upper) { DoNotAcceptEvents = true, IsVisible = true, Size = new Vector2(40, 40), Left = 400 };
         upper.Root.DoNotAcceptEvents = true;
         parent.AddChild(modal);
         upper.Root.AddChild(parent);
         upper.Root.UpdatePosition();
+        modal.IsVisible = false;
         screen.AddLayer(upper, true, true);
         var ui = new LiveTestUi(adapter);
         var snapshot = ui.Inspect(null, 0, ui.Discover().Layers[0].Layer);
         var element = snapshot.Elements.Single(e => e.Widget.Native == button);
         modal.IsVisible = true;
+        int clicks = 0;
+        button.ClickEventHandlers.Add(_ => clicks++);
+        ui.Act(snapshot.Snapshot, element.Reference, "click", null, null);
+        Assert.Equal(1, clicks);
+    }
+
+    [Fact]
+    public void UpperLayerContentAndNonOverlappingGeometryChurnDoesNotInvalidateClick()
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        using var screen = new TestScreenScope(context);
+        var upper = Context();
+        upper.Root.DoNotAcceptEvents = true;
+        var label = new TextWidget(upper) { Text = "initial", Size = new Vector2(100, 40), Left = 400, DoNotAcceptEvents = true };
+        upper.Root.AddChild(label);
+        upper.Root.UpdatePosition();
+        screen.AddLayer(upper, true, true);
+        var ui = new LiveTestUi(adapter);
+        var snapshot = ui.Inspect(null, 0, ui.Discover().Layers[0].Layer);
+        var element = snapshot.Elements.Single(e => e.Widget.Native == button);
+        label.Text = "changed";
+        label.Left = 500;
+        upper.Root.UpdatePosition();
+        int clicks = 0;
+        button.ClickEventHandlers.Add(_ => clicks++);
+        ui.Act(snapshot.Snapshot, element.Reference, "click", null, null);
+        Assert.Equal(1, clicks);
+    }
+
+    [Fact]
+    public void OverlappingUpperWidgetGeometryChangeInvalidatesSelectedSnapshot()
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        using var screen = new TestScreenScope(context);
+        var upper = Context();
+        upper.Root.DoNotAcceptEvents = true;
+        var label = new TextWidget(upper) { Text = "initial", Size = new Vector2(100, 40), Left = 400, DoNotAcceptEvents = true };
+        upper.Root.AddChild(label);
+        upper.Root.UpdatePosition();
+        screen.AddLayer(upper, true, true);
+        var ui = new LiveTestUi(adapter);
+        var snapshot = ui.Inspect(null, 0, ui.Discover().Layers[0].Layer);
+        var element = snapshot.Elements.Single(e => e.Widget.Native == button);
+        label.Left = 0;
+        upper.Root.UpdatePosition();
         Assert.Equal("stale_reference", Assert.Throws<UiAutomationException>(() =>
             ui.Act(snapshot.Snapshot, element.Reference, "click", null, null)).Code);
+    }
+
+    [Fact]
+    public void OverlappingUpperWidgetTextChurnDoesNotInvalidateSelectedSnapshot()
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        using var screen = new TestScreenScope(context);
+        var upper = Context();
+        upper.Root.DoNotAcceptEvents = true;
+        var label = new TextWidget(upper) { Text = "initial", Size = new Vector2(100, 40), DoNotAcceptEvents = true };
+        upper.Root.AddChild(label);
+        upper.Root.UpdatePosition();
+        screen.AddLayer(upper, true, true);
+        var ui = new LiveTestUi(adapter);
+        var snapshot = ui.Inspect(null, 0, ui.Discover().Layers[0].Layer);
+        var element = snapshot.Elements.Single(e => e.Widget.Native == button);
+        label.Text = "changed";
+        int clicks = 0;
+        button.ClickEventHandlers.Add(_ => clicks++);
+        ui.Act(snapshot.Snapshot, element.Reference, "click", null, null);
+        Assert.Equal(1, clicks);
+    }
+
+    [Fact]
+    public void NewOverlappingUpperLayerInvalidatesSelectedSnapshot()
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { Size = new Vector2(40, 40) };
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        using var screen = new TestScreenScope(context);
+        var ui = new LiveTestUi(adapter);
+        var handle = ui.Discover().Layers[0].Layer;
+        var snapshot = ui.Inspect(null, 0, handle);
+        var element = snapshot.Elements.Single(e => e.Widget.Native == button);
+        screen.AddLayer(Context(), true, true);
+        Assert.Equal("stale_reference", Assert.Throws<UiAutomationException>(() =>
+            ui.Act(snapshot.Snapshot, element.Reference, "click", null, null)).Code);
+    }
+
+    [Fact]
+    public void LongButtonLabelCanBeClickedWhenUnchangedButRejectsChangedContent()
+    {
+        var context = Context();
+        var button = new ButtonWidget(context) { Size = new Vector2(200, 40) };
+        var label = new TextWidget(context) { Text = new string('a', 128) + "x" };
+        button.AddChild(label);
+        context.Root.AddChild(button);
+        context.Root.UpdatePosition();
+        using var screen = new TestScreenScope(context);
+        var ui = new LiveTestUi(adapter);
+        var snapshot = ui.Inspect(null, 0);
+        var element = snapshot.Elements.Single(e => e.Widget.Native == button);
+        Assert.True(element.Widget.ContentTruncated);
+        Assert.DoesNotContain(new string('a', 128) + "x", JsonSerializer.Serialize(snapshot));
+        int clicks = 0;
+        button.ClickEventHandlers.Add(_ => clicks++);
+        ui.Act(snapshot.Snapshot, element.Reference, "click", null, null);
+        Assert.Equal(1, clicks);
+
+        snapshot = ui.Inspect(null, 0);
+        element = snapshot.Elements.Single(e => e.Widget.Native == button);
+        label.Text = new string('a', 128) + "y";
+        Assert.Equal("stale_reference", Assert.Throws<UiAutomationException>(() =>
+            ui.Act(snapshot.Snapshot, element.Reference, "click", null, null)).Code);
+        Assert.Equal(1, clicks);
     }
 
     [Theory]

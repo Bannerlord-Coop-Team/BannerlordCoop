@@ -36,10 +36,43 @@ public class TradeHandlerTests
             (new ItemRosterElement(new EquipmentElement(shield, null), 2), 534)
         };
 
-        int result = TradeHandler.ReconcilePurchases(merchantRoster, merchantRosterData, partyRosterData, boughtItems, totalAmount: 534);
+        int result = TradeHandler.ReconcilePurchases(merchantRoster, ref merchantRosterData, ref partyRosterData, boughtItems, totalAmount: 534);
 
         Assert.Equal(534, result);
         Assert.Equal(2, partyRosterData[0].Amount);
+        Assert.Equal(2, AmountOf(merchantRosterData, new EquipmentElement(shield, null)));
+        Assert.Equal(1, AmountOf(merchantRosterData, new EquipmentElement(shield, thick)));
+    }
+
+    [Fact]
+    public void ReconcilePurchases_SetsMerchantStockFromLiveRoster_WhenAnotherPlayerBoughtFirst()
+    {
+        var shield = new ItemObject("old_horsemans_kite_shield");
+
+        // The client saw 7 and bought 2, but another player bought 3 meanwhile
+        var merchantRoster = new ItemRoster();
+        merchantRoster.AddToCounts(new EquipmentElement(shield, null), 4);
+
+        var merchantRosterData = new[]
+        {
+            new ItemRosterElement(new EquipmentElement(shield, null), 5)
+        };
+        var partyRosterData = new[]
+        {
+            new ItemRosterElement(new EquipmentElement(shield, null), 2)
+        };
+
+        var boughtItems = new List<(ItemRosterElement, int)>
+        {
+            (new ItemRosterElement(new EquipmentElement(shield, null), 2), 200)
+        };
+
+        int result = TradeHandler.ReconcilePurchases(merchantRoster, ref merchantRosterData, ref partyRosterData, boughtItems, totalAmount: 200);
+
+        // No shortfall, but the merchant keeps 4 - 2 = 2, not the 5 the client saw
+        Assert.Equal(200, result);
+        Assert.Equal(2, partyRosterData[0].Amount);
+        Assert.Equal(2, AmountOf(merchantRosterData, new EquipmentElement(shield, null)));
     }
 
     [Fact]
@@ -61,12 +94,101 @@ public class TradeHandlerTests
             (new ItemRosterElement(new EquipmentElement(shield, null), 4), 400)
         };
 
-        int result = TradeHandler.ReconcilePurchases(merchantRoster, merchantRosterData, partyRosterData, boughtItems, totalAmount: 400);
+        int result = TradeHandler.ReconcilePurchases(merchantRoster, ref merchantRosterData, ref partyRosterData, boughtItems, totalAmount: 400);
 
         // 1 of 4 available: 3 short, refunded at 100 each, so only 100 is paid and 1 is kept.
+        // The merchant sold its only shield, so it has none left.
         Assert.Equal(100, result);
         Assert.Equal(1, partyRosterData[0].Amount);
+        Assert.Equal(0, AmountOf(merchantRosterData, new EquipmentElement(shield, null)));
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReconcilePurchases_ConservesStock_WhenMerchantEntryIsMissing(bool withTombstone)
+    {
+        var shield = new ItemObject("old_horsemans_kite_shield");
+
+        var merchantRoster = new ItemRoster();
+        merchantRoster.AddToCounts(new EquipmentElement(shield, null), 3);
+
+        // The client bought every shield it saw, so its merchant proposal has no shield entry left
+        var merchantRosterData = withTombstone ? new[] { default(ItemRosterElement) } : System.Array.Empty<ItemRosterElement>();
+        var partyRosterData = new[]
+        {
+            new ItemRosterElement(new EquipmentElement(shield, null), 5)
+        };
+
+        var boughtItems = new List<(ItemRosterElement, int)>
+        {
+            (new ItemRosterElement(new EquipmentElement(shield, null), 5), 100)
+        };
+
+        int result = TradeHandler.ReconcilePurchases(merchantRoster, ref merchantRosterData, ref partyRosterData, boughtItems, totalAmount: 100);
+
+        // 3 of 5 available: the buyer keeps all 3 and 40 is refunded for the 2 missing.
+        // Those 2 were bought by someone else, so the merchant ends with none.
+        Assert.Equal(60, result);
+        Assert.Equal(3, partyRosterData[0].Amount);
+        Assert.Equal(0, AmountOf(merchantRosterData, new EquipmentElement(shield, null)));
+        Assert.Equal(withTombstone ? 1 : 0, merchantRosterData.Length);
+    }
+
+    [Fact]
+    public void ReconcilePurchases_NoRefund_WhenPartyEntryIsMissing()
+    {
+        var shield = new ItemObject("old_horsemans_kite_shield");
+
+        var merchantRoster = new ItemRoster();
+        merchantRoster.AddToCounts(new EquipmentElement(shield, null), 3);
+
+        // The bought shields left the party roster (equipped during the trade), so none can be taken back
+        var merchantRosterData = System.Array.Empty<ItemRosterElement>();
+        var partyRosterData = new[] { default(ItemRosterElement) };
+
+        var boughtItems = new List<(ItemRosterElement, int)>
+        {
+            (new ItemRosterElement(new EquipmentElement(shield, null), 5), 100)
+        };
+
+        int result = TradeHandler.ReconcilePurchases(merchantRoster, ref merchantRosterData, ref partyRosterData, boughtItems, totalAmount: 100);
+
+        Assert.Equal(100, result);
+        Assert.Empty(merchantRosterData);
+        Assert.Equal(0, partyRosterData[0].Amount);
+    }
+
+    [Fact]
+    public void ReconcilePurchases_RefundsOnlyWhatThePartyStillHolds()
+    {
+        var shield = new ItemObject("old_horsemans_kite_shield");
+
+        var merchantRoster = new ItemRoster();
+        merchantRoster.AddToCounts(new EquipmentElement(shield, null), 3);
+
+        var merchantRosterData = System.Array.Empty<ItemRosterElement>();
+        var partyRosterData = new[]
+        {
+            new ItemRosterElement(new EquipmentElement(shield, null), 1)
+        };
+
+        var boughtItems = new List<(ItemRosterElement, int)>
+        {
+            (new ItemRosterElement(new EquipmentElement(shield, null), 5), 100)
+        };
+
+        int result = TradeHandler.ReconcilePurchases(merchantRoster, ref merchantRosterData, ref partyRosterData, boughtItems, totalAmount: 100);
+
+        // 2 short but the party only holds 1: that 1 is taken back and 20 is refunded.
+        // The buyer still keeps 4 against the 3 in stock, so the merchant has none left.
+        Assert.Equal(80, result);
+        Assert.Equal(0, partyRosterData[0].Amount);
+        Assert.Equal(0, AmountOf(merchantRosterData, new EquipmentElement(shield, null)));
+    }
+
+    private static int AmountOf(ItemRosterElement[] rosterData, EquipmentElement element) =>
+        rosterData.Where(e => e.EquipmentElement.IsEqualTo(element)).Sum(e => e.Amount);
 
     [Fact]
     public void TryResolveLeftRemainder_SkipsEmptyTombstoneSlots()
