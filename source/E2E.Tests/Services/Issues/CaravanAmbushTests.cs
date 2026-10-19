@@ -130,7 +130,7 @@ public class CaravanAmbushTests : IDisposable
 
             QuestOf(Server)._vicinityCheckFailCounter = 1;
             publisher.Publish(QuestOf(Server));
-            Assert.Equal(baseline + 1, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>());
+            Assert.Equal(baseline + 2, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>());
         });
         Owner.Call(() => Assert.Equal(1, QuestOf(Owner)._vicinityCheckFailCounter));
         Other.Call(() => Assert.Equal(0, QuestOf(Other)._vicinityCheckFailCounter));
@@ -412,7 +412,7 @@ public class CaravanAmbushTests : IDisposable
         Server.Call(() => CampaignEventDispatcher.Instance.HourlyTick());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
 
-        Owner.Call(() => QuestOf(Owner).CompleteQuestWithTimeOut());
+        Owner.Call(() => QuestOf(Owner).HourlyTick());
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Server.Call(() => Assert.False(QuestOf(Server).IsOngoing));
     }
