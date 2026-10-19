@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Configuration;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
@@ -68,7 +69,7 @@ namespace GameInterface.Services.Kingdoms
 
     public class KingdomDecisionVoteManager : IKingdomDecisionVoteManager, IDisposable
     {
-        internal static readonly TimeSpan VotingRoundDuration = TimeSpan.FromSeconds(60);
+        internal TimeSpan VotingRoundDuration => TimeSpan.FromSeconds((modConfig.Data.ModOptions?.KingdomDecisionVoteTimeoutSeconds ?? ModOptionsData.DefaultKingdomDecisionVoteTimeoutSeconds));
         private static readonly TimeSpan VotingRoundTickInterval = TimeSpan.FromSeconds(1);
         private static readonly ILogger Logger = LogManager.GetLogger(typeof(KingdomDecisionVoteManager));
         private readonly Dictionary<KingdomDecision, KingdomDecisionVoteState> DecisionStates = new Dictionary<KingdomDecision, KingdomDecisionVoteState>();
@@ -77,6 +78,7 @@ namespace GameInterface.Services.Kingdoms
         private readonly List<PendingKingdomDecisionVote> PendingRemoteVotes = new List<PendingKingdomDecisionVote>();
         private readonly List<KingdomDecisionRoundStatusData> PendingRoundStatuses = new List<KingdomDecisionRoundStatusData>();
 
+        private readonly IModConfig modConfig;
         private readonly IPlayerManager playerManager;
         private readonly IObjectManager objectManager;
         private readonly IMessageBroker messageBroker;
@@ -92,8 +94,10 @@ namespace GameInterface.Services.Kingdoms
             IMessageBroker messageBroker,
             IKingdomDecisionOutcomeResolver outcomeResolver,
             IKingdomDecisionOutcomeOrder outcomeOrder,
-            IKingdomDecisionRoundPresentation roundPresentation)
+            IKingdomDecisionRoundPresentation roundPresentation,
+            IModConfig modConfig)
         {
+            this.modConfig = modConfig;
             this.playerManager = playerManager;
             this.objectManager = objectManager;
             this.messageBroker = messageBroker;

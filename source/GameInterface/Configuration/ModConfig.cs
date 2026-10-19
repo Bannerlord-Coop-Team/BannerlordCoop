@@ -1,4 +1,4 @@
-using Common.Logging;
+﻿using Common.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
@@ -108,6 +108,12 @@ internal sealed class ModConfig : IModConfig
             var loaded = JsonConvert.DeserializeObject<ModConfigData>(File.ReadAllText(path), MakeSettings())
                 ?? new ModConfigData();
             Logger.Information("mod-config.json loaded ({Path})", path);
+            if (loaded.ModOptions != null && loaded.ModOptions.KingdomDecisionVoteTimeoutSeconds <= 0)
+            {
+                Logger.Warning("mod-config.json: modOptions.kingdomDecisionVoteTimeoutSeconds must be positive; using {DefaultSeconds}",
+                    ModOptionsData.DefaultKingdomDecisionVoteTimeoutSeconds);
+                loaded.ModOptions.KingdomDecisionVoteTimeoutSeconds = ModOptionsData.DefaultKingdomDecisionVoteTimeoutSeconds;
+            }
             WarnAllUnknownKeys(loaded);
             return loaded;
         }

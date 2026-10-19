@@ -39,6 +39,25 @@ public class ModConfigTests : IDisposable
 
     private IModConfig NewModConfig() => new ModConfig(tempDir);
 
+    [Theory]
+    [InlineData("{}", 60)]
+    [InlineData("{\"kingdomDecisionVoteTimeoutSeconds\":36000}", 36000)]
+    [InlineData("{\"kingdomDecisionVoteTimeoutSeconds\":0}", 60)]
+    [InlineData("{\"kingdomDecisionVoteTimeoutSeconds\":-1}", 60)]
+    [InlineData("{\"kingdomDecisionVoteTimeoutSeconds\":\"invalid\"}", 60)]
+    [InlineData("{\"kingdomDecisionVoteTimeoutSeconds\":2147483648}", 60)]
+    public void DecisionVoteTimeout_LoadsOrFallsBackWithoutLosingOtherSettings(string json, int expected)
+    {
+        json = "{\"modOptions\":" + json.Insert(1, "\"autoPauseEnabled\":false" + (json.Length > 2 ? "," : "")) + "}";
+        File.WriteAllText(ConfigPath, json);
+
+        var data = NewModConfig().Data;
+
+        Assert.Equal(expected, data.ModOptions.KingdomDecisionVoteTimeoutSeconds);
+        Assert.False(data.ModOptions.AutoPauseEnabled);
+        Assert.True(data.ModOptions.UnknownKeys == null || !data.ModOptions.UnknownKeys.ContainsKey("kingdomDecisionVoteTimeoutSeconds"));
+    }
+
     [Fact]
     public void MissingFile_IsSeededFromTheShippedTemplate()
     {

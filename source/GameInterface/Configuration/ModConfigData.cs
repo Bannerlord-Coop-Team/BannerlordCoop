@@ -68,6 +68,11 @@ public enum DifficultyLevel
 
 public sealed class ModOptionsData
 {
+    public const int DefaultKingdomDecisionVoteTimeoutSeconds = 60;
+
+    /// <summary>Kingdom decision vote timeout in seconds.</summary>
+    public int KingdomDecisionVoteTimeoutSeconds { get; set; } = DefaultKingdomDecisionVoteTimeoutSeconds;
+
     public bool? VoiceEnabled { get; set; }
 
     public int? BattleSize { get; set; }

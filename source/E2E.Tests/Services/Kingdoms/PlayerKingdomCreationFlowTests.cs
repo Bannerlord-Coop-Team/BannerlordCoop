@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Configuration;
 using Common.Commands;
 using Common.Network;
 using Common.Messaging;
@@ -1289,7 +1290,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             GetConcreteVoteManager(Server).ProcessVotingRounds(
-                DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1));
+                DateTime.UtcNow + GetConcreteVoteManager(Server).VotingRoundDuration + TimeSpan.FromSeconds(1));
         });
 
         Assert.Single(
@@ -2613,9 +2614,12 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
     }
 
-    [Fact]
-    public void KingdomDecisionVotes_MissingVoteTimesOutAfterVotingWindow()
+    [Theory]
+    [InlineData(60)]
+    [InlineData(36000)]
+    public void KingdomDecisionVotes_MissingVoteTimesOutAfterVotingWindow(int timeoutSeconds)
     {
+        Server.Call(() => Server.Resolve<IModConfig>().Data.ModOptions.KingdomDecisionVoteTimeoutSeconds = timeoutSeconds);
         var player = CreateSyncedPlayerContext();
         var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
@@ -2665,8 +2669,11 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
 
+            GetConcreteVoteManager(Server).ProcessVotingRounds(DateTime.UtcNow.AddSeconds(timeoutSeconds * 0.9));
+            Assert.Same(decision, Assert.Single(kingdom.UnresolvedDecisions));
+
             GetConcreteVoteManager(Server).ProcessVotingRounds(
-                DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration);
+                DateTime.UtcNow + GetConcreteVoteManager(Server).VotingRoundDuration);
 
             Assert.Empty(kingdom.UnresolvedDecisions);
         });
@@ -2712,7 +2719,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
 
             GetConcreteVoteManager(Server).ProcessVotingRounds(
-                DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration);
+                DateTime.UtcNow + GetConcreteVoteManager(Server).VotingRoundDuration);
 
             Assert.Empty(kingdom.UnresolvedDecisions);
         });
@@ -3009,7 +3016,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             }
             Assert.True(decisionStates.Contains(decision));
 
-            voteManager.ProcessVotingRounds(DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration);
+            voteManager.ProcessVotingRounds(DateTime.UtcNow + GetConcreteVoteManager(Server).VotingRoundDuration);
 
             Assert.False(decisionStates.Contains(decision));
             Assert.Empty(voteManager.GetDecisionDebugInfo(kingdom));
