@@ -2,7 +2,6 @@
 using Common.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
-using TaleWorlds.Core;
 using HarmonyLib;
 using Quest = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssueQuest;
 
@@ -24,12 +23,13 @@ internal class LadysKnightOutHonorPatches
 [HarmonyPatch]
 internal class LadysKnightOutHonorMirrorPatches
 {
-    [HarmonyPatch(typeof(PropertyOwner<TraitObject>), nameof(PropertyOwner<TraitObject>.SetPropertyValue))]
+    [HarmonyPatch(typeof(TraitLevelingHelper), "AddTraitXp")]
     [HarmonyPostfix]
-    private static void MirrorClientHonor(PropertyOwner<TraitObject> __instance, TraitObject attribute, int value)
+    private static void MirrorClientHonor(TraitObject trait)
     {
-        if (ModInformation.IsServer || AllowedThread.IsThisThreadAllowed() || !ReferenceEquals(Campaign.Current?.PlayerTraitDeveloper, __instance) ||
-            attribute != DefaultTraits.Honor) return;
-        if (ContainerProvider.TryResolve<ILadysKnightOutHonorProgress>(out var honor)) honor.MirrorClientHonor(value);
+        if (ModInformation.IsServer || AllowedThread.IsThisThreadAllowed() || trait != DefaultTraits.Honor ||
+            Campaign.Current?.PlayerTraitDeveloper == null) return;
+        if (ContainerProvider.TryResolve<ILadysKnightOutHonorProgress>(out var honor))
+            honor.MirrorClientHonor(Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
     }
 }
