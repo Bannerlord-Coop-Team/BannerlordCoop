@@ -79,7 +79,7 @@ internal sealed class LadysKnightOutLordHandler : IHandler
                 if (data.Complete)
                 {
                     if (!issue.IsSolvingWithLordSolution || !ownership.TryGetOwner(data.GiverId, data.IssueId, out var owner) ||
-                        owner != player.ControllerId || hero.Clan.Influence < issue.NeededInfluenceForLordSolution) return;
+                        owner != player.ControllerId) return;
                     issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
                     dispatcher.After(issue, IssueOutcome.QuestSuccess);
                     return;
