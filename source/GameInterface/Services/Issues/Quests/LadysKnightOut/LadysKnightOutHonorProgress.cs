@@ -22,7 +22,6 @@ internal interface ILadysKnightOutHonorProgress
     void Seed(IssueBase issue, int xp);
     void MirrorClientHonor(int xp);
     void MirrorServerHonor(string controllerId, int xp);
-    void Clear(IssueBase issue);
     void ApplyPenalty(QuestBase quest);
 }
 
@@ -63,11 +62,6 @@ internal sealed class LadysKnightOutHonorProgress : ILadysKnightOutHonorProgress
     public void MirrorServerHonor(string controllerId, int xp)
     {
         if (ModInformation.IsServer) honorXp[controllerId] = xp;
-    }
-
-    public void Clear(IssueBase issue)
-    {
-        if (owners.TryGetOwnerControllerId(issue, out var controllerId)) honorXp.Remove(controllerId);
     }
 
     public void ApplyPenalty(QuestBase quest)
@@ -160,25 +154,5 @@ internal sealed class LadysKnightOutHonorHandler : IHandler
                     Campaign.Current.PlayerTraitDeveloper?.SetPropertyValue(DefaultTraits.Honor, data.Xp);
             }
         }, context: nameof(LadysKnightOutHonorHandler));
-    }
-}
-
-internal sealed class LadysKnightOutHonorOutcomeHandler : IHandler
-{
-    private readonly IMessageBroker broker;
-    private readonly ILadysKnightOutHonorProgress progress;
-
-    public LadysKnightOutHonorOutcomeHandler(IMessageBroker broker, ILadysKnightOutHonorProgress progress)
-    {
-        this.broker = broker;
-        this.progress = progress;
-        broker.Subscribe<IssueOutcomeObserved>(HandleOutcome);
-    }
-
-    public void Dispose() => broker.Unsubscribe<IssueOutcomeObserved>(HandleOutcome);
-
-    private void HandleOutcome(MessagePayload<IssueOutcomeObserved> payload)
-    {
-        if (ModInformation.IsServer && payload.What.Issue is Issue) progress.Clear(payload.What.Issue);
     }
 }
