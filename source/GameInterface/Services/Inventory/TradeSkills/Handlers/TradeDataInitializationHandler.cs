@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Barters.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Inventory.TradeSkills.Interfaces;
 using GameInterface.Services.Inventory.TradeSkills.Messages;
@@ -23,6 +24,7 @@ internal class TradeDataInitializationHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionTradePlayerDataInterface sessionTradePlayerDataInterface;
+    private readonly IRansomOfferCampaignBehaviorInterface ransomOfferCampaignBehaviorInterface;
 
     private TradePlayerData tradePlayerData;
 
@@ -30,12 +32,14 @@ internal class TradeDataInitializationHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionTradePlayerDataInterface sessionTradePlayerDataInterface)
+        ISessionTradePlayerDataInterface sessionTradePlayerDataInterface,
+        IRansomOfferCampaignBehaviorInterface ransomOfferCampaignBehaviorInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionTradePlayerDataInterface = sessionTradePlayerDataInterface;
+        this.ransomOfferCampaignBehaviorInterface = ransomOfferCampaignBehaviorInterface;
 
         messageBroker.Subscribe<InitializeClientTradeData>(Handle);
         messageBroker.Subscribe<PlayerHeroChanged>(Handle);
@@ -76,6 +80,7 @@ internal class TradeDataInitializationHandler : IHandler
         GameThread.RunSafe(() =>
         {
             sessionTradePlayerDataInterface.AddPlayerKeys(obj.What.PlayerHeroId);
+            ransomOfferCampaignBehaviorInterface.AddNewPlayerHeroId(obj.What.PlayerHeroId);
         });
     }
 
