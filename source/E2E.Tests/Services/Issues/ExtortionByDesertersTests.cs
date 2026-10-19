@@ -588,10 +588,8 @@ public class ExtortionByDesertersTests : IDisposable
         });
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void RaidRepelledWithoutTheOwner_CancelsOnlyWhenTheDesertersAreGone(bool desertersSurvive)
+    [Fact]
+    public void RaidRepelledWithoutTheOwner_KeepsTheQuestForTheSurvivingDeserters()
     {
         Accept();
         var quest = (Quest)scenario.QuestOf(Server);
@@ -602,20 +600,36 @@ public class ExtortionByDesertersTests : IDisposable
             deserters.SetPartyUsedByQuest(true);
             var raid = CreateBattle(deserters, quest.QuestSettlement.Party, true);
             raid._battleState = BattleState.DefenderVictory;
-            deserters.IsActive = desertersSurvive;
             CampaignEventDispatcher.Instance.OnMapEventEnded(raid);
-            Assert.Equal(desertersSurvive, quest.IsOngoing);
+            Assert.True(quest.IsOngoing);
             Assert.Equal(State.DesertersMovingToSettlement, quest._currentState);
         }, TextLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
-        if (desertersSurvive)
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    [Fact]
+    public void BattleWithoutTheOwnerThatDestroysTheDeserters_CancelsTheQuest()
+    {
+        Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        Server.Call(() =>
         {
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        }
-        else
+            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var victors = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            quest._deserterMobileParty = deserters;
+            deserters.SetPartyUsedByQuest(true);
+            var battle = CreateBattle(deserters, victors.Party, false);
+            battle._battleState = BattleState.DefenderVictory;
+            battle.FinalizeEventAux();
+            Assert.False(deserters.IsActive);
+            Assert.False(quest.IsOngoing);
+        }, TextLinks.Concat(new[]
         {
-            Assert.Equal(IssueOutcome.QuestCancel,
-                Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
-        }
+            AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
+            AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"),
+        }).ToArray());
+        Assert.Equal(IssueOutcome.QuestCancel,
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
 
     private static MapEvent CreateBattle(MobileParty attacker, PartyBase defender, bool raid)

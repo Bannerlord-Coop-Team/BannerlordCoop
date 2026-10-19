@@ -51,9 +51,18 @@ internal class ExtortionByDesertersWorldPatches
         if (__state == null || __state.Count == 0) return;
         Run(quest =>
         {
-            if (__state.Contains(quest) && quest._deserterBattleFinalizedForTheFirstTime &&
-                ContainerProvider.TryResolve<ExtortionByDesertersFinalizationProofStrategy>(out var proof))
-                proof.TryRunBranch(quest, (byte)ExtortionByDesertersBranch.BattleCleanup);
+            if (!__state.Contains(quest)) return;
+            if (quest._deserterBattleFinalizedForTheFirstTime)
+            {
+                if (ContainerProvider.TryResolve<ExtortionByDesertersFinalizationProofStrategy>(out var proof))
+                    proof.TryRunBranch(quest, (byte)ExtortionByDesertersBranch.BattleCleanup);
+            }
+            // A battle without the owner destroys its losers only after OnMapEventEnded. Another player's victory
+            // must not leave the quest pointing at a destroyed party, but survivors keep raiding as in vanilla.
+            else if (quest.IsOngoing && quest._deserterMobileParty?.IsActive == false)
+            {
+                quest.CompleteQuestWithCancel();
+            }
         });
     }
 
@@ -96,13 +105,9 @@ internal class ExtortionByDesertersWorldPatches
         var owner = Hero.MainHero.PartyBelongedTo?.Party;
         var captor = Hero.MainHero.IsPrisoner ? Hero.MainHero.PartyBelongedToAsPrisoner : null;
         var ownerWasCaptured = captor?.MapEvent == mapEvent && mapEvent.WinningSide == captor.Side;
-        if (!ownerWasCaptured && (owner == null || !mapEvent.InvolvedParties.Contains(owner)))
-        {
-            // Another player's victory must not leave a quest pointing at a destroyed party,
-            // but deserters who survive a fight without the owner, such as the village militia's, keep raiding as in vanilla.
-            if (!deserters.IsActive) __instance.CompleteQuestWithCancel();
-            return false;
-        }
+        // Like vanilla, a battle without the owner, such as the village militia's, leaves the quest alone here;
+        // the FinalizeEventAux postfix cancels it if the deserters were destroyed.
+        if (!ownerWasCaptured && (owner == null || !mapEvent.InvolvedParties.Contains(owner))) return false;
 
         __instance._deserterBattleFinalizedForTheFirstTime = true;
         if (!ownerWasCaptured && mapEvent.WinningSide == owner.Side)
