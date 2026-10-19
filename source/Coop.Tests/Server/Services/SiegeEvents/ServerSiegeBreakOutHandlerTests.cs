@@ -259,9 +259,22 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
         action.Verify(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Once);
     }
 
-    private void Send(string requestId)
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SwitchingBetweenGateAndPort_IsTurnedDownInsteadOfReusingTheFirstResult(bool firstFromPort)
     {
-        broker.Publish(peer, new NetworkRequestBreakOut(requestId, 1, 2, 3, false));
+        Send("first", firstFromPort);
+        Send("switched", !firstFromPort);
+        Send("same-again", firstFromPort);
+
+        Assert.Equal(new[] { true, false, true }, Results().Select(result => result.Approved));
+        action.Verify(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Once);
+    }
+
+    private void Send(string requestId, bool isFromPort = false)
+    {
+        broker.Publish(peer, new NetworkRequestBreakOut(requestId, 1, 2, 3, isFromPort));
         GameThread.Run(() => { }, blocking: true);
     }
 

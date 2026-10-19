@@ -72,9 +72,10 @@ internal class ServerSiegeBreakOutHandler : IHandler
             {
                 if (receipts.TryGetValue(party, out var receipt) && receipt.Siege == siege)
                 {
-                    result = receipt.Result;
-                    result = new NetworkBreakOutResult(request.RequestId, result.Approved,
-                        result.CharacterIds, result.Counts, result.ArmyCasualties);
+                    // A paid gate break out is not reused for the port or the other way round, so this request is turned down.
+                    if (receipt.IsFromPort == request.IsFromPort)
+                        result = new NetworkBreakOutResult(request.RequestId, receipt.Result.Approved,
+                            receipt.Result.CharacterIds, receipt.Result.Counts, receipt.Result.ArmyCasualties);
                 }
                 else
                 {
