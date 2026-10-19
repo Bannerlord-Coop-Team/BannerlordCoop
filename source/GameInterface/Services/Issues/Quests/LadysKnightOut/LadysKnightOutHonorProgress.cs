@@ -3,14 +3,17 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using ProtoBuf;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Issues;
+using Issue = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssue;
 
 namespace GameInterface.Services.Issues.Quests.LadysKnightOut;
 
@@ -19,6 +22,7 @@ internal interface ILadysKnightOutHonorProgress
     void Seed(IssueBase issue, int xp);
     void MirrorClientHonor(int xp);
     void MirrorServerHonor(string controllerId, int xp);
+    void Clear(IssueBase issue);
     void ApplyPenalty(QuestBase quest);
 }
 
@@ -49,13 +53,20 @@ internal sealed class LadysKnightOutHonorProgress : ILadysKnightOutHonorProgress
 
     public void MirrorClientHonor(int xp)
     {
-        if (ModInformation.IsServer) return;
+        if (ModInformation.IsServer || !Campaign.Current.IssueManager.Issues.Values
+                .OfType<Issue>()
+                .Any(issue => issue.IssueOwner == Hero.MainHero && issue.IssueQuest != null)) return;
         network.SendAll(new RequestLadysKnightOutHonorMirror(controller.ControllerId, xp));
     }
 
     public void MirrorServerHonor(string controllerId, int xp)
     {
         if (ModInformation.IsServer) honorXp[controllerId] = xp;
+    }
+
+    public void Clear(IssueBase issue)
+    {
+        if (owners.TryGetOwnerControllerId(issue, out var controllerId)) honorXp.Remove(controllerId);
     }
 
     public void ApplyPenalty(QuestBase quest)
@@ -141,9 +152,32 @@ internal sealed class LadysKnightOutHonorHandler : IHandler
         {
             var data = payload.What;
             if (!objects.TryGetObjectWithLogging<Hero>(data.HeroId, out var hero)) return;
-            using (new AllowedThread()) hero.SetTraitLevel(DefaultTraits.Honor, data.Level);
-            if (data.ControllerId == controller.ControllerId)
-                Campaign.Current.PlayerTraitDeveloper?.SetPropertyValue(DefaultTraits.Honor, data.Xp);
+            using (new AllowedThread())
+            {
+                hero.SetTraitLevel(DefaultTraits.Honor, data.Level);
+                if (data.ControllerId == controller.ControllerId)
+                    Campaign.Current.PlayerTraitDeveloper?.SetPropertyValue(DefaultTraits.Honor, data.Xp);
+            }
         }, context: nameof(LadysKnightOutHonorHandler));
+    }
+}
+
+internal sealed class LadysKnightOutHonorOutcomeHandler : IHandler
+{
+    private readonly IMessageBroker broker;
+    private readonly ILadysKnightOutHonorProgress progress;
+
+    public LadysKnightOutHonorOutcomeHandler(IMessageBroker broker, ILadysKnightOutHonorProgress progress)
+    {
+        this.broker = broker;
+        this.progress = progress;
+        broker.Subscribe<IssueOutcomeObserved>(HandleOutcome);
+    }
+
+    public void Dispose() => broker.Unsubscribe<IssueOutcomeObserved>(HandleOutcome);
+
+    private void HandleOutcome(MessagePayload<IssueOutcomeObserved> payload)
+    {
+        if (ModInformation.IsServer && payload.What.Issue is Issue) progress.Clear(payload.What.Issue);
     }
 }

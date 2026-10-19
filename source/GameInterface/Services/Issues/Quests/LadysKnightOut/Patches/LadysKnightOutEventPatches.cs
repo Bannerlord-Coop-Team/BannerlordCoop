@@ -36,6 +36,7 @@ internal class LadysKnightOutEventPatches
     [HarmonyPrefix]
     private static void WarDeclaredPrefix(ref DeclareWarAction.DeclareWarDetail detail)
     {
+        if (ModInformation.IsClient) return;
         var initiator = warInitiator ?? ResolvedMainHeroContext.ResolvedMainHero;
         if (detail == DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility && initiator != Hero.MainHero)
             detail = DeclareWarAction.DeclareWarDetail.Default;
