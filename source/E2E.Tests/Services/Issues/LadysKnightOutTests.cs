@@ -315,27 +315,19 @@ public class LadysKnightOutTests : IDisposable
     [Fact]
     public void LadyEligibilityUsesTheGiverSettlementFactionForWar()
     {
-        var playerClanId = environment.CreateRegisteredObject<Clan>();
-        var otherClanId = environment.CreateRegisteredObject<Clan>();
-        var playerKingdomId = environment.CreateRegisteredObject<Kingdom>();
-        var otherKingdomId = environment.CreateRegisteredObject<Kingdom>();
         foreach (var instance in Instances)
         {
             instance.Call(() =>
             {
                 var giver = instance.GetRegisteredObject<Hero>(scenario.NotableId);
                 var hero = Hero.MainHero;
-                var playerClan = instance.GetRegisteredObject<Clan>(playerClanId);
-                var otherClan = instance.GetRegisteredObject<Clan>(otherClanId);
-                var playerKingdom = instance.GetRegisteredObject<Kingdom>(playerKingdomId);
-                var otherKingdom = instance.GetRegisteredObject<Kingdom>(otherKingdomId);
+                var playerClan = Clan.CreateClan("lady_test_player_clan");
+                var otherClan = Clan.CreateClan("lady_test_other_clan");
+                var playerKingdom = Kingdom.CreateKingdom("lady_test_player_kingdom");
+                var otherKingdom = Kingdom.CreateKingdom("lady_test_other_kingdom");
                 using (new AllowedThread())
                 {
                     hero.Clan = playerClan;
-                    playerClan.Id = new MBGUID(1);
-                    otherClan.Id = new MBGUID(2);
-                    playerKingdom.Id = new MBGUID(3);
-                    otherKingdom.Id = new MBGUID(4);
                     playerClan._kingdom = playerKingdom;
                     otherClan._kingdom = otherKingdom;
                     playerKingdom._rulingClan = playerClan;
@@ -346,6 +338,7 @@ public class LadysKnightOutTests : IDisposable
                 }
                 Assert.NotNull(giver.CurrentSettlement?.MapFaction);
                 Assert.NotSame(hero.MapFaction, giver.CurrentSettlement.MapFaction);
+                Assert.NotNull(FactionManager.Instance.GetStanceLinkInternal(hero.MapFaction, giver.CurrentSettlement.MapFaction));
                 VillageHostileFactionStanceHelper.ApplyWarStance(hero.MapFaction, giver.CurrentSettlement.MapFaction);
             });
         }
