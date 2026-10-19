@@ -360,6 +360,45 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         Assert.False(company.IsActive);
     }
 
+    [Fact]
+    public void TheLeaveDialog_OpensForMercenariesInTheOwnersParty()
+    {
+        Assert.True(CompanyDialogOpens(conversationPartyId: ownerPartyId));
+    }
+
+    [Fact]
+    public void TheLeaveDialog_DoesNotOpenInAnEncounterWithTheHostileCompany()
+    {
+        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        Assert.False(CompanyDialogOpens(conversationPartyId: companyPartyId));
+    }
+
+    private bool CompanyDialogOpens(string conversationPartyId)
+    {
+        var opens = false;
+
+        Owner.Call(() =>
+        {
+            Assert.True(Owner.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            Assert.True(Owner.ObjectManager.TryGetObject<MobileParty>(conversationPartyId, out var conversationParty));
+            var quest = (Quest)AttachQuest(Owner, companyTroopCount: 4).IssueQuest;
+            var conversation = Campaign.Current.ConversationManager;
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = ownerParty;
+                conversation._conversationParty = conversationParty;
+                conversation._conversationAgents.Clear();
+                conversation._conversationAgents.Add(new ConversationAgentStub(quest._troubleCharacterObject));
+            }
+
+            opens = quest.CompanyDialogFromCondition();
+        }, CharacterLinks.Append(AccessTools.PropertyGetter(typeof(CharacterObject), nameof(CharacterObject.EncyclopediaLinkWithName))));
+
+        return opens;
+    }
+
     private Quest CompanyTurnedHostile(string companyPartyId)
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(companyPartyId, out var company));
