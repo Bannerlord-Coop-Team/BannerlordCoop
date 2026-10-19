@@ -32,7 +32,7 @@ internal class SmugglersQuestEventPatches
         }
 
         // Most battles have no party used by a quest in them
-        if (!HasQuestParty(mapEvent?.AttackerSide) && !HasQuestParty(mapEvent?.DefenderSide))
+        if (!HasQuestParty(mapEvent))
         {
             return;
         }
@@ -124,15 +124,15 @@ internal class SmugglersQuestEventPatches
             issue.IssueQuest is Quest quest && quest.IsOngoing) == true;
     }
 
-    private static bool HasQuestParty(MapEventSide side)
+    private static bool HasQuestParty(MapEvent mapEvent)
     {
-        return side?.Parties?.Any(party => party?.Party?.MobileParty?.IsCurrentlyUsedByAQuest == true) == true;
+        return mapEvent?._sides?.Any(side => side?.Parties?.Any(party =>
+            party?.Party?.MobileParty?.IsCurrentlyUsedByAQuest == true) == true) == true;
     }
 
     private static bool ContainsParty(MapEvent mapEvent, PartyBase party)
     {
-        return mapEvent?.AttackerSide?.Parties?.Any(mapEventParty => mapEventParty?.Party == party) == true ||
-            mapEvent?.DefenderSide?.Parties?.Any(mapEventParty => mapEventParty?.Party == party) == true;
+        return mapEvent?._sides?.Any(side => side?.Parties?.Any(mapEventParty => mapEventParty?.Party == party) == true) == true;
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementOwnerChanged))]
