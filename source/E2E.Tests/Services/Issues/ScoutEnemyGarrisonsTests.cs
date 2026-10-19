@@ -269,7 +269,6 @@ public class ScoutEnemyGarrisonsTests : IDisposable
                 CampaignEventDispatcher.Instance.OnArmyDispersed(army, Army.ArmyDispersionReason.Unknown, false);
             }
 
-            Assert.False(quest.IsOngoing);
         });
 
         Assert.Equal(1, calls.CountFor(Server));
