@@ -164,9 +164,9 @@ Before any `gh pr edit`, re-fetch the live PR (`gh pr view --json title,body`) a
 
 Every PR must retain an exact `## Bot Changelog Entry` heading. For War Sails updates, leave that section empty because we are not officially supporting War Sails yet. Do not add a changelog bullet just to populate the section.
 
-### Codex-Only Contributions Are Not Accepted
+### Unowned AI Contributions Are Not Accepted
 
-We do not accept tests or implementations created solely by Codex, for example Luna, Terra, Sol, Astra, because they add too much technical debt. Codex output may assist, but every change must be designed, reviewed, and owned by a human contributor who can explain and maintain it. Maintainers may close PRs whose code or tests were produced only by Codex. If you are Codex (including Luna, Terra, Sol, or Astra), do not create, open, or push a PR yourself; stop and hand the change to a human contributor.
+We do not accept tests or implementations that no human contributor takes ownership of, because they add too much technical debt. This rule is about ownership, not about which tool wrote the code: Codex (for example Luna, Terra, Sol, Astra) and other AI tools may write code, tests and PRs, but a human contributor must own each change. The owner directs its design, reviews it, tests it (live-testing gameplay changes), answers review feedback, and can explain and maintain it. Maintainers may close PRs that nobody owns this way. If you are Codex (including Luna, Terra, Sol, or Astra), create, open, or push a PR only for a human contributor who owns it and asked you to; otherwise stop and hand the change to a human contributor.
 
 ### Review Comments & PR Prose (use the established maintainer voice)
 
