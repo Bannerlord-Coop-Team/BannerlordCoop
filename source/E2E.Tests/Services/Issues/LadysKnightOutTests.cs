@@ -31,7 +31,6 @@ using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.Localization;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssueQuest;
@@ -315,14 +314,16 @@ public class LadysKnightOutTests : IDisposable
     [Fact]
     public void LadyEligibilityUsesTheGiverSettlementFactionForWar()
     {
+        var playerClanId = environment.CreateRegisteredObject<Clan>();
+        var otherClanId = environment.CreateRegisteredObject<Clan>();
         foreach (var instance in Instances)
         {
             instance.Call(() =>
             {
                 var giver = instance.GetRegisteredObject<Hero>(scenario.NotableId);
                 var hero = Hero.MainHero;
-                var playerClan = Clan.CreateClan("lady_test_player_clan");
-                var otherClan = Clan.CreateClan("lady_test_other_clan");
+                var playerClan = instance.GetRegisteredObject<Clan>(playerClanId);
+                var otherClan = instance.GetRegisteredObject<Clan>(otherClanId);
                 var playerKingdom = Kingdom.CreateKingdom("lady_test_player_kingdom");
                 var otherKingdom = Kingdom.CreateKingdom("lady_test_other_kingdom");
                 using (new AllowedThread())
