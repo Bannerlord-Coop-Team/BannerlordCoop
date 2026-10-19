@@ -4,16 +4,16 @@ using ProtoBuf;
 namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 
 [ProtoContract(SkipConstructor = true)]
-internal class NetworkCaravanAmbushState : IServerToClientCommand
+public readonly struct NetworkCaravanAmbushState : IServerToClientCommand
 {
-    [ProtoMember(1)] public string IssueOwnerId { get; }
-    [ProtoMember(2)] public string IssueId { get; }
-    [ProtoMember(3)] public string ControllerId { get; }
-    [ProtoMember(4)] public string CaravanId { get; }
-    [ProtoMember(5)] public string BanditId { get; }
-    [ProtoMember(6)] public bool Saved { get; }
-    [ProtoMember(7)] public int Warnings { get; }
-    [ProtoMember(8)] public string[] Journal { get; }
+    [ProtoMember(1)] public readonly string IssueOwnerId;
+    [ProtoMember(2)] public readonly string IssueId;
+    [ProtoMember(3)] public readonly string ControllerId;
+    [ProtoMember(4)] public readonly string CaravanId;
+    [ProtoMember(5)] public readonly string BanditId;
+    [ProtoMember(6)] public readonly bool Saved;
+    [ProtoMember(7)] public readonly int Warnings;
+    [ProtoMember(8)] public readonly string[] Journal;
 
     public NetworkCaravanAmbushState(string ownerId, string issueId, string controllerId,
         string caravanId, string banditId, bool saved, int warnings, string[] journal)
@@ -30,12 +30,12 @@ internal class NetworkCaravanAmbushState : IServerToClientCommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal class NetworkCaravanAmbushConversation : IServerToClientCommand
+public readonly struct NetworkCaravanAmbushConversation : IServerToClientCommand
 {
-    [ProtoMember(1)] public string IssueOwnerId { get; }
-    [ProtoMember(2)] public string IssueId { get; }
-    [ProtoMember(3)] public string ControllerId { get; }
-    [ProtoMember(4)] public string CaravanId { get; }
+    [ProtoMember(1)] public readonly string IssueOwnerId;
+    [ProtoMember(2)] public readonly string IssueId;
+    [ProtoMember(3)] public readonly string ControllerId;
+    [ProtoMember(4)] public readonly string CaravanId;
 
     public NetworkCaravanAmbushConversation(string ownerId, string issueId, string controllerId, string caravanId)
     {

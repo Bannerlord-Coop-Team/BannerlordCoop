@@ -1,9 +1,9 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using ProtoBuf;
 
 namespace GameInterface.Services.Issues.Framework.Conversation;
 
-internal readonly struct IssueConversationOpenedLocally : IEvent
+public readonly struct IssueConversationOpenedLocally : IEvent
 {
     public readonly string IssueOwnerId;
 
@@ -14,7 +14,7 @@ internal readonly struct IssueConversationOpenedLocally : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct RequestIssueConversationOpened : ICommand
+public readonly struct RequestIssueConversationOpened : ICommand
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
 
@@ -25,7 +25,7 @@ internal readonly struct RequestIssueConversationOpened : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkIssueConversationAllowed : IServerToClientCommand
+public readonly struct NetworkIssueConversationAllowed : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
     [ProtoMember(2)] public readonly string IssueId;
@@ -38,7 +38,7 @@ internal readonly struct NetworkIssueConversationAllowed : IServerToClientComman
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkIssueConversationDenied : IServerToClientCommand
+public readonly struct NetworkIssueConversationDenied : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
 
