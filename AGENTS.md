@@ -51,6 +51,8 @@ Run from the repo root on Windows; the repo expects `mb2` to be a junction to th
 
 `DeployToGame` in `Deploy.targets` runs after every successful build of a project that imports it (`Coop.csproj`, `MissionTestMod.csproj`), including a full `Coop.sln` build, whenever `mb2\Modules` exists. Clearing `PostBuildEvent` doesn't stop it. For compile-only checks, pass an empty global `-p:ModName=`, which turns off `DeployToGame`.
 
+CI builds Release and runs `source\CoopUnitTests.slnf` plus the E2E shards in `.github/workflows/pull_request.yml`. After touching Coop.Core or Autofac registrations, run all of `Coop.Tests` with `-c Release`. `--no-restore` fails on the first build in a fresh worktree, so restore once first.
+
 ### Licensing & Authorized Agent Use
 
 This repository contains proprietary project code. Access to the source does not grant permission to copy, redistribute, repackage, reverse engineer, create competing derivatives from, or otherwise reuse the code except where explicitly permitted by the applicable license or by the maintainers.
@@ -140,6 +142,10 @@ Source `.cs` files are UTF-8 with a BOM and CRLF line endings, but files written
 
 Tests use xUnit. Add unit tests for logic that does not require Bannerlord to run, especially serialization, state transitions, and service behavior. Name test classes after the subject under test and keep test method names behavior-focused. If a change depends on the game runtime, document the manual verification path in the PR.
 
+A new Coop.Core server handler that depends on a GameInterface service needs a `RegisterMock<T>` in `Coop.Tests/TestComponentBase.cs`, otherwise every server-container test in `Coop.Tests` fails to build its container.
+
+An empty array of structs in a message arrives as `null`, because protobuf-net writes nothing for it (an empty `byte[]` field arrives non-null), so guard it with `?? Array.Empty<T>()`. `MessageBroker.Publish` catches and logs a subscriber's exception, so an in-process test can pass over a throwing handler: call the handler directly, or assert something it does after its riskiest line.
+
 When a change needs runtime verification, **prefer adding a debug cheat over hand-staging the scenario.** Co-op state is usually impractical to set up by hand (winning a specific battle to take a prisoner, an AI governor change), so add or extend a `coop.debug.*` console command that triggers the exact authoritative action — e.g. `coop.debug.town.set_governor` driving `ChangeGovernorAction`, or `coop.debug.town.imprison_hero` driving `TakePrisonerAction` — and drive the test from the console instead of describing fiddly in-game steps. **Run state-changing cheats on the server only:** the host is authoritative and replicates to clients, so a cheat must originate there (it also lets server-side events fire on the host); use a client purely for read-only inspection (e.g. `coop.debug.location.list_characters`) to confirm what it received.
 
 Write manual-test steps with **real, concrete in-game names and ids — never `<placeholders>` or invented examples.** Default to **Danustica** (a **Southern Empire** town) as the worked example: settlement `town_ES1`, town object `town_comp_ES1`, locations `Location_town_ES1_lordshall` / `_tavern` / `_prison`. Resolve any genuinely save-specific value (e.g. which hero is in a tavern) by giving the lookup command (`coop.debug.town.list_towns`, `coop.debug.location.list`, `coop.debug.location.list_characters`) plus a worked example, not a bare placeholder.
@@ -158,9 +164,9 @@ Before any `gh pr edit`, re-fetch the live PR (`gh pr view --json title,body`) a
 
 Every PR must retain an exact `## Bot Changelog Entry` heading. For War Sails updates, leave that section empty because we are not officially supporting War Sails yet. Do not add a changelog bullet just to populate the section.
 
-### Codex-Only Contributions Are Not Accepted
+### Unowned AI Contributions Are Not Accepted
 
-We do not accept tests or implementations created solely by Codex, for example Luna, Terra, Sol, Astra, because they add too much technical debt. Codex output may assist, but every change must be designed, reviewed, and owned by a human contributor who can explain and maintain it. Maintainers may close PRs whose code or tests were produced only by Codex. If you are Codex (including Luna, Terra, Sol, or Astra), do not create, open, or push a PR yourself; stop and hand the change to a human contributor.
+We do not accept tests or implementations that no human contributor takes ownership of, because they add too much technical debt. This rule is about ownership, AI tools may write code, tests and PRs, but a human contributor must own each change. The owner directs its design, reviews it, tests it (live-testing gameplay changes), answers review feedback, and can explain and maintain it. Maintainers may close PRs that nobody owns this way. Create, open, or push a PR only for a human contributor who owns it and asked you to; otherwise stop and hand the change to a human contributor.
 
 ### Review Comments & PR Prose (use the established maintainer voice)
 
