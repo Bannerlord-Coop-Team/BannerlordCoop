@@ -3,6 +3,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Common.Network;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -30,6 +31,7 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
     private readonly IObjectManager objects;
     private readonly IIssueOwnerResolver owners;
     private readonly IPlayerManager players;
+    private readonly HashSet<Quest> pendingConversations = new();
 
     public CaravanAmbushEvents(IOutcomeDispatcher dispatcher, ICaravanAmbushStatePublisher publisher,
         INetwork network, IObjectManager objects, IIssueOwnerResolver owners, IPlayerManager players)
@@ -47,7 +49,12 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         dispatcher.RunAsOwners<Quest>(quest =>
         {
             action(quest);
-            if (quest.IsOngoing) publisher.Publish(quest);
+            if (quest.IsOngoing)
+            {
+                publisher.Publish(quest);
+                if (pendingConversations.Contains(quest)) OpenOwnerConversation(quest);
+            }
+            else pendingConversations.Remove(quest);
         });
     }
 
@@ -89,8 +96,15 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
             !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
             !objects.TryGetIdWithLogging(quest._caravanParty, out var caravanId) ||
             !owners.TryGetOwnerControllerId(issue, out var controllerId)) return;
-        if (players.TryGetPeer(controllerId, out var peer))
-            network.Send(peer, new NetworkCaravanAmbushConversation(ownerId, issue.StringId, controllerId, caravanId));
+        if (!players.TryGetPeer(controllerId, out var peer))
+        {
+            pendingConversations.Add(quest);
+            Logger.Warning("The owner peer for {quest} is not connected, retrying the reward conversation", issue.StringId);
+            return;
+        }
+
+        pendingConversations.Remove(quest);
+        network.Send(peer, new NetworkCaravanAmbushConversation(ownerId, issue.StringId, controllerId, caravanId));
     }
 
     public void Release(Quest quest, bool completing = false)

@@ -131,6 +131,10 @@ public class CaravanAmbushTests : IDisposable
             QuestOf(Server)._vicinityCheckFailCounter = 1;
             publisher.Publish(QuestOf(Server));
             Assert.Equal(baseline + 2, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>());
+
+            publisher.Forget(QuestOf(Server));
+            publisher.Publish(QuestOf(Server));
+            Assert.Equal(baseline + 3, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>());
         });
         Owner.Call(() => Assert.Equal(1, QuestOf(Owner)._vicinityCheckFailCounter));
         Other.Call(() => Assert.Equal(0, QuestOf(Other)._vicinityCheckFailCounter));

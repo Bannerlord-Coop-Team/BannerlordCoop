@@ -67,11 +67,12 @@ internal class CaravanAmbushStateHandler : IHandler
             var data = pendingConversation.Value;
             if (data.ControllerId != controller.ControllerId ||
                 !issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
-                !(issue.IssueQuest is Quest quest) || !quest.IsOngoing || !quest._isCaravanSaved)
+                !(issue.IssueQuest is Quest quest) || !quest.IsOngoing)
             {
                 ClearPendingConversation();
                 return;
             }
+            if (!quest._isCaravanSaved) return;
             // Battle results can arrive before the owner leaves the mission and loot screens.
             if (!(GameStateManager.Current?.ActiveState is MapState map) || map.AtMenu || map.IsSimulationActive ||
                 Campaign.Current.ConversationManager.IsConversationInProgress) return;
