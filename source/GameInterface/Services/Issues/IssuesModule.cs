@@ -5,7 +5,9 @@ using GameInterface.Services.Issues.Framework.Dispatch;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
-using GameInterface.Services.Issues.Quests.ArtisanProducts;`r`nusing GameInterface.Services.Issues.Quests.TheConquestOfSettlement;`r`nusing System;
+using GameInterface.Services.Issues.Quests.ArtisanProducts;
+using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
+using System;
 
 namespace GameInterface.Services.Issues;
 
@@ -56,4 +58,5 @@ internal class IssuesModule : Module
             || typeof(IFinalizationProofStrategy).IsAssignableFrom(type);
     }
 }
+
 
