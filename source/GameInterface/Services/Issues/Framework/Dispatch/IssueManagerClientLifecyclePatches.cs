@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Visibility;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -75,7 +76,7 @@ internal static class IssueManagerClientLifecyclePatches
         {
             if (!issue.IsSolvingWithAlternative ||
                 issue.AlternativeSolutionReturnTimeForTroops.IsPast ||
-                GameInterface.Services.Issues.Framework.Visibility.QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(issue))
+                QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(issue))
             {
                 continue;
             }
