@@ -38,4 +38,11 @@ internal class QuestTraitXpPatches
     {
         return false;
     }
+
+    [HarmonyPatch(nameof(TraitLevelingHelper.OnIssueFailed))]
+    [HarmonyPrefix]
+    public static bool OnIssueFailedPrefix()
+    {
+        return false;
+    }
 }
