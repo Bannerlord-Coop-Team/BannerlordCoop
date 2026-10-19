@@ -19,6 +19,7 @@ using GameInterface.Services.Villages.Interfaces;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encyclopedia;
@@ -367,13 +368,25 @@ public class LadysKnightOutTests : IDisposable
             Assert.True(scenario.Server.Resolve<IIssueOwnerResolver>().TryResolveOwnerHero(giver.Issue, out owner));
             relationBefore = giver.GetRelation(owner);
         });
-        scenario.Server.Call(() => scenario.Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(quest =>
+        scenario.Server.Call(() =>
         {
-            if (quest.QuestGiver != scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId)) return;
-            Campaign.Current.Models.CharacterDevelopmentModel.GetTraitLevelForTraitXp(Hero.MainHero, DefaultTraits.Honor,
-                183 - 50, out expectedLevel, out expectedXp);
-            quest.CriminalActionPerformedTowardsSettlement();
-        }));
+            var issues = new IssuesCampaignBehavior();
+            issues.RegisterEvents();
+            try
+            {
+                scenario.Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(quest =>
+                {
+                    if (quest.QuestGiver != scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId)) return;
+                    Campaign.Current.Models.CharacterDevelopmentModel.GetTraitLevelForTraitXp(Hero.MainHero, DefaultTraits.Honor,
+                        183 - 50, out expectedLevel, out expectedXp);
+                    quest.CriminalActionPerformedTowardsSettlement();
+                });
+            }
+            finally
+            {
+                CampaignEvents.Instance.RemoveListeners(issues);
+            }
+        });
         var penalty = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLadysKnightOutHonor>());
         Assert.Equal(QuestScenario.ControllerA, penalty.ControllerId);
         Assert.Equal(expectedXp, penalty.Xp);
