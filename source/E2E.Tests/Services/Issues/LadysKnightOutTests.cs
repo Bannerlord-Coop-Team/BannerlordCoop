@@ -31,6 +31,7 @@ using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.Localization;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssueQuest;
