@@ -108,6 +108,14 @@ namespace GameInterface.Services.Banners.Handlers
                     clan.Color2 = payload.Color2;
                     clan.UpdateBannerColor(payload.Color, payload.Color2);
 
+                    // A ruler's own banner is kept apart from the kingdom banner and shows again once
+                    // they lose the throne, so it takes the new colours on every instance too.
+                    if (clan.Kingdom?.RulingClan == clan)
+                    {
+                        clan.ClanOriginalBanner?.ChangePrimaryColor(clan.Banner.GetPrimaryColor());
+                        clan.ClanOriginalBanner?.ChangeIconColors(clan.Banner.GetFirstIconColor());
+                    }
+
                     // The banner is mutated in place, so the cached party map visuals (the flag rendered
                     // on the campaign map) won't rebuild on their own. Mark every party belonging to the
                     // clan as visually dirty so the visual is regenerated from the new banner code.

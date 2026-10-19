@@ -84,6 +84,29 @@ public class KingdomBannerColorTests : SyncTestBase
     }
 
     [Fact]
+    public void RulerBannerEdit_FormerRulerKeepsNewColorsAfterRulershipTransfer()
+    {
+        SendRulerBannerEdit(rulerClient);
+
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                var kingdom = instance.GetRegisteredObject<Kingdom>(kingdomId);
+                var rulerClan = instance.GetRegisteredObject<Clan>(rulerClanId);
+
+                using (new AllowedThread())
+                {
+                    kingdom._rulingClan = instance.GetRegisteredObject<Clan>(memberClanId);
+                }
+
+                // No longer the ruler, so Clan.Banner now shows the clan's own banner.
+                Assert.Equal(EditedBannerCode, rulerClan.Banner.Serialize());
+            });
+        }
+    }
+
+    [Fact]
     public void BannerEdit_FromPlayerWhoDoesNotLeadTheClan_IsIgnored()
     {
         SendRulerBannerEdit(memberClient);
