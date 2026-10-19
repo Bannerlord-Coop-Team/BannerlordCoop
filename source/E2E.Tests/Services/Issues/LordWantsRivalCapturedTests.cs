@@ -313,6 +313,33 @@ public class LordWantsRivalCapturedTests : IDisposable
     }
 
     [Fact]
+    public void DisposedFinalizationStrategy_DoesNotRecordLootEntitlement()
+    {
+        Accept(ClientA, giverId);
+
+        LordWantsRivalCapturedFinalizationProofStrategy strategy = null;
+        Server.Call(() =>
+        {
+            strategy = Server.Resolve<LordWantsRivalCapturedFinalizationProofStrategy>();
+            strategy.Dispose();
+        });
+
+        AllocateTargetPrisonerLoot();
+
+        Server.Call(() =>
+        {
+            using (new MainHeroSubstitutionScope(Get<Hero>(Server, playerA.HeroId), Get<MobileParty>(Server, playerA.MobilePartyId)))
+            {
+                Assert.True(strategy.TryRunBranch(QuestOf(Server, giverId), (byte)LordWantsRivalCapturedBranch.CapturedAtCounterOffer));
+            }
+
+            Assert.False(Get<Hero>(Server, targetId).IsPrisoner);
+            Assert.True(QuestOf(Server, giverId).IsOngoing);
+            Assert.False(QuestOf(Server, giverId)._firstCounterOfferMade);
+        });
+    }
+
+    [Fact]
     public void AcceptingTheCounterOffer_PaysTheOwnerReleasesTheTargetAndBetraysTheGiver()
     {
         Accept(ClientA, giverId);
