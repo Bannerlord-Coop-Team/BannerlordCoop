@@ -2,6 +2,7 @@
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.Party;
 using Issue = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssueQuest;
 
@@ -64,11 +65,34 @@ internal sealed class LandLordCompanyOfTroubleChoiceCoopCommand : ICoopCommand
                 quest.CreateCompanyEnemyParty();
                 return Succeeded("The mercenaries turned hostile");
             case "steal":
+                var food = DescribeFood();
+                if (food == null)
+                {
+                    return Failed("No food to steal");
+                }
+
                 quest.TryToStealItemFromPlayer();
-                return Succeeded("Ran the food theft");
+                return Succeeded($"Stole one {food} before the theft");
             default:
                 return Failed($"Unknown choice '{args[0]}'");
         }
+    }
+
+    private static string DescribeFood()
+    {
+        var roster = MobileParty.MainParty.ItemRoster;
+
+        for (int i = 0; i < roster.Count; i++)
+        {
+            var element = roster[i];
+
+            if (!element.IsEmpty && element.EquipmentElement.Item.IsFood)
+            {
+                return $"{element.EquipmentElement.Item.StringId}, {element.Amount} in roster";
+            }
+        }
+
+        return null;
     }
 
     private static CoopCommandResult Succeeded(string output) =>
