@@ -47,11 +47,12 @@ internal sealed class LadysKnightOutJournalHandler : IHandler
         var issue = payload.What.Issue;
         if (ModInformation.IsClient || !owners.TryGetOwnerControllerId(issue, out var owner) ||
             !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
-        network.SendAll(new NetworkLadysKnightOutLog
-        {
-            GiverId = giverId, IssueId = issue.StringId, ControllerId = owner, IsIssueLog = true,
-            Text = issue.JournalEntries[issue.JournalEntries.Count - 1].LogText.ToString(),
-        });
+        network.SendAll(new NetworkLadysKnightOutLog(
+            giverId,
+            issue.StringId,
+            owner,
+            issue.JournalEntries[issue.JournalEntries.Count - 1].LogText.ToString(),
+            true));
     }
 
     private void HandleAdded(MessagePayload<LadysKnightOutLogAdded> payload)
@@ -61,8 +62,12 @@ internal sealed class LadysKnightOutJournalHandler : IHandler
         var issue = quest.QuestGiver.Issue;
         if (issue == null || !owners.TryGetOwnerControllerId(issue, out var owner) ||
             !objects.TryGetIdWithLogging(quest.QuestGiver, out var giverId)) return;
-        network.SendAll(new NetworkLadysKnightOutLog
-        { GiverId = giverId, IssueId = issue.StringId, ControllerId = owner, Text = payload.What.Log.LogText.ToString() });
+        network.SendAll(new NetworkLadysKnightOutLog(
+            giverId,
+            issue.StringId,
+            owner,
+            payload.What.Log.LogText.ToString(),
+            false));
     }
 
     private void HandleLog(MessagePayload<NetworkLadysKnightOutLog> payload)

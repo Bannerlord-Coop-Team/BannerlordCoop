@@ -13,22 +13,39 @@ internal sealed class LadysKnightOutLordTriggered : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal sealed class RequestLadysKnightOutLord : ICommand
+public readonly struct RequestLadysKnightOutLord : ICommand
 {
-    [ProtoMember(1)] public string GiverId;
-    [ProtoMember(2)] public string IssueId;
-    [ProtoMember(3)] public bool Complete;
-    [ProtoMember(4)] public float Difficulty;
+    [ProtoMember(1)] public readonly string GiverId;
+    [ProtoMember(2)] public readonly string IssueId;
+    [ProtoMember(3)] public readonly bool Complete;
+    [ProtoMember(4)] public readonly float Difficulty;
+
+    public RequestLadysKnightOutLord(string giverId, string issueId, bool complete, float difficulty)
+    {
+        GiverId = giverId;
+        IssueId = issueId;
+        Complete = complete;
+        Difficulty = difficulty;
+    }
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal sealed class NetworkLadysKnightOutLordAccepted : ICommand
+public readonly struct NetworkLadysKnightOutLordAccepted : ICommand
 {
-    [ProtoMember(1)] public string GiverId;
-    [ProtoMember(2)] public string IssueId;
-    [ProtoMember(3)] public string ControllerId;
-    [ProtoMember(4)] public float Difficulty;
-    [ProtoMember(5)] public string StartLog;
+    [ProtoMember(1)] public readonly string GiverId;
+    [ProtoMember(2)] public readonly string IssueId;
+    [ProtoMember(3)] public readonly string ControllerId;
+    [ProtoMember(4)] public readonly float Difficulty;
+    [ProtoMember(5)] public readonly string StartLog;
+
+    public NetworkLadysKnightOutLordAccepted(string giverId, string issueId, string controllerId, float difficulty, string startLog)
+    {
+        GiverId = giverId;
+        IssueId = issueId;
+        ControllerId = controllerId;
+        Difficulty = difficulty;
+        StartLog = startLog;
+    }
 }
 
 internal sealed class LadysKnightOutLogAdded : IEvent
@@ -45,11 +62,20 @@ internal sealed class LadysKnightOutIssueLogAdded : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal sealed class NetworkLadysKnightOutLog : ICommand
+public readonly struct NetworkLadysKnightOutLog : ICommand
 {
-    [ProtoMember(1)] public string GiverId;
-    [ProtoMember(2)] public string IssueId;
-    [ProtoMember(3)] public string ControllerId;
-    [ProtoMember(4)] public string Text;
-    [ProtoMember(5)] public bool IsIssueLog;
+    [ProtoMember(1)] public readonly string GiverId;
+    [ProtoMember(2)] public readonly string IssueId;
+    [ProtoMember(3)] public readonly string ControllerId;
+    [ProtoMember(4)] public readonly string Text;
+    [ProtoMember(5)] public readonly bool IsIssueLog;
+
+    public NetworkLadysKnightOutLog(string giverId, string issueId, string controllerId, string text, bool isIssueLog)
+    {
+        GiverId = giverId;
+        IssueId = issueId;
+        ControllerId = controllerId;
+        Text = text;
+        IsIssueLog = isIssueLog;
+    }
 }

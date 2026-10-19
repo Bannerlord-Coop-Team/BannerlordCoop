@@ -49,17 +49,25 @@ internal sealed class LadysKnightOutHonorProgress : ILadysKnightOutHonorProgress
         model.GetTraitLevelForTraitXp(hero, DefaultTraits.Honor, xp - 50, out var level, out xp);
         honorXp[hero] = xp;
         hero.SetTraitLevel(DefaultTraits.Honor, level);
-        network.SendAll(new NetworkLadysKnightOutHonor { HeroId = heroId, ControllerId = controllerId, Xp = xp, Level = level });
+        network.SendAll(new NetworkLadysKnightOutHonor(heroId, controllerId, xp, level));
     }
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal sealed class NetworkLadysKnightOutHonor : ICommand
+public readonly struct NetworkLadysKnightOutHonor : ICommand
 {
-    [ProtoMember(1)] public string HeroId;
-    [ProtoMember(2)] public string ControllerId;
-    [ProtoMember(3)] public int Xp;
-    [ProtoMember(4)] public int Level;
+    [ProtoMember(1)] public readonly string HeroId;
+    [ProtoMember(2)] public readonly string ControllerId;
+    [ProtoMember(3)] public readonly int Xp;
+    [ProtoMember(4)] public readonly int Level;
+
+    public NetworkLadysKnightOutHonor(string heroId, string controllerId, int xp, int level)
+    {
+        HeroId = heroId;
+        ControllerId = controllerId;
+        Xp = xp;
+        Level = level;
+    }
 }
 
 internal sealed class LadysKnightOutHonorHandler : IHandler

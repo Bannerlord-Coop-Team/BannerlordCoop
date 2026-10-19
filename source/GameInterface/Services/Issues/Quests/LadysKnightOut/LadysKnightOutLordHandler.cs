@@ -57,11 +57,11 @@ internal sealed class LadysKnightOutLordHandler : IHandler
     private void HandleTriggered(MessagePayload<LadysKnightOutLordTriggered> payload)
     {
         if (ModInformation.IsServer || !objects.TryGetIdWithLogging(payload.What.Issue.IssueOwner, out var giverId)) return;
-        network.SendAll(new RequestLadysKnightOutLord
-        {
-            GiverId = giverId, IssueId = payload.What.Issue.StringId, Complete = payload.What.Complete,
-            Difficulty = payload.What.Issue.IssueDifficultyMultiplier,
-        });
+        network.SendAll(new RequestLadysKnightOutLord(
+            giverId,
+            payload.What.Issue.StringId,
+            payload.What.Complete,
+            payload.What.Issue.IssueDifficultyMultiplier));
     }
 
     private void HandleRequest(MessagePayload<RequestLadysKnightOutLord> payload)
@@ -92,11 +92,12 @@ internal sealed class LadysKnightOutLordHandler : IHandler
                 issue.StartIssueWithLordSolution();
                 // Only the owner's client opens the menu that completes this solution.
                 CampaignEvents.BeforeGameMenuOpenedEvent.ClearListeners(issue);
-                network.SendAll(new NetworkLadysKnightOutLordAccepted
-                {
-                    GiverId = data.GiverId, IssueId = data.IssueId, ControllerId = player.ControllerId,
-                    Difficulty = issue.IssueDifficultyMultiplier, StartLog = issue.JournalEntries[0].LogText.ToString(),
-                });
+                network.SendAll(new NetworkLadysKnightOutLordAccepted(
+                    data.GiverId,
+                    data.IssueId,
+                    player.ControllerId,
+                    issue.IssueDifficultyMultiplier,
+                    issue.JournalEntries[0].LogText.ToString()));
             }
         }, context: nameof(LadysKnightOutLordHandler));
     }

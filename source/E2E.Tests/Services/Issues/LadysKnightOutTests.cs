@@ -490,11 +490,12 @@ public class LadysKnightOutTests : IDisposable
     {
         using var callback = new MethodCallRecorder(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.BeforeGameMenuOpened)));
         scenario.ClientA.Call(() => Campaign.Current.ConversationManager.IsConversationInProgress = false);
-        scenario.ClientA.SimulateMessage(this, new NetworkLadysKnightOutLordAccepted
-        {
-            GiverId = scenario.NotableId, IssueId = QuestScenario.IssueId,
-            ControllerId = QuestScenario.ControllerA, StartLog = "accepted",
-        });
+        scenario.ClientA.SimulateMessage(this, new NetworkLadysKnightOutLordAccepted(
+            scenario.NotableId,
+            QuestScenario.IssueId,
+            QuestScenario.ControllerA,
+            1f,
+            "accepted"));
         Assert.Equal(1, callback.CountFor(scenario.ClientA));
     }
 
