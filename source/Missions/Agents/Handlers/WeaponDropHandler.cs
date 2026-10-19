@@ -6,6 +6,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
+using Missions.Missiles.Message;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -141,6 +142,7 @@ public class WeaponDropHandler : IWeaponDropHandler
         new Dictionary<Guid, WorldItemTransitionState>();
     private readonly Queue<Guid> preDropStateOrder = new Queue<Guid>();
     private readonly HashSet<Guid> liveDropAppliedWorldItemIds = new HashSet<Guid>();
+    private readonly HashSet<Guid> missileWorldItemIds = new HashSet<Guid>();
     private readonly Dictionary<Guid, PendingResyncRequest> pendingResyncRequests =
         new Dictionary<Guid, PendingResyncRequest>();
     private readonly Queue<Guid> pendingResyncRequestOrder = new Queue<Guid>();
@@ -194,6 +196,7 @@ public class WeaponDropHandler : IWeaponDropHandler
         messageBroker.Subscribe<WeaponPickedup>(HandleWeaponPickedup);
         messageBroker.Subscribe<WeaponPickupApplied>(HandleWeaponPickupApplied);
         messageBroker.Subscribe<PendingWorldItemPickupsRejected>(HandlePendingWorldItemPickupsRejected);
+        messageBroker.Subscribe<MissileItemIdentified>(HandleMissileItemIdentified);
     }
 
     ~WeaponDropHandler()
@@ -214,6 +217,7 @@ public class WeaponDropHandler : IWeaponDropHandler
         messageBroker.Unsubscribe<WeaponPickedup>(HandleWeaponPickedup);
         messageBroker.Unsubscribe<WeaponPickupApplied>(HandleWeaponPickupApplied);
         messageBroker.Unsubscribe<PendingWorldItemPickupsRejected>(HandlePendingWorldItemPickupsRejected);
+        messageBroker.Unsubscribe<MissileItemIdentified>(HandleMissileItemIdentified);
         deferredMissionDrops.Clear();
         pendingDrops.Clear();
         activeDrops.Clear();
@@ -228,6 +232,7 @@ public class WeaponDropHandler : IWeaponDropHandler
         worldItemTransitionStates.Clear();
         preDropStateOrder.Clear();
         liveDropAppliedWorldItemIds.Clear();
+        missileWorldItemIds.Clear();
         pendingResyncRequests.Clear();
         pendingResyncRequestOrder.Clear();
         expiryCancellation.Dispose();
@@ -502,6 +507,26 @@ public class WeaponDropHandler : IWeaponDropHandler
                 return;
             }
         }
+    }
+
+    // [Game thread] Every client spawns its own copy of a stuck missile; the shot names them all with one id. A copy
+    // that lands after a peer already picked the missile up is removed instead of becoming pickable again.
+    private void HandleMissileItemIdentified(MessagePayload<MissileItemIdentified> payload)
+    {
+        MissileItemIdentified identified = payload.What;
+        if (disposed || identified.Item == null || identified.WorldItemId == Guid.Empty) return;
+
+        if (retiredWorldItemIds.Contains(identified.WorldItemId) ||
+            consumedWorldItemIds.Contains(identified.WorldItemId))
+        {
+            if (!worldItemSpawner.TryRemove(identified.Item))
+                Logger.Error("[WeaponDrop] Failed to remove consumed missile item={WorldItemId}", identified.WorldItemId);
+            return;
+        }
+
+        worldItemRegistry.Register(identified.WorldItemId, identified.Item);
+        missileWorldItemIds.Add(identified.WorldItemId);
+        messageBroker.Publish(this, new WorldItemIdentityResolved(identified.Item, identified.WorldItemId));
     }
 
     private bool TryCreateTransition(
@@ -1040,10 +1065,11 @@ public class WeaponDropHandler : IWeaponDropHandler
         }
         else if (WeaponMatches(current, canonical))
         {
-            HashSet<SpawnedItemEntity> existingItems = WeaponDropItemTracker.Capture();
-            using (new AllowedThread())
-                agent.DropItem(message.EquipmentIndex);
-            worldItem = WeaponDropItemTracker.FindDroppedItem(existingItems);
+            worldItem = WeaponDropItemTracker.CaptureDroppedItem(() =>
+            {
+                using (new AllowedThread())
+                    agent.DropItem(message.EquipmentIndex);
+            });
 
             if (message.WorldItemId == Guid.Empty)
             {
@@ -1920,6 +1946,7 @@ public class WeaponDropHandler : IWeaponDropHandler
 
         PrunePreDropStates();
         PrunePendingResyncRequests();
+        PruneMissileWorldItems();
         var snapshot = new List<KeyValuePair<Guid, NetworkWeaponDropped>>(activeDrops);
         foreach (KeyValuePair<Guid, NetworkWeaponDropped> pair in snapshot)
         {
@@ -1948,6 +1975,21 @@ public class WeaponDropHandler : IWeaponDropHandler
             }
 
             worldItemRegistry.Remove(pair.Key);
+        }
+    }
+
+    // Stuck-missile identities never enter activeDrops, so forget them here once their world item is gone.
+    private void PruneMissileWorldItems()
+    {
+        if (missileWorldItemIds.Count == 0) return;
+
+        foreach (Guid worldItemId in new List<Guid>(missileWorldItemIds))
+        {
+            if (IsActiveDropPresent(worldItemId)) continue;
+
+            missileWorldItemIds.Remove(worldItemId);
+            if (!activeDrops.ContainsKey(worldItemId))
+                worldItemRegistry.Remove(worldItemId);
         }
     }
 

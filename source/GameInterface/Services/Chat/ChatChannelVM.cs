@@ -92,9 +92,10 @@ internal sealed class ChatChannelVM : ViewModel
         if (selected) HasUnreadMessages = false;
     }
 
-    public void MarkUnread()
+    // hidden: chat is closed, so even the selected tab hasn't been seen
+    public void MarkUnread(bool hidden = false)
     {
-        if (!IsSelected) HasUnreadMessages = true;
+        if (hidden || !IsSelected) HasUnreadMessages = true;
     }
 
     public void SetMuted(bool muted)
