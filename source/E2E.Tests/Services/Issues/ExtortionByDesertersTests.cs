@@ -620,7 +620,8 @@ public class ExtortionByDesertersTests : IDisposable
             deserters.SetPartyUsedByQuest(true);
             var battle = CreateBattle(deserters, victors.Party, false);
             battle._battleState = BattleState.DefenderVictory;
-            battle.FinalizeEventAux();
+            deserters.IsActive = false;
+            CampaignEventDispatcher.Instance.OnMapEventEnded(battle);
             Assert.False(deserters.IsActive);
             Assert.False(quest.IsOngoing);
         }, TextLinks.Concat(new[]
