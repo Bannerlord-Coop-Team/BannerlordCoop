@@ -3064,8 +3064,10 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         });
     }
 
-    [Fact]
-    public void BreakInContinuation_WithoutAPaidBreakIn_DoesNotEnterTheSettlement()
+    [Theory]
+    [InlineData(40, false)]
+    [InlineData(0, true)]
+    public void BreakInContinuation_WithoutAPaidBreakIn_EntersOnlyWhenBreakingInCostsNothing(int losses, bool entered)
     {
         var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
         var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
@@ -3075,6 +3077,8 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
             playerPartyId,
             siege.SettlementId,
             siege.LeaderPartyId);
+        AddRegularTroops(playerMobilePartyId, 200);
+        Server.Call(() => Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(losses));
         Server.NetworkSentMessages.Clear();
 
         Server.Call(
@@ -3083,10 +3087,12 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                 new NetworkRequestBreakInContinuation("unpaid", playerMobilePartyId, siege.SettlementId)),
             MapEventDisabledMethods);
 
-        Assert.False(Assert.Single(
+        Assert.Equal(entered, Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkBreakInContinuationApproved>()).Approved);
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkPartyEnterSettlement>());
-        AssertPartyOutsideSettlement(Server, playerMobilePartyId);
+        if (entered)
+            AssertPartyEnteredSettlement(Server, playerMobilePartyId, siege.SettlementId);
+        else
+            AssertPartyOutsideSettlement(Server, playerMobilePartyId);
     }
 
     [Fact]

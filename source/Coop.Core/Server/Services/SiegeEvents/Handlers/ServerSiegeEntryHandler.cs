@@ -114,9 +114,11 @@ internal class ServerSiegeEntryHandler : IHandler
             return false;
 
         var alreadyEntered = ReferenceEquals(party.CurrentSettlement, settlement);
-        // Getting in needs the troops paid in the break in first; a party already inside only gets the entry resent.
+        // Getting in needs the break in troops paid first, unless breaking in costs nothing (vanilla then goes straight in).
+        // A party already inside only gets the entry resent.
         if (!breakOut.CanJoinDefenders(party, settlement, alreadyEntered) ||
-            (!alreadyEntered && !breakInReceipts.IsPaid(party, settlement.SiegeEvent)))
+            (!alreadyEntered && !breakInReceipts.IsPaid(party, settlement.SiegeEvent) &&
+            breakOut.GetBreakInCasualties(party, settlement.SiegeEvent) > 0))
         {
             Logger.Warning("Rejecting break-in request {RequestId} for party {PartyId} and settlement {SettlementId}",
                 request.RequestId, request.PartyId, request.SettlementId);
