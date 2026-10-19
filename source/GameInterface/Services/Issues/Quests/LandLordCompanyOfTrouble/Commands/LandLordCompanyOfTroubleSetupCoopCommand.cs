@@ -11,6 +11,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using Issue = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssue;
 
 namespace GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble.Commands;
@@ -93,6 +94,12 @@ internal sealed class LandLordCompanyOfTroubleSetupCoopCommand : ICoopCommand
         if (!TryTeleport(playerParty, lord.PartyBelongedTo))
         {
             return Failed($"Unable to read the movement state of {playerHero.Name}'s party, it was not teleported");
+        }
+
+        // The company's daily theft only takes food
+        if (playerParty.ItemRoster.TotalFood == 0)
+        {
+            playerParty.ItemRoster.AddToCounts(DefaultItems.Grain, 5);
         }
 
         return new CoopCommandResult(true, Report(playerHero, playerParty, lord, (Issue)lord.Issue));
