@@ -16,11 +16,14 @@ Scope: everything under `source/GameInterface/Services/Issues/`. The repo root `
 
 ## Rules that decide correctness
 
+Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
+
 1. The server runs vanilla outcome code as the owning player inside
    `using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))`. Clients replay what the
    server announced and never roll or pay anything again.
 2. A quest with a `FinalizationProofStrategy` ends through its branch, not a generic `QuestSuccess`, which skips
-   the branch method where vanilla pays.
+   the branch method where vanilla pays. The framework doesnt enforce this yet (#3981), so reject a generic
+   `QuestSuccess` for your descriptor.
 3. The first accepter owns the issue, decided by `IIssueOwnershipRegistry.TrySetOwner` on the server. Clients
    keep a mirror of the registry, filled from accept messages and the join snapshot and emptied on
    `NetworkIssueFinalized`. `Framework/Gating/SimilarCommitmentsGatePatch.cs` reads it inside
