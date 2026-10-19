@@ -86,6 +86,8 @@ Support helps cover development tools, hosting infrastructure, dedicated servers
 
 Get started [here!](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/wiki/Getting-Started-as-a-Contributor) Also join our [Discord](https://discord.gg/VXqGyT8) for direct questions and collaboration.
 
+We do not accept tests or implementations created solely by AI, because they add too much technical debt. AI tools may assist, but every change must be designed, reviewed, and owned by a human contributor who can explain and maintain it. PRs whose code or tests were produced only by AI may be closed.
+
 Debug builds of the in-game server always try to load a campaign save named `MP` when the server starts: a plain `/server` launch loads nothing else, and a `/coopsave <name>` launch attempts `MP` before the named save. A missing `MP` save is skipped with `Failed to load save with name MP` in the server log, so create a game and save it as `MP` before hosting from a Debug build; the [Environment Setup Guide](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/wiki/Environment-Setup-Guide) wiki page covers this under Windows Setup (create a new game and save it as MP). Release builds skip `MP` and load only the save picked in the host screen or passed with `/coopsave`.
 
 By submitting a contribution to BannerlordCoop, you agree that your contribution

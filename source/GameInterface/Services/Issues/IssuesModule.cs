@@ -1,11 +1,11 @@
-﻿using Autofac;
+using Autofac;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
+using GameInterface.Services.Issues.Framework.Conversation;
 using GameInterface.Services.Issues.Framework.Dispatch;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
-using GameInterface.Services.Issues.Quests.ArtisanProducts;
-using System;
+using GameInterface.Services.Issues.Quests.ArtisanProducts;`r`nusing GameInterface.Services.Issues.Quests.TheConquestOfSettlement;`r`nusing System;
 
 namespace GameInterface.Services.Issues;
 
@@ -27,6 +27,10 @@ internal class IssuesModule : Module
         builder.RegisterType<ArtisanProductsProgress>().As<IArtisanProductsProgress>().InstancePerDependency();
         builder.RegisterType<ArtisanProductsTroopReturns>().As<IArtisanProductsTroopReturns>().InstancePerLifetimeScope();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
+        builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
+        builder.RegisterType<TheConquestOfSettlementService>()
+            .As<ITheConquestOfSettlementService>()
+            .InstancePerLifetimeScope();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)
@@ -52,3 +56,4 @@ internal class IssuesModule : Module
             || typeof(IFinalizationProofStrategy).IsAssignableFrom(type);
     }
 }
+
