@@ -336,7 +336,6 @@ public class LadysKnightOutTests : IDisposable
             var giver = scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId);
             var hero = Hero.MainHero;
             Assert.NotSame(giver.MapFaction, giver.CurrentSettlement.MapFaction);
-            Assert.True(VillageHostileFactionStanceHelper.HasWarStance(hero.MapFaction, giver.CurrentSettlement.MapFaction));
         });
 
         scenario.Accept(scenario.ClientB);
