@@ -69,7 +69,9 @@ internal class CaravanAmbushPatches
         var conversationManager = Campaign.Current.ConversationManager;
         // Publicizer exposes duplicate event metadata, so direct event binding does not compile here.
         var conversationEnd = AccessTools.Event(conversationManager.GetType(), "ConversationEndOneShot");
-        conversationEnd?.AddEventHandler(conversationManager, new Action(quest.OnQuestSucceeded));
+        if (conversationEnd == null)
+            throw new MissingMemberException("ConversationEndOneShot");
+        conversationEnd.AddEventHandler(conversationManager, new Action(quest.OnQuestSucceeded));
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnQuestSucceeded))]
