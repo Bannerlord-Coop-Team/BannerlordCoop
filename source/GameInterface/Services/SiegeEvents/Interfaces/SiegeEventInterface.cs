@@ -879,13 +879,9 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
                 PlayerEncounter.Finish(forcePlayerOutFromSettlement: false);
             }
 
-            // AllowedThread stands the co-op EncounterManager patch down so this runs locally, not round-tripped.
-            // Vanilla DoEnd starts a member's encounter on the army leader and does not enter the settlement.
-            if (asArmyMember)
-            {
-                EncounterManager.StartSettlementEncounter(MobileParty.MainParty.Army?.LeaderParty ?? MobileParty.MainParty, settlement);
-            }
-            else
+            // An army member only needs the menu: its narration reads the leader's CurrentSettlement and Continue
+            // just exits, so no encounter is started for it.
+            if (!asArmyMember)
             {
                 if (MobileParty.MainParty.CurrentSettlement != settlement)
                 {

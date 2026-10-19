@@ -34,9 +34,9 @@ public class DirectMigratedCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(123, commandTypes.Length);
+        Assert.Equal(124, commandTypes.Length);
 #else
-        Assert.Equal(104, commandTypes.Length);
+        Assert.Equal(105, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -96,6 +96,7 @@ public class DirectMigratedCommandTests
                 "engage_nearest_bandit",
                 "kms",
                 "move_to_settlement",
+                "route_enemies",
                 "start_nearest_bandit_attack",
                 "upgrade_party_screen_troop",
             },
@@ -204,6 +205,30 @@ public class DirectMigratedCommandTests
 
             Assert.False(result.Succeeded);
             Assert.Equal("command_failed", result.ErrorCode);
+        }
+        finally
+        {
+            ModInformation.IsServer = originalIsServer;
+        }
+    }
+
+    [Fact]
+    public void RouteEnemies_RunOnClient_ReturnsExplicitFailure()
+    {
+        bool originalIsServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = false;
+            ICoopCommand command = Assert.Single(
+                CreateCommands(),
+                candidate => candidate.Prefix == "coop.debug.map_event" && candidate.Name == "route_enemies");
+            Assert.Equal(CoopCommandSide.Server, command.Side);
+
+            CoopCommandResult result = command.ProcessCommand(new TestArgs(new[] { "map_event", "0" }));
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("command_failed", result.ErrorCode);
+            Assert.Equal("Run this command on the server.", result.Output);
         }
         finally
         {
