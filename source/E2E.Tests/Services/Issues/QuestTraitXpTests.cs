@@ -55,6 +55,7 @@ public class QuestTraitXpTests : IDisposable
                     TraitLevelingHelper.OnIssueSolvedThroughQuest(owner, DefaultTraits.Honor, Reward);
                     TraitLevelingHelper.OnIssueSolvedThroughAlternativeSolution(owner, calculating);
                     TraitLevelingHelper.OnIssueSolvedThroughBetrayal(owner, calculating);
+                    TraitLevelingHelper.OnIssueFailed(owner, calculating);
                 }
             }
 
@@ -73,5 +74,6 @@ public class QuestTraitXpTests : IDisposable
         Assert.False(QuestTraitXpPatches.OnIssueSolvedThroughQuestSingleTraitPrefix());
         Assert.False(QuestTraitXpPatches.OnIssueSolvedThroughAlternativeSolutionPrefix());
         Assert.False(QuestTraitXpPatches.OnIssueSolvedThroughBetrayalPrefix());
+        Assert.False(QuestTraitXpPatches.OnIssueFailedPrefix());
     }
 }
