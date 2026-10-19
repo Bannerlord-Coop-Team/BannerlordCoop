@@ -48,11 +48,11 @@ public class AlternativeSolutionNonOwnerJournalTests : IDisposable
     [Fact]
     public void AClientDailyTick_AdvancesTheReturnDaysUpToTheirRange()
     {
-        AcceptedOn(scenario.ClientB, QuestScenario.ControllerB);
+        AcceptedOn(scenario.ClientA, QuestScenario.ControllerA);
 
-        scenario.ClientB.Call(() =>
+        scenario.ClientA.Call(() =>
         {
-            Assert.True(scenario.ClientB.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
+            Assert.True(scenario.ClientA.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
             var journalLog = Assert.Single(notable.Issue.JournalEntries);
             Assert.True(journalLog.Range > 1);
             Assert.Equal(0, journalLog.CurrentProgress);
