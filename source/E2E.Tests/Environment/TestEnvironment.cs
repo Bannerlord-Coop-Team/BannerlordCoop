@@ -11,9 +11,12 @@ using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface;
 using GameInterface.Policies;
+using GameInterface.Services.Entity;
 using Missions;
 using Missions.Agents.Handlers;
 using Missions.Battles;
+using Missions.Services.Network;
+using System.Diagnostics;
 using Xunit.Abstractions;
 using MockServerTelemetryUploader = Coop.IntegrationTests.Environment.Mock.MockServerTelemetryUploader;
 
@@ -134,6 +137,20 @@ public class TestEnvironment
             .InstancePerDependency();
         builder.RegisterInstance(new FixedBattleSizeProvider(1000))
             .As<IBattleSizeProvider>();
+        // The wall-clock receiver-cap heartbeat sends from a timer thread into the single-threaded mesh scheduler, and
+        // deadlocks teardown: Dispose waits for that callback while holding the GameInstance lock it is blocked on.
+        builder.Register(context => new MovementRateController(
+                context.Resolve<IBattleNetwork>(),
+                context.Resolve<IMessageBroker>(),
+                context.Resolve<IControllerIdProvider>(),
+                context.Resolve<IMissionContext>(),
+                Stopwatch.GetTimestamp,
+                Stopwatch.Frequency,
+                MovementRateController.ReadFrameLimitHz,
+                enableHeartbeat: false,
+                context.Resolve<IMovementNetworkSettings>()))
+            .As<IMovementRateController>()
+            .InstancePerDependency();
 
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
         builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
