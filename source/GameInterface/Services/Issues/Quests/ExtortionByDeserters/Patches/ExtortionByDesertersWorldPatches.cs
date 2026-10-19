@@ -103,14 +103,12 @@ internal class ExtortionByDesertersWorldPatches
         if (ModInformation.IsClient || deserters == null || !mapEvent.InvolvedParties.Contains(deserters.Party)) return false;
 
         var owner = Hero.MainHero.PartyBelongedTo?.Party;
-        var captor = Hero.MainHero.IsPrisoner ? Hero.MainHero.PartyBelongedToAsPrisoner : null;
-        var ownerWasCaptured = captor?.MapEvent == mapEvent && mapEvent.WinningSide == captor.Side;
         // Like vanilla, a battle without the owner, such as the village militia's, leaves the quest alone here;
         // the FinalizeEventAux postfix cancels it if the deserters were destroyed.
-        if (!ownerWasCaptured && (owner == null || !mapEvent.InvolvedParties.Contains(owner))) return false;
+        if (owner == null || !mapEvent.InvolvedParties.Contains(owner)) return false;
 
         __instance._deserterBattleFinalizedForTheFirstTime = true;
-        if (!ownerWasCaptured && mapEvent.WinningSide == owner.Side)
+        if (mapEvent.WinningSide == owner.Side)
         {
             __instance._currentState = State.DesertersAreDefeated;
             __instance.AddLog(__instance.OnDeserterPartyDefeatedLogText);

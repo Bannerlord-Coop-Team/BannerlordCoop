@@ -5,10 +5,10 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
-using System.Reflection;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 
 namespace E2E.Tests.Services.Issues;
