@@ -329,9 +329,13 @@ public class LadysKnightOutTests : IDisposable
             });
         }
 
-        scenario.Accept(scenario.ClientB);
-        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
-        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+        scenario.ClientB.Call(() =>
+        {
+            var giver = scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId);
+            var hero = Hero.MainHero;
+            Assert.NotSame(giver.MapFaction, giver.CurrentSettlement.MapFaction);
+            Assert.True(VillageHostileFactionStanceHelper.HasWarStance(hero.MapFaction, giver.CurrentSettlement.MapFaction));
+        });
     }
 
     [Fact]
