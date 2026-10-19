@@ -63,7 +63,7 @@ namespace Coop.Tests.Server.Services.Save
             interactionsPlayerData.PlayerHasMetHermit[players[0].HeroId] = true;
             interactionsPlayerData.PlayerHasMetHermit[players[1].HeroId] = false;
 
-            var tradePlayerData = new TradePlayerData(new(), new(), new(), new());
+            var tradePlayerData = new TradePlayerData(new(), new(), new(), new(), new());
             tradePlayerData.PlayerSettlementBribePaid[players[0].HeroId] = new() { ["settlement1Id"] = 0, ["settlement2Id"] = 1000 };
             tradePlayerData.PlayerSettlementBribePaid[players[1].HeroId] = new() { ["settlement2Id"] = 3200, ["settlement3Id"] = 123 };
 
@@ -123,7 +123,7 @@ namespace Coop.Tests.Server.Services.Save
             interactionsPlayerData.PlayerHasMetHermit[players[0].HeroId] = true;
             interactionsPlayerData.PlayerHasMetHermit[players[1].HeroId] = false;
 
-            var tradePlayerData = new TradePlayerData(new(), new(), new(), new());
+            var tradePlayerData = new TradePlayerData(new(), new(), new(), new(), new());
             tradePlayerData.PlayerSettlementBribePaid[players[0].HeroId] = new() { ["settlement1Id"] = 0, ["settlement2Id"] = 1000 };
             tradePlayerData.PlayerSettlementBribePaid[players[1].HeroId] = new() { ["settlement2Id"] = 3200, ["settlement3Id"] = 123 };
 
