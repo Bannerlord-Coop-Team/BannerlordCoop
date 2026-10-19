@@ -10,6 +10,7 @@ using Missions.Agents;
 using Missions.Agents.Handlers;
 using Missions.Agents.Messages;
 using Missions.Agents.Packets;
+using Missions.Agents.Patches;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Message;
 using Missions.Tournaments;
@@ -1034,6 +1035,137 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         });
     }
 
+    [Fact]
+    public void StuckMissileIdentity_IsPrunedOnceItsWorldItemIsGone()
+    {
+        RunWithStuckMissileClients((clients, picker, shooter, itemObject, weapon) =>
+        {
+            SpawnedItemEntity copy = clients.Peer.LandMissile(shooter, weapon, missileIndex: 11, sceneId: 99);
+            Assert.True(clients.Peer.Items.TryGetId(copy, out Guid copyId));
+
+            clients.Peer.Tick(1f);
+            Assert.True(clients.Peer.Items.TryGet(copyId, out _));
+
+            // The engine despawned the stuck arrow without any pickup naming it.
+            Assert.True(clients.Peer.Spawner.TryRemove(copy));
+            clients.Peer.Tick(1f);
+
+            Assert.False(clients.Peer.Items.TryGet(copyId, out _));
+            Assert.False(clients.Peer.Items.TryGetId(copy, out _));
+        });
+    }
+
+    [Fact]
+    public void NativeDeathDrop_OfAnUnregisteredAgent_IsNotCapturedOrAnnounced()
+    {
+        RunWithAgentShims(observer =>
+        {
+            Agent agent = ObjectHelper.SkipConstructor<Agent>();
+            AgentEquipmentShim.Track(agent, CreateEquipment(default));
+
+            RunNativeAgentDrop(agent, EquipmentIndex.Weapon0);
+
+            Assert.Equal(0, AgentEquipmentShim.GetWeaponEntityLookupCount(agent));
+            Assert.Empty(PublishedDrops(observer, agent));
+        });
+    }
+
+    [Fact]
+    public void NativeDeathDrop_OfARegisteredAgent_ReadsTheSlotEntityAndAnnouncesOnce()
+    {
+        RunWithAgentShims(observer =>
+        {
+            Agent agent = ObjectHelper.SkipConstructor<Agent>();
+            AgentEquipmentShim.Track(agent, CreateEquipment(default));
+            Assert.True(observer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("fighter", Guid.NewGuid(), agent));
+
+            RunNativeAgentDrop(agent, EquipmentIndex.Weapon0);
+
+            Assert.Equal(1, AgentEquipmentShim.GetWeaponEntityLookupCount(agent));
+            WeaponDropped dropped = Assert.Single(PublishedDrops(observer, agent));
+            Assert.Equal(EquipmentIndex.Weapon0, dropped.EquipmentIndex);
+        });
+    }
+
+    [Fact]
+    public void NativeDropInsideDropItem_HandsItsItemToDropItemWhichAnnouncesOnce()
+    {
+        RunWithAgentShims(observer =>
+        {
+            Agent agent = ObjectHelper.SkipConstructor<Agent>();
+            AgentEquipmentShim.Track(agent, CreateEquipment(default));
+            Assert.True(observer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("fighter", Guid.NewGuid(), agent));
+
+            AgentDropPatch.DropState state = AgentDropPatch.Capture(agent, EquipmentIndex.Weapon1);
+            Assert.True(state.IsCaptured);
+            WeaponDropItemTracker.Begin();
+            RunNativeAgentDrop(agent, EquipmentIndex.Weapon1);
+            Assert.Empty(PublishedDrops(observer, agent));
+            AgentDropPatch.Publish(agent, EquipmentIndex.Weapon1, state.Weapon, WeaponDropItemTracker.End());
+
+            Assert.Equal(1, AgentEquipmentShim.GetWeaponEntityLookupCount(agent));
+            WeaponDropped dropped = Assert.Single(PublishedDrops(observer, agent));
+            Assert.Equal(EquipmentIndex.Weapon1, dropped.EquipmentIndex);
+            Assert.False(WeaponDropItemTracker.IsCapturing);
+        });
+    }
+
+    [Fact]
+    public void NativeDropWhileApplyingAReceivedDrop_IsRecordedForTheHandlerAndNotAnnounced()
+    {
+        RunWithAgentShims(observer =>
+        {
+            Agent agent = ObjectHelper.SkipConstructor<Agent>();
+            AgentEquipmentShim.Track(agent, CreateEquipment(default));
+            Assert.True(observer.Resolve<INetworkAgentRegistry>().TryRegisterAgent("fighter", Guid.NewGuid(), agent));
+
+            SpawnedItemEntity item = WeaponDropItemTracker.CaptureDroppedItem(() =>
+            {
+                using (new AllowedThread())
+                    RunNativeAgentDrop(agent, EquipmentIndex.Weapon0);
+            });
+
+            Assert.Null(item);
+            Assert.Equal(1, AgentEquipmentShim.GetWeaponEntityLookupCount(agent));
+            Assert.Empty(PublishedDrops(observer, agent));
+            Assert.False(WeaponDropItemTracker.IsCapturing);
+        });
+    }
+
+    [Fact]
+    public void DroppedItemTracker_KeepsTheFirstRecordedItemOnlyWhileCapturing()
+    {
+        SpawnedItemEntity first = ObjectHelper.SkipConstructor<SpawnedItemEntity>();
+        SpawnedItemEntity attached = ObjectHelper.SkipConstructor<SpawnedItemEntity>();
+
+        WeaponDropItemTracker.Record(first);
+        Assert.Null(WeaponDropItemTracker.CaptureDroppedItem(() => { }));
+
+        Assert.Same(first, WeaponDropItemTracker.CaptureDroppedItem(() =>
+        {
+            WeaponDropItemTracker.Record(first);
+            WeaponDropItemTracker.Record(attached);
+        }));
+
+        Assert.Throws<InvalidOperationException>(() => WeaponDropItemTracker.CaptureDroppedItem(
+            () => throw new InvalidOperationException()));
+        Assert.False(WeaponDropItemTracker.IsCapturing);
+    }
+
+    // Runs the native drop callback's patch bodies around a drop the shimmed agent cannot perform natively.
+    private static void RunNativeAgentDrop(Agent agent, EquipmentIndex equipmentIndex)
+    {
+        NativeAgentDropPatch.NativeDropState state = NativeAgentDropPatch.Capture(agent, equipmentIndex);
+        NativeAgentDropPatch.Publish(agent, equipmentIndex, state);
+    }
+
+    // Lists the drops the patches announced for one agent on this instance.
+    private static WeaponDropped[] PublishedDrops(EnvironmentInstance observer, Agent agent) =>
+        observer.Resolve<Common.Tests.Utils.TestMessageBroker>().Messages
+            .GetMessages<WeaponDropped>()
+            .Where(dropped => ReferenceEquals(dropped.Agent, agent))
+            .ToArray();
+
     private delegate void StuckMissileTest(
         StuckMissileClients clients, Agent picker, Agent shooter, ItemObject itemObject, MissionWeapon weapon);
 
@@ -1170,6 +1302,8 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         }
 
         public void RemoveMissile(int missileIndex) => Broker.Publish(this, new MissileRemoved(missileIndex));
+
+        public void Tick(float dt) => drops.Tick(dt);
 
         public int KeptShotCount(string map) => ((System.Collections.IDictionary)ShotMap(map)).Count;
 
