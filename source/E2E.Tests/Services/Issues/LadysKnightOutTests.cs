@@ -790,14 +790,22 @@ public class LadysKnightOutTests : IDisposable
     {
         PrepareLordSolution();
         scenario.ClientA.Call(() => scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution());
+        var expectedInfluence = 0f;
         scenario.Server.Call(() =>
         {
             Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
             Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var owner));
             owner.Clan.Influence = 0;
+            expectedInfluence = -scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.NeededInfluenceForLordSolution;
         });
         scenario.ClientA.Call(() => scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
         Assert.Equal(IssueOutcome.QuestSuccess, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        environment.FlushCoalescer();
+        scenario.Server.Call(() =>
+        {
+            Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
+            Assert.Equal(expectedInfluence, scenario.Server.GetRegisteredObject<Hero>(player.HeroId).Clan.Influence);
+        });
     }
 
     private static TournamentSessionSnapshot Snapshot(int round, bool finished, bool champion)
