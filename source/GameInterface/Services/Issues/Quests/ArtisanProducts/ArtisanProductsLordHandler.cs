@@ -10,6 +10,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using ProtoBuf;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;

@@ -6,6 +6,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Entity;
 using ProtoBuf;
+using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -39,7 +40,7 @@ internal class ArtisanProductsProgress : IArtisanProductsProgress
         var issue = IssueManager.GetIssueOfQuest(quest);
         if (!(issue is Issue artisan) || !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
             !owners.TryGetOwnerControllerId(issue, out var controllerId)) return;
-        var prosperity = artisan.QuestGiver?.CurrentSettlement?.Town?.Prosperity ?? 0;
+        var prosperity = quest.QuestGiver?.CurrentSettlement?.Town?.Prosperity ?? 0;
         network.SendAll(new NetworkArtisanProductsProgress(ownerId, issue.StringId, quest._deliveredRawGoods,
             quest._counterOfferRefused, quest.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), controllerId,
             prosperity));
