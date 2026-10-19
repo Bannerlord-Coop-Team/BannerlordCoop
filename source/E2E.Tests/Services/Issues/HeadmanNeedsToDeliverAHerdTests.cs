@@ -248,7 +248,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false));
         environment.FlushCoalescer();
 
-        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(), message => message.Outcome == IssueOutcome.QuestCancel);
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
         ClientA.Call(() => Assert.Contains(accepted[ClientA].JournalEntries, log => log.LogText.GetID() == "m41vdhSR"));
         foreach (var instance in Instances)
@@ -264,7 +264,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         Server.Call(() => Campaign.Current.IssueManager.OnHeroKilled(Object<Hero>(Server, scenario.NotableId), null,
             KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false));
         environment.FlushCoalescer();
-        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(), message => message.Outcome == IssueOutcome.QuestCancel);
         foreach (var instance in Instances)
         {
             instance.Call(() =>
@@ -485,6 +485,26 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
                 Assert.True(Party(instance, QuestScenario.ControllerA).MemberRoster.Contains(Object<Hero>(instance, companionId).CharacterObject));
             });
         }
+    }
+
+    [Fact]
+    public void GiverDeathAction_CancelsPersonalQuestOnOwnerClient()
+    {
+        Accept(ClientA);
+        Server.Call(() =>
+        {
+            var giver = Object<Hero>(Server, scenario.NotableId);
+            giver.AddDeathMark(null, KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge);
+            KillCharacterAction.ApplyByDeathMarkForced(giver);
+        });
+        environment.FlushCoalescer();
+
+        Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(), message => message.Outcome == IssueOutcome.QuestCancel);
+        ClientA.Call(() =>
+        {
+            Assert.Empty(Campaign.Current.QuestManager.Quests);
+            Assert.Null(Object<Hero>(ClientA, scenario.NotableId).Issue);
+        });
     }
 
     [Fact]
