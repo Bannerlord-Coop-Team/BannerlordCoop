@@ -8,7 +8,6 @@ using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using LiteNetLib;
 using SandBox.GauntletUI.Map;
 using SandBox.View.Map;
 using SandBox.ViewModelCollection.Nameplate;
@@ -85,7 +84,7 @@ namespace GameInterface.Services.Banners.Handlers
             }
 
             // Only the clan leader may edit the banner, same rule as the banner editor button.
-            if (ModInformation.IsServer && !CanManageClan(obj.Who, clan))
+            if (ModInformation.IsServer && !playerManager.CanManageClan(obj.Who, clan, objectManager, permissions))
             {
                 Logger.Warning("Ignoring banner edit for clan {clanId} from a player who does not lead it", payload.ClanId);
                 return;
@@ -166,13 +165,6 @@ namespace GameInterface.Services.Banners.Handlers
                     messageBroker.Publish(this, new PlayerBannerChanged(kingdomClan));
                 }
             }
-        }
-
-        private bool CanManageClan(object sender, Clan clan)
-        {
-            return sender is NetPeer peer && playerManager.TryGetPlayer(peer, out var player) &&
-                objectManager.TryGetObject<Hero>(player.HeroId, out var actor) &&
-                permissions.CanManageClan(actor, clan);
         }
 
         /// <summary>
