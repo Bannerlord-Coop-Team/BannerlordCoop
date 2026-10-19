@@ -104,9 +104,10 @@ internal class ArtisanProductsProgressHandler : IHandler
         {
             if (string.IsNullOrEmpty(data.ControllerId) || data.ControllerId != controller.ControllerId) return;
             if (!resolver.TryResolve(data.OwnerId, data.IssueId, out _, out var issue, out _)) return;
+            if (!(issue is Issue artisan)) return;
             using (new AllowedThread())
             {
-                issue._targetSettlement.Town.Prosperity = data.Prosperity;
+                artisan._targetSettlement.Town.Prosperity = data.Prosperity;
                 if (!(issue.IssueQuest is Quest quest))
                 {
                     foreach (var text in data.Logs.Skip(issue.JournalEntries.Count)) issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(text)));
