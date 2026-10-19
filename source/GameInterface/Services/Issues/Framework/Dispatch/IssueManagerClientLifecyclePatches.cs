@@ -1,8 +1,10 @@
-using Common;
+﻿using Common;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -18,7 +20,37 @@ internal static class IssueManagerClientLifecyclePatches
         yield return AccessTools.Method(typeof(IssueManager), nameof(IssueManager.OnSettlementEntered));
         yield return AccessTools.Method(typeof(IssueManager), nameof(IssueManager.OnSettlementLeft));
         yield return AccessTools.Method(typeof(IssueManager), nameof(IssueManager.OnCharacterPortraitPopUpOpened));
-        yield return AccessTools.Method(typeof(IssueManager), nameof(IssueManager.OnHeroKilled));
+    }
+
+    [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
+    private static class HeroKilledPatch
+    {
+        [HarmonyPrefix]
+        private static bool Prefix(Hero victim, out IDisposable __state)
+        {
+            __state = null;
+            if (ModInformation.IsClient)
+            {
+                return false;
+            }
+
+            if (victim?.Issue == null ||
+                !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver) ||
+                !ownerResolver.TryResolveOwnerHero(victim.Issue, out var ownerHero))
+            {
+                return false;
+            }
+
+            __state = new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo);
+            return true;
+        }
+
+        [HarmonyFinalizer]
+        private static Exception Finalizer(Exception __exception, IDisposable __state)
+        {
+            __state?.Dispose();
+            return __exception;
+        }
     }
 
     [HarmonyPrefix]
@@ -41,7 +73,9 @@ internal static class IssueManagerClientLifecyclePatches
     {
         foreach (var issue in issueManager.Issues.Values)
         {
-            if (!issue.IsSolvingWithAlternative || issue.AlternativeSolutionReturnTimeForTroops.IsPast)
+            if (!issue.IsSolvingWithAlternative ||
+                issue.AlternativeSolutionReturnTimeForTroops.IsPast ||
+                GameInterface.Services.Issues.Framework.Visibility.QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(issue))
             {
                 continue;
             }

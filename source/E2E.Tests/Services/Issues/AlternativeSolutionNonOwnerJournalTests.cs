@@ -30,7 +30,7 @@ public class AlternativeSolutionNonOwnerJournalTests : IDisposable
     [Fact]
     public void AClientThatDidNotStartTheMission_HasAJournalEntryForTheDailyTick()
     {
-        AcceptedOn(scenario.ClientB, QuestScenario.ControllerA);
+        AcceptedOn(scenario.ClientB, QuestScenario.ControllerB);
 
         scenario.ClientB.Call(() =>
         {

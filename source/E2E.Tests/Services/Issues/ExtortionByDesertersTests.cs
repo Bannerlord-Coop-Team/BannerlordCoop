@@ -621,13 +621,13 @@ public class ExtortionByDesertersTests : IDisposable
             var battle = CreateBattle(deserters, victors.Party, false);
             battle._battleState = BattleState.DefenderVictory;
             DestroyPartyAction.Apply(null, deserters);
-            CampaignEventDispatcher.Instance.OnMapEventEnded(battle);
+            battle.FinalizeEventAux();
             Assert.False(deserters.IsActive);
             Assert.False(quest.IsOngoing);
         }, TextLinks.Concat(new[]
         {
             AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
-            AccessTools.Method(typeof(MapEvent), "MovePartyToSuitablePositionOnMapEventFinalize"),
+            AccessTools.Method(typeof(MapEvent), nameof(MapEvent.MovePartyToSuitablePositionOnMapEventFinalize)),
         }).ToArray());
         Assert.Equal(IssueOutcome.QuestCancel,
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
