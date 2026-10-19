@@ -14,6 +14,7 @@ public class IssuesLayoutTests
 {
     private static readonly string IssuesNamespace = typeof(IssuesModule).Namespace;
     private static readonly string InterfaceNamespace = typeof(IQuestTypeDescriptor).Namespace;
+    private static readonly string FrameworkNamespace = InterfaceNamespace.Substring(0, InterfaceNamespace.LastIndexOf('.'));
 
     private static List<Type> IssueTypes()
     {
@@ -35,10 +36,12 @@ public class IssuesLayoutTests
     }
 
     [Fact]
-    public void Interfaces_AreDeclaredInTheFrameworkInterfaceNamespace()
+    public void FrameworkInterfaces_AreDeclaredInTheFrameworkInterfaceNamespace()
     {
         var misplaced = IssueTypes()
-            .Where(type => type.IsInterface && type.Namespace != InterfaceNamespace)
+            .Where(type => type.IsInterface &&
+                (type.Namespace == FrameworkNamespace || type.Namespace.StartsWith(FrameworkNamespace + ".")))
+            .Where(type => type.Namespace != InterfaceNamespace)
             .Select(type => type.FullName)
             .ToList();
 

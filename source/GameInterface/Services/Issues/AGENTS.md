@@ -11,7 +11,7 @@ Scope: everything under `source/GameInterface/Services/Issues/`. The repo root `
   `GameInterface.Services.Issues.Quests` that implements `IQuestTypeDescriptor` or a strategy interface, and
   `Framework/Gating/IssueTypeAllowlistGate.cs` turns off `RegisterEvents` for every other issue behavior. Do not
   add a per-quest "disable this behavior" patch, it will fight the gate.
-- `IssuesLayoutTests` in `GameInterface.Tests` checks that interfaces sit in `Framework.Interface` and that
+- `IssuesLayoutTests` in `GameInterface.Tests` checks that `Framework/` interfaces sit in `Framework.Interface` and that
   messages are public readonly structs, with network commands as `[ProtoContract(SkipConstructor = true)]`.
 
 ## Rules that decide correctness
