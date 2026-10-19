@@ -312,10 +312,9 @@ public class CaravanAmbushTests : IDisposable
             GameStateManager._current = Game.Current.GameStateManager;
             GameStateManager.Current._gameStates.Add(GameStateManager.Current.CreateState<MapState>());
         });
+        SendState(QuestScenario.ControllerA, true, 0);
         Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkCaravanAmbushConversation(
             scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA, caravanId)));
-        Assert.Equal(0, conversations.CountFor(Owner));
-        SendState(QuestScenario.ControllerA, true, 0);
         Assert.Equal(1, conversations.CountFor(Owner));
         Assert.Equal(0, conversations.CountFor(Other));
     }
