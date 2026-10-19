@@ -11,7 +11,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.ArtisanCantSellProductsAtAFairPri
 
 namespace GameInterface.Services.Issues.Quests.ArtisanProducts;
 
-internal readonly struct ArtisanProductsOwnerChanged : IEvent
+public readonly struct ArtisanProductsOwnerChanged : IEvent
 {
     public readonly Issue Issue;
     public readonly Hero Previous;

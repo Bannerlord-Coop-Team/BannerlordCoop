@@ -20,7 +20,7 @@ namespace GameInterface.Services.Issues.Quests.ArtisanProducts;
 
 public enum ArtisanProductsLordAction : byte { Start, AcceptMerchant, RefuseMerchant, Journal, Rejected }
 
-internal readonly struct ArtisanProductsLordRequested : IEvent
+public readonly struct ArtisanProductsLordRequested : IEvent
 {
     public readonly Issue Issue;
     public readonly ArtisanProductsLordAction Action;
