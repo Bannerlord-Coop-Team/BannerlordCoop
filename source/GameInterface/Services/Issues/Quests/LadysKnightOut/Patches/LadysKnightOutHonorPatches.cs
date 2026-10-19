@@ -24,9 +24,9 @@ internal class LadysKnightOutHonorPatches
 [HarmonyPatch]
 internal class LadysKnightOutHonorMirrorPatches
 {
-    [HarmonyPatch(typeof(PropertyOwner<PropertyObject>), nameof(PropertyOwner<PropertyObject>.SetPropertyValue))]
+    [HarmonyPatch(typeof(PropertyOwner<TraitObject>), nameof(PropertyOwner<TraitObject>.SetPropertyValue))]
     [HarmonyPostfix]
-    private static void MirrorClientHonor(PropertyOwner<PropertyObject> __instance, PropertyObject attribute, int value)
+    private static void MirrorClientHonor(PropertyOwner<TraitObject> __instance, TraitObject attribute, int value)
     {
         if (ModInformation.IsServer || AllowedThread.IsThisThreadAllowed() || Campaign.Current?.PlayerTraitDeveloper != __instance ||
             attribute != DefaultTraits.Honor) return;
