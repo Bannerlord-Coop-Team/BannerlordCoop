@@ -54,6 +54,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         this.controller = controller;
         broker.Subscribe<RequestLordSolution>(HandleRequest);
         broker.Subscribe<NetworkLordSolutionStarted>(HandleStarted);
+        broker.Subscribe<NetworkLordSolutionRejected>(HandleRejected);
         broker.Subscribe<NetworkIssueFinalized>(HandleFinalized);
         broker.Subscribe<AllGameObjectsRegistered>(HandleSessionLoaded);
     }
@@ -62,6 +63,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
     {
         broker.Unsubscribe<RequestLordSolution>(HandleRequest);
         broker.Unsubscribe<NetworkLordSolutionStarted>(HandleStarted);
+        broker.Unsubscribe<NetworkLordSolutionRejected>(HandleRejected);
         broker.Unsubscribe<NetworkIssueFinalized>(HandleFinalized);
         broker.Unsubscribe<AllGameObjectsRegistered>(HandleSessionLoaded);
     }
@@ -101,7 +103,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
                 !issue.IsThereLordSolution || !objects.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) ||
                 hero.PartyBelongedTo == null)
             {
-                Reject(peer, data.Operation);
+                Reject(peer, data);
                 return;
             }
 
@@ -114,7 +116,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
                         !issue.LordSolutionCondition(out _) || Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution ||
                         !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
                     {
-                        Reject(peer, data.Operation);
+                        Reject(peer, data);
                         return;
                     }
 
@@ -127,7 +129,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
                 if (!issue.IsSolvingWithLordSolution ||
                     !ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != player.ControllerId)
                 {
-                    Reject(peer, data.Operation);
+                    Reject(peer, data);
                     return;
                 }
 
@@ -141,14 +143,14 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
                     case LordSolutionOperation.RefuseCounterOffer:
                         if (Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution)
                         {
-                            Reject(peer, data.Operation);
+                            Reject(peer, data);
                             return;
                         }
                         issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
                         outcome = IssueOutcome.LordRefusedCounterOffer;
                         break;
                     default:
-                        Reject(peer, data.Operation);
+                        Reject(peer, data);
                         return;
                 }
                 broker.Publish(issue, new IssueOutcomeObserved(issue, outcome));
@@ -156,12 +158,23 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         }, context: nameof(LordSolutionCoordinator));
     }
 
-    private void Reject(NetPeer peer, LordSolutionOperation operation)
+    private void Reject(NetPeer peer, RequestLordSolution data)
     {
-        var message = operation == LordSolutionOperation.Start
+        var message = data.Operation == LordSolutionOperation.Start
             ? "The decree could not be accepted. Check your influence and speak to the artisan again."
             : "The decree decision could not be applied. Check your influence and speak to the merchant again.";
         network.Send(peer, new SendInformationMessage(message));
+        network.Send(peer, new NetworkLordSolutionRejected(data.IssueOwnerId, data.IssueId));
+    }
+
+    private void HandleRejected(MessagePayload<NetworkLordSolutionRejected> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        var data = payload.What;
+        GameThread.RunSafe(() => pendingDecisions.RemoveWhere(issue =>
+                issue.StringId == data.IssueId && issue.IssueOwner.StringId == data.IssueOwnerId),
+            context: nameof(LordSolutionCoordinator));
     }
 
     private void HandleStarted(MessagePayload<NetworkLordSolutionStarted> payload)

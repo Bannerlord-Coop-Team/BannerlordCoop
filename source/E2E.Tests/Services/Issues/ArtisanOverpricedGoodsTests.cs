@@ -313,6 +313,27 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     }
 
     [Fact]
+    public void LordCounterOffer_RejectedDecisionCanRetryAfterInfluenceIsRestored()
+    {
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        Server.Call(() => Get<Clan>(Server, clanId).Influence = 0);
+        environment.FlushCoalescer();
+
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+        environment.FlushCoalescer();
+
+        ClientA.Call(() => Assert.False(ClientA.Resolve<ILordSolutionCoordinator>()
+            .IsDecisionPending(Get<Hero>(ClientA, scenario.NotableId).Issue)));
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+
+        Server.Call(() => Get<Clan>(Server, clanId).Influence = 100);
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+        environment.FlushCoalescer();
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    [Fact]
     public void ASecondPlayer_CannotCompleteTheFirstPlayersLordSolution()
     {
         ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
