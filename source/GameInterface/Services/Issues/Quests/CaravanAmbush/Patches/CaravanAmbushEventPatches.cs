@@ -19,6 +19,12 @@ internal class CaravanAmbushEventPatches
     [HarmonyPostfix]
     private static void Hourly() => Run(quest =>
     {
+        if (quest.QuestDueTime.IsPast)
+        {
+            quest.OnTimedOut();
+            return;
+        }
+
         if (MobileParty.MainParty == null)
         {
             // A captured owner has no party, but an active ambush must still lose invulnerability after six hours.

@@ -74,6 +74,7 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
             return;
         }
         if (!losers.Parties.Any(party => party.Party == quest._banditParty.Party)) return;
+        if (quest._isCaravanSaved) return;
         quest._isCaravanSaved = true;
         Release(quest);
         var ownerParty = MobileParty.MainParty;
