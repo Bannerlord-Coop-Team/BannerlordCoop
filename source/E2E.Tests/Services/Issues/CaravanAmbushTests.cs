@@ -412,7 +412,7 @@ public class CaravanAmbushTests : IDisposable
         Server.Call(() => CampaignEventDispatcher.Instance.HourlyTick());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
 
-        Owner.Call(() => QuestOf(Owner).HourlyTick());
+        Owner.Call(() => Campaign.Current.QuestManager.HourlyTick());
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Server.Call(() => Assert.False(QuestOf(Server).IsOngoing));
     }
