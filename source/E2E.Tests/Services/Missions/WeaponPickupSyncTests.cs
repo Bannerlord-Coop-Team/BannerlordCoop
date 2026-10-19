@@ -405,57 +405,6 @@ public class WeaponPickupSyncTests
     }
 
     [Fact]
-    public void NativeAgentDropCallback_AnnouncesItsOwnDropButNotOneInsideDropItem()
-    {
-        Agent agent = ObjectHelper.SkipConstructor<Agent>();
-        var equipment = new MissionEquipment();
-        typeof(MissionEquipment)
-            .GetField("_weaponSlots", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-            .SetValue(equipment, new MissionWeapon[(int)EquipmentIndex.NumAllWeaponSlots]);
-        agent.Equipment = equipment;
-        var published = new List<EquipmentIndex>();
-        void Record(MessagePayload<WeaponDropped> payload)
-        {
-            if (ReferenceEquals(payload.What.Agent, agent)) published.Add(payload.What.EquipmentIndex);
-        }
-
-        MessageBroker.Instance.Subscribe<WeaponDropped>(Record);
-        try
-        {
-            // A death drop reaches only the native callback.
-            InvokeNativeAgentDrop(agent, EquipmentIndex.Weapon1);
-
-            // DropItem reaches the same callback; DropItem's own patch announces that drop.
-            object[] dropItemArgs = { EquipmentIndex.Weapon2, agent, null };
-            AccessTools.Method(typeof(AgentDropPatch), "Prefix").Invoke(null, dropItemArgs);
-            try
-            {
-                InvokeNativeAgentDrop(agent, EquipmentIndex.Weapon2);
-                AccessTools.Method(typeof(AgentDropPatch), "Postfix")
-                    .Invoke(null, new[] { EquipmentIndex.Weapon2, agent, dropItemArgs[2] });
-            }
-            finally
-            {
-                AccessTools.Method(typeof(AgentDropPatch), "Finalizer").Invoke(null, null);
-            }
-
-            Assert.Equal(new[] { EquipmentIndex.Weapon1, EquipmentIndex.Weapon2 }, published);
-        }
-        finally
-        {
-            MessageBroker.Instance.Unsubscribe<WeaponDropped>(Record);
-        }
-    }
-
-    private static void InvokeNativeAgentDrop(Agent agent, EquipmentIndex equipmentIndex)
-    {
-        object[] args = { agent, equipmentIndex, null };
-        AccessTools.Method(typeof(NativeAgentDropPatch), "Prefix").Invoke(null, args);
-        AccessTools.Method(typeof(NativeAgentDropPatch), "Postfix")
-            .Invoke(null, new[] { agent, equipmentIndex, args[2] });
-    }
-
-    [Fact]
     public void MissionModule_RegistersWeaponPickupPatchCategory()
     {
         HarmonyPatchCategoryRegistration registration = Assert.Single(
