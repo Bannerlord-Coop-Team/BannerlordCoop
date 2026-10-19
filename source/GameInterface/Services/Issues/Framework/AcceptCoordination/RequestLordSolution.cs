@@ -3,7 +3,7 @@ using ProtoBuf;
 
 namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 
-internal enum LordSolutionOperation : byte
+public enum LordSolutionOperation : byte
 {
     Start,
     AcceptCounterOffer,
