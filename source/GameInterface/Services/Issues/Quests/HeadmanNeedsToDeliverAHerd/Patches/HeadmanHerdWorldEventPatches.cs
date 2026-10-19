@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using System;
@@ -20,10 +21,24 @@ internal class HeadmanHerdWorldEventPatches
 {
     private static readonly HashSet<Issue> pendingGiverDeaths = new();
 
+    private sealed class GiverKilledState : IDisposable
+    {
+        internal readonly IDisposable OwnerScope;
+        internal readonly Issue Issue;
+
+        internal GiverKilledState(IDisposable ownerScope, Issue issue)
+        {
+            OwnerScope = ownerScope;
+            Issue = issue;
+        }
+
+        public void Dispose() => OwnerScope?.Dispose();
+    }
+
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
     [HarmonyPrefix]
     [HarmonyPriority(Priority.First)]
-    private static bool GiverKilledPrefix(Hero victim, out IDisposable __state)
+    private static bool GiverKilledPrefix(Hero victim, out GiverKilledState __state)
     {
         __state = null;
         if (!(victim.Issue is Issue issue)) return true;
@@ -34,15 +49,25 @@ internal class HeadmanHerdWorldEventPatches
         if (issue.IsSolvingWithAlternative && owner.PartyBelongedTo != null &&
             ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var cleanup))
             cleanup.Remember(issue, owner.PartyBelongedTo);
-        __state = new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo);
+        __state = new GiverKilledState(new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo), issue);
         // Keep the owner on the issue until vanilla can return the troops without its global queue.
         if (issue.IsSolvingWithAlternative && !Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return false;
         return true;
     }
 
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
+    [HarmonyPostfix]
+    private static void GiverKilledPostfix(Hero victim, GiverKilledState __state)
+    {
+        if (__state == null || victim.IsAlive || !ModInformation.IsServer ||
+            !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher)) return;
+
+        dispatcher.After(__state.Issue, IssueOutcome.QuestCancel);
+    }
+
+    [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
     [HarmonyFinalizer]
-    private static void GiverKilledFinalizer(IDisposable __state) => __state?.Dispose();
+    private static void GiverKilledFinalizer(GiverKilledState __state) => __state?.Dispose();
 
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.StartIssueWithAlternativeSolution))]
     [HarmonyPrefix]
