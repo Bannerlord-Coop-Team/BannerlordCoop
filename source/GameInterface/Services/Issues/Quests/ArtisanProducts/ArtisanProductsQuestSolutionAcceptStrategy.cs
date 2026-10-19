@@ -22,6 +22,8 @@ internal class ArtisanProductsQuestSolutionAcceptStrategy : IQuestSolutionAccept
     {
         this.owners = owners;
     }
+
+    internal ArtisanProductsQuestSolutionAcceptStrategy() { }
     public byte[] Capture(IssueBase issue)
     {
         if (!(issue.IssueQuest is Quest quest)) return Array.Empty<byte>();
@@ -56,7 +58,7 @@ internal class ArtisanProductsQuestSolutionAcceptStrategy : IQuestSolutionAccept
             quest._playerStartsQuestLog = quest.AddDiscreteLog(quest.PlayerStartsQuestLogText,
                 new TextObject("{=L700FNht}Delivered {RAW_MATERIAL}").SetTextVariable("RAW_MATERIAL", quest._rawMaterialsToBeDelivered.Name),
                 0, quest._amountOfRawGoodsToBeDelivered, null, true);
-            if (!owners.TryResolveOwnerHero(issue, out var hero) || hero.PartyBelongedTo == null)
+            if (owners == null || !owners.TryResolveOwnerHero(issue, out var hero) || hero.PartyBelongedTo == null)
                 throw new InvalidOperationException("Artisan quest owner has no party");
             hero.PartyBelongedTo.ItemRoster.AddToCounts(quest._rawMaterialsToBeDelivered, quest._amountOfRawGoodsToBeDelivered);
         }
