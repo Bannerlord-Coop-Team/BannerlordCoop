@@ -73,9 +73,9 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId))
         {
-            network.SendAll(new RequestLordSolution(giverId, issue.StringId, operation));
             // Vanilla decides when the merchant conversation ends, then reopens the menu before the server replies.
             if (operation != LordSolutionOperation.Start) pendingDecisions.Add(issue);
+            network.SendAll(new RequestLordSolution(giverId, issue.StringId, operation));
         }
         return false;
     }
