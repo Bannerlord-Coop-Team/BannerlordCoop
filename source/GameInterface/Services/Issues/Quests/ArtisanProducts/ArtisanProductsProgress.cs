@@ -40,7 +40,7 @@ internal class ArtisanProductsProgress : IArtisanProductsProgress
         var issue = IssueManager.GetIssueOfQuest(quest);
         if (!(issue is Issue artisan) || !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
             !owners.TryGetOwnerControllerId(issue, out var controllerId)) return;
-        var prosperity = quest.QuestGiver?.CurrentSettlement?.Town?.Prosperity ?? 0;
+        var prosperity = quest.QuestGiver?.CurrentSettlement?.Town?.Prosperity ?? float.NaN;
         network.SendAll(new NetworkArtisanProductsProgress(ownerId, issue.StringId, quest._deliveredRawGoods,
             quest._counterOfferRefused, quest.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), controllerId,
             prosperity));
@@ -50,7 +50,7 @@ internal class ArtisanProductsProgress : IArtisanProductsProgress
     {
         if (!objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
             !owners.TryGetOwnerControllerId(issue, out var controllerId)) return;
-        var prosperity = issue is Issue artisan ? artisan.IssueOwner?.CurrentSettlement?.Town?.Prosperity ?? 0 : 0;
+        var prosperity = issue is Issue artisan ? artisan.IssueOwner?.CurrentSettlement?.Town?.Prosperity ?? float.NaN : float.NaN;
         network.SendAll(new NetworkArtisanProductsProgress(ownerId, issue.StringId, 0, false,
             issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), controllerId, prosperity, detail));
     }
@@ -109,7 +109,8 @@ internal class ArtisanProductsProgressHandler : IHandler
             if (!(issue is Issue artisan)) return;
             using (new AllowedThread())
             {
-                if (artisan.IssueOwner?.CurrentSettlement?.Town != null) artisan.IssueOwner.CurrentSettlement.Town.Prosperity = data.Prosperity;
+                if (!float.IsNaN(data.Prosperity) && artisan.IssueOwner?.CurrentSettlement?.Town != null)
+                    artisan.IssueOwner.CurrentSettlement.Town.Prosperity = data.Prosperity;
                 if (data.ControllerId != controller.ControllerId) return;
                 var logs = data.Logs ?? Array.Empty<string>();
                 if (!(issue.IssueQuest is Quest quest))
