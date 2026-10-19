@@ -115,6 +115,25 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
+    public void StatePublishesOnlyChangedOwnerState()
+    {
+        scenario.AttachQuest(Other, CreateQuest);
+        Server.Call(() =>
+        {
+            var publisher = Server.Resolve<ICaravanAmbushStatePublisher>();
+            var baseline = Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>();
+            publisher.Publish(QuestOf(Server));
+            Assert.Equal(baseline, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>());
+
+            QuestOf(Server)._vicinityCheckFailCounter = 1;
+            publisher.Publish(QuestOf(Server));
+            Assert.Equal(baseline + 1, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>());
+        });
+        Owner.Call(() => Assert.Equal(1, QuestOf(Owner)._vicinityCheckFailCounter));
+        Other.Call(() => Assert.Equal(0, QuestOf(Other)._vicinityCheckFailCounter));
+    }
+
+    [Fact]
     public void ServerMirrorIsNeverStarted()
     {
         Server.Call(() =>
@@ -380,6 +399,18 @@ public class CaravanAmbushTests : IDisposable
             Assert.Empty(quest.JournalEntries);
         });
         Assert.Equal(0, ticks.CountFor(Owner));
+    }
+
+    [Fact]
+    public void TimeoutUsesTheOwnerDispatchPathOnly()
+    {
+        Server.Call(() => QuestOf(Server).ChangeQuestDueTime(CampaignTime.Now - CampaignTime.Hours(1f)));
+        Server.Call(() => CampaignEventDispatcher.Instance.HourlyTick());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+
+        Owner.Call(() => QuestOf(Owner).CompleteQuestWithTimeOut());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Server.Call(() => Assert.False(QuestOf(Server).IsOngoing));
     }
 
     [Theory]

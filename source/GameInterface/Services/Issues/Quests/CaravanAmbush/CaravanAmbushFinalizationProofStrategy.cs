@@ -5,11 +5,6 @@ using Quest = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.Carava
 
 namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 
-internal enum CaravanAmbushBranch : byte
-{
-    CollectReward = 1,
-}
-
 internal class CaravanAmbushFinalizationProofStrategy : IFinalizationProofStrategy
 {
     public bool TryRunBranch(QuestBase quest, byte proof)

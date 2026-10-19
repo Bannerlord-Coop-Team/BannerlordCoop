@@ -74,15 +74,6 @@ internal class CaravanAmbushPatches
         conversationEnd.AddEventHandler(conversationManager, new Action(quest.OnQuestSucceeded));
     }
 
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnQuestSucceeded))]
-    [HarmonyPrefix]
-    private static bool Reward(Quest __instance)
-    {
-        if (!__instance.IsOngoing) return false;
-        return ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) &&
-            dispatcher.BeforeQuestBranch(__instance, (byte)CaravanAmbushBranch.CollectReward);
-    }
-
     [HarmonyPatch(typeof(Quest), nameof(Quest.HandlePartyAiAfterCompletion))]
     [HarmonyPrefix]
     private static bool Release(Quest __instance)

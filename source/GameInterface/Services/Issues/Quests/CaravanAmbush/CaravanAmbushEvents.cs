@@ -74,7 +74,6 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         }
         else
         {
-            publisher.Publish(quest);
             OpenOwnerConversation(quest);
         }
     }
