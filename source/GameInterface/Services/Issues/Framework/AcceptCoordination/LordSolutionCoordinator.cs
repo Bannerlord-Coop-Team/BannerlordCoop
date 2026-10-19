@@ -19,14 +19,6 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 
-internal interface ILordSolutionCoordinator
-{
-    bool Before(IssueBase issue, LordSolutionOperation operation);
-
-    /// <summary>The owner's counter-offer decision is waiting for the server, so the merchant must not ask again.</summary>
-    bool IsDecisionPending(IssueBase issue);
-}
-
 /// <summary>The server accepts a decree and applies its counter-offer as the owning player.</summary>
 internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
 {
@@ -86,7 +78,12 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
     {
         if (ModInformation.IsServer) return;
         var issueId = payload.What.IssueId;
-        GameThread.RunSafe(() => pendingDecisions.RemoveWhere(issue => issue.StringId == issueId),
+        var issueOwnerId = payload.What.IssueOwnerId;
+        GameThread.RunSafe(() =>
+        {
+            if (!objects.TryGetObject<Hero>(issueOwnerId, out var owner)) return;
+            pendingDecisions.RemoveWhere(issue => issue.StringId == issueId && issue.IssueOwner == owner);
+        },
             context: nameof(LordSolutionCoordinator));
     }
 
@@ -164,7 +161,8 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
             ? "The decree could not be accepted. Check your influence and speak to the artisan again."
             : "The decree decision could not be applied. Check your influence and speak to the merchant again.";
         network.Send(peer, new SendInformationMessage(message));
-        network.Send(peer, new NetworkLordSolutionRejected(data.IssueOwnerId, data.IssueId));
+        if (data.Operation != LordSolutionOperation.Start)
+            network.Send(peer, new NetworkLordSolutionRejected(data.IssueOwnerId, data.IssueId));
     }
 
     private void HandleRejected(MessagePayload<NetworkLordSolutionRejected> payload)

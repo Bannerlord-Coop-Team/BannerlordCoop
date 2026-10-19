@@ -5,7 +5,7 @@ namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 
 /// <summary>Sent when the server rejects a lord-solution request without finalizing the issue.</summary>
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkLordSolutionRejected : IServerToClientCommand
+public readonly struct NetworkLordSolutionRejected : IServerToClientCommand
 {
     [ProtoMember(1)]
     public readonly string IssueOwnerId;
