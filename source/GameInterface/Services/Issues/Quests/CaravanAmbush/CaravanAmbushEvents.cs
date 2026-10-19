@@ -112,6 +112,7 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
 
     public void Release(Quest quest, bool completing = false)
     {
+        pendingConversations.Remove(quest);
         if (!completing && quest._isCaravanSaved && quest._caravanParty?.IsActive == true)
         {
             // Keep the caravan available for the owner's reward conversation.

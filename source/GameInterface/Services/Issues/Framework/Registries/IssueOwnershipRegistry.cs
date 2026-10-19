@@ -56,6 +56,16 @@ internal class IssueOwnershipRegistry : IIssueOwnershipRegistry
         }
     }
 
+    public void Remove(string issueOwnerId, string issueId, string controllerId)
+    {
+        lock (owners)
+        {
+            if (owners.TryGetValue(issueOwnerId, out var existing) && existing.IssueId == issueId &&
+                existing.ControllerId == controllerId)
+                owners.Remove(issueOwnerId);
+        }
+    }
+
     public IssueOwnershipData[] GetAll()
     {
         lock (owners)

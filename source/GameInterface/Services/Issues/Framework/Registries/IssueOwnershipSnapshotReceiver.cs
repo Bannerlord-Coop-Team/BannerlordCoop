@@ -45,7 +45,7 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
             // The client may have missed the server cancellation while disconnected. Replay a local
             // cancel so its quest and tracked objects do not survive a snapshot that removed it.
             messageBroker.Publish(this, new NetworkIssueFinalized(
-                remembered.IssueOwnerId, remembered.IssueId, IssueOutcome.QuestCancel));
+                remembered.IssueOwnerId, remembered.IssueId, IssueOutcome.QuestCancel, remembered.ControllerId));
         }
 
         // Clear every remembered controller before applying the authoritative snapshot. TrySetOwner is

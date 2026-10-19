@@ -199,7 +199,10 @@ internal class FinalizationCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
-            ownership.Remove(data.IssueOwnerId, data.IssueId);
+            if (string.IsNullOrEmpty(data.ControllerId))
+                ownership.Remove(data.IssueOwnerId, data.IssueId);
+            else
+                ownership.Remove(data.IssueOwnerId, data.IssueId, data.ControllerId);
 
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
             {
