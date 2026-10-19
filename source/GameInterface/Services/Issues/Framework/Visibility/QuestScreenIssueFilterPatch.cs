@@ -62,7 +62,7 @@ internal class QuestScreenIssueFilterPatch
             && ownerControllerId == controllerIdProvider.ControllerId);
     }
 
-    private static void SetState(List<IssueBase> issues, IssueBase.IssueState state)
+    internal static void SetState(List<IssueBase> issues, IssueBase.IssueState state)
     {
         using (new AllowedThread())
         {

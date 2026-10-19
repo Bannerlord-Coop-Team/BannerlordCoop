@@ -10,8 +10,10 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.SiegeEvents;
@@ -65,17 +67,13 @@ public class ArmyMemberSiegeAftermathTests : IDisposable
         var leaderPartyId = environment.CreateRegisteredObject<MobileParty>();
         var settlementId = environment.CreateRegisteredObject<Settlement>();
 
-        // record (and skip) the engine-side calls so only the routing decision is under test
+        // record (and skip) the stale encounter teardown; the menu switch runs for real
         using var finishRecorder = new MethodCallRecorder(Priority.First,
             AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish)));
-        using var settlementEncounterRecorder = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(EncounterManager), nameof(EncounterManager.StartSettlementEncounter)));
-        using var menuRecorder = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }),
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }));
 
         var siegeEvents = client.Resolve<ISiegeEventInterface>();
         var playerEncounters = client.Resolve<IPlayerEncounterInterface>();
+        MenuContext menuContext = null;
 
         client.Call(() =>
         {
@@ -101,6 +99,7 @@ public class ArmyMemberSiegeAftermathTests : IDisposable
             var aftermathBehavior = Campaign.Current.GetCampaignBehavior<SiegeAftermathCampaignBehavior>();
             aftermathBehavior._besiegerParty = leaderParty;
             aftermathBehavior._wasPlayerArmyMember = true;
+            menuContext = SeedStaleEncounterMenu(aftermathBehavior);
             siegeEvents.SetLocalAftermathNarrationContext(settlement);
 
             // the leader picks before this member's encounter reaches End
@@ -119,11 +118,33 @@ public class ArmyMemberSiegeAftermathTests : IDisposable
             }
 
             Assert.Equal(SiegeAftermathAction.SiegeAftermath.ShowMercy, aftermathBehavior._playerEncounterAftermath);
+            // vanilla menu_settlement_taken routes a member to the leader's decision narration
+            Assert.Same(menuContext, Campaign.Current.CurrentMenuContext);
+            Assert.Equal("menu_settlement_taken_player_army_member", menuContext.GameMenu.StringId);
         });
 
-        Assert.Equal(1, settlementEncounterRecorder.CountFor(client));
-        Assert.Equal(new[] { "menu_settlement_taken" }, menuRecorder.MenusFor(client));
         // only the route's own Finish of the stale encounter, not the plain end-of-battle one as well
         Assert.Equal(1, finishRecorder.CountFor(client));
+    }
+
+    // Registers the vanilla aftermath menus on the live behavior and opens a map menu still showing the stale encounter.
+    private static MenuContext SeedStaleEncounterMenu(SiegeAftermathCampaignBehavior aftermathBehavior)
+    {
+        var menus = Campaign.Current.GameMenuManager;
+        if (menus.GetGameMenu("menu_settlement_taken") == null)
+        {
+            aftermathBehavior.AddGameMenus(new CampaignGameStarter(menus, Campaign.Current.ConversationManager));
+        }
+
+        // The member narration's text needs a fully built army and settlement; only where it lands is under test.
+        menus.GetGameMenu("menu_settlement_taken_player_army_member").OnInit = _ => { };
+
+        var context = Game.Current.ObjectManager.CreateObject<MenuContext>();
+        context.GameMenu = ObjectHelper.SkipConstructor<GameMenu>();
+        context.GameMenu.StringId = "encounter";
+        var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+        mapState._menuContext = context;
+        Game.Current.GameStateManager._gameStates.Add(mapState);
+        return context;
     }
 }
