@@ -24,7 +24,7 @@ internal class CaravanAmbushStateHandler : IHandler
     private readonly IIssueResolver issues;
     private readonly IControllerIdProvider controller;
     private readonly ICaravanAmbushEvents events;
-    private NetworkCaravanAmbushConversation pendingConversation;
+    private NetworkCaravanAmbushConversation? pendingConversation;
 
     public CaravanAmbushStateHandler(IMessageBroker broker, IObjectManager objects, IIssueResolver issues,
         IControllerIdProvider controller, ICaravanAmbushEvents events)
@@ -63,8 +63,8 @@ internal class CaravanAmbushStateHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
-            var data = pendingConversation;
-            if (data == null) return;
+            if (!pendingConversation.HasValue) return;
+            var data = pendingConversation.Value;
             if (data.ControllerId != controller.ControllerId ||
                 !issues.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
                 !(issue.IssueQuest is Quest quest) || !quest.IsOngoing || !quest._isCaravanSaved)

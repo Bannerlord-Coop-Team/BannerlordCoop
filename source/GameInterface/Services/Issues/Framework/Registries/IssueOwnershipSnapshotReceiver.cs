@@ -39,8 +39,7 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
         var owners = payload.What.Owners ?? Array.Empty<IssueOwnershipData>();
         foreach (var remembered in ownership.GetAll()
                      .Where(remembered => !owners.Any(owner =>
-                         owner.IssueOwnerId == remembered.IssueOwnerId && owner.IssueId == remembered.IssueId &&
-                         owner.ControllerId == remembered.ControllerId)))
+                         owner.IssueOwnerId == remembered.IssueOwnerId && owner.IssueId == remembered.IssueId)))
         {
             // The client may have missed the server cancellation while disconnected. Replay a local
             // cancel so its quest and tracked objects do not survive a snapshot that removed it.
