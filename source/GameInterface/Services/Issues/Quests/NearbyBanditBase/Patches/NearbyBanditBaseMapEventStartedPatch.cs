@@ -15,7 +15,7 @@ internal class NearbyBanditBaseMapEventStartedPatch
     [HarmonyPostfix]
     private static void OnMapEventStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
     {
-        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+        if (!(mapEvent.IsForcingSupplies || mapEvent.IsForcingVolunteers) || !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
         {
             return;
         }

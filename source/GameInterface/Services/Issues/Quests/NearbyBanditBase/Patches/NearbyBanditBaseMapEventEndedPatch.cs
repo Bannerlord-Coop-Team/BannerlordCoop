@@ -14,7 +14,7 @@ internal class NearbyBanditBaseMapEventEndedPatch
     [HarmonyPostfix]
     private static void OnMapEventEndedPostfix(MapEvent mapEvent)
     {
-        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+        if (!mapEvent.IsHideoutBattle || !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
         {
             return;
         }

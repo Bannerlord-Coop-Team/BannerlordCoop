@@ -25,7 +25,10 @@ internal class NearbyBanditBaseCreationCaptureStrategy : ICreationCaptureStrateg
 
     public IssueBase CreateIssue(Hero issueOwner, byte[] captured)
     {
-        objectManager.TryGetObjectWithLogging<Settlement>(Encoding.UTF8.GetString(captured), out var hideout);
+        if (!objectManager.TryGetObjectWithLogging<Settlement>(Encoding.UTF8.GetString(captured), out var hideout))
+        {
+            return null;
+        }
 
         return new Issue(issueOwner, hideout);
     }

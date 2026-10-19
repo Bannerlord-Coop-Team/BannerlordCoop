@@ -8,9 +8,11 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using HarmonyLib;
+using Helpers;
 using SandBox.GauntletUI.Map;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -29,6 +31,16 @@ public class NearbyBanditBaseTests : IDisposable
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.OnQuestSucceededLogText)),
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.OnQuestFailedLogText)),
         AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.OnQuestCanceledLogText)),
+        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.OnQuestFailedFromWarCausedByPlayerLogText)),
+        AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog)),
+    };
+
+    private static readonly MethodBase[] QuestAcceptedMethods =
+    {
+        AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.OnQuestStartedLogText)),
+        AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)),
+        AccessTools.Method(typeof(QuestHelper), nameof(QuestHelper.AddMapArrowFromPointToTarget)),
+        AccessTools.Method(typeof(MBInformationManager), nameof(MBInformationManager.AddQuickInformation)),
         AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog)),
     };
 
@@ -189,6 +201,113 @@ public class NearbyBanditBaseTests : IDisposable
         Assert.Equal(IssueOutcome.QuestTimeOut, finalized.Outcome);
         Assert.Equal(powerBefore - 5f, PowerOfHeadman(Server));
         Assert.Equal(powerBefore - 5f, PowerOfHeadman(ClientA));
+    }
+
+    [Fact]
+    public void TheOwnersAcceptStartsTheQuestWithoutSpottingTheHideoutOnTheClient()
+    {
+        CreateIssueOnServer();
+
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(headmanId, out var headman));
+            Assert.True(ClientA.ObjectManager.TryGetObject<Settlement>(hideoutSettlementId, out var hideout));
+
+            headman.Issue.StartIssueWithQuest();
+            var quest = Assert.IsType<Quest>(headman.Issue.IssueQuest);
+
+            using (new AllowedThread())
+            {
+                hideout.Hideout.IsSpotted = false;
+            }
+
+            quest.OnQuestAccepted();
+
+            Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
+            Assert.True(hideout.IsVisible);
+            Assert.False(hideout.Hideout.IsSpotted);
+        }, QuestAcceptedMethods);
+    }
+
+    [Fact]
+    public void AHideoutBattleTheOwnerLosesFailsTheQuestEverywhere()
+    {
+        CreateIssueOnServer();
+        AcceptOnClientA();
+
+        var powerBefore = PowerOfHeadman(Server);
+
+        EndHideoutBattleOnServer(ownerPartyId, BattleState.DefenderVictory);
+
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
+        Assert.Equal(powerBefore - 5f, PowerOfHeadman(Server));
+        AssertIssueEndedEverywhere();
+    }
+
+    [Fact]
+    public void AnEmptiedHideoutCancelsTheQuestEverywhere()
+    {
+        CreateIssueOnServer();
+        AcceptOnClientA();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(hideoutSettlementId, out var hideout));
+
+            CampaignEventDispatcher.Instance.OnHideoutDeactivated(hideout);
+        }, QuestLogTexts);
+
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
+        AssertIssueEndedEverywhere();
+    }
+
+    [Fact]
+    public void AWarTheOwnerCausesFailsTheQuestEverywhere()
+    {
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var clanId = TestEnvironment.CreateRegisteredObject<Clan>();
+
+        CreateIssueOnServer();
+        AcceptOnClientA();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
+
+            DeclareWarAction.ApplyInternal(kingdom, clan, DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
+        }, QuestLogTexts);
+
+        Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
+        AssertIssueEndedEverywhere();
+    }
+
+    [Fact]
+    public void TheServerKeepsAiLordsAwayWhileAPlayerIsHeldInTheHideout()
+    {
+        CreateIssueOnServer();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(headmanId, out var headman));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(hideoutSettlementId, out var hideout));
+            var issue = Assert.IsType<Issue>(headman.Issue);
+
+            Assert.True(issue.CanBeCompletedByAI());
+
+            using (new AllowedThread())
+            {
+                hideout.Party.PrisonRoster.AddToCounts(owner.CharacterObject, 1);
+            }
+
+            Assert.False(issue.CanBeCompletedByAI());
+        });
     }
 
     private (string HeroId, string PartyId) RegisterPlayer(EnvironmentInstance client, string controllerId)
