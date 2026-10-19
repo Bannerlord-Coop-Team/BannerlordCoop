@@ -39,7 +39,7 @@ internal class ArtisanProductsProgress : IArtisanProductsProgress
         var issue = IssueManager.GetIssueOfQuest(quest);
         if (!(issue is Issue artisan) || !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
             !owners.TryGetOwnerControllerId(issue, out var controllerId)) return;
-        var prosperity = artisan._targetSettlement?.Town?.Prosperity ?? 0;
+        var prosperity = artisan.QuestGiver?.CurrentSettlement?.Town?.Prosperity ?? 0;
         network.SendAll(new NetworkArtisanProductsProgress(ownerId, issue.StringId, quest._deliveredRawGoods,
             quest._counterOfferRefused, quest.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), controllerId,
             prosperity));
@@ -49,7 +49,7 @@ internal class ArtisanProductsProgress : IArtisanProductsProgress
     {
         if (!objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
             !owners.TryGetOwnerControllerId(issue, out var controllerId)) return;
-        var prosperity = issue is Issue artisan ? artisan._targetSettlement?.Town?.Prosperity ?? 0 : 0;
+        var prosperity = issue is Issue artisan ? artisan.IssueOwner?.CurrentSettlement?.Town?.Prosperity ?? 0 : 0;
         network.SendAll(new NetworkArtisanProductsProgress(ownerId, issue.StringId, 0, false,
             issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), controllerId, prosperity, detail));
     }
@@ -108,18 +108,19 @@ internal class ArtisanProductsProgressHandler : IHandler
             if (!(issue is Issue artisan)) return;
             using (new AllowedThread())
             {
-                if (artisan._targetSettlement?.Town != null) artisan._targetSettlement.Town.Prosperity = data.Prosperity;
+                if (artisan.IssueOwner?.CurrentSettlement?.Town != null) artisan.IssueOwner.CurrentSettlement.Town.Prosperity = data.Prosperity;
                 if (data.ControllerId != controller.ControllerId) return;
+                var logs = data.Logs ?? Array.Empty<string>();
                 if (!(issue.IssueQuest is Quest quest))
                 {
-                    foreach (var text in data.Logs.Skip(issue.JournalEntries.Count)) issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(text)));
+                    foreach (var text in logs.Skip(issue.JournalEntries.Count)) issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(text)));
                     CampaignEventDispatcher.Instance.OnIssueUpdated(issue, data.Detail, Hero.MainHero);
                     return;
                 }
                 quest._deliveredRawGoods = data.Delivered;
                 quest._counterOfferRefused = data.MerchantRefused;
                 if (quest._playerStartsQuestLog != null) quest.UpdateQuestTaskStage(quest._playerStartsQuestLog, data.Delivered);
-                foreach (var text in data.Logs.Skip(quest.JournalEntries.Count)) quest.AddLog(new TextObject(text));
+                foreach (var text in logs.Skip(quest.JournalEntries.Count)) quest.AddLog(new TextObject(text));
             }
         }, context: nameof(ArtisanProductsProgressHandler));
     }

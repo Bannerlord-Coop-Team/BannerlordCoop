@@ -94,7 +94,7 @@ internal class ArtisanProductsLordHandler : IHandler
         if (!objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
             !ownership.TryGetOwner(ownerId, issue.StringId, out var owner)) return;
         network.SendAll(new NetworkArtisanProductsLord(ownerId, issue.StringId, owner, ArtisanProductsLordAction.Journal,
-            issue._issueDifficultyMultiplier, issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), issue._targetSettlement?.Town?.Prosperity ?? 0));
+            issue._issueDifficultyMultiplier, issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), issue.IssueOwner?.CurrentSettlement?.Town?.Prosperity ?? 0));
     }
 
     private void Receive(MessagePayload<RequestArtisanProductsLord> payload)
@@ -131,7 +131,7 @@ internal class ArtisanProductsLordHandler : IHandler
                             issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject("The decree could not be issued because you no longer own the town or have enough influence. Speak to the merchant again to reconsider the offer or try again when eligible.")));
                             network.Send(peer, new NetworkArtisanProductsLord(data.OwnerId, data.IssueId, player.ControllerId,
                                 ArtisanProductsLordAction.Rejected, issue._issueDifficultyMultiplier,
-                                issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), issue._targetSettlement?.Town?.Prosperity ?? 0));
+                                issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), issue.IssueOwner?.CurrentSettlement?.Town?.Prosperity ?? 0));
                             return;
                         }
                         issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
@@ -140,7 +140,7 @@ internal class ArtisanProductsLordHandler : IHandler
                     ownership.Remove(data.OwnerId);
                 }
                 network.SendAll(new NetworkArtisanProductsLord(data.OwnerId, data.IssueId, player.ControllerId,
-                    data.Action, issue._issueDifficultyMultiplier, issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), issue._targetSettlement?.Town?.Prosperity ?? 0));
+                    data.Action, issue._issueDifficultyMultiplier, issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), issue.IssueOwner?.CurrentSettlement?.Town?.Prosperity ?? 0));
             }
         }, context: nameof(ArtisanProductsLordHandler));
     }
@@ -155,11 +155,12 @@ internal class ArtisanProductsLordHandler : IHandler
             var localOwner = data.ControllerId == controller.ControllerId;
             using (new AllowedThread())
             {
-                if (issue._targetSettlement?.Town != null) issue._targetSettlement.Town.Prosperity = data.Prosperity;
+                if (issue.IssueOwner?.CurrentSettlement?.Town != null) issue.IssueOwner.CurrentSettlement.Town.Prosperity = data.Prosperity;
+                var logs = data.Logs ?? Array.Empty<string>();
                 if (data.Action == ArtisanProductsLordAction.Journal || data.Action == ArtisanProductsLordAction.Rejected)
                 {
                     if (localOwner)
-                        foreach (var text in data.Logs.Skip(issue.JournalEntries.Count))
+                        foreach (var text in logs.Skip(issue.JournalEntries.Count))
                             issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(text)));
                     return;
                 }
@@ -173,7 +174,7 @@ internal class ArtisanProductsLordHandler : IHandler
                 else
                 {
                     if (localOwner)
-                        foreach (var text in data.Logs.Skip(issue.JournalEntries.Count))
+                        foreach (var text in logs.Skip(issue.JournalEntries.Count))
                             issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(text)));
                     ownership.Remove(data.OwnerId);
                     issue.IssueFinalized();
