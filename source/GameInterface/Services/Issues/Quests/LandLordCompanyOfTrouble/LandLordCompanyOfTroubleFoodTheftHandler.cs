@@ -8,7 +8,6 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
 using Quest = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssueQuest;
@@ -23,7 +22,7 @@ internal class LandLordCompanyOfTroubleFoodTheftHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IIssueResolver issueResolver;
-    private readonly IIssueOwnershipRegistry ownership;
+    private readonly IIssueOwnerResolver ownerResolver;
     private readonly IPlayerManager playerManager;
 
     public LandLordCompanyOfTroubleFoodTheftHandler(
@@ -31,14 +30,14 @@ internal class LandLordCompanyOfTroubleFoodTheftHandler : IHandler
         INetwork network,
         IObjectManager objectManager,
         IIssueResolver issueResolver,
-        IIssueOwnershipRegistry ownership,
+        IIssueOwnerResolver ownerResolver,
         IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.issueResolver = issueResolver;
-        this.ownership = ownership;
+        this.ownerResolver = ownerResolver;
         this.playerManager = playerManager;
 
         messageBroker.Subscribe<LandLordCompanyOfTroubleFoodStolen>(Handle_FoodStolen);
@@ -94,19 +93,18 @@ internal class LandLordCompanyOfTroubleFoodTheftHandler : IHandler
             return;
         }
 
-        if (!ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var ownerControllerId) || ownerControllerId != player.ControllerId)
+        if (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero) || !objectManager.TryGetId(ownerHero, out var ownerHeroId) || ownerHeroId != player.HeroId)
         {
             Logger.Warning("{controller} does not own {issue}", player.ControllerId, data.IssueId);
             return;
         }
 
-        if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var playerHero) ||
-            !objectManager.TryGetObjectWithLogging<ItemObject>(data.ItemId, out var item))
+        if (!objectManager.TryGetObjectWithLogging<ItemObject>(data.ItemId, out var item))
         {
             return;
         }
 
-        var roster = playerHero.PartyBelongedTo.ItemRoster;
+        var roster = ownerHero.PartyBelongedTo.ItemRoster;
         if (roster.GetItemNumber(item) <= 0)
         {
             return;

@@ -29,13 +29,24 @@ internal class LandLordCompanyOfTroubleFinalizePatches
             return;
         }
 
-        GameThread.RunSafe(() =>
+        GameThread.RunSafe(() => RemoveCompany(company), context: nameof(LandLordCompanyOfTroubleFinalizePatches));
+    }
+
+    private static void RemoveCompany(MobileParty company)
+    {
+        if (!company.IsActive)
         {
-            if (company.IsActive)
-            {
-                DestroyPartyAction.Apply(null, company);
-            }
-        }, context: nameof(LandLordCompanyOfTroubleFinalizePatches));
+            return;
+        }
+
+        if (company.MapEvent != null)
+        {
+            company.Ai.SetDoNotMakeNewDecisions(false);
+            company.SetPartyUsedByQuest(false);
+            return;
+        }
+
+        DestroyPartyAction.Apply(null, company);
     }
 
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
@@ -79,9 +90,9 @@ internal class LandLordCompanyOfTroubleFinalizePatches
             }
         }
 
-        if (quest._companyOfTroubleParty?.IsActive == true)
+        if (quest._companyOfTroubleParty != null)
         {
-            DestroyPartyAction.Apply(null, quest._companyOfTroubleParty);
+            RemoveCompany(quest._companyOfTroubleParty);
         }
     }
 }

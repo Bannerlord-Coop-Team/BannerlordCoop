@@ -33,6 +33,12 @@ internal class LandLordCompanyOfTroubleMapEventEndedPatch
 
     private static void OnMapEventEnded(Quest quest, MapEvent mapEvent)
     {
+        var involvedParties = mapEvent.InvolvedParties.ToList();
+        if (!involvedParties.Contains(PartyBase.MainParty))
+        {
+            return;
+        }
+
         var company = quest._companyOfTroubleParty;
         if (company == null)
         {
@@ -40,8 +46,7 @@ internal class LandLordCompanyOfTroubleMapEventEndedPatch
             return;
         }
 
-        var involvedParties = mapEvent.InvolvedParties.ToList();
-        if (!involvedParties.Contains(company.Party) || !involvedParties.Contains(PartyBase.MainParty))
+        if (!involvedParties.Contains(company.Party))
         {
             return;
         }

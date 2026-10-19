@@ -13,7 +13,7 @@ internal class LandLordCompanyOfTroubleCompanyDestroyedPatch
     [HarmonyPostfix]
     private static void OnMobilePartyDestroyedPostfix(MobileParty mobileParty, PartyBase destroyerParty)
     {
-        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+        if (!mobileParty.IsCurrentlyUsedByAQuest || !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
         {
             return;
         }

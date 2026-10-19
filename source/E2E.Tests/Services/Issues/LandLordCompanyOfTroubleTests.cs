@@ -37,6 +37,11 @@ public class LandLordCompanyOfTroubleTests : IDisposable
         .Where(method => method.Name == nameof(StringHelpers.SetCharacterProperties))
         .ToArray<MethodBase>();
 
+    private static readonly MethodBase[] MapEventVisuals =
+    {
+        AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
+    };
+
     private readonly MethodCallRecorder questEndings;
     private readonly string lordId;
     private readonly string troopId;
@@ -301,6 +306,51 @@ public class LandLordCompanyOfTroubleTests : IDisposable
     }
 
     [Fact]
+    public void EndingTheQuest_LeavesACompanyThatIsInABattle()
+    {
+        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var otherPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        MobileParty company = null!;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var other));
+            var quest = CompanyTurnedHostile(companyPartyId);
+            company = quest._companyOfTroubleParty;
+            StartFieldBattle(other, company);
+
+            quest.OnFinalize();
+        }, MapEventVisuals);
+        Server.PumpGameThread();
+
+        Assert.True(company.IsActive);
+        Assert.False(company.IsCurrentlyUsedByAQuest);
+    }
+
+    [Fact]
+    public void ASimulatedBattleTheOwnerIsNotIn_DoesNotEndTheQuest()
+    {
+        var attackerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var defenderPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        SetOwner();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(attackerPartyId, out var attacker));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(defenderPartyId, out var defender));
+            AttachQuest(Server, companyTroopCount: 0);
+
+            var mapEvent = StartFieldBattle(attacker, defender);
+            mapEvent.IsPlayerSimulation = true;
+            mapEvent._battleState = BattleState.AttackerVictory;
+
+            CampaignEventDispatcher.Instance.OnMapEventEnded(mapEvent);
+        }, MapEventVisuals.Concat(CharacterLinks));
+
+        Assert.Equal(0, questEndings.Count);
+    }
+
+    [Fact]
     public void TheCompanyDestroyedBySomeoneElse_FailsTheQuest()
     {
         var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
@@ -405,6 +455,7 @@ public class LandLordCompanyOfTroubleTests : IDisposable
 
         var quest = (Quest)AttachQuest(Server, companyTroopCount: 0).IssueQuest;
         quest._companyOfTroubleParty = company;
+        company.SetPartyUsedByQuest(true);
         return quest;
     }
 
@@ -415,14 +466,20 @@ public class LandLordCompanyOfTroubleTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(enemyPartyId, out var enemy));
 
-            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
-            mapEvent.Initialize(ownerParty.Party, enemy.Party, new FieldBattleEventComponent(mapEvent), MapEvent.BattleTypes.FieldBattle);
-            mapEvent.MapEventVisual = null;
+            var mapEvent = StartFieldBattle(ownerParty, enemy);
             mapEvent._battleState = battleState;
 
             CampaignEventDispatcher.Instance.OnMapEventEnded(mapEvent);
-        }, CharacterLinks.Append(AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize))));
+        }, CharacterLinks.Concat(MapEventVisuals));
+    }
+
+    private static MapEvent StartFieldBattle(MobileParty attacker, MobileParty defender)
+    {
+        var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
+        mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+        mapEvent.Initialize(attacker.Party, defender.Party, new FieldBattleEventComponent(mapEvent), MapEvent.BattleTypes.FieldBattle);
+        mapEvent.MapEventVisual = null;
+        return mapEvent;
     }
 
     private int GoldOfOwner()
