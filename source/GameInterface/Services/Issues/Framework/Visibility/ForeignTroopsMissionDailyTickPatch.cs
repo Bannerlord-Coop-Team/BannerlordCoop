@@ -45,7 +45,7 @@ internal class ForeignTroopsMissionDailyTickPatch
 
         using (new Common.Util.AllowedThread())
         {
-            foreach (var issue in __state.Where(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission)
+            foreach (var issue in __state
                          .Where(issue => issue.AlternativeSolutionIssueEffectClearTime.NumTicks <= CampaignTime.Now.NumTicks))
             {
                 issue._areIssueEffectsResolved = true;
