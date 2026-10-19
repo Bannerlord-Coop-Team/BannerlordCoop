@@ -218,6 +218,20 @@ public class SmugglersTests : IDisposable
     }
 
     [Fact]
+    public void MapEventEnded_WithMissingSides_DoesNotBlockOtherListeners()
+    {
+        var receiver = new MapEventEndedReceiver();
+
+        Server.Call(() =>
+        {
+            CampaignEventDispatcher.Instance.AddCampaignEventReceiver(receiver);
+            CampaignEventDispatcher.Instance.OnMapEventEnded(ObjectHelper.SkipConstructor<MapEvent>());
+        });
+
+        Assert.Equal(1, receiver.CallCount);
+    }
+
+    [Fact]
     public void SmugglersRoute_SkipsPartiesNotUsedByAQuest()
     {
         TickParty(Server, usedByQuest: false);
@@ -598,5 +612,15 @@ public class SmugglersTests : IDisposable
     {
         Assert.True(instance.Container.Resolve<IQuestTypeRegistry>().TryGetByName(IssueName, out var descriptor));
         return descriptor;
+    }
+
+    private sealed class MapEventEndedReceiver : CampaignEventReceiver
+    {
+        public int CallCount { get; private set; }
+
+        public override void OnMapEventEnded(MapEvent mapEvent)
+        {
+            CallCount++;
+        }
     }
 }

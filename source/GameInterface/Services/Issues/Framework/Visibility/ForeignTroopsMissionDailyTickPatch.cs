@@ -2,6 +2,7 @@
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Framework.Visibility;
@@ -40,6 +41,13 @@ internal class ForeignTroopsMissionDailyTickPatch
         if (__state == null)
         {
             return;
+        }
+
+        // Vanilla logs the return here, but only the owner may see that entry.
+        foreach (var issue in __state
+                     .Where(issue => (int)issue.AlternativeSolutionIssueEffectClearTime.ToDays <= (int)CampaignTime.Now.ToDays))
+        {
+            issue._areIssueEffectsResolved = true;
         }
 
         QuestScreenIssueFilterPatch.SetState(__state, IssueBase.IssueState.SolvingWithAlternativeSolution);
