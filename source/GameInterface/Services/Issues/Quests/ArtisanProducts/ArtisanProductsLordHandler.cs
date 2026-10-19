@@ -47,9 +47,10 @@ public readonly struct NetworkArtisanProductsLord : IServerToClientCommand
     [ProtoMember(4)] public readonly ArtisanProductsLordAction Action;
     [ProtoMember(5)] public readonly float Difficulty;
     [ProtoMember(6)] public readonly string[] Logs;
+    [ProtoMember(7)] public readonly float Prosperity;
     public NetworkArtisanProductsLord(string ownerId, string issueId, string controllerId,
-        ArtisanProductsLordAction action, float difficulty, string[] logs)
-    { OwnerId = ownerId; IssueId = issueId; ControllerId = controllerId; Action = action; Difficulty = difficulty; Logs = logs; }
+        ArtisanProductsLordAction action, float difficulty, string[] logs, float prosperity)
+    { OwnerId = ownerId; IssueId = issueId; ControllerId = controllerId; Action = action; Difficulty = difficulty; Logs = logs; Prosperity = prosperity; }
 }
 
 internal class ArtisanProductsLordHandler : IHandler
@@ -93,7 +94,7 @@ internal class ArtisanProductsLordHandler : IHandler
         if (!objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
             !ownership.TryGetOwner(ownerId, issue.StringId, out var owner)) return;
         network.SendAll(new NetworkArtisanProductsLord(ownerId, issue.StringId, owner, ArtisanProductsLordAction.Journal,
-            issue._issueDifficultyMultiplier, issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray()));
+            issue._issueDifficultyMultiplier, issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), issue._targetSettlement.Town.Prosperity));
     }
 
     private void Receive(MessagePayload<RequestArtisanProductsLord> payload)
@@ -130,7 +131,7 @@ internal class ArtisanProductsLordHandler : IHandler
                             issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject("The decree could not be issued because you no longer own the town or have enough influence. Speak to the merchant again to reconsider the offer or try again when eligible.")));
                             network.Send(peer, new NetworkArtisanProductsLord(data.OwnerId, data.IssueId, player.ControllerId,
                                 ArtisanProductsLordAction.Rejected, issue._issueDifficultyMultiplier,
-                                issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray()));
+                                issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), issue._targetSettlement.Town.Prosperity));
                             return;
                         }
                         issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
@@ -139,7 +140,7 @@ internal class ArtisanProductsLordHandler : IHandler
                     ownership.Remove(data.OwnerId);
                 }
                 network.SendAll(new NetworkArtisanProductsLord(data.OwnerId, data.IssueId, player.ControllerId,
-                    data.Action, issue._issueDifficultyMultiplier, issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray()));
+                    data.Action, issue._issueDifficultyMultiplier, issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray(), issue._targetSettlement.Town.Prosperity));
             }
         }, context: nameof(ArtisanProductsLordHandler));
     }
@@ -154,6 +155,7 @@ internal class ArtisanProductsLordHandler : IHandler
             var localOwner = data.ControllerId == controller.ControllerId;
             using (new AllowedThread())
             {
+                issue._targetSettlement.Town.Prosperity = data.Prosperity;
                 if (data.Action == ArtisanProductsLordAction.Journal || data.Action == ArtisanProductsLordAction.Rejected)
                 {
                     if (localOwner)

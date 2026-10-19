@@ -88,7 +88,7 @@ internal class ArtisanProductsJournalPatch
     [HarmonyPostfix]
     private static void After(QuestBase __instance)
     {
-        if (ModInformation.IsServer && __instance is Quest quest &&
+        if (ModInformation.IsServer && __instance is Quest quest && quest.IsOngoing &&
             ContainerProvider.TryResolve<IArtisanProductsProgress>(out var progress)) progress.Send(quest);
     }
 }
