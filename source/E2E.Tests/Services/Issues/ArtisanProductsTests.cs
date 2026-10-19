@@ -341,7 +341,12 @@ public class ArtisanProductsTests : IDisposable
     [InlineData(false)]
     public void LordChoice_UsesTheServerAndKeepsTheJournalOnTheOwner(bool acceptMerchant)
     {
-        Owner.Call(() => Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution());
+        Owner.Call(() =>
+        {
+            var issue = Owner.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+            issue.StartIssueWithLordSolution();
+            Assert.Single(issue.JournalEntries);
+        });
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
         Other.Call(() => Assert.Empty(Other.GetRegisteredObject<Hero>(scenario.NotableId).Issue.JournalEntries));
         var before = OwnerGold();
