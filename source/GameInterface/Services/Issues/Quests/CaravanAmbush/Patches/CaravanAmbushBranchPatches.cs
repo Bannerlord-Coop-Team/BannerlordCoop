@@ -1,4 +1,4 @@
-using GameInterface.Services.Issues.Framework.Interface;
+﻿using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Issues;
 using Quest = TaleWorlds.CampaignSystem.Issues.CaravanAmbushIssueBehavior.CaravanAmbushIssueQuest;
@@ -13,7 +13,7 @@ internal class CaravanAmbushBranchPatches
     private static bool Reward(Quest __instance)
     {
         if (!__instance.IsOngoing) return false;
-        return ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) &&
-            dispatcher.BeforeQuestBranch(__instance, (byte)CaravanAmbushBranch.CollectReward);
+        if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher)) return true;
+        return dispatcher.BeforeQuestBranch(__instance, (byte)CaravanAmbushBranch.CollectReward);
     }
 }

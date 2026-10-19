@@ -89,6 +89,7 @@ internal class CaravanAmbushPatches
         if (ModInformation.IsClient || !(__instance is Quest quest)) return;
         if (ContainerProvider.TryResolve<ICaravanAmbushStatePublisher>(out var publisher)) publisher.Publish(quest);
         if (ContainerProvider.TryResolve<ICaravanAmbushEvents>(out var events)) events.Release(quest, completing: true);
+        if (ContainerProvider.TryResolve<ICaravanAmbushStatePublisher>(out publisher)) publisher.Forget(quest);
     }
 
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
@@ -99,6 +100,7 @@ internal class CaravanAmbushPatches
         if (ModInformation.IsClient || !(__instance.IssueQuest is Quest quest)) return;
         quest.RemoveAllTrackedObjects();
         if (ContainerProvider.TryResolve<ICaravanAmbushEvents>(out var events)) events.Release(quest, completing: true);
+        if (ContainerProvider.TryResolve<ICaravanAmbushStatePublisher>(out var publisher)) publisher.Forget(quest);
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.InitializeQuestOnGameLoad))]

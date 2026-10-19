@@ -14,6 +14,7 @@ namespace GameInterface.Services.Issues.Quests.CaravanAmbush;
 internal interface ICaravanAmbushStatePublisher
 {
     void Publish(Quest quest);
+    void Forget(Quest quest);
 }
 
 internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
@@ -49,6 +50,8 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
         network.Send(peer, new NetworkCaravanAmbushState(ownerId, issue.StringId, controllerId, caravanId,
             banditId, quest._isCaravanSaved, quest._vicinityCheckFailCounter, journal));
     }
+
+    public void Forget(Quest quest) => published.Remove(quest);
 
     private string IdOf(object obj)
     {
