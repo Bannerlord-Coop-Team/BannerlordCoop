@@ -51,6 +51,8 @@ Run from the repo root on Windows; the repo expects `mb2` to be a junction to th
 
 `DeployToGame` in `Deploy.targets` runs after every successful build of a project that imports it (`Coop.csproj`, `MissionTestMod.csproj`), including a full `Coop.sln` build, whenever `mb2\Modules` exists. Clearing `PostBuildEvent` doesn't stop it. For compile-only checks, pass an empty global `-p:ModName=`, which turns off `DeployToGame`.
 
+CI builds Release and runs `source\CoopUnitTests.slnf` plus the E2E shards in `.github/workflows/pull_request.yml`. After touching Coop.Core or Autofac registrations, run all of `Coop.Tests` with `-c Release`. `--no-restore` fails on the first build in a fresh worktree, so restore once first.
+
 ### Licensing & Authorized Agent Use
 
 This repository contains proprietary project code. Access to the source does not grant permission to copy, redistribute, repackage, reverse engineer, create competing derivatives from, or otherwise reuse the code except where explicitly permitted by the applicable license or by the maintainers.
@@ -139,6 +141,10 @@ Source `.cs` files are UTF-8 with a BOM and CRLF line endings, but files written
 ## Testing
 
 Tests use xUnit. Add unit tests for logic that does not require Bannerlord to run, especially serialization, state transitions, and service behavior. Name test classes after the subject under test and keep test method names behavior-focused. If a change depends on the game runtime, document the manual verification path in the PR.
+
+A new Coop.Core server handler that depends on a GameInterface service needs a `RegisterMock<T>` in `Coop.Tests/TestComponentBase.cs`, otherwise every server-container test in `Coop.Tests` fails to build its container.
+
+An empty array of structs in a message arrives as `null`, because protobuf-net writes nothing for it (an empty `byte[]` field arrives non-null), so guard it with `?? Array.Empty<T>()`. `MessageBroker.Publish` catches and logs a subscriber's exception, so an in-process test can pass over a throwing handler: call the handler directly, or assert something it does after its riskiest line.
 
 When a change needs runtime verification, **prefer adding a debug cheat over hand-staging the scenario.** Co-op state is usually impractical to set up by hand (winning a specific battle to take a prisoner, an AI governor change), so add or extend a `coop.debug.*` console command that triggers the exact authoritative action — e.g. `coop.debug.town.set_governor` driving `ChangeGovernorAction`, or `coop.debug.town.imprison_hero` driving `TakePrisonerAction` — and drive the test from the console instead of describing fiddly in-game steps. **Run state-changing cheats on the server only:** the host is authoritative and replicates to clients, so a cheat must originate there (it also lets server-side events fire on the host); use a client purely for read-only inspection (e.g. `coop.debug.location.list_characters`) to confirm what it received.
 
