@@ -72,4 +72,15 @@ internal class QuestScreenIssueFilterPatch
             }
         }
     }
+
+    internal static void SetState(List<IssueBase> issues, IssueBase.IssueState state)
+    {
+        using (new AllowedThread())
+        {
+            foreach (var issue in issues)
+            {
+                issue._issueState = state;
+            }
+        }
+    }
 }
