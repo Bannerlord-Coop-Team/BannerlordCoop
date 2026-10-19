@@ -53,6 +53,10 @@ Run from the repo root on Windows; the repo expects `mb2` to be a junction to th
 
 CI builds Release and runs `source\CoopUnitTests.slnf` plus the E2E shards in `.github/workflows/pull_request.yml`. After touching Coop.Core or Autofac registrations, run all of `Coop.Tests` with `-c Release`. `--no-restore` fails on the first build in a fresh worktree, so restore once first.
 
+If a local Release restore fails with Scriban's `NU1902` advisory promoted to an error, build-time flags can't undo it — it is baked into `obj/project.assets.json`. Delete the SDK projects' `obj/` and re-restore with `-p:NuGetAudit=false`. CI doesn't hit this.
+
+If `dotnet test` fails with `An Application Control policy has blocked this file. (0x800711C7)` (Win32 error 4551), an App Control policy such as Windows 11 Smart App Control is refusing the freshly built, unsigned test assemblies. `Unblock-File` doesn't help, because locally built files carry no download mark. Changing Smart App Control is the machine owner's call: turning it off lowers protection, and on some Windows builds it can only be turned back on by resetting Windows ([Microsoft's FAQ](https://support.microsoft.com/windows/security/threat-malware-protection/smart-app-control-frequently-asked-questions)). An agent should report the error, not change security settings. CI doesn't hit this.
+
 ### Licensing & Authorized Agent Use
 
 This repository contains proprietary project code. Access to the source does not grant permission to copy, redistribute, repackage, reverse engineer, create competing derivatives from, or otherwise reuse the code except where explicitly permitted by the applicable license or by the maintainers.
@@ -90,15 +94,7 @@ When working inside an authorized repository for legitimate development, debuggi
 
 ### Working From WSL
 
-The agent runs in WSL but the toolchain is Windows and is **not on the WSL PATH** (bare `dotnet`/`MSBuild` give "command not found"). Use the full paths, and don't reinstall, they are already there: dotnet at `/mnt/c/Program Files/dotnet/dotnet.exe`, MSBuild at `/mnt/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/MSBuild.exe`.
-
-Git and builds over the `/mnt/c` mount are slow: a multi-commit `merge`/`fetch`/`push`, a codex review, or a Docker test run routinely blows past the 2-minute Bash default and gets SIGTERM'd (exit 143), and foreground Bash is hard-capped at 10 minutes. Run those with `run_in_background: true` (or a long `timeout`) from the start.
-
-A freshly-created worktree has **no `mb2` junction** (only the main checkout does), so MSBuild/dotnet there fail with thousands of "game type not found" errors. Create a real Windows junction: `powershell.exe New-Item -ItemType Junction -Path <wt>\mb2 -Target '<game dir>'`; a WSL `ln -s` won't resolve for the Windows build, and a Docker run clobbers the junction so recreate it afterward.
-
-If a local Release restore fails with Scriban's `NU1902` advisory promoted to an error, build-time flags can't undo it — it is baked into `obj/project.assets.json`. Delete the SDK projects' `obj/` and re-restore with `-p:NuGetAudit=false`. CI doesn't hit this.
-
-If `dotnet test` fails with `An Application Control policy has blocked this file. (0x800711C7)` (Win32 error 4551), an App Control policy such as Windows 11 Smart App Control is refusing the freshly built, unsigned test assemblies. `Unblock-File` doesn't help, because locally built files carry no download mark. Changing Smart App Control is the machine owner's call: turning it off lowers protection, and on some Windows builds it can only be turned back on by resetting Windows ([Microsoft's FAQ](https://support.microsoft.com/windows/security/threat-malware-protection/smart-app-control-frequently-asked-questions)). An agent should report the error, not change security settings. CI doesn't hit this.
+If the agent runs in WSL, read `doc/WorkingFromWSL.md` first: the Windows toolchain isn't on the WSL PATH, worktrees need a real Windows `mb2` junction, and long git/build commands need a longer timeout.
 
 ### Local MCP Tools (Pi and Codex)
 
@@ -118,15 +114,15 @@ Each log is **deleted and recreated on every startup** (`CoopMod.SetupLogging`),
 
 ### Reading Vanilla Game Code (Decompile Before You Theorize)
 
-The game DLLs are the source of truth. **Decompile the real type before asserting what vanilla does**, and don't guess method names, signatures, or which side sets a field. Use the `decompile` skill: `decompile.sh <Full.Type.Name> [out.cs]` writes the C# to a scratch file, and `decompile.sh -l <pattern>` finds a type's FQN and DLL. It wraps the already-installed Windows `ilspycmd`, so never install a decompiler. Decompiled types run 1000+ lines, so grep them instead of pasting them whole.
+The game DLLs are the source of truth. **Decompile the real type before asserting what vanilla does**, and don't guess method names, signatures, or which side sets a field. Use `.agents/skills/decompile/scripts/decompile.sh <Full.Type.Name> [out.cs]` to write the C# to a scratch file, and `decompile.sh -l <pattern>` to find a type's FQN and DLL (see `.agents/skills/decompile/SKILL.md`). Decompiled types run 1000+ lines, so grep them instead of pasting them whole.
 
 ### Prefer the Publicizer Over Reflection
 
-`GameInterface` and `Coop.Core` build with **Krafs.Publicizer**, so `private`/`internal` game members and nested types compile as public. **Bind to them directly instead of using `AccessTools`/`FieldInfo`/`MethodInfo` reflection**, e.g. `alley.State = Alley.AreaState.OccupiedByPlayer;` (private setter). The `<Publicize Include="..." />` list in each `.csproj` says which assemblies are exposed. Reflection over a publicized member gets flagged in review, so decompile for the exact member name and bind to it; keep reflection for unpublicized assemblies or truly dynamic lookups.
+`GameInterface` builds with **Krafs.Publicizer**, so `private`/`internal` game members and nested types compile as public (`Coop.Core` only publicizes `TaleWorlds.Library`). **Bind to them directly instead of using `AccessTools`/`FieldInfo`/`MethodInfo` reflection**, e.g. `alley.State = Alley.AreaState.OccupiedByPlayer;` (private setter). The `<Publicize Include="..." />` list in each `.csproj` says which assemblies are exposed. Reflection over a publicized member gets flagged in review, so decompile for the exact member name and bind to it; keep reflection for unpublicized assemblies or truly dynamic lookups.
 
 ## Code Style & Naming
 
-@doc/CodeStyle.md
+Read @doc/CodeStyle.md before writing or reviewing code.
 
 ## Testing
 
