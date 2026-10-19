@@ -173,7 +173,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
 
         var data = payload.What;
         GameThread.RunSafe(() => pendingDecisions.RemoveWhere(issue =>
-                issue.StringId == data.IssueId && issue.IssueOwner.StringId == data.IssueOwnerId),
+                issue.StringId == data.IssueId),
             context: nameof(LordSolutionCoordinator));
     }
 
