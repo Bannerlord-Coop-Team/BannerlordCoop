@@ -15,8 +15,8 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.SiegeEvents.Handlers;
 
 /// <summary>
-/// Client-side deferred settlement-taken transition for siege captures. The prompt arrives before the old map event
-/// is destroyed, so the battle presentation and the post-battle loot steps must finish before the aftermath menu opens.
+/// Client-side fallback settlement-taken transition for a prompted siege capture whose encounter End never routes it
+/// (e.g. auto-resolve dropped the encounter first). Waits until the battle has finished resolving.
 /// </summary>
 internal class SiegeCaptureTransitionRetryHandler : IHandler
 {
@@ -43,7 +43,7 @@ internal class SiegeCaptureTransitionRetryHandler : IHandler
         pendingSettlement = settlement;
     }
 
-    /// <summary>True while the battle presentation or the post-battle loot steps still own the encounter.</summary>
+    /// <summary>True while the battle presentation or the post-battle steps, up to the End that routes, own the encounter.</summary>
     internal static bool IsBattleStillResolving() => IsBattlePresentationActive() || IsAfterBattleEncounterActive();
 
     private static bool IsBattlePresentationActive()
@@ -55,10 +55,14 @@ internal class SiegeCaptureTransitionRetryHandler : IHandler
             .Any(state => state.IsSimulationActive) == true;
     }
 
-    // The encounter's own End routes the leader once its loot steps finish, like vanilla DoEnd.
+    // The encounter's own End routes the leader once its loot steps finish, like vanilla DoEnd. A left encounter
+    // never advances to that End, so it doesn't count.
     private static bool IsAfterBattleEncounterActive()
     {
-        switch (Campaign.Current?.PlayerEncounter?.EncounterState)
+        var encounter = Campaign.Current?.PlayerEncounter;
+        if (encounter == null || encounter._leaveEncounter) return false;
+
+        switch (encounter.EncounterState)
         {
             case PlayerEncounterState.PlayerVictory:
             case PlayerEncounterState.CaptureHeroes:

@@ -847,11 +847,12 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         pendingAftermathAsArmyMember = false;
         if (wonSiege == null || wonSiege != endingMapEvent) return false;
 
-        // The leader holds the choice the server prompted it for; any other non-member participant just finishes.
+        // Only the leader holds the choice the server prompted it for; any other non-member participant just finishes.
         var settlement = wonSiege.MapEventSettlement;
-        if (!asArmyMember && !SiegeCaptureMenuHoldPatch.IsHeld(settlement)) return false;
+        var asLeader = SiegeCaptureMenuHoldPatch.IsHeld(settlement);
+        if (!asLeader && !asArmyMember) return false;
 
-        SwitchLocalPartyToSettlementTaken(settlement, asArmyMember);
+        SwitchLocalPartyToSettlementTaken(settlement, asArmyMember: !asLeader);
         return true;
     }
 
@@ -925,6 +926,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
         // menu after the loot screen. Runs off that observable stuck menu, whatever made the prompt path fail.
         localAftermathChoiceSettlement = settlement;
         pendingAftermathSiege = null;
+        pendingAftermathAsArmyMember = false;
         SiegeCaptureMenuHoldPatch.HoldFor(settlement);
         SwitchLocalPartyToSettlementTaken(settlement);
     }

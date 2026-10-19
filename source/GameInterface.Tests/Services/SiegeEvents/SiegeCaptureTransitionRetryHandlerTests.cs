@@ -89,6 +89,22 @@ public sealed class SiegeCaptureTransitionRetryHandlerTests : IDisposable
     }
 
     [Fact]
+    public void CampaignTick_LeftLootStepsEncounter_DoesNotHoldTheRetry()
+    {
+        // a left encounter never advances to the End that would route the leader
+        var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+        encounter.EncounterState = PlayerEncounterState.LootParty;
+        encounter._leaveEncounter = true;
+        Campaign.Current.PlayerEncounter = encounter;
+        SiegeCaptureMenuHoldPatch.HoldFor(settlement);
+
+        SiegeCaptureTransitionRetryHandler.Arm(leaderParty, settlement);
+        messageBroker.Publish(this, new CampaignTick());
+
+        VerifyPrompted(Times.Once());
+    }
+
+    [Fact]
     public void CampaignTick_ReleasedChoice_DropsTheRetry()
     {
         // the encounter End opened the menu and the player picked before the retry got its tick
