@@ -314,6 +314,7 @@ public class LadysKnightOutTests : IDisposable
     [Fact]
     public void LadyEligibilityUsesTheGiverSettlementFactionForWar()
     {
+        var playerClanId = environment.CreateRegisteredObject<Clan>();
         var otherClanId = environment.CreateRegisteredObject<Clan>();
         foreach (var instance in Instances)
         {
@@ -321,9 +322,15 @@ public class LadysKnightOutTests : IDisposable
             {
                 var giver = instance.GetRegisteredObject<Hero>(scenario.NotableId);
                 var hero = Hero.MainHero;
+                var playerClan = instance.GetRegisteredObject<Clan>(playerClanId);
                 var otherClan = instance.GetRegisteredObject<Clan>(otherClanId);
-                giver.CurrentSettlement.Town.OwnerClan = otherClan;
-                otherClan.Id = new MBGUID(2);
+                using (new AllowedThread())
+                {
+                    hero.Clan = playerClan;
+                    playerClan.Id = new MBGUID(1);
+                    otherClan.Id = new MBGUID(2);
+                    giver.CurrentSettlement.Town.OwnerClan = otherClan;
+                }
                 Assert.NotNull(giver.CurrentSettlement?.MapFaction);
                 Assert.NotSame(hero.MapFaction, giver.CurrentSettlement.MapFaction);
                 VillageHostileFactionStanceHelper.ApplyWarStance(hero.MapFaction, giver.CurrentSettlement.MapFaction);
