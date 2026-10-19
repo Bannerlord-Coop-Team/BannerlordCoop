@@ -346,8 +346,7 @@ public class LadysKnightOutTests : IDisposable
         Accept(scenario.ClientA);
         scenario.ClientA.Call(() =>
         {
-            Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, 183);
-            TraitLevelingHelper.OnIncidentResolved(DefaultTraits.Honor, 0);
+            TraitLevelingHelper.OnIncidentResolved(DefaultTraits.Honor, 100);
         });
         AddSecondOffer();
         Quest otherQuest = null!;
