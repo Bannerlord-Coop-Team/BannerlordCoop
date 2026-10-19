@@ -129,7 +129,7 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
 
         // a won siege's army member sees the leader's aftermath, like vanilla DoEnd (#3903); this finishes
         // the encounter itself, otherwise the stale assault menu stays up with only Leave
-        if (siegeEventInterface?.TryRouteArmyMemberToAftermath(playerEncounter._mapEvent?.MapEventSettlement) == true)
+        if (siegeEventInterface?.TryRouteArmyMemberToAftermath(playerEncounter._mapEvent) == true)
             return;
 
         PlayerEncounter.Finish(true);

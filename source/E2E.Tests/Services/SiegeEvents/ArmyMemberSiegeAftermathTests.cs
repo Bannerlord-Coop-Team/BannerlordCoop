@@ -35,13 +35,14 @@ public class ArmyMemberSiegeAftermathTests : IDisposable
         var client = environment.Clients.First();
         var settlementId = environment.CreateRegisteredObject<Settlement>();
         var siegeEvents = new Mock<ISiegeEventInterface>();
-        siegeEvents.Setup(siege => siege.TryRouteArmyMemberToAftermath(It.IsAny<Settlement>())).Returns(true);
-        Settlement? siegeSettlement = null;
+        siegeEvents.Setup(siegeEvent => siegeEvent.TryRouteArmyMemberToAftermath(It.IsAny<MapEvent>())).Returns(true);
+        MapEvent? siege = null;
 
         client.Call(() =>
         {
-            Assert.True(client.ObjectManager.TryGetObject(settlementId, out siegeSettlement));
-            var encounter = CreateEndingEncounter(siegeSettlement);
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            siege = CreateMapEvent(settlement);
+            var encounter = CreateEndingEncounter(siege);
             Campaign.Current.PlayerEncounter = encounter;
             try
             {
@@ -57,8 +58,8 @@ public class ArmyMemberSiegeAftermathTests : IDisposable
             }
         });
 
-        // the route is keyed off the ending encounter's own map event settlement, like vanilla DoEnd
-        siegeEvents.Verify(siege => siege.TryRouteArmyMemberToAftermath(siegeSettlement), Times.Once);
+        // the route is keyed off the ending encounter's own map event, like vanilla DoEnd
+        siegeEvents.Verify(siegeEvent => siegeEvent.TryRouteArmyMemberToAftermath(siege), Times.Once);
     }
 
     [Fact]
@@ -74,12 +75,13 @@ public class ArmyMemberSiegeAftermathTests : IDisposable
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-            var aftermathBehavior = SetUpArmyMemberOfWonSiege(siegeEvents, settlement);
+            var wonSiege = CreateMapEvent(settlement);
+            var aftermathBehavior = SetUpArmyMemberOfWonSiege(siegeEvents, settlement, wonSiege);
 
             // the leader picks before this member's encounter reaches End
             siegeEvents.SetLocalAftermathNarration(settlement, (int)SiegeAftermathAction.SiegeAftermath.ShowMercy);
 
-            RunEnd(playerEncounters, CreateEndingEncounter(settlement));
+            RunEnd(playerEncounters, CreateEndingEncounter(wonSiege));
 
             Assert.Equal(SiegeAftermathAction.SiegeAftermath.ShowMercy, aftermathBehavior._playerEncounterAftermath);
         });
@@ -105,11 +107,11 @@ public class ArmyMemberSiegeAftermathTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
 
             // the won siege's own End never ran (left via _leaveEncounter), so the member route stays pending
-            SetUpArmyMemberOfWonSiege(siegeEvents, settlement);
+            SetUpArmyMemberOfWonSiege(siegeEvents, settlement, CreateMapEvent(settlement));
 
-            // a field fight days later, then the old siege's settlement again
-            RunEnd(playerEncounters, CreateEndingEncounter(null));
-            RunEnd(playerEncounters, CreateEndingEncounter(settlement));
+            // a field fight days later, then a new battle at the old siege's settlement
+            RunEnd(playerEncounters, CreateEndingEncounter(CreateMapEvent(null)));
+            RunEnd(playerEncounters, CreateEndingEncounter(CreateMapEvent(settlement)));
         });
 
         Assert.Equal(0, recorders.SettlementEncounters.CountFor(client));
@@ -118,8 +120,34 @@ public class ArmyMemberSiegeAftermathTests : IDisposable
         Assert.Equal(2, recorders.Finishes.CountFor(client));
     }
 
+    [Fact]
+    public void EndState_StalePendingAftermath_DoesNotRouteNextBattleAtSameSettlement()
+    {
+        var client = environment.Clients.First();
+        var settlementId = environment.CreateRegisteredObject<Settlement>();
+        using var recorders = new EngineCallRecorders();
+
+        var siegeEvents = client.Resolve<ISiegeEventInterface>();
+        var playerEncounters = client.Resolve<IPlayerEncounterInterface>();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            // the won siege's own End never ran, so the member route stays pending
+            SetUpArmyMemberOfWonSiege(siegeEvents, settlement, CreateMapEvent(settlement));
+
+            // the very next End is a different battle at the same settlement, e.g. a later siege assault
+            RunEnd(playerEncounters, CreateEndingEncounter(CreateMapEvent(settlement)));
+        });
+
+        Assert.Equal(0, recorders.SettlementEncounters.CountFor(client));
+        Assert.Empty(recorders.Menus.MenusFor(client));
+        Assert.Equal(1, recorders.Finishes.CountFor(client));
+    }
+
     // Leaves what the client's OnMapEventEnded prefix sets for a won siege's army member, then the narration context.
-    private SiegeAftermathCampaignBehavior SetUpArmyMemberOfWonSiege(ISiegeEventInterface siegeEvents, Settlement settlement)
+    private SiegeAftermathCampaignBehavior SetUpArmyMemberOfWonSiege(ISiegeEventInterface siegeEvents, Settlement settlement, MapEvent wonSiege)
     {
         var client = environment.Clients.First();
         var mainPartyId = environment.CreateRegisteredObject<MobileParty>();
@@ -144,19 +172,24 @@ public class ArmyMemberSiegeAftermathTests : IDisposable
         var aftermathBehavior = Campaign.Current.GetCampaignBehavior<SiegeAftermathCampaignBehavior>();
         aftermathBehavior._besiegerParty = leaderParty;
         aftermathBehavior._wasPlayerArmyMember = true;
-        siegeEvents.SetLocalAftermathNarrationContext(settlement);
+        siegeEvents.SetLocalAftermathNarrationContext(settlement, wonSiege);
         return aftermathBehavior;
     }
 
-    // Builds an after-battle encounter at End whose map event is at the given settlement (null for a field fight).
-    private static PlayerEncounter CreateEndingEncounter(Settlement? mapEventSettlement)
+    // Builds a map event at the given settlement (null for a field fight).
+    private static MapEvent CreateMapEvent(Settlement? mapEventSettlement)
     {
         var mapEvent = ObjectHelper.SkipConstructor<MapEvent>();
         using (new AllowedThread())
         {
             mapEvent.MapEventSettlement = mapEventSettlement;
         }
+        return mapEvent;
+    }
 
+    // Builds an after-battle encounter at End for the given map event.
+    private static PlayerEncounter CreateEndingEncounter(MapEvent mapEvent)
+    {
         var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
         encounter._mapEvent = mapEvent;
         encounter.EncounterState = PlayerEncounterState.End;
