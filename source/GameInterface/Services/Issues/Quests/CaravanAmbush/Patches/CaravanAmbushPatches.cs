@@ -2,6 +2,7 @@
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using Helpers;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -58,9 +59,17 @@ internal class CaravanAmbushPatches
             })
             .PlayerLine("{=MKbLhn9d}I'm glad we caught up to you in time.")
             .NpcLine("{=yxg91L0a}We'll tell everyone what you did.[if:convo_happy][ib:normal2] Please take some of these goods in compensation. We have no intention to sell them anyway. Safe travels, {?PLAYER.GENDER}milady{?}sir{\\?}.")
-            .Consequence(() => Campaign.Current.ConversationManager.ConversationEndOneShot += __instance.OnQuestSucceeded)
+            .Consequence(() => CompleteOnConversationEnd(__instance))
             .CloseDialog();
         return false;
+    }
+
+    private static void CompleteOnConversationEnd(Quest quest)
+    {
+        var conversationManager = Campaign.Current.ConversationManager;
+        // Publicizer exposes duplicate event metadata, so direct event binding does not compile here.
+        var conversationEnd = AccessTools.Event(conversationManager.GetType(), "ConversationEndOneShot");
+        conversationEnd?.AddEventHandler(conversationManager, new Action(quest.OnQuestSucceeded));
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnQuestSucceeded))]
