@@ -4,8 +4,11 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Banners.Messages;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using LiteNetLib;
 using SandBox.GauntletUI.Map;
 using SandBox.View.Map;
 using SandBox.ViewModelCollection.Nameplate;
@@ -23,13 +26,22 @@ namespace GameInterface.Services.Banners.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
+        private readonly IPlayerManager playerManager;
+        private readonly ICoopClanPermissions permissions;
         private readonly ILogger Logger = LogManager.GetLogger<PlayerBannerHandler>();
 
-        public PlayerBannerHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+        public PlayerBannerHandler(
+            IMessageBroker messageBroker,
+            IObjectManager objectManager,
+            INetwork network,
+            IPlayerManager playerManager,
+            ICoopClanPermissions permissions)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
+            this.playerManager = playerManager;
+            this.permissions = permissions;
             messageBroker.Subscribe<PlayerBannerChanged>(Handle);
             messageBroker.Subscribe<NetworkUpdatePlayerBanner>(Handle);
         }
@@ -69,6 +81,13 @@ namespace GameInterface.Services.Banners.Handlers
             if (objectManager.TryGetObject<Clan>(payload.ClanId, out var clan) == false)
             {
                 Logger.Error("Unable to find clan ({clanId})", payload.ClanId);
+                return;
+            }
+
+            // Only the clan leader may edit the banner, same rule as the banner editor button.
+            if (ModInformation.IsServer && !CanManageClan(obj.Who, clan))
+            {
+                Logger.Warning("Ignoring banner edit for clan {clanId} from a player who does not lead it", payload.ClanId);
                 return;
             }
 
@@ -139,6 +158,13 @@ namespace GameInterface.Services.Banners.Handlers
                     messageBroker.Publish(this, new PlayerBannerChanged(kingdomClan));
                 }
             }
+        }
+
+        private bool CanManageClan(object sender, Clan clan)
+        {
+            return sender is NetPeer peer && playerManager.TryGetPlayer(peer, out var player) &&
+                objectManager.TryGetObject<Hero>(player.HeroId, out var actor) &&
+                permissions.CanManageClan(actor, clan);
         }
 
         /// <summary>

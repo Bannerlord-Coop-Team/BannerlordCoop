@@ -2,6 +2,8 @@
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Banners.Messages;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -24,28 +26,34 @@ public class KingdomBannerColorTests : SyncTestBase
     private readonly string kingdomId;
     private readonly string rulerClanId;
     private readonly string memberClanId;
+    private readonly string rulerHeroId;
+    private readonly string memberHeroId;
+    private readonly EnvironmentInstance rulerClient;
+    private readonly EnvironmentInstance memberClient;
 
     public KingdomBannerColorTests(ITestOutputHelper output) : base(output)
     {
         kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         rulerClanId = TestEnvironment.CreateRegisteredObject<Clan>();
         memberClanId = TestEnvironment.CreateRegisteredObject<Clan>();
-    }
+        rulerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        memberHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        rulerClient = Clients.First();
+        memberClient = Clients.Skip(1).First();
 
-    [Fact]
-    public void RulerBannerEdit_SurvivesKingdomRepaintOnLoad()
-    {
         foreach (var instance in Clients.Append(Server))
         {
             instance.Call(() => SetUpKingdom(instance));
         }
 
-        Server.SimulateMessage(this, new NetworkUpdatePlayerBanner(EditedBannerCode, rulerClanId, BackgroundColor, NewIconColor));
-        Server.PumpGameThread();
-        foreach (var client in Clients)
-        {
-            client.PumpGameThread();
-        }
+        RegisterClanLeader(rulerClient, "ruler", rulerHeroId, rulerClanId);
+        RegisterClanLeader(memberClient, "member", memberHeroId, memberClanId);
+    }
+
+    [Fact]
+    public void RulerBannerEdit_SurvivesKingdomRepaintOnLoad()
+    {
+        SendRulerBannerEdit(rulerClient);
 
         Server.Call(() =>
         {
@@ -73,6 +81,55 @@ public class KingdomBannerColorTests : SyncTestBase
                 Assert.Equal(EditedBannerCode, memberClan.Banner.Serialize());
             });
         }
+    }
+
+    [Fact]
+    public void BannerEdit_FromPlayerWhoDoesNotLeadTheClan_IsIgnored()
+    {
+        SendRulerBannerEdit(memberClient);
+
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                var kingdom = instance.GetRegisteredObject<Kingdom>(kingdomId);
+                var rulerClan = instance.GetRegisteredObject<Clan>(rulerClanId);
+                var memberClan = instance.GetRegisteredObject<Clan>(memberClanId);
+
+                Assert.Equal(OldIconColor, kingdom.SecondaryBannerColor);
+                Assert.Equal(OriginalBannerCode, rulerClan.Banner.Serialize());
+                Assert.Equal(OriginalBannerCode, memberClan.Banner.Serialize());
+            });
+        }
+    }
+
+    private void SendRulerBannerEdit(EnvironmentInstance sender)
+    {
+        Server.SimulateMessage(sender.NetPeer, new NetworkUpdatePlayerBanner(EditedBannerCode, rulerClanId, BackgroundColor, NewIconColor));
+        Server.PumpGameThread();
+        foreach (var client in Clients)
+        {
+            client.PumpGameThread();
+        }
+    }
+
+    private void RegisterClanLeader(EnvironmentInstance client, string controllerId, string heroId, string clanId)
+    {
+        Server.Call(() =>
+        {
+            var hero = Server.GetRegisteredObject<Hero>(heroId);
+            var clan = Server.GetRegisteredObject<Clan>(clanId);
+
+            using (new AllowedThread())
+            {
+                hero.Clan = clan;
+                clan.SetLeader(hero);
+            }
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player(controllerId, heroId, null, clanId, null)));
+            playerManager.SetPeer(controllerId, client.NetPeer);
+        });
     }
 
     private void SetUpKingdom(EnvironmentInstance instance)
