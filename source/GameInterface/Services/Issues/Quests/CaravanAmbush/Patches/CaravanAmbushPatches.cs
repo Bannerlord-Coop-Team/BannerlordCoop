@@ -124,6 +124,7 @@ internal class CaravanAmbushServerListeners
     private static IEnumerable<MethodBase> TargetMethods()
     {
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.HourlyTick));
+        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnTimedOut));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.MapEventStarted));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.MapEventEnded));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnSettlementEntered));
