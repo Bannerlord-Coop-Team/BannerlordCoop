@@ -17,7 +17,7 @@ internal class LadysKnightOutHonorPatches
     {
         if (ModInformation.IsClient) return false;
         if (ContainerProvider.TryResolve<ILadysKnightOutHonorProgress>(out var honor)) honor.ApplyPenalty(__instance);
-        return true;
+        return false;
     }
 }
 

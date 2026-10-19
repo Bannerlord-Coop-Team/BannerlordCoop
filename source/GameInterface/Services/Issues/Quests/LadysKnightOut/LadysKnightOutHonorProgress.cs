@@ -92,7 +92,7 @@ public readonly struct RequestLadysKnightOutHonorMirror : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkLadysKnightOutHonor : ICommand
+public readonly struct NetworkLadysKnightOutHonor : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string HeroId;
     [ProtoMember(2)] public readonly string ControllerId;

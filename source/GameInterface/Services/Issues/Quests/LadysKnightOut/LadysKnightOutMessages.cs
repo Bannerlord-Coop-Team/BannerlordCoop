@@ -30,7 +30,7 @@ public readonly struct RequestLadysKnightOutLord : ICommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkLadysKnightOutLordAccepted : ICommand
+public readonly struct NetworkLadysKnightOutLordAccepted : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
@@ -62,7 +62,7 @@ public readonly struct LadysKnightOutIssueLogAdded : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct NetworkLadysKnightOutLog : ICommand
+public readonly struct NetworkLadysKnightOutLog : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
