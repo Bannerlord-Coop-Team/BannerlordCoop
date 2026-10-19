@@ -89,7 +89,9 @@ public class WeaponPickupSyncTests
             worldItemDataValue: 11,
             hasWorldItemDataValue: true,
             worldItemModifierId: "ItemModifier_world_item",
-            pickupId: pickupId);
+            pickupId: pickupId,
+            isStuckMissile: true,
+            stackedOntoSlot: true);
         PropertyInfo? property = typeof(NetworkWeaponPickedup).GetProperty(
             nameof(NetworkWeaponPickedup.CurrentEquipment));
         Assert.NotNull(property);
@@ -131,6 +133,8 @@ public class WeaponPickupSyncTests
         Assert.True(received.HasWorldItemDataValue);
         Assert.Equal("ItemModifier_world_item", received.WorldItemModifierId);
         Assert.Equal(pickupId, received.PickupId);
+        Assert.True(received.IsStuckMissile);
+        Assert.True(received.StackedOntoSlot);
     }
 
     [Fact]
