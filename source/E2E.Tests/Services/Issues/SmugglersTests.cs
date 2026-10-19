@@ -224,11 +224,6 @@ public class SmugglersTests : IDisposable
 
         Server.Call(() =>
         {
-            using (new AllowedThread())
-            {
-                QuestOf(Server)._questState = QuestBase.QuestStates.Finalized;
-            }
-
             CampaignEventDispatcher.Instance.AddCampaignEventReceiver(receiver);
             CampaignEventDispatcher.Instance.OnMapEventEnded(ObjectHelper.SkipConstructor<MapEvent>());
         });
