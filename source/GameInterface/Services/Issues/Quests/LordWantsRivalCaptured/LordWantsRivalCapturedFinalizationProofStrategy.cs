@@ -1,7 +1,9 @@
 ﻿using Common.Logging;
 using Common;
+using Common.Messaging;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -39,12 +41,19 @@ internal class LordWantsRivalCapturedFinalizationProofStrategy : IFinalizationPr
         IObjectManager objectManager,
         IPlayerManager playerManager,
         IIssueOwnershipRegistry ownership,
-        ConversationPartyTracker conversationPartyTracker)
+        ConversationPartyTracker conversationPartyTracker,
+        IMessageBroker messageBroker)
     {
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.ownership = ownership;
         this.conversationPartyTracker = conversationPartyTracker;
+        messageBroker.Subscribe<PlayerPrisonersLooted>(Handle_PlayerPrisonersLooted);
+    }
+
+    private void Handle_PlayerPrisonersLooted(MessagePayload<PlayerPrisonersLooted> payload)
+    {
+        RecordPendingCaptures(payload.What.Player, payload.What.Prisoners);
     }
 
     public bool TryRunBranch(QuestBase quest, byte proof)

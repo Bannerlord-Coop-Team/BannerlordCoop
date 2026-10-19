@@ -3,11 +3,11 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.Issues.Quests.LordWantsRivalCaptured;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
@@ -34,7 +34,6 @@ internal class MapEventResultsHandler : IHandler
     private readonly IMapEventInitializationBarrier initializationBarrier;
     private readonly IMapEventContributionBarrier contributionBarrier;
     private readonly IPlayerManager playerManager;
-    private readonly LordWantsRivalCapturedFinalizationProofStrategy rivalCapturedFinalization;
     private readonly ConditionalWeakTable<MapEvent, HashSet<string>> receivedHideoutResults = new();
 
     public MapEventResultsHandler(
@@ -44,8 +43,7 @@ internal class MapEventResultsHandler : IHandler
         IMapEventResultsInterface mapEventResultsInterface,
         IMapEventInitializationBarrier initializationBarrier,
         IMapEventContributionBarrier contributionBarrier,
-        IPlayerManager playerManager,
-        LordWantsRivalCapturedFinalizationProofStrategy rivalCapturedFinalization)
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -54,7 +52,6 @@ internal class MapEventResultsHandler : IHandler
         this.initializationBarrier = initializationBarrier;
         this.contributionBarrier = contributionBarrier;
         this.playerManager = playerManager;
-        this.rivalCapturedFinalization = rivalCapturedFinalization;
 
         messageBroker.Subscribe<CommitMapEventResults>(Handle_CommitMapEventResults);
         messageBroker.Subscribe<NetworkCommitMapEventResults>(Handle_NetworkCommitMapEventResults);
@@ -107,7 +104,7 @@ internal class MapEventResultsHandler : IHandler
                     networkPlayerLootData.LootedPrisoners?.TryGetValue(playerMapEventPartyId, out prisoners);
                 }
 
-                rivalCapturedFinalization.RecordPendingCaptures(player, prisoners);
+                messageBroker.Publish(this, new PlayerPrisonersLooted(player, prisoners));
 
                 network.Send(peer, new NetworkCommitMapEventResults(
                     mapEventId,

@@ -287,6 +287,30 @@ public class LordWantsRivalCapturedTests : IDisposable
     }
 
     [Fact]
+    public void TargetEscapingAfterLootAllocation_ClearsPendingCapture()
+    {
+        Accept(ClientA, giverId);
+        TakePrisonerOnServer(Get<MobileParty>(Server, playerA.MobilePartyId).Party);
+        AllocateTargetPrisonerLoot();
+
+        Server.Call(() =>
+        {
+            EndCaptivityAction.ApplyByEscape(Get<Hero>(Server, targetId));
+            Assert.False(Get<Hero>(Server, targetId).IsPrisoner);
+        });
+
+        ClientA.Call(() => QuestOf(ClientA, giverId).FirstCounterOfferFinished());
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Server.Call(() =>
+        {
+            Assert.True(QuestOf(Server, giverId).IsOngoing);
+            Assert.False(QuestOf(Server, giverId)._firstCounterOfferMade);
+            Assert.False(Get<Hero>(Server, targetId).IsPrisoner);
+        });
+    }
+
+    [Fact]
     public void AcceptingTheCounterOffer_PaysTheOwnerReleasesTheTargetAndBetraysTheGiver()
     {
         Accept(ClientA, giverId);

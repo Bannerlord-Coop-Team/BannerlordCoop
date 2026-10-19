@@ -36,6 +36,18 @@ internal class LordWantsRivalCapturedWorldEventPatches
         RunAsOwners(quest => quest.OnPrisonerTaken(capturer, prisoner));
     }
 
+    [HarmonyPatch(nameof(CampaignEventDispatcher.OnHeroPrisonerReleased))]
+    [HarmonyPostfix]
+    private static void HeroPrisonerReleasedPostfix(
+        Hero prisoner,
+        PartyBase party,
+        IFaction capturerFaction,
+        EndCaptivityDetail detail,
+        bool showNotification)
+    {
+        RunAsOwners(quest => quest.OnHeroPrisonerReleased(prisoner, party, capturerFaction, detail, showNotification));
+    }
+
     [HarmonyPatch(nameof(CampaignEventDispatcher.OnMapEventStarted))]
     [HarmonyPostfix]
     private static void MapEventStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
