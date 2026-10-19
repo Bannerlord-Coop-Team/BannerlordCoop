@@ -7,7 +7,6 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using ProtoBuf;
-using System.Linq;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -50,15 +49,13 @@ internal sealed class LadysKnightOutHonorProgress : ILadysKnightOutHonorProgress
 
     public void MirrorClientHonor(int xp)
     {
-        if (ModInformation.IsServer || !Campaign.Current.IssueManager.Issues.Values
-                .OfType<IssueBase>()
-                .Any(issue => issue.IssueOwner == Hero.MainHero && issue.IssueQuest != null)) return;
+        if (ModInformation.IsServer) return;
         network.SendAll(new RequestLadysKnightOutHonorMirror(controller.ControllerId, xp));
     }
 
     public void MirrorServerHonor(string controllerId, int xp)
     {
-        if (ModInformation.IsServer && honorXp.ContainsKey(controllerId)) honorXp[controllerId] = xp;
+        if (ModInformation.IsServer) honorXp[controllerId] = xp;
     }
 
     public void ApplyPenalty(QuestBase quest)

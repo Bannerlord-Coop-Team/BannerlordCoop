@@ -322,15 +322,18 @@ public class LadysKnightOutTests : IDisposable
             Assert.NotNull(giver.CurrentSettlement?.MapFaction);
             VillageHostileFactionStanceHelper.ApplyWarStance(hero.MapFaction, giver.CurrentSettlement.MapFaction);
 
-            var canTake = issue.CanPlayerTakeQuestConditions(
-                hero,
+            using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+            {
+                var canTake = issue.CanPlayerTakeQuestConditions(
+                giver,
                 out var flags,
                 out _,
                 out _,
                 out _);
 
-            Assert.False(canTake);
-            Assert.True(flags.HasFlag(IssueBase.PreconditionFlags.AtWar));
+                Assert.False(canTake);
+                Assert.True(flags.HasFlag(IssueBase.PreconditionFlags.AtWar));
+            }
         });
     }
 
