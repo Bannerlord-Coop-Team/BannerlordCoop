@@ -10,22 +10,15 @@ using Quest = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.
 namespace GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Patches;
 
 /// <summary>
-/// Clients fire army dispersal and settlement owner changes while applying the server's message under
-/// AllowedThread, where the dispatcher would let the quest cancel locally without telling the server.
-/// The owner's quest reacts on the next frame instead, so its cancel is handed to the server.
+/// Clients fire settlement owner changes while applying the server's message under AllowedThread, where the
+/// dispatcher would let the quest cancel locally without telling the server. The owner's quest reacts on the next
+/// frame instead, so its cancel is handed to the server. Army dispersal is relayed by the framework on the server.
 /// </summary>
 [HarmonyPatch]
 internal class ScoutEnemyGarrisonsReplayedEventPatch
 {
     [ThreadStatic]
     private static bool isDeferredRun;
-
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnArmyDispersed))]
-    [HarmonyPrefix]
-    private static bool OnArmyDispersedPrefix(Quest __instance, Army army, Army.ArmyDispersionReason reason, bool isPlayersArmy)
-    {
-        return RunOutsideReplay(__instance, () => __instance.OnArmyDispersed(army, reason, isPlayersArmy));
-    }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementOwnerChanged))]
     [HarmonyPrefix]

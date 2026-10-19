@@ -13,6 +13,7 @@ using HarmonyLib;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsIssue;
@@ -235,61 +236,32 @@ public class ScoutEnemyGarrisonsTests : IDisposable
     }
 
     [Fact]
-    public void ReplayedArmyDispersal_ReachesTheOwnerQuestOnTheNextFrame()
+    public void ArmyDispersalIsRelayedToTheOwnerQuestOnTheServer()
     {
         var targetIds = CreateTargets();
         var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
-        var harmony = new Harmony($"test-scout-army-dispersed-{Guid.NewGuid()}");
-        var listener = AccessTools.Method(typeof(Quest), nameof(Quest.OnArmyDispersed));
-        ListenerRuns.Clear();
-        harmony.Patch(listener, postfix: new HarmonyMethod(typeof(ScoutEnemyGarrisonsTests), nameof(RecordListenerRun)) { priority = Priority.Last });
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        using var calls = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.OnArmyDispersed)));
 
-        try
+        Server.Call(() =>
         {
-            Client.Call(() =>
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+
+            var quest = IssueBackedQuest(giver, Resolve(Server, targetIds));
+            using (new AllowedThread())
             {
-                Assert.True(Client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                quest.StartQuest();
+                var army = new Army(kingdom, party, Army.ArmyTypes.Patrolling);
+                army.ArmyOwner = giver;
+                CampaignEventDispatcher.Instance.OnArmyDispersed(army, Army.ArmyDispersionReason.Unknown, false);
+            }
+        });
 
-                // Another lord's army, so vanilla's listener has nothing to cancel once it runs
-                var quest = QuestWithTargets(Resolve(Client, targetIds));
-                quest.QuestGiver = giver;
-                var army = (Army)RuntimeHelpers.GetUninitializedObject(typeof(Army));
-
-                // Clients fire the event while applying the server's message
-                using (new AllowedThread())
-                {
-                    quest.OnArmyDispersed(army, Army.ArmyDispersionReason.Unknown, false);
-                }
-            });
-
-            Assert.Equal(new[] { false }, ListenerRuns);
-
-            Client.PumpGameThread();
-
-            Assert.Equal(new[] { false, true }, ListenerRuns);
-
-            // Outside a replay the listener runs at once
-            Client.Call(() =>
-            {
-                Assert.True(Client.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
-
-                var quest = QuestWithTargets(Resolve(Client, targetIds));
-                quest.QuestGiver = giver;
-
-                quest.OnArmyDispersed((Army)RuntimeHelpers.GetUninitializedObject(typeof(Army)), Army.ArmyDispersionReason.Unknown, false);
-            });
-
-            Assert.Equal(new[] { false, true, true }, ListenerRuns);
-        }
-        finally
-        {
-            harmony.Unpatch(listener, HarmonyPatchType.Postfix, harmony.Id);
-        }
+        Assert.Equal(1, calls.CountFor(Server));
     }
-
-    private static readonly List<bool> ListenerRuns = new List<bool>();
-
-    private static void RecordListenerRun(bool __runOriginal) => ListenerRuns.Add(__runOriginal);
 
     [Fact]
     public void ReplayedSuccess_AddsTheSuccessEntryToTheOwnerJournal()

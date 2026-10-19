@@ -18,20 +18,20 @@ internal class ScoutEnemyGarrisonsTargetsHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IIssueResolver issueResolver;
-    private readonly ScoutEnemyGarrisonsCreationCaptureStrategy targets;
+    private readonly ScoutEnemyGarrisonsQuestSolutionAcceptStrategy questSolutionAcceptStrategy;
 
     public ScoutEnemyGarrisonsTargetsHandler(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
         IIssueResolver issueResolver,
-        ScoutEnemyGarrisonsCreationCaptureStrategy targets)
+        ScoutEnemyGarrisonsQuestSolutionAcceptStrategy questSolutionAcceptStrategy)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.issueResolver = issueResolver;
-        this.targets = targets;
+        this.questSolutionAcceptStrategy = questSolutionAcceptStrategy;
 
         messageBroker.Subscribe<ScoutEnemyGarrisonsTargetsChanged>(Handle_TargetsChanged);
         messageBroker.Subscribe<NetworkScoutEnemyGarrisonsTargetsChanged>(Handle_NetworkTargetsChanged);
@@ -58,7 +58,7 @@ internal class ScoutEnemyGarrisonsTargetsHandler : IHandler
             return;
         }
 
-        network.SendAll(new NetworkScoutEnemyGarrisonsTargetsChanged(issueOwnerId, issue.StringId, targets.Capture(issue)));
+        network.SendAll(new NetworkScoutEnemyGarrisonsTargetsChanged(issueOwnerId, issue.StringId, questSolutionAcceptStrategy.Capture(issue)));
     }
 
     // Client only.
@@ -75,8 +75,7 @@ internal class ScoutEnemyGarrisonsTargetsHandler : IHandler
         {
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
                 !(issue is Issue scoutIssue) ||
-                !issue.IsOngoingWithoutQuest ||
-                !targets.TryReadTargets(data.Targets, out var settlements))
+                !issue.IsOngoingWithoutQuest)
             {
                 return;
             }
@@ -84,9 +83,7 @@ internal class ScoutEnemyGarrisonsTargetsHandler : IHandler
             // A taken issue keeps the targets its accepter was given
             using (new AllowedThread())
             {
-                scoutIssue._settlement1 = settlements[0];
-                scoutIssue._settlement2 = settlements[1];
-                scoutIssue._settlement3 = settlements[2];
+                questSolutionAcceptStrategy.Apply(scoutIssue, data.Targets);
             }
         }, context: nameof(ScoutEnemyGarrisonsTargetsHandler));
     }

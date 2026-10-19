@@ -2,8 +2,6 @@
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using Quest = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.ScoutEnemyGarrisonsQuest;
@@ -54,41 +52,4 @@ internal class ScoutEnemyGarrisonsBranchPatches
             HandedOff.Add(quest, new object());
         }
     }
-}
-
-[HarmonyPatch]
-internal class ScoutEnemyGarrisonsOutcomeHandOffPatch
-{
-    private static IEnumerable<MethodBase> TargetMethods()
-    {
-        yield return AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithCancel));
-        yield return AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithFail));
-        yield return AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut));
-    }
-
-    [HarmonyPostfix]
-    internal static void Postfix(QuestBase __instance)
-    {
-        // Still running after an ending means the dispatcher handed the ending to the server instead
-        if (ModInformation.IsClient && __instance is Quest quest && quest.IsOngoing)
-        {
-            ScoutEnemyGarrisonsBranchPatches.HandOff(quest);
-        }
-    }
-}
-
-[HarmonyPatch]
-internal class ScoutEnemyGarrisonsHandedOffListenerPatch
-{
-    private static IEnumerable<MethodBase> TargetMethods()
-    {
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.HourlyTick));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnSettlementOwnerChanged));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnArmyDispersed));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
-    }
-
-    // Otherwise every hour logs and requests the same ending again until the server answers
-    [HarmonyPrefix]
-    internal static bool Prefix(Quest __instance) => !ScoutEnemyGarrisonsBranchPatches.IsHandedOff(__instance);
 }
