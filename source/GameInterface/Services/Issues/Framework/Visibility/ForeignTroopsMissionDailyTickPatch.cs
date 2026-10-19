@@ -1,5 +1,4 @@
 ﻿using Common;
-using Common.Util;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,7 +31,7 @@ internal class ForeignTroopsMissionDailyTickPatch
             .ToList();
 
         // A taken state the daily tick has nothing to do for
-        SetState(__state, IssueBase.IssueState.SolvingWithQuestSolution);
+        QuestScreenIssueFilterPatch.SetState(__state, IssueBase.IssueState.SolvingWithQuestSolution);
     }
 
     [HarmonyFinalizer]
@@ -43,17 +42,6 @@ internal class ForeignTroopsMissionDailyTickPatch
             return;
         }
 
-        SetState(__state, IssueBase.IssueState.SolvingWithAlternativeSolution);
-    }
-
-    private static void SetState(List<IssueBase> issues, IssueBase.IssueState state)
-    {
-        using (new AllowedThread())
-        {
-            foreach (var issue in issues)
-            {
-                issue._issueState = state;
-            }
-        }
+        QuestScreenIssueFilterPatch.SetState(__state, IssueBase.IssueState.SolvingWithAlternativeSolution);
     }
 }
