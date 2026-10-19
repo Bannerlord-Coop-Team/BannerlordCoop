@@ -11,7 +11,7 @@ internal enum LordSolutionOperation : byte
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct RequestLordSolution : ICommand
+public readonly struct RequestLordSolution : ICommand
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
     [ProtoMember(2)] public readonly string IssueId;

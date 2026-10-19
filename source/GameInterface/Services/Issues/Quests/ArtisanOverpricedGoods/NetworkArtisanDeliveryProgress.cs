@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.Issues.Quests.ArtisanOverpricedGoods;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkArtisanDeliveryProgress : IServerToClientCommand
+public readonly struct NetworkArtisanDeliveryProgress : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
     [ProtoMember(2)] public readonly string IssueId;

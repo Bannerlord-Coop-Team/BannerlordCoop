@@ -22,7 +22,7 @@ internal readonly struct ArtisanJournalObserved : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkArtisanJournal : IServerToClientCommand
+public readonly struct NetworkArtisanJournal : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
