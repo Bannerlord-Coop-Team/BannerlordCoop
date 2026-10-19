@@ -15,6 +15,7 @@ using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
@@ -35,6 +36,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
     private readonly IPlayerManager playerManager;
     private readonly IAlternativeSolutionTroopValidator troopValidator;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IIssueAcceptPreconditions acceptPreconditions;
 
     public AlternativeSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -44,7 +46,8 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager,
         IAlternativeSolutionTroopValidator troopValidator,
-        IControllerIdProvider controllerIdProvider)
+        IControllerIdProvider controllerIdProvider,
+        IIssueAcceptPreconditions acceptPreconditions)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -54,6 +57,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         this.playerManager = playerManager;
         this.troopValidator = troopValidator;
         this.controllerIdProvider = controllerIdProvider;
+        this.acceptPreconditions = acceptPreconditions;
 
         messageBroker.Subscribe<AlternativeSolutionAcceptRequested>(Handle_AlternativeSolutionAcceptRequested);
         messageBroker.Subscribe<RequestAlternativeSolutionAccept>(Handle_RequestAlternativeSolutionAccept);
@@ -118,7 +122,8 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
         if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor) ||
             descriptor.AlternativeSolutionAcceptStrategy == null ||
-            !issue.IsOngoingWithoutQuest)
+            !issue.IsOngoingWithoutQuest ||
+            !acceptPreconditions.CanTake(issue, playerHero, player.ControllerId))
         {
             Reject(peer, data, playerHero);
             return;
@@ -201,6 +206,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             {
                 issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
                 ApplyState(issue, data.State);
+                AddPlaceholderLog(issue);
                 return;
             }
 
@@ -238,6 +244,22 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
             troopValidator.ReturnToMainParty(issue);
         }, context: nameof(AlternativeSolutionAcceptCoordinator));
+    }
+
+    // Vanilla's daily tick reads the first log entry, which only the starting machine has
+    private static void AddPlaceholderLog(IssueBase issue)
+    {
+        if (issue.JournalEntries.Count > 0)
+        {
+            return;
+        }
+
+        issue._journalEntries.Add(new JournalLog(
+            CampaignTime.Now,
+            new TextObject(string.Empty),
+            new TextObject("{=VFO7rMzK}Return Days"),
+            0,
+            issue.AlternativeSolutionBaseDurationInDaysInternal));
     }
 
     private static AlternativeSolutionVanillaState CaptureState(IssueBase issue)

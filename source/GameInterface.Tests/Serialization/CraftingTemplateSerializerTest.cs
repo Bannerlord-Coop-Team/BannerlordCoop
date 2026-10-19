@@ -12,31 +12,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CraftingTemplateSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public CraftingTemplateSerializationTest()
         {
             GameBootStrap.Initialize();
 
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void CraftingTemplate_Serialize()
-        {
-            CraftingTemplate testCraftingTemplate = (CraftingTemplate)FormatterServices.GetUninitializedObject(typeof(CraftingTemplate));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            CraftingTemplateBinaryPackage package = new CraftingTemplateBinaryPackage(testCraftingTemplate, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

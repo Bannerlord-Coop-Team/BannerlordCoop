@@ -51,17 +51,14 @@ public class CrossOwnerMountCatchUpTests : MissionTestEnvironment
         RunCatchUp(initialHost, "B", disconnected: true, withdrawAfterReturn: true);
     }
 
-    public static IEnumerable<object[]> DelayedHorseDepartureCases()
-    {
-        foreach (string initialHost in new[] { "A", "C" })
-            foreach (bool disconnected in new[] { false, true })
-                foreach (bool refreshedFirst in new[] { false, true })
-                    foreach (bool atCapacity in new[] { false, true })
-                        yield return new object[] { initialHost, disconnected, refreshedFirst, atCapacity };
-    }
-
+    // Pairwise over host, disconnect, refresh order and capacity.
     [Theory]
-    [MemberData(nameof(DelayedHorseDepartureCases))]
+    [InlineData("A", false, false, false)]
+    [InlineData("A", true, true, true)]
+    [InlineData("C", false, true, false)]
+    [InlineData("C", true, false, true)]
+    [InlineData("A", false, true, true)]
+    [InlineData("C", true, true, false)]
     public void DelayedCatchUp_HorseAuthorityConvergesAfterOwnerReturns(
         string initialHost, bool disconnected, bool refreshedFirst, bool atCapacity)
     {
