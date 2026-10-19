@@ -323,6 +323,8 @@ public class LadysKnightOutTests : IDisposable
                 var hero = Hero.MainHero;
                 var otherClan = instance.GetRegisteredObject<Clan>(otherClanId);
                 giver.CurrentSettlement.Town.OwnerClan = otherClan;
+                hero.Clan.Id = new MBGUID(1);
+                otherClan.Id = new MBGUID(2);
                 Assert.NotNull(giver.CurrentSettlement?.MapFaction);
                 Assert.NotSame(hero.MapFaction, giver.CurrentSettlement.MapFaction);
                 VillageHostileFactionStanceHelper.ApplyWarStance(hero.MapFaction, giver.CurrentSettlement.MapFaction);
