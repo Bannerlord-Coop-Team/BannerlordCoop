@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Inventory.Data;
 using GameInterface.Services.Inventory.Handlers;
 using GameInterface.Services.Inventory.Interfaces;
 using GameInterface.Services.ObjectManager;
@@ -136,13 +137,17 @@ public class TradeHandlerTests
         battleSlots[1] = new EquipmentElement(shield, null);
         var civilianSlots = new EquipmentElement[Equipment.EquipmentSlotLength];
         civilianSlots[1] = new EquipmentElement(shield, null);
+        var preTradeBattleSlots = new EquipmentElement[Equipment.EquipmentSlotLength];
+        preTradeBattleSlots[0] = new EquipmentElement(sword, null);
+        var preTradeCivilianSlots = new EquipmentElement[Equipment.EquipmentSlotLength];
+        var heroEquipment = new HeroTradeEquipment(new[] { battleSlots, civilianSlots }, new[] { preTradeBattleSlots, preTradeCivilianSlots });
 
         var boughtItems = new List<(ItemRosterElement, int)>
         {
             (new ItemRosterElement(new EquipmentElement(shield, null), 3), 300)
         };
 
-        int result = TradeHandler.ReconcilePurchases(merchantRoster, partyRosterData, new[] { battleSlots, civilianSlots }, boughtItems, totalAmount: 300, out var keptItems);
+        int result = TradeHandler.ReconcilePurchases(merchantRoster, partyRosterData, new[] { heroEquipment }, boughtItems, totalAmount: 300, out var keptItems);
 
         // 2 short: 1 comes out of the party roster and 1 out of the first equipped slot
         Assert.Equal(100, result);
@@ -150,6 +155,69 @@ public class TradeHandlerTests
         Assert.True(battleSlots[1].IsEmpty);
         Assert.True(civilianSlots[1].IsEqualTo(new EquipmentElement(shield, null)));
         Assert.True(battleSlots[0].IsEqualTo(new EquipmentElement(sword, null)));
+        Assert.Equal(1, AmountOf(keptItems, new EquipmentElement(shield, null)));
+    }
+
+    [Fact]
+    public void ReconcilePurchases_LeavesAnotherHerosPreTradeItem_WhenTakingBackFromEquipment()
+    {
+        var shield = new ItemObject("old_horsemans_kite_shield");
+
+        // Merchant had nothing left, the party roster has no shield, hero A already owned one and hero B equipped the bought one
+        var merchantRoster = new ItemRoster();
+        var partyRosterData = new[] { default(ItemRosterElement) };
+
+        var heroASlots = new EquipmentElement[Equipment.EquipmentSlotLength];
+        heroASlots[1] = new EquipmentElement(shield, null);
+        var heroAPreTradeSlots = new EquipmentElement[Equipment.EquipmentSlotLength];
+        heroAPreTradeSlots[1] = new EquipmentElement(shield, null);
+        var heroBSlots = new EquipmentElement[Equipment.EquipmentSlotLength];
+        heroBSlots[1] = new EquipmentElement(shield, null);
+        var heroBPreTradeSlots = new EquipmentElement[Equipment.EquipmentSlotLength];
+
+        var heroEquipments = new[]
+        {
+            new HeroTradeEquipment(new[] { heroASlots }, new[] { heroAPreTradeSlots }),
+            new HeroTradeEquipment(new[] { heroBSlots }, new[] { heroBPreTradeSlots })
+        };
+
+        var boughtItems = new List<(ItemRosterElement, int)>
+        {
+            (new ItemRosterElement(new EquipmentElement(shield, null), 1), 100)
+        };
+
+        int result = TradeHandler.ReconcilePurchases(merchantRoster, partyRosterData, heroEquipments, boughtItems, totalAmount: 100, out var keptItems);
+
+        Assert.Equal(0, result);
+        Assert.True(heroASlots[1].IsEqualTo(new EquipmentElement(shield, null)));
+        Assert.True(heroBSlots[1].IsEmpty);
+        Assert.Equal(0, AmountOf(keptItems, new EquipmentElement(shield, null)));
+    }
+
+    [Fact]
+    public void ReconcilePurchases_NoRefund_WhenOnlyPreTradeEquipmentHoldsTheItem()
+    {
+        var shield = new ItemObject("old_horsemans_kite_shield");
+
+        var merchantRoster = new ItemRoster();
+        var partyRosterData = new[] { default(ItemRosterElement) };
+
+        // The hero moved an owned shield between slots, so the slot that changed did not gain a new shield
+        var tradedSlots = new EquipmentElement[Equipment.EquipmentSlotLength];
+        tradedSlots[2] = new EquipmentElement(shield, null);
+        var preTradeSlots = new EquipmentElement[Equipment.EquipmentSlotLength];
+        preTradeSlots[1] = new EquipmentElement(shield, null);
+        var heroEquipments = new[] { new HeroTradeEquipment(new[] { tradedSlots }, new[] { preTradeSlots }) };
+
+        var boughtItems = new List<(ItemRosterElement, int)>
+        {
+            (new ItemRosterElement(new EquipmentElement(shield, null), 1), 100)
+        };
+
+        int result = TradeHandler.ReconcilePurchases(merchantRoster, partyRosterData, heroEquipments, boughtItems, totalAmount: 100, out var keptItems);
+
+        Assert.Equal(100, result);
+        Assert.True(tradedSlots[2].IsEqualTo(new EquipmentElement(shield, null)));
         Assert.Equal(1, AmountOf(keptItems, new EquipmentElement(shield, null)));
     }
 
@@ -210,7 +278,7 @@ public class TradeHandlerTests
         Assert.Equal(2, stock.Length);
     }
 
-    private static EquipmentElement[][] NoEquipment() => System.Array.Empty<EquipmentElement[]>();
+    private static HeroTradeEquipment[] NoEquipment() => System.Array.Empty<HeroTradeEquipment>();
 
     private static int AmountOf(IEnumerable<ItemRosterElement> rosterData, EquipmentElement element) =>
         rosterData.Where(e => e.EquipmentElement.IsEqualTo(element)).Sum(e => e.Amount);
