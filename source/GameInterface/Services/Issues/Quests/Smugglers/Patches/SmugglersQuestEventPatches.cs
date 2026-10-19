@@ -26,13 +26,8 @@ internal class SmugglersQuestEventPatches
     [HarmonyPostfix]
     private static void OnMapEventEndedPostfix(MapEvent mapEvent)
     {
-        if (!HasActiveSmugglersQuest())
-        {
-            return;
-        }
-
         // Most battles have no party used by a quest in them
-        if (!HasQuestParty(mapEvent?.AttackerSide) && !HasQuestParty(mapEvent?.DefenderSide))
+        if (!mapEvent.InvolvedParties.Any(party => party.MobileParty?.IsCurrentlyUsedByAQuest == true))
         {
             return;
         }
@@ -70,8 +65,8 @@ internal class SmugglersQuestEventPatches
         var smugglers = quest._smugglerParty.Party;
         var captor = owner?.PartyBelongedToAsPrisoner;
 
-        return quest.IsOngoing && captor != null && owner.IsPrisoner && ContainsParty(mapEvent, smugglers) &&
-            ContainsParty(mapEvent, captor) && captor.Side == smugglers.Side &&
+        return quest.IsOngoing && captor != null && owner.IsPrisoner && mapEvent.InvolvedParties.Contains(smugglers) &&
+            mapEvent.InvolvedParties.Contains(captor) && captor.Side == smugglers.Side &&
             owner.CaptivityStartTime >= mapEvent.BattleStartTime;
     }
 
@@ -105,7 +100,7 @@ internal class SmugglersQuestEventPatches
     private static void CancelIfDefeatedWithoutOwner(Quest quest, MapEvent mapEvent)
     {
         var smugglers = quest._smugglerParty.Party;
-        if (!quest.IsOngoing || !ContainsParty(mapEvent, smugglers))
+        if (!quest.IsOngoing || !mapEvent.InvolvedParties.Contains(smugglers))
         {
             return;
         }
@@ -116,23 +111,6 @@ internal class SmugglersQuestEventPatches
         }
 
         quest.CompleteQuestWithCancel();
-    }
-
-    private static bool HasActiveSmugglersQuest()
-    {
-        return Campaign.Current?.IssueManager?.Issues.Values.Any(issue =>
-            issue.IssueQuest is Quest quest && quest.IsOngoing) == true;
-    }
-
-    private static bool HasQuestParty(MapEventSide side)
-    {
-        return side?.Parties?.Any(party => party?.Party?.MobileParty?.IsCurrentlyUsedByAQuest == true) == true;
-    }
-
-    private static bool ContainsParty(MapEvent mapEvent, PartyBase party)
-    {
-        return mapEvent?.AttackerSide?.Parties?.Any(mapEventParty => mapEventParty?.Party == party) == true ||
-            mapEvent?.DefenderSide?.Parties?.Any(mapEventParty => mapEventParty?.Party == party) == true;
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementOwnerChanged))]
