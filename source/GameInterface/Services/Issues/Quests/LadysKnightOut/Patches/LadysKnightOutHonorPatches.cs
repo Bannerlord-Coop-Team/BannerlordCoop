@@ -28,7 +28,7 @@ internal class LadysKnightOutHonorMirrorPatches
     [HarmonyPostfix]
     private static void MirrorClientHonor(PropertyOwner<TraitObject> __instance, TraitObject attribute, int value)
     {
-        if (ModInformation.IsServer || AllowedThread.IsThisThreadAllowed() || Campaign.Current?.PlayerTraitDeveloper != __instance ||
+        if (ModInformation.IsServer || AllowedThread.IsThisThreadAllowed() || !ReferenceEquals(Campaign.Current?.PlayerTraitDeveloper, __instance) ||
             attribute != DefaultTraits.Honor) return;
         if (ContainerProvider.TryResolve<ILadysKnightOutHonorProgress>(out var honor)) honor.MirrorClientHonor(value);
     }
