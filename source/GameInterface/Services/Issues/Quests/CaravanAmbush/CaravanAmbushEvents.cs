@@ -3,6 +3,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Common.Logging;
 using Common.Network;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,6 +27,7 @@ internal interface ICaravanAmbushEvents
 
 internal class CaravanAmbushEvents : ICaravanAmbushEvents
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<CaravanAmbushEvents>();
     private readonly IOutcomeDispatcher dispatcher;
     private readonly ICaravanAmbushStatePublisher publisher;
     private readonly INetwork network;
