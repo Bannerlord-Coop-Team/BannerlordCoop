@@ -59,7 +59,7 @@ internal class HeadmanHerdWorldEventPatches
     [HarmonyPostfix]
     private static void GiverKilledPostfix(Hero victim, GiverKilledState __state)
     {
-        if (__state == null || victim.IsAlive || !ModInformation.IsServer ||
+        if (__state == null || victim.IsAlive || __state.Issue.IsSolvingWithAlternative || !ModInformation.IsServer ||
             !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher)) return;
 
         dispatcher.After(__state.Issue, IssueOutcome.QuestCancel);
