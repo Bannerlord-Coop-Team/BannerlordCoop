@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -11,8 +12,8 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 
 /// <summary>
 /// Backstop for a capturing leader that lands back on the stale pre-mission siege encounter menu (dead Leave)
-/// instead of menu_settlement_taken, for example when the map rebuilds that menu after the post-battle loot screen
-/// with no live encounter left. Routes off the observable stuck state, so it lands regardless of why the prompt path missed.
+/// instead of menu_settlement_taken once the battle has resolved, e.g. its encounter End was skipped or the prompt
+/// arrived late. Routes off the observable stuck state, so it lands regardless of why the normal paths missed.
 /// Client-only; runs alongside EncounterAssaultInitGuardPatch on the same menu.
 /// </summary>
 [HarmonyPatch(typeof(EncounterGameMenuBehavior))]
@@ -23,6 +24,8 @@ internal class EncounterCaptureAftermathInitPatch
     internal static bool Prefix()
     {
         if (ModInformation.IsServer) return true;
+        // The presentation and loot steps still own this menu; the encounter End routes the leader after them.
+        if (SiegeCaptureTransitionRetryHandler.IsBattleStillResolving()) return true;
         if (!TryGetCapturedSettlement(out var settlement)) return true;
         if (!ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface)) return true;
 
@@ -32,12 +35,17 @@ internal class EncounterCaptureAftermathInitPatch
 
     private static bool TryGetCapturedSettlement(out Settlement settlement)
     {
-        // The leader's held capture choice; also covers a vassal, whose fief stays with the ruler until the claimant vote.
-        if (SiegeCaptureMenuHoldPatch.TryGetHeldSettlement(PlayerEncounter.Current, out settlement)) return true;
-        if (PlayerEncounter.Current == null) return false;
+        settlement = null;
+        if (PlayerEncounter.Current == null)
+        {
+            // Finished stale encounter: the leader's held capture choice, which also covers a vassal whose fief stays
+            // with the ruler until the claimant vote. A live map event (a new attack) owns the menu instead.
+            return MobileParty.MainParty?.MapEvent == null && SiegeCaptureMenuHoldPatch.TryGetOnlyHeldSettlement(out settlement);
+        }
 
         settlement = PlayerEncounter.EncounterSettlement;
         if (settlement == null || !settlement.IsFortification) return false;
+        if (MobileParty.MainParty?.MapEvent == null && SiegeCaptureMenuHoldPatch.IsHeld(settlement)) return true;
 
         var battle = PlayerEncounter.Battle;
         if (battle == null || !battle.IsSiegeAssault) return false;

@@ -1,8 +1,8 @@
 ﻿using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -18,11 +18,16 @@ namespace GameInterface.Services.SiegeEvents.Patches;
 [HarmonyPatch]
 internal static class SiegeCaptureMenuHoldPatch
 {
-    private static readonly HashSet<Settlement> pendingChoice = new HashSet<Settlement>();
+    // Held capture choices, with the defeated owner the server snapshotted for the consequence text (null if unknown).
+    private static readonly Dictionary<Settlement, Clan> pendingChoice = new Dictionary<Settlement, Clan>();
 
-    internal static void HoldFor(Settlement settlement)
+    /// <summary>Holds the capture choice for a settlement; a null previous owner keeps one already held.</summary>
+    internal static void HoldFor(Settlement settlement, Clan previousOwnerClan = null)
     {
-        if (settlement != null) pendingChoice.Add(settlement);
+        if (settlement == null) return;
+        if (previousOwnerClan == null && pendingChoice.ContainsKey(settlement)) return;
+
+        pendingChoice[settlement] = previousOwnerClan;
     }
 
     internal static void Release(Settlement settlement)
@@ -30,17 +35,24 @@ internal static class SiegeCaptureMenuHoldPatch
         if (settlement != null) pendingChoice.Remove(settlement);
     }
 
-    /// <summary>
-    /// The held capture an encounter menu belongs to: a live encounter's own settlement, or the only held
-    /// capture when the stale siege encounter was already finished.
-    /// </summary>
-    internal static bool TryGetHeldSettlement(PlayerEncounter encounter, out Settlement settlement)
-    {
-        settlement = encounter != null
-            ? encounter.EncounterSettlementAux
-            : pendingChoice.Count == 1 ? pendingChoice.First() : null;
+    /// <summary>True while this client holds the capture choice for the settlement.</summary>
+    internal static bool IsHeld(Settlement settlement) => settlement != null && pendingChoice.ContainsKey(settlement);
 
-        return settlement != null && pendingChoice.Contains(settlement);
+    /// <summary>The defeated owner held with the settlement's capture choice, or null.</summary>
+    internal static Clan GetHeldPreviousOwner(Settlement settlement)
+    {
+        if (settlement == null) return null;
+        return pendingChoice.TryGetValue(settlement, out var previousOwnerClan) ? previousOwnerClan : null;
+    }
+
+    /// <summary>
+    /// The capture a finished stale encounter menu belongs to. With no encounter left to name it, only an
+    /// unambiguous single held capture qualifies.
+    /// </summary>
+    internal static bool TryGetOnlyHeldSettlement(out Settlement settlement)
+    {
+        settlement = pendingChoice.Count == 1 ? pendingChoice.Keys.First() : null;
+        return settlement != null;
     }
 
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_town_outside_on_init))]
@@ -54,7 +66,7 @@ internal static class SiegeCaptureMenuHoldPatch
     private static bool RedirectIfHeld()
     {
         var settlement = Settlement.CurrentSettlement;
-        if (settlement != null && pendingChoice.Contains(settlement))
+        if (IsHeld(settlement))
         {
             GameMenu.SwitchToMenu("menu_settlement_taken");
             return false;

@@ -3,14 +3,14 @@ using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
 using System.Linq;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
 
 namespace GameInterface.Tests.Services.SiegeEvents;
 
-/// <summary>Verifies capture aftermath holds cover every fortification entry menu and the stale encounter menu.</summary>
+/// <summary>Verifies capture aftermath holds cover every fortification entry menu and carry the defeated owner.</summary>
 public class SiegeCaptureMenuHoldPatchTests
 {
     [Theory]
@@ -28,41 +28,45 @@ public class SiegeCaptureMenuHoldPatchTests
     }
 
     [Fact]
-    public void TryGetHeldSettlement_LiveEncounter_MatchesOnlyItsOwnSettlement()
+    public void HoldFor_KeepsTheHeldPreviousOwnerWhenReheldWithoutOne()
     {
-        var held = ObjectHelper.SkipConstructor<Settlement>();
-        var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
-        SiegeCaptureMenuHoldPatch.HoldFor(held);
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        var defeatedClan = ObjectHelper.SkipConstructor<Clan>();
+        Assert.Null(SiegeCaptureMenuHoldPatch.GetHeldPreviousOwner(settlement));
+
+        SiegeCaptureMenuHoldPatch.HoldFor(settlement, defeatedClan);
         try
         {
-            encounter.EncounterSettlementAux = ObjectHelper.SkipConstructor<Settlement>();
-            Assert.False(SiegeCaptureMenuHoldPatch.TryGetHeldSettlement(encounter, out _));
+            // the encounter-menu backstop re-holds without knowing the owner
+            SiegeCaptureMenuHoldPatch.HoldFor(settlement);
 
-            encounter.EncounterSettlementAux = held;
-            Assert.True(SiegeCaptureMenuHoldPatch.TryGetHeldSettlement(encounter, out var settlement));
-            Assert.Same(held, settlement);
+            Assert.True(SiegeCaptureMenuHoldPatch.IsHeld(settlement));
+            Assert.Same(defeatedClan, SiegeCaptureMenuHoldPatch.GetHeldPreviousOwner(settlement));
         }
         finally
         {
-            SiegeCaptureMenuHoldPatch.Release(held);
+            SiegeCaptureMenuHoldPatch.Release(settlement);
         }
+
+        Assert.False(SiegeCaptureMenuHoldPatch.IsHeld(settlement));
+        Assert.Null(SiegeCaptureMenuHoldPatch.GetHeldPreviousOwner(settlement));
     }
 
     [Fact]
-    public void TryGetHeldSettlement_FinishedEncounter_UsesTheOnlyHeldCapture()
+    public void TryGetOnlyHeldSettlement_UsesTheHeldCaptureOnlyWhenUnambiguous()
     {
         var first = ObjectHelper.SkipConstructor<Settlement>();
         var second = ObjectHelper.SkipConstructor<Settlement>();
-        Assert.False(SiegeCaptureMenuHoldPatch.TryGetHeldSettlement(null, out _));
+        Assert.False(SiegeCaptureMenuHoldPatch.TryGetOnlyHeldSettlement(out _));
 
         SiegeCaptureMenuHoldPatch.HoldFor(first);
         try
         {
-            Assert.True(SiegeCaptureMenuHoldPatch.TryGetHeldSettlement(null, out var settlement));
+            Assert.True(SiegeCaptureMenuHoldPatch.TryGetOnlyHeldSettlement(out var settlement));
             Assert.Same(first, settlement);
 
             SiegeCaptureMenuHoldPatch.HoldFor(second);
-            Assert.False(SiegeCaptureMenuHoldPatch.TryGetHeldSettlement(null, out _));
+            Assert.False(SiegeCaptureMenuHoldPatch.TryGetOnlyHeldSettlement(out _));
         }
         finally
         {
