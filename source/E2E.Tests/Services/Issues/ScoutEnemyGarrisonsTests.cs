@@ -9,6 +9,8 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons;
 using GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Messages;
 using GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Patches;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using HarmonyLib;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
@@ -25,6 +27,7 @@ namespace E2E.Tests.Services.Issues;
 public class ScoutEnemyGarrisonsTests : IDisposable
 {
     private const string IssueName = "ScoutEnemyGarrisonsIssue";
+    private const string IssueId = "issue_scout_enemy_garrisons";
 
     private readonly MethodCallRecorder scoutingDone;
 
@@ -242,6 +245,8 @@ public class ScoutEnemyGarrisonsTests : IDisposable
         var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var ownerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var ownerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         using var calls = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.OnArmyDispersed)));
 
         Server.Call(() =>
@@ -249,15 +254,22 @@ public class ScoutEnemyGarrisonsTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+
+            ownerHero._partyBelongedTo = ownerParty;
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("player-A", ownerHeroId, ownerPartyId, "", "")));
 
             var quest = IssueBackedQuest(giver, Resolve(Server, targetIds));
+            Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(giverId, IssueId, "player-A"));
             using (new AllowedThread())
             {
-                quest.StartQuest();
                 var army = new Army(kingdom, party, Army.ArmyTypes.Patrolling);
                 army.ArmyOwner = giver;
                 CampaignEventDispatcher.Instance.OnArmyDispersed(army, Army.ArmyDispersionReason.Unknown, false);
             }
+
+            Assert.False(quest.IsOngoing);
         });
 
         Assert.Equal(1, calls.CountFor(Server));
@@ -423,7 +435,10 @@ public class ScoutEnemyGarrisonsTests : IDisposable
         using (new AllowedThread())
         {
             issue.IssueQuest = quest;
+            issue.IssueOwner = giver;
+            issue.StringId = IssueId;
             Campaign.Current.IssueManager._issues.Add(giver, issue);
+            giver.OnIssueCreatedForHero(issue);
         }
 
         return quest;
