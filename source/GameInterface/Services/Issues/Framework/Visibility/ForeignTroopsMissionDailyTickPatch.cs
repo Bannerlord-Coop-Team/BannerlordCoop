@@ -27,7 +27,7 @@ internal class ForeignTroopsMissionDailyTickPatch
         // A client that joined later loaded the server's journal for it, ticking that would mark a hidden quest as updated
         __state = __instance.Issues.Values
             .Where(issue => issue.IsSolvingWithAlternative &&
-                issue.JournalEntries.Count == 0)
+                (issue.JournalEntries.Count == 0 || QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission(issue)))
             .ToList();
 
         // A taken state the daily tick has nothing to do for
@@ -40,6 +40,15 @@ internal class ForeignTroopsMissionDailyTickPatch
         if (__state == null)
         {
             return;
+        }
+
+        using (new Common.Util.AllowedThread())
+        {
+            foreach (var issue in __state.Where(QuestScreenIssueFilterPatch.IsAnotherPlayersTroopsMission)
+                         .Where(issue => issue.AlternativeSolutionIssueEffectClearTime.NumTicks <= CampaignTime.Now.NumTicks))
+            {
+                issue._areIssueEffectsResolved = true;
+            }
         }
 
         QuestScreenIssueFilterPatch.SetState(__state, IssueBase.IssueState.SolvingWithAlternativeSolution);
