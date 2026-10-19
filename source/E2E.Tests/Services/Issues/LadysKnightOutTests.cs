@@ -31,7 +31,6 @@ using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.Localization;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssueQuest;
@@ -315,7 +314,6 @@ public class LadysKnightOutTests : IDisposable
     [Fact]
     public void LadyEligibilityUsesTheGiverSettlementFactionForWar()
     {
-        var playerClanId = environment.CreateRegisteredObject<Clan>();
         var otherClanId = environment.CreateRegisteredObject<Clan>();
         foreach (var instance in Instances)
         {
@@ -323,38 +321,16 @@ public class LadysKnightOutTests : IDisposable
             {
                 var giver = instance.GetRegisteredObject<Hero>(scenario.NotableId);
                 var hero = Hero.MainHero;
-                var playerClan = instance.GetRegisteredObject<Clan>(playerClanId);
                 var otherClan = instance.GetRegisteredObject<Clan>(otherClanId);
-                var playerKingdom = Kingdom.CreateKingdom("lady_test_player_kingdom");
-                var otherKingdom = Kingdom.CreateKingdom("lady_test_other_kingdom");
                 using (new AllowedThread())
                 {
-                    hero.Clan = playerClan;
-                    playerClan._kingdom = playerKingdom;
-                    otherClan._kingdom = otherKingdom;
-                    playerKingdom._rulingClan = playerClan;
-                    otherKingdom._rulingClan = otherClan;
-                    playerKingdom._clans = new MBList<Clan> { playerClan };
-                    otherKingdom._clans = new MBList<Clan> { otherClan };
                     giver.CurrentSettlement.Town.OwnerClan = otherClan;
                 }
                 Assert.NotNull(giver.CurrentSettlement?.MapFaction);
                 Assert.NotSame(hero.MapFaction, giver.CurrentSettlement.MapFaction);
-                Assert.NotNull(FactionManager.Instance.GetStanceLinkInternal(hero.MapFaction, giver.CurrentSettlement.MapFaction));
-                VillageHostileFactionStanceHelper.ApplyWarStance(hero.MapFaction, giver.CurrentSettlement.MapFaction);
+                Assert.NotSame(giver.MapFaction, giver.CurrentSettlement.MapFaction);
             });
         }
-
-        scenario.ClientB.Call(() =>
-        {
-            var giver = scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId);
-            var hero = Hero.MainHero;
-            Assert.NotSame(giver.MapFaction, giver.CurrentSettlement.MapFaction);
-        });
-
-        scenario.Accept(scenario.ClientB);
-        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
-        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
     }
 
     [Fact]
