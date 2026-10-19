@@ -49,6 +49,8 @@ public class NearbyBanditBaseTests : IDisposable
         AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
     };
 
+    private readonly StubIssuePreconditions preconditions = new(typeof(Issue));
+
     private readonly string headmanId;
     private readonly string villageSettlementId;
     private readonly string townSettlementId;
@@ -106,6 +108,7 @@ public class NearbyBanditBaseTests : IDisposable
     public void Dispose()
     {
         TestEnvironment.Dispose();
+        preconditions.Dispose();
     }
 
     [Fact]
