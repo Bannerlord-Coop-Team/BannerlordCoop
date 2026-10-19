@@ -361,7 +361,12 @@ public class LadysKnightOutTests : IDisposable
         int expectedXp = 0;
         int expectedLevel = 0;
         var relationBefore = 0;
-        scenario.Server.Call(() => relationBefore = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).GetRelation(Hero.MainHero));
+        scenario.Server.Call(() =>
+        {
+            var giver = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId);
+            Assert.True(scenario.Server.Resolve<IIssueOwnerResolver>().TryResolveOwnerHero(giver.Issue, out var owner));
+            relationBefore = giver.GetRelation(owner);
+        });
         scenario.Server.Call(() => scenario.Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(quest =>
         {
             if (quest.QuestGiver != scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId)) return;
@@ -374,7 +379,12 @@ public class LadysKnightOutTests : IDisposable
         Assert.Equal(expectedXp, penalty.Xp);
         Assert.Equal(expectedLevel, penalty.Level);
         var relationAfter = 0;
-        scenario.Server.Call(() => relationAfter = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).GetRelation(Hero.MainHero));
+        scenario.Server.Call(() =>
+        {
+            var giver = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId);
+            Assert.True(scenario.Server.Resolve<IIssueOwnerResolver>().TryResolveOwnerHero(giver.Issue, out var owner));
+            relationAfter = giver.GetRelation(owner);
+        });
         Assert.Equal(relationBefore - 5, relationAfter);
         scenario.ClientA.Call(() =>
         {
