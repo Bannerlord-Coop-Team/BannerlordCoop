@@ -168,7 +168,12 @@ internal class ArtisanProductsLordHandler : IHandler
                 if (data.Action == ArtisanProductsLordAction.Start)
                 {
                     ownership.TrySetOwner(data.OwnerId, data.IssueId, data.ControllerId);
-                    if (localOwner) issue.StartIssueWithLordSolution();
+                    if (localOwner)
+                    {
+                        issue.StartIssueWithLordSolution();
+                        foreach (var text in logs.Skip(issue.JournalEntries.Count))
+                            issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(text)));
+                    }
                     else issue._issueState = IssueBase.IssueState.SolvingWithLordSolution;
                     issue._issueDifficultyMultiplier = data.Difficulty;
                 }
