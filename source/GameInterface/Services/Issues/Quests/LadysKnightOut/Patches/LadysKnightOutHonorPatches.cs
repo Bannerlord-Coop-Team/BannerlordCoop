@@ -26,10 +26,10 @@ internal class LadysKnightOutHonorMirrorPatches
 {
     [HarmonyPatch(typeof(PropertyOwner<PropertyObject>), nameof(PropertyOwner<PropertyObject>.SetPropertyValue))]
     [HarmonyPostfix]
-    private static void MirrorClientHonor(PropertyOwner<PropertyObject> __instance, PropertyObject property, int value)
+    private static void MirrorClientHonor(PropertyOwner<PropertyObject> __instance, PropertyObject attribute, int value)
     {
         if (ModInformation.IsServer || AllowedThread.IsThisThreadAllowed() || Campaign.Current?.PlayerTraitDeveloper != __instance ||
-            property != DefaultTraits.Honor) return;
+            attribute != DefaultTraits.Honor) return;
         if (ContainerProvider.TryResolve<ILadysKnightOutHonorProgress>(out var honor)) honor.MirrorClientHonor(value);
     }
 }
