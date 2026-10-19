@@ -15,7 +15,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavi
 
 namespace GameInterface.Services.Issues.Quests.ArtisanOverpricedGoods;
 
-internal readonly struct ArtisanJournalObserved : IEvent
+public readonly struct ArtisanJournalObserved : IEvent
 {
     public readonly Issue Issue;
     public ArtisanJournalObserved(Issue issue) => Issue = issue;
