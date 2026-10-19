@@ -414,7 +414,7 @@ public class CaravanAmbushTests : IDisposable
         using var timedOut = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.OnTimedOut)));
         Server.Call(() => QuestOf(Server).ChangeQuestDueTime(CampaignTime.Now - CampaignTime.Hours(1f)));
         Owner.Call(() => QuestOf(Owner).ChangeQuestDueTime(CampaignTime.Now - CampaignTime.Hours(1f)));
-        Server.Call(() => CampaignEventDispatcher.Instance.HourlyTick());
+        Owner.Call(() => QuestOf(Owner).OnTimedOut());
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(1, timedOut.CountFor(Server));
         Server.Call(() => Assert.False(QuestOf(Server).IsOngoing));
