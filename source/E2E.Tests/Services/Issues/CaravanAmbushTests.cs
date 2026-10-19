@@ -123,7 +123,10 @@ public class CaravanAmbushTests : IDisposable
             var publisher = Server.Resolve<ICaravanAmbushStatePublisher>();
             var baseline = Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>();
             publisher.Publish(QuestOf(Server));
-            Assert.Equal(baseline, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>());
+            Assert.Equal(baseline + 1, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>());
+
+            publisher.Publish(QuestOf(Server));
+            Assert.Equal(baseline + 1, Server.NetworkSentMessages.GetMessageCount<NetworkCaravanAmbushState>());
 
             QuestOf(Server)._vicinityCheckFailCounter = 1;
             publisher.Publish(QuestOf(Server));
@@ -405,6 +408,7 @@ public class CaravanAmbushTests : IDisposable
     public void TimeoutUsesTheOwnerDispatchPathOnly()
     {
         Server.Call(() => QuestOf(Server).ChangeQuestDueTime(CampaignTime.Now - CampaignTime.Hours(1f)));
+        Owner.Call(() => QuestOf(Owner).ChangeQuestDueTime(CampaignTime.Now - CampaignTime.Hours(1f)));
         Server.Call(() => CampaignEventDispatcher.Instance.HourlyTick());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
 
