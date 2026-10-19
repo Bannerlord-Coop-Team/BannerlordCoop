@@ -45,8 +45,12 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
             // cancel so its quest and tracked objects do not survive a snapshot that removed it.
             messageBroker.Publish(this, new NetworkIssueFinalized(
                 remembered.IssueOwnerId, remembered.IssueId, IssueOutcome.QuestCancel));
-            ownership.Remove(remembered.IssueOwnerId);
         }
+
+        // Clear every remembered controller before applying the authoritative snapshot. TrySetOwner is
+        // first-wins by design for accept races, so it cannot replace a controller during a reconnect.
+        foreach (var remembered in ownership.GetAll())
+            ownership.Remove(remembered.IssueOwnerId);
 
         foreach (var owner in owners)
         {
