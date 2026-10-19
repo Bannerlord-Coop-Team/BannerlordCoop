@@ -314,13 +314,14 @@ public class LadysKnightOutTests : IDisposable
     [Fact]
     public void LadyEligibilityUsesTheGiverSettlementFactionForWar()
     {
+        var otherClanId = environment.CreateRegisteredObject<Clan>();
         foreach (var instance in Instances)
         {
             instance.Call(() =>
             {
                 var giver = instance.GetRegisteredObject<Hero>(scenario.NotableId);
                 var hero = Hero.MainHero;
-                var otherClan = Campaign.Current.Clans.First(clan => clan != hero.Clan && clan.MapFaction != hero.MapFaction);
+                var otherClan = instance.GetRegisteredObject<Clan>(otherClanId);
                 giver.CurrentSettlement.Town.OwnerClan = otherClan;
                 Assert.NotNull(giver.CurrentSettlement?.MapFaction);
                 Assert.NotSame(hero.MapFaction, giver.CurrentSettlement.MapFaction);
