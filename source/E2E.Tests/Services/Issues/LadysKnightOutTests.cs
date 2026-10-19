@@ -312,7 +312,7 @@ public class LadysKnightOutTests : IDisposable
     }
 
     [Fact]
-    public void LadyEligibilityUsesTheGiverSettlementFactionForWar()
+    public void WarFixtureUsesADistinctSettlementFaction()
     {
         foreach (var instance in Instances)
         {
