@@ -43,13 +43,11 @@ internal class ForeignTroopsMissionDailyTickPatch
             return;
         }
 
-        using (new Common.Util.AllowedThread())
+        // Vanilla logs the return here, but only the owner may see that entry.
+        foreach (var issue in __state
+                     .Where(issue => (int)issue.AlternativeSolutionIssueEffectClearTime.ToDays <= (int)CampaignTime.Now.ToDays))
         {
-            foreach (var issue in __state
-                         .Where(issue => issue.AlternativeSolutionIssueEffectClearTime.NumTicks <= CampaignTime.Now.NumTicks))
-            {
-                issue._areIssueEffectsResolved = true;
-            }
+            issue._areIssueEffectsResolved = true;
         }
 
         QuestScreenIssueFilterPatch.SetState(__state, IssueBase.IssueState.SolvingWithAlternativeSolution);
