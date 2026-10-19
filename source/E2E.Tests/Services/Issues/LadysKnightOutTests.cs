@@ -314,30 +314,23 @@ public class LadysKnightOutTests : IDisposable
     [Fact]
     public void LadyEligibilityUsesTheGiverSettlementFactionForWar()
     {
-        scenario.ClientB.Call(() =>
+        foreach (var instance in Instances)
         {
-            var giver = scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId);
-            var issue = Assert.IsType<Issue>(giver.Issue);
-            var hero = Hero.MainHero;
-            var otherClan = Campaign.Current.Clans.First(clan => clan != hero.Clan && clan.MapFaction != hero.MapFaction);
-            giver.CurrentSettlement.Town.OwnerClan = otherClan;
-            Assert.NotNull(giver.CurrentSettlement?.MapFaction);
-            Assert.NotSame(hero.MapFaction, giver.CurrentSettlement.MapFaction);
-            VillageHostileFactionStanceHelper.ApplyWarStance(hero.MapFaction, giver.CurrentSettlement.MapFaction);
-
-            using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
+            instance.Call(() =>
             {
-                var canTake = issue.CanPlayerTakeQuestConditions(
-                giver,
-                out var flags,
-                out _,
-                out _,
-                out _);
+                var giver = instance.GetRegisteredObject<Hero>(scenario.NotableId);
+                var hero = Hero.MainHero;
+                var otherClan = Campaign.Current.Clans.First(clan => clan != hero.Clan && clan.MapFaction != hero.MapFaction);
+                giver.CurrentSettlement.Town.OwnerClan = otherClan;
+                Assert.NotNull(giver.CurrentSettlement?.MapFaction);
+                Assert.NotSame(hero.MapFaction, giver.CurrentSettlement.MapFaction);
+                VillageHostileFactionStanceHelper.ApplyWarStance(hero.MapFaction, giver.CurrentSettlement.MapFaction);
+            });
+        }
 
-                Assert.False(canTake);
-                Assert.True(flags.HasFlag(IssueBase.PreconditionFlags.AtWar));
-            }
-        });
+        scenario.Accept(scenario.ClientB);
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
     }
 
     [Fact]
