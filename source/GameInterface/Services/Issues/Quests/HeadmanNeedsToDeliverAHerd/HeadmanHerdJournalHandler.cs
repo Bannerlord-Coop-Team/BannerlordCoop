@@ -17,7 +17,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBe
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkHeadmanHerdLog : IServerToClientCommand
+public readonly struct NetworkHeadmanHerdLog : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
@@ -31,7 +31,17 @@ internal readonly struct NetworkHeadmanHerdLog : IServerToClientCommand
     }
 }
 
-internal readonly record struct HeadmanHerdLogAdded(Quest Quest, TextObject Text) : IEvent;
+public readonly struct HeadmanHerdLogAdded : IEvent
+{
+    internal readonly Quest Quest;
+    internal readonly TextObject Text;
+
+    internal HeadmanHerdLogAdded(Quest quest, TextObject text)
+    {
+        Quest = quest;
+        Text = text;
+    }
+}
 
 internal class HeadmanHerdJournalHandler : IHandler
 {
