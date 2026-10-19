@@ -210,6 +210,7 @@ internal class FinalizationCoordinator : IHandler
             var journalEntryCount = quest?.JournalEntries.Count ?? 0;
 
             using (new AllowedThread())
+            using (new QuestEndingReplay())
             {
                 Replay(issue, data.Outcome);
 
