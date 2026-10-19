@@ -1,5 +1,8 @@
 ﻿using Common.Messaging;
+using Common.Util;
+using Coop.Core.Client.Services.MobileParties.Messages;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Data;
@@ -14,6 +17,7 @@ using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
@@ -227,6 +231,79 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
         {
             harmony.UnpatchAll(harmony.Id);
         }
+    }
+
+    [Fact]
+    public void DefenderVictory_LateTownEncounterApproval_KeepsSiegeDefeatedMenu()
+    {
+        const string controllerId = "PlayerOne";
+        var client = Clients.First();
+        var (_, partyId) = CreatePlayerHeroParty(controllerId);
+        TestEnvironment.ConnectRegisteredPlayer(client, controllerId);
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+        // The server holds the winning defender inside its town.
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                AccessTools.Field(typeof(Settlement), "<Party>k__BackingField").SetValue(settlement, new PartyBase(settlement));
+                party._currentSettlement = settlement;
+            });
+        }
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Campaign.Current.MainParty = party;
+            Campaign.Current.PlayerEncounter = null;
+            var states = Game.Current.GameStateManager;
+            var map = states.CreateState<MapState>();
+            states._gameStates.Add(map);
+            map._menuContext = Game.Current.ObjectManager.CreateObject<MenuContext>();
+            map._menuContext.GameMenu = ObjectHelper.SkipConstructor<GameMenu>();
+            map._menuContext.GameMenu.StringId = "siege_attacker_defeated";
+        });
+
+        var harmony = new Harmony($"siege-defender-menu.{Guid.NewGuid()}");
+        harmony.Patch(AccessTools.Method(typeof(PlayerEncounter), "Init", new[] { typeof(PartyBase), typeof(PartyBase), typeof(Settlement) }),
+            prefix: new HarmonyMethod(typeof(SiegeDefenderVictoryLootTests), nameof(OpenTownMenuOnInit)));
+        harmony.Patch(AccessTools.Method(typeof(MenuContext), nameof(MenuContext.SwitchToMenu)),
+            prefix: new HarmonyMethod(typeof(SiegeDefenderVictoryLootTests), nameof(SwitchMenu)));
+        try
+        {
+            // The server answers the prompt's town encounter request after siege_attacker_defeated is open.
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                client.Resolve<IMessageBroker>().Publish(this, new StartSettlementEncounterAttempted(MobileParty.MainParty, settlement));
+            });
+
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
+            client.Call(() =>
+            {
+                Assert.NotNull(PlayerEncounter.Current);
+                Assert.Equal("siege_attacker_defeated", Campaign.Current.CurrentMenuContext.GameMenu.StringId);
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+    // Vanilla PlayerEncounter.Init opens the settlement's encounter menu.
+    private static bool OpenTownMenuOnInit()
+    {
+        Campaign.Current.CurrentMenuContext.GameMenu.StringId = "town_outside";
+        return false;
+    }
+
+    private static bool SwitchMenu(MenuContext __instance, string menuId)
+    {
+        __instance.GameMenu.StringId = menuId;
+        return false;
     }
 
     /// <summary>

@@ -154,12 +154,17 @@ public class ClientSettlementExitEnterHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging(partyId, out MobileParty party)) return;
         if (!objectManager.TryGetObjectWithLogging(settlementId, out Settlement settlement)) return;
 
+        // A winning siege defender is already on siege_attacker_defeated when this approval lands.
+        bool keepSiegeDefeatedMenu = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId == "siege_attacker_defeated";
+
         using (new AllowedThread())
         {
             settlementInterface.StartSettlementEncounter(party, settlement);
 
             if (ShouldShowRaidOccupiedMenu(party, settlement))
                 GameMenu.SwitchToMenu("raid_occupied");
+            else if (keepSiegeDefeatedMenu)
+                GameMenu.SwitchToMenu("siege_attacker_defeated");
         }
 #if DEBUG
         Logger.Debug(
