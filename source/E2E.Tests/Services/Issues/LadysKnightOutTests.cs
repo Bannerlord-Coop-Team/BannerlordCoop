@@ -347,7 +347,7 @@ public class LadysKnightOutTests : IDisposable
         scenario.ClientA.Call(() =>
         {
             Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, 183);
-            TraitLevelingHelper.OnHostileAction(0);
+            TraitLevelingHelper.OnIncidentResolved(DefaultTraits.Honor, 0);
         });
         AddSecondOffer();
         Quest otherQuest = null!;
@@ -360,6 +360,8 @@ public class LadysKnightOutTests : IDisposable
         });
         int expectedXp = 0;
         int expectedLevel = 0;
+        var relationBefore = 0;
+        scenario.Server.Call(() => relationBefore = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).GetRelation(Hero.MainHero));
         scenario.Server.Call(() => scenario.Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(quest =>
         {
             if (quest.QuestGiver != scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId)) return;
@@ -371,6 +373,9 @@ public class LadysKnightOutTests : IDisposable
         Assert.Equal(QuestScenario.ControllerA, penalty.ControllerId);
         Assert.Equal(expectedXp, penalty.Xp);
         Assert.Equal(expectedLevel, penalty.Level);
+        var relationAfter = 0;
+        scenario.Server.Call(() => relationAfter = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).GetRelation(Hero.MainHero));
+        Assert.Equal(relationBefore - 5, relationAfter);
         scenario.ClientA.Call(() =>
         {
             Assert.Equal(expectedXp, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
