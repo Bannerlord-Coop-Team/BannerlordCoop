@@ -17,7 +17,7 @@ namespace GameInterface.Services.Issues.Quests.LordWantsRivalCaptured.Patches;
 
 /// <summary>
 /// The server runs the world event listeners the framework's QuestEventRelay does not cover as each owning player:
-/// kills, the quest's own prisoner listener (named OnPrisonerTaken, not OnHeroPrisonerTaken) and map events.
+/// kills, prisoner releases, the quest's own prisoner listener (named OnPrisonerTaken, not OnHeroPrisonerTaken) and map events.
 /// </summary>
 [HarmonyPatch(typeof(CampaignEventDispatcher))]
 internal class LordWantsRivalCapturedWorldEventPatches

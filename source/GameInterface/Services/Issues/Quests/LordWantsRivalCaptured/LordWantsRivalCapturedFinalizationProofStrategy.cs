@@ -245,6 +245,7 @@ internal class LordWantsRivalCapturedFinalizationProofStrategy : IFinalizationPr
         ChangeRelationAction.ApplyPlayerRelation(quest._targetHero, DeliveredTargetRelation);
         quest.RelationshipChangeWithQuestGiver = DeliveredGiverRelation;
         GainRenownAction.Apply(Hero.MainHero, DeliveredRenown);
+        quest.AddLog(quest.PlayerDeliveredPrisonerQuestSuccessLogText);
         quest.CompleteQuestWithSuccess();
         TransferPrisonerAction.Apply(quest._targetHero.CharacterObject, PartyBase.MainParty, receiver);
     }

@@ -1,4 +1,5 @@
 ﻿using Common.Network;
+using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -10,6 +11,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.LordWantsRivalCaptured;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
 using HarmonyLib;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
@@ -738,9 +740,11 @@ public class LordWantsRivalCapturedTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetHandle(Get<Hero>(Server, targetId).CharacterObject, out var targetHandle));
-            Server.Resolve<LordWantsRivalCapturedFinalizationProofStrategy>().RecordPendingCaptures(
-                playerA,
-                new TroopRosterData(new[] { new TroopRosterElementData(targetHandle, 1, 0, 0) }));
+            Server.Resolve<IMessageBroker>().Publish(
+                this,
+                new PlayerPrisonersLooted(
+                    playerA,
+                    new TroopRosterData(new[] { new TroopRosterElementData(targetHandle, 1, 0, 0) })));
         });
     }
 
