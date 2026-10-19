@@ -321,6 +321,8 @@ public class ArtisanOverpricedGoodsTests : IDisposable
 
         ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
         environment.FlushCoalescer();
+        ClientA.SimulateMessage(Server.NetPeer,
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionRejected>()));
 
         ClientA.Call(() => Assert.False(ClientA.Resolve<ILordSolutionCoordinator>()
             .IsDecisionPending(Get<Hero>(ClientA, scenario.NotableId).Issue)));
