@@ -58,7 +58,7 @@ internal class CaravanAmbushPatches
             })
             .PlayerLine("{=MKbLhn9d}I'm glad we caught up to you in time.")
             .NpcLine("{=yxg91L0a}We'll tell everyone what you did.[if:convo_happy][ib:normal2] Please take some of these goods in compensation. We have no intention to sell them anyway. Safe travels, {?PLAYER.GENDER}milady{?}sir{\\?}.")
-            .Consequence(__instance.OnQuestSucceeded)
+            .Consequence(() => Campaign.Current.ConversationManager.ConversationEndOneShot += __instance.OnQuestSucceeded)
             .CloseDialog();
         return false;
     }

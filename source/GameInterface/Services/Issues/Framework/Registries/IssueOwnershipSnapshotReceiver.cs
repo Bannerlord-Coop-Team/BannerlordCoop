@@ -1,7 +1,9 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using System;
+using System.Linq;
 
 namespace GameInterface.Services.Issues.Framework.Registries;
 
@@ -34,12 +36,19 @@ internal class IssueOwnershipSnapshotReceiver : IHandler
             return;
         }
 
-        foreach (var remembered in ownership.GetAll())
+        var owners = payload.What.Owners ?? Array.Empty<IssueOwnershipData>();
+        foreach (var remembered in ownership.GetAll()
+                     .Where(remembered => !owners.Any(owner =>
+                         owner.IssueOwnerId == remembered.IssueOwnerId && owner.IssueId == remembered.IssueId)))
         {
+            // The client may have missed the server cancellation while disconnected. Replay a local
+            // cancel so its quest and tracked objects do not survive a snapshot that removed it.
+            messageBroker.Publish(this, new NetworkIssueFinalized(
+                remembered.IssueOwnerId, remembered.IssueId, IssueOutcome.QuestCancel));
             ownership.Remove(remembered.IssueOwnerId);
         }
 
-        foreach (var owner in payload.What.Owners ?? Array.Empty<IssueOwnershipData>())
+        foreach (var owner in owners)
         {
             ownership.TrySetOwner(owner.IssueOwnerId, owner.IssueId, owner.ControllerId);
         }

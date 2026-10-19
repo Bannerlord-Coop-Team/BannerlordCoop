@@ -20,6 +20,13 @@ internal class CaravanAmbushEventPatches
     private static void Hourly() => Run(quest =>
     {
         if (quest.QuestDueTime.IsPast) quest.CompleteQuestWithTimeOut();
+        else if (MobileParty.MainParty == null)
+        {
+            // A captured owner has no party, but an active ambush must still lose invulnerability after six hours.
+            var battle = quest._caravanParty?.MapEvent;
+            if (battle != null && battle.IsInvulnerable && battle.BattleStartTime.ElapsedHoursUntilNow > 6f)
+                battle.IsInvulnerable = false;
+        }
         else quest.HourlyTick();
     });
 
