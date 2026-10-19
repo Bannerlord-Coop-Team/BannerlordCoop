@@ -55,7 +55,8 @@ internal sealed class LadysKnightOutHonorProgress : ILadysKnightOutHonorProgress
     {
         if (ModInformation.IsServer || !Campaign.Current.IssueManager.Issues.Values
                 .OfType<Issue>()
-                .Any(issue => issue.IssueOwner == Hero.MainHero && issue.IssueQuest != null)) return;
+                .Any(issue => issue.IssueQuest != null && owners.TryGetOwnerControllerId(issue, out var ownerControllerId) &&
+                    ownerControllerId == controller.ControllerId)) return;
         network.SendAll(new RequestLadysKnightOutHonorMirror(controller.ControllerId, xp));
     }
 
