@@ -23,7 +23,7 @@ internal class LadysKnightOutHonorPatches
 [HarmonyPatch]
 internal class LadysKnightOutHonorMirrorPatches
 {
-    [HarmonyPatch(typeof(TraitLevelingHelper), "AddTraitXp")]
+    [HarmonyPatch(typeof(TraitLevelingHelper), nameof(TraitLevelingHelper.AddTraitXp))]
     [HarmonyPostfix]
     private static void MirrorClientHonor(TraitObject trait)
     {
