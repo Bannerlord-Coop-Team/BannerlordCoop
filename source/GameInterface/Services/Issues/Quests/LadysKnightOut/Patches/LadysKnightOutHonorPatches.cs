@@ -1,4 +1,8 @@
 ﻿using Common;
+using Common.Util;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.Core;
 using HarmonyLib;
 using Quest = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssueQuest;
 
@@ -14,5 +18,18 @@ internal class LadysKnightOutHonorPatches
         if (ModInformation.IsClient) return false;
         if (ContainerProvider.TryResolve<ILadysKnightOutHonorProgress>(out var honor)) honor.ApplyPenalty(__instance);
         return true;
+    }
+}
+
+[HarmonyPatch]
+internal class LadysKnightOutHonorMirrorPatches
+{
+    [HarmonyPatch(typeof(PropertyOwner<PropertyObject>), nameof(PropertyOwner<PropertyObject>.SetPropertyValue))]
+    [HarmonyPostfix]
+    private static void MirrorClientHonor(PropertyOwner<PropertyObject> __instance, PropertyObject property, int value)
+    {
+        if (ModInformation.IsServer || AllowedThread.IsThisThreadAllowed() || Campaign.Current?.PlayerTraitDeveloper != __instance ||
+            property != DefaultTraits.Honor) return;
+        if (ContainerProvider.TryResolve<ILadysKnightOutHonorProgress>(out var honor)) honor.MirrorClientHonor(value);
     }
 }

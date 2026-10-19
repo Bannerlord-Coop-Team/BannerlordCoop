@@ -312,6 +312,29 @@ public class LadysKnightOutTests : IDisposable
     }
 
     [Fact]
+    public void LadyEligibilityUsesTheGiverSettlementFactionForWar()
+    {
+        scenario.ClientB.Call(() =>
+        {
+            var giver = scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId);
+            var issue = Assert.IsType<Issue>(giver.Issue);
+            var hero = Hero.MainHero;
+            Assert.NotNull(giver.CurrentSettlement?.MapFaction);
+            VillageHostileFactionStanceHelper.ApplyWarStance(hero.MapFaction, giver.CurrentSettlement.MapFaction);
+
+            var canTake = issue.CanPlayerTakeQuestConditions(
+                hero,
+                out var flags,
+                out _,
+                out _,
+                out _);
+
+            Assert.False(canTake);
+            Assert.True(flags.HasFlag(IssueBase.PreconditionFlags.AtWar));
+        });
+    }
+
+    [Fact]
     public void CrimePenaltyChangesOnlyTheOwnersHonorStore()
     {
         foreach (var client in environment.Clients)
@@ -321,6 +344,7 @@ public class LadysKnightOutTests : IDisposable
                 Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, 83);
             });
         Accept(scenario.ClientA);
+        scenario.ClientA.Call(() => Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, 183));
         AddSecondOffer();
         Quest otherQuest = null!;
         scenario.ClientB.Call(() =>
@@ -336,7 +360,7 @@ public class LadysKnightOutTests : IDisposable
         {
             if (quest.QuestGiver != scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId)) return;
             Campaign.Current.Models.CharacterDevelopmentModel.GetTraitLevelForTraitXp(Hero.MainHero, DefaultTraits.Honor,
-                83 - 50, out expectedLevel, out expectedXp);
+                183 - 50, out expectedLevel, out expectedXp);
             quest.CriminalActionPerformedTowardsSettlement();
         }));
         var penalty = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLadysKnightOutHonor>());
