@@ -319,7 +319,10 @@ public class LadysKnightOutTests : IDisposable
             var giver = scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId);
             var issue = Assert.IsType<Issue>(giver.Issue);
             var hero = Hero.MainHero;
+            var otherClan = Campaign.Current.Clans.First(clan => clan != hero.Clan && clan.MapFaction != hero.MapFaction);
+            giver.CurrentSettlement.Town.OwnerClan = otherClan;
             Assert.NotNull(giver.CurrentSettlement?.MapFaction);
+            Assert.NotSame(hero.MapFaction, giver.CurrentSettlement.MapFaction);
             VillageHostileFactionStanceHelper.ApplyWarStance(hero.MapFaction, giver.CurrentSettlement.MapFaction);
 
             using (new MainHeroSubstitutionScope(hero, hero.PartyBelongedTo))
