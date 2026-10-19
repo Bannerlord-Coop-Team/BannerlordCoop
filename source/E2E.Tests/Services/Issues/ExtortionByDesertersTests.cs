@@ -620,7 +620,7 @@ public class ExtortionByDesertersTests : IDisposable
             deserters.SetPartyUsedByQuest(true);
             var battle = CreateBattle(deserters, victors.Party, false);
             battle._battleState = BattleState.DefenderVictory;
-            deserters.IsActive = false;
+            DestroyPartyAction.Apply(null, deserters);
             CampaignEventDispatcher.Instance.OnMapEventEnded(battle);
             Assert.False(deserters.IsActive);
             Assert.False(quest.IsOngoing);
