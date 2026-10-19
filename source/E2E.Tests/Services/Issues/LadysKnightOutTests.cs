@@ -31,6 +31,7 @@ using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.Localization;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssueQuest;
@@ -316,6 +317,8 @@ public class LadysKnightOutTests : IDisposable
     {
         var playerClanId = environment.CreateRegisteredObject<Clan>();
         var otherClanId = environment.CreateRegisteredObject<Clan>();
+        var playerKingdomId = environment.CreateRegisteredObject<Kingdom>();
+        var otherKingdomId = environment.CreateRegisteredObject<Kingdom>();
         foreach (var instance in Instances)
         {
             instance.Call(() =>
@@ -324,11 +327,21 @@ public class LadysKnightOutTests : IDisposable
                 var hero = Hero.MainHero;
                 var playerClan = instance.GetRegisteredObject<Clan>(playerClanId);
                 var otherClan = instance.GetRegisteredObject<Clan>(otherClanId);
+                var playerKingdom = instance.GetRegisteredObject<Kingdom>(playerKingdomId);
+                var otherKingdom = instance.GetRegisteredObject<Kingdom>(otherKingdomId);
                 using (new AllowedThread())
                 {
                     hero.Clan = playerClan;
                     playerClan.Id = new MBGUID(1);
                     otherClan.Id = new MBGUID(2);
+                    playerKingdom.Id = new MBGUID(3);
+                    otherKingdom.Id = new MBGUID(4);
+                    playerClan._kingdom = playerKingdom;
+                    otherClan._kingdom = otherKingdom;
+                    playerKingdom._rulingClan = playerClan;
+                    otherKingdom._rulingClan = otherClan;
+                    playerKingdom._clans = new MBList<Clan> { playerClan };
+                    otherKingdom._clans = new MBList<Clan> { otherClan };
                     giver.CurrentSettlement.Town.OwnerClan = otherClan;
                 }
                 Assert.NotNull(giver.CurrentSettlement?.MapFaction);
