@@ -57,6 +57,19 @@ public class MissilePickupArbiterTests
         Assert.Null(displaced);
     }
 
+    [Fact]
+    public void LateLosingPickup_AfterManyOtherMissilesWereClaimed_StillLoses()
+    {
+        var arbiter = new MissilePickupArbiter();
+
+        Assert.True(arbiter.TryClaim(Pickup(FirstRanked), out _));
+        for (int i = 0; i < 5000; i++)
+            Assert.True(arbiter.TryClaim(Pickup(Guid.NewGuid(), Guid.NewGuid()), out _));
+
+        Assert.False(arbiter.TryClaim(Pickup(SecondRanked), out NetworkWeaponPickedup displaced));
+        Assert.Null(displaced);
+    }
+
     // Builds a pickup that consumed a stuck missile item under the given pickup id.
     private static NetworkWeaponPickedup Pickup(Guid pickupId, Guid? worldItemId = null) =>
         new(Guid.NewGuid(), EquipmentIndex.Weapon0, worldItemId ?? WorldItemId, "arrows", null, null,

@@ -17,10 +17,9 @@ public interface IMissilePickupArbiter
 /// <inheritdoc/>
 public class MissilePickupArbiter : IMissilePickupArbiter
 {
-    private const int MaxTrackedItems = 1024;
-
+    // Never evicted: the arbiter dies with its mission's pickup handler, and forgetting an item would let a late
+    // losing pickup of it win again.
     private readonly Dictionary<Guid, NetworkWeaponPickedup> winners = new();
-    private readonly Queue<Guid> winnerOrder = new();
 
     // Every client sees every pickup of the item, so ranking by pickup id picks the same winner everywhere without
     // a round trip, whatever order the pickups arrive in.
@@ -31,7 +30,7 @@ public class MissilePickupArbiter : IMissilePickupArbiter
 
         if (!winners.TryGetValue(pickup.WorldItemId, out NetworkWeaponPickedup winner))
         {
-            Track(pickup);
+            winners.Add(pickup.WorldItemId, pickup);
             return true;
         }
 
@@ -41,14 +40,5 @@ public class MissilePickupArbiter : IMissilePickupArbiter
         displaced = winner;
         winners[pickup.WorldItemId] = pickup;
         return true;
-    }
-
-    // Keeps the item's winner, forgetting the oldest item once the cap is reached since contested pickups land close together.
-    private void Track(NetworkWeaponPickedup pickup)
-    {
-        winners.Add(pickup.WorldItemId, pickup);
-        winnerOrder.Enqueue(pickup.WorldItemId);
-        while (winnerOrder.Count > MaxTrackedItems)
-            winners.Remove(winnerOrder.Dequeue());
     }
 }
