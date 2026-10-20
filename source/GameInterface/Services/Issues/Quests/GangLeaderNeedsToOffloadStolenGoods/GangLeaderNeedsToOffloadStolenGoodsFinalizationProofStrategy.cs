@@ -22,7 +22,10 @@ internal class GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy : IF
         }
 
         var issue = IssueManager.GetIssueOfQuest(gangLeaderQuest);
-        if (issue == null || !evidence.Consume(issue, proof)) return true;
+        if (issue == null || !evidence.Consume(issue, proof) || !MatchesVanillaState(gangLeaderQuest, proof))
+        {
+            return true;
+        }
 
         switch ((GangLeaderNeedsToOffloadStolenGoodsBranch)proof)
         {
@@ -44,6 +47,26 @@ internal class GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy : IF
             default:
                 return false;
         }
+    }
+
+    private static bool MatchesVanillaState(Quest quest, byte proof)
+    {
+        var branch = (GangLeaderNeedsToOffloadStolenGoodsBranch)proof;
+        if (branch == GangLeaderNeedsToOffloadStolenGoodsBranch.FailByLosingHideoutBattle)
+        {
+            return quest._isFightingForGoods;
+        }
+
+        var isSuccess = branch is GangLeaderNeedsToOffloadStolenGoodsBranch.SuccessByKeepingGoods or
+            GangLeaderNeedsToOffloadStolenGoodsBranch.SuccessByGivingGoodsBack;
+        if (quest._isPayingForGoods != isSuccess)
+        {
+            return false;
+        }
+
+        var keepsGoods = branch is GangLeaderNeedsToOffloadStolenGoodsBranch.SuccessByKeepingGoods or
+            GangLeaderNeedsToOffloadStolenGoodsBranch.BetrayalByKeepingGoods;
+        return quest._playerHasTheGoods == keepsGoods;
     }
 
 }
