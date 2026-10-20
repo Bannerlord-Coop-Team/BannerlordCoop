@@ -301,14 +301,7 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
     [Fact]
     public void ACompanionMissionRejectedWhenGoldDropsBeforeTheRequestArrives()
     {
-        var (_, fee) = AcceptTheCompanionMission(flush: false);
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var owner));
-            owner.Gold = fee - 1;
-        });
-        TestEnvironment.FlushCoalescer();
+        var (_, fee) = AcceptTheCompanionMission(dropGoldBeforeRequest: true);
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAcceptRejected>());
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
@@ -480,7 +473,7 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
         }
     }
 
-    private (int StartingGold, int Fee) AcceptTheCompanionMission(bool flush = true)
+    private (int StartingGold, int Fee) AcceptTheCompanionMission(bool dropGoldBeforeRequest = false)
     {
         var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
@@ -509,9 +502,15 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
             fee = (int)AccessTools.Property(typeof(Issue), "CompanionGoldNeedForAlternativeSolution").GetValue(giver.Issue)!;
         });
-        if (flush)
+        TestEnvironment.FlushCoalescer();
+
+        if (dropGoldBeforeRequest)
         {
-            TestEnvironment.FlushCoalescer();
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var owner));
+                owner.Gold = fee - 1;
+            });
         }
 
         ClientA.Call(() =>
@@ -534,10 +533,7 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
             clientGoldAfter = clientOwner.Gold;
             giver.Issue.StartIssueWithAlternativeSolution();
         });
-        if (flush)
-        {
-            TestEnvironment.FlushCoalescer();
-        }
+        TestEnvironment.FlushCoalescer();
 
         Assert.Equal(clientGoldBefore, clientGoldAfter);
         return (startingGold, fee);
