@@ -102,8 +102,8 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
             !owners.TryGetOwnerControllerId(issue, out var controllerId)) return;
         if (!players.TryGetPeer(controllerId, out var peer))
         {
-            pendingConversations.Add(quest);
-            Logger.Warning("The owner peer for {quest} is not connected, retrying the reward conversation", issue.StringId);
+            if (pendingConversations.Add(quest))
+                Logger.Warning("The owner peer for {quest} is not connected, retrying the reward conversation", issue.StringId);
             return;
         }
 

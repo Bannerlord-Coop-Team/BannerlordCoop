@@ -56,7 +56,7 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
     private string IdOf(object obj)
     {
         if (obj == null) return string.Empty;
-        objects.TryGetIdWithLogging(obj, out var id);
+        objects.TryGetId(obj, out var id);
         return id ?? string.Empty;
     }
 
