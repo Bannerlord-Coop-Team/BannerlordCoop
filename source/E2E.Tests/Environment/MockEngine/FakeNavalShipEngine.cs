@@ -106,7 +106,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         var fake = Of(hull);
         return new BattleShipSpawnData(identity.ShipId, identity.CurrentAuthority, identity.MapEventPartyId, identity.IsNpcParty,
             fake.Side, fake.FormationIndex, NetworkBattleShipSample.FromFrame(fake.Frame), HullId, null, null, null, null,
-            fake.HitPoints, fake.SailHitPoints, 1, "", identity.OriginalOwner, fake.CampaignShipId);
+            fake.HitPoints, fake.SailHitPoints, 1, "", identity.OriginalOwner);
     }
 
     public MissionObject SpawnForeignHull(BattleShipSpawnData data, Team team, out Formation formation)
@@ -128,7 +128,6 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             Team = team,
             Formation = FormationOf(team, formationIndex),
             SpawnData = data,
-            CampaignShipId = data.CampaignShipId,
         };
         if (ArmsCopies) copy.ArmWeapon();
         hulls.Add(copy);
@@ -251,7 +250,6 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             Team = old.Team,
             Formation = old.Formation,
             CrewCapacity = old.CrewCapacity,
-            CampaignShipId = old.CampaignShipId,
         };
         hulls.Add(fresh);
         // The replacement takes the old hull's formation, so its crew and the agents parked for boarding it carry over.
@@ -377,8 +375,6 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         return taken;
     }
 
-    public string CampaignShipIdOf(MissionObject hull) => Of(hull).CampaignShipId!;
-
     // The live engine fades the agent out of the mission, which the mission fixture's FadeOut patch mirrors.
     public void WithdrawAgent(Agent agent)
     {
@@ -451,7 +447,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             removalViolations.Add($"{NameOf(deck.Key)} still stands on removed {Describe(deck.Value)}");
     }
 
-    // The registry drops a removed hull, so the hull keeps the last id it was registered under, a hand-back's included.
+    // The registry drops a removed hull, so the hull keeps the last id it was registered under.
     private void RefreshShipId(FakeHull fake)
     {
         if (RegisteredShipId?.Invoke(fake.Hull) is Guid shipId) fake.ShipId = shipId;
@@ -568,8 +564,6 @@ public sealed class FakeHull
     /// <summary>The local formation the hull is assigned to, which differs per client for the same ship.</summary>
     public Formation? Formation { get; set; }
     public BattleShipSpawnData? SpawnData { get; set; }
-    /// <summary>The registry id of the party's campaign ship the hull stands for, or null.</summary>
-    public string? CampaignShipId { get; set; }
     public BattleRopeState[] Ropes { get; set; } = Array.Empty<BattleRopeState>();
     public int FrameWrites { get; set; }
     public int FinalRopesApplied { get; set; }

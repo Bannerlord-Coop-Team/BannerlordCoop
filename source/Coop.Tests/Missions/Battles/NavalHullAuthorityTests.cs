@@ -116,7 +116,7 @@ public class NavalHullAuthorityTests
         Assert.Equal(new[] { heroMoved }, unparked);
     }
 
-    // M8c r1: an owner still in the battle (a per-ship retreat, a reclaimed duplicate) keeps the crew its removal left alive and
+    // M8c r1: an owner still in the battle (a per-ship retreat) keeps the crew its removal left alive and
     // sends the ones it fades as routs, so nobody withdraws here and everyone parked goes back once the hull is removed.
     [Fact]
     public void Remove_HullsWhoseOwnerStays_WithdrawNobody_AndPutEveryoneParkedBack()

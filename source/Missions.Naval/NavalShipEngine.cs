@@ -71,8 +71,7 @@ public class NavalShipEngine : INavalShipEngine
             ship.ShipOrigin.SailHitPoints,
             ship.ShipOrigin.RandomValue,
             ship.ShipOrigin.CustomSailPatternId,
-            identity.OriginalOwner,
-            CampaignShipIdOf(hull));
+            identity.OriginalOwner);
     }
 
     public MissionObject SpawnForeignHull(BattleShipSpawnData data, Team team, out Formation formation)
@@ -616,16 +615,6 @@ public class NavalShipEngine : INavalShipEngine
         }
 
         return added;
-    }
-
-    // An own hull's snapshot knows the party's ship it was built from; another owner's carries the id its record gave.
-    public string CampaignShipIdOf(MissionObject hull)
-    {
-        if (!(((MissionShip)hull).ShipOrigin is Ship snapshot)) return null;
-
-        var source = CoopShipSnapshots.SourceOf(snapshot);
-        if (source == null) return CoopShipSnapshots.CampaignShipIdOf(snapshot);
-        return objectManager.TryGetId(source, out var id) ? id : null;
     }
 
     // NavalTeamAgents.OnShipRemoved fades a removed hull's crew this way.

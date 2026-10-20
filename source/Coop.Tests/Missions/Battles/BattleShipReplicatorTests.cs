@@ -1081,13 +1081,13 @@ public class BattleShipReplicatorTests
         Assert.Equal(record.CustomSailPatternId, copy.CustomSailPatternId);
     }
 
-    // An AI hull a later host simulates keeps naming the host that fielded it, and every record its campaign ship.
+    // An AI hull a later host simulates keeps naming the host that fielded it.
     [Fact]
-    public void SpawnRecord_RoundTripsTheOriginalOwnerAndCampaignShip_AndAnOwnRecordNamesItsOwner()
+    public void SpawnRecord_RoundTripsTheOriginalOwner_AndAnOwnRecordNamesItsOwner()
     {
         var migrated = new BattleShipSpawnData(Guid.NewGuid(), "host", "MapEventParty_1", true, BattleSideEnum.Defender, 2,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
-            "", Peer, "MobileParty_peer_0");
+            "", Peer);
         var own = new BattleShipSpawnData(Guid.NewGuid(), Peer, "MapEventParty_1", false, BattleSideEnum.Defender, 2,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
             "", Peer);
@@ -1095,7 +1095,6 @@ public class BattleShipReplicatorTests
         var copies = Serializer.DeepClone(new NetworkSpawnBattleShips(new[] { migrated, own })).Ships;
 
         Assert.Equal(Peer, copies[0].OriginalOwner);
-        Assert.Equal("MobileParty_peer_0", copies[0].CampaignShipId);
         Assert.Equal(Peer, copies[1].OriginalOwner);
         Assert.Null(copies[1].OriginalOwnerControllerId);
     }

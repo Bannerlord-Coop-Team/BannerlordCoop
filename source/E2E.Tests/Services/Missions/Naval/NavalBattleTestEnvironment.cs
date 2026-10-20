@@ -275,8 +275,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 peer.Commit();
         }
 
-        public Guid FieldPlayerHull(NavalPeer owner, Vec3 position, string? campaignShipId = null) =>
-            owner.FieldOwnHull(owner.Side, position, PartyIds[owner.Id], campaignShipId);
+        public Guid FieldPlayerHull(NavalPeer owner, Vec3 position) =>
+            owner.FieldOwnHull(owner.Side, position, PartyIds[owner.Id]);
 
         public Guid FieldAiHull(NavalPeer host, BattleSideEnum side, Vec3 position, int? formationIndex = null) =>
             host.FieldAiHull(side, position, PirateMapEventPartyId, formationIndex);
@@ -438,17 +438,13 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
 
         public void Commit() => Call(() => Controller.Deployment.OnLocalDeploymentFinished());
 
-        /// <summary>
-        /// A hull vanilla's team setup fielded for this client, registered as the spawn postfix does; it stands for the party's
-        /// campaign ship <paramref name="campaignShipId"/> when given.
-        /// </summary>
-        public Guid FieldOwnHull(BattleSideEnum side, Vec3 position, string mapEventPartyId, string? campaignShipId = null)
+        /// <summary>A hull vanilla's team setup fielded for this client, registered as the spawn postfix does.</summary>
+        public Guid FieldOwnHull(BattleSideEnum side, Vec3 position, string mapEventPartyId)
         {
             var shipId = Guid.NewGuid();
             Call(() =>
             {
                 var hull = Engine.Field(side, position);
-                hull.CampaignShipId = campaignShipId;
                 Assert.True(Registry.TryRegister(new NetworkShipInfo(shipId, Id, mapEventPartyId, false, hull.Hull, null)));
             });
             return shipId;

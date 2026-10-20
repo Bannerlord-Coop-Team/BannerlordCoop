@@ -144,9 +144,6 @@ public interface INavalShipEngine
     /// </summary>
     int AddHullReserve(MissionObject hull, IReadOnlyList<IAgentOriginBase> origins);
 
-    /// <summary>The registry id of the party's campaign ship the hull stands for, or null when it has none.</summary>
-    string CampaignShipIdOf(MissionObject hull);
-
     /// <summary>
     /// [Game thread] Takes an agent out of the battle the way vanilla takes a removed hull's crew: it fades out, which reads as
     /// a rout, not a casualty.
