@@ -383,7 +383,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(battle.DefenderPlayerPartyId, out var mainParty));
             var previousMainParty = Campaign.Current.MainParty;
             var previousEncounter = Campaign.Current.PlayerEncounter;
-            bool previousConclusionGate = BattleConclusionGate.IsInCoopBattleMission;
+            var missionRegistry = client.Resolve<ICoopBattleMissionRegistry>();
 
             try
             {
@@ -391,7 +391,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 PlayerEncounter.Start();
                 PlayerEncounter.Current._mapEvent = mapEvent;
                 PlayerEncounter.Current.SetIsSallyOutAmbush(true);
-                BattleConclusionGate.IsInCoopBattleMission = true;
+                missionRegistry.BeginMission(battle.MapEventId);
 
                 new SiegeAmbushCampaignBehavior().OnMissionEnded(Mock.Of<IMission>());
 
@@ -401,7 +401,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             }
             finally
             {
-                BattleConclusionGate.IsInCoopBattleMission = previousConclusionGate;
+                missionRegistry.EndMission(battle.MapEventId);
                 Campaign.Current.MainParty = previousMainParty;
                 Campaign.Current.PlayerEncounter = previousEncounter;
             }

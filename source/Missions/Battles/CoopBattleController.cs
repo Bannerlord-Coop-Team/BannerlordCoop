@@ -81,6 +81,11 @@ public class CoopBattleController : CoopMissionController
 #endif
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly IBattleHostRegistry hostRegistryRef;
+    private readonly ICoopBattleMissionRegistry missionRegistry;
+
+    // The window this controller opened in AfterStart, so Dispose closes exactly that one and never a newer mission's.
+    private bool missionStarted;
+    private string beganMissionId;
     private readonly IMissionContext debugMissionContext;
     private NetworkBattleResultSnapshot? pendingResultSnapshot;
     private int lastResultSnapshotEpochReported;
@@ -113,7 +118,8 @@ public class CoopBattleController : CoopMissionController
         IBattleAgentSpawnBatchCodec spawnBatchCodec,
         IBattleDamageDataMapper battleDamageDataMapper,
         IMissionWeaponDataMapper missionWeaponDataMapper,
-        ISiegeGateHitApplier siegeGateHitApplier)
+        ISiegeGateHitApplier siegeGateHitApplier,
+        ICoopBattleMissionRegistry missionRegistry)
         : base(
             network,
             messageBroker,
@@ -195,6 +201,7 @@ public class CoopBattleController : CoopMissionController
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         hostRegistryRef = hostRegistry;
+        this.missionRegistry = missionRegistry;
         Session = session;
         Deployment = deployment;
         ResultCommitter = new BattleResultCommitter(network, relayNetwork, session);
@@ -238,7 +245,8 @@ public class CoopBattleController : CoopMissionController
         SiegeMissionAuthorityGate.IsLocalAuthority = false;
         SiegeMissionAuthorityGate.IsAuthorityKnown = false;
         SiegeMissionAuthorityGate.ResetClaimedMachines();
-        BattleConclusionGate.IsInCoopBattleMission = false;
+        if (missionStarted)
+            missionRegistry.EndMission(beganMissionId);
 
         base.Dispose();
     }
@@ -252,7 +260,9 @@ public class CoopBattleController : CoopMissionController
     {
         base.AfterStart();
 
-        BattleConclusionGate.IsInCoopBattleMission = true;
+        beganMissionId = Session.InstanceId;
+        missionStarted = true;
+        missionRegistry.BeginMission(beganMissionId);
 
         // BR-025: the deployment time limit begins when this player becomes mission-ready — right here.
         Deployment.OnMissionReady();
@@ -282,9 +292,6 @@ public class CoopBattleController : CoopMissionController
             SiegeMissionAuthorityGate.IsLocalAuthority = Session.IsLocalHost;
             SiegeMissionAuthorityGate.IsAuthorityKnown = hostRegistryRef.TryGet(Session.InstanceId, out _);
         }
-
-        // Route coop mission victories through the server's result-ready completion barrier.
-        BattleConclusionGate.IsInCoopBattleMission = true;
 
         // Register the buffered puppet batch before the one-shot end-condition gate so it can observe both
         // sides as fielded even when a queued terminal event removes every agent on one side this tick.

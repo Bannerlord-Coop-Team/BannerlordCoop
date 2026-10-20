@@ -43,15 +43,15 @@ public class BattleResultReadyTests : MissionTestEnvironment
         {
             Assert.True(host.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
             host.NetworkSentMessages.Clear();
-            bool wasInCoopBattleMission = BattleConclusionGate.IsInCoopBattleMission;
-            BattleConclusionGate.IsInCoopBattleMission = true;
+            var missionRegistry = host.Resolve<ICoopBattleMissionRegistry>();
+            missionRegistry.BeginMission(mapEventId);
             try
             {
                 mapEvent.BattleState = BattleState.DefenderVictory;
             }
             finally
             {
-                BattleConclusionGate.IsInCoopBattleMission = wasInCoopBattleMission;
+                missionRegistry.EndMission(mapEventId);
             }
         }, VictoryConclusionDisabledMethods());
 
