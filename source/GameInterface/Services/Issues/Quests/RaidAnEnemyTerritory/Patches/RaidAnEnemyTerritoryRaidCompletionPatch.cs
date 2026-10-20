@@ -1,9 +1,12 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using HarmonyLib;
+using Serilog;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -19,6 +22,8 @@ namespace GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory.Patches;
 [HarmonyPatch]
 internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<RaidAnEnemyTerritoryRaidCompletionPatch>();
+
     [HarmonyPatch(typeof(Quest), "OnRaidCompleted")]
     [HarmonyPrefix]
     private static bool OnRaidCompletedPrefix() => false;
@@ -27,12 +32,21 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
     [HarmonyPostfix]
     private static void RaidCompletedPostfix(BattleSideEnum winnerSide, RaidEventComponent raidEvent)
     {
+        Logger.Information("Raid quest raid callback winner={winner} village={village} hitPoints={hitPoints} mapEvent={mapEvent}",
+            winnerSide,
+            raidEvent?.MapEvent?.MapEventSettlement?.StringId,
+            raidEvent?.MapEvent?.MapEventSettlement?.SettlementHitPoints,
+            raidEvent?.MapEvent?.StringId);
         if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
         {
             return;
         }
 
-        dispatcher.RunAsOwners<Quest>(quest => ResolveForOwner(quest, winnerSide, raidEvent));
+        // RaidCompleted runs while the map event is unwinding. Apply only after the vanilla callback has
+        // returned so owner substitution cannot re-enter map-event finalization or release the owner party.
+        GameThread.RunSafe(
+            () => dispatcher.RunAsOwners<Quest>(quest => ResolveForOwner(quest, winnerSide, raidEvent)),
+            context: nameof(RaidCompletedPostfix));
     }
 
     private static void ResolveForOwner(Quest quest, BattleSideEnum winnerSide, RaidEventComponent raidEvent)
@@ -71,6 +85,12 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
 
         quest._raidedVillages.Add(village);
         quest._raidedVillagesTrackLog?.UpdateCurrentProgress(quest._raidedVillages.Count);
+        Logger.Information("Raid quest progress issue={issue} giver={giver} owner={owner} count={count} village={village}",
+            quest.QuestGiver?.Issue?.StringId,
+            quest.QuestGiver?.StringId,
+            quest.QuestGiver?.Issue?.IssueOwner?.StringId,
+            quest._raidedVillages.Count,
+            village.StringId);
 
         if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
             !objectManager.TryGetIdWithLogging(quest.QuestGiver, out var giverId))
