@@ -6,6 +6,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
@@ -51,8 +52,9 @@ internal class HeadmanHerdJournalHandler : IHandler
     private readonly IIssueResolver issues;
     private readonly IControllerIdProvider controllerId;
     private readonly IIssueOwnershipRegistry ownership;
+    private readonly IPlayerManager players;
 
-    public HeadmanHerdJournalHandler(IMessageBroker broker, INetwork network, IObjectManager objects, IIssueResolver issues, IControllerIdProvider controllerId, IIssueOwnershipRegistry ownership)
+    public HeadmanHerdJournalHandler(IMessageBroker broker, INetwork network, IObjectManager objects, IIssueResolver issues, IControllerIdProvider controllerId, IIssueOwnershipRegistry ownership, IPlayerManager players)
     {
         this.broker = broker;
         this.network = network;
@@ -60,6 +62,7 @@ internal class HeadmanHerdJournalHandler : IHandler
         this.issues = issues;
         this.controllerId = controllerId;
         this.ownership = ownership;
+        this.players = players;
         broker.Subscribe<HeadmanHerdLogAdded>(Send);
         broker.Subscribe<NetworkHeadmanHerdLog>(Receive);
         broker.Subscribe<NetworkQuestSolutionAccepted>(ShowGrant);
@@ -91,7 +94,9 @@ internal class HeadmanHerdJournalHandler : IHandler
         if (ModInformation.IsClient) return;
         var issue = IssueManager.GetIssueOfQuest(payload.What.Quest);
         if (issue == null || !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
-        network.SendAll(new NetworkHeadmanHerdLog(giverId, issue.StringId, payload.What.Text));
+        if (!ownership.TryGetOwner(giverId, issue.StringId, out var owner)) return;
+        if (!players.TryGetPeer(owner, out var peer)) return;
+        network.Send(peer, new NetworkHeadmanHerdLog(giverId, issue.StringId, payload.What.Text));
     }
 
     private void Receive(MessagePayload<NetworkHeadmanHerdLog> payload)

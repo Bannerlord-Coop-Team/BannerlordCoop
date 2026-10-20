@@ -268,7 +268,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false));
         environment.FlushCoalescer();
 
-        Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(), message => message.Outcome == IssueOutcome.QuestCancel);
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
         ClientA.Call(() => Assert.Contains(accepted[ClientA].JournalEntries, log => log.LogText.GetID() == "m41vdhSR"));
         foreach (var instance in Instances)
@@ -284,7 +284,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         Server.Call(() => Campaign.Current.IssueManager.OnHeroKilled(Object<Hero>(Server, scenario.NotableId), null,
             KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false));
         environment.FlushCoalescer();
-        Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(), message => message.Outcome == IssueOutcome.QuestCancel);
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         foreach (var instance in Instances)
         {
             instance.Call(() =>
@@ -536,7 +536,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         });
         environment.FlushCoalescer();
 
-        Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>(), message => message.Outcome == IssueOutcome.QuestCancel);
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         ClientA.Call(() =>
         {
             Assert.Empty(Campaign.Current.QuestManager.Quests);

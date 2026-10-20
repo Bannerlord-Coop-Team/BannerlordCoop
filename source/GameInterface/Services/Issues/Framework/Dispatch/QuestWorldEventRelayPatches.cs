@@ -3,6 +3,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
@@ -38,6 +39,21 @@ internal class QuestWorldEventRelayPatches
     private static void OnArmyDispersedPostfix(Army army, Army.ArmyDispersionReason reason, bool isPlayersArmy)
     {
         Relay("OnArmyDispersed", new[] { typeof(Army), typeof(Army.ArmyDispersionReason), typeof(bool) }, army, reason, isPlayersArmy);
+    }
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
+    [HarmonyPostfix]
+    private static void OnHeroKilledPostfix(Hero victim, Hero killer, TaleWorlds.CampaignSystem.Actions.KillCharacterAction.KillCharacterActionDetail detail, bool showNotification)
+    {
+        Relay("OnHeroKilled", new[] { typeof(Hero), typeof(Hero), typeof(TaleWorlds.CampaignSystem.Actions.KillCharacterAction.KillCharacterActionDetail), typeof(bool) }, victim, killer, detail, showNotification);
+    }
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
+    [HarmonyPostfix]
+    private static void OnMapEventStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
+    {
+        if (mapEvent.IsForcingSupplies || mapEvent.IsForcingVolunteers)
+            Relay("OnMapEventStarted", new[] { typeof(MapEvent), typeof(PartyBase), typeof(PartyBase) }, mapEvent, attackerParty, defenderParty);
     }
 
     private static void Relay(string listenerName, System.Type[] parameterTypes, params object[] arguments)

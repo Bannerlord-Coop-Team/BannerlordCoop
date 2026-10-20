@@ -16,6 +16,10 @@ internal interface IHeadmanHerdCleanup : IGameAbstraction
 {
     void Remember(IssueBase issue, MobileParty party);
     bool HasRememberedParty(IssueBase issue);
+    void RememberGiverDeath(IssueBase issue);
+    IReadOnlyCollection<IssueBase> PendingGiverDeaths { get; }
+    IReadOnlyCollection<IssueBase> RememberedIssues { get; }
+    void ForgetGiverDeath(IssueBase issue);
     bool ReturnAlternativeTroops(IssueBase issue);
     void RemoveRemaining(Quest quest);
     void Finalize(IssueBase issue);
@@ -26,14 +30,22 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
 {
     private Dictionary<string, MobileParty> parties = new Dictionary<string, MobileParty>();
     private Dictionary<string, string> questIssueIds = new Dictionary<string, string>();
+    private readonly HashSet<IssueBase> pendingGiverDeaths = new HashSet<IssueBase>();
+    private readonly Dictionary<string, IssueBase> rememberedIssues = new Dictionary<string, IssueBase>();
+    public IReadOnlyCollection<IssueBase> PendingGiverDeaths => pendingGiverDeaths;
+    public IReadOnlyCollection<IssueBase> RememberedIssues => rememberedIssues.Values;
 
     public void Remember(IssueBase issue, MobileParty party)
     {
         if (string.IsNullOrEmpty(issue.StringId)) return;
         parties[issue.StringId] = party;
+        rememberedIssues[issue.StringId] = issue;
         if (!string.IsNullOrEmpty(issue.IssueQuest?.StringId))
             questIssueIds[issue.IssueQuest.StringId] = issue.StringId;
     }
+
+    public void RememberGiverDeath(IssueBase issue) => pendingGiverDeaths.Add(issue);
+    public void ForgetGiverDeath(IssueBase issue) => pendingGiverDeaths.Remove(issue);
 
     public bool HasRememberedParty(IssueBase issue) => !string.IsNullOrEmpty(issue.StringId) && parties.ContainsKey(issue.StringId);
 
@@ -60,7 +72,10 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
         if (!string.IsNullOrEmpty(issue.IssueQuest?.StringId))
             questIssueIds.Remove(issue.IssueQuest.StringId);
         if (!string.IsNullOrEmpty(issue.StringId))
+        {
             parties.Remove(issue.StringId);
+            rememberedIssues.Remove(issue.StringId);
+        }
     }
 
     public void RemoveRemaining(Quest quest)
@@ -89,6 +104,8 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
         dataStore.SyncData("coop_herd_cleanup_quest_issue_ids", ref questIssueIds);
         if (parties == null || ModInformation.IsClient) parties = new Dictionary<string, MobileParty>();
         if (questIssueIds == null || ModInformation.IsClient) questIssueIds = new Dictionary<string, string>();
+        pendingGiverDeaths.Clear();
+        rememberedIssues.Clear();
     }
 }
 

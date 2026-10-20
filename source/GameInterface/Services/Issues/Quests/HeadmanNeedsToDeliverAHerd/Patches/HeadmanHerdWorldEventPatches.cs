@@ -19,8 +19,6 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd.Patche
 [HarmonyPatch]
 internal class HeadmanHerdWorldEventPatches
 {
-    private static readonly HashSet<Issue> pendingGiverDeaths = new();
-
     private sealed class GiverKilledState : IDisposable
     {
         internal readonly IDisposable OwnerScope;
@@ -45,7 +43,11 @@ internal class HeadmanHerdWorldEventPatches
         if (ModInformation.IsClient) return false;
         if (issue.IssueQuest == null && !issue.IsSolvingWithAlternative) return true;
         if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) || !owners.TryResolveOwnerHero(issue, out var owner)) return false;
-        if (owner.PartyBelongedTo == null && !owner.IsPrisoner) return false;
+        if (owner.PartyBelongedTo == null && !owner.IsPrisoner)
+        {
+            if (ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var pending)) pending.RememberGiverDeath(issue);
+            return false;
+        }
         if (issue.IsSolvingWithAlternative && owner.PartyBelongedTo != null &&
             ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var cleanup))
             cleanup.Remember(issue, owner.PartyBelongedTo);
@@ -53,16 +55,6 @@ internal class HeadmanHerdWorldEventPatches
         // Keep the owner on the issue until vanilla can return the troops without its global queue.
         if (issue.IsSolvingWithAlternative && !Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return false;
         return true;
-    }
-
-    [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
-    [HarmonyPostfix]
-    private static void GiverKilledPostfix(Hero victim, GiverKilledState __state)
-    {
-        if (__state == null || victim.IsAlive || __state.Issue.IsSolvingWithAlternative || !ModInformation.IsServer ||
-            !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher)) return;
-
-        dispatcher.After(__state.Issue, IssueOutcome.QuestCancel);
     }
 
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.OnHeroKilled))]
@@ -91,7 +83,7 @@ internal class HeadmanHerdWorldEventPatches
         if (!ModInformation.IsServer || !victim.IsAlive || !(victim.Issue is Issue issue))
             return;
 
-        pendingGiverDeaths.Add(issue);
+        if (ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var cleanup)) cleanup.RememberGiverDeath(issue);
         __state = issue;
     }
 
@@ -102,19 +94,14 @@ internal class HeadmanHerdWorldEventPatches
         if (__state == null) return;
         if (victim.IsAlive)
         {
-            pendingGiverDeaths.Remove(__state);
             return;
         }
 
         if (__state.IsSolvingWithAlternative)
         {
-            TryCancelCompanions(__state);
+            TryCancelGiver(__state);
         }
-        else if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
-        {
-            dispatcher.After(__state, IssueOutcome.QuestCancel);
-            pendingGiverDeaths.Remove(__state);
-        }
+        else if (__state.IssueQuest == null) TryCancelGiver(__state);
     }
 
     [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.TryToMakeTroopsReturn))]
@@ -133,13 +120,10 @@ internal class HeadmanHerdWorldEventPatches
     private static void RetryCanceledCompanionsPostfix()
     {
         if (ModInformation.IsClient) return;
-        var issues = pendingGiverDeaths
-            .Concat(Campaign.Current.IssueManager.Issues.Values.OfType<Issue>()
-                .Where(issue => issue.IsSolvingWithAlternative && !issue.IssueOwner.IsAlive))
-            .Distinct()
-            .ToList();
+        if (!ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var cleanup)) return;
+        var issues = cleanup.PendingGiverDeaths.Concat(cleanup.RememberedIssues).OfType<Issue>().Distinct().ToList();
         foreach (var issue in issues)
-            TryCancelCompanions(issue);
+            TryCancelGiver(issue);
     }
 
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithAlternativeSolution))]
@@ -148,22 +132,22 @@ internal class HeadmanHerdWorldEventPatches
     private static bool CancelInsteadOfCompletingPrefix(IssueBase __instance)
     {
         if (!(__instance is Issue issue) || issue.IssueOwner.IsAlive) return true;
-        if (ModInformation.IsServer) TryCancelCompanions(issue);
+        if (ModInformation.IsServer) TryCancelGiver(issue);
         return false;
     }
 
-    private static void TryCancelCompanions(Issue issue)
+    private static void TryCancelGiver(Issue issue)
     {
+        if (!ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var cleanup)) return;
         if (issue.IssueOwner.IsAlive)
         {
-            pendingGiverDeaths.Remove(issue);
+            cleanup.ForgetGiverDeath(issue);
             return;
         }
 
-        if (!ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var cleanup)) return;
-        if (!cleanup.HasRememberedParty(issue))
+        if (issue.IsSolvingWithAlternative && !cleanup.HasRememberedParty(issue))
         {
-            pendingGiverDeaths.Remove(issue);
+            cleanup.ForgetGiverDeath(issue);
             return;
         }
         if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) ||
@@ -172,7 +156,7 @@ internal class HeadmanHerdWorldEventPatches
 
         using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
         {
-            if (!Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return;
+            if (issue.IsSolvingWithAlternative && !Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution()) return;
 
             if (issue.IssueOwner.Issue == issue)
                 Campaign.Current.IssueManager.OnHeroKilled(issue.IssueOwner, null, KillCharacterAction.KillCharacterActionDetail.None, false);
@@ -180,24 +164,7 @@ internal class HeadmanHerdWorldEventPatches
                 issue.CompleteIssueWithCancel();
         }
 
-        pendingGiverDeaths.Remove(issue);
-    }
-
-    internal static void ForgetGiverDeath(Issue issue) => pendingGiverDeaths.Remove(issue);
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
-    [HarmonyPostfix]
-    private static void HeroKilledPostfix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification)
-    {
-        RunAsOwners(quest => quest.OnHeroKilled(victim, killer, detail, showNotification));
-    }
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
-    [HarmonyPostfix]
-    private static void MapEventStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
-    {
-        if (mapEvent.IsForcingSupplies || mapEvent.IsForcingVolunteers)
-            RunAsOwners(quest => quest.OnMapEventStarted(mapEvent, attackerParty, defenderParty));
+        cleanup.ForgetGiverDeath(issue);
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnHeroKilled))]
@@ -208,8 +175,4 @@ internal class HeadmanHerdWorldEventPatches
     [HarmonyPrefix]
     private static bool MapEventStartedPrefix() => ModInformation.IsServer;
 
-    private static void RunAsOwners(Action<Quest> listener)
-    {
-        if (ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher)) dispatcher.RunAsOwners(listener);
-    }
 }
