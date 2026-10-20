@@ -7,6 +7,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Quests.Smugglers;
 using GameInterface.Services.Issues.Quests.Smugglers.Patches;
 using GameInterface.Services.Players;
