@@ -32,6 +32,8 @@ internal sealed class ChatVM : ViewModel
         new Dictionary<string, List<ChatLineVM>>(StringComparer.Ordinal);
 
     private ChatChannelVM selectedChannel;
+    private string clanId;
+    private string kingdomId;
     private string writtenText = string.Empty;
     private bool isOpen;
     private float chatBoxSizeX;
@@ -217,10 +219,10 @@ internal sealed class ChatVM : ViewModel
     }
 
     /// <summary>Lists Clan and Kingdom tabs before DMs when the local player belongs to them.</summary>
-    public void SetGroupChannelMembership(bool inClan, bool inKingdom)
+    public void SetGroupChannelMembership(string clanId, string kingdomId)
     {
-        SetFixedChannelListed(ClanChannelId, inClan);
-        SetFixedChannelListed(KingdomChannelId, inKingdom);
+        UpdateGroupChannel(ClanChannelId, ref this.clanId, clanId);
+        UpdateGroupChannel(KingdomChannelId, ref this.kingdomId, kingdomId);
     }
 
     public void AddParticipant(string controllerId, string displayName)
@@ -254,7 +256,7 @@ internal sealed class ChatVM : ViewModel
             availableParticipants.Add(participant);
         }
 
-        if (selectedChannel?.IsDirect == true && !availableIds.Contains(selectedChannel.ControllerId))
+        if (selectedChannel.IsDirect && !availableIds.Contains(selectedChannel.ControllerId))
             SelectChannel(channelsById[AllChannelId]);
 
         var directChannels = new List<ChatChannelVM>();
@@ -327,7 +329,7 @@ internal sealed class ChatVM : ViewModel
                 if (string.IsNullOrEmpty(message.RecipientControllerId))
                 {
                     // All is skipped by Tick. Events is read-only. Both map to Global.
-                    channelId = selectedChannel.IsAll || selectedChannel.SendChannel == null
+                    channelId = selectedChannel.IsAll || selectedChannel.IsEvents
                         ? GlobalChannelId
                         : selectedChannel.ControllerId;
                 }
@@ -374,6 +376,26 @@ internal sealed class ChatVM : ViewModel
         }
 
         Channels.Insert(IndexForGroupChannel(channel.Kind), channel);
+    }
+
+    private void UpdateGroupChannel(string channelId, ref string previousFactionId, string factionId)
+    {
+        if (!string.Equals(previousFactionId, factionId, StringComparison.Ordinal))
+        {
+            previousFactionId = factionId;
+            ClearGroupChannelHistory(channelId);
+        }
+
+        SetFixedChannelListed(channelId, !string.IsNullOrEmpty(factionId));
+    }
+
+    private void ClearGroupChannelHistory(string channelId)
+    {
+        histories[channelId].Clear();
+        channelsById[channelId].ClearUnreadMessages();
+
+        if (IsOpen && string.Equals(selectedChannel.ControllerId, channelId, StringComparison.Ordinal))
+            UpdateVisibleLines();
     }
 
     private int IndexForGroupChannel(ChatChannelKind kind)
@@ -445,8 +467,8 @@ internal sealed class ChatVM : ViewModel
         ChatLineVM passiveTrimmed = TrimHistory(passiveHistory);
 
         bool viewingThisChannel = IsOpen &&
-            string.Equals(selectedChannel?.ControllerId, channelId, StringComparison.Ordinal);
-        bool viewingAll = IsOpen && selectedChannel?.IsAll == true && feedsAll;
+            string.Equals(selectedChannel.ControllerId, channelId, StringComparison.Ordinal);
+        bool viewingAll = IsOpen && selectedChannel.IsAll && feedsAll;
         if (!IsOpen)
         {
             AppendVisibleLine(line, passiveTrimmed);
@@ -491,9 +513,7 @@ internal sealed class ChatVM : ViewModel
         IList<ChatLineVM> history;
         if (!IsOpen)
             history = passiveHistory;
-        else if (!histories.TryGetValue(
-                     selectedChannel?.ControllerId ?? AllChannelId,
-                     out var channelHistory))
+        else if (!histories.TryGetValue(selectedChannel.ControllerId, out var channelHistory))
             return;
         else
             history = channelHistory;

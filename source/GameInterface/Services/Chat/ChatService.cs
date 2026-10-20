@@ -82,6 +82,9 @@ public sealed class ChatService : IChatService, IDisposable
 
     public void Receive(NetworkChatMessage message)
     {
+        if (message.Channel == ChatChannel.Clan || message.Channel == ChatChannel.Kingdom)
+            RefreshGroupChannels();
+
         viewModel.Receive(message);
     }
 
@@ -127,15 +130,15 @@ public sealed class ChatService : IChatService, IDisposable
 
     private void RefreshGroupChannels()
     {
-        bool inClan = false;
-        bool inKingdom = false;
+        string clanId = null;
+        string kingdomId = null;
         if (playerManager.TryGetPlayer(controllerIdProvider.ControllerId, out var player))
         {
-            inClan = factionMembership.GetClan(player) != null;
-            inKingdom = factionMembership.GetKingdom(player) != null;
+            clanId = factionMembership.GetClan(player)?.StringId;
+            kingdomId = factionMembership.GetKingdom(player)?.StringId;
         }
 
-        viewModel.SetGroupChannelMembership(inClan, inKingdom);
+        viewModel.SetGroupChannelMembership(clanId, kingdomId);
     }
 
     private void HandleChatVisibilitySelected(MessagePayload<ChatVisibilitySelected> payload)

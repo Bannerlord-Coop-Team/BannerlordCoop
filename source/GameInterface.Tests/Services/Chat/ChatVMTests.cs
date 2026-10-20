@@ -213,7 +213,7 @@ public class ChatVMTests
         var vm = new ChatVM(_ => { }, () => "local");
         vm.AddParticipant("other-controller", "Other Hero");
 
-        vm.SetGroupChannelMembership(inClan: true, inKingdom: true);
+        vm.SetGroupChannelMembership("clan-1", "kingdom-1");
 
         Assert.Equal(6, vm.Channels.Count);
         Assert.True(vm.Channels[0].IsAll);
@@ -223,7 +223,7 @@ public class ChatVMTests
         Assert.True(vm.Channels[4].IsKingdom);
         Assert.True(vm.Channels[5].IsDirect);
 
-        vm.SetGroupChannelMembership(inClan: false, inKingdom: true);
+        vm.SetGroupChannelMembership(null, "kingdom-1");
 
         Assert.Equal(5, vm.Channels.Count);
         Assert.True(vm.Channels[3].IsKingdom);
@@ -231,12 +231,46 @@ public class ChatVMTests
         Assert.DoesNotContain(vm.Channels, channel => channel.IsClan);
     }
 
+    [Theory]
+    [InlineData(ChatChannel.Clan)]
+    [InlineData(ChatChannel.Kingdom)]
+    public void SetGroupChannelMembership_FactionChanges_ClearPreviousGroupHistory(ChatChannel channel)
+    {
+        var vm = new ChatVM(_ => { }, () => "local");
+        string originalClanId = channel == ChatChannel.Clan ? "clan-a" : null;
+        string originalKingdomId = channel == ChatChannel.Kingdom ? "kingdom-a" : null;
+        vm.SetGroupChannelMembership(originalClanId, originalKingdomId);
+
+        vm.Receive(new NetworkChatMessage(
+            channel,
+            "other-controller",
+            "Other Hero",
+            string.Empty,
+            string.Empty,
+            "old faction line"));
+
+        var groupChannel = vm.Channels.Single(candidate =>
+            channel == ChatChannel.Clan ? candidate.IsClan : candidate.IsKingdom);
+        Assert.True(groupChannel.HasUnreadMessages);
+
+        vm.SetGroupChannelMembership(originalClanId, originalKingdomId);
+        groupChannel.ExecuteSelection();
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("old faction line"));
+
+        vm.SetGroupChannelMembership(
+            channel == ChatChannel.Clan ? "clan-b" : originalClanId,
+            channel == ChatChannel.Kingdom ? "kingdom-b" : originalKingdomId);
+
+        Assert.False(groupChannel.HasUnreadMessages);
+        Assert.Empty(vm.VisibleLines);
+    }
+
     [Fact]
     public void ActionSend_ClanChannel_SendsClanRequest()
     {
         var sent = new List<NetworkSendChatMessage>();
         var vm = new ChatVM(sent.Add, () => "local");
-        vm.SetGroupChannelMembership(inClan: true, inKingdom: false);
+        vm.SetGroupChannelMembership("clan-1", null);
         vm.Channels.Single(channel => channel.IsClan).ExecuteSelection();
         vm.WrittenText = "for the clan";
 
@@ -252,7 +286,7 @@ public class ChatVMTests
     {
         var sent = new List<NetworkSendChatMessage>();
         var vm = new ChatVM(sent.Add, () => "local");
-        vm.SetGroupChannelMembership(inClan: false, inKingdom: true);
+        vm.SetGroupChannelMembership(null, "kingdom-1");
         vm.Channels.Single(channel => channel.IsKingdom).ExecuteSelection();
         vm.WrittenText = "for the realm";
 
@@ -284,7 +318,7 @@ public class ChatVMTests
         vm.SetOpen(true);
         Assert.DoesNotContain(vm.VisibleLines, line => line.Text.Contains("[Clan]"));
 
-        vm.SetGroupChannelMembership(inClan: true, inKingdom: false);
+        vm.SetGroupChannelMembership("clan-1", null);
         vm.Channels.Single(channel => channel.IsClan).ExecuteSelection();
         Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Clan] Other Hero: rally at the keep"));
     }
@@ -309,7 +343,7 @@ public class ChatVMTests
         vm.SetOpen(true);
         Assert.DoesNotContain(vm.VisibleLines, line => line.Text.Contains("[Kingdom]"));
 
-        vm.SetGroupChannelMembership(inClan: false, inKingdom: true);
+        vm.SetGroupChannelMembership(null, "kingdom-1");
         vm.Channels.Single(channel => channel.IsKingdom).ExecuteSelection();
         Assert.Contains(vm.VisibleLines, line => line.Text.Contains("[Kingdom] Other Hero: hold the pass"));
     }
@@ -319,7 +353,7 @@ public class ChatVMTests
     {
         var vm = new ChatVM(_ => { }, () => "local");
         vm.SetOpen(true);
-        vm.SetGroupChannelMembership(inClan: false, inKingdom: true);
+        vm.SetGroupChannelMembership(null, "kingdom-1");
         vm.Channels.Single(channel => channel.IsKingdom).ExecuteSelection();
 
         vm.Receive(new NetworkChatMessage(
@@ -350,7 +384,11 @@ public class ChatVMTests
             string.Empty,
             "You are not in a clan."));
 
-        Assert.Contains(vm.VisibleLines, line => line.Text == "[Chat] You are not in a clan.");
+        var systemLine = Assert.Single(vm.VisibleLines);
+        Assert.Equal("[Chat] You are not in a clan.", systemLine.Text);
+        vm.SetOpen(false);
+        vm.Tick(10.25f);
+        Assert.Equal(0.5f, systemLine.Alpha, 3);
         vm.Channels.Single(channel => channel.IsGlobal).ExecuteSelection();
         Assert.Contains(vm.VisibleLines, line => line.Text == "[Chat] You are not in a clan.");
         vm.Channels.Single(channel => channel.IsEvents).ExecuteSelection();
