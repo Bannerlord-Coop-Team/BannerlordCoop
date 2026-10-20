@@ -17,6 +17,8 @@ public interface IDebugTools
     Task<LiveTestResponse> ListCommands(string run_id, string instance, CancellationToken cancellationToken);
     Task<LiveTestResponse> ExecuteCommand(string run_id, string instance, string name, string[] arguments, CancellationToken cancellationToken);
     Task<LiveTestResponse> JoinClient(string run_id, string instance, CancellationToken cancellationToken);
+    Task<LiveTestResponse> DisconnectClient(string run_id, string instance, CancellationToken cancellationToken);
+    Task<LiveTestResponse> ReconnectClient(string run_id, string instance, CancellationToken cancellationToken);
     Task<LogChunk> ReadLogs(string run_id, string instance, CancellationToken cancellationToken, string cursor = null, int max_bytes = 16384);
     Task<LiveTestResponse> Screenshot(string run_id, string instance, CancellationToken cancellationToken);
     Task<LiveTestResponse> ScreenshotStatus(string run_id, string instance, string capture_id, CancellationToken cancellationToken);
@@ -70,6 +72,14 @@ public sealed class DebugTools : IDebugTools
     [McpServerTool(Name = "join_client", UseStructuredContent = true), Description("Attempt one deferred client join after server readyForCampaignTests and client readyToJoin. This schedules joining, not completion. Then wait for client readyForCampaignTests. Do not retry uncertain outcomes.")]
     public Task<LiveTestResponse> JoinClient(string run_id, string instance, CancellationToken cancellationToken) =>
         runs.RequestAsync(run_id, instance, "join", new { }, true, cancellationToken);
+
+    [McpServerTool(Name = "disconnect_client", UseStructuredContent = true), Description("Cleanly leave the active client campaign. Wait for readyToJoin before reconnecting.")]
+    public Task<LiveTestResponse> DisconnectClient(string run_id, string instance, CancellationToken cancellationToken) =>
+        runs.RequestAsync(run_id, instance, "disconnect", new { }, true, cancellationToken);
+
+    [McpServerTool(Name = "reconnect_client", UseStructuredContent = true), Description("Reconnect a client after it reaches readyToJoin. Reuses the configured session so the same player and hero rejoin.")]
+    public Task<LiveTestResponse> ReconnectClient(string run_id, string instance, CancellationToken cancellationToken) =>
+        runs.RequestAsync(run_id, instance, "reconnect", new { }, true, cancellationToken);
 
     [McpServerTool(Name = "read_logs", ReadOnly = true, UseStructuredContent = true), Description("Read 4..65536 UTF-8 bytes from the endpoint-reported log (or archived log after stop). Omit cursor for beginning. Pass returned cursor for incremental reads. reset=true means replacement/truncation/compaction changed the observed content; output restarts at beginning. Cursors are opaque and instance-specific.")]
     public Task<LogChunk> ReadLogs(string run_id, string instance, CancellationToken cancellationToken, string cursor = null, int max_bytes = 16384) =>

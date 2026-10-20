@@ -775,6 +775,10 @@ namespace Coop.LiveTesting
 
             return ExecuteOnGameThread(request, () =>
             {
+                if (Campaign.Current == null)
+                {
+                    return Failure(request.Id, "client_not_in_campaign", "The client is not in an active campaign.", false);
+                }
                 if (!ContainerProvider.TryResolve<IClientLogic>(out var clientLogic))
                 {
                     return Failure(request.Id, "client_session_unavailable", "No active client session was found.", false);
@@ -803,8 +807,11 @@ namespace Coop.LiveTesting
                 {
                     return Failure(request.Id, "client_not_at_main_menu", "The client must be at the main menu with no campaign loaded before reconnecting.", false);
                 }
+                if (ContainerProvider.TryResolve<ILogic>(out _))
+                {
+                    return Failure(request.Id, "client_session_active", "The previous client session is still tearing down.", false);
+                }
 
-                Interlocked.Exchange(ref deferredClientJoinAttempted, 0);
                 bool started = startAsClient();
                 Interlocked.Exchange(ref deferredClientJoinAttempted, started ? 1 : 0);
                 Logger.Information("[LiveTest] Reconnect StartAsClient() returned {Started}", started);

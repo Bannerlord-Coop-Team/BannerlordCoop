@@ -276,9 +276,9 @@ public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGu
         try
         {
             if (!Alive(target)) throw new InvalidOperationException("The owned process has exited.");
-            if (method == "join")
+            if (method == "join" || method == "reconnect")
             {
-                if (target.Identity.Role != "client") return LocalFailure(target, "client_only", "Only an owned client can join.");
+                if (target.Identity.Role != "client") return LocalFailure(target, "client_only", "Only an owned client can join or reconnect.");
                 var report = preflight.Check(settings.Profiles[run.Profile], 0);
                 if (!report.Allowed || report.Bridge.Mvid != run.Preflight.Bridge.Mvid)
                     return LocalFailure(target, report.Allowed ? "bridge_build_changed" : report.Code,
