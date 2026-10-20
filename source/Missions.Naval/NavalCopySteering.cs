@@ -183,16 +183,29 @@ internal sealed class CopySteering
         return (sampleFrame.origin.AsVec2 + (sampleVelocity * ahead), YawOf(sampleFrame.rotation.f) + (sampleYawRate * ahead));
     }
 
-    // The owner's frame moved and turned to the extrapolated target, which the engine teleports the copy to.
+    // Asks for a snap to the extrapolated target and restarts the oscillation count.
     private CopySteeringStep SnapTo((Vec2 Position, float Yaw) target)
     {
         pendingSnap = false;
         Snaps++;
         lastSign = 0;
+        return new CopySteeringStep(true, FrameAt(target), Vec2.Zero, 0f, 0f);
+    }
+
+    /// <summary>The frame a queued snap teleports to now, from the latest sample; a jump observed since then is covered by it.</summary>
+    public MatrixFrame TakeSnapFrame()
+    {
+        pendingSnap = false;
+        return FrameAt(Target);
+    }
+
+    // The owner's sample frame moved and turned to the target.
+    private MatrixFrame FrameAt((Vec2 Position, float Yaw) target)
+    {
         var frame = sampleFrame;
         frame.origin = new Vec3(target.Position.x, target.Position.y, frame.origin.z);
         frame.rotation = RotateYaw(frame.rotation, WrapAngle(target.Yaw - YawOf(frame.rotation.f)));
-        return new CopySteeringStep(true, frame, Vec2.Zero, 0f, 0f);
+        return frame;
     }
 
     /// <summary>The owner's velocity the snap carries over, zero once the owner is stale.</summary>

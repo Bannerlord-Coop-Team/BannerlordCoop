@@ -66,8 +66,8 @@ sealed class SteeredCopy
     /// <summary>Whether the warning that its body isn't simulating was logged.</summary>
     internal bool WarnedWritten { get; set; }
 
-    /// <summary>The frame a physics step asked to teleport the copy to, applied on the next mission tick.</summary>
-    internal MatrixFrame? PendingSnap { get; set; }
+    /// <summary>Whether a physics step asked to teleport the copy, which the next mission tick does.</summary>
+    internal bool SnapPending { get; set; }
 
 #if DEBUG
     internal CopyDiagnostics Diagnostics { get; } = new CopyDiagnostics();
@@ -118,7 +118,7 @@ public class NavalSteeredCopies : INavalSteeredCopies
         foreach (var entry in copies)
         {
             var ship = entry.Key;
-            if (entry.Value.PendingSnap.HasValue || ship.IsRemoved || !IsSimulating(ship)) continue;
+            if (entry.Value.SnapPending || ship.IsRemoved || !IsSimulating(ship)) continue;
 
             SteerOne(ship, entry.Value, fixedDt);
         }
@@ -132,11 +132,10 @@ public class NavalSteeredCopies : INavalSteeredCopies
         foreach (var entry in copies)
         {
             var copy = entry.Value;
-            if (!copy.PendingSnap.HasValue) continue;
+            if (!copy.SnapPending) continue;
 
-            var frame = copy.PendingSnap.Value;
-            copy.PendingSnap = null;
-            if (!entry.Key.IsRemoved && entry.Key.GameEntity.IsValid) Snap(entry.Key, copy, frame);
+            copy.SnapPending = false;
+            if (!entry.Key.IsRemoved && entry.Key.GameEntity.IsValid) Snap(entry.Key, copy, copy.Steering.TakeSnapFrame());
         }
     }
 
@@ -179,7 +178,7 @@ public class NavalSteeredCopies : INavalSteeredCopies
 #endif
         if (step.Snap)
         {
-            copy.PendingSnap = step.SnapFrame;
+            copy.SnapPending = true;
             return;
         }
 
@@ -189,7 +188,8 @@ public class NavalSteeredCopies : INavalSteeredCopies
         if (step.DeltaYawRate != 0f) entity.SetAngularVelocity(new Vec3(angular.x, angular.y, angular.z + step.DeltaYawRate));
     }
 
-    // Teleports the copy with its crew (vanilla) and anyone else standing on it, then gives it the owner's motion.
+    // Teleports the copy with its crew (vanilla) and anyone else standing on it, released from what they use, then gives it the
+    // owner's motion.
     private static void Snap(MissionShip ship, SteeredCopy copy, MatrixFrame target)
     {
         var entity = ship.GameEntity;
@@ -199,7 +199,11 @@ public class NavalSteeredCopies : INavalSteeredCopies
 
         var after = entity.GetGlobalFrame();
         foreach (var rider in riders)
+        {
+            // A rider still bound to a machine or plank would be left holding a point that moved away from it.
+            if (rider.CurrentlyUsedGameObject != null) rider.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
             rider.TeleportToPosition(after.TransformToParent(before.TransformToLocalNonOrthogonal(rider.Position)));
+        }
 
         var ownerVelocity = copy.Steering.FeedForwardVelocity;
         entity.SetLinearVelocity(new Vec3(ownerVelocity.x, ownerVelocity.y, 0f));

@@ -155,6 +155,22 @@ public class NavalCopySteeringTests
         Assert.Equal(0.5f, steering.FeedForwardYawRate);
     }
 
+    // M10 round 3: a snap queued in a physics step is applied on the mission tick, by when a newer sample may have arrived.
+    [Fact]
+    public void TakeSnapFrame_UsesTheLatestSampleAndCoversAJumpSinceTheQueue()
+    {
+        var steering = Observed(Knobs("snap=10", "lead=0"), 0f, Vec2.Zero);
+        Assert.True(steering.Compute(Dt, new Vec3(0f, 20f, 0f), 0f, Vec2.Zero, 0f).Snap);
+
+        steering.ObserveOwner(Frame(40f, 0f, 0f), Vec2.Zero, 0f);
+        var frame = steering.TakeSnapFrame();
+        var next = steering.Compute(Dt, frame.origin, 0f, Vec2.Zero, 0f);
+
+        Assert.Equal(40f, frame.origin.x, 3);
+        Assert.False(next.Snap);
+        Assert.Equal(1, steering.Snaps);
+    }
+
     [Fact]
     public void RotateYaw_TurnsEveryAxisAboutWorldUpAndKeepsThemOrthonormal()
     {
