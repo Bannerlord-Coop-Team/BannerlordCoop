@@ -15,4 +15,5 @@ public interface IQuestTypeDescriptor
     [CanBeNull] IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy { get; }
 
     // Null if the quest has no outcome branch that needs to be told apart
-    [CanBeNull] IFinalizationProofStrategy FinalizationProofStrategy { get; }\r\n}
+    [CanBeNull] IFinalizationProofStrategy FinalizationProofStrategy { get; }
+}
