@@ -347,6 +347,9 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
 
         public void Enter(string controllerId) => members.Add(controllerId);
 
+        /// <summary>Takes a member out of this client's view without a departure, as before the server told a joiner of it.</summary>
+        public void Forget(string controllerId) => members.Remove(controllerId);
+
         private void Handle_Entered(MessagePayload<NetworkMissionPeerEntered> payload) => members.Add(payload.What.ControllerId);
 
         private void Handle_Left(MessagePayload<MissionPeerLeft> payload) => members.Remove(payload.What.ControllerId);

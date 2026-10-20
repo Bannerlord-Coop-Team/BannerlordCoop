@@ -237,9 +237,10 @@ public class BattleShipReplicatorTests
         Assert.Equal("not_in_mission", (string)inspected["lastReject"]!);
     }
 
-    // R7: a record a player sent before it left can arrive after its departure; it never spawns a copy here.
+    // R41a-2 E: a member's catch-up record is relayed past the server's join hold, so it can reach a joiner before the joiner
+    // knows its owner is a member. It is held, not dropped, and spawns once the owner is a member.
     [Fact]
-    public void AcceptSpawnRecords_FromAPlayerNoLongerInTheMission_SpawnsNothing()
+    public void AcceptSpawnRecords_FromAPlayerNotYetAMember_HoldsItAndSpawnsItOnMembership()
     {
         using var mission = new MissionCurrentScope();
         var harness = new Harness(committed: false);
@@ -248,10 +249,63 @@ public class BattleShipReplicatorTests
 
         harness.Members.Remove(Peer);
         harness.Replicator.AcceptSpawnRecords(new[] { record });
+        harness.Replicator.Tick(0.1f);
+        var stateWhileHeld = harness.Registry.StateOf(record.ShipId);
+        harness.Members.Add(Peer);
+        harness.Replicator.Tick(0.1f);
 
-        Assert.Equal(ShipLifecycle.Unknown, harness.Registry.StateOf(record.ShipId));
+        Assert.Equal(ShipLifecycle.Awaiting, stateWhileHeld);
+        Assert.True(harness.Registry.TryGet(record.ShipId, out var ship));
+        Assert.Equal(Peer, ship.CurrentAuthority);
+        harness.Engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out It.Ref<Formation>.IsAny),
+            Times.Once);
+    }
+
+    // A record held for its owner's membership goes with the owner when it leaves instead.
+    [Fact]
+    public void AcceptSpawnRecords_HeldForMembership_IsPrunedWhenItsOwnerLeaves()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: true);
+        harness.SetupForeignSpawn();
+        var record = ForeignRecord(Guid.NewGuid());
+        harness.Members.Remove(Peer);
+        harness.Replicator.AcceptSpawnRecords(new[] { record });
+
+        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
+        GameThread.Run(() => { }, blocking: true);
+        harness.Members.Add(Peer);
+        harness.Replicator.Tick(0.1f);
+
+        Assert.Equal(ShipLifecycle.Removed, harness.Registry.StateOf(record.ShipId));
+        Assert.Equal(0, (int)JObject.FromObject(harness.Replicator.Inspect())["pendingForeignHulls"]!);
         harness.Engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out It.Ref<Formation>.IsAny),
             Times.Never);
+    }
+
+    // R7: a record a departed player sent can arrive after its leave; it is dropped, not held, until the player enters again.
+    [Fact]
+    public void AcceptSpawnRecords_FromADepartedPlayer_IsDroppedUntilItEntersAgain()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: true);
+        harness.SetupForeignSpawn();
+        var late = ForeignRecord(Guid.NewGuid());
+        var fresh = ForeignRecord(Guid.NewGuid());
+
+        harness.Members.Remove(Peer);
+        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
+        GameThread.Run(() => { }, blocking: true);
+        harness.Replicator.AcceptSpawnRecords(new[] { late });
+        int heldAfterLeave = (int)JObject.FromObject(harness.Replicator.Inspect())["pendingForeignHulls"]!;
+        harness.Members.Add(Peer);
+        harness.Broker.Publish(this, new NetworkMissionPeerEntered(Peer, Instance));
+        GameThread.Run(() => { }, blocking: true);
+        harness.Replicator.AcceptSpawnRecords(new[] { fresh });
+
+        Assert.Equal(0, heldAfterLeave);
+        Assert.False(harness.Registry.TryGet(late.ShipId, out _));
+        Assert.True(harness.Registry.TryGet(fresh.ShipId, out _));
     }
 
     // D4: the server sends a naval disconnect as a leave, so a record the player sent before it dropped spawns nothing here

@@ -90,6 +90,30 @@ public class NavalLateJoinScenarioTests : NavalBattleTestEnvironment
         Assert.All(c.Registry.Ships, ship => Assert.Equal("A", ship.CurrentAuthority));
     }
 
+    // R41a-2 E: a member's catch-up reaches the joiner relayed past the server's join hold, so B's own hull record can arrive
+    // before C knows B is a member. C holds it and spawns it once B's membership arrives.
+    [Fact]
+    public void LateJoiner_ThatLearnsAnOwnersMembershipLate_HoldsItsHullUntilThen()
+    {
+        using var battle = StartRunningBattle(out _, out var hulls, out _);
+        var hullB = hulls[^1];
+
+        var c = battle.Join("C");
+        c.Members.Forget("B");
+        c.Commit();
+        battle.AnnounceEntry(c);
+        battle.TickAll(2);
+        bool spawnedBeforeMembership = c.Has(hullB);
+        bool aiHullsSpawned = hulls.Take(hulls.Length - 1).All(c.Has);
+        c.Members.Enter("B");
+        battle.TickAll(2);
+
+        Assert.False(spawnedBeforeMembership);
+        Assert.True(aiHullsSpawned);
+        Assert.True(c.Has(hullB));
+        Assert.Equal("B", c.Ship(hullB).CurrentAuthority);
+    }
+
     // vs_pirates with A hosting three AI hulls, one of them crewed at the helm and damaged, and B's hull; C still to join.
     private NavalBattle StartRunningBattle(out NavalPeer a, out Guid[] hulls, out Guid crewId)
     {

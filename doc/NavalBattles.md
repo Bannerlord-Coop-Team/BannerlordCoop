@@ -265,6 +265,12 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   re-assigned.
 - **Late join and reconnect.** A late joiner gets every record, condition, weapon state and seat; a returning player is
   one. Only `late_join` ran live (R39); the condition catch-up and the rejoin are E2E-only.
+- **Open: relayed catch-up bypasses the server's join hold.** The server holds its own sends to a joining peer
+  (`CoopServer.Send`), but a peer's catch-up goes through `RelayPacketHandler` (`target.Send`), so a member's hull record
+  can reach a joiner before the joiner learns that member is in the mission (R41a-2 E). The replicator now holds such a
+  record until the owner is a member (log `Holding hull ... until it is a mission member`) and drops one from a departed
+  owner (`Dropped hull record ... of departed ...`). Weapon and seat catch-up may hit the same ordering gap; the relay
+  ordering itself is unchanged.
 - **Follow-up A, late hulls skip `MissionShip.OnDeploymentFinished`.** Hulls fielded after deployment (mainly the AI
   fleet) miss its standing points, `SetUsableByAIOnly` on enemy helms, `_navalShipsLogic` (needed for capture,
   `ShipControllerMachine`), model ammo, wake and flotsam, and `IsDeployed`. Fix: call `ship.OnDeploymentFinished()` in

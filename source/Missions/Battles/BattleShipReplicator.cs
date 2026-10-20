@@ -114,6 +114,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly Dictionary<BattleSideEnum, int> departedHulls = new Dictionary<BattleSideEnum, int>();
     // Everything received for a ship that is not registered here yet, applied in one ordered drain once it is.
     private readonly Dictionary<Guid, HeldShip> heldShips = new Dictionary<Guid, HeldShip>();
+    // [Game thread] Players that left and have not entered again; a late record of theirs never spawns a hull here.
+    private readonly HashSet<string> departedOwners = new HashSet<string>();
     private long recordsHeld;
     // The host AI hulls last migrated to, so an AI copy whose record was still waiting registers under it too.
     private string npcHullHost;
@@ -576,9 +578,11 @@ public class BattleShipReplicator : IBattleShipReplicator
         foreach (var record in records.Where(record => record != null))
         {
             // A player who left or disconnected takes its hulls; an AI hull still spawns, then moves to the host.
-            if (!record.FollowsBattleHost
-                && AuthorityStamp.ValidateMember(record.OwnerControllerId, missionContext.ControllersInMission) != null)
+            if (!record.FollowsBattleHost && departedOwners.Contains(record.OwnerControllerId))
+            {
+                Logger.Information("[NavalSync] Dropped hull record {ShipId} of departed {Owner}", record.ShipId, record.OwnerControllerId);
                 continue;
+            }
 
             // A repeated record (the host announces its AI hulls again at its commit) keeps the first one's place.
             var held = Held(record.ShipId);
@@ -640,6 +644,17 @@ public class BattleShipReplicator : IBattleShipReplicator
         {
             held.SettleRecord();
             return true;
+        }
+
+        // A peer's catch-up is relayed past the server's join hold, so it can beat this client learning the owner is a member.
+        if (!data.FollowsBattleHost && AuthorityStamp.ValidateMember(data.OwnerControllerId, missionContext.ControllersInMission) != null)
+        {
+            if (!held.HeldForMembership)
+            {
+                held.HeldForMembership = true;
+                Logger.Information("[NavalSync] Holding hull {ShipId} of {Owner} until it is a mission member", data.ShipId, data.OwnerControllerId);
+            }
+            return false;
         }
 
         // Vanilla's team setup spawns a hull for every set ship assignment, so a copy spawned before it would get a local twin.
@@ -837,6 +852,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         GameThread.RunSafe(() =>
         {
+            departedOwners.Add(left.ControllerId);
             ForgetReportedReserveOf(left.ControllerId);
             if (Mission.Current == null) return;
 
@@ -915,6 +931,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         GameThread.RunSafe(() =>
         {
+            departedOwners.Remove(entered.ControllerId);
             if (!spawnRecordsSent || session.IsOwn(entered.ControllerId)) return;
 
             SendSpawnRecords(entered.ControllerId);
@@ -1015,12 +1032,14 @@ public class BattleShipReplicator : IBattleShipReplicator
         public int FailedAttempts;
         public float RetryAt;
         public bool HeldForDeployment;
+        public bool HeldForMembership;
 
         public void SettleRecord()
         {
             Record = null;
             FailedAttempts = 0;
             HeldForDeployment = false;
+            HeldForMembership = false;
         }
     }
 
