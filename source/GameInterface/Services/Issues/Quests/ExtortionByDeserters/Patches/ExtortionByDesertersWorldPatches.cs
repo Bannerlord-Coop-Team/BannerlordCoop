@@ -91,8 +91,12 @@ internal class ExtortionByDesertersWorldPatches
     [HarmonyPostfix]
     private static void MapEndedPostfix(MapEvent mapEvent)
     {
-        if (!mapEvent.InvolvedParties.Any(party => party.MobileParty?.IsCurrentlyUsedByAQuest == true)) return;
-        Run(quest => quest.MapEventEnded(mapEvent));
+        if (mapEvent == null) return;
+        Run(quest =>
+        {
+            if (quest._deserterMobileParty?.MapEvent == mapEvent)
+                quest.MapEventEnded(mapEvent);
+        });
     }
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.MapEventEnded))]
