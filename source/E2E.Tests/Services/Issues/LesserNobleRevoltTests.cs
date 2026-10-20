@@ -55,6 +55,17 @@ public sealed class LesserNobleRevoltTests : IDisposable
         testEnvironment.Clients.First().Resolve<IControllerIdProvider>().SetControllerId(controllerId);
     }
 
+    private void RegisterPlayer(string controllerId, EnvironmentInstance client)
+    {
+        var heroId = testEnvironment.CreateRegisteredObject<Hero>();
+        var partyId = testEnvironment.CreateRegisteredObject<MobileParty>();
+        testEnvironment.Server.Call(() => Assert.True(testEnvironment.Server.Resolve<IPlayerManager>().AddPlayer(new Player(controllerId, heroId, partyId, "", ""))));
+        testEnvironment.ConnectRegisteredPlayer(client, controllerId);
+        client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+    }
+
+
+
     // A constructed issue can be finalized, but only the server has the culture names its constructor needs.
     private void AddIssueWithQuest(EnvironmentInstance instance, string issueId, string revoltPartyId = null, bool constructed = false)
     {
@@ -202,6 +213,32 @@ public sealed class LesserNobleRevoltTests : IDisposable
         Assert.Equal(1, wars.CountFor(server));
         Assert.Equal(1, kingdoms.CountFor(server));
     }
+
+    [Fact]
+    public void KingdomCancellation_DoesNotChangeAnObserverRelation()
+    {
+        const string issueId = "issue_lesser_noble_observer";
+        RegisterPlayer("player-A", testEnvironment.Clients.First());
+        RegisterPlayer("player-B", testEnvironment.Clients.Last());
+        AddIssueWithQuest(testEnvironment.Server, issueId);
+
+        testEnvironment.Server.Call(() =>
+        {
+            Assert.True(testEnvironment.Server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(giverId, issueId, "player-A"));
+            Assert.True(testEnvironment.Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(testEnvironment.Server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var ownerPlayer));
+            Assert.True(testEnvironment.Server.Resolve<IPlayerManager>().TryGetPlayer("player-B", out var observerPlayer));
+            Assert.True(testEnvironment.Server.ObjectManager.TryGetObject<Hero>(ownerPlayer.HeroId, out var owner));
+            Assert.True(testEnvironment.Server.ObjectManager.TryGetObject<Hero>(observerPlayer.HeroId, out var observer));
+            var ownerBefore = owner.GetRelation(giver);
+            var observerBefore = observer.GetRelation(giver);
+            CampaignEventDispatcher.Instance.OnClanChangedKingdom(null, null, null, ChangeKingdomAction.ChangeKingdomActionDetail.JoinKingdom, false);
+            Assert.Equal(ownerBefore, owner.GetRelation(giver));
+            Assert.Equal(observerBefore, observer.GetRelation(giver));
+        });
+    }
+
+
 
     [Fact]
     public void OwnerInARevoltBattle_IsNeitherCapturedNorParked()
