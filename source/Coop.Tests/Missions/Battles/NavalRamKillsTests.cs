@@ -15,14 +15,5 @@ public class NavalRamKillsTests
     {
         Assert.Equal(expected, NavalRamKills.KillsAgent(isRegistered, isLocallyControlled));
     }
-
-    [Fact]
-    public void ExitRamTick_EndsTheSparing()
-    {
-        NavalRamKills.EnterRamTick();
-        NavalRamKills.ExitRamTick();
-
-        Assert.False(NavalRamKills.IsInRamTick);
-    }
 }
 #endif

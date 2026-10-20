@@ -136,62 +136,41 @@ internal class ShipQueuedCollisionScopePatch
     private static void Finalizer() => NavalShipDamageGate.ExitQueuedContact();
 }
 
-// The ram's damage tick deals the hit, breaks the target's deck parts and kills every agent at the impact. Only the
-// rammer's owner deals the hit; every client kills only its own agents there, and a copy keeps vanilla's 2 s cooldown.
+// Vanilla's ram damage tick on every client: only the rammer's owner deals the hit, routed by ShipCollisionDamagePatch,
+// and every client breaks the target's deck parts and kills only its own agents at the impact (NavalRamKills).
 [HarmonyPatch(typeof(MissionShipRam), nameof(MissionShipRam.OnTick))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
-internal class CopyRamTickPatch
+internal class RamTickPatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(MissionShipRam __instance, out bool __state)
+    private static bool Prefix(MissionShipRam __instance)
     {
-        __state = RunsRamTick(NavalForeignHulls.Contains(__instance._ownerShip));
-        if (__state)
-        {
-            NavalRamKills.EnterRamTick();
-            return true;
-        }
-
-        ShowCopyRamImpact(__instance);
+        TickRam(__instance, DealsRamHit(NavalForeignHulls.Contains(__instance._ownerShip)));
         return false;
     }
 
-    [HarmonyFinalizer]
-    private static void Finalizer(bool __state)
-    {
-        if (__state) NavalRamKills.ExitRamTick();
-    }
+    /// <summary>Whether this client deals a ram's hit: only for a ram on a hull it simulates.</summary>
+    internal static bool DealsRamHit(bool ownerIsCopy) => !ownerIsCopy;
 
-    /// <summary>Whether this client runs a ram's damage tick: only for a ram on a hull it simulates.</summary>
-    internal static bool RunsRamTick(bool ownerIsCopy) => !ownerIsCopy;
-
-    // Vanilla OnTick without the hit: the cooldown, this client's deck breaks and kills, the effect, then the hit is spent.
-    private static void ShowCopyRamImpact(MissionShipRam ram)
+    // MissionShipRam.OnTick in vanilla's order: hit, cooldown, deck parts and kills, effect, then the impact is spent.
+    private static void TickRam(MissionShipRam ram, bool dealsHit)
     {
         var impact = ram._ramDamageData;
         if (!impact.IsValid) return;
 
-        if (impact.CalculatedDamage > 0f)
+        float damage = impact.CalculatedDamage;
+        if (damage > 0f)
         {
+            if (dealsHit) impact.TargetShip.DealCollisionDamage(ram._ownerShip, isRamDamage: true, impact.SelectedIntersectionPoint, damage);
             ram._ownerShip.UpdateDamageCooldown(impact.TargetShip);
-            NavalRamKills.ApplyCopyImpact(ram);
+            NavalRamKills.ApplyImpact(ram);
         }
 #if DEBUG
-        NavalContactProbe.CountGatedCopyRamTick();
+        if (!dealsHit) NavalContactProbe.CountGatedCopyRamTick();
 #endif
-        ram.TriggerRamCollisionParticleAndSoundEffect(impact.TargetShip.Index, impact.TargetShip.GameEntity, impact.CapsuleData,
-            impact.CalculatedDamage);
+        ram.TriggerRamCollisionParticleAndSoundEffect(impact.TargetShip.Index, impact.TargetShip.GameEntity, impact.CapsuleData, damage);
         ram._ramDamageData = default;
     }
-}
-
-// Inside a ram's damage tick another owner's puppet at the impact is spared; its owner kills it on its own copy of the ram.
-[HarmonyPatch(typeof(Agent), nameof(Agent.Die))]
-[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
-internal class RamPuppetDiePatch
-{
-    [HarmonyPrefix]
-    private static bool Prefix(Agent __instance) => NavalRamKills.AllowsDie(__instance);
 }
 
 #if DEBUG

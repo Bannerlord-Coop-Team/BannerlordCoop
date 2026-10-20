@@ -300,13 +300,13 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - ship loot and distribution are his;
   - the PvP loser's ships vanish (R39).
 - **Ram damage has one writer.** A ram exists only on a hull with a bow ram piece (`MissionShip._ram`; the preset hull
-  `northern_light_ship` has no bow slot, so use `ram=n`). Only the rammer's owner runs `MissionShipRam.OnTick`
-  (`CopyRamTickPatch`) and deals the hit, routed to the target's owner when the target is a copy. A copy keeps vanilla's
-  2 s cooldown and plays the effect; its fixed-tick ram forces stay, so each owner's hull is pushed back by the other's
-  copy locally.
+  `northern_light_ship` has no bow slot, so use `ram=n`). `RamTickPatch` replaces `MissionShipRam.OnTick` on every
+  client with one implementation: only the rammer's owner deals the hit, routed to the target's owner when the target is
+  a copy, and every client keeps vanilla's 2 s cooldown, deck breaks, kills and effect. The fixed-tick ram forces stay, so
+  each owner's hull is pushed back by the other's copy locally.
 - **Ram kills are authority-scoped (`NavalRamKills`).** Every client that sees a ram impact, through the owner's tick
-  or a copy's, kills only its own (or un-networked) agents within 2 m: `RamPuppetDiePatch` spares another owner's
-  puppet inside the tick, and that owner kills it on its own view of the impact and reports it like any death. Every
+  or a copy's, kills only its own (or un-networked) agents within 2 m: the kill loop skips another owner's puppet, and
+  that owner kills it on its own view of the impact and reports it like any death. Every
   client that sees the impact also breaks the target's deck parts within 5 m locally (oars included), which only steers
   the outcome on the hull's owner and is cosmetic elsewhere. A puppet that still dies here without its owner's death is
   logged as a Warning (`Puppet ... died here without a routed blow`); DEBUG counts the spared ones (`ramPuppetsSpared`).
@@ -354,8 +354,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - one staleness constant should serve both the replicator's `SampleLifetimeSeconds` and `CopySteering.StaleSeconds`;
   - `CoopNavalBattleBehavior` should get the engine directly instead of through `INavalBattleServices.Engine`;
   - the DEBUG engage reset tracer should check cheaply whether anything is watched before it resolves;
-  - `ShowCopyRamImpact` and `NavalRamKills.ApplyCopyImpact` mirror vanilla `MissionShipRam.OnTick`, so re-check them
-    against it on every DLC update;
+  - `RamTickPatch` replaces vanilla `MissionShipRam.OnTick` on every client (with `NavalRamKills.ApplyImpact`), so
+    re-check the whole replacement against it on every DLC update;
   - the next cut of `NavalShipEngine` is the hull-swap trio (`ParkHullAgents`, `ReplaceHull`, `BoardHullAgents`).
 - **Boarding.** Ropes and bridges replicate, but plank crossing and melee on a foreign deck were never seen live, and a
   rope cut from the target side isn't replicated.
