@@ -119,6 +119,7 @@ public class LocationCompanionAuthorityPatchTests
         Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(state, remotePartyPuppet, mainAgent: null));
     }
 
+    /// <summary>Builds an authority state over a real, empty host registry.</summary>
     private static LocationNpcAuthorityState CreateAuthorityState()
         => new LocationNpcAuthorityState(new LocationHostRegistry(new ControllerIdProvider()));
 

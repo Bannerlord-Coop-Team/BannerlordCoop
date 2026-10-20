@@ -17,13 +17,16 @@ public class LocationNpcAuthorityStateTests : IDisposable
     private readonly Mock<ILocationHostRegistry> hostRegistry = new Mock<ILocationHostRegistry>();
     private readonly LocationNpcAuthorityState state;
 
+    /// <summary>Builds the state over a mocked host registry.</summary>
     public LocationNpcAuthorityStateTests()
     {
         state = new LocationNpcAuthorityState(hostRegistry.Object);
     }
 
+    /// <summary>Releases the state's per-thread flags.</summary>
     public void Dispose() => state.Dispose();
 
+    /// <summary>With no active mission nothing is confirmed or suppressed, even if the registry names this client.</summary>
     [Fact]
     public void Inactive_NothingSuppressed()
     {
@@ -35,6 +38,7 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.False(state.ShouldSuppressNativeSpawns);
     }
 
+    /// <summary>A started mission suppresses native spawns until the registry confirms this client as host.</summary>
     [Fact]
     [Trait("Requirement", "SR-013")]
     public void BeginMission_SuppressesUntilHostConfirmed()
@@ -47,6 +51,7 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.True(state.ShouldSuppressNativeSpawns);
     }
 
+    /// <summary>A registry assignment naming this client lifts the suppression.</summary>
     [Fact]
     [Trait("Requirement", "SR-011")]
     public void ConfirmedHost_LiftsSuppression()
@@ -58,6 +63,7 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.False(state.ShouldSuppressNativeSpawns);
     }
 
+    /// <summary>A registry assignment naming another client keeps the suppression.</summary>
     [Fact]
     [Trait("Requirement", "SR-012")]
     public void ConfirmedNonHost_StaysSuppressed()
@@ -69,6 +75,7 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.True(state.ShouldSuppressNativeSpawns);
     }
 
+    /// <summary>Hosting a different instance does not confirm the active one.</summary>
     [Fact]
     public void HostOfAnotherInstance_DoesNotConfirmActiveInstance()
     {
@@ -79,6 +86,7 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.True(state.ShouldSuppressNativeSpawns);
     }
 
+    /// <summary>Confirmation follows the registry as the host migrates to and away from this client.</summary>
     [Fact]
     [Trait("Requirement", "SR-014")]
     public void HostMigration_FollowsTheRegistry()
@@ -97,13 +105,14 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.True(state.ShouldSuppressNativeSpawns);
     }
 
+    /// <summary>A real registry assignment naming this client as host confirms it.</summary>
     [Fact]
     public void StoredAssignmentNamingThisClient_ConfirmsHost()
     {
         var controllerIdProvider = new Mock<IControllerIdProvider>();
         controllerIdProvider.SetupGet(provider => provider.ControllerId).Returns("local");
         var registry = new LocationHostRegistry(controllerIdProvider.Object);
-        var registryState = new LocationNpcAuthorityState(registry);
+        using var registryState = new LocationNpcAuthorityState(registry);
         registryState.BeginMission(TavernInstanceId);
 
         registry.Set(TavernInstanceId, new LocationHostAssignment("remote", new[] { "local" }, epoch: 1));
@@ -114,6 +123,7 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.False(registryState.ShouldSuppressNativeSpawns);
     }
 
+    /// <summary>Ending the mission clears the active instance and its confirmation.</summary>
     [Fact]
     public void EndMission_ResetsEverything()
     {
@@ -128,6 +138,7 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.False(state.ShouldSuppressNativeSpawns);
     }
 
+    /// <summary>Switching instances reads confirmation for the new instance, not the previous one.</summary>
     [Fact]
     public void BeginMission_ReadsHostConfirmationForTheNewInstance()
     {
@@ -140,6 +151,7 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.True(state.ShouldSuppressNativeSpawns);
     }
 
+    /// <summary>Capture suppression holds only inside its scope.</summary>
     [Fact]
     public void SuppressCapture_IsRaisedOnlyInsideTheScope()
     {
@@ -151,6 +163,7 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.False(state.IsCaptureSuppressed);
     }
 
+    /// <summary>Disposing a nested capture scope restores the outer scope.</summary>
     [Fact]
     public void SuppressCapture_NestedScopeRestoresTheOuterScope()
     {
@@ -165,6 +178,7 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.False(state.IsCaptureSuppressed);
     }
 
+    /// <summary>Disposing a capture scope twice does not clear an outer scope.</summary>
     [Fact]
     public void SuppressCapture_DisposingTwiceDoesNotClearAnOuterScope()
     {
@@ -178,6 +192,7 @@ public class LocationNpcAuthorityStateTests : IDisposable
         }
     }
 
+    /// <summary>Capture suppression on one thread is not seen by another.</summary>
     [Fact]
     public void SuppressCapture_IsPerThread()
     {
@@ -193,6 +208,7 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.False(otherThreadSuppressed);
     }
 
+    /// <summary>Disposing a nested replay scope restores the outer scope.</summary>
     [Fact]
     public void ReplayNativePopulation_NestedScopeRestoresTheOuterScope()
     {

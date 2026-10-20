@@ -224,55 +224,56 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         if (mission == null || location == null || agentHandler == null) return;
 
         _spawningOwnedCompanions = true;
-        IDisposable captureSuppression = authorityState.SuppressCapture();
         int ownedRosterEntries = 0;
         int recoverySpawns = 0;
-        try
+        using (authorityState.SuppressCapture())
         {
-            foreach (LocationCharacter locationCharacter in location.GetCharacterList())
+            try
             {
-                if (!IsOwnPartyCompanion(locationCharacter)) continue;
-                ownedRosterEntries++;
-
-                bool alreadySpawned = false;
-                foreach (Agent agent in mission.Agents)
+                foreach (LocationCharacter locationCharacter in location.GetCharacterList())
                 {
-                    if (ReferenceEquals(agent.Origin, locationCharacter.AgentOrigin))
+                    if (!IsOwnPartyCompanion(locationCharacter)) continue;
+                    ownedRosterEntries++;
+
+                    bool alreadySpawned = false;
+                    foreach (Agent agent in mission.Agents)
                     {
-                        alreadySpawned = true;
-                        break;
+                        if (ReferenceEquals(agent.Origin, locationCharacter.AgentOrigin))
+                        {
+                            alreadySpawned = true;
+                            break;
+                        }
+                    }
+
+                    if (alreadySpawned)
+                    {
+                        Logger.Information("[LocationCompanion] Roster entry {Character} already has a native mission agent",
+                            locationCharacter.Character?.StringId ?? "<null>");
+                        continue;
+                    }
+
+                    Logger.Warning("[LocationCompanion] Vanilla did not materialize roster entry {Character}; attempting owner-side recovery spawn in {Location}",
+                        locationCharacter.Character?.StringId ?? "<null>", location.StringId);
+                    Agent companion = agentHandler.SpawnDefaultLocationCharacter(locationCharacter);
+                    if (companion == null)
+                    {
+                        Logger.Warning("[LocationCompanion] Recovery spawn failed for local companion {Character} in {Location}",
+                            locationCharacter.Character?.StringId ?? "<null>", location.StringId);
+                    }
+                    else
+                    {
+                        recoverySpawns++;
+                        Logger.Information("[LocationCompanion] Recovery spawn created {Character} at {Position}",
+                            locationCharacter.Character?.StringId ?? "<null>", companion.Position);
                     }
                 }
-
-                if (alreadySpawned)
-                {
-                    Logger.Information("[LocationCompanion] Roster entry {Character} already has a native mission agent",
-                        locationCharacter.Character?.StringId ?? "<null>");
-                    continue;
-                }
-
-                Logger.Warning("[LocationCompanion] Vanilla did not materialize roster entry {Character}; attempting owner-side recovery spawn in {Location}",
-                    locationCharacter.Character?.StringId ?? "<null>", location.StringId);
-                Agent companion = agentHandler.SpawnDefaultLocationCharacter(locationCharacter);
-                if (companion == null)
-                {
-                    Logger.Warning("[LocationCompanion] Recovery spawn failed for local companion {Character} in {Location}",
-                        locationCharacter.Character?.StringId ?? "<null>", location.StringId);
-                }
-                else
-                {
-                    recoverySpawns++;
-                    Logger.Information("[LocationCompanion] Recovery spawn created {Character} at {Position}",
-                        locationCharacter.Character?.StringId ?? "<null>", companion.Position);
-                }
             }
-        }
-        finally
-        {
-            captureSuppression.Dispose();
-            _spawningOwnedCompanions = false;
-            Logger.Information("[LocationCompanion] Owner roster reconciliation complete for {Location}: ownedRosterEntries={RosterCount}, recoverySpawns={RecoveryCount}",
-                location.StringId, ownedRosterEntries, recoverySpawns);
+            finally
+            {
+                _spawningOwnedCompanions = false;
+                Logger.Information("[LocationCompanion] Owner roster reconciliation complete for {Location}: ownedRosterEntries={RosterCount}, recoverySpawns={RecoveryCount}",
+                    location.StringId, ownedRosterEntries, recoverySpawns);
+            }
         }
     }
 

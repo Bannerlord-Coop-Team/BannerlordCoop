@@ -1,6 +1,7 @@
 ﻿using Coop.Core.Server.Services.Instances;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.Locations.Messages;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
@@ -123,7 +124,7 @@ public class SettlementPopulationLifecycleTests : SettlementTestEnvironment
     }
 
     [Fact]
-    public void GracefulLeaveAndReentry_CreateCleanMissionAndGateState()
+    public void GracefulLeaveAndReentry_CreateCleanMissionAndLocationAuthorityState()
     {
         EnvironmentInstance client = Clients.First();
         var (instanceId, _) = CreateSettlement("A");
@@ -141,12 +142,26 @@ public class SettlementPopulationLifecycleTests : SettlementTestEnvironment
         Assert.Null(first.Mesh.ActiveInstanceId);
         AssertMissionMembers(instanceId);
         AssertCleanLocationAuthority(client, activeInstanceId: null, localHostConfirmed: false);
+        // The client keeps its own assignment after the instance empties, so it still names this client.
+        client.Call(() => Assert.True(client.Resolve<ILocationHostRegistry>().IsHost(instanceId)));
 
+        bool suppressedBeforeReady = false;
+        bool confirmedBeforeReady = true;
         SettlementClientFixture second = EnterLocation(
             client,
             instanceId,
-            enableNativePopulationBoundary: true);
+            enableNativePopulationBoundary: true,
+            beforeMissionReady: mission =>
+            {
+                ILocationNpcAuthorityState authorityState = client.Resolve<ILocationNpcAuthorityState>();
+                suppressedBeforeReady = authorityState.ShouldSuppressNativeSpawns;
+                confirmedBeforeReady = authorityState.IsLocalHostConfirmed;
+                // Vanilla's AfterStart population pass runs while the mission loads, before the election.
+                mission.LocationAgentHandler.SpawnLocationCharacters();
+            });
 
+        Assert.True(suppressedBeforeReady);
+        Assert.False(confirmedBeforeReady);
         Assert.NotSame(first.Mission, second.Mission);
         Assert.NotSame(first.Controller, second.Controller);
         Assert.Single(second.Mission.Agents);

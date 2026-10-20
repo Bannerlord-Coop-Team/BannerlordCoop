@@ -53,7 +53,6 @@ internal class LocationAgentSpawnedPatch
     internal static bool IsCapturingHost()
     {
         if (!ContainerProvider.TryResolve<ILocationNpcAuthorityState>(out var authorityState)) return false;
-        if (!authorityState.IsCoopLocationMissionActive) return false;
         if (!authorityState.IsLocalHostConfirmed) return false;
 
         return !authorityState.IsCaptureSuppressed;

@@ -66,7 +66,7 @@ internal class LocationNpcHoldHandler : IHandler
     private void SetNpcPaused(string locationId, string characterId, bool paused)
     {
         if (ModInformation.IsServer) return;
-        if (!authorityState.IsCoopLocationMissionActive || !authorityState.IsLocalHostConfirmed) return;
+        if (!authorityState.IsLocalHostConfirmed) return;
 
         GameThread.RunSafe(() =>
         {

@@ -56,7 +56,8 @@ internal class LocationNativeSpawnSuppressionPatches
     [HarmonyPatch(nameof(MissionAgentHandler.SimulateAgent))]
     [HarmonyPrefix]
     [HarmonyPriority(Priority.High)]
-    private static bool SkipPlayerPartySimulation(Agent agent)
+    /// <summary>Runs vanilla simulation unless the authority state says to skip this player-party agent.</summary>
+    internal static bool SkipPlayerPartySimulation(Agent agent)
     {
         if (!ContainerProvider.TryResolve<ILocationNpcAuthorityState>(out var authorityState)) return true;
 
