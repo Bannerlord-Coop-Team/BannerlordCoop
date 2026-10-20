@@ -380,9 +380,7 @@ public class AcceptVisibilityTests : IDisposable
             Assert.Null(notable.Issue);
         });
 
-        var update = Assert.Single(otherUpdates);
-        Assert.Equal(IssueBase.IssueUpdateDetails.IssueFinishedWithSuccess, update.Details);
-        Assert.Null(update.Solver);
+        Assert.Empty(otherUpdates);
         Other.Call(() => Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(entry => entry.IsRelatedTo(mirrorIssue))));
     }
 }
