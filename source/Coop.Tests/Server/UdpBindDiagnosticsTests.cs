@@ -14,42 +14,45 @@ public class UdpBindDiagnosticsTests
     private const string Closing = UdpBindDiagnostics.Closing;
     private const string CoopHint = ", a co-op server, probably one still running from an earlier session (its window may be hidden)";
 
+    /// <summary>A port that cannot be bound gets the generic text without a probe.</summary>
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
     public void Describe_InvalidPort_SkipsTheProbe(int port)
     {
-        UdpBindFailure failure = new UdpBindDiagnostics().Describe(port);
+        UdpBindFailure failure = new UdpBindDiagnostics().Describe(IPAddress.Loopback, port);
 
         Assert.Equal("reason unavailable", failure.Error);
         Assert.Equal(Closing, failure.Detail);
     }
 
+    /// <summary>A port another socket holds reports the real socket error.</summary>
     [Fact]
     public void Describe_HolderOnOneAddress_ReportsTheBindError()
     {
-        // Default options on a specific address; a default-option wildcard probe could share the port on Windows.
+        // Default options on the holder; the probe's exclusive bind still has to report the collision.
         using var holder = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         holder.Bind(new IPEndPoint(IPAddress.Loopback, 0));
         int port = ((IPEndPoint)holder.LocalEndPoint!).Port;
 
-        UdpBindFailure failure = new UdpBindDiagnostics().Describe(port);
+        UdpBindFailure failure = new UdpBindDiagnostics().Describe(IPAddress.Loopback, port);
 
         Assert.Equal("AddressAlreadyInUse, 10048", failure.Error);
         Assert.DoesNotContain("can be opened now", failure.Detail);
     }
 
+    /// <summary>A port that was released before the probe reads as a temporary failure.</summary>
     [Fact]
     public void Describe_FreedPort_ReadsAsTemporary()
     {
         int port;
         using (var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
         {
-            socket.Bind(new IPEndPoint(IPAddress.Any, 0));
+            socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
             port = ((IPEndPoint)socket.LocalEndPoint!).Port;
         }
 
-        UdpBindFailure failure = new UdpBindDiagnostics().Describe(port);
+        UdpBindFailure failure = new UdpBindDiagnostics().Describe(IPAddress.Loopback, port);
 
         Assert.Equal("reason unavailable", failure.Error);
         Assert.StartsWith("the port can be opened now, so the failure was temporary", failure.Detail);
