@@ -7,10 +7,12 @@ using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.TroopRosters.Data;
 using Serilog;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -95,6 +97,14 @@ internal class MapEventResultsHandler : IHandler
                 {
                     continue;
                 }
+
+                var prisoners = default(TroopRosterData);
+                if (playerSide == mapEvent.WinningSide)
+                {
+                    networkPlayerLootData.LootedPrisoners?.TryGetValue(playerMapEventPartyId, out prisoners);
+                }
+
+                messageBroker.Publish(this, new PlayerPrisonersLooted(player, prisoners));
 
                 network.Send(peer, new NetworkCommitMapEventResults(
                     mapEventId,

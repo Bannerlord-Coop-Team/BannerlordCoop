@@ -155,7 +155,7 @@ public sealed class SiegeAftermathPendingTests : IDisposable
             var unrelatedSettlement = CreateSettlement(CreateUninitialized<Clan>(), CreateUninitialized<Clan>());
             var siegeEventInterface = new SiegeEventInterface();
 
-            siegeEventInterface.SetLocalAftermathNarrationContext(participantSettlement);
+            siegeEventInterface.SetLocalAftermathNarrationContext(participantSettlement, null);
             siegeEventInterface.SetLocalAftermathNarration(unrelatedSettlement,
                 (int)SiegeAftermathAction.SiegeAftermath.Devastate);
             Assert.True(siegeEventInterface.HasLocalAftermathNarrationContext(participantSettlement));
