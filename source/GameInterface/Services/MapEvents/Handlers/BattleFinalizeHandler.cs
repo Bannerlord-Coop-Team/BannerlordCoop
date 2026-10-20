@@ -63,6 +63,7 @@ internal class BattleFinalizeHandler : IHandler
     private readonly IBattleHostRegistry hostRegistry;
     private readonly IPlayerManager playerManager;
     private readonly ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler;
+    private readonly IBattleHostRetentionPolicy retentionPolicy;
 
     public BattleFinalizeHandler(
         IMessageBroker messageBroker,
@@ -74,7 +75,8 @@ internal class BattleFinalizeHandler : IHandler
         ISettlementInterface settlementInterface,
         IBattleHostRegistry hostRegistry,
         IPlayerManager playerManager,
-        ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler)
+        ISiegeMapEventLeaderReconciler siegeMapEventLeaderReconciler,
+        IBattleHostRetentionPolicy retentionPolicy)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -86,6 +88,7 @@ internal class BattleFinalizeHandler : IHandler
         this.hostRegistry = hostRegistry;
         this.playerManager = playerManager;
         this.siegeMapEventLeaderReconciler = siegeMapEventLeaderReconciler;
+        this.retentionPolicy = retentionPolicy;
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
@@ -152,7 +155,7 @@ internal class BattleFinalizeHandler : IHandler
                 return;
             }
 
-            if (IsAwaitingNavalConclusion(payload.What.MapEventId))
+            if (retentionPolicy.DefersHostFinalize(payload.What.MapEventId))
             {
                 Logger.Information("Refused finalize of {MapEventId} from host {ControllerId}: its naval result waits for the server's conclusion",
                     payload.What.MapEventId, requestingPlayer.ControllerId);
@@ -190,12 +193,6 @@ internal class BattleFinalizeHandler : IHandler
         if (requester != null)
             network.Send(requester, new NetworkMapEventFinalized());
     }
-
-    // A naval host that left a resolved battle stays host until the server concludes it; finalizing first would drop the
-    // result, and the conclusion closes the host's encounter anyway.
-    private bool IsAwaitingNavalConclusion(string mapEventId) =>
-        objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent)
-        && mapEvent.IsNavalMapEvent && mapEvent.BattleState == BattleState.None;
 
     private bool TryLeaveSharedHideout(NetPeer requester, string mapEventId)
     {

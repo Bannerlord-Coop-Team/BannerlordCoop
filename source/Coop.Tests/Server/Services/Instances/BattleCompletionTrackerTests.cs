@@ -1,4 +1,6 @@
 ﻿using Coop.Core.Server.Services.Instances;
+using GameInterface.Services.MapEvents;
+using Moq;
 using TaleWorlds.Core;
 using Xunit;
 
@@ -10,7 +12,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void SoleMissionMemberReport_ConcludesBattle()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
 
         var concluded = tracker.TryRecordResult(
             "battle",
@@ -29,7 +31,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void SiegeAmbushCompletion_ReconcilesWithoutVictoryState()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
 
         var concluded = tracker.TryRecordResult(
             "ambush",
@@ -48,7 +50,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void HostReport_WaitsForEveryCurrentMember()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
         var members = new[] { "host", "successor" };
 
         Assert.False(tracker.TryRecordResult(
@@ -62,7 +64,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void ConflictingMemberReports_DoNotConcludeBattle()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
         var members = new[] { "host", "successor" };
 
         Assert.False(tracker.TryRecordResult(
@@ -74,7 +76,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void DepartedMemberReport_DoesNotCountAfterReentry()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
         var members = new[] { "host", "successor" };
 
         Assert.False(tracker.TryRecordResult(
@@ -87,7 +89,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void WaitingMemberDeparts_RemainingHostReportConcludesBattle()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
         var members = new[] { "host", "loading" };
 
         Assert.False(tracker.TryRecordResult(
@@ -101,7 +103,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void MemberEnteringResolvedBattle_MustReportResult()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
 
         Assert.False(tracker.TryRecordResult(
             "battle",
@@ -126,7 +128,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void HostDeparts_PromotedHostMustReportAtNewEpoch()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
         var members = new[] { "host", "successor" };
 
         Assert.False(tracker.TryRecordResult(
@@ -144,7 +146,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void HostLeavesMidEnd_PeerReportAtTheOldEpochWaitsForThePromotedHost()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
 
         Assert.False(tracker.TryRecordResult(
             "battle", "host", BattleState.AttackerVictory, 1, new[] { "host", "peer" }, "host", 1, out _));
@@ -159,22 +161,23 @@ public class BattleCompletionTrackerTests
         Assert.Equal(BattleState.AttackerVictory, state);
     }
 
-    // R41a D: a naval host stays host after it reported and left, so a remaining member's matching report concludes.
-    [Fact]
-    public void NavalHostReportsAndLeaves_ARemainingMembersMatchingReportConcludes()
+    // R41a D: a naval host stays host after it reported and left, so a remaining member's matching report concludes; a land
+    // host that left concludes nothing.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void HostReportsAndLeaves_ARemainingMembersMatchingReportConcludesOnlyAtSea(bool naval)
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker(naval);
 
         Assert.False(tracker.TryRecordResult(
-            "battle", "host", BattleState.DefenderVictory, 1, new[] { "host", "peer" }, "host", 1, out _,
-            keepsDepartedHostReport: true));
+            "battle", "host", BattleState.DefenderVictory, 1, new[] { "host", "peer" }, "host", 1, out _));
         tracker.MemberDeparted("battle", "host");
 
-        Assert.False(tracker.TryReconcile("battle", new[] { "peer" }, "host", 1, out _, keepsDepartedHostReport: false));
-        Assert.True(tracker.TryRecordResult(
-            "battle", "peer", BattleState.DefenderVictory, 1, new[] { "peer" }, "host", 1, out var state,
-            keepsDepartedHostReport: true));
-        Assert.Equal(BattleState.DefenderVictory, state);
+        bool concluded = tracker.TryRecordResult(
+            "battle", "peer", BattleState.DefenderVictory, 1, new[] { "peer" }, "host", 1, out var state);
+        Assert.Equal(naval, concluded);
+        Assert.Equal(naval ? BattleState.DefenderVictory : BattleState.None, state);
     }
 
     // R41a D: the naval host reported and left, a member never reported and leaves too; the empty instance concludes with
@@ -184,14 +187,13 @@ public class BattleCompletionTrackerTests
     [InlineData(true)]
     public void NavalHostReportsAndLeaves_ASilentMembersDepartureConcludesTheEmptyInstance(bool hostChangedFirst)
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker(naval: true);
 
         Assert.False(tracker.TryRecordResult(
-            "battle", "host", BattleState.DefenderVictory, 1, new[] { "host", "silent" }, "host", 1, out _,
-            keepsDepartedHostReport: true));
+            "battle", "host", BattleState.DefenderVictory, 1, new[] { "host", "silent" }, "host", 1, out _));
         tracker.MemberDeparted("battle", "host");
-        Assert.False(tracker.TryReconcile("battle", new[] { "silent" }, "host", 1, out _, keepsDepartedHostReport: true));
-        if (hostChangedFirst) tracker.HostAssigned("battle", "silent", 2, keepsDepartedHostReport: true);
+        Assert.False(tracker.TryReconcile("battle", new[] { "silent" }, "host", 1, out _));
+        if (hostChangedFirst) tracker.HostAssigned("battle", "silent", 2);
         tracker.MemberDeparted("battle", "silent");
 
         Assert.True(tracker.TryConcludeAbandoned("battle", out var state, out var hostEpoch, out var memberCount));
@@ -204,7 +206,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void LandHostChange_DropsTheDepartedHostsReport_ForAnEmptiedInstance()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
 
         Assert.False(tracker.TryRecordResult(
             "battle", "host", BattleState.DefenderVictory, 1, new[] { "host", "silent" }, "host", 1, out _));
@@ -218,7 +220,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void ReportsBeforeHostElection_RequireCurrentEpochHostReport()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
 
         Assert.False(tracker.TryRecordResult(
             "battle", "host", BattleState.AttackerVictory, 0, new[] { "host" }, null, 0, out _));
@@ -235,7 +237,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void PreElectionReport_DoesNotAuthorizeAbandonedConclusion()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
 
         Assert.False(tracker.TryRecordResult(
             "battle", "host", BattleState.DefenderVictory, 0, new[] { "host" }, null, 0, out _,
@@ -250,7 +252,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void EmptyResolvedInstance_ConcludesFromAllParticipantReports()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
         var members = new[] { "host", "successor" };
 
         Assert.False(tracker.TryRecordResult(
@@ -268,7 +270,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void EmptyInstance_MissingParticipantReportRemainsUnresolved()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
 
         Assert.False(tracker.TryRecordResult(
             "battle",
@@ -287,7 +289,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void DepartedMemberWithoutAReport_DoesNotBlockAbandonedConclusion()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
 
         Assert.False(tracker.TryRecordResult(
             "battle",
@@ -311,7 +313,7 @@ public class BattleCompletionTrackerTests
     [Fact]
     public void DepartedMemberWithAReport_RemainsInAbandonedConsensus()
     {
-        var tracker = new BattleCompletionTracker();
+        var tracker = CreateTracker();
         var members = new[] { "host", "departed" };
 
         Assert.False(tracker.TryRecordResult(
@@ -326,4 +328,8 @@ public class BattleCompletionTrackerTests
         Assert.Equal(BattleState.DefenderVictory, state);
         Assert.Equal(2, memberCount);
     }
+
+    // A tracker for a land battle, or one at sea whose departed host's report still counts.
+    private static BattleCompletionTracker CreateTracker(bool naval = false) =>
+        new BattleCompletionTracker(Mock.Of<IBattleHostRetentionPolicy>(policy => policy.KeepsDepartedHostReport("battle") == naval));
 }

@@ -73,7 +73,6 @@ public class ServerBattleCompletionHandlerRecoveryTests : IDisposable
                 HostControllerId,
                 1,
                 out It.Ref<BattleState>.IsAny,
-                It.IsAny<bool>(),
                 It.IsAny<bool>()))
             .Returns((
                 string _,
@@ -81,7 +80,6 @@ public class ServerBattleCompletionHandlerRecoveryTests : IDisposable
                 string _,
                 int _,
                 out BattleState concludedState,
-                bool _,
                 bool _) =>
             {
                 concludedState = BattleState.DefenderVictory;

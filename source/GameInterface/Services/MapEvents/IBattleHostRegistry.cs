@@ -14,12 +14,16 @@ public class BattleHostAssignment
     public string HostControllerId { get; }
     public IReadOnlyList<string> SuccessorControllerIds { get; }
     public int Epoch { get; }
+    /// <summary>[Server] A battle at sea, recorded at the election and kept by every later assignment; false on a client.</summary>
+    public bool IsNaval { get; }
 
-    public BattleHostAssignment(string hostControllerId, IReadOnlyList<string> successorControllerIds, int epoch = 0)
+    public BattleHostAssignment(string hostControllerId, IReadOnlyList<string> successorControllerIds, int epoch = 0,
+        bool isNaval = false)
     {
         HostControllerId = hostControllerId;
         SuccessorControllerIds = successorControllerIds;
         Epoch = epoch;
+        IsNaval = isNaval;
     }
 }
 

@@ -65,6 +65,7 @@ internal class BattleHostHandler : IHandler
     private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly IBattleTroopLedger ledger;
     private readonly IBattleSizeProvider battleSizeProvider;
+    private readonly IBattleHostRetentionPolicy retentionPolicy;
 
     // [Server] Highest host epoch ever issued per battle instance (BR-102), retained across assignment
     // removal: clients keep their last assignment when a battle is fully abandoned (only the server's entry
@@ -93,8 +94,6 @@ internal class BattleHostHandler : IHandler
         public HostEndpoint HostEndpoint;
         public BattleState ResolvedState;
         public bool Concluded;
-        // Recorded at the election, because the map event is finalized and gone once the result is committed.
-        public bool IsNaval;
     }
 
     private sealed class PartyHealthReports
@@ -227,7 +226,8 @@ internal class BattleHostHandler : IHandler
         IControllerIdProvider controllerIdProvider,
         IBattleTroopReserveBuilder reserveBuilder,
         IBattleTroopLedger ledger,
-        IBattleSizeProvider battleSizeProvider)
+        IBattleSizeProvider battleSizeProvider,
+        IBattleHostRetentionPolicy retentionPolicy)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -238,6 +238,7 @@ internal class BattleHostHandler : IHandler
         this.reserveBuilder = reserveBuilder;
         this.ledger = ledger;
         this.battleSizeProvider = battleSizeProvider;
+        this.retentionPolicy = retentionPolicy;
 
         messageBroker.Subscribe<PlayerEnteredBattle>(Handle_PlayerEnteredBattle);
         messageBroker.Subscribe<BattleMissionReady>(Handle_BattleMissionReady);
@@ -370,7 +371,6 @@ internal class BattleHostHandler : IHandler
             }
 
             MarkPresent(mapEventId, requesterId);
-            GetOrCreateRuntimeState(mapEventId).IsNaval = mapEvent.IsNavalMapEvent;
 
             if (hostRegistry.TryGet(mapEventId, out var existing))
             {
@@ -393,7 +393,7 @@ internal class BattleHostHandler : IHandler
                 // BR-102: the election issues the battle's next hosting generation — epoch 1 for a fresh
                 // battle, or one past the last generation if this map event was abandoned and re-entered.
                 var epoch = NextEpoch(mapEventId);
-                var assignment = new BattleHostAssignment(requesterId, Array.Empty<string>(), epoch);
+                var assignment = new BattleHostAssignment(requesterId, Array.Empty<string>(), epoch, mapEvent.IsNavalMapEvent);
                 SetServerAssignment(mapEventId, assignment);
 
                 Logger.Information("[BattleHost] Elected host {Host} (first mission-ready) for battle {MapEventId} at epoch {Epoch}",
@@ -1073,7 +1073,7 @@ internal class BattleHostHandler : IHandler
             // At sea a disconnect withdraws too: the player's hulls leave with it and a return is a late join (D4).
             objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent);
             bool newlyAbsent = false;
-            if (payload.What.WasRetreat || IsNavalBattle(mapEventId, mapEvent))
+            if (payload.What.WasRetreat || retentionPolicy.DisconnectWithdraws(mapEventId))
             {
                 if (mapEvent != null)
                     WithdrawPartyReserves(mapEventId, mapEvent, controllerId);
@@ -1155,7 +1155,8 @@ internal class BattleHostHandler : IHandler
                 // BR-102: the host CHANGED, so the promotion opens the next hosting generation (epoch + 1).
                 var newHost = successors[0];
                 successors.RemoveAt(0);
-                var promoted = new BattleHostAssignment(newHost, successors, NextEpoch(mapEventId, assignment.Epoch));
+                var promoted = new BattleHostAssignment(newHost, successors, NextEpoch(mapEventId, assignment.Epoch),
+                    assignment.IsNaval);
                 SetServerAssignment(mapEventId, promoted);
 
                 Logger.Information("[BattleHost] Host {Old} left battle {MapEventId}; promoted {New} at epoch {Epoch} (successors: {Successors})",
@@ -1169,7 +1170,8 @@ internal class BattleHostHandler : IHandler
             else if (successors.Remove(controllerId))
             {
                 // Successor-line cleanup: the host did not change, so the epoch is unchanged (BR-102).
-                var updated = new BattleHostAssignment(assignment.HostControllerId, successors, assignment.Epoch);
+                var updated = new BattleHostAssignment(assignment.HostControllerId, successors, assignment.Epoch,
+                    assignment.IsNaval);
                 SetServerAssignment(mapEventId, updated);
 
                 Logger.Information("[BattleHost] Successor {Controller} left battle {MapEventId}; successor line now: {Successors}",
@@ -1216,7 +1218,7 @@ internal class BattleHostHandler : IHandler
             return;
         }
 
-        if (IsNavalBattle(mapEventId, mapEvent))
+        if (retentionPolicy.DisconnectWithdraws(mapEventId))
         {
             WithdrawPartyReserves(mapEventId, mapEvent, controllerId);
             return;
@@ -1311,15 +1313,10 @@ internal class BattleHostHandler : IHandler
     private bool HasWithdrawn(string mapEventId, string controllerId) =>
         battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) && runtimeState.WithdrawnControllers.Contains(controllerId);
 
-    // [Server, game thread] A battle at sea, read from the map event or, once it is gone, from the election's record.
-    private bool IsNavalBattle(string mapEventId, MapEvent mapEvent) =>
-        mapEvent?.IsNavalMapEvent
-        ?? (battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) && runtimeState.IsNaval);
-
-    // [Server, game thread] A naval host that reported its result, or whose result the map event applied, stays the host.
+    // [Server, game thread] Whether the host stays after it leaves: it reported its result, or the map event applied one.
     private bool KeepsHostAfterResult(string mapEventId) =>
-        battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) && runtimeState.IsNaval
-        && (runtimeState.Concluded || runtimeState.ResolvedState != BattleState.None);
+        battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState)
+        && retentionPolicy.KeepsHostAfterResult(mapEventId, runtimeState.Concluded || runtimeState.ResolvedState != BattleState.None);
 
     // Append the requester to the successor line unless it is already the host or already queued. Returns the
     // new immutable assignment via <paramref name="updated"/>, or false when nothing changed.
@@ -1334,7 +1331,7 @@ internal class BattleHostHandler : IHandler
 
         // The host did not change, so the assignment stays in the same hosting generation (BR-102).
         var successors = new List<string>(existing.SuccessorControllerIds) { requesterId };
-        updated = new BattleHostAssignment(existing.HostControllerId, successors, existing.Epoch);
+        updated = new BattleHostAssignment(existing.HostControllerId, successors, existing.Epoch, existing.IsNaval);
         return true;
     }
 

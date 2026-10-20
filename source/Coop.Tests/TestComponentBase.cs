@@ -147,6 +147,7 @@ internal abstract class TestComponentBase
         // BattleHostHandler (MissionModule, auto-activated) needs the registry and the troop ledger,
         // which the real containers get from GameInterfaceModule — not loaded here.
         RegisterMock<IBattleHostRegistry>(builder);
+        RegisterMock<IBattleHostRetentionPolicy>(builder);
         RegisterMock<IBattleTroopLedger>(builder);
         RegisterMock<IRetreatedMapEventPartyTracker>(builder);
         // LocationHostHandler (MissionModule, auto-activated) needs its registry the same way.
