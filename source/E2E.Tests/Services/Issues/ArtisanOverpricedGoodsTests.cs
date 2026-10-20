@@ -6,6 +6,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
+using GameInterface.Services.Issues.Framework.CreationCapture;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ArtisanOverpricedGoods;
@@ -137,6 +138,33 @@ public class ArtisanOverpricedGoodsTests : IDisposable
                 Assert.Same(Get<ItemObject>(ClientA, itemId), issue._requestedTradeGood);
                 Assert.Equal(Amount, issue.RequestedTradeGoodAmount);
                 Assert.Equal(Payment, issue._goldReward);
+            }
+        });
+    }
+
+    [Fact]
+    public void DebugCapture_PreservesTheRolledValuesWithoutBroadcastingIssueCreation()
+    {
+        byte[] captured = null!;
+        Server.NetworkSentMessages.Clear();
+
+        Server.Call(() =>
+        {
+            var giver = Get<Hero>(Server, scenario.NotableId);
+            Assert.True(Descriptor(Server).CreationCaptureStrategy.TryBuildDebugCapture(giver, out captured));
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
+        });
+
+        ClientA.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                var recreated = (Issue)Descriptor(ClientA).CreationCaptureStrategy.CreateIssue(
+                    Get<Hero>(ClientA, scenario.NotableId), captured);
+                Assert.NotNull(recreated.CounterOfferHero);
+                Assert.NotNull(recreated._requestedTradeGood);
+                Assert.True(recreated.RequestedTradeGoodAmount > 0);
+                Assert.True(recreated._goldReward > 0);
             }
         });
     }
