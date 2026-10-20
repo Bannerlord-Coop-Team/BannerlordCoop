@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipes;
 using System.Net.Sockets;
@@ -16,7 +17,7 @@ public sealed class NamedPipeLiveTestServer : IDisposable
     private readonly ManualResetEventSlim listenerWaiting = new ManualResetEventSlim(false);
 
     private Thread listenerThread;
-    private NamedPipeServerStream activePipe;
+    private readonly HashSet<NamedPipeServerStream> activePipes = new HashSet<NamedPipeServerStream>();
     private bool started;
     private bool disposed;
 
@@ -59,8 +60,11 @@ public sealed class NamedPipeLiveTestServer : IDisposable
             if (disposed) return;
 
             disposed = true;
-            activePipe?.Dispose();
-            activePipe = null;
+            foreach (NamedPipeServerStream pipe in activePipes)
+            {
+                pipe.Dispose();
+            }
+            activePipes.Clear();
             threadToJoin = listenerThread;
         }
 
@@ -93,43 +97,41 @@ public sealed class NamedPipeLiveTestServer : IDisposable
     {
         while (!IsDisposed())
         {
+            NamedPipeServerStream pipe = null;
             try
             {
-                using (var pipe = new NamedPipeServerStream(
+                pipe = new NamedPipeServerStream(
                     pipeName,
                     PipeDirection.InOut,
-                    1,
+                    NamedPipeServerStream.MaxAllowedServerInstances,
                     PipeTransmissionMode.Byte,
-                    PipeOptions.Asynchronous))
+                    PipeOptions.Asynchronous);
+                if (!SetActivePipe(pipe))
                 {
-                    SetActivePipe(pipe);
-                    while (!IsDisposed())
-                    {
-                        bool connectionAccepted = false;
-                        try
-                        {
-                            listenerWaiting.Set();
-                            try
-                            {
-                                pipe.WaitForConnection();
-                                connectionAccepted = true;
-                            }
-                            finally
-                            {
-                                listenerWaiting.Reset();
-                            }
-
-                            ServeConnection(pipe);
-                        }
-                        finally
-                        {
-                            if (connectionAccepted && !IsDisposed())
-                            {
-                                pipe.Disconnect();
-                            }
-                        }
-                    }
+                    pipe.Dispose();
+                    return;
                 }
+
+                listenerWaiting.Set();
+                try
+                {
+                    pipe.WaitForConnection();
+                }
+                finally
+                {
+                    listenerWaiting.Reset();
+                }
+
+                if (IsDisposed()) return;
+
+                NamedPipeServerStream acceptedPipe = pipe;
+                pipe = null;
+                var connectionThread = new Thread(() => ServeAndClose(acceptedPipe))
+                {
+                    IsBackground = true,
+                    Name = "BannerlordCoop live-test pipe connection",
+                };
+                connectionThread.Start();
             }
             catch (SocketException) when (IsDisposed())
             {
@@ -145,8 +147,37 @@ public sealed class NamedPipeLiveTestServer : IDisposable
             finally
             {
                 listenerWaiting.Reset();
-                ClearActivePipe();
+                if (pipe != null)
+                {
+                    pipe.Dispose();
+                    ClearActivePipe(pipe);
+                }
             }
+        }
+    }
+
+    private void ServeAndClose(NamedPipeServerStream pipe)
+    {
+        try
+        {
+            if (!IsDisposed()) ServeConnection(pipe);
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (IOException)
+        {
+        }
+        catch (SocketException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        finally
+        {
+            pipe.Dispose();
+            ClearActivePipe(pipe);
         }
     }
 
@@ -276,25 +307,25 @@ public sealed class NamedPipeLiveTestServer : IDisposable
         }
     }
 
-    private void SetActivePipe(NamedPipeServerStream pipe)
+    private bool SetActivePipe(NamedPipeServerStream pipe)
     {
         lock (lifetimeLock)
         {
             if (disposed)
             {
-                pipe.Dispose();
-                return;
+                return false;
             }
 
-            activePipe = pipe;
+            activePipes.Add(pipe);
+            return true;
         }
     }
 
-    private void ClearActivePipe()
+    private void ClearActivePipe(NamedPipeServerStream pipe)
     {
         lock (lifetimeLock)
         {
-            activePipe = null;
+            activePipes.Remove(pipe);
         }
     }
 

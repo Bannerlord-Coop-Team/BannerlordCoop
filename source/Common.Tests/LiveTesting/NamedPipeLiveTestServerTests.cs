@@ -2,6 +2,8 @@
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Common.Tests.LiveTesting;
 
@@ -85,6 +87,65 @@ public class NamedPipeLiveTestServerTests
     }
 
     [Fact]
+    public async Task Server_AcceptsSecondConnectionWhileFirstRequestIsRunning()
+    {
+        string pipeName = "BannerlordCoop.LiveTest.Tests." + Guid.NewGuid().ToString("N");
+        using var requestStarted = new ManualResetEventSlim(false);
+        using var releaseRequest = new ManualResetEventSlim(false);
+        using var server = new NamedPipeLiveTestServer(pipeName, Process, request =>
+        {
+            if (request.Method == "slow")
+            {
+                requestStarted.Set();
+                releaseRequest.Wait();
+            }
+
+            return LiveTestResponse.Success(request.Id, Process(), new { method = request.Method });
+        });
+        server.Start();
+
+        using ConnectedPipe firstClient = Connect(pipeName);
+        WriteRequest(firstClient, "slow");
+        Assert.True(requestStarted.Wait(TimeSpan.FromSeconds(5)));
+
+        try
+        {
+            Task<ConnectedPipe> secondClientTask = Task.Run(() => Connect(pipeName));
+            Assert.Same(secondClientTask, await Task.WhenAny(secondClientTask, Task.Delay(TimeSpan.FromSeconds(5))));
+            using ConnectedPipe secondClient = await secondClientTask;
+            AssertResponse(secondClient, "status", "status");
+        }
+        finally
+        {
+            releaseRequest.Set();
+        }
+        LiveTestResponse firstResponse = ReadResponse(firstClient);
+        Assert.True(firstResponse.Ok);
+        Assert.Equal("slow", Assert.IsType<JsonElement>(firstResponse.Result).GetProperty("method").GetString());
+    }
+
+    [Fact]
+    public void Dispose_ClosesConnectedInstances()
+    {
+        string pipeName = "BannerlordCoop.LiveTest.Tests." + Guid.NewGuid().ToString("N");
+        using var server = new NamedPipeLiveTestServer(pipeName, Process, request =>
+            LiveTestResponse.Success(request.Id, Process(), new { method = request.Method }));
+        server.Start();
+
+        using ConnectedPipe firstClient = Connect(pipeName);
+        using ConnectedPipe secondClient = Connect(pipeName);
+        server.Dispose();
+        Assert.Null(firstClient.Reader.ReadLine());
+        Assert.Null(secondClient.Reader.ReadLine());
+
+        using var replacement = new NamedPipeLiveTestServer(pipeName, Process, request =>
+            LiveTestResponse.Success(request.Id, Process(), new { method = request.Method }));
+        replacement.Start();
+        using ConnectedPipe replacementClient = Connect(pipeName);
+        AssertResponse(replacementClient, "status", "status");
+    }
+
+    [Fact]
     public void Server_OversizedResponseReportsUncertainOutcome()
     {
         string pipeName = "BannerlordCoop.LiveTest.Tests." + Guid.NewGuid().ToString("N");
@@ -127,6 +188,11 @@ public class NamedPipeLiveTestServerTests
 
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(2));
 
+        using (var probe = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut))
+        {
+            Assert.Throws<TimeoutException>(() => probe.Connect(200));
+        }
+
         using var replacement = new NamedPipeLiveTestServer(pipeName, Process, request =>
             LiveTestResponse.Success(request.Id, Process(), new { method = request.Method }));
         replacement.Start();
@@ -144,6 +210,18 @@ public class NamedPipeLiveTestServerTests
 
     private static void AssertResponse(ConnectedPipe client, string method, string expectedMethod)
     {
+        string id = WriteRequest(client, method);
+
+        LiveTestResponse response = ReadResponse(client);
+        Assert.True(response.Ok);
+        Assert.Equal(id, response.Id);
+        Assert.Equal(456, response.Process.Pid);
+        JsonElement result = Assert.IsType<JsonElement>(response.Result);
+        Assert.Equal(expectedMethod, result.GetProperty("method").GetString());
+    }
+
+    private static string WriteRequest(ConnectedPipe client, string method)
+    {
         string id = Guid.NewGuid().ToString("N");
         using JsonDocument parameters = JsonDocument.Parse("{}");
         var request = new LiveTestRequest
@@ -155,13 +233,7 @@ public class NamedPipeLiveTestServerTests
         };
 
         client.Writer.WriteLine(LiveTestProtocol.SerializeRequest(request));
-
-        LiveTestResponse response = ReadResponse(client);
-        Assert.True(response.Ok);
-        Assert.Equal(id, response.Id);
-        Assert.Equal(456, response.Process.Pid);
-        JsonElement result = Assert.IsType<JsonElement>(response.Result);
-        Assert.Equal(expectedMethod, result.GetProperty("method").GetString());
+        return id;
     }
 
     private static LiveTestResponse ReadResponse(ConnectedPipe client)
@@ -201,8 +273,28 @@ public class NamedPipeLiveTestServerTests
 
         public void Dispose()
         {
-            Writer.Dispose();
-            Reader.Dispose();
+            try
+            {
+                Writer.Dispose();
+            }
+            catch (IOException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
+            try
+            {
+                Reader.Dispose();
+            }
+            catch (IOException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+
             Pipe.Dispose();
         }
     }
