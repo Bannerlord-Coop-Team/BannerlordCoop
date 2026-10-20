@@ -151,6 +151,10 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
     {
     }
 
+    public void SnapCopies()
+    {
+    }
+
     public void ForgetHull(MissionObject hull)
     {
     }

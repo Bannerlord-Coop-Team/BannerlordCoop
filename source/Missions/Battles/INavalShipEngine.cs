@@ -42,7 +42,10 @@ public interface INavalShipEngine
     /// <summary>[Fixed physics step] Steers every copy toward its owner's latest sample.</summary>
     void TickCopies(float fixedDt);
 
-    /// <summary>[Game thread] Drops the steering state of a hull that left the mission.</summary>
+    /// <summary>[Mission tick] Teleports the copies the physics steps found too far from their owner's sample.</summary>
+    void SnapCopies();
+
+    /// <summary>[Game thread] Stops treating a hull that left the mission as a copy and drops its steering.</summary>
     void ForgetHull(MissionObject hull);
 
     /// <summary>The hull's effective helm input this frame.</summary>

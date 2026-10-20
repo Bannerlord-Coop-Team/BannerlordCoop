@@ -1,9 +1,12 @@
 ﻿using Common.Logging;
 using Missions.Messages;
+using NavalDLC.Missions;
+using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
 using Serilog;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -30,8 +33,11 @@ public interface INavalSteeredCopies
     /// <summary>Takes the owner's latest sample of a tracked copy; a copy whose body isn't simulating gets the frame written.</summary>
     void Observe(MissionShip ship, MatrixFrame frame, BattleShipMotion motion);
 
-    /// <summary>[Fixed physics step] Pushes every simulating copy toward its target.</summary>
+    /// <summary>[Fixed physics step] Pushes every simulating copy toward its target; a snap waits for <see cref="ApplySnaps"/>.</summary>
     void Tick(float fixedDt);
+
+    /// <summary>[Mission tick] Teleports the copies whose steering asked for a snap in the physics steps since the last call.</summary>
+    void ApplySnaps();
 
     /// <summary>Stops treating a hull as a copy, when it left the mission or this client took it over.</summary>
     void Forget(MissionShip ship);
@@ -59,6 +65,9 @@ sealed class SteeredCopy
 
     /// <summary>Whether the warning that its body isn't simulating was logged.</summary>
     internal bool WarnedWritten { get; set; }
+
+    /// <summary>The frame a physics step asked to teleport the copy to, applied on the next mission tick.</summary>
+    internal MatrixFrame? PendingSnap { get; set; }
 
 #if DEBUG
     internal CopyDiagnostics Diagnostics { get; } = new CopyDiagnostics();
@@ -109,13 +118,26 @@ public class NavalSteeredCopies : INavalSteeredCopies
         foreach (var entry in copies)
         {
             var ship = entry.Key;
-            if (ship.IsRemoved || !IsSimulating(ship)) continue;
+            if (entry.Value.PendingSnap.HasValue || ship.IsRemoved || !IsSimulating(ship)) continue;
 
             SteerOne(ship, entry.Value, fixedDt);
         }
 #if DEBUG
         LastTickMilliseconds = (float)tickClock.Elapsed.TotalMilliseconds;
 #endif
+    }
+
+    public void ApplySnaps()
+    {
+        foreach (var entry in copies)
+        {
+            var copy = entry.Value;
+            if (!copy.PendingSnap.HasValue) continue;
+
+            var frame = copy.PendingSnap.Value;
+            copy.PendingSnap = null;
+            if (!entry.Key.IsRemoved && entry.Key.GameEntity.IsValid) Snap(entry.Key, copy, frame);
+        }
     }
 
     public void Forget(MissionShip ship)
@@ -144,11 +166,11 @@ public class NavalSteeredCopies : INavalSteeredCopies
             ship.Index);
     }
 
-    // One correction step: a velocity and yaw rate change, or a teleport to the owner's frame that carries the crew.
+    // One correction step from the body's physics pose, as vanilla's fixed-tick code reads it, or a snap queued for the mission tick.
     private static void SteerOne(MissionShip ship, SteeredCopy copy, float dt)
     {
         var entity = ship.GameEntity;
-        var frame = ship.GlobalFrame;
+        var frame = entity.GetBodyWorldTransform();
         var velocity = entity.GetLinearVelocity();
         var angular = entity.GetAngularVelocity();
         var step = copy.Steering.Compute(dt, frame.origin, CopySteering.YawOf(frame.rotation.f), velocity.AsVec2, angular.z);
@@ -157,10 +179,7 @@ public class NavalSteeredCopies : INavalSteeredCopies
 #endif
         if (step.Snap)
         {
-            ship.ShipsLogic.TeleportShip(ship, step.SnapFrame, checkFreeArea: false);
-            var ownerVelocity = copy.Steering.FeedForwardVelocity;
-            entity.SetLinearVelocity(new Vec3(ownerVelocity.x, ownerVelocity.y, 0f));
-            Logger.Debug("[NavalSync] Snapped copy hull {Index} to its owner's frame ({Snaps} snaps)", ship.Index, copy.Steering.Snaps);
+            copy.PendingSnap = step.SnapFrame;
             return;
         }
 
@@ -168,5 +187,37 @@ public class NavalSteeredCopies : INavalSteeredCopies
         if (deltaVelocity.x != 0f || deltaVelocity.y != 0f)
             entity.SetLinearVelocity(new Vec3(velocity.x + deltaVelocity.x, velocity.y + deltaVelocity.y, velocity.z));
         if (step.DeltaYawRate != 0f) entity.SetAngularVelocity(new Vec3(angular.x, angular.y, angular.z + step.DeltaYawRate));
+    }
+
+    // Teleports the copy with its crew (vanilla) and anyone else standing on it, then gives it the owner's motion.
+    private static void Snap(MissionShip ship, SteeredCopy copy, MatrixFrame target)
+    {
+        var entity = ship.GameEntity;
+        var before = entity.GetGlobalFrame();
+        var riders = RidersOf(ship);
+        ship.ShipsLogic.TeleportShip(ship, target, checkFreeArea: false);
+
+        var after = entity.GetGlobalFrame();
+        foreach (var rider in riders)
+            rider.TeleportToPosition(after.TransformToParent(before.TransformToLocalNonOrthogonal(rider.Position)));
+
+        var ownerVelocity = copy.Steering.FeedForwardVelocity;
+        entity.SetLinearVelocity(new Vec3(ownerVelocity.x, ownerVelocity.y, 0f));
+        entity.SetAngularVelocity(new Vec3(0f, 0f, copy.Steering.FeedForwardYawRate));
+        Logger.Debug("[NavalSync] Snapped copy hull {Index} to its owner's frame ({Snaps} snaps, {Riders} rider(s) moved along)",
+            ship.Index, copy.Steering.Snaps, riders.Count);
+    }
+
+    // Agents standing on the copy that aren't its crew, like a local main agent that boarded it; TeleportShip moves only the crew.
+    private static List<Agent> RidersOf(MissionShip ship)
+    {
+        var mission = Mission.Current;
+        var crew = mission?.GetMissionBehavior<NavalAgentsLogic>()?.GetActiveAgentsOfShip(ship);
+        if (mission == null) return new List<Agent>();
+
+        return mission.Agents
+            .Where(agent => agent.IsActive() && agent.GetComponent<AgentNavalComponent>()?.SteppedShip == ship
+                && (crew == null || !crew.Contains(agent)))
+            .ToList();
     }
 }

@@ -59,6 +59,8 @@ public class CoopNavalBattleBehavior : MissionLogic
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);
+        // A snap teleports the hull and the agents on it, so it runs here rather than inside the fixed physics step.
+        services.Engine.SnapCopies();
         services.Tick(dt, tickNpcFleet);
         LogAgentCountDrop();
     }

@@ -141,6 +141,33 @@ public class NavalCopySteeringTests
         Assert.Equal(1, steering.Snaps);
     }
 
+    // M10 fix C5: the snap frame takes the extrapolated heading with the extrapolated position, not the sample's heading.
+    [Fact]
+    public void Compute_SnapsToTheExtrapolatedPositionAndHeading()
+    {
+        var steering = Observed(Knobs("snap=10", "lead=0.1"), 0f, new Vec2(5f, 0f), yawRate: 0.5f);
+
+        var step = steering.Compute(0.1f, new Vec3(0f, 20f, 0f), 0f, Vec2.Zero, 0f);
+
+        Assert.True(step.Snap);
+        Assert.Equal(steering.Target.Position.x, step.SnapFrame.origin.x, 3);
+        Assert.Equal(steering.Target.Yaw, CopySteering.YawOf(step.SnapFrame.rotation.f), 3);
+        Assert.Equal(0.5f, steering.FeedForwardYawRate);
+    }
+
+    [Fact]
+    public void RotateYaw_TurnsEveryAxisAboutWorldUpAndKeepsThemOrthonormal()
+    {
+        var rotation = Frame(0f, 0f, 0.3f).rotation;
+
+        var turned = CopySteering.RotateYaw(rotation, 0.4f);
+
+        Assert.Equal(0.7f, CopySteering.YawOf(turned.f), 4);
+        Assert.Equal(1f, turned.u.z, 4);
+        Assert.Equal(0f, Vec3.DotProduct(turned.s, turned.f), 4);
+        Assert.Equal(1f, turned.s.Length, 4);
+    }
+
     [Fact]
     public void Compute_SnapsOnceWhenTheOwnerTeleports()
     {

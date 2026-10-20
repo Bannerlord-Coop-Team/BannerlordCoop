@@ -18,7 +18,10 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   driven only by its owner's streams (D3 option B). It replays the owner's helm input, and `NavalSteeredCopies`
   (`Missions.Naval`) steers it every fixed physics step toward the owner's latest sample extrapolated by the owner's
   velocity and yaw rate: target velocity = owner velocity + clamped, soft-zoned correction, blended in with a time
-  constant. A large error or a jump between samples teleports it (`NavalShipsLogic.TeleportShip`, crew carried along).
+  constant. Steering reads the body's physics pose (`GetBodyWorldTransform`), as vanilla's fixed-tick code does. A large
+  error or a jump between samples queues a snap that the next mission tick applies, outside the physics step: a teleport
+  to the extrapolated position and heading (`NavalShipsLogic.TeleportShip`, which carries the crew), along with any other
+  agent standing on the copy, such as a local main agent that boarded it, then the owner's velocity and yaw rate.
   Heave, pitch and roll come from this client's water. One rule decides a copy's mode at every sample and step: steered
   while its body simulates, its owner's frames written otherwise (warning `has no simulating body` once per copy;
   `bodyMode` in `inspect`). `NavalSteeredCopies.Track`/`Forget` are the only writers of `NavalForeignHulls`, the static

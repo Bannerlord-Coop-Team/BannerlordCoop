@@ -157,7 +157,7 @@ internal sealed class CopySteering
         var target = Target;
         var error = target.Position - origin.AsVec2;
         float distance = error.Length;
-        if (pendingSnap || distance > knobs.SnapMetres) return SnapTo(target.Position);
+        if (pendingSnap || distance > knobs.SnapMetres) return SnapTo(target);
 
         bool stale = IsOwnerStale;
         float rate = knobs.Gain / knobs.WindowSeconds;
@@ -183,19 +183,38 @@ internal sealed class CopySteering
         return (sampleFrame.origin.AsVec2 + (sampleVelocity * ahead), YawOf(sampleFrame.rotation.f) + (sampleYawRate * ahead));
     }
 
-    // The owner's frame moved to the extrapolated target, which the engine teleports the copy to.
-    private CopySteeringStep SnapTo(Vec2 position)
+    // The owner's frame moved and turned to the extrapolated target, which the engine teleports the copy to.
+    private CopySteeringStep SnapTo((Vec2 Position, float Yaw) target)
     {
         pendingSnap = false;
         Snaps++;
         lastSign = 0;
         var frame = sampleFrame;
-        frame.origin = new Vec3(position.x, position.y, frame.origin.z);
+        frame.origin = new Vec3(target.Position.x, target.Position.y, frame.origin.z);
+        frame.rotation = RotateYaw(frame.rotation, WrapAngle(target.Yaw - YawOf(frame.rotation.f)));
         return new CopySteeringStep(true, frame, Vec2.Zero, 0f, 0f);
     }
 
     /// <summary>The owner's velocity the snap carries over, zero once the owner is stale.</summary>
     public Vec2 FeedForwardVelocity => IsOwnerStale ? Vec2.Zero : sampleVelocity;
+
+    /// <summary>The owner's yaw rate the snap carries over, zero once the owner is stale.</summary>
+    public float FeedForwardYawRate => IsOwnerStale ? 0f : sampleYawRate;
+
+    /// <summary>The rotation turned about the world up axis by <paramref name="radians"/>, counter-clockwise from above.</summary>
+    internal static Mat3 RotateYaw(Mat3 rotation, float radians)
+    {
+        float sin = (float)Math.Sin(radians);
+        float cos = (float)Math.Cos(radians);
+        rotation.s = TurnAboutZ(rotation.s, sin, cos);
+        rotation.f = TurnAboutZ(rotation.f, sin, cos);
+        rotation.u = TurnAboutZ(rotation.u, sin, cos);
+        return rotation;
+    }
+
+    // The vector turned about the world z axis by the angle whose sine and cosine are given.
+    private static Vec3 TurnAboutZ(Vec3 vector, float sin, float cos) =>
+        new Vec3((vector.x * cos) - (vector.y * sin), (vector.x * sin) + (vector.y * cos), vector.z);
 
     // A sign change of the correction along the heading; corrections inside the epsilon keep the last sign.
     private void CountOscillation(float along)

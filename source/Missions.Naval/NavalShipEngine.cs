@@ -330,6 +330,8 @@ public class NavalShipEngine : INavalShipEngine
 
     public void TickCopies(float fixedDt) => SteeredCopies.Tick(fixedDt);
 
+    public void SnapCopies() => SteeredCopies.ApplySnaps();
+
     public void ForgetHull(MissionObject hull)
     {
         if (hull is MissionShip ship) SteeredCopies.Forget(ship);
