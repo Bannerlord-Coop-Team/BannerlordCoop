@@ -201,11 +201,11 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 |---|---|---|
 | G1 Beat a pirate fleet to a natural end, with ship weapons | Natural end done and live-passed (R40 A, B1, B2). Weapons live-passed in R41a-2 W1 (ballistas for 156 s, no crash). | `vs_pirates`, `sinking`, `fleet`, `migration`, `weapons=n`; `NavalNaturalEndScenarioTests`, `NavalShipWeaponScenarioTests`, `NavalVsPiratesScenarioTests` |
 | G2 Ramming and boarding between any two hulls | Not started. Probes in code (copy_body, contact counters); peer ram does no damage (R37), copies never collide. | `ramming`, `boarding`; no E2E |
-| G3 Retreat, leave or disconnect without breaking the battle | Retreat and leave live-passed in R41a (A, B, C). Disconnect is a leave (D4); hard drops of a non-host and of the host live-passed in R41a-2 (D, E). The R41a-2 W2 and S crashes and the departure order are fixed in E2E, not live-run yet. | `retreat`, `migration who=nonhost`; `NavalDepartureScenarioTests`, `BattleReserveReconnectScopeTests` |
+| G3 Retreat, leave or disconnect without breaking the battle | Retreat and leave live-passed in R41a (A, B, C). Disconnect is a leave (D4); hard drops of a non-host and of the host live-passed in R41a-2 (D, E). Done: the R41a-2 W2 and S fixes and the departure order (parked N of N, then withdrew N) live-passed in R41a-3. | `retreat`, `migration who=nonhost`; `NavalDepartureScenarioTests`, `BattleReserveReconnectScopeTests` |
 | G4 Results match vanilla | Pending (M6). HP, sunk ships and captured ships are not written back. | none yet |
 | G5 Battles from real campaign play | Presets done (WP4), never live. | `encounter`, `blockade`; preset unit tests |
 | G6 AI allies, 3+ players per side | Allies pending (M11): the launcher passes empty ally lists and the spawner fields the enemy side only. 3 players are E2E-covered; live runs had 2 clients. | `allied_npc`; 3-client E2E scenarios |
-| G7 Join or rejoin mid-battle shows the true state | Late-join catch-up done (records, condition, weapon, seats); `late_join` live-passed in R39. A rejoin is a late join with a fresh reserve (D4), live-passed in R41a-2 (D, E); a late joiner's dropped host hull record (R41a-2 E) is fixed in E2E. | `late_join`, `migration`; `NavalLateJoinScenarioTests`, `NavalDepartureScenarioTests` |
+| G7 Join or rejoin mid-battle shows the true state | Late-join catch-up done (records, condition, weapon, seats); `late_join` live-passed in R39. A rejoin is a late join with a fresh reserve (D4), live-passed in R41a-2 (D, E) and R41a-3 (W2, D, E); a late joiner's dropped host hull record (R41a-2 E) is fixed in E2E, its member hold not hit live yet. | `late_join`, `migration`; `NavalLateJoinScenarioTests`, `NavalDepartureScenarioTests` |
 
 ### Milestones
 
@@ -226,7 +226,10 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | R41a live run | done: A, B, C pass, D fail, E partial |
 | D4 disconnect as leave, rejoin as late join, R41a fixes | done, live in R41a-2 (D, E, K) |
 | R41a-2 live run | done: W1, D, E, K pass; W2, S fail |
-| R41a-2 fixes (pickup stations, player allocation, setup failure, departure order, late-join record, preset) | done in E2E, not live |
+| R41a-2 fixes (pickup stations, player allocation, setup failure, departure order, late-join record, preset) | done, live in R41a-3 (member hold and W2 pickup not hit) |
+| R41a-3 live run | done: W2, D, E, S, K, W1 pass |
+| R41a retreat, leave and disconnect live validation | done (R41a, R41a-2, R41a-3) |
+| R41b probes | next |
 | M7 contact probe (live), M10a ram and contact, M10b plank crossing and melee | pending, needs D3 |
 | M6 results parity | pending |
 | M11 allied fleets | pending |
@@ -255,6 +258,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | R40 | `a9475656d` | Natural ends pass; blocked by two native crashes on the survivor when a player left a concluded battle (crew left parked after the removal). |
 | R41a | `6eceafdcc` | A, B, C pass (R40 crashes gone, removal invariant held); D fails, E partial. The preset's disconnect was a graceful leave, so adoption and hand-back never ran; the returner had an empty reserve and hung in deployment (guard's `EndMission` undone by `AfterStart`, then a per-tick NRE on a missing hull); the host left first and the map event was orphaned. The ballista NRE crash found during R41a was fixed in `20b3e4c80`. Led to D4. |
 | R41a-2 | `9f643fc36` | W1 (`vs_pirates weapons=1`, ballistas ran 156 s), D (`who=nonhost` hard drop and rejoin), E (hard host drop, migration, rejoin) and K (kept host) pass. W2 fails: the rejoined client crashed natively 15 s in, a deck item pickup replicated as a station use and its puppet re-seated onto the removed item (fixed: pickups are no stations, re-seats need the point still on its hull). S fails: a returner whose wounded hero was left out of its rebuilt reserve threw in vanilla's player allocation every tick, re-running team setup and spawning 161 hulls (fixed: the player allocation in `CoopNavalTeamSetupFailurePatches` needs the player origin, and a failed naval setup ends the mission once). Also fixed after the run: the leaver's crew was faded before its hull removal (party withdrawal now follows the removal), a late joiner dropped the host's hull record that beat its membership (now held), and the `migration` preset dropped the successor too and left an early-pulled returner unready. |
+| R41a-3 | `25e1c856d` | Game v1.4.8, NavalDLC v1.2.8. W2, D, E, S, K and W1 pass, no crash. Departure order holds: each departing hull parked N of N, then withdrew N crew; no migrator despawn. S: the heroless returner ends cleanly with `PlayerTeamNotAllocatable`. E stalled 9 min (no weapons, hulls not closing) and needed a forced win. |
 
 ## 6. Open decisions and known limits
 
@@ -283,13 +287,19 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 - **Allied fleets.** An AI lord on the players' side fields no hulls. Agents refused by a formation with no hull are not
   re-assigned.
 - **Late join and reconnect.** A late joiner gets every record, condition, weapon state and seat; a returning player is
-  one. `late_join` ran live in R39 and the rejoin in R41a-2 (D, E); the condition catch-up is E2E-only.
+  one. `late_join` ran live in R39 and the rejoin in R41a-2 (D, E) and R41a-3 (W2, D, E); the condition catch-up is
+  E2E-only. Not hit live yet: an item pickup on a rejoined client in W2 (pickups by the returner's agents ran in R41a-3
+  E with no crash).
+- **A hero knocked out earlier in a battle can't rejoin it.** Vanilla `MapEventParty.Update` leaves heroes in
+  `_woundedInBattle` or `_diedInBattle` out of the roster, so the returner's rebuilt reserve has no hero and the setup
+  guard ends its mission (`PlayerTeamNotAllocatable`, R41a-3 S). This matches vanilla, where a wounded hero can't enter
+  a battle. Inferred from the decompile and the troop counts, not traced; the `Left hero` Debug line never fires for it.
 - **Open: relayed catch-up bypasses the server's join hold.** The server holds its own sends to a joining peer
   (`CoopServer.Send`), but a peer's catch-up goes through `RelayPacketHandler` (`target.Send`), so a member's hull record
   can reach a joiner before the joiner learns that member is in the mission (R41a-2 E). The replicator now holds such a
   record until the owner is a member (log `Holding hull ... until it is a mission member`) and drops one from a departed
   owner (`Dropped hull record ... of departed ...`). Weapon and seat catch-up may hit the same ordering gap; the relay
-  ordering itself is unchanged.
+  ordering itself is unchanged. The hold is not hit live yet: in R41a-3 the race didn't occur.
 - **Follow-up A, late hulls skip `MissionShip.OnDeploymentFinished`.** Hulls fielded after deployment (mainly the AI
   fleet) miss its standing points, `SetUsableByAIOnly` on enemy helms, `_navalShipsLogic` (needed for capture,
   `ShipControllerMachine`), model ammo, wake and flotsam, and `IsDeployed`. Fix: call `ship.OnDeploymentFinished()` in
