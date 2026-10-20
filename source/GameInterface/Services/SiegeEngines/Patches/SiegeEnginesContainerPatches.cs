@@ -30,8 +30,8 @@ internal class SiegeEnginesContainerPatches
 
         if (ModInformation.IsClient)
         {
-            // The map production popup is the only client caller; route the build order to the server.
-            // The progress object the popup made locally is an unregistered ghost, so the request
+            // MapSiegeProductionPatches routes the production popup click before it gets here, so this catches
+            // any other client caller. A progress object made locally is an unregistered ghost, so the request
             // carries the engine type and the server does its own reserve-lookup-or-create.
             if (!TryDescribeContainer(__instance, out var siegeEvent, out var side))
             {
