@@ -177,6 +177,10 @@ namespace Coop.LiveTesting
                     return HandleOptionsMenu(request);
                 case "join":
                     return HandleDeferredClientJoin(request);
+                case "disconnect":
+                    return HandleClientDisconnect(request);
+                case "reconnect":
+                    return HandleClientReconnect(request);
                 case "shutdown":
                     return HandleShutdown(request);
                 default:
@@ -759,6 +763,52 @@ namespace Coop.LiveTesting
                     attempted = true,
                     started,
                 });
+            }, true);
+        }
+
+        private LiveTestResponse HandleClientDisconnect(LiveTestRequest request)
+        {
+            if (isServer)
+            {
+                return Failure(request.Id, "client_only", "Only a client process may disconnect.", false);
+            }
+
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (!ContainerProvider.TryResolve<IClientLogic>(out var clientLogic))
+                {
+                    return Failure(request.Id, "client_session_unavailable", "No active client session was found.", false);
+                }
+
+                clientLogic.Disconnect();
+                Interlocked.Exchange(ref deferredClientJoinAttempted, 0);
+                return Success(request.Id, new { scheduled = true, readyForJoin = false });
+            }, true);
+        }
+
+        private LiveTestResponse HandleClientReconnect(LiveTestRequest request)
+        {
+            if (isServer)
+            {
+                return Failure(request.Id, "client_only", "Only a client process may reconnect.", false);
+            }
+            if (!deferredClientJoinEnabled)
+            {
+                return Failure(request.Id, "manual_join_not_enabled", "The client was not launched for a deferred live-test join.", false);
+            }
+
+            return ExecuteOnGameThread(request, () =>
+            {
+                if (!(GameStateManager.Current?.ActiveState is InitialState) || Campaign.Current != null)
+                {
+                    return Failure(request.Id, "client_not_at_main_menu", "The client must be at the main menu with no campaign loaded before reconnecting.", false);
+                }
+
+                Interlocked.Exchange(ref deferredClientJoinAttempted, 0);
+                bool started = startAsClient();
+                Interlocked.Exchange(ref deferredClientJoinAttempted, started ? 1 : 0);
+                Logger.Information("[LiveTest] Reconnect StartAsClient() returned {Started}", started);
+                return Success(request.Id, new { attempted = true, started });
             }, true);
         }
 
