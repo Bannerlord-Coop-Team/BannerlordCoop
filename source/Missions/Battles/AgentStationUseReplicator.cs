@@ -97,9 +97,6 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private void Handle_AgentStationUseChanged(MessagePayload<AgentStationUseChanged> payload)
     {
         var change = payload.What;
-        // An item pickup is no station: WeaponPickupHandler syncs it, and vanilla releases a puppet from it locally.
-        if (change.Point is SpawnedItemEntity) return;
-
         var agents = missionComponent.AgentRegistry;
         if (change.Agent == null || !agents.TryGetAgentInfo(change.Agent, out var info)) return;
 
@@ -349,14 +346,6 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         }
 
         var point = engine.ResolveStation(ship.Hull, use.StationKey, use.PointIndex);
-        if (point is SpawnedItemEntity)
-        {
-            dropped++;
-            Logger.Warning("[NavalSync] Dropped station use {Revision} of agent {AgentId}: {Station}#{Point} of hull {ShipId} is a world item",
-                use.Revision, use.AgentId, use.StationKey, use.PointIndex, use.ShipId);
-            return true;
-        }
-
         if (point == null)
         {
             dropped++;

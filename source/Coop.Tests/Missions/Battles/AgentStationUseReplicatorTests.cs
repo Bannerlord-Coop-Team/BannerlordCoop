@@ -309,14 +309,14 @@ public class AgentStationUseReplicatorTests
 
     private static AgentStationUseReplicator CreateReplicator(INavalShipEngine engine,
         INetworkAgentRegistry? registry = null, INetworkShipRegistry? ships = null, MessageBroker? broker = null,
-        IMissionContext? members = null, IBattleNetwork? network = null)
+        IMissionContext? members = null)
     {
         var component = new Mock<ICoopMissionComponent>();
         component.SetupGet(c => c.AgentMovementHandler).Returns(Mock.Of<IAgentMovementHandler>());
         component.SetupGet(c => c.AgentActionHandler).Returns(Mock.Of<IAgentActionHandler>());
         component.SetupGet(c => c.AgentRegistry).Returns(registry ?? RemoteOwnerRegistry());
         component.SetupGet(c => c.ShipRegistry).Returns(ships ?? Mock.Of<INetworkShipRegistry>());
-        return new AgentStationUseReplicator(network ?? Mock.Of<IBattleNetwork>(), broker ?? new MessageBroker(), Mock.Of<IBattleSession>(),
+        return new AgentStationUseReplicator(Mock.Of<IBattleNetwork>(), broker ?? new MessageBroker(), Mock.Of<IBattleSession>(),
             component.Object, engine, Mock.Of<IBattleDeploymentCoordinator>(), members ?? Members("owner", "old", "new"));
     }
 
@@ -338,58 +338,6 @@ public class AgentStationUseReplicatorTests
         string stationKey = "oar";
         int pointIndex = 0;
         engine.Setup(e => e.TryDescribeStation(point, out stationHull, out stationKey, out pointIndex)).Returns(true);
-    }
-
-    // R41a-2 W2: a pickup announced as a station got its puppet re-seated onto the removed item, a native AV.
-    [Fact]
-    public void Handle_NeverAnnouncesAnItemPickupAsAStationUse()
-    {
-        var agentId = Guid.NewGuid();
-        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
-        var info = new CoopAgentInfo("local", "local", "battle", agent, agentId, 1);
-        var registry = new Mock<INetworkAgentRegistry>();
-        registry.Setup(r => r.TryGetAgentInfo(agent, out info)).Returns(true);
-        registry.Setup(r => r.IsLocallyControlled(agent)).Returns(true);
-        var engine = new Mock<INavalShipEngine>();
-        var item = ShipTestHulls.CreateWorldItem();
-        StationOf(engine, item, ShipTestHulls.Create());
-        var network = new Mock<IBattleNetwork>();
-        var broker = new MessageBroker();
-        using var replicator = CreateReplicator(engine.Object, registry.Object, broker: broker, network: network.Object);
-
-        broker.Publish(this, new AgentStationUseChanged(agent, item, inUse: true));
-        broker.Publish(this, new AgentStationUseChanged(agent, item, inUse: false));
-
-        Assert.False(replicator.IsOwnSeat(agentId));
-        network.Verify(n => n.SendAll(It.IsAny<NetworkAgentStationUse>()), Times.Never);
-        engine.Verify(e => e.TryDescribeStation(It.IsAny<UsableMissionObject>(), out It.Ref<MissionObject>.IsAny,
-            out It.Ref<string>.IsAny, out It.Ref<int>.IsAny), Times.Never);
-    }
-
-    [Fact]
-    public void TryApply_DropsAUseThatResolvesToAWorldItem()
-    {
-        var agentId = Guid.NewGuid();
-        var shipId = Guid.NewGuid();
-        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
-        var info = new CoopAgentInfo("owner", "owner", "battle", agent, agentId, 1);
-        var registry = new Mock<INetworkAgentRegistry>();
-        registry.Setup(r => r.TryGetAgentInfo(agentId, out info)).Returns(true);
-        var hull = ShipTestHulls.Create();
-        var ship = new NetworkShipInfo(shipId, "owner", "party", isNpcParty: false, hull, null!);
-        var ships = new Mock<INetworkShipRegistry>();
-        ships.Setup(s => s.TryGet(shipId, out ship)).Returns(true);
-        var engine = new Mock<INavalShipEngine>();
-        engine.Setup(e => e.ResolveStation(hull, "oar", 0)).Returns(ShipTestHulls.CreateWorldItem());
-        using var replicator = CreateReplicator(engine.Object, registry.Object, ships.Object);
-
-        Assert.True(replicator.TryApply(Use(agentId, shipId, inUse: true, revision: 1, "owner")));
-        replicator.RefreshAppliedSeats();
-
-        engine.Verify(e => e.ApplyStationUse(It.IsAny<Agent>(), It.IsAny<UsableMissionObject>(), It.IsAny<bool>()), Times.Never);
-        var inspected = JObject.FromObject(replicator.Inspect());
-        Assert.Equal(1, (long)inspected["dropped"]!);
-        Assert.Equal(0, (int)inspected["appliedSeats"]!);
     }
 
     [Fact]

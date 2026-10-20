@@ -494,15 +494,18 @@ public class NavalShipEngine : INavalShipEngine
         if (pointIndex < 0) return null;
 
         var entity = ResolvePath(((MissionShip)hull).GameEntity, stationKey);
-        return entity.IsValid ? entity.GetScriptComponents<UsableMissionObject>().Skip(pointIndex).FirstOrDefault() : null;
+        var point = entity.IsValid ? entity.GetScriptComponents<UsableMissionObject>().Skip(pointIndex).FirstOrDefault() : null;
+        // A dropped weapon on a deck is a pickup with its own sync, never a station.
+        return point is SpawnedItemEntity ? null : point;
     }
 
     public void ApplyStationUse(Agent agent, UsableMissionObject point, bool inUse)
     {
         if (inUse)
         {
-            // Agent.UseGameObject doesn't validate, so a deactivated point (a picked-up item, a broken machine) would bind the puppet.
-            if (IsSeated(agent, point) || point.IsDeactivated) return;
+            // Agent.UseGameObject doesn't validate, so a removed point would bind the puppet to a freed object. A deactivated
+            // machine stays usable: its state is recomputed locally and can lag the owner's.
+            if (point is SpawnedItemEntity || !point.GameEntity.IsValid || IsSeated(agent, point)) return;
             if (agent.CurrentlyUsedGameObject != null) agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
             agent.UseGameObject(point);
 
