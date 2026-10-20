@@ -11,4 +11,5 @@ public record BattleContext(
     IBattleResultCommitter ResultCommitter,
     IReinforcementFielder ReinforcementFielder,
     IMissionContext MissionContext,
-    IBattleTroopWithdrawal TroopWithdrawal);
+    IBattleTroopWithdrawal TroopWithdrawal,
+    IBattlePartyWithdrawal PartyWithdrawal);

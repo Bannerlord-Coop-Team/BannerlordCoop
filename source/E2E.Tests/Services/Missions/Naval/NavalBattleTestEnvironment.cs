@@ -534,20 +534,39 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
 
         /// <summary>
         /// A headless agent registered under <paramref name="authority"/>, as a replicated crew member or own troop; with a
-        /// <paramref name="team"/> it joins that team, as crew join their hull's team.
+        /// <paramref name="team"/> it joins that team, as crew join their hull's team; with an <paramref name="origin"/> it is
+        /// that party's troop.
         /// </summary>
-        public Agent RegisterAgent(Guid agentId, string authority, MockTeam? team = null)
+        public Agent RegisterAgent(Guid agentId, string authority, MockTeam? team = null, IAgentOriginBase? origin = null)
         {
             Agent agent = null!;
             Call(() =>
             {
                 var build = new AgentBuildData(Game.Current.PlayerTroop)
                     .Controller(authority == Id ? AgentControllerType.AI : AgentControllerType.None);
+                if (origin != null) build = build.TroopOrigin(origin);
                 agent = Mission.SpawnAgent(team == null ? build : build.Team(team.Shell));
                 Assert.True(Agents.TryRegisterAgent(authority, agentId, agent));
                 agentNames[agent] = $"agent {agentId} of {authority}";
             });
             return agent;
+        }
+
+        /// <summary>
+        /// A troop of <paramref name="owner"/>'s own party registered under the owner, as its supplier mints them, so it
+        /// withdraws with the party when the owner leaves.
+        /// </summary>
+        public Agent RegisterPartyTroop(Guid agentId, string owner)
+        {
+            CoopAgentOrigin origin = null!;
+            Call(() =>
+            {
+                Assert.True(Instance.Resolve<IPlayerManager>().TryGetPlayer(owner, out var player));
+                Assert.True(Instance.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party));
+                origin = new CoopAgentOrigin((CharacterObject)Game.Current.PlayerTroop, party.Party, 0, null!,
+                    new UniqueTroopDescriptor(agentId.GetHashCode()));
+            });
+            return RegisterAgent(agentId, owner, origin: origin);
         }
 
         /// <summary>The use/release patch's event for an agent this client drives at a station of its local hull.</summary>

@@ -1647,7 +1647,8 @@ public class BattleShipReplicatorTests
             var members = new Mock<IMissionContext>();
             members.SetupGet(m => m.ControllersInMission).Returns(() => Members.ToArray());
             var context = new BattleContext(session.Object, deployment.Object, component.Object, epochs, resultCommitter.Object,
-                Mock.Of<IReinforcementFielder>(), members.Object, Mock.Of<IBattleTroopWithdrawal>());
+                Mock.Of<IReinforcementFielder>(), members.Object, Mock.Of<IBattleTroopWithdrawal>(),
+                Mock.Of<IBattlePartyWithdrawal>());
             Replicator = new BattleShipReplicator(Network.Object, Broker, context, engine.Object, TeamResolver.Object,
                 Mock.Of<IObjectManager>(), new NavalHullAuthority(session.Object, component.Object, engine.Object, context.TroopWithdrawal),
                 new BattleShipConditionStream(Network.Object, session.Object, engine.Object, epochs, members.Object), Stations.Object);

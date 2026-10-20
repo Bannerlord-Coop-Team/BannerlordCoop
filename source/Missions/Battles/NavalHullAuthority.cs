@@ -36,6 +36,12 @@ public interface INavalHullAuthority : IDisposable
     /// </summary>
     void Remove(IReadOnlyList<NetworkShipInfo> ships, DepartingCrew crew);
 
+    /// <summary>
+    /// Runs <paramref name="action"/> at a later <see cref="Tick"/>, once no removal of <paramref name="owner"/>'s hulls is
+    /// queued or under way and no swap holds agents parked, so the owner's party leaves the battle only after its hulls did.
+    /// </summary>
+    void AfterRemovalsOf(string owner, Action action);
+
     /// <summary>The hulls <see cref="Remove"/> queued and not yet removed; nobody may move onto them, as they go with whoever stands there.</summary>
     IReadOnlyCollection<MissionObject> HullsBeingRemoved { get; }
 
@@ -79,6 +85,7 @@ public class NavalHullAuthority : INavalHullAuthority
 
     private readonly List<HullSwap> hullSwaps = new List<HullSwap>();
     private readonly List<HullRemoval> hullRemovals = new List<HullRemoval>();
+    private readonly List<(string Owner, Action Action)> afterRemovals = new List<(string Owner, Action Action)>();
     private int spawnScopes;
 
     public NavalHullAuthority(IBattleSession session, ICoopMissionComponent missionComponent, INavalShipEngine engine,
@@ -130,7 +137,14 @@ public class NavalHullAuthority : INavalHullAuthority
         if (ships.Count == 0) return;
 
         hullRemovals.Add(new HullRemoval(ships.Select(ship => ship.ShipId).ToList(), ships.Select(ship => ship.Hull).ToList(),
-            crew));
+            ships.Select(ship => ship.CurrentAuthority).Distinct().ToList(), crew));
+    }
+
+    public void AfterRemovalsOf(string owner, Action action)
+    {
+        if (action == null) return;
+
+        afterRemovals.Add((owner, action));
     }
 
     public bool IsReplacing(Guid shipId) => hullSwaps.Any(swap => swap.ShipId == shipId);
@@ -163,6 +177,9 @@ public class NavalHullAuthority : INavalHullAuthority
     // after spawning it (Quest5 CallReinforcement, then InitializeReinforcement).
     public void Tick()
     {
+        // Before this tick's steps, so a removal finished last tick has its unparked agents back on physics first.
+        RunAfterRemovals();
+
         foreach (var removal in hullRemovals.ToArray())
             AdvanceHullRemoval(removal);
 
@@ -186,6 +203,27 @@ public class NavalHullAuthority : INavalHullAuthority
                 Logger.Error(exception, "[NavalSync] Hull swap {ShipId} failed in phase {Phase}", swap.ShipId, swap.Phase);
                 // Boarding is the step that threw in the last phase, so only an earlier failure hands the parked agents back.
                 if (swap.Phase == HullSwapPhase.ReplaceHull && swap.Agents != null) ReturnParkedAgents(swap, ship);
+            }
+        }
+    }
+
+    // Runs every follow-up whose owner's hulls are gone, while no swap holds agents parked with physics off.
+    private void RunAfterRemovals()
+    {
+        if (afterRemovals.Count == 0 || hullSwaps.Any(swap => swap.Agents != null)) return;
+
+        foreach (var entry in afterRemovals.ToArray())
+        {
+            if (hullRemovals.Any(removal => removal.Owners.Contains(entry.Owner))) continue;
+
+            afterRemovals.Remove(entry);
+            try
+            {
+                entry.Action();
+            }
+            catch (Exception exception)
+            {
+                Logger.Error(exception, "[NavalSync] The follow-up after the hull removals of {Owner} failed", entry.Owner);
             }
         }
     }
@@ -305,6 +343,7 @@ public class NavalHullAuthority : INavalHullAuthority
     {
         hullSwaps.Clear();
         hullRemovals.Clear();
+        afterRemovals.Clear();
     }
 
     private enum HullSwapPhase
@@ -328,15 +367,19 @@ public class NavalHullAuthority : INavalHullAuthority
 
     private sealed class HullRemoval
     {
-        public HullRemoval(IReadOnlyList<Guid> shipIds, IReadOnlyList<MissionObject> hulls, DepartingCrew crew)
+        public HullRemoval(IReadOnlyList<Guid> shipIds, IReadOnlyList<MissionObject> hulls, IReadOnlyList<string> owners,
+            DepartingCrew crew)
         {
             ShipIds = shipIds;
             Hulls = hulls;
+            Owners = owners;
             Crew = crew;
         }
 
         public IReadOnlyList<Guid> ShipIds { get; }
         public IReadOnlyList<MissionObject> Hulls { get; }
+        /// <summary>The controllers whose hulls these are, as queued.</summary>
+        public IReadOnlyList<string> Owners { get; }
         public DepartingCrew Crew { get; }
         /// <summary>Everyone the first step parked off the hulls; null before it ran.</summary>
         public IReadOnlyList<HullSwapAgent> Agents { get; set; }

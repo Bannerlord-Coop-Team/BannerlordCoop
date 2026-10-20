@@ -176,6 +176,66 @@ public class NavalHullAuthorityTests
         Assert.Empty(whileBoarding);
     }
 
+    // R41a-2: a departed owner's party withdraws only after its hulls are gone, so the hull removal takes the crew first. It
+    // runs the tick after the removal finished, once the removal's unparked agents are back on physics.
+    [Fact]
+    public void AfterRemovalsOf_RunsTheTickAfterTheOwnersRemovalFinished_AndNotForAnotherOwnersRemoval()
+    {
+        var (authority, _, engine, _) = Create();
+        var departing = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_2", false, ShipTestHulls.Create(), null);
+        var other = new NetworkShipInfo(Guid.NewGuid(), "third", "MapEventParty_3", false, ShipTestHulls.Create(), null);
+        engine.Setup(e => e.ParkHullAgents(It.IsAny<MissionObject>())).Returns(Array.Empty<HullSwapAgent>());
+        var ran = new List<string>();
+        var removed = new List<string>();
+        engine.Setup(e => e.RemoveHull(departing.Hull)).Callback(() => removed.Add(Peer));
+
+        authority.Remove(new[] { departing }, DepartingCrew.All);
+        authority.Remove(new[] { other }, DepartingCrew.All);
+        authority.AfterRemovalsOf(Peer, () => ran.Add(Peer));
+        authority.AfterRemovalsOf("nobody", () => ran.Add("nobody"));
+        authority.Tick();
+        var afterParking = ran.ToArray();
+        authority.Tick();
+        var afterRemoval = ran.ToArray();
+        authority.Tick();
+        authority.Tick();
+
+        Assert.Equal(new[] { "nobody" }, afterParking);
+        Assert.Equal(new[] { Peer }, removed);
+        Assert.Equal(new[] { "nobody" }, afterRemoval);
+        Assert.Equal(new[] { "nobody", Peer }, ran);
+    }
+
+    // The withdrawal fades agents, which must never happen to one a swap holds parked with physics off (R33, R40).
+    [Fact]
+    public void AfterRemovalsOf_WaitsWhileASwapHoldsAgentsParked()
+    {
+        var (authority, registry, engine, _) = Create();
+        var hull = ShipTestHulls.Create();
+        var ship = new NetworkShipInfo(Guid.NewGuid(), Own, "MapEventParty_2", true, hull, null);
+        registry.TryRegister(ship);
+        engine.Setup(e => e.ParkHullAgents(hull)).Returns(new[]
+        {
+            new HullSwapAgent(CreateAgent(), isCrew: true, isParked: true, Vec3.Zero, Vec3.Zero),
+        });
+        engine.Setup(e => e.ReplaceHull(hull)).Returns(ShipTestHulls.Create());
+        authority.Replace(ship.ShipId);
+        authority.Tick();
+        int ran = 0;
+
+        authority.AfterRemovalsOf(Peer, () => ran++);
+        authority.Tick();
+        int whileReplacing = ran;
+        authority.Tick();
+        int whileBoarding = ran;
+        authority.Tick();
+        authority.Tick();
+
+        Assert.Equal(0, whileReplacing);
+        Assert.Equal(0, whileBoarding);
+        Assert.Equal(1, ran);
+    }
+
     [Fact]
     public void SuppressSpawnRegistration_HoldsUntilEveryScopeCloses()
     {

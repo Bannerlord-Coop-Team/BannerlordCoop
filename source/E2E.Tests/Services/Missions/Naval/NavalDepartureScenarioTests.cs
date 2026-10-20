@@ -30,7 +30,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         var hullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
         var hullC = battle.FieldPlayerHull(c, new Vec3(80f, 0f, 0f));
         battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f));
-        var helmsman = RegisterEverywhere(battle, Guid.NewGuid(), "B");
+        var helmsman = RegisterPartyTroopEverywhere(battle, Guid.NewGuid(), "B");
         var ally = RegisterEverywhere(battle, Guid.NewGuid(), "A");
         battle.CommitAll();
         battle.TickAll(2);
@@ -42,7 +42,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         foreach (var peer in new[] { a, c })
         {
             AssertRemovedWithClearDeck(peer, hullB, ally[peer], hullA);
-            AssertCrewWithdrawn(peer, helmsman[peer]);
+            AssertCrewWithdrawnByTheHullRemoval(peer, helmsman[peer]);
             Assert.True(peer.Has(hullA) && peer.Has(hullC));
         }
         Assert.Equal(1, b.Network.NetworkSentMessages.GetMessages<NetworkShipRemoved>()
@@ -65,7 +65,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
         var hullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
         battle.FieldPlayerHull(c, new Vec3(80f, 0f, 0f));
-        var helmsman = RegisterEverywhere(battle, Guid.NewGuid(), "B");
+        var helmsman = RegisterPartyTroopEverywhere(battle, Guid.NewGuid(), "B");
         var ally = RegisterEverywhere(battle, Guid.NewGuid(), "A");
         // B's late crew member reached only B, so its station use waits on A and C.
         var lateCrew = b.RegisterAgent(Guid.NewGuid(), "B");
@@ -89,7 +89,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         foreach (var peer in new[] { a, c })
         {
             AssertRemovedWithClearDeck(peer, hullB, ally[peer], hullA);
-            AssertCrewWithdrawn(peer, helmsman[peer]);
+            AssertCrewWithdrawnByTheHullRemoval(peer, helmsman[peer]);
             Assert.Equal(0, (int)peer.StationStats()["pending"]!);
             var replicator = JObject.FromObject(peer.Ships.Inspect());
             Assert.Equal(0, (int)replicator["pendingForeignHulls"]!);
@@ -109,7 +109,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         var hullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
         battle.FieldPlayerHull(c, new Vec3(80f, 0f, 0f));
         var pirate = battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f));
-        var helmsman = RegisterEverywhere(battle, Guid.NewGuid(), "B");
+        var helmsman = RegisterPartyTroopEverywhere(battle, Guid.NewGuid(), "B");
         var ally = RegisterEverywhere(battle, Guid.NewGuid(), "A");
         battle.CommitAll();
         battle.TickAll(2);
@@ -128,7 +128,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
             Assert.Single(peer.Instance.InternalMessages.GetMessages<MissionPeerLeft>(), left => left.ControllerId == "B");
             Assert.Empty(peer.Instance.InternalMessages.GetMessages<MissionPeerDisconnected>());
             AssertRemovedWithClearDeck(peer, hullB, ally[peer], hullA);
-            AssertCrewWithdrawn(peer, helmsman[peer]);
+            AssertCrewWithdrawnByTheHullRemoval(peer, helmsman[peer]);
             Assert.False(peer.Has(hullB));
             Assert.Equal("A", peer.Ship(pirate).CurrentAuthority);
         }
@@ -155,15 +155,23 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
         var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
         var pirate = battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f));
+        var crewA = RegisterPartyTroopEverywhere(battle, Guid.NewGuid(), "A");
         battle.CommitAll();
         battle.TickAll(2);
+        foreach (var peer in battle.Peers)
+            peer.Engine.PlaceAgent(crewA[peer], peer.Ship(hullA).Hull, peer.Ship(hullA).Hull);
 
         battle.MigrateHost(a, "B");
+        // The successor adopts the AI A ran, never A's own party, which waits for its hull's removal.
+        string? crewAuthorityOnSuccessor = null;
+        b.Call(() => crewAuthorityOnSuccessor = b.Agents.TryGetAgentInfo(crewA[b], out var info) ? info.CurrentAuthority : null);
         battle.TickAll(3);
 
+        Assert.Equal("A", crewAuthorityOnSuccessor);
         Assert.All(new[] { b, c }, peer =>
         {
             AssertRemovedWithClearDeck(peer, hullA);
+            AssertCrewWithdrawnByTheHullRemoval(peer, crewA[peer]);
             Assert.Equal("B", peer.Ship(pirate).CurrentAuthority);
         });
         Assert.False(b.Hull(pirate).IsCopy);
@@ -172,6 +180,89 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         c.Tick();
         Assert.Equal(battle.HostEpoch, b.SentSamples(pirate).Last().HostEpoch);
         Assert.Equal(-20f, c.Hull(pirate).Frame.origin.x, 3);
+    }
+
+    // R41a-2: B's troop stands on A's deck, off every hull of B's. The hull removal can't take it, so the party withdrawal
+    // fades it, but only once B's hull is gone: until then nothing of B's party leaves the battle outside the hull path.
+    [Fact]
+    public void DisconnectedPlayer_TroopOffItsHulls_FadesOnlyAfterItsHullRemovalFinished()
+    {
+        using var battle = StartServerBattle(atSea: true, out _, "A", "B", "C");
+        var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var hullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
+        battle.FieldPlayerHull(c, new Vec3(80f, 0f, 0f));
+        var helmsman = RegisterPartyTroopEverywhere(battle, Guid.NewGuid(), "B");
+        var straggler = RegisterPartyTroopEverywhere(battle, Guid.NewGuid(), "B");
+        var ally = RegisterEverywhere(battle, Guid.NewGuid(), "A");
+        battle.CommitAll();
+        battle.TickAll(2);
+        SeatAndBoard(battle, b, hullB, helmsman, ally, hullA);
+        foreach (var peer in battle.Peers)
+            peer.Engine.PlaceAgent(straggler[peer], peer.Ship(hullA).Hull);
+
+        DropConnection(b);
+        var survivors = new[] { a, c };
+        foreach (var peer in survivors) peer.Tick();
+        Assert.All(survivors, peer => Assert.True(straggler[peer].IsActive(), $"{peer.Id} faded B's party while parking its hull"));
+        foreach (var peer in survivors) peer.Tick();
+        Assert.All(survivors, peer =>
+        {
+            Assert.True(CopyOf(peer, hullB).IsRemoved);
+            Assert.True(straggler[peer].IsActive(), $"{peer.Id} faded B's party in the tick that removed its hull");
+        });
+        foreach (var peer in survivors) peer.Tick();
+
+        foreach (var peer in survivors)
+        {
+            AssertRemovedWithClearDeck(peer, hullB, ally[peer], hullA);
+            AssertCrewWithdrawnByTheHullRemoval(peer, helmsman[peer]);
+            Assert.False(straggler[peer].IsActive(), $"{peer.Id} kept B's troop off its hull in the battle");
+            Assert.DoesNotContain(straggler[peer], peer.Engine.Withdrawn);
+            bool registered = true;
+            peer.Call(() => registered = peer.Agents.TryGetAgentInfo(straggler[peer], out _));
+            Assert.False(registered, $"{peer.Id} kept B's troop off its hull registered");
+        }
+    }
+
+    // R41a-2: B's own removal reached the survivors and they parked its hull, then the server's departure came a tick later.
+    // The party withdrawal waits for that removal in flight, so the hull path still takes B's crew.
+    [Fact]
+    public void LeavingPlayer_DepartureATickAfterItsRemoval_WaitsForTheRemovalInFlight()
+    {
+        using var battle = StartServerBattle(atSea: true, out _, "A", "B", "C");
+        var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var hullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
+        battle.FieldPlayerHull(c, new Vec3(80f, 0f, 0f));
+        var helmsman = RegisterPartyTroopEverywhere(battle, Guid.NewGuid(), "B");
+        var straggler = RegisterPartyTroopEverywhere(battle, Guid.NewGuid(), "B");
+        var ally = RegisterEverywhere(battle, Guid.NewGuid(), "A");
+        battle.CommitAll();
+        battle.TickAll(2);
+        SeatAndBoard(battle, b, hullB, helmsman, ally, hullA);
+        foreach (var peer in battle.Peers)
+            peer.Engine.PlaceAgent(straggler[peer], peer.Ship(hullA).Hull);
+        var survivors = new[] { a, c };
+
+        EndMission(b, ShipRemovalReason.Leave);
+        foreach (var peer in survivors) peer.Tick();
+        Assert.All(survivors, peer => Assert.Equal(1, CopyOf(peer, hullB).Parkings));
+        battle.Leave(b);
+        foreach (var peer in survivors) peer.Tick();
+        Assert.All(survivors, peer =>
+        {
+            Assert.True(CopyOf(peer, hullB).IsRemoved);
+            Assert.True(straggler[peer].IsActive(), $"{peer.Id} faded B's party before its removal in flight finished");
+        });
+        foreach (var peer in survivors) peer.Tick();
+
+        foreach (var peer in survivors)
+        {
+            AssertRemovedWithClearDeck(peer, hullB, ally[peer], hullA);
+            AssertCrewWithdrawnByTheHullRemoval(peer, helmsman[peer]);
+            Assert.False(straggler[peer].IsActive(), $"{peer.Id} kept B's troop off its hull in the battle");
+        }
     }
 
     // R41a fix-loop C3: the host and a player drop together. The successor is mid-swap on the AI hull it took over when the
@@ -416,8 +507,21 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         Assert.Empty(peer.Engine.ParkedAgents);
     }
 
+    // R41a-2: the leaver's party fade ran before the hull removal, which then parked and withdrew nobody. The hull removal
+    // must take its crew, so the party withdrawal finds only what was left off its hulls.
+    private static void AssertCrewWithdrawnByTheHullRemoval(NavalPeer peer, params Agent[] crew)
+    {
+        AssertCrewWithdrawn(peer, crew);
+        foreach (var agent in crew)
+            Assert.Contains(agent, peer.Engine.Withdrawn);
+    }
+
     private static Dictionary<NavalPeer, Agent> RegisterEverywhere(NavalBattle battle, Guid agentId, string authority) =>
         battle.Peers.ToDictionary(peer => peer, peer => peer.RegisterAgent(agentId, authority));
+
+    // A troop of the owner's own party on every client, which withdraws with the party when the owner leaves.
+    private static Dictionary<NavalPeer, Agent> RegisterPartyTroopEverywhere(NavalBattle battle, Guid agentId, string owner) =>
+        battle.Peers.ToDictionary(peer => peer, peer => peer.RegisterPartyTroop(agentId, owner));
 
     // B's helmsman, crew of B's hull, takes the helm, which seats its puppet on A and C, and A's ally boards B's deck on every
     // client.

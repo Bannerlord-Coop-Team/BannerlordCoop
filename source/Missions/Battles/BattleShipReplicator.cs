@@ -108,6 +108,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly INavalHullAuthority hullAuthority;
     private readonly IBattleShipConditionStream conditions;
     private readonly IAgentStationUseReplicator stations;
+    private readonly IBattlePartyWithdrawal partyWithdrawal;
 
     private readonly Dictionary<Guid, ShipStream> streams = new Dictionary<Guid, ShipStream>();
     private readonly Dictionary<BattleSideEnum, int> departedHulls = new Dictionary<BattleSideEnum, int>();
@@ -148,6 +149,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         missionContext = context.MissionContext;
         hostEpochPolicy = context.HostEpochPolicy;
         resultCommitter = context.ResultCommitter;
+        partyWithdrawal = context.PartyWithdrawal;
         this.engine = engine;
         this.teamResolver = teamResolver;
         this.objectManager = objectManager;
@@ -836,7 +838,11 @@ public class BattleShipReplicator : IBattleShipReplicator
         GameThread.RunSafe(() =>
         {
             ForgetReportedReserveOf(left.ControllerId);
-            if (Mission.Current != null) RemoveHullsOf(left.ControllerId);
+            if (Mission.Current == null) return;
+
+            // At sea the hull removal takes the leaver's crew, so its party is withdrawn only once the hulls are gone.
+            RemoveHullsOf(left.ControllerId);
+            hullAuthority.AfterRemovalsOf(left.ControllerId, () => partyWithdrawal.WithdrawParty(left.ControllerId));
         }, context: nameof(Handle_MissionPeerLeft));
     }
 

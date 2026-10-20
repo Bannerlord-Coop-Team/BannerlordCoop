@@ -21,6 +21,16 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Battles;
 
 /// <summary>
+/// Takes a departed player's own party out of the battle on this client, as a withdrawal, not a casualty. At sea the ship
+/// replicator calls it once the player's hulls are gone, so the hull removal withdraws their crew first.
+/// </summary>
+public interface IBattlePartyWithdrawal
+{
+    /// <summary>[Any thread] Fades out the departed controller's own-party troops still in the battle, whoever holds them now.</summary>
+    void WithdrawParty(string controllerId);
+}
+
+/// <summary>
 /// Ownership changes when a player leaves a coop battle. A graceful leave withdraws the player's own-party
 /// troops on every client. A disconnect instead leaves those troops in the battle for the current or promoted
 /// host to adopt. When the departed player was the host, the server promotes a successor. Every peer applies
@@ -29,7 +39,7 @@ namespace Missions.Battles;
 /// adopts every agent still keyed to ANY controller no longer in the mission, not just the departed host's —
 /// otherwise agents the old host merely HELD by adoption would be left driverless.
 /// </summary>
-public interface IBattleAuthorityMigrator : IDisposable
+public interface IBattleAuthorityMigrator : IBattlePartyWithdrawal, IDisposable
 {
     /// <summary>
     /// [Game thread] Apply current authority to a retained former-host record that spawned after migration.
@@ -72,6 +82,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     // which all run on the relay's receive thread, so no locking. Entries are consumed by the promotion and
     // cleared if the controller re-enters (a later drop of the same controller must not be treated as a retreat).
     private readonly HashSet<string> withdrawnHosts = new HashSet<string>();
+    // [Game thread] Departed hosts whose party withdrawal is still to run; a host's AI must never be taken for its party.
+    private readonly HashSet<string> hostsAwaitingWithdrawal = new HashSet<string>();
     private readonly Dictionary<string, NetworkRetainedPlayerHero> playerHandoffs = new();
     private readonly HashSet<Guid> confirmedPlayerHandoffs = new();
     private readonly Dictionary<Guid, (Agent Agent, AgentControllerType Controller)> provisionalPlayerControllers = new();
@@ -345,6 +357,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         AdoptAgentsFrom(controllerId, "player disconnect", withdrawOwnParty: false);
     }
 
+    // Bookkeeping that must precede the host migration runs now; on land the party fades now too, while at sea the ship
+    // replicator owns the departure and withdraws the party once the leaver's hulls are gone (WithdrawParty).
     private void HandlePartyWithdrawal(string controllerId, string instanceId, string reason)
     {
         if (instanceId != null && instanceId != session.InstanceId) return;
@@ -355,126 +369,86 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         if (session.IsHostController(controllerId))
         {
             withdrawnHosts.Add(controllerId);
-            Logger.Information("[BattleSync] Host {Controller} {Reason} — despawning its own party; migration adopts the AI it ran", controllerId, reason);
-            DespawnOwnPartyTroops(controllerId);
-            return;
+            GameThread.RunSafe(() => hostsAwaitingWithdrawal.Add(controllerId), context: nameof(HandlePartyWithdrawal));
+            Logger.Information("[BattleSync] Host {Controller} {Reason} — withdrawing its own party; migration adopts the AI it ran", controllerId, reason);
         }
 
-        // A non-host owns its own party. Select by origin ownership because PVP puppets may be on the opposite
-        // side from this client's PlayerTeam.
-        DespawnControllerTroops(controllerId);
+        if (!WithdrawsPartyOnDeparture(session.IsNaval)) return;
+
+        WithdrawParty(controllerId);
     }
 
-    // [All clients] Withdraw a departed HOST's own-party troops: its hero and the troops of the party it
-    // leads, identified by OWNERSHIP (the agent's origin party), NOT by battle side — a host also fields
-    // allied NPC parties on the player side, and those must keep fighting under the promoted successor.
-    // FadeOut (not Die/MakeDead) so it is a withdrawal, not a casualty — the player keeps these troops on the
-    // map (the server forgot its reserve on departure, so a rejoin re-flattens and re-spawns them fresh).
-    private void DespawnOwnPartyTroops(string controllerId)
+    /// <summary>
+    /// Whether a departure fades the party at once. At sea the hull removal must take the leaver's crew first (the removal
+    /// invariant), so the ship replicator withdraws the party after it instead.
+    /// </summary>
+    internal static bool WithdrawsPartyOnDeparture(bool isNavalMission) => !isNavalMission;
+
+    public void WithdrawParty(string controllerId)
+    {
+        if (string.IsNullOrEmpty(controllerId) || session.IsOwn(controllerId)) return;
+
+        GameThread.RunSafe(() => DespawnPartyTroops(controllerId, hostsAwaitingWithdrawal.Remove(controllerId)),
+            context: nameof(WithdrawParty));
+    }
+
+    // [Game thread] Fades a departed player's own-party troops, by ownership (not side, BR-051, nor holder: at sea a host
+    // change may have re-keyed leftovers before this runs). An unresolved party keeps a host's troops for the adoption and
+    // falls back to a non-host's originally assigned agents.
+    private void DespawnPartyTroops(string controllerId, bool wasHost)
     {
         var registry = coopMissionComponent.AgentRegistry;
+        var controllers = registry.GetControllerIds();
+        var troops = controllers.SelectMany(registry.GetAgents).ToArray();
 
-        GameThread.RunSafe(() =>
+        if (troops.Length == 0) return;
+        if (Mission.Current == null) return;
+
+        if (!TryGetPlayerParty(controllerId, out var retreaterParty, out var retreaterHero))
         {
-            if (Mission.Current == null) return;
-
-            if (!TryGetPlayerParty(controllerId, out var playerParty, out var playerHero))
+            if (wasHost)
             {
-                // Can't tell the departed player's own troops from the AI parties it fielded — despawning the wrong
-                // set is worse than keeping them fighting, so leave everything to the adoption (pre-fix behavior).
                 Logger.Warning("[BattleSync] Cannot resolve the withdrawn party of host {Controller}; its troops will be adopted instead of despawned", controllerId);
                 return;
             }
 
-            int despawned = 0;
-            var despawnedRiders = new HashSet<Agent>();
-            foreach (var info in registry.GetAgents(controllerId))
-            {
-                var agent = info.Agent;
-                if (agent == null || agent.IsMount || !IsOwnPartyAgent(agent, playerParty, playerHero)) continue;
+            Logger.Warning("[BattleSync] Cannot resolve the withdrawn party of {Controller}; despawning the agents originally assigned to it instead", controllerId);
+        }
 
-                lifecycle.RecordWithdrawnHealth(agent);
-                registry.RemoveAgent(info.AgentId);
-                fader.FadeOut(agent, hideInstantly: false, hideMount: true);
-                casualties.Forget(info.AgentId);
-                despawnedRiders.Add(agent);
-                despawned++;
-            }
-
-            // Only the mounts of the riders that just withdrew: the host's AI cavalry horses stay registered
-            // so the promoted successor adopts them (authority transfer) along with their riders.
-            CleanUpDepartedMounts(controllerId, despawnedRiders, allMounts: false);
-
-            if (despawned > 0)
-                Logger.Information("[BattleSync] Despawned {Count} withdrawn own-party troop(s) of host {Controller}", despawned, controllerId);
-        });
-    }
-
-    // [All clients] Withdraw a departed NON-host's troops, selected by OWNERSHIP exactly like the host path
-    // above: its hero and the troops whose origin party is the player's party. Battle side is NOT identity —
-    // in a PVP battle those puppets can sit on the OPPOSING team of a remaining client, so the old
-    // local-PlayerTeam side filter skipped every one of them and they leaked as inert, effectively unkillable
-    // puppets keyed to a controller that no longer answers (the live BR-051 leak). When the player's party
-    // cannot be resolved, fall back to the agents ASSIGNED to it (registry OriginalOwner == that controller) —
-    // adoption preserves OriginalOwner, so agents it merely HELD from an earlier hosting stint are excluded
-    // (those belong to the absent-controller sweep, not the retreat despawn). Our own retreat tears the mission
-    // down (skip self); other clients drop its puppets. FadeOut (not Die/MakeDead) so it is a withdrawal, not a
-    // casualty — the player keeps these troops on the map.
-    private void DespawnControllerTroops(string controllerId)
-    {
-        if (string.IsNullOrEmpty(controllerId)) return;
-        if (session.IsOwn(controllerId)) return;
-
-        var registry = coopMissionComponent.AgentRegistry;
-
-        GameThread.RunSafe(() =>
+        int candidates = 0;
+        int despawned = 0;
+        var despawnedRiders = new HashSet<Agent>();
+        foreach (var info in troops)
         {
-            var controllers = registry.GetControllerIds();
-            var troops = controllers.SelectMany(registry.GetAgents).ToArray();
+            var agent = info.Agent;
+            if (agent == null || agent.IsMount) continue;
+            candidates++;
 
-            if (troops.Length == 0) return;
-            if (Mission.Current == null) return;
+            bool isRetreatersOwn = retreaterParty != null
+                ? IsOwnPartyAgent(agent, retreaterParty, retreaterHero)
+                : info.OriginalOwner == controllerId;
+            if (!isRetreatersOwn) continue;
 
-            if (!TryGetPlayerParty(controllerId, out var retreaterParty, out var retreaterHero))
-                Logger.Warning("[BattleSync] Cannot resolve the withdrawn party of {Controller}; despawning the agents originally assigned to it instead", controllerId);
+            lifecycle.RecordWithdrawnHealth(agent);
+            registry.RemoveAgent(info.AgentId);
+            fader.FadeOut(agent, hideInstantly: false, hideMount: true);
+            casualties.Forget(info.AgentId);
+            despawnedRiders.Add(agent);
+            despawned++;
+        }
 
-            int candidates = 0;
-            int despawned = 0;
-            var despawnedRiders = new HashSet<Agent>();
-            foreach (var info in troops)
-            {
-                var agent = info.Agent;
-                if (agent == null || agent.IsMount) continue;
-                candidates++;
+        // Include adopted riders' mounts. A departed non-host's remaining horses go with it; a host's other cavalry horses
+        // stay registered so the promoted successor adopts them with their riders.
+        foreach (var holderId in controllers)
+            CleanUpDepartedMounts(holderId, despawnedRiders, allMounts: !wasHost && holderId == controllerId);
 
-                // Ownership, not side: the retreater's own party (origin party + the hero belt-check) — or,
-                // when its party did not resolve, whatever is still originally assigned to it. An agent it
-                // merely holds by adoption (OriginalOwner = a third controller) is not its party and must not
-                // withdraw with it — that one stays for the absent-controller sweep.
-                bool isRetreatersOwn = retreaterParty != null
-                    ? IsOwnPartyAgent(agent, retreaterParty, retreaterHero)
-                    : info.OriginalOwner == controllerId;
-                if (!isRetreatersOwn) continue;
-
-                lifecycle.RecordWithdrawnHealth(agent);
-                registry.RemoveAgent(info.AgentId);
-                fader.FadeOut(agent, hideInstantly: false, hideMount: true);
-                casualties.Forget(info.AgentId);
-                despawnedRiders.Add(agent);
-                despawned++;
-            }
-
-            // Include adopted riders' mounts, but keep the holder's other cavalry in the battle.
-            foreach (var holderId in controllers)
-                CleanUpDepartedMounts(holderId, despawnedRiders, allMounts: holderId == controllerId);
-
-            // At sea the hull removal can withdraw the crew first, so a miss only matters while agents are still keyed to the leaver.
-            int stillKeyed = registry.GetAgents(controllerId).Count(info => info.Agent != null && !info.Agent.IsMount);
-            if (despawned > 0)
-                Logger.Information("[BattleSync] Despawned {Count} withdrawn troop(s) of {Controller}", despawned, controllerId);
-            else if (candidates > 0 && stillKeyed > 0)
-                Logger.Warning("[BattleSync] Withdrawal of {Controller} matched 0 of its {Count} registered troop(s) — selection found no own-party agents; anything left is keyed to a controller that no longer answers", controllerId, stillKeyed);
-        });
+        // At sea the hull removal withdraws the crew first, so a miss only matters while agents are still keyed to the leaver.
+        int stillKeyed = registry.GetAgents(controllerId).Count(info => info.Agent != null && !info.Agent.IsMount);
+        if (despawned > 0)
+            Logger.Information("[BattleSync] Despawned {Count} withdrawn own-party troop(s) of {Role} {Controller}",
+                despawned, wasHost ? "host" : "player", controllerId);
+        else if (!wasHost && candidates > 0 && stillKeyed > 0)
+            Logger.Warning("[BattleSync] Withdrawal of {Controller} matched 0 of its {Count} registered troop(s) — selection found no own-party agents; anything left is keyed to a controller that no longer answers", controllerId, stillKeyed);
     }
 
     // [Game thread] Clean up a departed controller's registered MOUNTS. A horse registered to a controller

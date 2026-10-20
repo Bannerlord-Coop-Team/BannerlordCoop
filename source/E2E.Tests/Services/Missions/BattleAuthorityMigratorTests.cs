@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -54,6 +55,59 @@ public class BattleAuthorityMigratorTests
         broker.Publish(this, new MissionPeerDisconnected("dropped", mapEventId));
 
         reinforcementFielder.Verify(value => value.PrepareForReserveOwnershipExpansion(), Times.Once);
+    }
+
+    // R41a-2: at sea the ship replicator owns a departure and withdraws the party after the leaver's hulls are gone, so the
+    // migrator's own leave handling touches no agent; on land it withdraws the party at once.
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void PeerLeft_WithdrawsThePartyAtOnceOnlyOnLand(bool isNaval, bool expectWithdrawal)
+    {
+        const string mapEventId = "battle";
+        using var broker = new MessageBroker();
+        var session = new Mock<IBattleSession>();
+        session.SetupGet(value => value.InstanceId).Returns(mapEventId);
+        session.SetupGet(value => value.HasInstance).Returns(true);
+        session.SetupGet(value => value.OwnControllerId).Returns("host");
+        session.SetupGet(value => value.IsNaval).Returns(isNaval);
+
+        var registry = new Mock<INetworkAgentRegistry>();
+        registry.Setup(value => value.GetControllerIds()).Returns(new[] { "left" });
+        registry.Setup(value => value.GetAgents(It.IsAny<string>())).Returns(Array.Empty<CoopAgentInfo>());
+        var mission = new Mock<ICoopMissionComponent>();
+        mission.SetupGet(value => value.AgentRegistry).Returns(registry.Object);
+
+        using var migrator = new BattleAuthorityMigrator(
+            Mock.Of<INetwork>(),
+            broker,
+            Mock.Of<IObjectManager>(),
+            Mock.Of<IPlayerManager>(),
+            mission.Object,
+            session.Object,
+            Mock.Of<ICasualtyAttributionMap>(),
+            Mock.Of<IBattleDeploymentCoordinator>(),
+            Mock.Of<IAgentFormationAssigner>(),
+            Mock.Of<IMissionContext>(),
+            Mock.Of<IReinforcementFielder>(),
+            Mock.Of<IBattleInstanceLifecycle>(),
+            Mock.Of<IBattleResultCommitter>(),
+            new BattleAgentFader());
+
+        // The withdrawal runs on the game thread; this thread stands in for it, and the previous registration goes back.
+        int previousGameThread = GameThread.Instance.GameThreadId;
+        GameThread.Instance.MarkGameThread();
+        try
+        {
+            broker.Publish(this, new MissionPeerLeft("left", mapEventId));
+        }
+        finally
+        {
+            GameThread.Instance.RestoreGameThread(previousGameThread);
+        }
+
+        Assert.Equal(expectWithdrawal, BattleAuthorityMigrator.WithdrawsPartyOnDeparture(isNaval));
+        registry.Verify(value => value.GetControllerIds(), expectWithdrawal ? Times.Once() : Times.Never());
     }
 
     [Theory]
