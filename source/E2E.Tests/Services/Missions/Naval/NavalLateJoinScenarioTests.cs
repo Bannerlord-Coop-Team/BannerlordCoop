@@ -66,32 +66,28 @@ public class NavalLateJoinScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(0.4f, weapon.Direction);
     }
 
-    // M8b: a joiner that enters after the host adopted a disconnected player's hull gets it from the host, as a hull that
-    // follows the host, with the condition the host last sent.
+    // D4: a disconnected player's hull left the battle with it, so a joiner that enters afterwards gets only the hulls still
+    // in it, and B's record arriving late spawns nothing.
     [Fact]
-    public void LateJoiner_AfterAnAdoption_GetsTheAdoptedHullFromTheHost_AndFollowsItsSamples()
+    public void LateJoiner_AfterADisconnect_GetsOnlyTheHullsStillInTheBattle()
     {
         using var battle = StartRunningBattle(out var a, out var hulls, out _);
+        var b = battle["B"];
         var hullB = hulls[^1];
-        battle.Disconnect(battle["B"]);
+        var lateRecord = b.Network.NetworkSentMessages.GetMessages<NetworkSpawnBattleShips>().Last();
+        battle.Disconnect(b);
         battle.TickAll(4);
-        a.Hull(hullB).HitPoints = 45f;
-        a.Hull(hullB).Frame = new MatrixFrame(Mat3.Identity, new Vec3(33f, 3f, 0f));
-        battle.TickAll(2);
 
         var c = battle.Join("C");
         c.Commit();
         battle.AnnounceEntry(c);
+        c.Call(() => c.Broker.Publish(c, lateRecord));
         battle.TickAll(3);
 
-        var adopted = c.Ship(hullB);
-        Assert.Equal("A", adopted.CurrentAuthority);
-        Assert.Equal("B", adopted.OriginalOwner);
-        Assert.True(adopted.IsAdopted);
-        Assert.Equal(45f, c.Hull(hullB).HitPoints, 3);
-        Assert.Equal(33f, c.Hull(hullB).Frame.origin.x, 3);
-        Assert.Equal(a.SentSamples(hullB).Last().Sequence, (long)c.Stream(hullB)["accepted"]!);
-        Assert.Equal(battle.HostEpoch, (int)c.Stream(hullB)["epoch"]!);
+        Assert.False(a.Has(hullB));
+        Assert.False(c.Has(hullB));
+        Assert.Equal(hulls.Take(hulls.Length - 1).OrderBy(id => id), c.Registry.Ships.Select(ship => ship.ShipId).OrderBy(id => id));
+        Assert.All(c.Registry.Ships, ship => Assert.Equal("A", ship.CurrentAuthority));
     }
 
     // vs_pirates with A hosting three AI hulls, one of them crewed at the helm and damaged, and B's hull; C still to join.

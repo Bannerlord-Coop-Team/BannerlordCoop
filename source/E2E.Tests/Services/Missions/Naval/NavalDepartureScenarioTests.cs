@@ -98,6 +98,111 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         Assert.Single(c.Engine.AllHulls, hull => hull.SpawnData?.ShipId == hullB);
     }
 
+    // D4: B drops without leaving. The server tells A and C it disconnected, and that is a leave at sea: its hull goes with a
+    // clear deck and its crew withdraws, its late traffic changes nothing, and the host keeps simulating the AI fleet.
+    [Fact]
+    public void DisconnectedPlayer_LosesItsHullOnEveryPeer_AndTheHostKeepsFighting()
+    {
+        using var battle = StartServerBattle(atSea: true, out var concluded, "A", "B", "C");
+        var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var hullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
+        battle.FieldPlayerHull(c, new Vec3(80f, 0f, 0f));
+        var pirate = battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f));
+        var helmsman = RegisterEverywhere(battle, Guid.NewGuid(), "B");
+        var ally = RegisterEverywhere(battle, Guid.NewGuid(), "A");
+        battle.CommitAll();
+        battle.TickAll(2);
+        SeatAndBoard(battle, b, hullB, helmsman, ally, hullA);
+        var lateSample = b.SentSamples(hullB).Last();
+
+        battle.Disconnect(b);
+        battle.TickAll(2);
+        c.Call(() => c.Broker.Publish(c, lateSample));
+        long pirateStreamed = (long)c.Stream(pirate)["accepted"]!;
+        a.Hull(pirate).Frame = new MatrixFrame(Mat3.Identity, new Vec3(12f, 300f, 0f));
+        battle.TickAll(2);
+
+        foreach (var peer in new[] { a, c })
+        {
+            AssertRemovedWithClearDeck(peer, hullB, ally[peer], hullA);
+            AssertCrewWithdrawn(peer, helmsman[peer]);
+            Assert.False(peer.Has(hullB));
+            Assert.Equal("A", peer.Ship(pirate).CurrentAuthority);
+        }
+        Assert.Equal(1, a.Ships.DepartedHulls(BattleSideEnum.Attacker));
+        Assert.False(a.Hull(pirate).IsCopy);
+        Assert.True((long)c.Stream(pirate)["accepted"]! > pirateStreamed);
+        Assert.Equal(12f, c.Hull(pirate).Frame.origin.x, 3);
+
+        ResolveOnHost(a, BattleState.AttackerVictory);
+        c.Call(() => c.Controller.ResultCommitter.ReportAcceptedResult(), VictoryConclusionDisabledMethods());
+        Assert.Equal(1, concluded());
+        AssertMapEventRemoved(battle.MapEventId);
+    }
+
+    // D4: the battle host drops. Its own hull leaves every client like any disconnected player's, while the AI hulls it
+    // simulated move to the promoted successor, which swaps them for simulated hulls and streams them at the new epoch.
+    [Fact]
+    public void DisconnectedHost_LosesItsOwnHull_AndItsSuccessorTakesOverTheAiHulls()
+    {
+        using var battle = StartNavalBattle(new[]
+        {
+            ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Attacker), ("C", BattleSideEnum.Attacker),
+        });
+        var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var pirate = battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f));
+        battle.CommitAll();
+        battle.TickAll(2);
+
+        battle.MigrateHost(a, "B");
+        battle.TickAll(3);
+
+        Assert.All(new[] { b, c }, peer =>
+        {
+            AssertRemovedWithClearDeck(peer, hullA);
+            Assert.Equal("B", peer.Ship(pirate).CurrentAuthority);
+        });
+        Assert.False(b.Hull(pirate).IsCopy);
+        b.Hull(pirate).Frame = new MatrixFrame(Mat3.Identity, new Vec3(-20f, 300f, 0f));
+        b.Tick();
+        c.Tick();
+        Assert.Equal(battle.HostEpoch, b.SentSamples(pirate).Last().HostEpoch);
+        Assert.Equal(-20f, c.Hull(pirate).Frame.origin.x, 3);
+    }
+
+    // D4: a player that disconnected comes back as a late joiner with a fresh hull, which every member spawns as a new copy;
+    // its old hull never comes back.
+    [Fact]
+    public void DisconnectedPlayer_ReturnsAsALateJoiner_WithAFreshHull()
+    {
+        using var battle = StartServerBattle(atSea: true, out _, "A", "B", "C");
+        var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
+        battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var oldHullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
+        battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f));
+        battle.CommitAll();
+        battle.TickAll(2);
+        battle.Disconnect(b);
+        battle.TickAll(2);
+
+        var returned = battle.Rejoin(b);
+        var freshHullB = battle.FieldPlayerHull(returned, new Vec3(45f, 0f, 0f));
+        returned.Commit();
+        battle.TickAll(3);
+
+        foreach (var peer in new[] { a, c })
+        {
+            Assert.True(peer.Has(freshHullB), $"{peer.Id} never spawned the returning player's fresh hull");
+            Assert.Equal("B", peer.Ship(freshHullB).CurrentAuthority);
+            Assert.True(peer.Hull(freshHullB).IsCopy);
+            Assert.False(peer.Has(oldHullB));
+        }
+        Assert.Equal(3, returned.Registry.Ships.Count);
+        Assert.False(returned.Has(oldHullB));
+    }
+
     // A per-ship Retreat order: B's hull sails off the map and vanilla's ShipRetreatLogic on B keeps the crew off its deck,
     // then removes it, fading the crew aboard, which reaches the others as routs. They withdraw nobody with the hull, so the
     // crew aboard goes through its rout and the crew off the deck stays. B stays in the battle with its other hull.

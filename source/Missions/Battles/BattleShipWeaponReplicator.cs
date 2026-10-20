@@ -328,7 +328,7 @@ public class BattleShipWeaponReplicator : IBattleShipWeaponReplicator
     internal static string ValidateState(NetworkShipInfo ship, string ownControllerId, NetworkShipWeaponState state,
         long appliedRevision, int appliedEpoch, IReadOnlyCollection<string> controllersInMission)
     {
-        // A new host numbers an AI or adopted hull's weapon states on from its own count, so a newer epoch restarts the order.
+        // A new host numbers an AI hull's weapon states on from its own count, so a newer epoch restarts the order.
         var rejection = state.Stamp.Validate(ship.CurrentAuthority, ownControllerId,
             new AuthorityStamp(ship.CurrentAuthority, appliedEpoch, appliedRevision), followsHostEpoch: ship.FollowsBattleHost,
             controllersInMission);

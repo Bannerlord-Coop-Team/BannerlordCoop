@@ -43,9 +43,9 @@ public sealed class BattleShipSpawnData
     [ProtoMember(14)] public readonly float SailHitPoints;
     [ProtoMember(15)] public readonly int RandomValue;
     [ProtoMember(16)] public readonly string CustomSailPatternId;
-    /// <summary>The player who fielded an adopted hull; empty when it is the record's owner.</summary>
+    /// <summary>The host that fielded an AI hull a later host now simulates; empty when it is the record's owner.</summary>
     [ProtoMember(17)] public readonly string OriginalOwnerControllerId;
-    /// <summary>The registry id of the party's campaign ship the hull was built from, so its owner can tell it back on return.</summary>
+    /// <summary>The registry id of the party's campaign ship the hull was built from; a copy's snapshot keeps it.</summary>
     [ProtoMember(18)] public readonly string CampaignShipId;
 
     public BattleShipSpawnData(
@@ -91,6 +91,6 @@ public sealed class BattleShipSpawnData
     /// <summary>The player or host that fielded the hull.</summary>
     public string OriginalOwner => string.IsNullOrEmpty(OriginalOwnerControllerId) ? OwnerControllerId : OriginalOwnerControllerId;
 
-    /// <summary>An AI hull or a player's hull the battle host adopted, as <c>NetworkShipInfo.FollowsBattleHost</c>.</summary>
-    public bool FollowsBattleHost => IsNpcParty || OriginalOwner != OwnerControllerId;
+    /// <summary>An AI hull, as <c>NetworkShipInfo.FollowsBattleHost</c>.</summary>
+    public bool FollowsBattleHost => IsNpcParty;
 }

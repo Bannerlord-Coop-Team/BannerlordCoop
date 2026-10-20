@@ -101,23 +101,20 @@ public class NavalMigrationReserveFielderTests
         Assert.Single(harness.Queued);
     }
 
-    // M8b: a disconnected player's hull the host adopted takes that player's recovered troops first, and troops a handed-back
-    // hull left behind join the host's pending reserve.
+    // D4: only AI hulls follow the host, so a player's own hull it simulates takes none of the recovered AI reserve.
     [Fact]
-    public void Tick_QueuesOnAnAdoptedHull_AndTakesTheReserveAHandBackLeftBehind()
+    public void Tick_QueuesOnlyOnAiHulls_NeverOnAPlayersOwnHull()
     {
-        const string PlayerParty = "MapEventParty_player";
         var harness = new Harness(isHost: true);
         var pirateHull = harness.AddAiHull(Pirates, capacity: 1);
-        var adoptedHull = harness.AddAiHull(PlayerParty, capacity: 2, originalOwner: "player");
-        harness.Recover(Origin(PlayerParty), Origin(PlayerParty));
-        harness.Kept.Add(Origin(Pirates));
+        var playerHull = harness.AddPlayerHull("MapEventParty_player");
+        harness.Recover(Origin(Pirates), Origin(Pirates));
 
         harness.Fielder.Tick();
 
-        Assert.Equal(new[] { PlayerParty, PlayerParty }, harness.Queued[adoptedHull].Select(origin => origin.MapEventPartyId));
         Assert.Equal(new[] { Pirates }, harness.Queued[pirateHull].Select(origin => origin.MapEventPartyId));
-        Assert.Empty(harness.Kept);
+        Assert.Empty(harness.Queued[playerHull]);
+        Assert.Equal(1, harness.Fielder.PendingReserve(BattleSideEnum.Defender));
     }
 
     // A recovered origin carries only the party it was supplied under for this decision.
@@ -160,14 +157,6 @@ public class NavalMigrationReserveFielderTests
 
             var replicator = new Mock<IBattleShipReplicator>();
             replicator.Setup(r => r.IsReplacingHull(It.IsAny<Guid>())).Returns((Guid shipId) => Replacing.Contains(shipId));
-            replicator.Setup(r => r.TakeReserveKeptOnHandBack(It.IsAny<BattleSideEnum>())).Returns((BattleSideEnum side) =>
-            {
-                if (side != BattleSideEnum.Defender) return Array.Empty<CoopAgentOrigin>();
-
-                var kept = Kept.ToList();
-                Kept.Clear();
-                return kept;
-            });
 
             Fielder = new NavalMigrationReserveFielder(session.Object, Reinforcements.Object, Registry, engine.Object, replicator.Object);
         }
@@ -178,18 +167,21 @@ public class NavalMigrationReserveFielderTests
         public Dictionary<MissionObject, int> Capacity { get; } = new();
         public HashSet<MissionObject> Sinking { get; } = new();
         public HashSet<Guid> Replacing { get; } = new();
-        /// <summary>Defender troops a handed-back hull left with the host.</summary>
-        public List<CoopAgentOrigin> Kept { get; } = new();
         public NavalMigrationReserveFielder Fielder { get; }
 
-        /// <summary>A Defender hull this host simulates: an AI party's, or with <paramref name="originalOwner"/> an adopted player's.</summary>
-        public MissionObject AddAiHull(string mapEventPartyId, int capacity = 40, string? originalOwner = null)
+        /// <summary>A Defender AI hull this host simulates.</summary>
+        public MissionObject AddAiHull(string mapEventPartyId, int capacity = 40) => AddHull(mapEventPartyId, capacity, isNpcParty: true);
+
+        /// <summary>A Defender hull of the host's own player party.</summary>
+        public MissionObject AddPlayerHull(string mapEventPartyId) => AddHull(mapEventPartyId, 40, isNpcParty: false);
+
+        // Registers a Defender hull this host simulates, with room for capacity queued troops.
+        private MissionObject AddHull(string mapEventPartyId, int capacity, bool isNpcParty)
         {
             var hull = ShipTestHulls.Create();
             Queued[hull] = new List<CoopAgentOrigin>();
             Capacity[hull] = capacity;
-            Assert.True(Registry.TryRegister(new NetworkShipInfo(Guid.NewGuid(), Host, mapEventPartyId, originalOwner == null, hull,
-                null, originalOwner)));
+            Assert.True(Registry.TryRegister(new NetworkShipInfo(Guid.NewGuid(), Host, mapEventPartyId, isNpcParty, hull, null)));
             return hull;
         }
 

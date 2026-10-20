@@ -131,7 +131,7 @@ public class BattleShipConditionStream : IBattleShipConditionStream
     internal static string ValidateCondition(NetworkShipInfo ship, string ownControllerId, NetworkShipCondition condition,
         long acceptedRevision, int acceptedEpoch, IReadOnlyCollection<string> controllersInMission)
     {
-        // A new host numbers an AI or adopted hull's conditions on from its own count, so a newer epoch restarts the order.
+        // A new host numbers an AI hull's conditions on from its own count, so a newer epoch restarts the order.
         var rejection = condition.Stamp.Validate(ship.CurrentAuthority, ownControllerId,
             new AuthorityStamp(ship.CurrentAuthority, acceptedEpoch, acceptedRevision), followsHostEpoch: ship.FollowsBattleHost,
             controllersInMission);

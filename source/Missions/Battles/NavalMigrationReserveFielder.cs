@@ -9,17 +9,17 @@ using TaleWorlds.Core;
 namespace Missions.Battles;
 
 /// <summary>
-/// [Game thread, battle host] Puts the reserve a naval host recovers onto the AI and adopted hulls it simulates. A departed
-/// host's or disconnected player's queued crew left with it; <see cref="IReinforcementFielder"/> recovers those troops from the
-/// roster, and here they join each hull's vanilla reserve, which spawns them as its crew falls.
+/// [Game thread, battle host] Puts the reserve a naval host recovers onto the AI hulls it simulates. A departed host's queued
+/// AI crew left with it; <see cref="IReinforcementFielder"/> recovers those troops from the roster, and here they join each
+/// hull's vanilla reserve, which spawns them as its crew falls.
 /// </summary>
 public interface INavalMigrationReserveFielder
 {
-    /// <summary>[Game thread] Takes newly recovered reserve and queues what fits on the AI and adopted hulls simulated here.</summary>
+    /// <summary>[Game thread] Takes newly recovered reserve and queues what fits on the AI hulls simulated here.</summary>
     void Tick();
 
     /// <summary>
-    /// [Game thread] Recovered reserve of a side that no hull holds yet, while an afloat AI or adopted hull of that side can take it.
+    /// [Game thread] Recovered reserve of a side that no hull holds yet, while an afloat AI hull of that side can take it.
     /// </summary>
     int PendingReserve(BattleSideEnum side);
 
@@ -61,14 +61,12 @@ public class NavalMigrationReserveFielder : INavalMigrationReserveFielder
             var hulls = AfloatHostHulls(side);
             if (hulls.Count == 0) continue;
 
-            // A hull handed back to its returning player left the host the queued troops that did not go with it.
-            pending[(int)side].AddRange(shipReplicator.TakeReserveKeptOnHandBack(side));
             var taken = reinforcementFielder.TakeMigrationReserve(side);
             if (taken.Count > 0)
             {
                 pending[(int)side].AddRange(taken);
                 recovered += taken.Count;
-                Logger.Information("[NavalBattle] Recovered {Count} {Side} reserve troop(s) after a host change or disconnect",
+                Logger.Information("[NavalBattle] Recovered {Count} {Side} reserve troop(s) after a host change",
                     taken.Count, side);
             }
 

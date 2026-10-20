@@ -377,39 +377,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         return taken;
     }
 
-    public IReadOnlyList<IAgentOriginBase> TakeHullReserve(MissionObject hull)
-    {
-        var fake = Of(hull);
-        if (fake.IsCopy) return Array.Empty<IAgentOriginBase>();
-
-        var taken = fake.ReservedOrigins.ToList();
-        fake.ReservedOrigins.Clear();
-        fake.SpawnableReserve = Math.Max(0, fake.SpawnableReserve - taken.Count);
-        return taken;
-    }
-
-    public int FreeCrewCapacity(MissionObject hull)
-    {
-        var fake = Of(hull);
-        return fake.IsCopy || fake.SinkingState > 0 ? 0 : Math.Max(0, fake.CrewCapacity - fake.SpawnableReserve);
-    }
-
     public string CampaignShipIdOf(MissionObject hull) => Of(hull).CampaignShipId!;
-
-    public void TeleportHull(MissionObject hull, MatrixFrame frame)
-    {
-        var fake = Of(hull);
-        fake.Frame = frame;
-        fake.Teleports++;
-        fake.AgentsAboardAtTeleport = AgentsOnDeck(hull).Where(agent => !(crews.TryGetValue(agent, out var crew) && crew == fake)).Count();
-    }
-
-    public void BoardAgent(Agent agent, MissionObject hull)
-    {
-        decks[agent] = Of(hull);
-        crews[agent] = Of(hull);
-        Boarded.Add(agent);
-    }
 
     // The live engine fades the agent out of the mission, which the mission fixture's FadeOut patch mirrors.
     public void WithdrawAgent(Agent agent)
@@ -496,9 +464,6 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
     private static string Describe(FakeHull fake) =>
         $"hull {(fake.ShipId == Guid.Empty ? "(unregistered)" : fake.ShipId.ToString())} ({(fake.IsCopy ? "copy" : "simulated")}, "
         + $"{fake.Side} formation {fake.FormationIndex})";
-
-    /// <summary>The agents <see cref="BoardAgent"/> put aboard a hull.</summary>
-    public List<Agent> Boarded { get; } = new();
 
     /// <summary>The agents <see cref="WithdrawAgent"/> took out of the battle.</summary>
     public List<Agent> Withdrawn { get; } = new();
@@ -605,9 +570,6 @@ public sealed class FakeHull
     public BattleShipSpawnData? SpawnData { get; set; }
     /// <summary>The registry id of the party's campaign ship the hull stands for, or null.</summary>
     public string? CampaignShipId { get; set; }
-    public int Teleports { get; set; }
-    /// <summary>How many agents other than the hull's own crew stood on it at its last teleport.</summary>
-    public int AgentsAboardAtTeleport { get; set; }
     public BattleRopeState[] Ropes { get; set; } = Array.Empty<BattleRopeState>();
     public int FrameWrites { get; set; }
     public int FinalRopesApplied { get; set; }

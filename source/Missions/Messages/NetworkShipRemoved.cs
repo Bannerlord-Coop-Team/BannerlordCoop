@@ -12,12 +12,6 @@ public enum ShipRemovalReason
 
     /// <summary>The owner left the battle any other way, or the hull left the mission without a retreat.</summary>
     Leave,
-
-    /// <summary>
-    /// A returning player's launcher fielded its ship again while the battle host still held the adopted hull of it; the
-    /// duplicate goes, the ship stays in the battle.
-    /// </summary>
-    Reclaimed,
 }
 
 /// <summary>

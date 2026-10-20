@@ -32,7 +32,7 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
     public string Name => "scenario_status";
 
     public string Description =>
-        "Reports the naval scenario's preset, phase, pending steps, hulls per owner, AI hulls, adoption and hand-back phases and result.";
+        "Reports the naval scenario's preset, phase, pending steps, hulls per owner, AI hulls and result.";
 
     public CoopCommandSide Side => CoopCommandSide.Both;
 
@@ -116,8 +116,6 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
                 ai = ship.IsNpcParty,
                 hasWeapon = (ship.Hull as MissionShip)?.ShipSiegeWeapon != null,
             }).ToArray(),
-            // Each player hull with its owner, adopted by the host or handed back, and this client's pending reclaims.
-            handBack = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipReplicator.InspectHandBack(),
             // How the copies exist here and how close every hull pair came, for the ramming preset above all.
             copyModes = NavalCopyBodies.Table.Entries.Select(entry => NavalContactProbe.Short(entry.Value.ShipId) + "=" +
                 NavalCopyBodies.ModeName(entry.Key)).ToArray(),

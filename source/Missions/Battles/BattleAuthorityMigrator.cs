@@ -326,12 +326,19 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         HandlePartyWithdrawal(payload.What.ControllerId, payload.What.InstanceId, "retreated");
     }
 
-    // A disconnect preserves both the remaining reserve and already-fielded agents. The current host adopts a
+    // A land disconnect preserves both the remaining reserve and already-fielded agents. The current host adopts a
     // non-host's agents immediately; a departed host's successor adopts them when the migration assignment lands.
+    // At sea a disconnect withdraws the party like a leave, since its hulls leave with it (D4).
     private void Handle_PeerDisconnected(MessagePayload<MissionPeerDisconnected> payload)
     {
         var controllerId = payload.What.ControllerId;
         if (payload.What.InstanceId != null && payload.What.InstanceId != session.InstanceId) return;
+        if (session.IsNaval)
+        {
+            HandlePartyWithdrawal(controllerId, payload.What.InstanceId, "disconnected");
+            return;
+        }
+
         CancelProvisionalPlayerHandoff(controllerId);
         if (session.IsHostController(controllerId)) return;
         if (!session.IsLocalHost)

@@ -70,11 +70,8 @@ public class NetworkShipInfo
     public string MapEventPartyId { get; }
     public bool IsNpcParty { get; }
 
-    /// <summary>A player's hull the battle host simulates because its owner disconnected, until it is handed back.</summary>
-    public bool IsAdopted => !IsNpcParty && CurrentAuthority != OriginalOwner;
-
-    /// <summary>An AI or adopted hull: it moves with every battle host change, and its states follow the host epoch.</summary>
-    public bool FollowsBattleHost => IsNpcParty || IsAdopted;
+    /// <summary>An AI hull: it moves with every battle host change, and its states follow the host epoch.</summary>
+    public bool FollowsBattleHost => IsNpcParty;
 
     public MissionObject Hull { get; private set; }
     public Formation Formation { get; }

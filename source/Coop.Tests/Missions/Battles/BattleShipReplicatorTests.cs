@@ -254,14 +254,13 @@ public class BattleShipReplicatorTests
             Times.Never);
     }
 
-    // M8b r1: a disconnect keeps the player's hulls, so its record arriving after the disconnect still spawns, under the host.
+    // D4: a disconnect is a leave at sea, so a record the player sent before it dropped spawns nothing here either.
     [Fact]
-    public void AcceptSpawnRecords_FromADisconnectedPlayer_SpawnsTheHullUnderTheBattleHost()
+    public void AcceptSpawnRecords_FromADisconnectedPlayer_SpawnsNothing()
     {
         using var mission = new MissionCurrentScope();
         var harness = new Harness(committed: true);
-        harness.Session.SetupGet(s => s.HostControllerId).Returns("successor");
-        var copy = harness.SetupForeignSpawn();
+        harness.SetupForeignSpawn();
         var record = ForeignRecord(Guid.NewGuid());
 
         harness.Members.Remove(Peer);
@@ -269,10 +268,9 @@ public class BattleShipReplicatorTests
         GameThread.Run(() => { }, blocking: true);
         harness.Replicator.AcceptSpawnRecords(new[] { record });
 
-        Assert.True(harness.Registry.TryGet(record.ShipId, out var ship));
-        Assert.Same(copy, ship.Hull);
-        Assert.Equal("successor", ship.CurrentAuthority);
-        Assert.True(ship.IsAdopted);
+        Assert.False(harness.Registry.TryGet(record.ShipId, out _));
+        harness.Engine.Verify(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out It.Ref<Formation>.IsAny),
+            Times.Never);
     }
 
     [Fact]
@@ -452,20 +450,20 @@ public class BattleShipReplicatorTests
             Times.Never);
     }
 
-    // M8b r2: a hull the departing host adopted follows the battle host, so its record still waiting here is kept and spawns
-    // under the next host.
+    // An AI hull follows the battle host, so its record still waiting here when the host departs is kept and spawns under the
+    // next host.
     [Fact]
-    public void RemoveHullsOf_KeepsAWaitingAdoptedRecordOfTheDepartingHost_AndSpawnsItUnderTheNextHost()
+    public void RemoveHullsOf_KeepsAWaitingAiRecordOfTheDepartingHost_AndSpawnsItUnderTheNextHost()
     {
         using var mission = new MissionCurrentScope();
         var harness = new Harness(committed: true);
         bool deploying = true;
         harness.Engine.SetupGet(e => e.IsDeploymentMode).Returns(() => deploying);
         harness.SetupForeignSpawn();
-        var adopted = new BattleShipSpawnData(Guid.NewGuid(), Peer, "MapEventParty_2", false, BattleSideEnum.Defender, 0,
+        var aiRecord = new BattleShipSpawnData(Guid.NewGuid(), Peer, "MapEventParty_2", true, BattleSideEnum.Defender, 0,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null,
-            100f, 50f, 1, "", originalOwnerControllerId: "player_b");
-        harness.Replicator.AcceptSpawnRecords(new[] { adopted });
+            100f, 50f, 1, "", originalOwnerControllerId: "first_host");
+        harness.Replicator.AcceptSpawnRecords(new[] { aiRecord });
 
         harness.Replicator.RemoveHullsOf(Peer);
         harness.Members.Remove(Peer);
@@ -475,11 +473,10 @@ public class BattleShipReplicatorTests
         harness.Replicator.Tick(0.1f);
         harness.Replicator.Tick(0.1f);
 
-        Assert.True(adopted.FollowsBattleHost);
-        Assert.True(harness.Registry.TryGet(adopted.ShipId, out var ship));
+        Assert.True(aiRecord.FollowsBattleHost);
+        Assert.True(harness.Registry.TryGet(aiRecord.ShipId, out var ship));
         Assert.Equal(Own, ship.CurrentAuthority);
-        Assert.Equal("player_b", ship.OriginalOwner);
-        Assert.True(ship.IsAdopted);
+        Assert.Equal("first_host", ship.OriginalOwner);
     }
 
     // M8a: the owner tells peers once its announced hull leaves; a swap, a hull nobody knows of yet and an AI hull at the
@@ -866,47 +863,32 @@ public class BattleShipReplicatorTests
         harness.Engine.Verify(e => e.ParkHullAgents(It.IsAny<MissionObject>()), Times.Never);
     }
 
-    // M8b: a disconnected player's hull goes to the battle host, follows the host from then on, and the host numbers its samples
-    // from its own count.
+    // D4: a disconnect removes the player's hulls as a leave does, after parking their decks; the AI hulls it simulated stay
+    // and move to the next host with the migration, while another player's hull stays with its owner.
     [Fact]
-    public void AdoptHullsOf_MovesOnlyThatPlayersHulls_AndTheHostsFirstSampleIsAccepted()
+    public void MissionPeerDisconnected_RemovesThePlayersHulls_AndTheAiHullsItHeldMoveWithTheMigration()
     {
+        using var mission = new MissionCurrentScope();
         var harness = new Harness(committed: true);
-        var peerShip = RegisterForeign(harness, Peer, isNpcParty: false);
-        var otherShip = RegisterForeign(harness, "someone_else", isNpcParty: false);
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(peerShip.ShipId, Peer, 40,
-            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), hostEpoch: HostEpoch));
-
-        Assert.Equal(1, harness.Replicator.AdoptHullsOf(Peer, "successor"));
-        harness.Replicator.AcceptSample(new NetworkBattleShipSample(peerShip.ShipId, "successor", 1,
-            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), hostEpoch: HostEpoch));
-
-        Assert.Equal("successor", peerShip.CurrentAuthority);
-        Assert.True(peerShip.IsAdopted);
-        Assert.True(peerShip.FollowsBattleHost);
-        Assert.Equal("someone_else", otherShip.CurrentAuthority);
-        var stream = JObject.FromObject(harness.Replicator.Inspect())["ships"]!
-            .Single(ship => (Guid)ship["shipId"]! == peerShip.ShipId);
-        Assert.Equal(1L, (long)stream["accepted"]!);
-        Assert.True((bool)stream["adopted"]!);
-    }
-
-    // A disconnected host's own hull moves to its successor with the AI hulls; a player's hull whose owner is present stays.
-    [Fact]
-    public void TransferHostHulls_TakesTheHullsOfADisconnectedPlayer_AndLeavesAPresentPlayersHull()
-    {
-        var harness = new Harness(committed: true);
-        var departedHostShip = RegisterForeign(harness, Peer, isNpcParty: false);
+        var departedShip = RegisterForeign(harness, Peer, isNpcParty: false);
+        var aiShip = RegisterForeign(harness, Peer, isNpcParty: true);
         var presentShip = RegisterForeign(harness, "someone_else", isNpcParty: false);
+
         harness.Members.Remove(Peer);
         harness.Broker.Publish(this, new MissionPeerDisconnected(Peer, Instance));
         GameThread.Run(() => { }, blocking: true);
+        harness.Replicator.Tick(0.1f);
+        harness.Engine.Verify(e => e.ParkHullAgents(departedShip.Hull), Times.Once);
+        harness.Engine.Verify(e => e.RemoveHull(It.IsAny<MissionObject>()), Times.Never);
+        harness.Replicator.Tick(0.1f);
+        int transferred = harness.Replicator.TransferHostHulls("successor");
 
-        Assert.Equal(1, harness.Replicator.TransferHostHulls("successor"));
-
-        Assert.Equal("successor", departedHostShip.CurrentAuthority);
-        Assert.True(departedHostShip.IsAdopted);
+        harness.Engine.Verify(e => e.RemoveHull(departedShip.Hull), Times.Once);
+        Assert.Equal(ShipLifecycle.Removed, harness.Registry.StateOf(departedShip.ShipId));
+        Assert.Equal(1, transferred);
+        Assert.Equal("successor", aiShip.CurrentAuthority);
         Assert.Equal("someone_else", presentShip.CurrentAuthority);
+        Assert.Equal(1, harness.Replicator.DepartedHulls(BattleSideEnum.Defender));
     }
 
     private static NetworkShipInfo RegisterForeign(Harness harness, string owner, bool isNpcParty)
@@ -1099,44 +1081,23 @@ public class BattleShipReplicatorTests
         Assert.Equal(record.CustomSailPatternId, copy.CustomSailPatternId);
     }
 
-    // M8b: an adopted hull's record names the player who fielded it and that player's campaign ship.
+    // An AI hull a later host simulates keeps naming the host that fielded it, and every record its campaign ship.
     [Fact]
     public void SpawnRecord_RoundTripsTheOriginalOwnerAndCampaignShip_AndAnOwnRecordNamesItsOwner()
     {
-        var adopted = new BattleShipSpawnData(Guid.NewGuid(), "host", "MapEventParty_1", false, BattleSideEnum.Defender, 2,
+        var migrated = new BattleShipSpawnData(Guid.NewGuid(), "host", "MapEventParty_1", true, BattleSideEnum.Defender, 2,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
             "", Peer, "MobileParty_peer_0");
         var own = new BattleShipSpawnData(Guid.NewGuid(), Peer, "MapEventParty_1", false, BattleSideEnum.Defender, 2,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
             "", Peer);
 
-        var copies = Serializer.DeepClone(new NetworkSpawnBattleShips(new[] { adopted, own })).Ships;
+        var copies = Serializer.DeepClone(new NetworkSpawnBattleShips(new[] { migrated, own })).Ships;
 
         Assert.Equal(Peer, copies[0].OriginalOwner);
         Assert.Equal("MobileParty_peer_0", copies[0].CampaignShipId);
         Assert.Equal(Peer, copies[1].OriginalOwner);
         Assert.Null(copies[1].OriginalOwnerControllerId);
-    }
-
-    [Fact]
-    public void HandedBack_RoundTripsTheFrameConditionAndReserve_AndAnEmptyReserveArrivesNull()
-    {
-        var handedBack = new NetworkShipHandedBack(Guid.NewGuid(), "host", Peer, HostEpoch, MovedFrame(), Condition(55f),
-            "MapEventParty_1", new[] { new global::GameInterface.Services.MapEvents.TroopSupply.TroopReserveEntry(7, "troop", 0, 0, 30f) });
-        var empty = new NetworkShipHandedBack(Guid.NewGuid(), "host", Peer, HostEpoch, MovedFrame(), Condition(55f),
-            "MapEventParty_1", null);
-
-        var copy = Serializer.DeepClone(handedBack);
-
-        Assert.True(copy.IsValid);
-        Assert.Equal(handedBack.Frame, copy.Frame);
-        Assert.Equal(55f, copy.Condition.HitPoints);
-        var entry = Assert.Single(copy.Reserve);
-        Assert.Equal(7, entry.Seed);
-        Assert.Equal("troop", entry.CharacterId);
-        Assert.Equal(30f, entry.Health);
-        Assert.Null(Serializer.DeepClone(empty).Reserve);
-        Assert.False(new NetworkShipHandedBack(Guid.NewGuid(), Peer, Peer, HostEpoch, MovedFrame(), Condition(55f), null, null).IsValid);
     }
 
     [Fact]

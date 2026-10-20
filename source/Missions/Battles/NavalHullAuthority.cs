@@ -58,13 +58,10 @@ public enum DepartingCrew
     All,
 
     /// <summary>
-    /// Hulls whose owner stays in the battle (a per-ship retreat, a returning player's duplicate): nobody withdraws here,
-    /// since the owner keeps whoever its removal left alive and the crew it fades reaches peers as routs.
+    /// Hulls whose owner stays in the battle (a per-ship retreat): nobody withdraws here, since the owner keeps whoever its
+    /// removal left alive and the crew it fades reaches peers as routs.
     /// </summary>
     None,
-
-    /// <summary>This client's own duplicate of a handed-back hull: only the crew parked off it withdraw, never the main agent.</summary>
-    ParkedOwn,
 }
 
 /// <inheritdoc cref="INavalHullAuthority"/>
@@ -225,11 +222,10 @@ public class NavalHullAuthority : INavalHullAuthority
         }
     }
 
-    // Crew is a formation match, so an own duplicate withdraws only the crew parked off it; the player's hero can share that
-    // formation. An agent is crew when any departing hull's parking counted it as such.
+    // Crew is a formation match, so the player's hero can share it; an agent is crew when any departing hull's parking
+    // counted it as such.
     private bool IsWithdrawn(HullRemoval removal, HullSwapAgent moved) =>
-        removal.Crew != DepartingCrew.None && moved.IsCrew && !engine.IsMainAgent(moved.Agent)
-        && (removal.Crew == DepartingCrew.All || moved.IsParked);
+        removal.Crew == DepartingCrew.All && moved.IsCrew && !engine.IsMainAgent(moved.Agent);
 
     private void UnparkTheRest(HullRemoval removal, HashSet<Agent> withdrawn)
     {
