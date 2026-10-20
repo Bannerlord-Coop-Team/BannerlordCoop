@@ -39,6 +39,9 @@ public interface INavalHullAuthority : IDisposable
     /// <summary>The hulls <see cref="Remove"/> queued and not yet removed; nobody may move onto them, as they go with whoever stands there.</summary>
     IReadOnlyCollection<MissionObject> HullsBeingRemoved { get; }
 
+    /// <summary>The hulls a swap replaces on its next <see cref="Tick"/>; nobody may move onto them, as they go then.</summary>
+    IReadOnlyCollection<MissionObject> HullsBeingReplaced { get; }
+
     bool IsReplacing(Guid shipId);
 
     /// <summary>The replacement step a hull is at, or null (diagnostics).</summary>
@@ -133,6 +136,13 @@ public class NavalHullAuthority : INavalHullAuthority
     public bool IsReplacing(Guid shipId) => hullSwaps.Any(swap => swap.ShipId == shipId);
 
     public IReadOnlyCollection<MissionObject> HullsBeingRemoved => hullRemovals.SelectMany(removal => removal.Hulls).ToList();
+
+    // A parking swap still waits on the deployment and a boarding one already has its fresh hull, so only these are going.
+    public IReadOnlyCollection<MissionObject> HullsBeingReplaced => hullSwaps
+        .Where(swap => swap.Phase == HullSwapPhase.ReplaceHull)
+        .Select(swap => Registry.TryGet(swap.ShipId, out var ship) ? ship.Hull : null)
+        .Where(hull => hull != null)
+        .ToList();
 
     public string SwapPhaseOf(Guid shipId) => hullSwaps.FirstOrDefault(swap => swap.ShipId == shipId)?.Phase.ToString();
 

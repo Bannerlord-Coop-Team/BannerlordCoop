@@ -147,6 +147,35 @@ public class NavalHullAuthorityTests
             Times.Once);
     }
 
+    // R41a fix-loop C3: only a swap that parked its agents is about to replace its hull. One parking through the deployment,
+    // or one boarding its fresh hull, leaves a hull agents may move onto.
+    [Fact]
+    public void HullsBeingReplaced_HoldsOnlyTheHullOfASwapAboutToReplaceIt()
+    {
+        var (authority, registry, engine, _) = Create();
+        var hull = ShipTestHulls.Create();
+        var fresh = ShipTestHulls.Create();
+        var ship = new NetworkShipInfo(Guid.NewGuid(), Own, "MapEventParty_2", true, hull, null);
+        registry.TryRegister(ship);
+        engine.Setup(e => e.ParkHullAgents(hull)).Returns(Array.Empty<HullSwapAgent>());
+        engine.Setup(e => e.ReplaceHull(hull)).Returns(fresh);
+        engine.SetupGet(e => e.IsDeploymentMode).Returns(true);
+        authority.Replace(ship.ShipId);
+
+        authority.Tick();
+        var whileDeploying = authority.HullsBeingReplaced;
+        engine.SetupGet(e => e.IsDeploymentMode).Returns(false);
+        authority.Tick();
+        var whileParked = authority.HullsBeingReplaced;
+        authority.Tick();
+        var whileBoarding = authority.HullsBeingReplaced;
+
+        Assert.Empty(whileDeploying);
+        Assert.Equal(new[] { hull }, whileParked);
+        Assert.True(authority.IsReplacing(ship.ShipId));
+        Assert.Empty(whileBoarding);
+    }
+
     [Fact]
     public void SuppressSpawnRegistration_HoldsUntilEveryScopeCloses()
     {
