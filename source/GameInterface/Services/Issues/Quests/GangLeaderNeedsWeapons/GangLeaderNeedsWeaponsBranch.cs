@@ -1,4 +1,4 @@
-namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsWeapons;
+﻿namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsWeapons;
 
 internal enum GangLeaderNeedsWeaponsBranch : byte
 {

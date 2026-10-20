@@ -1,4 +1,4 @@
-using TaleWorlds.CampaignSystem;
+﻿using TaleWorlds.CampaignSystem;
 
 namespace E2E.Tests.Services.Issues;
 

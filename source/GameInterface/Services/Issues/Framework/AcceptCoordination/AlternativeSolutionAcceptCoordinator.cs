@@ -123,7 +123,9 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor) ||
             descriptor.AlternativeSolutionAcceptStrategy == null ||
             !issue.IsOngoingWithoutQuest ||
-            !acceptPreconditions.CanTake(issue, playerHero, player.ControllerId))
+            !acceptPreconditions.CanTake(issue, playerHero, player.ControllerId) ||
+            descriptor.AlternativeSolutionAcceptStrategy is IAlternativeSolutionAcceptPrecondition precondition &&
+            !precondition.CanAccept(issue, playerHero))
         {
             Reject(peer, data, playerHero);
             return;

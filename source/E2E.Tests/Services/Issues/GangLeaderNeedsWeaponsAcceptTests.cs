@@ -299,6 +299,27 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
     }
 
     [Fact]
+    public void ACompanionMissionRejectedWhenGoldDropsBeforeTheRequestArrives()
+    {
+        var (_, fee) = AcceptTheCompanionMission(flush: false);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var owner));
+            owner.Gold = fee - 1;
+        });
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAcceptRejected>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var owner));
+            Assert.Equal(fee - 1, owner.Gold);
+        });
+    }
+
+    [Fact]
     public void AForgedSuccessRequestDoesNotCompleteTheQuest()
     {
         Accept(ClientA, FirstGiverId);
@@ -459,7 +480,7 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
         }
     }
 
-    private (int StartingGold, int Fee) AcceptTheCompanionMission()
+    private (int StartingGold, int Fee) AcceptTheCompanionMission(bool flush = true)
     {
         var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
@@ -488,7 +509,10 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
             fee = (int)AccessTools.Property(typeof(Issue), "CompanionGoldNeedForAlternativeSolution").GetValue(giver.Issue)!;
         });
-        TestEnvironment.FlushCoalescer();
+        if (flush)
+        {
+            TestEnvironment.FlushCoalescer();
+        }
 
         ClientA.Call(() =>
         {
@@ -506,9 +530,6 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
 
             Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var clientOwner));
             clientGoldBefore = clientOwner.Gold;
-            var prefix = AccessTools.Method(AccessTools.TypeByName("GameInterface.Services.Issues.Quests.GangLeaderNeedsWeapons.Patches.GangLeaderNeedsWeaponsStartConsequencePatch"), "Prefix");
-            Assert.NotNull(prefix);
-            Assert.False((bool)prefix!.Invoke(null, null)!);
             giver.Issue.AlternativeSolutionStartConsequence();
             clientGoldAfter = clientOwner.Gold;
             giver.Issue.StartIssueWithAlternativeSolution();

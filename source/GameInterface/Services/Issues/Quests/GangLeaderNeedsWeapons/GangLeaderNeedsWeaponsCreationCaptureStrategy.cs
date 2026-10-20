@@ -1,7 +1,9 @@
-using GameInterface.Services.Issues.Framework.Interface;
+﻿using GameInterface.Services.Issues.Framework.Interface;
 using System.IO;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using Issue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsWeaponsIssueQuestBehavior.GangLeaderNeedsWeaponsIssue;
 
 namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsWeapons;
@@ -58,24 +60,55 @@ internal class GangLeaderNeedsWeaponsCreationCaptureStrategy : ICreationCaptureS
             return false;
         }
 
-        var issue = new Issue(issueOwner);
+        var settlement = issueOwner.CurrentSettlement;
+        if (settlement.Town == null || settlement.OwnerClan == Clan.PlayerClan || settlement.Town.Loyalty >= 75f)
+        {
+            return false;
+        }
 
-        // The issue only exists to be read, vanilla's constructor listens to settlement owner changes for it
-        CampaignEvents.OnSettlementOwnerChangedEvent.ClearListeners(issue);
-
+        var averagePrice = CalculateAveragePriceForWeaponClass(WeaponClass.OneHandedAxe);
         // No market sells the weapon, so the quest would ask for nothing
-        if (issue._averagePriceForItem <= 0)
+        if (averagePrice <= 0)
         {
             return false;
         }
 
-        // A town the player owns or one that is too loyal would lose the issue on the next daily tick
-        if (!issue.IssueStayAliveConditions())
+        using (var stream = new MemoryStream())
+        using (var writer = new BinaryWriter(stream))
         {
-            return false;
+            writer.Write(0);
+            writer.Write(averagePrice);
+            writer.Flush();
+            captured = stream.ToArray();
         }
 
-        captured = Capture(issue);
         return true;
+    }
+
+    private static int CalculateAveragePriceForWeaponClass(WeaponClass weaponClass)
+    {
+        var totalPrice = 0;
+        var totalAmount = 0;
+
+        foreach (var settlement in Settlement.All)
+        {
+            if (!settlement.IsTown)
+            {
+                continue;
+            }
+
+            for (var i = 0; i < settlement.ItemRoster.Count; i++)
+            {
+                var item = settlement.ItemRoster[i];
+                var weaponComponent = item.EquipmentElement.Item.WeaponComponent;
+                if (weaponComponent != null && weaponComponent.PrimaryWeapon.WeaponClass == weaponClass)
+                {
+                    totalAmount += item.Amount;
+                    totalPrice += item.EquipmentElement.ItemValue;
+                }
+            }
+        }
+
+        return totalPrice / (totalAmount == 0 ? 1 : totalAmount);
     }
 }

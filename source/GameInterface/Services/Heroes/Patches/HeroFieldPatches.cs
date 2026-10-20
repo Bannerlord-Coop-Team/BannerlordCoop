@@ -64,7 +64,10 @@ namespace GameInterface.Services.Heroes.Patches
         {
             foreach(var method in AccessTools.GetDeclaredMethods(typeof(Hero)))
             {
-                yield return method;
+                if (method.Name != nameof(Hero.AddPower))
+                {
+                    yield return method;
+                }
             }
             yield return AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.CheckLevel));
             yield return AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.ClearHeroLevel));
