@@ -140,7 +140,6 @@ public class SmugglersTests : IDisposable
         ClientA.Call(() =>
         {
             var quest = QuestOf(ClientA);
-            quest.GetPersuasionTask();
             quest.SucceedQuest(null);
         });
 
@@ -153,7 +152,6 @@ public class SmugglersTests : IDisposable
         ClientA.Call(() =>
         {
             var quest = QuestOf(ClientA);
-            quest.GetPersuasionTask();
             quest.SucceedQuest(null);
         });
 
