@@ -8,7 +8,6 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Finalization;
-using GameInterface.Services.Issues.Framework.Resolvers;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
@@ -28,7 +27,6 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-    private readonly IIssueResolver issueResolver;
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
     private readonly Dictionary<SessionKey, string> sessions = new();
@@ -37,14 +35,12 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        IIssueResolver issueResolver,
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
-        this.issueResolver = issueResolver;
         this.ownership = ownership;
         this.playerManager = playerManager;
 
@@ -122,7 +118,7 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
             Hero hero = null;
             MobileParty party = null;
             MobileParty targetParty = null;
-            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out issue, out _) ||
+            if (!TryResolveIssue(data.IssueOwnerId, data.IssueId, out issue) ||
                 !issue.IsSolvingWithQuest ||
                 data.Generation != issue.StringId ||
                 !ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out owner) || owner != player.ControllerId ||
@@ -189,6 +185,13 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
 
         party = null;
         return false;
+    }
+
+    private bool TryResolveIssue(string issueOwnerId, string issueId, out IssueBase issue)
+    {
+        issue = null;
+        return objectManager.TryGetObject<Hero>(issueOwnerId, out var owner) &&
+            (issue = owner.Issue) != null && issue.StringId == issueId;
     }
 
     private static bool AreTogether(MobileParty owner, MobileParty target)
