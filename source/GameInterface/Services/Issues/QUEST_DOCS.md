@@ -44,20 +44,16 @@ copied.
   executions finalize the server's mirror outside any owner scope, and cleanup that looks at `PlayerClan` finds
   nothing. If vanilla's cancel needs the owner's party and they have none at that moment, retry it later; don't
   drop it. (#3781, #3796)
-- **A merge can undo a framework fix.** After merging development, re-read framework files your PR touched. The
-  issue-scoped `IIssueOwnershipRegistry.Remove` became the owner-wide `Remove` again in a conflict resolution, so a
-  queued finalize removed the hero's next issue. (#3952)
-- **Debug completion skips the branch.** `coop.debug.issues.complete` ends the quest without the branch method,
-  so it proves nothing about rewards (see `AGENTS.md`, Verification).
+- **A merge can undo a framework fix.** After merging development, re-read framework files your PR touched. A
+  conflict resolution can quietly bring back the old version of a framework method.
 
 ### Server authority
 
-- **Ownership is not enough to accept a request.** A request handler that checks only the owner and the generation
-  lets the owner skip the game: `HearCounterOffer` before the target was beaten, `PersuasionSucceeded` after one
-  failed try, a troop deposit right after sending the companion, a delivery away from the giver's settlement.
-  Check the game state that vanilla's dialog condition checks. (#3810, #3832, #3834)
-- **A generic `QuestSuccess` skips the proof.** Reject it for any descriptor with a `FinalizationProofStrategy`
-  until #3981 lands (rule 2). (#3796, #3834)
+- **Ownership is not enough to accept a request.** A request sent from a stale dialog or a double-click can arrive
+  when the game state no longer allows it: `HearCounterOffer` before the target was beaten, `PersuasionSucceeded`
+  after one failed try, a troop deposit right after sending the companion, a delivery away from the giver's
+  settlement. A handler that checks only the owner and the generation applies it anyway. Check the game state that
+  vanilla's dialog condition checks. (#3810, #3832, #3834)
 - **Server checks must run as the owner.** `CanAccept`, fee and difficulty checks that run before
   `MainHeroSubstitutionScope` and `IssueDifficultyOverride` use the server's own `PlayerProgress`, which is per
   machine. Run them in the same scope as the charge. (#3834)
@@ -98,8 +94,6 @@ copied.
 - **Debug capture must not build live objects.** `new Issue(...)` on the server with patches active registers a
   roster and sends it to every client, and it's never destroyed. Work the values out without constructing the
   issue. (#3834)
-- **Debug capture must respect `IssueStayAliveConditions`.** An owner the conditions reject makes an issue that
-  ends on the next daily tick (Adding a quest type, step 2). (#3832)
 
 ### Harmony
 
@@ -134,7 +128,6 @@ copied.
 - **Framework code doesn't know quests.** A shared handler like `MapEventResultsHandler` publishes a message that
   the quest's strategy subscribes to. When two quests need the same postfix, it goes in the framework. (#3810,
   #3832)
-- **No host-party edge cases.** The host never opens a conversation and isn't a player. (#3821)
 - **Decision callbacks reject on exception.** Wrap them like `AlternativeSolutionAcceptCoordinator.AcceptOnServer`
   does, or the client keeps waiting. (#3795)
 - **Reading a capture fails cleanly on truncated data.** Check lengths before `BinaryReader.ReadString()`. (#3798)
@@ -147,6 +140,4 @@ copied.
 - **Use `ContainerProvider.TryResolve(out var x)`** instead of ignoring the result and null-checking twice.
   (#3952)
 - **Keep `README.md` and `AGENTS.md` current** when a PR adds a registered quest or closes a known gap. (#3832)
-- **Live-test the flows the change touches, on the exact head.** That means real UI, two clients, success and
-  failure, the non-owner's view and a rejoin. List each flow as live, in-process only, or not run (see
-  `AGENTS.md`, Verification). A flow the tooling can't drive means the tooling needs support, not a gap in the PR.
+- **A flow the live-test tooling can't drive** means the tooling needs support, not a gap in the PR.
