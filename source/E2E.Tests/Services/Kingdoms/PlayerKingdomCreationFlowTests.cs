@@ -5016,7 +5016,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         }
     }
 
-    // Two player clans vote on declare-war decisions proposed by the first player's clan.
     // Returns the last round status the server sent for the kingdom.
     private KingdomDecisionRoundStatusData GetLatestRoundStatus(string kingdomId)
     {
@@ -5026,6 +5025,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             .Status;
     }
 
+    // Two player clans vote on declare-war decisions proposed by the first player's clan.
     private (EnvironmentInstance Client1, EnvironmentInstance Client2, PlayerContext Player1, PlayerContext Player2, string KingdomId)
         SetUpPlayerDeclareWarVotes(string targetControllerId, int decisionCount = 1)
     {
