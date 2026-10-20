@@ -26,8 +26,11 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 - `BattleShipWeaponReplicator` sends a ship weapon's aim and ammo state at 10 Hz plus each shot. A copy replays the shot
   with a projectile that deals no damage.
 - `AgentStationUseReplicator` sends seat and release events (helm, oars, weapon). Puppets are seated on copies the way the
-  owner seated them. A dropped item on a deck is no station: its pickup goes through `WeaponPickupHandler`, and a seat is
-  only re-seated while its point is still a station of its hull (R41a-2 W2).
+  owner seated them. A dropped item on a deck is no station: its pickup goes through `WeaponPickupHandler`, the use and
+  release patches never publish it, `NavalShipEngine` neither describes nor resolves it as a station, and a seat is only
+  re-seated while its point is still a station of its hull (R41a-2 W2). A deactivated machine is still seated, since its
+  state is recomputed locally and can lag the owner's. A use published on an agent tick worker is announced on the game
+  thread.
 - A hit on a hull that another client simulates is routed to that owner, which applies it once through the vanilla damage
   method (`BattleShipDamageRouter`).
 - Every stream is ordered by `AuthorityStamp` (host epoch, then revision) and drops traffic from a controller that is not
@@ -114,13 +117,16 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
     main agent is deregistered and faded, the way vanilla fades a removed hull's crew.
   - `None`: the owner stays in the battle (per-ship retreat). The owner fades its crew and that reaches peers as routs.
 - **Hull removal first, party withdrawal after (R41a-2).** At sea the ship replicator owns a player's departure. On
-  `MissionPeerLeft` it queues `RemoveHullsOf`, then `NavalHullAuthority.AfterRemovalsOf`, which runs
-  `IBattlePartyWithdrawal.WithdrawParty` the tick after no removal of that owner is queued or under way (one in flight from
-  `NetworkShipRemoved` included) and no swap holds agents parked. So the hull removal withdraws the crew, and the party
-  withdrawal only fades what was left off the leaver's hulls, selected by ownership across every holder.
-  `BattleAuthorityMigrator` still does its bookkeeping at once (the provisional hand-off, the withdrawn-host mark the
-  successor's adoption reads) and fades the party at once only on land. Before this, the migrator subscribed first and
-  faded the crew before the replicator's removal, which then parked and withdrew 0 of 0 (R41a-2 W2, D, E).
+  `MissionPeerLeft` it reads whether the leaver was the host, queues `RemoveHullsOf` and keeps a pending withdrawal for
+  it. Its tick, before the hull step, calls `IBattlePartyWithdrawal.WithdrawParty` once
+  `NavalHullAuthority.IsSettledFor` the leaver: no removal of its hulls queued or under way (one in flight from
+  `NetworkShipRemoved` included) and no swap holding agents parked, so it runs the tick after the removal finished. So
+  the hull removal withdraws the crew, and the party withdrawal only fades what was left off the leaver's hulls, selected
+  by ownership across every holder. A re-entry drops the pending withdrawal, which would otherwise fade the returner's
+  fresh troops of the same party. `BattleAuthorityMigrator` still does its bookkeeping at once (the provisional
+  hand-off, the withdrawn-host mark the successor's adoption reads) and fades the party at once only on land. Before
+  this, the migrator subscribed first and faded the crew before the replicator's removal, which then parked and withdrew
+  0 of 0 (R41a-2 W2, D, E).
 
 ### The removal invariant
 
@@ -168,12 +174,13 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   mission start (`BattleMissionStartHandler`); the conclusion closes its encounter. These rules live in one place,
   `IBattleHostRetentionPolicy` (`GameInterface/Services/MapEvents/BattleHostRetentionPolicy.cs`). Land still promotes a
   successor that must report again.
-- **A missing own reserve ends the mission.** `CoopNavalReserveGuard` checks the reserve in `EarlyStart` and ends the
+- **A missing own reserve ends the mission.** `CoopNavalSetupGuard` checks the reserve in `EarlyStart` and ends the
   mission from its first `OnPreDisplayMissionTick` (an `EndMission` in `EarlyStart` is undone by `Mission.AfterStart`).
   A player team with no troops gets no ship, and a reserve without the player hero (a wounded hero left out of the
-  rebuilt reserve, R41a-2 S) has no player troop, so `CoopNavalPlayerTeamAllocationPatch` skips vanilla's initial player
-  allocation, which would throw every tick, and has the guard end the mission. The player sees the guard's message and
-  goes back to the map, as in vanilla where a wounded hero can't enter a battle.
+  rebuilt reserve, R41a-2 S) has no player troop, so the allocation prefix in `CoopNavalTeamSetupFailurePatches` skips
+  vanilla's initial player allocation, which would throw every tick, and has the guard end the mission. The player gets
+  a message for the reason (the reserve one only for a missing reserve) and goes back to the map, as in vanilla where a
+  wounded hero can't enter a battle.
 - **A failed naval team setup ends the mission.** A throw in `DeploymentMissionController.SetupTeams` leaves
   `TeamSetupOver` unset, so vanilla re-runs it every tick and deploys every side again (R41a-2 S: 161 hulls, then a
   native crash). `CoopNavalTeamSetupFailurePatches` marks the guard's `SetupFailed` on the first throw, which ends the
@@ -247,7 +254,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | R39 | `c923f9527` | Pass: 8 battles, no crash; `late_join` works; `allied_npc` fields no allied hulls; the duel loser's ships vanish (Jordan). |
 | R40 | `a9475656d` | Natural ends pass; blocked by two native crashes on the survivor when a player left a concluded battle (crew left parked after the removal). |
 | R41a | `6eceafdcc` | A, B, C pass (R40 crashes gone, removal invariant held); D fails, E partial. The preset's disconnect was a graceful leave, so adoption and hand-back never ran; the returner had an empty reserve and hung in deployment (guard's `EndMission` undone by `AfterStart`, then a per-tick NRE on a missing hull); the host left first and the map event was orphaned. The ballista NRE crash found during R41a was fixed in `20b3e4c80`. Led to D4. |
-| R41a-2 | `9f643fc36` | W1 (`vs_pirates weapons=1`, ballistas ran 156 s), D (`who=nonhost` hard drop and rejoin), E (hard host drop, migration, rejoin) and K (kept host) pass. W2 fails: the rejoined client crashed natively 15 s in, a deck item pickup replicated as a station use and its puppet re-seated onto the removed item (fixed: pickups are no stations, re-seats need the point still on its hull). S fails: a returner whose wounded hero was left out of its rebuilt reserve threw in vanilla's player allocation every tick, re-running team setup and spawning 161 hulls (fixed: `CoopNavalPlayerTeamAllocationPatch` needs the player origin, and a failed naval setup ends the mission once). Also fixed after the run: the leaver's crew was faded before its hull removal (party withdrawal now follows the removal), a late joiner dropped the host's hull record that beat its membership (now held), and the `migration` preset dropped the successor too and left an early-pulled returner unready. |
+| R41a-2 | `9f643fc36` | W1 (`vs_pirates weapons=1`, ballistas ran 156 s), D (`who=nonhost` hard drop and rejoin), E (hard host drop, migration, rejoin) and K (kept host) pass. W2 fails: the rejoined client crashed natively 15 s in, a deck item pickup replicated as a station use and its puppet re-seated onto the removed item (fixed: pickups are no stations, re-seats need the point still on its hull). S fails: a returner whose wounded hero was left out of its rebuilt reserve threw in vanilla's player allocation every tick, re-running team setup and spawning 161 hulls (fixed: the player allocation in `CoopNavalTeamSetupFailurePatches` needs the player origin, and a failed naval setup ends the mission once). Also fixed after the run: the leaver's crew was faded before its hull removal (party withdrawal now follows the removal), a late joiner dropped the host's hull record that beat its membership (now held), and the `migration` preset dropped the successor too and left an early-pulled returner unready. |
 
 ## 6. Open decisions and known limits
 
@@ -297,6 +304,16 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - `BattleHostHandler` tracks a controller in four overlapping sets (`PresentControllers`, `AbsentControllers`,
     `HostOwnedOfflineControllers`, `WithdrawnControllers`), which should become one status per controller;
   - `BattleHostHandler` is too big: membership and the health withdrawal should move out into their own services.
+- **Follow-ups from the R41a-2 review (not done):**
+  - `BattleAuthorityMigrator.DespawnPartyTroops` repeats `BattleTroopWithdrawal.Deregister` per agent; hoist it into the
+    withdrawal and inject that;
+  - the ship replicator's `departedOwners` is a second membership view next to `IMissionContext`, which could own it;
+  - `BattleShipReplicator.cs` (about 1090 lines) and `BattleAuthorityMigrator.cs` (about 860) are too big and should be
+    split;
+  - a station use published on an agent tick worker is announced at the next game-thread drain, so a release of the same
+    agent on the game thread in that frame would be numbered first and leave the puppet seated on peers; not seen live;
+  - the `migration` preset fixes who drops by the first host each client sees, so a client whose mission starts only
+    after the host dropped would take the successor for it.
 - **Boarding.** Ropes and bridges replicate, but plank crossing and melee on a foreign deck were never seen live, and a
   rope cut from the target side isn't replicated.
 - **Sea raids** still open the land raid scene.
