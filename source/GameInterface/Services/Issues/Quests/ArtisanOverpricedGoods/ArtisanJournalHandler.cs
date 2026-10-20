@@ -75,8 +75,8 @@ internal class ArtisanJournalHandler : IHandler
         var issue = payload.What.Issue;
         if (issue.IsSolvingWithLordSolution || !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
         var entries = issue.IssueQuest?.JournalEntries ?? issue.JournalEntries;
-        if (players.TryGetPlayer(issue.IssueOwner, out var player) &&
-            players.TryGetPeer(player.ControllerId, out var peer))
+        if (owners.TryGetOwnerControllerId(issue, out var controllerId) &&
+            players.TryGetPeer(controllerId, out var peer))
             network.Send(peer, new NetworkArtisanJournal(giverId, issue.StringId, entries.Select(log => log.LogText).ToArray()));
     }
 
