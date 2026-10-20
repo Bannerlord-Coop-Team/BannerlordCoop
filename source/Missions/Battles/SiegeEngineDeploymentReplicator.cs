@@ -362,35 +362,31 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
     }
 
     // Mirrors the vanilla teardown for BOTH sides (RemoveDeploymentPoints for the player side and
-    // the one DeployAllSiegeWeaponsOfAi runs for the AI side — both blocked on non-deployers),
-    // applied under AllowedThread so the disables don't re-capture. Returns false while the teams
-    // aren't up yet.
+    // the one DeployAllSiegeWeaponsOfAi runs for the AI side — both blocked on non-deployers).
+    // Returns false while the teams aren't up yet.
     private bool SweepUndeployedWeapons()
     {
         var playerTeam = Mission.Current.PlayerTeam;
         if (playerTeam == null) return false;
 
-        using (new AllowedThread())
+        int swept = 0;
+        foreach (var missionObject in Mission.Current.ActiveMissionObjects.ToArray())
         {
-            int swept = 0;
-            foreach (var missionObject in Mission.Current.ActiveMissionObjects.ToArray())
+            if (!(missionObject is DeploymentPoint point)) continue;
+
+            foreach (var weapon in point.DeployableWeapons.ToArray())
             {
-                if (!(missionObject is DeploymentPoint point)) continue;
-
-                foreach (var weapon in point.DeployableWeapons.ToArray())
+                if ((point.DeployedWeapon == null || !weapon.GameEntity.IsVisibleIncludeParents()) && weapon is SiegeWeapon siegeWeapon)
                 {
-                    if ((point.DeployedWeapon == null || !weapon.GameEntity.IsVisibleIncludeParents()) && weapon is SiegeWeapon siegeWeapon)
-                    {
-                        siegeWeapon.SetDisabledSynched();
-                        swept++;
-                    }
+                    siegeWeapon.SetDisabledSynched();
+                    swept++;
                 }
-
-                point.SetDisabledSynched();
             }
 
-            Logger.Information("[BattleSync] Swept {Count} undeployed siege weapon(s) after the deployer finished", swept);
+            point.SetDisabledSynched();
         }
+
+        Logger.Information("[BattleSync] Swept {Count} undeployed siege weapon(s) after the deployer finished", swept);
 
         return true;
     }

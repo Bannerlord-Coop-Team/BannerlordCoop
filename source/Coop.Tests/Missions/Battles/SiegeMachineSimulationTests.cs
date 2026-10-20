@@ -5,6 +5,7 @@ using Common.Util;
 using Missions;
 using Moq;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
 using HarmonyLib;
 using TaleWorlds.Engine;
 using Missions.Battles;
@@ -293,6 +294,98 @@ public class SiegeMachineSimulationTests : IDisposable
             SiegeMissionAuthorityGate.IsAuthorityKnown = previousKnown;
             SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
             SiegeMissionAuthorityGate.ResetClaimedMachines();
+        }
+    }
+
+    // A non-authority client blocks its own ladder, gate and teardown changes, but a received apply
+    // runs under AllowedThread and must reach vanilla.
+    [Fact]
+    public void AuthorityReaders_LetVanillaRunOnlyInsideAllowedThread()
+    {
+#pragma warning disable SYSLIB0050
+        var ladder = (SiegeLadder)FormatterServices.GetUninitializedObject(typeof(SiegeLadder));
+        var gate = (CastleGate)FormatterServices.GetUninitializedObject(typeof(CastleGate));
+#pragma warning restore SYSLIB0050
+        var assembly = typeof(BattleSpawnGate).Assembly;
+        var ladderPrefix = assembly.GetType("GameInterface.Services.MapEvents.Patches.SiegeLadderAuthorityPatches")
+            .GetMethod("StateSetterPrefix", BindingFlags.Static | BindingFlags.NonPublic);
+        var gateToggle = assembly.GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches")
+            .GetMethod("AllowGateToggle", BindingFlags.Static | BindingFlags.NonPublic);
+        var teardownPrefix = assembly.GetType("GameInterface.Services.MapEvents.Patches.SiegeDeploymentPatches")
+            .GetMethod("RemoveDeploymentPointsPrefix", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(ladderPrefix);
+        Assert.NotNull(gateToggle);
+        Assert.NotNull(teardownPrefix);
+        bool previousKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
+        bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
+        bool previousEnabled = BattleSpawnConfig.Enabled;
+        BattleSpawnConfig.Enabled = true;
+        BattleSpawnGate.BeginBattle("authority-readers-test");
+        SiegeMissionAuthorityGate.IsAuthorityKnown = true;
+        SiegeMissionAuthorityGate.IsLocalAuthority = false;
+        SiegeMissionAuthorityGate.ResetClaimedMachines();
+        try
+        {
+            using (new AllowedThread())
+            {
+                Assert.True((bool)ladderPrefix.Invoke(null, new object[] { ladder }));
+                Assert.True((bool)gateToggle.Invoke(null, new object[] { gate }));
+                Assert.True((bool)teardownPrefix.Invoke(null, Array.Empty<object>()));
+            }
+
+            Assert.False((bool)ladderPrefix.Invoke(null, new object[] { ladder }));
+            Assert.False((bool)gateToggle.Invoke(null, new object[] { gate }));
+            Assert.False((bool)teardownPrefix.Invoke(null, Array.Empty<object>()));
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+            BattleSpawnConfig.Enabled = previousEnabled;
+            SiegeMissionAuthorityGate.IsAuthorityKnown = previousKnown;
+            SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
+            SiegeMissionAuthorityGate.ResetClaimedMachines();
+        }
+    }
+
+    // The deployer publishes its own placement changes, but not one it re-applies under AllowedThread.
+    [Fact]
+    public void PlacementCapture_SkipsChangesAppliedInsideAllowedThread()
+    {
+#pragma warning disable SYSLIB0050
+        var point = (DeploymentPoint)FormatterServices.GetUninitializedObject(typeof(DeploymentPoint));
+#pragma warning restore SYSLIB0050
+        var publish = typeof(BattleSpawnGate).Assembly
+            .GetType("GameInterface.Services.MapEvents.Patches.SiegeDeploymentPatches")
+            .GetMethod("PublishPlacement", BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(publish);
+        bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
+        bool previousEnabled = BattleSpawnConfig.Enabled;
+        BattleSpawnConfig.Enabled = true;
+        BattleSpawnGate.BeginBattle("placement-capture-test");
+        SiegeMissionAuthorityGate.IsLocalAuthority = true;
+        int published = 0;
+        Action<MessagePayload<SiegeEnginePlacementChanged>> receive = payload =>
+        {
+            if (ReferenceEquals(payload.What.Point, point)) published++;
+        };
+        MessageBroker.Instance.Subscribe(receive);
+        try
+        {
+            using (new AllowedThread())
+            {
+                publish.Invoke(null, new object[] { point });
+            }
+            Assert.Equal(0, published);
+
+            publish.Invoke(null, new object[] { point });
+            Assert.Equal(1, published);
+        }
+        finally
+        {
+            MessageBroker.Instance.Unsubscribe(receive);
+            BattleSpawnGate.EndBattle();
+            BattleSpawnConfig.Enabled = previousEnabled;
+            SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
         }
     }
 
