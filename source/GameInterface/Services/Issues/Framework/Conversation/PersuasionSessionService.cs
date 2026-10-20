@@ -14,6 +14,7 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
@@ -85,8 +86,10 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
         }
 
         var issue = IssueManager.GetIssueOfQuest(quest);
-        if (issue == null || !objectManager.TryGetId(issue.IssueOwner, out var ownerId) ||
-            !objectManager.TryGetId(Hero.MainHero, out var heroId) ||
+        string ownerId;
+        string heroId;
+        if (issue == null || !objectManager.TryGetId(issue.IssueOwner, out ownerId) ||
+            !objectManager.TryGetId(Hero.MainHero, out heroId) ||
             !playerManager.Players.Any(player => player.HeroId == heroId))
         {
             return false;
@@ -114,13 +117,18 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) ||
-                !issue.IsOngoing || issue.IssueQuest == null ||
+            IssueBase issue = null;
+            string owner = null;
+            Hero hero = null;
+            MobileParty party = null;
+            MobileParty targetParty = null;
+            if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out issue, out _) ||
+                !issue.IsSolvingWithQuest ||
                 data.Generation != issue.StringId ||
-                !ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != player.ControllerId ||
-                !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) ||
-                !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party) ||
-                !TryGetTargetParty(data.TargetId, out var targetParty) ||
+                !ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out owner) || owner != player.ControllerId ||
+                !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out hero) ||
+                !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out party) ||
+                !TryGetTargetParty(data.TargetId, out targetParty) ||
                 !AreTogether(party, targetParty))
             {
                 Logger.Warning("Rejected persuasion start for {issue}", data.IssueId);
