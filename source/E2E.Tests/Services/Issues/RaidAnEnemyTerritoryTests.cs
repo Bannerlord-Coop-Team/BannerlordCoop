@@ -77,7 +77,8 @@ public class RaidAnEnemyTerritoryTests : IDisposable
     }
 
     [Fact]
-    // This fixture checks the owner-scoped resolver only; it does not reproduce the live map-event path.\n    public void OwnerScopedCompletionResolverRunsSafelyOnTheServer()
+    // This fixture checks the owner-scoped resolver only; it does not reproduce the live map-event path.
+    public void OwnerScopedCompletionResolverRunsSafelyOnTheServer()
     {
         var server = testEnvironment.Server;
         var owner = testEnvironment.Clients.First();
