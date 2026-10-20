@@ -16,8 +16,8 @@ namespace Missions.Naval;
 
 /// <summary>
 /// [Game thread] DEBUG: while started, logs one <c>NAVAL_WATER_PROBE</c> JSON line per physics step with every clock this
-/// client has, the water height at a fixed grid (the renderer-backed query NavalPhysics uses) and the heave, pitch and roll
-/// of every registered hull, own or copy. Run on every client at once; the logs are diffed offline to see whether the
+/// client has, the water height at a fixed grid (the renderer-backed query NavalPhysics uses) and the position, yaw, heave,
+/// pitch and roll of every registered hull, own or copy. Run on every client at once; the logs are diffed offline to see whether the
 /// water clock is shared. Read only: it changes nothing and sends nothing.
 /// </summary>
 public class NavalWaterProbeLogic : MissionLogic
@@ -136,8 +136,8 @@ public class NavalWaterProbeLogic : MissionLogic
             var frame = hull.GlobalFrame;
             bool isCopy = NavalForeignHulls.Contains(hull);
             yield return new NavalWaterProbeHull(NavalContactProbe.Short(ship.ShipId), isCopy ? "copy" : "own", NavalCopyBodies.ModeName(hull),
-                frame.origin.z, AxisTiltDegrees(frame.rotation.f.z), AxisTiltDegrees(frame.rotation.s.z),
-                scene.GetWaterLevelAtPosition(frame.origin.AsVec2, true, false));
+                frame.origin.x, frame.origin.y, YawDegrees(frame.rotation.f), frame.origin.z, AxisTiltDegrees(frame.rotation.f.z),
+                AxisTiltDegrees(frame.rotation.s.z), scene.GetWaterLevelAtPosition(frame.origin.AsVec2, true, false));
         }
     }
 
@@ -162,6 +162,9 @@ public class NavalWaterProbeLogic : MissionLogic
 
     internal static float AxisTiltDegrees(float axisZ) =>
         (float)(Math.Asin(Math.Max(-1f, Math.Min(1f, axisZ))) * 180.0 / Math.PI);
+
+    /// <summary>The heading of <paramref name="forward"/> on the water plane in degrees, counter-clockwise from +x, in (-180, 180].</summary>
+    internal static float YawDegrees(Vec3 forward) => (float)(Math.Atan2(forward.y, forward.x) * 180.0 / Math.PI);
 
     /// <summary>A grid × grid square of points <paramref name="spacing"/> metres apart, centred on <paramref name="center"/>, row by row.</summary>
     internal static Vec2[] GridPoints(Vec2 center, int grid, float spacing)
@@ -210,6 +213,9 @@ public class NavalWaterProbeLogic : MissionLogic
                 ["id"] = hull.ShipId,
                 ["role"] = hull.Role,
                 ["mode"] = hull.Mode,
+                ["x"] = Round(hull.X, 3),
+                ["y"] = Round(hull.Y, 3),
+                ["yaw"] = Round(hull.Yaw, 3),
                 ["z"] = Round(hull.Heave, 4),
                 ["pitch"] = Round(hull.Pitch, 3),
                 ["roll"] = Round(hull.Roll, 3),

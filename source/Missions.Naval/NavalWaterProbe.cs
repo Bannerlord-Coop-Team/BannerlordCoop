@@ -57,14 +57,21 @@ public sealed class NavalWaterProbeSettings
         result >= min && result <= max;
 }
 
-/// <summary>DEBUG: one hull's pose in a probe line: heave (origin height), pitch and roll in degrees, and the water under it.</summary>
+/// <summary>
+/// DEBUG: one hull's pose in a probe line: planar position, yaw, heave (origin height), pitch and roll in degrees, and the
+/// water under it.
+/// </summary>
 internal readonly struct NavalWaterProbeHull
 {
-    public NavalWaterProbeHull(string shipId, string role, string mode, float heave, float pitch, float roll, float water)
+    public NavalWaterProbeHull(string shipId, string role, string mode, float x, float y, float yaw, float heave, float pitch,
+        float roll, float water)
     {
         ShipId = shipId;
         Role = role;
         Mode = mode;
+        X = x;
+        Y = y;
+        Yaw = yaw;
         Heave = heave;
         Pitch = pitch;
         Roll = roll;
@@ -74,6 +81,10 @@ internal readonly struct NavalWaterProbeHull
     public string ShipId { get; }
     public string Role { get; }
     public string Mode { get; }
+    public float X { get; }
+    public float Y { get; }
+    /// <summary>Heading of the hull's forward axis in degrees, counter-clockwise from +x.</summary>
+    public float Yaw { get; }
     public float Heave { get; }
     public float Pitch { get; }
     public float Roll { get; }
