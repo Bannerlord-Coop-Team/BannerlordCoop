@@ -62,6 +62,12 @@ public interface INavalScenarioState
 
     /// <summary>Records the outcome of step <paramref name="name"/>; ignored when it is not pending.</summary>
     void Complete(string name, bool succeeded, string detail);
+
+    /// <summary>
+    /// Who disconnects, fixed by the first battle host this machine sees while its disconnect is pending: after a migration
+    /// the successor would match <c>who=host</c> too (R41a-2 E). Null before a host is known or without a pending disconnect.
+    /// </summary>
+    string ResolveDisconnectingControllerId(string hostControllerId);
 }
 
 /// <inheritdoc cref="INavalScenarioState"/>
@@ -87,6 +93,8 @@ public class NavalScenarioState : INavalScenarioState
     public const string BlockadeStep = "blockade";
 
     private List<NavalScenarioStep> steps = new List<NavalScenarioStep>();
+    private bool disconnectingResolved;
+    private string resolvedDisconnecting;
 
     public NavalScenarioConfig Current { get; private set; }
 
@@ -100,6 +108,8 @@ public class NavalScenarioState : INavalScenarioState
         Phase = config == null ? NavalScenarioPhase.None : NavalScenarioPhase.Staging;
         var names = rejoining ? RejoinStepsFor(config, localControllerId) : StepsFor(config, localControllerId, isServer);
         steps = names.Select(name => new NavalScenarioStep(name)).ToList();
+        disconnectingResolved = false;
+        resolvedDisconnecting = null;
         if (rejoining) Complete(DisconnectStep, true, "disconnected before this session; re-entering the running battle");
     }
 
@@ -128,6 +138,16 @@ public class NavalScenarioState : INavalScenarioState
 
         step.Status = succeeded ? NavalScenarioStepStatus.Done : NavalScenarioStepStatus.Failed;
         step.Detail = detail;
+    }
+
+    public string ResolveDisconnectingControllerId(string hostControllerId)
+    {
+        if (disconnectingResolved || !IsPending(DisconnectStep)) return resolvedDisconnecting;
+        if (string.IsNullOrEmpty(hostControllerId)) return null;
+
+        disconnectingResolved = true;
+        resolvedDisconnecting = Current.DisconnectingControllerId(hostControllerId);
+        return resolvedDisconnecting;
     }
 
     private NavalScenarioStep Find(string name) => steps.FirstOrDefault(step => step.Name == name);

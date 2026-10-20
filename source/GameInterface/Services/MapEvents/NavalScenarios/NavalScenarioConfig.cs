@@ -93,10 +93,6 @@ public sealed class NavalScenarioConfig
     [ProtoMember(24)]
     public bool GracefulDisconnect { get; set; }
 
-    // This machine's fixed answer to who disconnects; local, never sent.
-    private bool disconnectingResolved;
-    private string resolvedDisconnecting;
-
     public string InitiatorControllerId => ControllerIds.Length == 0 ? null : ControllerIds[0];
 
     /// <summary>The player who joins the running battle, or null.</summary>
@@ -120,20 +116,6 @@ public sealed class NavalScenarioConfig
         }
 
         return null;
-    }
-
-    /// <summary>
-    /// The player who disconnects, fixed the first time a host is known: after a migration the successor would match
-    /// <c>who=host</c> too (R41a-2 E). A client that first sees a later host epoch never disconnects, as the drop came before.
-    /// </summary>
-    public string ResolveDisconnectingControllerId(string hostControllerId, int hostEpoch)
-    {
-        if (disconnectingResolved) return resolvedDisconnecting;
-        if (string.IsNullOrEmpty(hostControllerId)) return null;
-
-        disconnectingResolved = true;
-        resolvedDisconnecting = hostEpoch <= 1 ? DisconnectingControllerId(hostControllerId) : null;
-        return resolvedDisconnecting;
     }
 }
 

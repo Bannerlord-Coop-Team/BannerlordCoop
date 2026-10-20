@@ -55,22 +55,34 @@ public class NavalScenarioStateTests
     }
 
     // R41a-2 E: who=host resolved at each client's step, so after the migration the successor matched "host" and dropped too.
-    // The first known host fixes it; a client that first sees a later epoch never disconnects.
+    // The first host this client sees fixes it, whatever its epoch: a re-entered map event's first host has a later one.
     [Fact]
-    public void ResolveDisconnectingControllerId_IsFixedByTheFirstHost_AndNoneForAClientThatFirstSeesALaterEpoch()
+    public void ResolveDisconnectingControllerId_IsFixedByTheFirstHostSeen_AndNewlyForTheNextScenario()
     {
-        var config = Config("migration", "PlayerOne", "PlayerTwo");
-        var lateViewer = Config("migration", "PlayerOne", "PlayerTwo");
+        var state = new NavalScenarioState();
+        state.Start(Config("migration", "PlayerOne", "PlayerTwo"), "PlayerTwo", isServer: false);
 
-        var beforeAHost = config.ResolveDisconnectingControllerId(null, 0);
-        var atFirstHost = config.ResolveDisconnectingControllerId("PlayerOne", 1);
-        var afterMigration = config.ResolveDisconnectingControllerId("PlayerTwo", 2);
+        var beforeAHost = state.ResolveDisconnectingControllerId(null);
+        var atFirstHost = state.ResolveDisconnectingControllerId("PlayerOne");
+        var afterMigration = state.ResolveDisconnectingControllerId("PlayerTwo");
+        state.Start(Config("migration", "PlayerOne", "PlayerTwo"), "PlayerTwo", isServer: false);
+        var nextScenario = state.ResolveDisconnectingControllerId("PlayerTwo");
 
         Assert.Null(beforeAHost);
         Assert.Equal("PlayerOne", atFirstHost);
         Assert.Equal("PlayerOne", afterMigration);
-        Assert.Null(lateViewer.ResolveDisconnectingControllerId("PlayerTwo", 2));
-        Assert.Null(lateViewer.ResolveDisconnectingControllerId("PlayerTwo", 1));
+        Assert.Equal("PlayerTwo", nextScenario);
+    }
+
+    // A returner's disconnect already happened, so the successor it first sees is nobody to disconnect.
+    [Fact]
+    public void ResolveDisconnectingControllerId_IsNoneOnceTheDisconnectIsDone()
+    {
+        var state = new NavalScenarioState();
+
+        state.Start(Config("migration", "PlayerOne", "PlayerTwo"), "PlayerOne", isServer: false, rejoining: true);
+
+        Assert.Null(state.ResolveDisconnectingControllerId("PlayerTwo"));
     }
 
     // D4: a player that reconnected into the running migration battle has its disconnect done and re-enters through Attack.

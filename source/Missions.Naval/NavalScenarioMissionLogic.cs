@@ -122,7 +122,7 @@ public class NavalScenarioMissionLogic : MissionLogic
     // Fixes who disconnects while the first host is known, and settles a returner's re-entry when it is already in the battle.
     private void TickInBattleBookkeeping()
     {
-        if (config.DisconnectBattleHost) config.ResolveDisconnectingControllerId(session.HostControllerId, session.HostEpoch);
+        state.ResolveDisconnectingControllerId(session.HostControllerId);
 
         // Another player's mission start can pull a returner in before its re-sent scenario arrived (R41a-2 E).
         Complete(NavalScenarioState.RejoinAttackStep, true, "already in the battle: a mission start pulled this client in");
@@ -345,7 +345,7 @@ public class NavalScenarioMissionLogic : MissionLogic
 
     private void Disconnect()
     {
-        var disconnecting = config.ResolveDisconnectingControllerId(session.HostControllerId, session.HostEpoch);
+        var disconnecting = state.ResolveDisconnectingControllerId(session.HostControllerId);
         if (disconnecting == null || !session.IsOwn(disconnecting))
         {
             var detail = disconnecting == null ? "no player to disconnect" : $"{disconnecting} disconnects, so this client stays connected";
