@@ -164,6 +164,7 @@ Every PR must retain an exact `## Bot Changelog Entry` heading. For War Sails up
 - **Offer a tech debt review before a PR leaves draft.** Before running `gh pr ready` (or opening a PR as non-draft), ask the user whether to run the tech-debt-review skill (`.agents/skills/tech-debt-review/SKILL.md`) with the following options.
   - Review/Fix Loop (suggested)
   - Review and report
+  - Skip
 - **On a `Resource not accessible by personal access token` 403, retry with the keyring token.** The agent environment can carry a fine-grained PAT in both `GH_TOKEN` and `GITHUB_TOKEN` (gh prefers `GH_TOKEN`), which lacks scopes the review and org endpoints need, so unset both: `env -u GH_TOKEN -u GITHUB_TOKEN gh ...` (PowerShell: `$env:GH_TOKEN = $null; $env:GITHUB_TOKEN = $null; gh ...`).
 - **Don't take maintainer actions unasked.** No merging, approving, closing or reopening PRs/issues, requesting reviewers, or force-pushing a branch someone else is reviewing, unless explicitly told to.
 
