@@ -11,6 +11,7 @@ using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Visibility;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Roster;
 using Xunit.Abstractions;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
@@ -382,6 +383,6 @@ public class AcceptVisibilityTests : IDisposable
         var update = Assert.Single(otherUpdates);
         Assert.Equal(IssueBase.IssueUpdateDetails.IssueFinishedWithSuccess, update.Details);
         Assert.Null(update.Solver);
-        Other.Call(() => Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog(entry => entry.IsRelatedTo(mirrorIssue))));
+        Other.Call(() => Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(entry => entry.IsRelatedTo(mirrorIssue))));
     }
 }
