@@ -70,16 +70,14 @@ public class ChatServiceTests
     }
 
     [Fact]
-    public void Dispose_StopsEventLogAndHidesVanillaGateReplacement()
+    public void Dispose_StopsEventLog()
     {
-        var gate = new Mock<IChatVanillaLogGate>();
         var eventLog = new Mock<IChatEventLog>();
-        var service = CreateService(vanillaLogGate: gate, eventLog: eventLog);
+        var service = CreateService(eventLog: eventLog);
 
         service.Dispose();
 
         eventLog.Verify(value => value.Dispose(), Times.Once);
-        gate.Verify(value => value.SetReplacementVisible(false), Times.Once);
     }
 
     private static ChatService CreateService(
@@ -88,7 +86,6 @@ public class ChatServiceTests
         Mock<IChatPlayerNameResolver>? playerNameResolver = null,
         Mock<ICoopOptionsStore>? optionsStore = null,
         IMessageBroker? messageBroker = null,
-        Mock<IChatVanillaLogGate>? vanillaLogGate = null,
         Mock<IChatEventLog>? eventLog = null)
     {
         network ??= new Mock<INetwork>();
@@ -100,7 +97,6 @@ public class ChatServiceTests
             optionsStore.Setup(store => store.LoadOrDefault()).Returns(new CoopOptionsData());
         }
         messageBroker ??= new MessageBroker();
-        vanillaLogGate ??= new Mock<IChatVanillaLogGate>();
         eventLog ??= new Mock<IChatEventLog>();
         var controllerIdProvider = new Mock<IControllerIdProvider>();
         controllerIdProvider.SetupGet(provider => provider.ControllerId).Returns("local");
@@ -112,7 +108,6 @@ public class ChatServiceTests
             controllerIdProvider.Object,
             optionsStore.Object,
             messageBroker,
-            vanillaLogGate.Object,
             eventLog.Object,
             new PlayerKillFeedColorService());
     }
