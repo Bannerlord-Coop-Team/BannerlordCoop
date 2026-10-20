@@ -1,9 +1,16 @@
 ﻿#if DEBUG
+using Common.Messaging;
+using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.TroopSupply;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Missions.Naval;
+using Moq;
 using NavalDLC;
 using NavalDLC.Missions.MissionLogics;
 using System.Runtime.CompilerServices;
+using TaleWorlds.Core;
 using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
@@ -33,6 +40,23 @@ public class CoopNavalReserveGuardTests
 
         Assert.False(CoopNavalShiplessPlayerTeamPatch.AllocatesPlayerTeam(null));
         Assert.False(CoopNavalShiplessPlayerTeamPatch.AllocatesPlayerTeam(unset));
+    }
+
+    // R41a fix-loop C5: a shipless player team asks the guard to end the mission each tick vanilla retries the allocation, and
+    // the player is told once.
+    [Fact]
+    public void RequestEnd_OnlyTheFirstRequestEndsTheMissionAndTellsThePlayer()
+    {
+        var broker = new Mock<IMessageBroker>();
+        var supplier = new CoopTroopSupplier("battle", BattleSideEnum.Attacker, Mock.Of<IObjectManager>(), Mock.Of<IBattleAgentBudget>());
+        var guard = new CoopNavalReserveGuard(supplier, BattleSideEnum.Attacker, broker.Object);
+
+        bool first = guard.RequestEnd();
+        bool second = guard.RequestEnd();
+
+        Assert.True(first);
+        Assert.False(second);
+        broker.Verify(b => b.Publish(guard, It.IsAny<SendInformationMessage>()), Times.Once);
     }
 }
 #endif
