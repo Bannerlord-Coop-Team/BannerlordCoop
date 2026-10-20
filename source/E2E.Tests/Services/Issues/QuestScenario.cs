@@ -58,6 +58,13 @@ internal sealed class QuestScenario
         });
     }
 
+    public string AddIssue()
+    {
+        var notableId = testEnvironment.CreateRegisteredObject<Hero>();
+        foreach (var instance in new[] { Server, ClientA, ClientB }) AddIssue(instance, notableId);
+        return notableId;
+    }
+
     public QuestBase QuestOf(EnvironmentInstance instance)
     {
         QuestBase quest = null!;
@@ -125,6 +132,23 @@ internal sealed class QuestScenario
                 issue.StringId = IssueId;
                 issue._issueState = IssueBase.IssueState.Ongoing;
 
+                Campaign.Current.IssueManager._issues.Add(notable, issue);
+                notable.OnIssueCreatedForHero(issue);
+            }
+        });
+    }
+
+    private void AddIssue(EnvironmentInstance instance, string notableId)
+    {
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+
+            using (new AllowedThread())
+            {
+                var issue = issueFactory?.Invoke(instance, notable) ?? new AllowedIssue(notable, null);
+                issue.StringId = $"issue_scenario_{notableId}";
+                issue._issueState = IssueBase.IssueState.Ongoing;
                 Campaign.Current.IssueManager._issues.Add(notable, issue);
                 notable.OnIssueCreatedForHero(issue);
             }
