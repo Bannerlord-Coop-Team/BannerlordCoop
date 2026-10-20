@@ -84,13 +84,8 @@ internal class LordNeedsHorsesCreationCaptureStrategy : ICreationCaptureStrategy
         var mount = MBObjectManager.Instance.GetObjectTypeList<ItemObject>().Where(item => item.IsMountable && item.Culture == issueOwner.Culture &&
             !item.NotMerchandise && item.Tierf > 2f && item.Tierf < 3f).ToList().GetRandomElement() ??
             MBObjectManager.Instance.GetObject<ItemObject>("sumpter_horse");
-        if (mount == null)
-        {
-            return false;
-        }
-
         var amount = 1 + (int)TaleWorlds.Library.MathF.Ceiling(12f * Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier());
-        captured = Write(mount.StringId, amount, mount.Value);
+        captured = Write(mount?.StringId ?? "sumpter_horse", amount, mount?.Value ?? 0);
         return true;
     }
 

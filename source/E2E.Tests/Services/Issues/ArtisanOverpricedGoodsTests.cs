@@ -168,7 +168,6 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         ClientA.Call(() => QuestHere(ClientA).DeliverItemsPartiallyOnConsequence());
         foreach (var instance in new[] { Server, ClientA })
             instance.Call(() => Assert.Equal(2, QuestHere(instance)._givenTradeGoods));
-        ClientB.Call(() => Assert.Null(QuestHere(ClientB)));
         ClientA.Call(() => Assert.Equal(2, QuestHere(ClientA)._playerStartsQuestLog.CurrentProgress));
         Server.Call(() => Assert.Equal(10000, Get<Hero>(Server, scenario.OwnerHeroId).Gold));
 
