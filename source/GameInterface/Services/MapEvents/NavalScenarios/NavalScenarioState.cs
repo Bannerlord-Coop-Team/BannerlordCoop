@@ -48,8 +48,11 @@ public interface INavalScenarioState
 
     IReadOnlyList<NavalScenarioStep> Steps { get; }
 
-    /// <summary>Makes <paramref name="config"/> current in the staging phase, with the steps this machine runs for it.</summary>
-    void Start(NavalScenarioConfig config, string localControllerId, bool isServer);
+    /// <summary>
+    /// Makes <paramref name="config"/> current in the staging phase, with the steps this machine runs for it; a
+    /// <paramref name="rejoining"/> client only re-enters the running battle.
+    /// </summary>
+    void Start(NavalScenarioConfig config, string localControllerId, bool isServer, bool rejoining = false);
 
     /// <summary>Moves the current scenario to <paramref name="phase"/>; phases only move forward.</summary>
     void Advance(NavalScenarioPhase phase);
@@ -75,6 +78,8 @@ public class NavalScenarioState : INavalScenarioState
     public const string DisconnectStep = "disconnect";
     /// <summary>The player who disconnected presses Ready again in the battle it reconnected into.</summary>
     public const string RejoinStep = "rejoin";
+    /// <summary>The player who reconnected enters the running battle again through the encounter menu's Attack.</summary>
+    public const string RejoinAttackStep = "rejoin_attack";
     public const string RetreatStep = "retreat";
     /// <summary>The server waits for the campaign AI's engage to start the encounter preset's map event.</summary>
     public const string EngageStep = "engage";
@@ -89,11 +94,23 @@ public class NavalScenarioState : INavalScenarioState
 
     public IReadOnlyList<NavalScenarioStep> Steps => steps;
 
-    public void Start(NavalScenarioConfig config, string localControllerId, bool isServer)
+    public void Start(NavalScenarioConfig config, string localControllerId, bool isServer, bool rejoining = false)
     {
         Current = config;
         Phase = config == null ? NavalScenarioPhase.None : NavalScenarioPhase.Staging;
-        steps = StepsFor(config, localControllerId, isServer).Select(name => new NavalScenarioStep(name)).ToList();
+        var names = rejoining ? RejoinStepsFor(config, localControllerId) : StepsFor(config, localControllerId, isServer);
+        steps = names.Select(name => new NavalScenarioStep(name)).ToList();
+        if (rejoining) Complete(DisconnectStep, true, "disconnected before this session; re-entering the running battle");
+    }
+
+    /// <summary>The steps of a player that reconnected while its scenario's battle runs: the disconnect, done, then re-entry.</summary>
+    internal static IEnumerable<string> RejoinStepsFor(NavalScenarioConfig config, string localControllerId)
+    {
+        if (config == null || !config.DisconnectBattleHost || !config.ControllerIds.Contains(localControllerId)) yield break;
+
+        yield return DisconnectStep;
+        yield return RejoinAttackStep;
+        yield return RejoinStep;
     }
 
     public void Advance(NavalScenarioPhase phase)

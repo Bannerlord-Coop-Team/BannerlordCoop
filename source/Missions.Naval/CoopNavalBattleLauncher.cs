@@ -240,7 +240,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
 
         var controller = mission.GetMissionBehavior<CoopBattleController>();
         mission.AddMissionBehavior(new NavalScenarioMissionLogic(scenarioState, debugHulls, controller.Session,
-            controller.MissionComponent.ShipRegistry));
+            controller.MissionComponent.ShipRegistry, messageBroker));
     }
 #endif
 

@@ -50,7 +50,8 @@ public sealed class NavalScenarioPreset
 
     /// <summary>
     /// The battle host client, or with <c>who=nonhost</c> the first other player, disconnects <c>delay</c> seconds after its
-    /// deployment and reconnects <c>reconnect</c> seconds later.
+    /// deployment (a server drop, or with <c>drop=leave</c> a main-menu leave), reconnects <c>reconnect</c> seconds later and
+    /// re-enters the running battle through Attack.
     /// </summary>
     public bool DisconnectBattleHost { get; set; }
 
@@ -146,8 +147,8 @@ public static class NavalScenarioPresets
         new NavalScenarioPreset
         {
             Name = "migration",
-            Description = "vs_pirates; the battle host client, or with who=nonhost the first other player, disconnects after " +
-                "deploying and reconnects later.",
+            Description = "vs_pirates; the battle host client, or with who=nonhost the first other player, is dropped by the " +
+                "server (drop=leave: leaves to the main menu) after deploying, then reconnects and re-enters the battle late.",
             MinPlayers = 2,
             DisconnectBattleHost = true,
         },

@@ -54,6 +54,40 @@ public class NavalScenarioStateTests
         Assert.Null(Config("vs_pirates", "PlayerOne", "PlayerTwo").DisconnectingControllerId("PlayerOne"));
     }
 
+    // D4: a player that reconnected into the running migration battle has its disconnect done and re-enters through Attack.
+    [Fact]
+    public void Start_Rejoining_MarksTheDisconnectDone_AndOnlyReentersTheBattle()
+    {
+        var config = Config("migration", "PlayerOne", "PlayerTwo");
+        var state = new NavalScenarioState();
+
+        state.Start(config, "PlayerTwo", isServer: false, rejoining: true);
+
+        Assert.Equal(new[] { NavalScenarioState.DisconnectStep, NavalScenarioState.RejoinAttackStep, NavalScenarioState.RejoinStep },
+            state.Steps.Select(step => step.Name));
+        Assert.False(state.IsPending(NavalScenarioState.DisconnectStep));
+        Assert.True(state.IsPending(NavalScenarioState.RejoinAttackStep));
+        Assert.True(state.IsPending(NavalScenarioState.RejoinStep));
+        Assert.Empty(NavalScenarioState.RejoinStepsFor(Config("vs_pirates", "PlayerOne", "PlayerTwo"), "PlayerTwo"));
+        Assert.Empty(NavalScenarioState.RejoinStepsFor(config, "PlayerThree"));
+    }
+
+    // The server re-sends the scenario only to a scenario player that came back into the scenario's own map event.
+    [Fact]
+    public void IsRejoinOf_OnlyAScenarioPlayerBackInTheDisconnectScenariosMapEvent()
+    {
+        var config = Config("migration", "PlayerOne", "PlayerTwo");
+        config.MapEventId = "MapEvent_7";
+
+        Assert.True(NavalScenarioRejoinHandler.IsRejoinOf(config, "PlayerTwo", "MapEvent_7"));
+        Assert.False(NavalScenarioRejoinHandler.IsRejoinOf(config, "PlayerTwo", "MapEvent_8"));
+        Assert.False(NavalScenarioRejoinHandler.IsRejoinOf(config, "PlayerThree", "MapEvent_7"));
+        Assert.False(NavalScenarioRejoinHandler.IsRejoinOf(null, "PlayerTwo", "MapEvent_7"));
+        var vsPirates = Config("vs_pirates", "PlayerOne", "PlayerTwo");
+        vsPirates.MapEventId = "MapEvent_7";
+        Assert.False(NavalScenarioRejoinHandler.IsRejoinOf(vsPirates, "PlayerTwo", "MapEvent_7"));
+    }
+
     // Every client carries the step; only the battle host hits the pre-damaged AI hull.
     [Fact]
     public void StepsFor_TheSinkingPresetHitsThePreDamagedHullAfterDeploying()

@@ -227,7 +227,7 @@ internal class PlayerPartyVisibilityHandler : IHandler
 
             deferredMapEventParking.Remove(party);
             if (party.MapEvent != null)
-                messageBroker.Publish(this, new PlayerReconnectedToMapEvent());
+                messageBroker.Publish(this, new PlayerReconnectedToMapEvent(player.ControllerId, party.MapEvent));
 
             if (party.IsActive)
             {

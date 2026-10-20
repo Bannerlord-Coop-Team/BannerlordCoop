@@ -86,6 +86,13 @@ public sealed class NavalScenarioConfig
     [ProtoMember(23)]
     public int ArmedShipsPerParty { get; set; }
 
+    /// <summary>
+    /// With <see cref="DisconnectBattleHost"/>, the player leaves through the main menu (<c>drop=leave</c>) instead of the
+    /// server dropping its connection (<c>drop=hard</c>, the default), which takes the real disconnect path.
+    /// </summary>
+    [ProtoMember(24)]
+    public bool GracefulDisconnect { get; set; }
+
     public string InitiatorControllerId => ControllerIds.Length == 0 ? null : ControllerIds[0];
 
     /// <summary>The player who joins the running battle, or null.</summary>
@@ -119,9 +126,14 @@ internal readonly struct NetworkNavalScenarioStarted : ICommand
     [ProtoMember(1)]
     public readonly NavalScenarioConfig Config;
 
-    public NetworkNavalScenarioStarted(NavalScenarioConfig config)
+    /// <summary>Re-sent to a player that reconnected while the scenario's battle runs: its disconnect already happened.</summary>
+    [ProtoMember(2)]
+    public readonly bool Rejoining;
+
+    public NetworkNavalScenarioStarted(NavalScenarioConfig config, bool rejoining = false)
     {
         Config = config;
+        Rejoining = rejoining;
     }
 }
 #endif

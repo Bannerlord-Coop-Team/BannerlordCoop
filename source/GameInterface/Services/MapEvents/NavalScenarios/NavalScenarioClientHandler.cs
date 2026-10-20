@@ -17,8 +17,8 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.MapEvents.NavalScenarios;
 
 /// <summary>
-/// DEBUG, client: takes the server's naval scenario and, for the attacked player and a late joiner, enters its battle
-/// through the same mission-start request the encounter menu's Attack! option sends.
+/// DEBUG, client: takes the server's naval scenario and, for the attacked player, a late joiner and a player that reconnected,
+/// enters its battle through the same mission-start request the encounter menu's Attack! option sends.
 /// </summary>
 internal class NavalScenarioClientHandler : IHandler
 {
@@ -56,11 +56,12 @@ internal class NavalScenarioClientHandler : IHandler
         if (ModInformation.IsServer) return;
 
         var config = payload.What.Config;
+        bool rejoining = payload.What.Rejoining;
         if (config == null) return;
 
         GameThread.RunSafe(() =>
         {
-            state.Start(config, controllerIdProvider.ControllerId, isServer: false);
+            state.Start(config, controllerIdProvider.ControllerId, isServer: false, rejoining);
             Logger.Information("[NavalScenario] {Preset} {ScenarioId} on {MapEventId}: steps {Steps}",
                 config.Preset, config.ScenarioId, config.MapEventId, string.Join(",", state.Steps.Select(item => item.Name)));
 
@@ -91,6 +92,7 @@ internal class NavalScenarioClientHandler : IHandler
     {
         if (state.IsPending(NavalScenarioState.AttackStep)) return NavalScenarioState.AttackStep;
         if (state.IsPending(NavalScenarioState.LateJoinAttackStep)) return NavalScenarioState.LateJoinAttackStep;
+        if (state.IsPending(NavalScenarioState.RejoinAttackStep)) return NavalScenarioState.RejoinAttackStep;
         return null;
     }
 

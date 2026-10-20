@@ -1,6 +1,8 @@
 ﻿#if DEBUG
 using Common;
 using Common.Logging;
+using Common.Messaging;
+using GameInterface.Services.Players.Messages;
 using GameInterface.Services.MapEvents.NavalScenarios;
 using Missions.Battles;
 using NavalDLC.GauntletUI.MissionViews;
@@ -22,7 +24,7 @@ namespace Missions.Naval;
 /// <summary>
 /// [Game thread] DEBUG: runs this client's steps of the active naval scenario inside its battle: presses Ready on the
 /// naval order of battle, then places the own hull and throws a rope, drives the helm, disconnects or retreats, as the
-/// scenario says; a client that disconnected presses Ready again in the battle it reconnects into.
+/// scenario says; a client that reconnected presses Ready again in the battle it re-entered.
 /// </summary>
 public class NavalScenarioMissionLogic : MissionLogic
 {
@@ -42,6 +44,7 @@ public class NavalScenarioMissionLogic : MissionLogic
     private readonly INavalDebugHulls hulls;
     private readonly IBattleSession session;
     private readonly INetworkShipRegistry registry;
+    private readonly IMessageBroker messageBroker;
     private readonly NavalScenarioConfig config;
     private readonly INavalScenarioReadyPress readyPress = new NavalScenarioReadyPress(
         press => GameThread.EnqueueSafe(press, context: "NavalScenarioMissionLogic.PressReady"));
@@ -60,12 +63,13 @@ public class NavalScenarioMissionLogic : MissionLogic
     private MissionShip placedTarget;
 
     public NavalScenarioMissionLogic(INavalScenarioState state, INavalDebugHulls hulls, IBattleSession session,
-        INetworkShipRegistry registry)
+        INetworkShipRegistry registry, IMessageBroker messageBroker)
     {
         this.state = state;
         this.hulls = hulls;
         this.session = session;
         this.registry = registry;
+        this.messageBroker = messageBroker;
         config = state.Current;
     }
 
@@ -325,14 +329,26 @@ public class NavalScenarioMissionLogic : MissionLogic
 
         disconnectedHere = true;
         Complete(NavalScenarioState.DisconnectStep, true, $"{(session.IsLocalHost ? "the battle host" : "a player that is not the host")} " +
-            $"disconnects now and reconnects in {config.ReconnectSeconds:0} s");
+            $"{(config.GracefulDisconnect ? "leaves to the main menu" : "is dropped by the server")} now and reconnects in " +
+            $"{config.ReconnectSeconds:0} s");
         float reconnectSeconds = config.ReconnectSeconds;
 
         // Both run as the console would, off the mission tick (RunSafe would run inline here); the reconnect outlives
         // this session's container.
-        GameThread.EnqueueSafe(() => RunConsoleCommand(DisconnectCommand), context: nameof(Disconnect));
+        if (config.GracefulDisconnect)
+            GameThread.EnqueueSafe(() => RunConsoleCommand(DisconnectCommand), context: nameof(Disconnect));
+        else
+            GameThread.EnqueueSafe(RequestHardDrop, context: nameof(Disconnect));
         Task.Delay(TimeSpan.FromSeconds(reconnectSeconds)).ContinueWith(_ =>
             GameThread.RunSafe(() => RunConsoleCommand(ReconnectCommand), context: nameof(Disconnect)));
+    }
+
+    // The server drops this client's connection at once, so the battle sees a real disconnect, not a mission leave, and no
+    // 60 s timeout passes first.
+    private void RequestHardDrop()
+    {
+        messageBroker.Publish(this, new PlayerDisconnectRequested());
+        Logger.Information("[NavalScenario] Asked the server to drop this client's connection for {MapEventId}", config.MapEventId);
     }
 
     private static void RunConsoleCommand(string command)

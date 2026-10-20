@@ -89,6 +89,9 @@ public class NavalScenarioResolverTests
         Assert.False(Resolve("migration").DisconnectNonHost);
         Assert.True(Resolve("migration", "who=nonhost").DisconnectNonHost);
         Assert.False(Resolve("migration", "who=host").DisconnectNonHost);
+        Assert.False(Resolve("migration").GracefulDisconnect);
+        Assert.True(Resolve("migration", "drop=leave").GracefulDisconnect);
+        Assert.False(Resolve("migration", "drop=hard").GracefulDisconnect);
         Assert.Equal(3, Resolve("fleet").ShipsPerPlayer);
         Assert.True(Resolve("allied_npc").AlliedNpc);
 
@@ -121,6 +124,8 @@ public class NavalScenarioResolverTests
     [InlineData("reconnect must be a number of seconds from 5 to 600.", "migration", "reconnect=1")]
     [InlineData("who must be host or nonhost.", "migration", "who=client")]
     [InlineData("vs_pirates disconnects nobody, so it takes no who knob.", "vs_pirates", "who=nonhost")]
+    [InlineData("drop must be hard or leave.", "migration", "drop=soft")]
+    [InlineData("vs_pirates disconnects nobody, so it takes no drop knob.", "vs_pirates", "drop=hard")]
     [InlineData("hull must name a ship hull id.", "solo", "hull=")]
     [InlineData("Player PlayerFour is not connected; coop.debug.players.list shows the current ids.", "vs_pirates", "PlayerFour")]
     [InlineData("Player PlayerOne is listed twice.", "vs_pirates", "PlayerOne", "PlayerOne")]

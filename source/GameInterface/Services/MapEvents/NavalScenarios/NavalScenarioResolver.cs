@@ -21,7 +21,7 @@ public interface INavalScenarioResolver
 public class NavalScenarioResolver : INavalScenarioResolver
 {
     internal const string Usage = "Usage: coop.debug.naval.scenario <preset> [hulls=n] [hull=id] [spacing=m] [ships=n] " +
-        "[delay=s] [reconnect=s] [who=host|nonhost] [town=id] [weapons=n] [controllerId...]";
+        "[delay=s] [reconnect=s] [who=host|nonhost] [drop=hard|leave] [town=id] [weapons=n] [controllerId...]";
 
     public bool TryResolve(IReadOnlyList<string> args, IReadOnlyList<string> connectedControllerIds,
         out NavalScenarioConfig config, out string error)
@@ -129,6 +129,11 @@ public class NavalScenarioResolver : INavalScenarioResolver
                 if (!config.DisconnectBattleHost) return $"{config.Preset} disconnects nobody, so it takes no who knob.";
                 if (value != "host" && value != "nonhost") return "who must be host or nonhost.";
                 config.DisconnectNonHost = value == "nonhost";
+                return null;
+            case "drop":
+                if (!config.DisconnectBattleHost) return $"{config.Preset} disconnects nobody, so it takes no drop knob.";
+                if (value != "hard" && value != "leave") return "drop must be hard or leave.";
+                config.GracefulDisconnect = value == "leave";
                 return null;
             default:
                 return $"Unknown knob {key}. {Usage}";
