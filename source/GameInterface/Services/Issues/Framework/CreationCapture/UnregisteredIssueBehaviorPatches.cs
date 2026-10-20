@@ -84,6 +84,7 @@ internal class UnregisteredIssueBehaviorPatches
     {
         if (!ContainerProvider.TryResolve<IQuestTypeRegistry>(out var registry))
         {
+            // fails closed, otherwise unsynced issue behaviors would register events and generate issues
             return false;
         }
 
