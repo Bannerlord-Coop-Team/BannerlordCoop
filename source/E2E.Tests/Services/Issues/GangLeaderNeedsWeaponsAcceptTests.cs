@@ -284,6 +284,40 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
     }
 
     [Fact]
+    public void CompanionMissionAcceptUsesTheOwnersDifficultyForItsFee()
+    {
+        const float ownerDifficulty = 0.5f;
+        const float serverDifficulty = 2f;
+        var ownerFee = 0;
+        var serverFee = 0;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+            using (new IssueDifficultyOverride(ownerDifficulty))
+            {
+                ownerFee = (int)AccessTools.Property(typeof(Issue), "CompanionGoldNeedForAlternativeSolution").GetValue(giver.Issue)!;
+            }
+
+            using (new IssueDifficultyOverride(serverDifficulty))
+            {
+                serverFee = (int)AccessTools.Property(typeof(Issue), "CompanionGoldNeedForAlternativeSolution").GetValue(giver.Issue)!;
+            }
+        });
+
+        Assert.NotEqual(ownerFee, serverFee);
+        var (_, fee) = AcceptTheCompanionMission(ownerDifficulty, ownerFee);
+
+        Assert.Equal(ownerFee, fee);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAcceptRejected>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var owner));
+            Assert.Equal(0, owner.Gold);
+        });
+    }
+
+    [Fact]
     public void ARejectedCompanionMissionDoesNotChargeTheOwner()
     {
         preconditions.Refuse(Server);
@@ -486,7 +520,10 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
         }
     }
 
-    private (int StartingGold, int Fee) AcceptTheCompanionMission(bool dropGoldBeforeRequest = false)
+    private (int StartingGold, int Fee) AcceptTheCompanionMission(
+        float? difficultyMultiplier = null,
+        int? startingGoldOverride = null,
+        bool dropGoldBeforeRequest = false)
     {
         var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
@@ -505,7 +542,7 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
             using (new AllowedThread())
             {
                 troop.Level = 20;
-                playerHero.Gold = 100000;
+                playerHero.Gold = startingGoldOverride ?? 100000;
                 startingGold = playerHero.Gold;
                 party.MemberRoster.AddToCounts(playerHero.CharacterObject, 1);
                 party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
@@ -513,7 +550,12 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
             }
 
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
-            fee = (int)AccessTools.Property(typeof(Issue), "CompanionGoldNeedForAlternativeSolution").GetValue(giver.Issue)!;
+            using (difficultyMultiplier is float multiplier
+                ? new IssueDifficultyOverride(multiplier)
+                : null)
+            {
+                fee = (int)AccessTools.Property(typeof(Issue), "CompanionGoldNeedForAlternativeSolution").GetValue(giver.Issue)!;
+            }
         });
         TestEnvironment.FlushCoalescer();
 
@@ -542,9 +584,14 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
 
             Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var clientOwner));
             clientGoldBefore = clientOwner.Gold;
-            giver.Issue.AlternativeSolutionStartConsequence();
+            using (difficultyMultiplier is float multiplier
+                ? new IssueDifficultyOverride(multiplier)
+                : null)
+            {
+                giver.Issue.AlternativeSolutionStartConsequence();
+                giver.Issue.StartIssueWithAlternativeSolution();
+            }
             clientGoldAfter = clientOwner.Gold;
-            giver.Issue.StartIssueWithAlternativeSolution();
         });
         TestEnvironment.FlushCoalescer();
 

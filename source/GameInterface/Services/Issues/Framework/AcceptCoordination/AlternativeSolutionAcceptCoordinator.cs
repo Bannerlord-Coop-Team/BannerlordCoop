@@ -123,24 +123,25 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out var descriptor) ||
             descriptor.AlternativeSolutionAcceptStrategy == null ||
             !issue.IsOngoingWithoutQuest ||
-            !acceptPreconditions.CanTake(issue, playerHero, player.ControllerId) ||
-            descriptor.AlternativeSolutionAcceptStrategy is IAlternativeSolutionAcceptPrecondition precondition &&
-            !precondition.CanAccept(issue, playerHero))
+            !acceptPreconditions.CanTake(issue, playerHero, player.ControllerId))
         {
             Reject(peer, data, playerHero);
             return;
         }
 
         bool troopsAreValid;
+        bool alternativeSolutionIsAcceptable;
         using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
         {
             using (new IssueDifficultyOverride(data.DifficultyMultiplier))
             {
+                alternativeSolutionIsAcceptable = descriptor.AlternativeSolutionAcceptStrategy is not IAlternativeSolutionAcceptPrecondition precondition ||
+                    precondition.CanAccept(issue, playerHero);
                 troopsAreValid = troopValidator.AreValid(issue, data.SentTroops);
             }
         }
 
-        if (!troopsAreValid || !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
+        if (!alternativeSolutionIsAcceptable || !troopsAreValid || !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
         {
             Reject(peer, data, playerHero);
             return;
