@@ -42,7 +42,7 @@ internal class HeadmanHerdWorldEventPatches
         if (!(victim.Issue is Issue issue)) return true;
         if (ModInformation.IsClient) return false;
         if (issue.IssueQuest == null && !issue.IsSolvingWithAlternative) return true;
-        if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) || !owners.TryResolveOwnerHero(issue, out var owner)) return false;
+        if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) || !owners.TryResolveOwnerHero(issue, out var owner)) return true;
         if (owner.PartyBelongedTo == null && !owner.IsPrisoner)
         {
             if (ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var pending)) pending.RememberGiverDeath(issue);

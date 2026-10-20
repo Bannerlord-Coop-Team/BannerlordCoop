@@ -22,13 +22,6 @@ namespace GameInterface.Services.Issues.Quests.LordWantsRivalCaptured.Patches;
 [HarmonyPatch(typeof(CampaignEventDispatcher))]
 internal class LordWantsRivalCapturedWorldEventPatches
 {
-    [HarmonyPatch(nameof(CampaignEventDispatcher.OnHeroKilled))]
-    [HarmonyPostfix]
-    private static void HeroKilledPostfix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification)
-    {
-        RunAsOwners(quest => quest.OnHeroKilled(victim, killer, detail, showNotification));
-    }
-
     [HarmonyPatch(nameof(CampaignEventDispatcher.OnHeroPrisonerTaken))]
     [HarmonyPostfix]
     private static void HeroPrisonerTakenPostfix(PartyBase capturer, Hero prisoner)
@@ -46,13 +39,6 @@ internal class LordWantsRivalCapturedWorldEventPatches
         bool showNotification)
     {
         RunAsOwners(quest => quest.OnHeroPrisonerReleased(prisoner, party, capturerFaction, detail, showNotification));
-    }
-
-    [HarmonyPatch(nameof(CampaignEventDispatcher.OnMapEventStarted))]
-    [HarmonyPostfix]
-    private static void MapEventStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
-    {
-        RunAsOwners(quest => quest.OnMapEventStarted(mapEvent, attackerParty, defenderParty));
     }
 
     private static void RunAsOwners(Action<Quest> listener)

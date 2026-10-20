@@ -31,6 +31,7 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
     private Dictionary<string, MobileParty> parties = new Dictionary<string, MobileParty>();
     private Dictionary<string, string> questIssueIds = new Dictionary<string, string>();
     private readonly HashSet<IssueBase> pendingGiverDeaths = new HashSet<IssueBase>();
+    private HashSet<string> pendingGiverDeathIds = new HashSet<string>();
     private readonly Dictionary<string, IssueBase> rememberedIssues = new Dictionary<string, IssueBase>();
     public IReadOnlyCollection<IssueBase> PendingGiverDeaths => pendingGiverDeaths;
     public IReadOnlyCollection<IssueBase> RememberedIssues => rememberedIssues.Values;
@@ -44,8 +45,8 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
             questIssueIds[issue.IssueQuest.StringId] = issue.StringId;
     }
 
-    public void RememberGiverDeath(IssueBase issue) => pendingGiverDeaths.Add(issue);
-    public void ForgetGiverDeath(IssueBase issue) => pendingGiverDeaths.Remove(issue);
+    public void RememberGiverDeath(IssueBase issue) { pendingGiverDeaths.Add(issue); pendingGiverDeathIds.Add(issue.StringId); }
+    public void ForgetGiverDeath(IssueBase issue) { pendingGiverDeaths.Remove(issue); pendingGiverDeathIds.Remove(issue.StringId); }
 
     public bool HasRememberedParty(IssueBase issue) => !string.IsNullOrEmpty(issue.StringId) && parties.ContainsKey(issue.StringId);
 
@@ -102,10 +103,20 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
     {
         dataStore.SyncData("coop_herd_cleanup_parties", ref parties);
         dataStore.SyncData("coop_herd_cleanup_quest_issue_ids", ref questIssueIds);
+        dataStore.SyncData("coop_herd_cleanup_pending_giver_deaths", ref pendingGiverDeathIds);
+        if (dataStore.IsLoading)
+        {
+            pendingGiverDeaths.Clear();
+            rememberedIssues.Clear();
+            foreach (var issue in Campaign.Current.IssueManager.Issues.Values.OfType<Issue>())
+            {
+                if (parties.ContainsKey(issue.StringId)) rememberedIssues[issue.StringId] = issue;
+                if (pendingGiverDeathIds.Contains(issue.StringId)) pendingGiverDeaths.Add(issue);
+            }
+        }
         if (parties == null || ModInformation.IsClient) parties = new Dictionary<string, MobileParty>();
         if (questIssueIds == null || ModInformation.IsClient) questIssueIds = new Dictionary<string, string>();
-        pendingGiverDeaths.Clear();
-        rememberedIssues.Clear();
+        if (pendingGiverDeathIds == null || ModInformation.IsClient) pendingGiverDeathIds = new HashSet<string>();
     }
 }
 

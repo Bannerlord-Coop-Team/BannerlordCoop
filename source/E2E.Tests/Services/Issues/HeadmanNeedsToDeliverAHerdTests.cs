@@ -545,6 +545,22 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     }
 
     [Fact]
+    public void GiverDeathAfterOwnerRemoval_StillCancelsTheIssue()
+    {
+        Accept(ClientA);
+        Server.Call(() =>
+        {
+            Server.Resolve<IIssueOwnershipRegistry>().Remove(scenario.NotableId);
+            Campaign.Current.IssueManager.OnHeroKilled(Object<Hero>(Server, scenario.NotableId), null,
+                KillCharacterAction.KillCharacterActionDetail.DiedInBattle, false);
+        });
+        environment.FlushCoalescer();
+
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        ClientA.Call(() => Assert.Empty(Campaign.Current.QuestManager.Quests));
+    }
+
+    [Fact]
     public void FinalizationAfterGiverRegistryRemoval_StillReachesClients()
     {
         StartCompanions();
@@ -702,6 +718,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     {
         private Dictionary<string, MobileParty>? savedParties;
         private Dictionary<string, string>? savedQuestIssueIds;
+        private HashSet<string>? savedPendingGiverDeaths;
         public bool IsLoading { get; set; }
         public bool IsSaving => !IsLoading;
 
@@ -716,6 +733,11 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             {
                 if (IsLoading) data = (T)(object)(savedQuestIssueIds ?? new Dictionary<string, string>());
                 else savedQuestIssueIds = new Dictionary<string, string>((Dictionary<string, string>)(object)data!);
+            }
+            else if (key == "coop_herd_cleanup_pending_giver_deaths")
+            {
+                if (IsLoading) data = (T)(object)(savedPendingGiverDeaths ?? new HashSet<string>());
+                else savedPendingGiverDeaths = new HashSet<string>((HashSet<string>)(object)data!);
             }
             return true;
         }

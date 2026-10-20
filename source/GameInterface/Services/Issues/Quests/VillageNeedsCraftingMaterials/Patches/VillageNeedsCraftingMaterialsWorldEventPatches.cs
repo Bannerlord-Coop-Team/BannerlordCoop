@@ -24,19 +24,6 @@ internal class VillageNeedsCraftingMaterialsWorldEventPatches
         RunAsOwners(quest => quest.OnRaidCompleted(winnerSide, raidEvent));
     }
 
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
-    [HarmonyPostfix]
-    private static void OnMapEventStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
-    {
-        // Only forcing supplies or volunteers can be a coercion of the quest giver
-        if (!mapEvent.IsForcingSupplies && !mapEvent.IsForcingVolunteers)
-        {
-            return;
-        }
-
-        RunAsOwners(quest => quest.OnMapEventStarted(mapEvent, attackerParty, defenderParty));
-    }
-
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnRaidCompleted))]
     [HarmonyPrefix]
     private static bool QuestOnRaidCompletedPrefix() => ModInformation.IsServer;
