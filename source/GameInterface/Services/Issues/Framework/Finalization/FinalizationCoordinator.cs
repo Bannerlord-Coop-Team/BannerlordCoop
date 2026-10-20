@@ -118,14 +118,14 @@ internal class FinalizationCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!TryResolveOwnedIssue(data.IssueOwnerId, data.IssueId, player, out var issue, out _, out var playerHero))
+            if (!TryResolveOwnedIssue(data.IssueOwnerId, data.IssueId, player, out var issue, out var descriptor, out var playerHero))
             {
                 return;
             }
 
             using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
             {
-                CompleteOnServer(issue, data.Outcome);
+                CompleteOnServer(issue, descriptor, data.Outcome);
             }
         }, context: nameof(FinalizationCoordinator));
     }
@@ -257,8 +257,14 @@ internal class FinalizationCoordinator : IHandler
         return objectManager.TryGetObjectWithLogging(player.HeroId, out playerHero);
     }
 
-    private void CompleteOnServer(IssueBase issue, IssueOutcome outcome)
+    private void CompleteOnServer(IssueBase issue, IQuestTypeDescriptor descriptor, IssueOutcome outcome)
     {
+        if (outcome == IssueOutcome.QuestSuccess && descriptor.FinalizationProofStrategy != null)
+        {
+            Logger.Warning("{issue} requires a branch proof instead of generic quest success", issue.StringId);
+            return;
+        }
+
         if (!IsQuestOutcome(outcome))
         {
             Logger.Error("{outcome} cannot be requested for {issue}", outcome, issue.StringId);

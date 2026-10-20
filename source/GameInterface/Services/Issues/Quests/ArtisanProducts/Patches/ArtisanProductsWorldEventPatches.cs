@@ -8,6 +8,8 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Issues.ArtisanCantSellProductsAtAFairPriceIssueBehavior;
+using TaleWorlds.SaveSystem;
 using GameInterface.Services.Heroes.Patches;
 using Behavior = TaleWorlds.CampaignSystem.Issues.ArtisanCantSellProductsAtAFairPriceIssueBehavior;
 using Quest = TaleWorlds.CampaignSystem.Issues.ArtisanCantSellProductsAtAFairPriceIssueBehavior.ArtisanCantSellProductsAtAFairPriceIssueQuest;
@@ -122,5 +124,16 @@ internal class ArtisanProductsPendingTroopReturnPatch
     {
         if (ModInformation.IsServer && ContainerProvider.TryResolve<IArtisanProductsTroopReturns>(out var returns))
             returns.ReturnPending();
+    }
+}
+
+[HarmonyPatch(typeof(ArtisanCantSellProductsAtAFairPriceIssueBehavior), nameof(ArtisanCantSellProductsAtAFairPriceIssueBehavior.SyncData))]
+internal static class ArtisanProductsPersistencePatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(IDataStore dataStore)
+    {
+        if (ContainerProvider.TryResolve<IArtisanProductsTroopReturns>(out var returns))
+            returns.SyncData(dataStore);
     }
 }

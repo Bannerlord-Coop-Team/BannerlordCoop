@@ -7,6 +7,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.SaveSystem;
 
 namespace GameInterface.Services.Issues.Quests.ArtisanProducts;
 
@@ -14,6 +15,7 @@ internal interface IArtisanProductsTroopReturns
 {
     bool TryDefer(IssueBase issue);
     void ReturnPending();
+    void SyncData(IDataStore dataStore);
 }
 
 internal sealed class ArtisanProductsTroopReturns : IArtisanProductsTroopReturns
@@ -22,6 +24,7 @@ internal sealed class ArtisanProductsTroopReturns : IArtisanProductsTroopReturns
     private readonly IPlayerManager players;
     private readonly IObjectManager objects;
     private readonly Dictionary<string, TroopRoster> pending = new Dictionary<string, TroopRoster>();
+    private static List<ArtisanProductsPendingTroopSaveData> savedPending;
 
     public ArtisanProductsTroopReturns(IIssueOwnerResolver owners, IPlayerManager players, IObjectManager objects)
     { this.owners = owners; this.players = players; this.objects = objects; }
@@ -38,6 +41,7 @@ internal sealed class ArtisanProductsTroopReturns : IArtisanProductsTroopReturns
 
     public void ReturnPending()
     {
+        RehydratePending();
         foreach (var entry in pending.ToArray())
         {
             if (!players.TryGetPlayer(entry.Key, out var player) || !players.IsConnected(player) ||
@@ -51,5 +55,64 @@ internal sealed class ArtisanProductsTroopReturns : IArtisanProductsTroopReturns
                 pending.Remove(entry.Key);
             }
         }
+    }
+
+    public void SyncData(IDataStore dataStore)
+    {
+        List<ArtisanProductsPendingTroopSaveData> data = null;
+        if (dataStore.IsSaving)
+        {
+            data = pending.SelectMany(entry => entry.Value.GetTroopRoster().Select(element =>
+                new ArtisanProductsPendingTroopSaveData(entry.Key, element.Character, element.Number, element.WoundedNumber, element.Xp))).ToList();
+        }
+
+        dataStore.SyncData("_coop_artisan_products_pending_troops", ref data);
+        if (dataStore.IsLoading)
+        {
+            savedPending = data;
+            pending.Clear();
+        }
+    }
+
+    private void RehydratePending()
+    {
+        if (savedPending == null) return;
+        foreach (var entry in savedPending)
+        {
+            if (entry?.Character == null || string.IsNullOrEmpty(entry.ControllerId)) continue;
+            if (!pending.TryGetValue(entry.ControllerId, out var roster))
+            { roster = TroopRoster.CreateDummyTroopRoster(); pending.Add(entry.ControllerId, roster); }
+            roster.AddToCounts(entry.Character, entry.Number, entry.WoundedNumber, entry.Xp, insertAtFront: false);
+        }
+        savedPending = null;
+    }
+}
+
+internal sealed class ArtisanProductsPendingTroopSaveData
+{
+    [SaveableField(1)] internal string ControllerId;
+    [SaveableField(2)] internal CharacterObject Character;
+    [SaveableField(3)] internal int Number;
+    [SaveableField(4)] internal int WoundedNumber;
+    [SaveableField(5)] internal int Xp;
+
+    private ArtisanProductsPendingTroopSaveData() { }
+
+    internal ArtisanProductsPendingTroopSaveData(string controllerId, CharacterObject character, int number, int woundedNumber, int xp)
+    { ControllerId = controllerId; Character = character; Number = number; WoundedNumber = woundedNumber; Xp = xp; }
+}
+
+public sealed class ArtisanProductsSaveableTypeDefiner : SaveableTypeDefiner
+{
+    public ArtisanProductsSaveableTypeDefiner() : base(44_186_004) { }
+
+    public override void DefineClassTypes()
+    {
+        AddClassDefinition(typeof(ArtisanProductsPendingTroopSaveData), 1);
+    }
+
+    public override void DefineContainerDefinitions()
+    {
+        ConstructContainerDefinition(typeof(List<ArtisanProductsPendingTroopSaveData>));
     }
 }
