@@ -2,7 +2,6 @@
 using SandBox.View.Map;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Engine.GauntletUI;
@@ -261,10 +260,8 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             gameplayLayer = mapScreen.SceneLayer;
             var mapState = GameStateManager.Current?.ActiveState as MapState;
             bool atMenu = mapState?.AtMenu == true;
-            var party = MobileParty.MainParty;
-            // Settlement menus and army_wait / army_wait_at_settlement (AttachedTo). MapMenuView only.
-            isMapMenu = atMenu &&
-                (party?.CurrentSettlement != null || party?.AttachedTo != null);
+            // MapMenuView focus below keeps escape, encyclopedia, and other map layers out.
+            isMapMenu = atMenu;
             isMenuLayerFocused = isMapMenu &&
                 ReferenceEquals(ScreenManager.FocusedLayer, mapScreen.FindLayer<GauntletLayer>(MapMenuLayerName));
             isOpenableScreen = mapState != null && (!atMenu || isMapMenu);
@@ -678,7 +675,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         return isCampaignContext && !isConversationActive && !isLoading;
     }
 
-    /// <summary>Enter/typing on open map, settlement map menus, or mission gameplay.</summary>
+    /// <summary>Enter/typing on open map, map menus, or mission gameplay.</summary>
     internal static bool ShouldAllowChatOpen(
         bool isOpenableScreen,
         bool isConversationActive,

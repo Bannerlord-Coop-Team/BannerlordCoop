@@ -109,6 +109,11 @@ internal sealed class ChatChannelVM : ViewModel
         if (hidden || !IsSelected) HasUnreadMessages = true;
     }
 
+    public void ClearUnreadMessages()
+    {
+        HasUnreadMessages = false;
+    }
+
     public void SetMuted(bool muted)
     {
         if (isMuted == muted) return;
