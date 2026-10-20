@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Module>
-    <Name value="Coop"/>
+    <Name value="Bannerlord Co-op"/>
     <Id value="Coop"/>
     <Version value="${version}"/>
     <SingleplayerModule value="true"/>
@@ -17,7 +17,7 @@
     </IncompatibleModules>
     <SubModules>
         <SubModule>
-            <Name value="Coop"/>
+            <Name value="Bannerlord Co-op"/>
             <DLLName value="Coop.dll"/>
             <SubModuleClassType value="Coop.${main_class}"/>
             <Tags>
