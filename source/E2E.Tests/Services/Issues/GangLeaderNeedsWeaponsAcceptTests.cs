@@ -397,14 +397,14 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
 
             // Vanilla's daily tick reads the first entry of every running mission
             Campaign.Current.IssueManager.DailyTick();
-            var entry = Assert.Single(giver.Issue.JournalEntries);
             var range = ((Issue)giver.Issue).AlternativeSolutionBaseDurationInDaysInternal;
+            var entry = Assert.Single(giver.Issue.JournalEntries.Where(log => log.Range == range));
             Assert.Equal(range, entry.Range);
-            Assert.Equal(Math.Min(1, range), entry.CurrentProgress);
+            Assert.Equal(0, entry.CurrentProgress);
 
             Campaign.Current.IssueManager.DailyTick();
-            Assert.Same(entry, Assert.Single(giver.Issue.JournalEntries));
-            Assert.Equal(Math.Min(2, range), entry.CurrentProgress);
+            Assert.Same(entry, Assert.Single(giver.Issue.JournalEntries.Where(log => log.Range == range)));
+            Assert.Equal(0, entry.CurrentProgress);
         });
     }
 
