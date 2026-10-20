@@ -15,8 +15,4 @@ public interface IQuestTypeDescriptor
     [CanBeNull] IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy { get; }
 
     // Null if the quest has no outcome branch that needs to be told apart
-    [CanBeNull] IFinalizationProofStrategy FinalizationProofStrategy { get; }
-
-
-    // Generic success is invalid only for quests that opt into branch-only finalization.
-}
+    [CanBeNull] IFinalizationProofStrategy FinalizationProofStrategy { get; }\r\n}

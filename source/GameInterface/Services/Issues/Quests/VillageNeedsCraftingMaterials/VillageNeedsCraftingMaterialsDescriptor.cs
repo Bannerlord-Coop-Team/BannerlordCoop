@@ -4,7 +4,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.VillageNeedsCraftingMaterialsIssu
 
 namespace GameInterface.Services.Issues.Quests.VillageNeedsCraftingMaterials;
 
-internal class VillageNeedsCraftingMaterialsDescriptor : IQuestTypeDescriptor
+internal class VillageNeedsCraftingMaterialsDescriptor : IQuestTypeDescriptor, IBranchOnlyFinalizationDescriptor
 {
     public Type IssueType => typeof(Issue);
 
@@ -15,6 +15,7 @@ internal class VillageNeedsCraftingMaterialsDescriptor : IQuestTypeDescriptor
     public IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy { get; }
 
     public IFinalizationProofStrategy FinalizationProofStrategy { get; }
+    public bool SuccessOnlyThroughBranchProof => true;
 
     public VillageNeedsCraftingMaterialsDescriptor(
         VillageNeedsCraftingMaterialsCreationCaptureStrategy creationCaptureStrategy,

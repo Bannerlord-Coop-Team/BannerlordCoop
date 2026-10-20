@@ -4,7 +4,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior.SmugglersI
 
 namespace GameInterface.Services.Issues.Quests.Smugglers;
 
-internal class SmugglersDescriptor : IQuestTypeDescriptor
+internal class SmugglersDescriptor : IQuestTypeDescriptor, IBranchOnlyFinalizationDescriptor
 {
     public Type IssueType => typeof(Issue);
 
@@ -15,6 +15,7 @@ internal class SmugglersDescriptor : IQuestTypeDescriptor
     public IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy { get; }
 
     public IFinalizationProofStrategy FinalizationProofStrategy { get; }
+    public bool SuccessOnlyThroughBranchProof => true;
 
     public SmugglersDescriptor(
         SmugglersCreationCaptureStrategy creationCaptureStrategy,

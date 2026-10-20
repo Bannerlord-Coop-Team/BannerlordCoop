@@ -4,7 +4,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.ArmyNeedsSuppliesIssueBehavior.Ar
 
 namespace GameInterface.Services.Issues.Quests.ArmyNeedsSupplies;
 
-internal class ArmyNeedsSuppliesDescriptor : IQuestTypeDescriptor
+internal class ArmyNeedsSuppliesDescriptor : IQuestTypeDescriptor, IBranchOnlyFinalizationDescriptor
 {
     public Type IssueType => typeof(Issue);
 
@@ -15,6 +15,7 @@ internal class ArmyNeedsSuppliesDescriptor : IQuestTypeDescriptor
     public IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy => null;
 
     public IFinalizationProofStrategy FinalizationProofStrategy { get; }
+    public bool SuccessOnlyThroughBranchProof => true;
 
     public ArmyNeedsSuppliesDescriptor(
         ArmyNeedsSuppliesCreationCaptureStrategy creationCaptureStrategy,
