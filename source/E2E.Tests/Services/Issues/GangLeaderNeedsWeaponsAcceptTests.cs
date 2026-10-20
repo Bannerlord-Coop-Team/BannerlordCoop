@@ -534,7 +534,10 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
             clientGoldAfter = clientOwner.Gold;
             giver.Issue.StartIssueWithAlternativeSolution();
         });
-        TestEnvironment.FlushCoalescer();
+        if (flush)
+        {
+            TestEnvironment.FlushCoalescer();
+        }
 
         Assert.Equal(clientGoldBefore, clientGoldAfter);
         return (startingGold, fee);
