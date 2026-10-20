@@ -145,6 +145,16 @@ internal static class LesserNobleRevoltWorldEventPatches
         return false;
     }
 
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnClanChangedKingdom))]
+    [HarmonyPrefix]
+    private static void ClearKingdomCancelRelation(Quest __instance)
+    {
+        if (ModInformation.IsServer)
+        {
+            __instance.RelationshipChangeWithQuestGiver = 0;
+        }
+    }
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventEnd))]
     [HarmonyPrefix]
     private static bool MapEventEndedPrefix(Quest __instance, MapEvent obj)
