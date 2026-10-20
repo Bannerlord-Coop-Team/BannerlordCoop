@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.MapEvents.Messages;
 using HarmonyLib;
 using System;
@@ -44,7 +45,7 @@ internal class SiegeDeploymentPatches
     private static bool RemoveDeploymentPointsPrefix()
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
-        if (SiegeMissionAuthorityGate.SuppressCapture) return true;
+        if (AllowedThread.IsThisThreadAllowed()) return true;
 
         return SiegeMissionAuthorityGate.IsLocalAuthority;
     }
@@ -89,7 +90,7 @@ internal class SiegeDeploymentPatches
     private static void PublishPlacement(DeploymentPoint point)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
-        if (SiegeMissionAuthorityGate.SuppressCapture) return;
+        if (AllowedThread.IsThisThreadAllowed()) return;
         if (!SiegeMissionAuthorityGate.IsLocalAuthority) return;
 
         string weaponTypeName = point.DeployedWeapon != null

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.MapEvents;
 using Missions.Messages;
 using Serilog;
@@ -1303,17 +1304,11 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
             if (!machinesById.TryGetValue(entry.Key, out var machine)) continue;
 
-            bool wasSuppressed = SiegeMissionAuthorityGate.SuppressCapture;
-            SiegeMissionAuthorityGate.SuppressCapture = true;
-            try
+            using (new AllowedThread())
             {
                 // Apply the baseline before any buffered pickup from the new simulator.
                 if (machine is StonePile pile) pile.SetAmmo(handoff.StoneAmmo);
                 pendingStoneHandoffs.Remove(entry.Key);
-            }
-            finally
-            {
-                SiegeMissionAuthorityGate.SuppressCapture = wasSuppressed;
             }
         }
     }
@@ -1343,14 +1338,9 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
             }
             if (!machinesById.TryGetValue(pending.Key, out var machine)) continue;
 
-            SiegeMissionAuthorityGate.SuppressCapture = true;
-            try
+            using (new AllowedThread())
             {
                 Apply(machine, pending.Value);
-            }
-            finally
-            {
-                SiegeMissionAuthorityGate.SuppressCapture = false;
             }
 
             if (!SiegeMissionAuthorityGate.IsMachineSimulatedLocally(pending.Key))
@@ -1496,14 +1486,9 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
 
             DrainPendingStoneHandoffs();
             var stateToApply = ReconcilePendingMachineStateForLiveApply(obj);
-            SiegeMissionAuthorityGate.SuppressCapture = true;
-            try
+            using (new AllowedThread())
             {
                 Apply(machine, stateToApply);
-            }
-            finally
-            {
-                SiegeMissionAuthorityGate.SuppressCapture = false;
             }
 
             PushClaimsToGate();

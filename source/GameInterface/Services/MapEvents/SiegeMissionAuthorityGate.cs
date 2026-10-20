@@ -8,8 +8,8 @@ namespace GameInterface.Services.MapEvents;
 /// ballistas, gates, ladders) — because their vanilla simulation is driven by whatever agents each
 /// machine happens to man locally, which diverges per client. A client interacting with a machine can
 /// claim its simulation per machine (see SiegeMachineStateReplicator). The Missions battle controller
-/// keeps <see cref="IsLocalAuthority"/> current, and the appliers raise <see cref="SuppressCapture"/>
-/// around a received change so the capture patches don't echo.
+/// keeps <see cref="IsLocalAuthority"/> current, and the appliers run a received change under
+/// <see cref="Common.Util.AllowedThread"/> so the capture patches don't echo.
 /// </summary>
 public static class SiegeMissionAuthorityGate
 {
@@ -20,9 +20,6 @@ public static class SiegeMissionAuthorityGate
     /// <summary>True once the host election result is stored locally; until then IsLocalAuthority
     /// being false means "unknown", and irreversible steps (auto-deploys, machine deactivation) wait.</summary>
     public static bool IsAuthorityKnown;
-
-    /// <summary>[Game thread] An applier is re-running vanilla code from a received change.</summary>
-    public static bool SuppressCapture;
 
     // Per-machine claims layered over the host default. Swapped whole (copy-on-write) because
     // SiegeWeapon.TickAux runs on parallel tick threads while the game thread updates the claims.

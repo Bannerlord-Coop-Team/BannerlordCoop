@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Tests.Utils;
+using Common.Util;
 using Missions;
 using Moq;
 using GameInterface.Services.MapEvents;
@@ -99,10 +100,15 @@ public class SiegeMachineSimulationTests : IDisposable
             var drain = typeof(SiegeMachineStateReplicator).GetMethod("DrainPendingMachineStates",
                 BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.NotNull(drain);
-            GameThread.Run(() => drain.Invoke(replicator, Array.Empty<object>()), blocking: true);
+            bool allowedAfterDrain = true;
+            GameThread.Run(() =>
+            {
+                drain.Invoke(replicator, Array.Empty<object>());
+                allowedAfterDrain = AllowedThread.IsThisThreadAllowed();
+            }, blocking: true);
 
             Assert.Empty(pending);
-            Assert.False(SiegeMissionAuthorityGate.SuppressCapture);
+            Assert.False(allowedAfterDrain);
             Assert.True(SiegeMissionAuthorityGate.TryGetRemoteAim(id, out float direction, out float releaseAngle));
             Assert.Equal(0.75f, direction);
             Assert.Equal(0.25f, releaseAngle);

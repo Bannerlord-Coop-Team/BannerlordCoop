@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using Missions.Messages;
@@ -87,9 +88,6 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
         messageBroker.Unsubscribe<NetworkBattleDeploymentFinished>(Handle_NetworkDeploymentFinished);
         messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
         pending.Clear();
-        // SuppressCapture is toggled around this replicator's own applies, so it resets here; the
-        // authority flags are owned by CoopBattleController (which sets them each tick) and reset there.
-        SiegeMissionAuthorityGate.SuppressCapture = false;
     }
 
     private void Handle_PlacementChanged(MessagePayload<SiegeEnginePlacementChanged> payload)
@@ -153,8 +151,7 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
             .FirstOrDefault(candidate => candidate.Id.Id == pointId);
         if (point == null) return false;
 
-        SiegeMissionAuthorityGate.SuppressCapture = true;
-        try
+        using (new AllowedThread())
         {
             if (string.IsNullOrEmpty(weaponTypeName))
             {
@@ -180,10 +177,6 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
                 if (point.DeployedWeapon != null) point.Disband();
                 point.Deploy(weaponType);
             }
-        }
-        finally
-        {
-            SiegeMissionAuthorityGate.SuppressCapture = false;
         }
 
         return true;
@@ -370,15 +363,14 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
 
     // Mirrors the vanilla teardown for BOTH sides (RemoveDeploymentPoints for the player side and
     // the one DeployAllSiegeWeaponsOfAi runs for the AI side — both blocked on non-deployers),
-    // applied under suppress so the disables don't re-capture. Returns false while the teams
+    // applied under AllowedThread so the disables don't re-capture. Returns false while the teams
     // aren't up yet.
     private bool SweepUndeployedWeapons()
     {
         var playerTeam = Mission.Current.PlayerTeam;
         if (playerTeam == null) return false;
 
-        SiegeMissionAuthorityGate.SuppressCapture = true;
-        try
+        using (new AllowedThread())
         {
             int swept = 0;
             foreach (var missionObject in Mission.Current.ActiveMissionObjects.ToArray())
@@ -398,10 +390,6 @@ public class SiegeEngineDeploymentReplicator : ISiegeEngineDeploymentReplicator
             }
 
             Logger.Information("[BattleSync] Swept {Count} undeployed siege weapon(s) after the deployer finished", swept);
-        }
-        finally
-        {
-            SiegeMissionAuthorityGate.SuppressCapture = false;
         }
 
         return true;

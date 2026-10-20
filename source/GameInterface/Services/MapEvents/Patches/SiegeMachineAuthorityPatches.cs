@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common.Util;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -215,11 +216,11 @@ internal class SiegeMachineAuthorityPatches
     }
 
     // The gate's auto-open logic reacts to nearby agents, including interpolated puppets, so a
-    // non-authority client's local toggles must not run; the replicated state applies under suppress.
+    // non-authority client's local toggles must not run; the replicated state applies under AllowedThread.
     private static bool AllowGateToggle(CastleGate gate)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
-        if (SiegeMissionAuthorityGate.SuppressCapture) return true;
+        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return initializingGate;
 
         return SiegeMissionAuthorityGate.IsMachineSimulatedLocally(gate.Id.Id);
