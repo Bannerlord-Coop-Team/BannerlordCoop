@@ -1,4 +1,5 @@
-﻿using Common;
+using Common;
+using Common.Messaging;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
@@ -69,13 +70,38 @@ internal class LadysKnightOutWorldListenerPatches
 [HarmonyPatch]
 internal class LadysKnightOutNativeTournamentPatches
 {
-    private static IEnumerable<MethodBase> TargetMethods()
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnPlayerStartedTournamentMatch))]
+    [HarmonyPrefix]
+    private static bool PlayerStartedPrefix() => ModInformation.IsClient;
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnPlayerEliminatedFromTournament))]
+    [HarmonyPrefix]
+    private static bool PlayerEliminatedPrefix(Quest __instance, int round)
     {
-        yield return AccessTools.DeclaredMethod(typeof(Quest), nameof(Quest.OnPlayerStartedTournamentMatch));
-        yield return AccessTools.DeclaredMethod(typeof(Quest), nameof(Quest.OnPlayerEliminatedFromTournament));
-        yield return AccessTools.DeclaredMethod(typeof(Quest), nameof(Quest.OnTournamentFinished));
+        if (ModInformation.IsServer)
+            return false;
+
+        Publish(__instance, __instance.TournamentRoundGoal > round + 1
+            ? LadysKnightOutBranch.TournamentFailure
+            : LadysKnightOutBranch.TournamentSuccess);
+        return false;
     }
 
-    // Co-op session results identify each competitor; vanilla callbacks refer to one local player.
-    private static bool Prefix() => false;
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnTournamentFinished))]
+    [HarmonyPrefix]
+    private static bool TournamentFinishedPrefix(Quest __instance, CharacterObject winner, Town town)
+    {
+        if (ModInformation.IsServer)
+            return false;
+
+        if (town == __instance._tournamentTown && winner == CharacterObject.PlayerCharacter)
+            Publish(__instance, LadysKnightOutBranch.TournamentSuccess);
+        return false;
+    }
+
+    private static void Publish(Quest quest, LadysKnightOutBranch branch)
+    {
+        if (ContainerProvider.TryResolve<IMessageBroker>(out var broker))
+            broker.Publish(quest, new LadysKnightOutTournamentTriggered(quest, (byte)branch));
+    }
 }

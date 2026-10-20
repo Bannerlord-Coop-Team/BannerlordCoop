@@ -31,6 +31,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.Localization;
+using TaleWorlds.Library;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.LadysKnightOutIssue;
@@ -224,6 +225,25 @@ public class LadysKnightOutTests : IDisposable
         scenario.ClientA.Call(() => quest.PlayerReachedTournamentRoundGoal());
         Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         scenario.ClientA.Call(() => Assert.True(quest.IsOngoing));
+    }
+
+    [Fact]
+    public void OwnerTournamentFinishedEventRequestsOneServerSuccess()
+    {
+        var quest = Accept(scenario.ClientA);
+        scenario.ClientA.Call(() =>
+        {
+            var town = quest.QuestGiver.CurrentSettlement.Town;
+            CampaignEventDispatcher.Instance.OnPlayerStartedTournamentMatch(town);
+            CampaignEventDispatcher.Instance.OnTournamentFinished(
+                CharacterObject.PlayerCharacter,
+                new MBReadOnlyList<CharacterObject>(new[] { CharacterObject.PlayerCharacter }),
+                town,
+                null);
+        });
+
+        var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
     }
 
     [Theory]

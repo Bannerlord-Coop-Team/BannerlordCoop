@@ -12,6 +12,33 @@ public readonly struct LadysKnightOutLordTriggered : IEvent
     public LadysKnightOutLordTriggered(IssueBase issue, bool complete) { Issue = issue; Complete = complete; }
 }
 
+public readonly struct LadysKnightOutTournamentTriggered : IEvent
+{
+    public QuestBase Quest { get; }
+    public byte Branch { get; }
+
+    public LadysKnightOutTournamentTriggered(QuestBase quest, byte branch)
+    {
+        Quest = quest;
+        Branch = branch;
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public readonly struct RequestLadysKnightOutTournamentOutcome : ICommand
+{
+    [ProtoMember(1)] public readonly string GiverId;
+    [ProtoMember(2)] public readonly string IssueId;
+    [ProtoMember(3)] public readonly byte Branch;
+
+    public RequestLadysKnightOutTournamentOutcome(string giverId, string issueId, byte branch)
+    {
+        GiverId = giverId;
+        IssueId = issueId;
+        Branch = branch;
+    }
+}
+
 [ProtoContract(SkipConstructor = true)]
 public readonly struct RequestLadysKnightOutLord : ICommand
 {
