@@ -30,8 +30,8 @@ internal class SiegeEnginesContainerPatches
 
         if (ModInformation.IsClient)
         {
-            // MapSiegeProductionPatches routes the production popup click before it gets here, so this catches
-            // any other client caller. A progress object made locally is an unregistered ghost, so the request
+            // DoSiegeAction is server-only and MapSiegeProductionPatches routes the popup, so this only catches the popup's
+            // missing-state fallback. A progress object made locally is an unregistered ghost, so the request
             // carries the engine type and the server does its own reserve-lookup-or-create.
             if (!TryDescribeContainer(__instance, out var siegeEvent, out var side))
             {
