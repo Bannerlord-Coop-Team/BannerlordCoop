@@ -46,10 +46,16 @@ Each lens returns candidate findings; it doesn't rank or filter across lenses.
 
 ## 4. Verify
 
-Re-check every candidate against the code yourself; lenses over-report. Drop findings that are wrong, pre-existing, or have no concrete cost. Merge duplicates found by more than one lens.
+Re-check every candidate against the code yourself; lenses over-report. Move findings that are wrong, pre-existing, or have no concrete cost to **looks bad but is fine** with the reason, and ones you can't settle to **open questions**. Merge duplicates found by more than one lens.
 
 ## 5. Report
 
-List findings in chat, ranked by cost. For each give `path:line`, the debt, what it costs, and the smallest fix. Split them into **fix before merge** and **follow-up issue**; for a follow-up, check `gh issue list --search` for an existing issue first.
+Report in chat with these sections:
+
+- **Fix before merge** and **Follow-up issue:** verified findings ranked by cost, each with `path:line`, the debt, what it costs, and the smallest fix. For a follow-up, check `gh issue list --search` for an existing issue first.
+- **Looks bad but is fine:** what the lenses and verification considered and dropped, with the reason, so the reader can see the judgment calls.
+- **Open questions:** items that might be debt or might be intentional, for the author to answer.
+
+Write "Nothing material" for an empty section instead of padding it.
 
 When asked to post on a PR, write one point per inline comment in the maintainer voice from `AGENTS.md` (Review Comments & PR Prose).

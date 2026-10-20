@@ -10,7 +10,7 @@ Review the change for code that guards against failures instead of understanding
 - a Harmony patch, where an escaping exception lands in vanilla code;
 - the `Poller` thread, where an uncaught exception silently stops networking.
 
-Below those, a try/catch is debt unless it actually recovers. Nested try/catch and log-and-rethrow at every layer are the same smell. An empty catch, or one that logs and carries on when the caller needed to know, hides a failure.
+For every catch the change adds, list every type of unexpected error that could be hidden by it. Below those boundaries, a try/catch is debt unless it actually recovers. Nested try/catch and log-and-rethrow at every layer are the same smell. An empty catch, or one that logs and carries on when the caller needed to know, hides a failure.
 
 **No validation of always-valid inputs.** Null checks on constructor-injected dependencies (Autofac never injects null), on values the caller just created, or on state an invariant guarantees add noise and hide real bugs. Checks belong where bad data can actually arrive: network message contents, an id that may not resolve, or game state that can be gone by the time a message applies (a destroyed party, `Campaign.Current` during load). Trace the callers before deciding a value can't be null.
 
@@ -18,4 +18,10 @@ Below those, a try/catch is debt unless it actually recovers. Nested try/catch a
 
 ## Return
 
-Candidate findings, each with `path:line`, which check, the debt, its concrete cost, and the smallest fix. Return nothing for a check that's clean.
+Three lists, every item with `path:line`:
+
+- **Candidate findings:** which check, the debt, its concrete cost, and the smallest fix.
+- **Looks bad but is fine:** things you considered flagging and dropped, with the reason. If it's empty, you didn't look hard enough.
+- **Open questions:** anything you're unsure is debt or intentional. Ask here instead of asserting a finding.
+
+Write "Nothing material" for a check with no findings instead of padding it.

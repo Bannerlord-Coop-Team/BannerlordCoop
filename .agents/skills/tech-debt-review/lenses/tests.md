@@ -23,6 +23,17 @@ Read each new or changed test next to the code it covers.
 
 **Missing tests.** Testable logic (serialization, state transitions, service behavior) with no test, and a new GameInterface dependency without a `RegisterMock` in `Coop.Tests/TestComponentBase.cs`. Logic that needs the game runtime should come with manual verification steps in the PR instead.
 
+Before suggesting a test:
+- name the specific failure or regression it would catch;
+- check whether existing tests already cover the path, including `Coop.IntegrationTests` and `E2E.Tests`;
+- weigh its upkeep against that benefit, and skip trivial getters, setters, and constructors.
+
 ## Return
 
-Candidate findings, each with `path:line`, which check, the debt, its concrete cost, and the smallest fix (often "delete this test" or "replace with one regression test"). Return nothing for a check that's clean.
+Three lists, every item with `path:line`:
+
+- **Candidate findings:** which check, the debt, its concrete cost, and the smallest fix.
+- **Looks bad but is fine:** things you considered flagging and dropped, with the reason. If it's empty, you didn't look hard enough.
+- **Open questions:** anything you're unsure is debt or intentional. Ask here instead of asserting a finding.
+
+Write "Nothing material" for a check with no findings instead of padding it.
