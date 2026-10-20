@@ -51,8 +51,8 @@ public interface INavalShipEngine
     /// <summary>Drives a copied hull's oars and sails with its owner's helm input.</summary>
     void ApplyInput(MissionObject hull, BattleShipInput input);
 
-    /// <summary>Whether the hull's rigid body is simulating (diagnostics).</summary>
-    bool IsBodyActive(MissionObject hull);
+    /// <summary>"own", or how a copy follows its owner here: "steered" while its body simulates, "written" otherwise (diagnostics).</summary>
+    string BodyMode(MissionObject hull);
 
     /// <summary>The hull's ship controller type name (diagnostics).</summary>
     string ControllerName(MissionObject hull);

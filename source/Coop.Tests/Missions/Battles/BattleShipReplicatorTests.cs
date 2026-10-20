@@ -108,7 +108,7 @@ public class BattleShipReplicatorTests
         Assert.True(streamingWhileFresh);
         Assert.False((bool)inspected["streaming"]!);
         Assert.Equal("expired", (string)inspected["lastReject"]!);
-        Assert.Equal(2, (long)inspected["applied"]!);
+        Assert.Equal(2, (long)inspected["accepted"]!);
         harness.Engine.Verify(e => e.ApplyForeignSample(copy, It.IsAny<MatrixFrame>(), It.IsAny<BattleShipMotion>()), Times.Exactly(2));
     }
 
@@ -931,7 +931,7 @@ public class BattleShipReplicatorTests
     }
 
     [Fact]
-    public void TransferHostHulls_BetweenTwoPeers_LeavesTheLocalCopyKinematic()
+    public void TransferHostHulls_BetweenTwoPeers_KeepsTheLocalCopyACopy()
     {
         var harness = new Harness(committed: true);
         var aiHull = CreateHull();

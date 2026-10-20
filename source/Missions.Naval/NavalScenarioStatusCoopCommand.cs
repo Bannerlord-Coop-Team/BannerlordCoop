@@ -119,7 +119,7 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
             }).ToArray(),
             // How the copies exist here and how close every hull pair came, for the ramming preset above all.
             copyModes = ships.Where(ship => ship.Hull is MissionShip hull && NavalForeignHulls.Contains(hull))
-                .Select(ship => NavalContactProbe.Short(ship.ShipId) + "=" + CopyDiagnostics.ModeName((MissionShip)ship.Hull)).ToArray(),
+                .Select(ship => NavalContactProbe.Short(ship.ShipId) + "=" + NavalSteeredCopies.ModeName((MissionShip)ship.Hull)).ToArray(),
             closestApproach = NavalContactProbe.InspectApproaches(),
             result = mission.MissionEnded ? CoopNavalBattleEndLogic.DescribeResult(mission.MissionResult) : "running",
         };

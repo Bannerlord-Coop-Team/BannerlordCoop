@@ -100,7 +100,6 @@ public class CoopNavalBattleBehavior : MissionLogic
     private void OnShipRemoved(MissionShip ship)
     {
         bool wasCopy = NavalForeignHulls.Contains(ship);
-        if (wasCopy) NavalForeignHulls.Remove(ship);
         services.Engine.ForgetHull(ship);
         if (shipsLogic.IsMissionEnding) return;
 
@@ -131,6 +130,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         NavalHelmOverride.Clear();
         NavalContactProbe.Clear();
 #endif
+        // The static mirror's reset for a copy the engine never forgot; the engine's own entries die with the mission.
         NavalForeignHulls.Clear();
         NavalShipDamageGate.Clear();
         NavalPlayerDeploymentSlot.Reset();

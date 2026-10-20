@@ -833,7 +833,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         stream.Target = sample;
         stream.TargetReceivedAt = elapsed;
         stream.Accepted = sample.Sequence;
-        stream.Applied = sample.Sequence;
     }
 
     // The owner reports it with the hull's condition, on change, so no frame length expires it: vanilla latches a depleted
@@ -983,12 +982,11 @@ public class BattleShipReplicator : IBattleShipReplicator
                 isNpcParty = ship.IsNpcParty,
                 formation = ship.Formation?.FormationIndex.ToString(),
                 team = ship.Formation?.Team?.TeamSide.ToString(),
-                bodyActive = engine.IsBodyActive(ship.Hull),
+                bodyMode = engine.BodyMode(ship.Hull),
                 controller = engine.ControllerName(ship.Hull),
                 input = engine.ReadInput(ship.Hull),
                 sent = stream?.Sent ?? 0,
                 accepted = stream?.Accepted ?? 0,
-                applied = stream?.Applied ?? 0,
                 rejects = stream?.Rejects ?? 0,
                 lastReject = stream?.LastReject,
                 streaming = stream?.Target != null,
@@ -1048,7 +1046,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         public long Sent;
         public long Accepted;
         public int AcceptedEpoch;
-        public long Applied;
         public long Rejects;
         public string LastReject;
 

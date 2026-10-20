@@ -158,8 +158,8 @@ public class NavalCopyProbeLogic : MissionLogic
                 maxMs = CopyDiagnostics.Round(frameMilliseconds.Max),
                 steerMeanMs = CopyDiagnostics.Round(steerMilliseconds.Mean),
                 steerMaxMs = CopyDiagnostics.Round(steerMilliseconds.Max),
-                simulatedHulls = hulls?.Count(ship => ship.GameEntity.IsValid && ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation()),
-                steeredCopies = steeredCopies.Copies.Count(entry => !entry.Value.WritesFrames),
+                simulatedHulls = hulls?.Count(NavalSteeredCopies.IsSimulating),
+                steeredCopies = steeredCopies.Copies.Keys.Count(NavalSteeredCopies.IsSimulating),
                 hulls = hulls?.Count,
             },
             copies = registry.Ships
@@ -171,8 +171,7 @@ public class NavalCopyProbeLogic : MissionLogic
                     return new
                     {
                         shipId = ship.ShipId,
-                        mode = CopyDiagnostics.ModeName(hull),
-                        writesFrames = copy.WritesFrames,
+                        mode = NavalSteeredCopies.ModeName(hull),
                         diagnostics = copy.Diagnostics.Inspect(copy.Steering),
                     };
                 })

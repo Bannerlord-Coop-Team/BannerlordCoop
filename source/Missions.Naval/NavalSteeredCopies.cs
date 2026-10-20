@@ -10,25 +10,30 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
 
-/// <summary>[Game thread] This engine's copies: each keeps its dynamic body and is steered toward its owner's latest sample.</summary>
+/// <summary>
+/// [Game thread] This engine's copies of other owners' hulls, the only writer of <see cref="NavalForeignHulls"/>: each copy
+/// is steered toward its owner's latest sample while its body simulates, and gets its owner's frames written otherwise.
+/// </summary>
 public interface INavalSteeredCopies
 {
     /// <summary>The correction knobs every copy of this engine reads each step.</summary>
     CopySteeringKnobs Knobs { get; }
 
-    /// <summary>Every tracked copy (diagnostics).</summary>
+#if DEBUG
+    /// <summary>DEBUG: every tracked copy.</summary>
     IReadOnlyDictionary<MissionShip, SteeredCopy> Copies { get; }
+#endif
 
-    /// <summary>Starts steering a copy; one whose body is not simulating gets its owner's frames written instead.</summary>
+    /// <summary>Makes a hull another owner's copy here, for this engine and the patches.</summary>
     void Track(MissionShip ship);
 
-    /// <summary>Takes the owner's latest sample of a copy.</summary>
+    /// <summary>Takes the owner's latest sample of a tracked copy; a copy whose body isn't simulating gets the frame written.</summary>
     void Observe(MissionShip ship, MatrixFrame frame, BattleShipMotion motion);
 
-    /// <summary>[Fixed physics step] Pushes every steered copy toward its target.</summary>
+    /// <summary>[Fixed physics step] Pushes every simulating copy toward its target.</summary>
     void Tick(float fixedDt);
 
-    /// <summary>Stops tracking a hull that left the mission.</summary>
+    /// <summary>Stops treating a hull as a copy, when it left the mission or this client took it over.</summary>
     void Forget(MissionShip ship);
 
 #if DEBUG
@@ -37,19 +42,23 @@ public interface INavalSteeredCopies
 #endif
 }
 
-/// <summary>One tracked copy: its steering, or that its owner's frames are written to it because its body is not simulating.</summary>
-public sealed class SteeredCopy
+/// <summary>One tracked copy's steering toward its owner's samples.</summary>
+#if DEBUG
+public
+#else
+internal
+#endif
+sealed class SteeredCopy
 {
-    internal SteeredCopy(CopySteering steering, bool writesFrames)
+    internal SteeredCopy(CopySteering steering)
     {
         Steering = steering;
-        WritesFrames = writesFrames;
     }
 
     internal CopySteering Steering { get; }
 
-    /// <summary>The fallback: the body was not simulating when the copy was tracked, so samples are written as frames.</summary>
-    public bool WritesFrames { get; }
+    /// <summary>Whether the warning that its body isn't simulating was logged.</summary>
+    internal bool WarnedWritten { get; set; }
 
 #if DEBUG
     internal CopyDiagnostics Diagnostics { get; } = new CopyDiagnostics();
@@ -66,32 +75,28 @@ public class NavalSteeredCopies : INavalSteeredCopies
     private readonly Stopwatch tickClock = new Stopwatch();
 
     public float LastTickMilliseconds { get; private set; }
+
+    public IReadOnlyDictionary<MissionShip, SteeredCopy> Copies => copies;
 #endif
 
     public CopySteeringKnobs Knobs { get; } = new CopySteeringKnobs();
-
-    public IReadOnlyDictionary<MissionShip, SteeredCopy> Copies => copies;
 
     public void Track(MissionShip ship)
     {
         if (copies.ContainsKey(ship)) return;
 
-        bool simulating = IsSimulating(ship);
-        copies.Add(ship, new SteeredCopy(new CopySteering(Knobs), writesFrames: !simulating));
-        if (!simulating)
-            Logger.Warning("[NavalSync] Copy hull {Index} has no simulating body; writing its owner's frames instead of steering it",
-                ship.Index);
+        copies.Add(ship, new SteeredCopy(new CopySteering(Knobs)));
+        NavalForeignHulls.Add(ship);
     }
 
     public void Observe(MissionShip ship, MatrixFrame frame, BattleShipMotion motion)
     {
-        if (!ship.GameEntity.IsValid) return;
-        if (!copies.ContainsKey(ship)) Track(ship);
+        if (!copies.TryGetValue(ship, out var copy) || ship.IsRemoved || !ship.GameEntity.IsValid) return;
 
-        var copy = copies[ship];
         copy.Steering.ObserveOwner(frame, motion.Velocity, motion.YawRate);
-        if (!copy.WritesFrames) return;
+        if (IsSimulating(ship)) return;
 
+        WarnWritten(ship, copy);
         ship.GameEntity.SetGlobalFrame(frame, isTeleportation: false);
         ship.GameEntity.UpdateAttachedNavigationMeshFaces();
     }
@@ -104,7 +109,7 @@ public class NavalSteeredCopies : INavalSteeredCopies
         foreach (var entry in copies)
         {
             var ship = entry.Key;
-            if (entry.Value.WritesFrames || ship.IsRemoved || !IsSimulating(ship)) continue;
+            if (ship.IsRemoved || !IsSimulating(ship)) continue;
 
             SteerOne(ship, entry.Value, fixedDt);
         }
@@ -113,7 +118,31 @@ public class NavalSteeredCopies : INavalSteeredCopies
 #endif
     }
 
-    public void Forget(MissionShip ship) => copies.Remove(ship);
+    public void Forget(MissionShip ship)
+    {
+        if (copies.Remove(ship)) NavalForeignHulls.Remove(ship);
+    }
+
+    /// <summary>"own", "steered" or "written": a copy is steered while its body simulates, otherwise its owner's frames are written.</summary>
+    internal static string ModeName(MissionShip hull)
+    {
+        if (!NavalForeignHulls.Contains(hull)) return "own";
+        return IsSimulating(hull) ? "steered" : "written";
+    }
+
+    // Whether the hull's dynamic body simulates, so velocity changes move it.
+    internal static bool IsSimulating(MissionShip ship) =>
+        ship.GameEntity.IsValid && ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation();
+
+    // Logs once per copy that its owner's frames are written to it instead of steering it.
+    private static void WarnWritten(MissionShip ship, SteeredCopy copy)
+    {
+        if (copy.WarnedWritten) return;
+
+        copy.WarnedWritten = true;
+        Logger.Warning("[NavalSync] Copy hull {Index} has no simulating body; writing its owner's frames instead of steering it",
+            ship.Index);
+    }
 
     // One correction step: a velocity and yaw rate change, or a teleport to the owner's frame that carries the crew.
     private static void SteerOne(MissionShip ship, SteeredCopy copy, float dt)
@@ -140,8 +169,4 @@ public class NavalSteeredCopies : INavalSteeredCopies
             entity.SetLinearVelocity(new Vec3(velocity.x + deltaVelocity.x, velocity.y + deltaVelocity.y, velocity.z));
         if (step.DeltaYawRate != 0f) entity.SetAngularVelocity(new Vec3(angular.x, angular.y, angular.z + step.DeltaYawRate));
     }
-
-    // Whether the hull's dynamic body simulates, so velocity changes move it.
-    private static bool IsSimulating(MissionShip ship) =>
-        ship.GameEntity.IsValid && ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation();
 }

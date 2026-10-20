@@ -143,7 +143,6 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         var fake = Of(hull);
         fake.Frame = frame;
         fake.Motion = motion;
-        fake.FrameWrites++;
     }
 
     public BattleShipMotion ReadMotion(MissionObject hull) => Of(hull).Motion;
@@ -160,8 +159,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
 
     public void ApplyInput(MissionObject hull, BattleShipInput input) => Of(hull).Input = input;
 
-    // A steered copy keeps its body simulating, as an own hull does.
-    public bool IsBodyActive(MissionObject hull) => true;
+    // A copy here stands in for one whose body simulates.
+    public string BodyMode(MissionObject hull) => Of(hull).IsCopy ? "steered" : "own";
 
     public string ControllerName(MissionObject hull) => Of(hull).IsCopy ? "copy" : "simulated";
 
@@ -579,8 +578,6 @@ public sealed class FakeHull
     public Formation? Formation { get; set; }
     public BattleShipSpawnData? SpawnData { get; set; }
     public BattleRopeState[] Ropes { get; set; } = Array.Empty<BattleRopeState>();
-    /// <summary>How many owner samples the copy took.</summary>
-    public int FrameWrites { get; set; }
     /// <summary>An own hull's body motion its samples send, or the motion a copy's latest sample carried.</summary>
     public BattleShipMotion Motion { get; set; }
     public int FinalRopesApplied { get; set; }

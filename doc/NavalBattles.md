@@ -19,8 +19,10 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   (`Missions.Naval`) steers it every fixed physics step toward the owner's latest sample extrapolated by the owner's
   velocity and yaw rate: target velocity = owner velocity + clamped, soft-zoned correction, blended in with a time
   constant. A large error or a jump between samples teleports it (`NavalShipsLogic.TeleportShip`, crew carried along).
-  Heave, pitch and roll come from this client's water. A copy whose body isn't simulating when it spawns gets its owner's
-  frames written instead (warning `has no simulating body`).
+  Heave, pitch and roll come from this client's water. One rule decides a copy's mode at every sample and step: steered
+  while its body simulates, its owner's frames written otherwise (warning `has no simulating body` once per copy;
+  `bodyMode` in `inspect`). `NavalSteeredCopies.Track`/`Forget` are the only writers of `NavalForeignHulls`, the static
+  copy set the patches read; spawning, releasing, replacing and removing a hull all go through them.
 - A copy collides with this client's own hulls, but its owner stays the authority of everything that happens to it:
   contact and ram damage on a copy is routed to the owner (`BattleShipDamageRouter`). Two copies never touch here
   (`CopyPairCollisionFilterPatch`, a prefix on `MissionShip.CanPhysicsCollideBetweenTwoEntities`), since no client

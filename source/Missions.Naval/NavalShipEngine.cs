@@ -41,8 +41,8 @@ public class NavalShipEngine : INavalShipEngine
         SteeredCopies = steeredCopies;
     }
 
-    /// <summary>This engine's copies and their steering knobs (DEBUG probes and copy_steer read them).</summary>
-    public INavalSteeredCopies SteeredCopies { get; }
+    /// <summary>This engine's copies and their steering knobs (the DEBUG probe and copy_steer read them).</summary>
+    internal INavalSteeredCopies SteeredCopies { get; }
 
     private static NavalShipsLogic ShipsLogic => Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
 
@@ -97,7 +97,6 @@ public class NavalShipEngine : INavalShipEngine
 
         // The owner decides this hull: no local controller and no auto controller; its body is steered toward the samples.
         ship.SetController(ShipControllerType.None, autoUpdateController: false);
-        NavalForeignHulls.Add(ship);
         SteeredCopies.Track(ship);
         formation = ship.Formation;
         return ship;
@@ -106,9 +105,8 @@ public class NavalShipEngine : INavalShipEngine
     public void ReleaseNpcHull(MissionObject hull)
     {
         var ship = (MissionShip)hull;
-        NavalForeignHulls.Add(ship);
+        SteeredCopies.Track(ship);
         ship.SetController(ShipControllerType.None, autoUpdateController: false);
-        if (ship.GameEntity.IsValid) SteeredCopies.Track(ship);
     }
 
     // Vanilla only removes a hull nobody it keeps stands on (Quest5 frees crewless hulls, ShipRetreatLogic fades the crew
@@ -170,7 +168,7 @@ public class NavalShipEngine : INavalShipEngine
 
         // Quest5's RemoveShipInternal: no rope or bridge may keep pointing at a removed hull.
         ship.BreakAllExistingConnections();
-        NavalForeignHulls.Remove(ship);
+        SteeredCopies.Forget(ship);
         shipsLogic.RemoveShip(ship);
 
         var fresh = shipsLogic.SpawnShip(origin, in frame, team, formation, spawnAnchored: false, checkForFreeArea: false);
@@ -358,11 +356,7 @@ public class NavalShipEngine : INavalShipEngine
         ((MissionShip)hull).SetInputRecord(in record);
     }
 
-    public bool IsBodyActive(MissionObject hull)
-    {
-        var entity = ((MissionShip)hull).GameEntity;
-        return entity.IsValid && entity.HasDynamicRigidBodyAndActiveSimulation();
-    }
+    public string BodyMode(MissionObject hull) => NavalSteeredCopies.ModeName((MissionShip)hull);
 
     public string ControllerName(MissionObject hull) =>
         ((MissionShip)hull).Controller?.ControllerType.ToString() ?? ShipControllerType.None.ToString();

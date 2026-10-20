@@ -98,13 +98,6 @@ internal sealed class CopyDiagnostics
         },
     };
 
-    /// <summary>"own", "steered" or "written" (a copy whose body does not simulate), for the probes.</summary>
-    internal static string ModeName(MissionShip hull)
-    {
-        if (!NavalForeignHulls.Contains(hull)) return "own";
-        return hull.GameEntity.IsValid && hull.GameEntity.HasDynamicRigidBodyAndActiveSimulation() ? "steered" : "written";
-    }
-
     internal static float Round(float value) => (float)Math.Round(value, 3);
 }
 #endif

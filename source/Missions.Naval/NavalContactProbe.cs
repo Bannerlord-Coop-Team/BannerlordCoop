@@ -102,8 +102,8 @@ internal static class NavalContactProbe
         // The modes are only named for a new closest approach, in the pair's order.
         if (!approach.Take(centerDistance, gap, time)) return;
         approach.Modes = inOrder
-            ? CopyDiagnostics.ModeName(firstHull) + "/" + CopyDiagnostics.ModeName(secondHull)
-            : CopyDiagnostics.ModeName(secondHull) + "/" + CopyDiagnostics.ModeName(firstHull);
+            ? NavalSteeredCopies.ModeName(firstHull) + "/" + NavalSteeredCopies.ModeName(secondHull)
+            : NavalSteeredCopies.ModeName(secondHull) + "/" + NavalSteeredCopies.ModeName(firstHull);
     }
 
     /// <summary>[Game thread] The closest approach of every hull pair, closest first.</summary>
