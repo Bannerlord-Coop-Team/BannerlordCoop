@@ -96,6 +96,12 @@ public sealed class IssuesCompleteCoopCommand : ICoopCommand
             }
         }
 
+        // A quest can refuse its own ending, for example a hand-in without the goods
+        if (hero.Issue == issue)
+        {
+            return Failed($"The issue of {hero.Name} did not end with {outcome}, see the server log");
+        }
+
         return new CoopCommandResult(true, $"Ended the issue of {hero.Name} with {outcome}");
     }
 

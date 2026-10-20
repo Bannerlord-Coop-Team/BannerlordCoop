@@ -27,7 +27,7 @@ namespace GameInterface.Services.MobileParties.Handlers;
 /// Dedicated recovery flow behind coop.unstuck. The client forwards
 /// <see cref="PlayerUnstuckRequested"/> to the server as <see cref="NetworkRequestPlayerUnstuck"/>;
 /// the server force-applies every applicable exit (captivity, map event, follower army, siege camp,
-/// settlement) for the requesting connection's registered player through
+/// settlement, unusable map spot) for the requesting connection's registered player through
 /// <see cref="IServerPlayerUnstuck"/>, with each step guarded independently, so one broken exit flow
 /// cannot block the others; the
 /// <see cref="NetworkPlayerUnstuckResult"/> reply then lets the requesting client clear the
