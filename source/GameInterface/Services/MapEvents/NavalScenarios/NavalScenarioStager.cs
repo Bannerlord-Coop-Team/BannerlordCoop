@@ -758,23 +758,25 @@ public class NavalScenarioStager : INavalScenarioStager
     // weapons=n: vanilla mounts a hull's ShipBallista from the piece in its fore slot (MissionShipFactory keeps only the
     // equipped slot prefabs), so a ship whose hull has no fore slot becomes an armed Battle Knarr.
     private static string ArmShips(PartyBase party, int count) => FitPiece(party, count, NavalScenarioPresets.WeaponSlotTag,
-        NavalScenarioPresets.WeaponPieceId, NavalScenarioPresets.WeaponHullId, ship => true);
+        NavalScenarioPresets.WeaponPieceId, NavalScenarioPresets.WeaponHullId);
 
     // ram=n: MissionShip finds its MissionShipRam on the bow piece's prefab. Ships carrying a fore ballista are skipped,
     // since the bow hull swapped in has no fore slot.
     private static string FitRams(PartyBase party, int count) => FitPiece(party, count, NavalScenarioPresets.RamSlotTag,
         NavalScenarioPresets.RamPieceId, NavalScenarioPresets.RamHullId, ship => !IsArmed(ship));
 
-    // Fits the piece in the slot of the first count ships the filter takes; a ship whose hull lacks the slot is swapped for
-    // a new ship of the fitting hull carrying it, so the count stays.
-    private static string FitPiece(PartyBase party, int count, string slotTag, string pieceId, string hullId, Func<Ship, bool> filter)
+    // Fits the piece in the slot of the first count ships the filter takes (any ship without one); a ship whose hull lacks
+    // the slot is swapped for a new ship of the fitting hull carrying it, so the count stays.
+    private static string FitPiece(PartyBase party, int count, string slotTag, string pieceId, string hullId,
+        Func<Ship, bool> filter = null)
     {
         var piece = MBObjectManager.Instance.GetObject<ShipUpgradePiece>(pieceId);
         var fittingHull = MBObjectManager.Instance.GetObject<ShipHull>(hullId);
         if (piece == null || fittingHull == null) return $"{party.Id}(none: no piece {pieceId} or hull {hullId})";
 
+        var candidates = filter == null ? party.Ships : party.Ships.Where(filter);
         int equipped = 0, swapped = 0;
-        foreach (var ship in party.Ships.Where(filter).Take(count).ToList())
+        foreach (var ship in candidates.Take(count).ToList())
         {
             if (ship.HasSlot(slotTag))
             {
