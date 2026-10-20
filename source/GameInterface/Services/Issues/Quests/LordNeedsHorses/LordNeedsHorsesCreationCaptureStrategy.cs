@@ -1,9 +1,9 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using Helpers;
+using System.Linq;
 using System.IO;
 using System.Reflection;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
@@ -28,7 +28,7 @@ internal class LordNeedsHorsesCreationCaptureStrategy : ICreationCaptureStrategy
 
         using (var stream = new MemoryStream())
         {
-        using (var writer = new System.IO.BinaryWriter(stream))
+            using (var writer = new System.IO.BinaryWriter(stream))
             {
                 writer.Write(horsesIssue._mountObjectToBeDelivered?.StringId ?? string.Empty);
                 writer.Write(horsesIssue._numMountsToBeDelivered);
@@ -46,7 +46,7 @@ internal class LordNeedsHorsesCreationCaptureStrategy : ICreationCaptureStrategy
 
         using (var stream = new MemoryStream(captured))
         {
-        using (var reader = new System.IO.BinaryReader(stream))
+            using (var reader = new System.IO.BinaryReader(stream))
             {
                 var mountId = reader.ReadString();
 

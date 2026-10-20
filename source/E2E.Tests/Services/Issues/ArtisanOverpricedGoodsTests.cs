@@ -8,7 +8,10 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.CreationCapture;
 using GameInterface.Services.Issues.Quests.ArtisanOverpricedGoods;
+using GameInterface.Services.ItemRosters.Messages;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -138,6 +141,22 @@ public class ArtisanOverpricedGoodsTests : IDisposable
                 Assert.Equal(Amount, issue.RequestedTradeGoodAmount);
                 Assert.Equal(Payment, issue._goldReward);
             }
+        });
+    }
+
+    [Fact]
+    public void DebugCapture_DoesNotCreateAnIssueOrRoster()
+    {
+        byte[] captured = null!;
+        Server.Call(() =>
+        {
+            Server.Resolve<IObjectManager>().AddExisting(DefaultItems.HardWood.StringId, DefaultItems.HardWood);
+            Server.NetworkSentMessages.Clear();
+            Assert.True(Descriptor(Server).CreationCaptureStrategy.TryBuildDebugCapture(
+                Get<Hero>(Server, scenario.NotableId), out captured));
+            Assert.NotEmpty(captured);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCreateItemRoster>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
         });
     }
 

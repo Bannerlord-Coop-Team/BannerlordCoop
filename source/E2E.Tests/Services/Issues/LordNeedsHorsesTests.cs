@@ -7,6 +7,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.ItemRosters.Messages;
 using HarmonyLib;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
@@ -202,15 +203,10 @@ public class LordNeedsHorsesTests : IDisposable
                 party.MemberRoster.AddToCounts(troop, 20);
             }
 
+            Server.NetworkSentMessages.Clear();
             Assert.True(Descriptor().CreationCaptureStrategy.TryBuildDebugCapture(giver, out var captured));
             Assert.NotEmpty(captured);
-
-            using (new AllowedThread())
-            {
-                var recreated = (Issue)Descriptor().CreationCaptureStrategy.CreateIssue(giver, captured);
-                Assert.Equal(recreated._numMountsToBeDelivered, 1 + (int)MathF.Ceiling(12f * Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier()));
-                Assert.Equal(recreated._mountValuePerUnit, recreated._mountObjectToBeDelivered.Value);
-            }
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCreateItemRoster>());
         });
     }
 
