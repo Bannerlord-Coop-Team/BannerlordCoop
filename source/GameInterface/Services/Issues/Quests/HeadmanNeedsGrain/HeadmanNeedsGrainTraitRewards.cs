@@ -21,6 +21,7 @@ internal interface IHeadmanNeedsGrainTraitRewards : IGameAbstraction
     void SyncData(IDataStore dataStore);
     void RequestSeed();
     void Seed(Hero owner, Dictionary<string, int> values);
+    void RecordRemoteReward(Hero owner, TraitObject trait, int remainingXp);
     void Restore(Hero owner);
     void RefreshSeed();
 }
@@ -58,7 +59,7 @@ internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
         model.GetTraitLevelForTraitXp(owner, trait, xp + amount, out var level, out var remainingXp);
         values[trait.StringId] = remainingXp;
         owner.SetTraitLevel(trait, level);
-        network.SendAll(new NetworkHeadmanNeedsGrainTraitReward(ownerId, giverId, trait.StringId, amount, (int)note, level));
+        network.SendAll(new NetworkHeadmanNeedsGrainTraitReward(ownerId, giverId, trait.StringId, amount, (int)note, level, remainingXp));
     }
 
     public void RequestSeed()
@@ -91,6 +92,17 @@ internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
             if (owner.GetTraitLevel(trait) != level) owner.SetTraitLevel(trait, level);
         }
         progress[owner] = accepted;
+    }
+
+    public void RecordRemoteReward(Hero owner, TraitObject trait, int remainingXp)
+    {
+        if (!progress.TryGetValue(owner, out var values))
+        {
+            values = new Dictionary<string, int>();
+            progress.Add(owner, values);
+        }
+
+        values[trait.StringId] = remainingXp;
     }
 
     public void SyncData(IDataStore dataStore)
@@ -130,8 +142,9 @@ public readonly struct NetworkHeadmanNeedsGrainTraitReward : IServerToClientComm
     [ProtoMember(4)] public readonly int Amount;
     [ProtoMember(5)] public readonly int Note;
     [ProtoMember(6)] public readonly int Level;
+    [ProtoMember(7)] public readonly int RemainingXp;
 
-    public NetworkHeadmanNeedsGrainTraitReward(string ownerId, string giverId, string traitId, int amount, int note, int level)
+    public NetworkHeadmanNeedsGrainTraitReward(string ownerId, string giverId, string traitId, int amount, int note, int level, int remainingXp)
     {
         OwnerId = ownerId;
         GiverId = giverId;
@@ -139,6 +152,7 @@ public readonly struct NetworkHeadmanNeedsGrainTraitReward : IServerToClientComm
         Amount = amount;
         Note = note;
         Level = level;
+        RemainingXp = remainingXp;
     }
 }
 
@@ -186,6 +200,7 @@ internal class HeadmanNeedsGrainTraitRewardHandler : IHandler
             if (trait == null) return;
             if (owner != Hero.MainHero)
             {
+                rewards.RecordRemoteReward(owner, trait, data.RemainingXp);
                 using (new Common.Util.AllowedThread()) owner.SetTraitLevel(trait, data.Level);
                 return;
             }

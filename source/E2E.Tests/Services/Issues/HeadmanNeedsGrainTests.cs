@@ -295,6 +295,40 @@ public class HeadmanNeedsGrainTests : IDisposable
         }, Texts);
     }
 
+    [Fact]
+    public void RemoteTraitReward_ForNonLocalOwner_IsRestoredAfterSwitchingBack()
+    {
+        textHarmony.Patch(AccessTools.Method(typeof(ChangePlayerCharacterAction), nameof(ChangePlayerCharacterAction.Apply)),
+            prefix: new HarmonyMethod(typeof(HeadmanNeedsGrainTests), nameof(SkipMapCharacterSwitch)) { priority = Priority.First });
+        ClientA.Call(() =>
+        {
+            var owner = Get<Hero>(ClientA, scenario.PlayerA.HeroId);
+            var local = Get<Hero>(ClientA, scenario.PlayerB.HeroId);
+            var trait = DefaultTraits.Generosity;
+            var startingXp = 123;
+            var amount = 20;
+            var records = new Dictionary<string, object>
+            {
+                ["_coop_grain_trait_progress"] = new Dictionary<Hero, Dictionary<string, int>>
+                {
+                    [owner] = new() { [trait.StringId] = startingXp },
+                },
+            };
+            Game.Current.PlayerTroop = local.CharacterObject;
+            var rewards = ClientA.Resolve<IHeadmanNeedsGrainTraitRewards>();
+            rewards.SyncData(new TestDataStore(false, records));
+
+            var model = Campaign.Current.Models.CharacterDevelopmentModel;
+            model.GetTraitLevelForTraitXp(owner, trait, startingXp + amount, out var level, out var remainingXp);
+            ClientA.SimulateMessage(this, new NetworkHeadmanNeedsGrainTraitReward(
+                scenario.PlayerA.HeroId, otherNotableId, trait.StringId, amount, (int)ActionNotes.DefaultNote, level, remainingXp));
+
+            Game.Current.PlayerTroop = owner.CharacterObject;
+            ChangePlayerCharacterAction.Apply(owner);
+            Assert.Equal(remainingXp, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(trait));
+        }, Texts);
+    }
+
     private static bool SkipMapCharacterSwitch() => false;
 
     [Fact]
