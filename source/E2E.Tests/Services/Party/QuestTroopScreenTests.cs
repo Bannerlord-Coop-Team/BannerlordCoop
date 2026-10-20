@@ -30,7 +30,8 @@ public class QuestTroopScreenTests : IDisposable
     }
 
     private ((int Regulars, int Heroes) BeforeDone, (int Regulars, int Heroes) AfterDone) SendTroopsAndPressDone(
-        Helpers.PartyScreenHelper.PartyScreenMode mode)
+        Helpers.PartyScreenHelper.PartyScreenMode mode,
+        bool doneDelegateResult = true)
     {
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -62,7 +63,10 @@ public class QuestTroopScreenTests : IDisposable
                 RightMemberRoster = party.MemberRoster,
                 RightPrisonerRoster = party.PrisonRoster,
                 RightOwnerParty = party.Party,
-                PartyPresentationDoneButtonDelegate = (_, _, _, _, _, _, _, _, _) => true
+                PartyPresentationDoneButtonDelegate = (_, _, _, _, _, _, _, _, _) => doneDelegateResult,
+                PartyPresentationDoneButtonConditionDelegate = mode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage
+                    ? (_, _, _, _, _, _) => Tuple.Create(true, (TaleWorlds.Localization.TextObject)null)
+                    : null
             });
 
             var states = Game.Current.GameStateManager;
@@ -94,6 +98,17 @@ public class QuestTroopScreenTests : IDisposable
     public void Done_InQuestMode_KeepsTheTransferredTroopsInTheSentRoster()
     {
         var (beforeDone, afterDone) = SendTroopsAndPressDone(Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage);
+
+        Assert.Equal((SentTroops, 1), beforeDone);
+        Assert.Equal(beforeDone, afterDone);
+    }
+
+    [Fact]
+    public void Done_InQuestMode_UsesTheVanillaConditionWhenTheGenericDelegateRefuses()
+    {
+        var (beforeDone, afterDone) = SendTroopsAndPressDone(
+            Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage,
+            doneDelegateResult: false);
 
         Assert.Equal((SentTroops, 1), beforeDone);
         Assert.Equal(beforeDone, afterDone);

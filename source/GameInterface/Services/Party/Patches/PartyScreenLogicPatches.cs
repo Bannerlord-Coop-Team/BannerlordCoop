@@ -98,6 +98,15 @@ internal class PartyScreenLogicPatches
         PartyScreenHelperPatches.ResetReleasedAndTakenPrisonerActionsRequest();
         PartyScreenHelperPatches.ResetPrisonerDonationRequest();
         bool flag = __instance.PartyPresentationDoneButtonDelegate(__instance.MemberRosters[0], __instance.PrisonerRosters[0], __instance.MemberRosters[1], __instance.PrisonerRosters[1], takenPrisonersRoster, releasedPrisonersRoster, isForced, __instance.LeftOwnerParty, __instance.RightOwnerParty);
+        var isQuestTroopScreen = __instance._partyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage ||
+            Game.Current.GameStateManager.ActiveState is PartyState activePartyState &&
+            activePartyState.PartyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+        if (!flag && isQuestTroopScreen)
+        {
+            // PartyVM checks the vanilla done condition before calling this method. Some game builds return
+            // false from the generic delegate after that check, which leaves the quest screen stuck open.
+            flag = true;
+        }
         bool applyReleasedAndTakenPrisonerActions =
             PartyScreenHelperPatches.ConsumeReleasedAndTakenPrisonerActionsRequest();
         PartyScreenHelperPatches.ConsumePrisonerDonationRequest(
