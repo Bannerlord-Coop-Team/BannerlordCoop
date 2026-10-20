@@ -120,7 +120,7 @@ internal class FinalizationCoordinator : IHandler
             }
 
             if (data.Outcome == IssueOutcome.QuestSuccess &&
-                descriptor.SuccessOnlyThroughBranchProof)
+                descriptor.IssueType == typeof(TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssue))
             {
                 Logger.Warning("{issue} requires a finalization proof and cannot accept generic success", data.IssueId);
                 return;
