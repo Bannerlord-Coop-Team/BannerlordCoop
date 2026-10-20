@@ -68,8 +68,6 @@ public enum DifficultyLevel
 
 public sealed class ModOptionsData
 {
-    public int? KingdomDecisionVoteTimeoutSeconds { get; set; }
-
     public bool? VoiceEnabled { get; set; }
 
     public int? BattleSize { get; set; }
@@ -123,6 +121,8 @@ public sealed class ModOptionsData
     public bool? PlayerWoundedBattleEntry { get; set; }
 
     public bool? ShowPlayerNameplates { get; set; }
+
+    public int? KingdomDecisionVoteTimeoutSeconds { get; set; }
 
     [JsonExtensionData]
     public IDictionary<string, JToken> UnknownKeys { get; set; }

@@ -378,6 +378,7 @@ public class ModConfigTests : IDisposable
 
         Assert.Null(config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(60, new ModOptions(config.ModOptions).KingdomDecisionVoteTimeoutSeconds);
+        Assert.Equal(40, config.ModOptions.WandererLimit);
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
     }
 

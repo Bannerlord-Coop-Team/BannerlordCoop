@@ -223,8 +223,8 @@
     // Default is true
     "playerWoundedBattleEntry": true,
 
-    // Kingdom decision vote timeout in seconds.
-    // Positive integer; default is 60 seconds. Set to 600 for ten minutes.
+    // Set the time in seconds players have to vote on kingdom decisions.
+    // Default is 60. Values of 0 or lower will default back to 60.
     "kingdomDecisionVoteTimeoutSeconds": 60
   }
 }

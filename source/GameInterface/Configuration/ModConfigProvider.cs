@@ -85,7 +85,6 @@ public readonly struct ModOptions
 
     public ModOptions(ModOptionsData modOptionsData)
     {
-        KingdomDecisionVoteTimeoutSeconds = modOptionsData.KingdomDecisionVoteTimeoutSeconds ?? KingdomDecisionVoteTimeoutSeconds;
         VoiceEnabled = modOptionsData.VoiceEnabled ?? VoiceEnabled;
         FastForwardEnabled = modOptionsData.FastForwardEnabled ?? FastForwardEnabled;
         AutoPauseEnabled = modOptionsData.AutoPauseEnabled ?? AutoPauseEnabled;
@@ -112,5 +111,6 @@ public readonly struct ModOptions
         EnablePlayerExecutions = modOptionsData.EnablePlayerExecutions ?? EnablePlayerExecutions;
         ShowPlayerNameplates = modOptionsData.ShowPlayerNameplates ?? ShowPlayerNameplates;
         PlayerWoundedBattleEntry = modOptionsData.PlayerWoundedBattleEntry ?? PlayerWoundedBattleEntry;
+        KingdomDecisionVoteTimeoutSeconds = modOptionsData.KingdomDecisionVoteTimeoutSeconds ?? KingdomDecisionVoteTimeoutSeconds;
     }
 }
