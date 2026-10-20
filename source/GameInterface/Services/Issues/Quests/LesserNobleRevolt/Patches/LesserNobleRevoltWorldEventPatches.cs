@@ -42,14 +42,14 @@ internal static class LesserNobleRevoltWorldEventPatches
             if (notificationPending && quest._giveNotificationAfterHoursCounter == -1 &&
                 quest._visitedVillagesList.Count > 0)
             {
-                SendJournalUpdate(quest, quest._visitedVillagesList.Last(), quest._visitedVillagesList.Count, true);
+                SendJournalUpdate(quest, quest._visitedVillagesList.Last(), quest._discreteLog.CurrentProgress, true);
             }
         });
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
     [HarmonyPostfix]
-    private static void HourlyTick()
+    internal static void HourlyTick()
     {
         if (ModInformation.IsClient)
         {
@@ -67,7 +67,7 @@ internal static class LesserNobleRevoltWorldEventPatches
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementEntered))]
     [HarmonyPostfix]
-    private static void SettlementEntered(MobileParty party, Settlement settlement, Hero hero)
+    internal static void SettlementEntered(MobileParty party, Settlement settlement, Hero hero)
     {
         // Vanilla only reacts to its own revolt party, which is marked as used by a quest.
         if (party?.IsCurrentlyUsedByAQuest != true)
@@ -80,7 +80,7 @@ internal static class LesserNobleRevoltWorldEventPatches
             if (IsRevoltPartyVisit(quest, party))
             {
                 // Sent before vanilla runs, because the twentieth visit times the quest out.
-                SendJournalUpdate(quest, settlement, quest._visitedVillagesList.Count + 1, false);
+                SendJournalUpdate(quest, settlement, quest._discreteLog.CurrentProgress + 1, false);
             }
 
             quest.OnSettlementEntered(party, settlement, hero);
@@ -166,11 +166,6 @@ internal static class LesserNobleRevoltWorldEventPatches
         return (ClientOwnerBattles.TryGetValue(quest, out var battle) && battle == mapEvent) ||
             (quest._lesserNobleParty != null && mapEvent.InvolvedParties.Contains(quest._lesserNobleParty.Party));
     }
-
-    // The server strips militia from the owner's battle in LesserNobleRevoltBattlePatches.
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnGameMenuOpened))]
-    [HarmonyPrefix]
-    private static bool GameMenuOpenedPrefix() => ModInformation.IsServer;
 
     // The server fails the quest when it times out, a client replaying the timeout only ends its copy
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
@@ -285,7 +280,7 @@ internal static class LesserNobleRevoltWorldEventPatches
     /// </summary>
     internal static bool ApplyClientSettlementProgress(Quest quest, Settlement settlement, int visitCount)
     {
-        if (settlement == null || quest._visitedVillagesList.Count >= visitCount)
+        if (settlement == null || quest._discreteLog.CurrentProgress >= visitCount)
         {
             return false;
         }
@@ -305,8 +300,8 @@ internal static class LesserNobleRevoltWorldEventPatches
     internal static bool ShouldApplyClientNotification(Quest quest, int visitCount)
     {
         return quest._giveNotificationAfterHoursCounter != -1 &&
-            quest._visitedVillagesList.Count > 0 &&
-            quest._visitedVillagesList.Count == visitCount;
+            quest._discreteLog.CurrentProgress > 0 &&
+            quest._discreteLog.CurrentProgress == visitCount;
     }
 
     internal static void ApplyClientHourlyJournalNotification(Quest quest, Settlement settlement)

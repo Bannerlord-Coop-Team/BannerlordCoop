@@ -103,7 +103,7 @@ public sealed class LesserNobleRevoltTests : IDisposable
         {
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             Assert.True(server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-            AccessTools.Method(typeof(LesserNobleRevoltWorldEventPatches), "SettlementEntered")
+            AccessTools.Method(typeof(LesserNobleRevoltWorldEventPatches), nameof(LesserNobleRevoltWorldEventPatches.SettlementEntered))
                 .Invoke(null, new object[] { party, settlement, null });
         });
     }
@@ -209,7 +209,7 @@ public sealed class LesserNobleRevoltTests : IDisposable
         // The guard must run before coop's capture prefix whatever order the patches were applied in.
         var prefixes = Harmony.GetPatchInfo(
             AccessTools.Method(typeof(TakePrisonerAction), nameof(TakePrisonerAction.ApplyInternal))).Prefixes;
-        var guard = Assert.Single(prefixes, prefix => prefix.PatchMethod.Name == "ProtectOwnerFromCapture");
+        var guard = Assert.Single(prefixes, prefix => prefix.PatchMethod == AccessTools.Method(typeof(LesserNobleRevoltAcceptPatches), nameof(LesserNobleRevoltAcceptPatches.ProtectOwnerFromCapture)));
         Assert.All(prefixes.Where(prefix => prefix != guard), prefix => Assert.True(guard.priority > prefix.priority));
 
         var server = testEnvironment.Server;
@@ -344,7 +344,7 @@ public sealed class LesserNobleRevoltTests : IDisposable
         RegisterOwner(issueId, "player-A");
         var quest = QuestOf(server);
         using var timeouts = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.OnTimedOut)));
-        var hourlyTick = AccessTools.Method(typeof(LesserNobleRevoltWorldEventPatches), "HourlyTick");
+        var hourlyTick = AccessTools.Method(typeof(LesserNobleRevoltWorldEventPatches), nameof(LesserNobleRevoltWorldEventPatches.HourlyTick));
 
         server.Call(() =>
         {

@@ -13,12 +13,8 @@ using Quest = TaleWorlds.CampaignSystem.Issues.LesserNobleRevoltIssueBehavior.Le
 namespace GameInterface.Services.Issues.Quests.LesserNobleRevolt.Patches;
 
 [HarmonyPatch]
-internal static class LesserNobleRevoltAcceptPatches
+public static class LesserNobleRevoltAcceptPatches
 {
-    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddDialogs))]
-    [HarmonyPrefix]
-    private static bool AddDialogs(QuestBase __instance) => __instance is not Quest || ModInformation.IsClient;
-
     [HarmonyPatch(typeof(Quest), MethodType.Constructor,
         new[] { typeof(string), typeof(Hero), typeof(CampaignTime), typeof(int), typeof(TextObject) })]
     [HarmonyPrefix]
@@ -40,7 +36,7 @@ internal static class LesserNobleRevoltAcceptPatches
     [HarmonyPatch(typeof(TakePrisonerAction), nameof(TakePrisonerAction.ApplyInternal))]
     [HarmonyPrefix]
     [HarmonyPriority(Priority.First)]
-    private static bool ProtectOwnerFromCapture(PartyBase capturerParty, Hero prisonerCharacter)
+    internal static bool ProtectOwnerFromCapture(PartyBase capturerParty, Hero prisonerCharacter)
     {
         return CallOriginalPolicy.IsOriginalAllowed() ||
             ModInformation.IsClient ||
