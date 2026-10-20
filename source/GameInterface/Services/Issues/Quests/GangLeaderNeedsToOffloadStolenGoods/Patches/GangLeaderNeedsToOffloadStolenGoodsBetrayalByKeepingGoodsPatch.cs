@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using Quest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest;
