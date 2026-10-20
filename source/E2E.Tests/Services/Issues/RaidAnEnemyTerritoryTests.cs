@@ -6,6 +6,8 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using HarmonyLib;
+using SandBox.GauntletUI.Map;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -97,6 +99,7 @@ public class RaidAnEnemyTerritoryTests : IDisposable
 
             var defenderParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
             var raid = new RaidEventComponent(mapEvent);
             mapEvent.Initialize(ownerParty.Party, defenderParty.Party, raid, MapEvent.BattleTypes.Raid);
             mapEvent.MapEventSettlement = settlement;
@@ -108,7 +111,7 @@ public class RaidAnEnemyTerritoryTests : IDisposable
             Assert.True(quest.IsOngoing);
             Assert.Single(quest._raidedVillages);
             Assert.Contains(settlement, quest._raidedVillages);
-        });
+        }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
 
         owner.Call(() =>
         {
