@@ -103,7 +103,8 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 - **Every removal co-op code makes takes the same path** (`BattleShipReplicator.RemoveHulls`, then
   `NavalHullAuthority.Remove`):
   1. release seats on the hull;
-  2. move other owners' agents off its deck to their own hull, or the nearest friendly one;
+  2. move other owners' agents off its deck to their own hull, or the nearest friendly one, never onto a hull already
+     being removed or mid-swap;
   3. next tick, park everyone still aboard;
   4. the tick after, withdraw the departing crew, remove the hull through vanilla `RemoveShip` with its ropes broken, and
      unpark everyone else.
@@ -161,7 +162,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 - **A missing own reserve ends the mission.** `CoopNavalReserveGuard` checks the reserve in `EarlyStart` and ends the
   mission from its first `OnPreDisplayMissionTick` (an `EndMission` in `EarlyStart` is undone by `Mission.AfterStart`).
   A player team with no troops gets no ship, so `CoopNavalShiplessPlayerTeamPatch` skips vanilla's initial player
-  allocation, which would put the player troop on that missing hull every tick.
+  allocation, which would put the player troop on that missing hull every tick, and has the guard end the mission.
 - **Not written back:**
   - a hull's final HP and sunk state (snapshots are mission-local);
   - the captured-ship list vanilla `OnMissionEnd` builds (patched off by `CoopNavalShipCapturePatch`, because mission
@@ -266,6 +267,12 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   spawned; formations still are.
 - **Silent member after the host left.** A naval battle whose host reported and left concludes once the remaining
   members match its report or leave; there is no timeout for a member that stays in the mission without reporting.
+- **Follow-ups from the D4 review (not done):**
+  - a hull's `OriginalOwnerControllerId` (`BattleShipSpawnData`, `NetworkShipInfo.OriginalOwner`) only feeds logs and
+    `inspect` now that hand-back is gone;
+  - `BattleHostHandler` tracks a controller in four overlapping sets (`PresentControllers`, `AbsentControllers`,
+    `HostOwnedOfflineControllers`, `WithdrawnControllers`), which should become one status per controller;
+  - `BattleHostHandler` is too big: membership and the health withdrawal should move out into their own services.
 - **Boarding.** Ropes and bridges replicate, but plank crossing and melee on a foreign deck were never seen live, and a
   rope cut from the target side isn't replicated.
 - **Sea raids** still open the land raid scene.
