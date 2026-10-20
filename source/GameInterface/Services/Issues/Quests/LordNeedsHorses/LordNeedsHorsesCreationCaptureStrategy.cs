@@ -7,7 +7,6 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 using Behavior = TaleWorlds.CampaignSystem.Issues.LordNeedsHorsesIssueBehavior;
 using Issue = TaleWorlds.CampaignSystem.Issues.LordNeedsHorsesIssueBehavior.LordNeedsHorsesIssue;
@@ -29,7 +28,7 @@ internal class LordNeedsHorsesCreationCaptureStrategy : ICreationCaptureStrategy
 
         using (var stream = new MemoryStream())
         {
-            using (var writer = new BinaryWriter(stream))
+        using (var writer = new System.IO.BinaryWriter(stream))
             {
                 writer.Write(horsesIssue._mountObjectToBeDelivered?.StringId ?? string.Empty);
                 writer.Write(horsesIssue._numMountsToBeDelivered);
@@ -47,7 +46,7 @@ internal class LordNeedsHorsesCreationCaptureStrategy : ICreationCaptureStrategy
 
         using (var stream = new MemoryStream(captured))
         {
-            using (var reader = new BinaryReader(stream))
+        using (var reader = new System.IO.BinaryReader(stream))
             {
                 var mountId = reader.ReadString();
 
@@ -82,7 +81,7 @@ internal class LordNeedsHorsesCreationCaptureStrategy : ICreationCaptureStrategy
             return false;
         }
 
-        var mount = Items.All.Where(item => item.IsMountable && item.Culture == issueOwner.Culture &&
+        var mount = MBObjectManager.Instance.GetObjectTypeList<ItemObject>().Where(item => item.IsMountable && item.Culture == issueOwner.Culture &&
             !item.NotMerchandise && item.Tierf > 2f && item.Tierf < 3f).ToList().GetRandomElement() ??
             MBObjectManager.Instance.GetObject<ItemObject>("sumpter_horse");
         if (mount == null)
@@ -90,7 +89,7 @@ internal class LordNeedsHorsesCreationCaptureStrategy : ICreationCaptureStrategy
             return false;
         }
 
-        var amount = 1 + (int)MathF.Ceiling(12f * Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier());
+        var amount = 1 + (int)TaleWorlds.Library.MathF.Ceiling(12f * Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier());
         captured = Write(mount.StringId, amount, mount.Value);
         return true;
     }
@@ -98,7 +97,7 @@ internal class LordNeedsHorsesCreationCaptureStrategy : ICreationCaptureStrategy
     private static byte[] Write(string mountId, int amount, int value)
     {
         using var stream = new MemoryStream();
-        using var writer = new BinaryWriter(stream);
+        using var writer = new System.IO.BinaryWriter(stream);
         writer.Write(mountId ?? string.Empty);
         writer.Write(amount);
         writer.Write(value);
