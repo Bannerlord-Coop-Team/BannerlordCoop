@@ -73,6 +73,9 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalScenarioStatusCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
+        builder.RegisterType<NavalCopySteerCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
         builder.RegisterType<NavalWaterProbeCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();

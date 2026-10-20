@@ -4,6 +4,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -80,6 +81,12 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     private NavalDeckFrameResolver navalDeckFrame;
     private long deckTargetsSet, deckTransitions, deckTicks, deckEvictions, deckTeleports;
     private float lastDeckError, maxDeckError;
+#if DEBUG
+    // DEBUG: an error past this is no lag but a pose read against the wrong hull or a parked agent (R41b, 206 to 561 m).
+    private const float DeckErrorLogMetres = 20f;
+    private const float DeckErrorLogIntervalSeconds = 5f;
+    private readonly Dictionary<Agent, float> deckErrorLoggedAt = new Dictionary<Agent, float>();
+#endif
 
     public AgentPositionInterpolator() : this(null) { }
 
@@ -292,7 +299,29 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
     {
         _targets.Clear();
         _mountedGuardProcessedSequences.Clear();
+#if DEBUG
+        deckErrorLoggedAt.Clear();
+#endif
     }
+
+#if DEBUG
+    // DEBUG: names the agent, its deck pose and what it stands on when the error is large, at most every few seconds per agent.
+    private void LogLargeDeckError(Agent agent, NavalDeckTarget deck, in MatrixFrame hull)
+    {
+        if (lastDeckError <= DeckErrorLogMetres) return;
+        if (deckErrorLoggedAt.TryGetValue(agent, out float loggedAt) && elapsed - loggedAt < DeckErrorLogIntervalSeconds) return;
+
+        deckErrorLoggedAt[agent] = elapsed;
+        var stepped = agent.GetSteppedEntity();
+        var support = stepped.IsValid ? stepped.Root : WeakGameEntity.Invalid;
+        Guid agentId = agentRegistry != null && agentRegistry.TryGetAgentInfo(agent, out var info) ? info.AgentId : Guid.Empty;
+        // Agent exposes no IsPhysicsForceClosed getter; a parked agent shows as z near 500.
+        Logger.Warning("[NavalDeck] Deck error {Error:0.0} m for agent {AgentId} ({Index}) on deck ship {Ship}: local {Local}, " +
+            "hull origin {HullOrigin}, agent at {Position}, standing on {Support} at {SupportOrigin}",
+            lastDeckError, agentId, agent.Index, deck.Ship, deck.Local, hull.origin, agent.Position,
+            support.IsValid ? support.Name : "nothing", support.IsValid ? support.GlobalPosition : Vec3.Invalid);
+    }
+#endif
 
     private long GetNextUpdateSequence()
     {
@@ -385,6 +414,9 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
                 deckTicks++;
                 lastDeckError = pair.Value.Deck.Value.HorizontalError(hull, agent.Position);
                 maxDeckError = Math.Max(maxDeckError, lastDeckError);
+#if DEBUG
+                LogLargeDeckError(agent, pair.Value.Deck.Value, hull);
+#endif
             }
 
             // Mounted riders are eased onto their horse's reported position directly, so they don't use snapDistance.
@@ -420,6 +452,9 @@ public class AgentPositionInterpolator : IAgentPositionInterpolator
             {
                 bool deckEvicted = HasDeckTarget(agent);
                 _targets.Remove(agent);
+#if DEBUG
+                deckErrorLoggedAt.Remove(agent);
+#endif
                 _mountedGuardProcessedSequences.Remove(agent);
                 if (deckEvicted)
                 {

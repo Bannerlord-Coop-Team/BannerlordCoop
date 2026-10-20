@@ -359,6 +359,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | `reswap <ship>` | battle host | Replaces an AI hull without a migration. |
 | `helm <rudder> <row> <sail> [seconds]` | client | Drives the own hull. |
 | `rope_list`, `rope_throw`, `rope_status` | client | Lists, throws and shows ropes. |
+| `copy_steer [key=value...]` | client | Shows or tunes the steered copies' knobs here (`gain window softzone clamp tau lead snap`), live. |
 | `water_probe start [grid=5] [spacing=40] [seconds=120] \| status \| stop` | client | Samples the water grid for the shared-clock test. |
 
 `coop.debug.map_event.start_naval` starts a naval battle directly. Everything above except `inspect` and `rope_status` is

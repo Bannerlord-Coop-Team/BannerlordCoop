@@ -9,7 +9,7 @@ public delegate bool NavalDeckFrameResolver(Agent agent, Guid deckShip, out Matr
 
 /// <summary>
 /// An owner pose kept in hull space so the puppet target follows the local hull on every tick, including
-/// between packets. A copied hull's frame is interpolated, so the inverse tolerates a slightly non-orthonormal basis.
+/// between packets. The inverse tolerates a slightly non-orthonormal hull basis.
 /// </summary>
 internal readonly struct NavalDeckTarget
 {
