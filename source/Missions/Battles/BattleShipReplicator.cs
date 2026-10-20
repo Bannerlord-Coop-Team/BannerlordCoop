@@ -297,7 +297,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         foreach (var entry in pendingWithdrawals.Where(entry => hullAuthority.IsSettledFor(entry.Key)).ToList())
         {
             pendingWithdrawals.Remove(entry.Key);
-            if (departedOwners.Contains(entry.Key)) partyWithdrawal.WithdrawParty(entry.Key, entry.Value);
+            partyWithdrawal.WithdrawParty(entry.Key, entry.Value);
         }
     }
 
@@ -993,7 +993,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         heldForDeployment = heldShips.Values.Count(held => held.HeldForDeployment),
         heldSamples = heldShips.Values.Count(held => held.Sample != null),
         pendingWithdrawals = pendingWithdrawals.Keys.ToArray(),
-        ships =Registry.Ships.Select(ship =>
+        ships = Registry.Ships.Select(ship =>
         {
             streams.TryGetValue(ship.ShipId, out var stream);
             var condition = engine.ReadCondition(ship.Hull);

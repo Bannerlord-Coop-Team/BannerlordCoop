@@ -12,7 +12,7 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
 
-/// <summary>Reports the local coop naval battle: session, reserve guard outcome and per-hull state.</summary>
+/// <summary>Reports the local coop naval battle: session, setup guard's reserve check and per-hull state.</summary>
 public sealed class NavalInspectCoopCommand : ICoopCommand
 {
     public string Prefix => "coop.debug.naval";
