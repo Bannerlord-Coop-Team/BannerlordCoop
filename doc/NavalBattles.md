@@ -349,6 +349,14 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     split;
   - the `migration` preset fixes who drops by the first host each client sees, so a client whose mission starts only
     after the host dropped would take the successor for it.
+- **Follow-ups from the M10 review (not done):**
+  - `NavalScenarioStager` (about 820 lines) should split into encounter, blockade and fleet-outfitter classes behind DI;
+  - one staleness constant should serve both the replicator's `SampleLifetimeSeconds` and `CopySteering.StaleSeconds`;
+  - `CoopNavalBattleBehavior` should get the engine directly instead of through `INavalBattleServices.Engine`;
+  - the DEBUG engage reset tracer should check cheaply whether anything is watched before it resolves;
+  - `ShowCopyRamImpact` and `NavalRamKills.ApplyCopyImpact` mirror vanilla `MissionShipRam.OnTick`, so re-check them
+    against it on every DLC update;
+  - the next cut of `NavalShipEngine` is the hull-swap trio (`ParkHullAgents`, `ReplaceHull`, `BoardHullAgents`).
 - **Boarding.** Ropes and bridges replicate, but plank crossing and melee on a foreign deck were never seen live, and a
   rope cut from the target side isn't replicated.
 - **Sea raids** still open the land raid scene.
