@@ -85,7 +85,7 @@ public readonly struct NetworkRevenueFarmingState : IServerToClientCommand
         AwaitingPayment = awaitingPayment;
         CollectionSettlementId = collectionSettlementId;
         Villages = villages;
-        UsedIncidents = usedIncidents ?? Array.Empty<string>();
+        _usedIncidents = usedIncidents ?? Array.Empty<string>();
         Journal = journal;
         ProgressLogIndex = progressLogIndex;
         Menu = menu;
