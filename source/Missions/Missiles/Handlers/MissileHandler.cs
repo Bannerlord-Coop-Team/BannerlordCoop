@@ -21,7 +21,7 @@ public interface IMissileHandler : IHandler
 {
     void DrainPendingShots();
     bool IsReconstructionPending(Guid agentId, long shotSequence);
-    bool TryTakeLocalShot(int missileIndex, out Guid agentId, out long shotSequence);
+    bool TryGetLocalShot(int missileIndex, out Guid agentId, out long shotSequence);
     void RecordImpactHint(Guid attackerAgentId, long shotSequence, Guid victimAgentId,
         bool isMountFallback, Vec3 impactVelocity);
 }
@@ -175,11 +175,12 @@ public class MissileHandler : IMissileHandler
     public bool IsReconstructionPending(Guid agentId, long shotSequence) =>
         !disposed && shotSequence != 0 && pendingReconstructions.ContainsKey((agentId, shotSequence));
 
-    public bool TryTakeLocalShot(int missileIndex, out Guid agentId, out long shotSequence)
+    // A hit keeps the shot because the missile can still bounce off a shield into a world item that needs its id;
+    // the engine's missile removal forgets it.
+    public bool TryGetLocalShot(int missileIndex, out Guid agentId, out long shotSequence)
     {
         if (!disposed && localShots.TryGetValue(missileIndex, out var shot))
         {
-            localShots.Remove(missileIndex);
             agentId = shot.AgentId;
             shotSequence = shot.ShotSequence;
             return true;
