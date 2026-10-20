@@ -93,6 +93,10 @@ public sealed class NavalScenarioConfig
     [ProtoMember(24)]
     public bool GracefulDisconnect { get; set; }
 
+    /// <summary>How many of each player's and the AI fleet's unarmed ships carry a bow ram; 0 leaves the ships as they are.</summary>
+    [ProtoMember(25)]
+    public int RammedShipsPerParty { get; set; }
+
     public string InitiatorControllerId => ControllerIds.Length == 0 ? null : ControllerIds[0];
 
     /// <summary>The player who joins the running battle, or null.</summary>

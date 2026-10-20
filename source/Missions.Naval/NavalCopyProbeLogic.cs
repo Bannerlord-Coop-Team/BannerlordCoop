@@ -177,7 +177,9 @@ public class NavalCopyProbeLogic : MissionLogic
                     };
                 })
                 .ToArray(),
-            contact = NavalContactProbe.Inspect(),
+            contact = NavalContactProbe.Inspect(registry.Ships
+                .Where(ship => ship.Hull is MissionShip hull && !hull.IsRemoved && hull.GameEntity.IsValid)
+                .Select(ship => (ship.ShipId, (MissionShip)ship.Hull))),
         };
     }
 

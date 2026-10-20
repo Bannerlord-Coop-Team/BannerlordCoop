@@ -115,6 +115,7 @@ public sealed class NavalScenarioStatusCoopCommand : ICoopCommand
                 owner = ship.CurrentAuthority,
                 ai = ship.IsNpcParty,
                 hasWeapon = (ship.Hull as MissionShip)?.ShipSiegeWeapon != null,
+                hasRam = (ship.Hull as MissionShip)?._ram != null,
             }).ToArray(),
             // How the copies exist here and how close every hull pair came, for the ramming preset above all.
             copyModes = ships.Where(ship => ship.Hull is MissionShip hull && NavalForeignHulls.Contains(hull))

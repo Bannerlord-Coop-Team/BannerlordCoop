@@ -590,6 +590,15 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 false, -1));
         });
 
+        /// <summary>A ram tip of <paramref name="rammerId"/> hitting this client's hull <paramref name="shipId"/>, as MissionShipRam deals it.</summary>
+        public void Ram(Guid shipId, Guid rammerId, float damage) => Call(() =>
+        {
+            Assert.True(Registry.TryGet(shipId, out var ship));
+            Assert.True(Registry.TryGet(rammerId, out var rammer));
+            Broker.Publish(this, new BattleShipHit(ship.Hull, BattleShipDamageKind.Collision, damage, 0f, new Vec3(0f, 12f, 0f),
+                null!, rammer.Hull, true, -1));
+        });
+
         /// <summary>The samples this client sent for a ship.</summary>
         public IReadOnlyList<NetworkBattleShipSample> SentSamples(Guid shipId) =>
             Network.NetworkSentMessages.GetMessages<NetworkBattleShipSample>().Where(sample => sample.ShipId == shipId).ToList();

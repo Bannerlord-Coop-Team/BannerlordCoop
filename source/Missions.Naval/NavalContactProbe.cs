@@ -1,10 +1,14 @@
 ﻿#if DEBUG
+using Common.Logging;
+using GameInterface;
 using Missions.Battles;
 using NavalDLC.Missions.Objects;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
 
@@ -15,10 +19,15 @@ namespace Missions.Naval;
 /// </summary>
 internal static class NavalContactProbe
 {
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(NavalContactProbe));
+
+    // MissionShipRam.OnTick kills every active agent within 2 m (squared 4) of the impact on the plane.
+    private const float RamKillRadiusSquared = 4f;
+
     private static long ramRayHitsOnCopies, ramRayDamagePointsOnCopies, ramRayHitsByCopies;
     private static long contactOwnOnCopy, contactCopyOnOwn, contactCopyOnCopy, copyPairsFiltered;
     private static long collisionVanilla, collisionSent, collisionDropped, ramVanilla, ramSent, ramDropped;
-    private static long routedCollisionApplies;
+    private static long routedCollisionApplies, ramTicksGatedOnCopies, ramPuppetKills;
 
     private static readonly Dictionary<(Guid, Guid), HullPairApproach> approaches = new Dictionary<(Guid, Guid), HullPairApproach>();
 
@@ -69,6 +78,33 @@ internal static class NavalContactProbe
         }
     }
 
+    /// <summary>[Game thread] A copy's ram hit was shown here and left to the rammer's owner.</summary>
+    internal static void CountGatedCopyRamTick() => Interlocked.Increment(ref ramTicksGatedOnCopies);
+
+    /// <summary>
+    /// [Game thread] Before an own ram's damage tick: the puppets within vanilla's 2 m kill radius of the impact, which
+    /// Agent.Die kills here without a routed blow, so their owners keep them alive.
+    /// </summary>
+    internal static void CountRamPuppetKills(MissionShipRam ram)
+    {
+        var impact = ram._ramDamageData;
+        var mission = Mission.Current;
+        if (!CoopNavalMissionScope.IsActive || !impact.IsValid || impact.CalculatedDamage <= 0f || mission == null) return;
+        if (!ContainerProvider.TryResolve<INetworkAgentRegistry>(out var agents)) return;
+
+        var point = impact.AverageIntersectionPoint.AsVec2;
+        var puppets = mission.Agents
+            .Where(agent => agent.IsActive() && agent.Position.AsVec2.DistanceSquared(point) < RamKillRadiusSquared
+                && agents.TryGetAgentInfo(agent, out _) && !agents.IsLocallyControlled(agent))
+            .Select(agent => agent.Index)
+            .ToList();
+        if (puppets.Count == 0) return;
+
+        Interlocked.Add(ref ramPuppetKills, puppets.Count);
+        Logger.Warning("[NavalSync] Ram of hull {Rammer} on hull {Target} kills {Count} puppet(s) without a routed blow: [{Agents}]",
+            ram._ownerShip.Index, impact.TargetShip.Index, puppets.Count, string.Join(", ", puppets));
+    }
+
     /// <summary>[Game thread] The owner applied a peer's collision report through vanilla DealCollisionDamage.</summary>
     internal static void CountRoutedCollisionApply() => Interlocked.Increment(ref routedCollisionApplies);
 
@@ -114,8 +150,15 @@ internal static class NavalContactProbe
             $"{closest.Value.MinCenter:0.00} m at {closest.Value.AtTime:0.0} s ({closest.Value.Modes})";
     }
 
-    internal static object Inspect() => new
+    /// <summary>Counters, closest approaches and whether each registered hull carries a ram here (diagnostics).</summary>
+    internal static object Inspect(IEnumerable<(Guid ShipId, MissionShip Hull)> hulls) => new
     {
+        rams = hulls.Select(hull => new
+        {
+            ship = Short(hull.ShipId),
+            copy = NavalForeignHulls.Contains(hull.Hull),
+            hasRam = hull.Hull._ram != null,
+        }).ToArray(),
         ramRaycast = new
         {
             hitsOnCopies = Interlocked.Read(ref ramRayHitsOnCopies),
@@ -138,6 +181,8 @@ internal static class NavalContactProbe
             ramSent = Interlocked.Read(ref ramSent),
             ramDropped = Interlocked.Read(ref ramDropped),
             routedApplies = Interlocked.Read(ref routedCollisionApplies),
+            ramTicksGatedOnCopies = Interlocked.Read(ref ramTicksGatedOnCopies),
+            ramPuppetKills = Interlocked.Read(ref ramPuppetKills),
         },
         closestApproach = InspectApproaches(),
     };
@@ -158,6 +203,8 @@ internal static class NavalContactProbe
         Interlocked.Exchange(ref ramSent, 0);
         Interlocked.Exchange(ref ramDropped, 0);
         Interlocked.Exchange(ref routedCollisionApplies, 0);
+        Interlocked.Exchange(ref ramTicksGatedOnCopies, 0);
+        Interlocked.Exchange(ref ramPuppetKills, 0);
         approaches.Clear();
     }
 

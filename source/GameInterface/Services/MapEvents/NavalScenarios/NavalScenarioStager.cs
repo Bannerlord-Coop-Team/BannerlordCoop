@@ -84,6 +84,8 @@ public class NavalScenarioStager : INavalScenarioStager
             (id, party) => $"{id}(ships={party.Ships.Count},troops={party.MemberRoster.TotalManCount})")));
         if (config.ArmedShipsPerParty > 0)
             log.Append(" armedPlayers=").Append(string.Join(",", players.Select(party => ArmShips(party.Party, config.ArmedShipsPerParty))));
+        if (config.RammedShipsPerParty > 0)
+            log.Append(" rammedPlayers=").Append(string.Join(",", players.Select(party => FitRams(party.Party, config.RammedShipsPerParty))));
 
         MobileParty engagingEnemy = null;
         bool started;
@@ -376,6 +378,7 @@ public class NavalScenarioStager : INavalScenarioStager
         SizeFleet(enemy.Party, config.EnemyHulls, hull);
         log.Append($" enemy={enemy.StringId}(ships={enemyShipsBefore}->{enemy.Ships.Count},troops={enemy.MemberRoster.TotalManCount})");
         if (config.ArmedShipsPerParty > 0) log.Append(" armedEnemy=").Append(ArmShips(enemy.Party, config.ArmedShipsPerParty));
+        if (config.RammedShipsPerParty > 0) log.Append(" rammedEnemy=").Append(FitRams(enemy.Party, config.RammedShipsPerParty));
 
         if (config.SinkingEnemyHull && enemy.Ships.Count > 0)
         {
@@ -566,6 +569,40 @@ public class NavalScenarioStager : INavalScenarioStager
 
         return $"{party.Id}(equipped={equipped},swapped={swapped},ships={party.Ships.Count})";
     }
+
+    // ram=n: MissionShip finds its MissionShipRam on the bow piece's prefab, so only a hull with a bow slot can ram. Ships
+    // that carry a fore weapon are skipped, since the bow hull swapped in has no fore slot.
+    private static string FitRams(PartyBase party, int count)
+    {
+        var piece = MBObjectManager.Instance.GetObject<ShipUpgradePiece>(NavalScenarioPresets.RamPieceId);
+        var ramHull = MBObjectManager.Instance.GetObject<ShipHull>(NavalScenarioPresets.RamHullId);
+        if (piece == null || ramHull == null)
+            return $"{party.Id}(none: no piece {NavalScenarioPresets.RamPieceId} or hull {NavalScenarioPresets.RamHullId})";
+
+        int equipped = 0, swapped = 0;
+        foreach (var ship in party.Ships.Where(ship => !IsArmed(ship)).Take(count).ToList())
+        {
+            if (ship.HasSlot(NavalScenarioPresets.RamSlotTag))
+            {
+                ship.EquipUpgradePiece(NavalScenarioPresets.RamSlotTag, piece);
+                equipped++;
+                continue;
+            }
+
+            var rammer = new Ship(ramHull);
+            ChangeShipOwnerAction.ApplyByProduction(party, rammer);
+            rammer.EquipUpgradePiece(NavalScenarioPresets.RamSlotTag, piece);
+            DestroyShipAction.Apply(ship);
+            swapped++;
+        }
+
+        return $"{party.Id}(equipped={equipped},swapped={swapped},ships={party.Ships.Count})";
+    }
+
+    // Whether weapons=n put its ballista in the ship's fore slot.
+    private static bool IsArmed(Ship ship) =>
+        ship.HasSlot(NavalScenarioPresets.WeaponSlotTag)
+        && ship.GetPieceAtSlot(NavalScenarioPresets.WeaponSlotTag)?.StringId == NavalScenarioPresets.WeaponPieceId;
 
     private void TopUpTroops(MobileParty party, int templates)
     {

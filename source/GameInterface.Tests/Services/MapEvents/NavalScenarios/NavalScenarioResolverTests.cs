@@ -67,6 +67,16 @@ public class NavalScenarioResolverTests
         Assert.Equal(2, config.ArmedShipsPerParty);
     }
 
+    // M10: the ramming preset fits a ram on one ship of every party unless ram=n says otherwise.
+    [Fact]
+    public void Resolve_RamDefaultsToOneShipForRamming_AndTheKnobOverridesIt()
+    {
+        Assert.Equal(1, Resolve("ramming").RammedShipsPerParty);
+        Assert.Equal(0, Resolve("ramming", "ram=0").RammedShipsPerParty);
+        Assert.Equal(0, Resolve("vs_pirates").RammedShipsPerParty);
+        Assert.Equal(3, Resolve("fleet", "ram=3").RammedShipsPerParty);
+    }
+
     [Fact]
     public void Resolve_CopiesThePresetValues()
     {
@@ -120,6 +130,8 @@ public class NavalScenarioResolverTests
     [InlineData("ships must be a whole number from 1 to 4.", "fleet", "ships=5")]
     [InlineData("weapons must be a whole number from 0 to 4.", "vs_pirates", "weapons=5")]
     [InlineData("weapons must be a whole number from 0 to 4.", "vs_pirates", "weapons=-1")]
+    [InlineData("ram must be a whole number from 0 to 4.", "ramming", "ram=5")]
+    [InlineData("ram must be a whole number from 0 to 4.", "ramming", "ram=x")]
     [InlineData("delay must be a number of seconds from 1 to 600.", "migration", "delay=NaN")]
     [InlineData("reconnect must be a number of seconds from 5 to 600.", "migration", "reconnect=1")]
     [InlineData("who must be host or nonhost.", "migration", "who=client")]

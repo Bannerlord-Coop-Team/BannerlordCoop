@@ -146,7 +146,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         fake.FrameWrites++;
     }
 
-    public BattleShipMotion ReadMotion(MissionObject hull) => default;
+    public BattleShipMotion ReadMotion(MissionObject hull) => Of(hull).Motion;
 
     public void TickCopies(float fixedDt)
     {
@@ -359,6 +359,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
     {
         var fake = Of(hull);
         fake.AppliedDamage.Add(damage);
+        fake.AppliedHitters.Add(hitter);
         fake.HitPoints = Math.Max(0f, fake.HitPoints - damage.Damage);
         if (fake.HitPoints <= 0f) fake.SinkingState = BattleShipCondition.Sunk;
     }
@@ -580,13 +581,15 @@ public sealed class FakeHull
     public BattleRopeState[] Ropes { get; set; } = Array.Empty<BattleRopeState>();
     /// <summary>How many owner samples the copy took.</summary>
     public int FrameWrites { get; set; }
-    /// <summary>The owner's body motion the copy's latest sample carried.</summary>
+    /// <summary>An own hull's body motion its samples send, or the motion a copy's latest sample carried.</summary>
     public BattleShipMotion Motion { get; set; }
     public int FinalRopesApplied { get; set; }
     public int AppliedConditions { get; set; }
     public int StationUses { get; set; }
     public int Pins { get; set; }
     public List<NetworkApplyShipDamage> AppliedDamage { get; } = new();
+    /// <summary>The hitter hull each routed hit resolved to here, null when it was not known.</summary>
+    public List<MissionObject?> AppliedHitters { get; } = new();
     public Dictionary<(string Key, int Index), UsableMissionObject> Stations { get; } = new();
     public Dictionary<UsableMissionObject, Agent> Seats { get; } = new(ReferenceEqualityComparer.Instance);
     /// <summary>The hull's ship siege weapon, a constructor-skipped ballista, once <see cref="ArmWeapon"/> mounted it.</summary>

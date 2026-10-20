@@ -75,6 +75,9 @@ public sealed class NavalScenarioPreset
 
     /// <summary>An AI lord's siege of a coastal town blockades its port, and the first player attacks the blockade from the sea.</summary>
     public bool Blockade { get; set; }
+
+    /// <summary>The default <c>ram=n</c>: how many ships of every player and of the AI fleet carry a bow ram.</summary>
+    public int RammedShipsPerParty { get; set; }
 }
 
 /// <summary>DEBUG: the naval scenario presets <c>coop.debug.naval.scenario</c> accepts.</summary>
@@ -110,6 +113,15 @@ public static class NavalScenarioPresets
     /// <summary>The Battle Knarr, a medium hull with a fore slot, which replaces a ship weapons=n must arm that has none.</summary>
     public const string WeaponHullId = "nord_mediumballista_ship";
 
+    /// <summary>The ship slot a hull's ram goes in; northern_light_ship has none.</summary>
+    public const string RamSlotTag = "bow";
+
+    /// <summary>The bow piece ram=n equips, whose ram_01 prefab carries the MissionShipRam script.</summary>
+    public const string RamPieceId = "bow_ram_lvl1";
+
+    /// <summary>A medium hull with a bow slot, which replaces a ship ram=n must fit that has none.</summary>
+    public const string RamHullId = "empire_medium_ship";
+
     public static IReadOnlyList<NavalScenarioPreset> All { get; } = new[]
     {
         new NavalScenarioPreset
@@ -137,6 +149,7 @@ public static class NavalScenarioPresets
             Description = "vs_pirates; each player's hull is placed bow-on to an AI hull and its helm drives at it.",
             Placement = NavalScenarioPlacement.Ramming,
             Spacing = 60f,
+            RammedShipsPerParty = 1,
         },
         new NavalScenarioPreset
         {

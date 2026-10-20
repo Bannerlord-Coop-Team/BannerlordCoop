@@ -211,7 +211,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | Goal | Status | Proven by |
 |---|---|---|
 | G1 Beat a pirate fleet to a natural end, with ship weapons | Natural end done and live-passed (R40 A, B1, B2). Weapons live-passed in R41a-2 W1 (ballistas for 156 s, no crash). | `vs_pirates`, `sinking`, `fleet`, `migration`, `weapons=n`; `NavalNaturalEndScenarioTests`, `NavalShipWeaponScenarioTests`, `NavalVsPiratesScenarioTests` |
-| G2 Ramming and boarding between any two hulls | In progress (M10a): copies are steered dynamic bodies (D3 option B) and collide with own hulls; contact damage routes to the owner (R41b). Not live yet. | `ramming`, `boarding`; `NavalCopySteeringTests` |
+| G2 Ramming and boarding between any two hulls | In progress (M10a): copies are steered dynamic bodies (D3 option B) and collide with own hulls; contact and ram damage route to the owner, and only the rammer's owner runs the ram's damage tick. Not live yet. | `ramming`, `boarding`; `NavalCopySteeringTests`, `NavalDamageRoundTripScenarioTests` |
 | G3 Retreat, leave or disconnect without breaking the battle | Retreat and leave live-passed in R41a (A, B, C). Disconnect is a leave (D4); hard drops of a non-host and of the host live-passed in R41a-2 (D, E). Done: the R41a-2 W2 and S fixes and the departure order (parked N of N, then withdrew N) live-passed in R41a-3. | `retreat`, `migration who=nonhost`; `NavalDepartureScenarioTests`, `BattleReserveReconnectScopeTests` |
 | G4 Results match vanilla | Pending (M6). HP, sunk ships and captured ships are not written back. | none yet |
 | G5 Battles from real campaign play | Presets done (WP4), never live. | `encounter`, `blockade`; preset unit tests |
@@ -294,8 +294,14 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - the campaign side of a mid-battle retreat (the party at sea, rafts) is his;
   - ship loot and distribution are his;
   - the PvP loser's ships vanish (R39).
-- **Ramming across owners is not gated yet.** Copies collide now, but a copy's `MissionShipRam` still runs its damage
-  tick on every client that holds the copy (M10a step 3).
+- **Ram damage has one writer.** A ram exists only on a hull with a bow ram piece (`MissionShip._ram`; the preset hull
+  `northern_light_ship` has no bow slot, so use `ram=n`). Only the rammer's owner runs `MissionShipRam.OnTick`
+  (`CopyRamTickPatch`): it deals the hit, routed to the target's owner when the target is a copy, breaks deck parts and
+  kills every agent within 2 m of the impact. A copy only plays the impact effect and keeps vanilla's 2 s cooldown; its
+  fixed-tick ram forces stay, so each owner's hull is pushed back by the other's copy locally.
+- **Open: ram kills on puppets.** The owner's 2 m kill also kills puppets of other owners there without a routed blow,
+  so their owners keep them alive. DEBUG counts and logs it (`ramPuppetKills`, `Ram of hull ... kills N puppet(s)`);
+  routing those kills through `BattleDamageRouter` waits on R42.
 - **Allied fleets.** An AI lord on the players' side fields no hulls. Agents refused by a formation with no hull are not
   re-assigned.
 - **Late join and reconnect.** A late joiner gets every record, condition, weapon state and seat; a returning player is
@@ -346,8 +352,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | Command | Side | What it does |
 |---|---|---|
 | `scenario <preset> [knobs] [ids]` | server | Stages a preset and starts the battle. |
-| `scenario_status` | client | Preset steps, knobs and `battle.hulls[]` with owner, AI flag and weapon. |
-| `inspect` | client | Session, host epoch, hull streams, damage, weapons, decks, stations, AI fleet, end tally, agents, ships; DEBUG adds `copyProbe`: steering knobs, drift and correction per copy, steering cost and contact counters. |
+| `scenario_status` | client | Preset steps, knobs and `battle.hulls[]` with owner, AI flag, weapon and ram. |
+| `inspect` | client | Session, host epoch, hull streams, damage, weapons, decks, stations, AI fleet, end tally, agents, ships; DEBUG adds `copyProbe`: steering knobs, drift and correction per copy, steering cost, contact counters, `rams[]` (`hasRam` per hull) and the ram counters (`ramTicksGatedOnCopies`, `ramPuppetKills`). |
 | `win`, `lose` | battle host | Ends the battle as a victory or defeat for the host's side; peers follow. |
 | `damage <ship> <amount>`, `sink <ship>` | client | Hits a hull as a ship weapon would; another owner's hull takes it through its owner. |
 | `reswap <ship>` | battle host | Replaces an AI hull without a migration. |
@@ -379,6 +385,9 @@ Knobs (`NavalScenarioResolver.Usage`):
 - `town=id` for `blockade`;
 - `weapons=n` (0 to 4) arms the first n ships of every player and of the AI fleet with `fore_ballista`, swapping in a Battle
   Knarr where a hull has no fore slot.
+- `ram=n` (0 to 4) fits `bow_ram_lvl1` on the first n ships without a ballista of every player and of the AI fleet
+  (not the `encounter` or `blockade` enemy), swapping in an `empire_medium_ship` where a hull has no bow slot. `ramming`
+  defaults to `ram=1`.
 
 ### Validation procedure
 
