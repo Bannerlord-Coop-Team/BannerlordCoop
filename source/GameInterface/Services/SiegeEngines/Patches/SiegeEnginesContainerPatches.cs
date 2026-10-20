@@ -85,8 +85,8 @@ internal class SiegeEnginesContainerPatches
         return true;
     }
 
-    // The container has no back-reference to its siege or side; on a client the only native caller is
-    // the local player's production popup, so the player's own siege identifies it.
+    // The container has no back-reference to its siege or side; client callers (e.g. SetSiegeEngineStatesAfterSiegeMission
+    // breaking engines after the player's siege battle) only touch the local player's siege, so that siege identifies it.
     private static bool TryDescribeContainer(SiegeEnginesContainer container, out SiegeEvent siegeEvent, out BattleSideEnum side)
     {
         siegeEvent = PlayerSiege.PlayerSiegeEvent;

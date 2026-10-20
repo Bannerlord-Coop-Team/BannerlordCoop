@@ -130,7 +130,7 @@ internal class SiegeEventCampaignBehaviorPatches
     private static bool OrderAssaultConditionPrefix(MenuCallbackArgs args, ref bool __result) =>
         ValidateSiegeGraph(args, GameMenuOption.LeaveType.OrderTroopsToAttack, ref __result);
 
-    // Only the BesiegerCamp leader can start the assault; joining an active one stays on the vanilla encounter flow.
+    // Only the BesiegerCamp leader can lead the assault.
     [HarmonyPatch(nameof(SiegeEventCampaignBehavior.game_menu_siege_strategies_lead_assault_on_condition))]
     [HarmonyPostfix]
     private static void LeadAssaultConditionPostfix(MenuCallbackArgs args, bool __result) => DisableForCoBesieger(args, __result);
@@ -140,7 +140,8 @@ internal class SiegeEventCampaignBehaviorPatches
     [HarmonyPostfix]
     private static void OrderAssaultConditionPostfix(MenuCallbackArgs args, bool __result) => DisableForCoBesieger(args, __result);
 
-    // Disables a shown assault option when the main party is not the synced BesiegerCamp leader.
+    // Disables a shown assault option when the main party is not the synced BesiegerCamp leader; joining an active
+    // assault stays on the vanilla encounter flow.
     private static void DisableForCoBesieger(MenuCallbackArgs args, bool result)
     {
         if (!result) return;
