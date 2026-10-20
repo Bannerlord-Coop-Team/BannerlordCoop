@@ -51,6 +51,19 @@ public class QuestRequestOwnershipTests : IDisposable
         scenario.Accept(scenario.ClientA);
         var quest = scenario.QuestOf(scenario.ClientA);
 
+        scenario.ClientA.Call(() =>
+        {
+            var gangLeaderQuest = (TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest)quest;
+            gangLeaderQuest._isPayingForGoods = true;
+            gangLeaderQuest._playerHasTheGoods = true;
+        });
+        scenario.Server.Call(() =>
+        {
+            var gangLeaderQuest = (TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest)scenario.QuestOf(scenario.Server);
+            gangLeaderQuest._isPayingForGoods = true;
+            gangLeaderQuest._playerHasTheGoods = true;
+        });
+
         scenario.ClientA.Call(() => scenario.ClientA.Resolve<IMessageBroker>().Publish(this, new QuestOutcomeRequested(quest, IssueOutcome.QuestCancel)));
 
         var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
@@ -124,6 +137,19 @@ public class QuestRequestOwnershipTests : IDisposable
 
         scenario.ClientA.Call(() =>
         {
+            var gangLeaderQuest = (TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest)quest;
+            gangLeaderQuest._isPayingForGoods = true;
+            gangLeaderQuest._playerHasTheGoods = true;
+        });
+        scenario.Server.Call(() =>
+        {
+            var gangLeaderQuest = (TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest)scenario.QuestOf(scenario.Server);
+            gangLeaderQuest._isPayingForGoods = true;
+            gangLeaderQuest._playerHasTheGoods = true;
+        });
+
+        scenario.ClientA.Call(() =>
+        {
             scenario.ClientA.Resolve<GangLeaderBranchEvidence>().Record(quest, Branch);
             scenario.ClientA.Resolve<IMessageBroker>().Publish(this, new QuestBranchRequested(quest, Branch));
         });
@@ -143,7 +169,8 @@ public class QuestRequestOwnershipTests : IDisposable
         scenario.ClientA.Call(() =>
             scenario.ClientA.Resolve<IMessageBroker>().Publish(this, new QuestBranchRequested(quest, Branch)));
 
-        Assert.Equal(0, branches.CountFor(scenario.Server));
+        Assert.Equal(1, branches.CountFor(scenario.Server));
+        Assert.Equal(0, consequences.CountFor(scenario.Server));
         Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
