@@ -95,9 +95,10 @@ public class RaidAnEnemyTerritoryTests : IDisposable
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
             settlement.SettlementHitPoints = 0f;
 
+            var defenderParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
             var raid = new RaidEventComponent(mapEvent);
-            mapEvent.Initialize(ownerParty.Party, settlement.Party, raid, MapEvent.BattleTypes.Raid);
+            mapEvent.Initialize(ownerParty.Party, defenderParty.Party, raid, MapEvent.BattleTypes.Raid);
             mapEvent.MapEventSettlement = settlement;
             mapEvent.State = MapEventState.Wait;
             Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
