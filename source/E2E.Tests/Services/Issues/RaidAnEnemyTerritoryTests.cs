@@ -81,9 +81,9 @@ public class RaidAnEnemyTerritoryTests : IDisposable
         var server = testEnvironment.Server;
         var owner = testEnvironment.Clients.First();
 
-        owner.Call(() =>
+        server.Call(() =>
         {
-            Assert.True(owner.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
             Assert.True(giver.Issue.StartIssueWithQuest());
         });
 
