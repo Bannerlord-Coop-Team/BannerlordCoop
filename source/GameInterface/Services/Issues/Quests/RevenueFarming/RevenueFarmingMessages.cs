@@ -44,6 +44,8 @@ public readonly struct RequestRevenueFarmingAction : ICommand
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkRevenueFarmingState : IServerToClientCommand
 {
+    private readonly string[] _usedIncidents;
+
     [ProtoMember(1)] public string GiverId { get; init; }
     [ProtoMember(2)] public string QuestId { get; init; }
     [ProtoMember(3)] public int Revision { get; init; }
@@ -54,7 +56,11 @@ public readonly struct NetworkRevenueFarmingState : IServerToClientCommand
     [ProtoMember(8)] public bool AwaitingPayment { get; init; }
     [ProtoMember(9)] public string CollectionSettlementId { get; init; }
     [ProtoMember(10)] public RevenueFarmingVillageState[] Villages { get; init; }
-    [ProtoMember(11)] public string[] UsedIncidents { get; init; }
+    [ProtoMember(11)] public string[] UsedIncidents
+    {
+        get => _usedIncidents ?? Array.Empty<string>();
+        init => _usedIncidents = value;
+    }
     [ProtoMember(12)] public RevenueFarmingJournalState[] Journal { get; init; }
     [ProtoMember(13)] public int ProgressLogIndex { get; init; }
     [ProtoMember(14)] public string Menu { get; init; }
