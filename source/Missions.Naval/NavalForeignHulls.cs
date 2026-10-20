@@ -1,5 +1,6 @@
 ﻿using NavalDLC.Missions.Objects;
 using System.Collections.Generic;
+using TaleWorlds.Engine;
 
 namespace Missions.Naval;
 
@@ -24,6 +25,20 @@ internal static class NavalForeignHulls
     }
 
     public static bool Contains(MissionShip ship) => ship != null && hulls.Contains(ship);
+
+    /// <summary>[Any thread] Whether the entity belongs to a copy: its root is a copy's hull entity.</summary>
+    public static bool ContainsRootOf(WeakGameEntity entity)
+    {
+        if (!entity.IsValid) return false;
+
+        var root = entity.Root;
+        foreach (var ship in hulls)
+        {
+            if (ship.GameEntity == root) return true;
+        }
+
+        return false;
+    }
 
     public static void Clear() => hulls = new HashSet<MissionShip>();
 }

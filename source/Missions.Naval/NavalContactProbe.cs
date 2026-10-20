@@ -16,7 +16,7 @@ namespace Missions.Naval;
 internal static class NavalContactProbe
 {
     private static long ramRayHitsOnCopies, ramRayDamagePointsOnCopies, ramRayHitsByCopies;
-    private static long contactOwnOnCopy, contactCopyOnOwn, contactCopyOnCopy;
+    private static long contactOwnOnCopy, contactCopyOnOwn, contactCopyOnCopy, copyPairsFiltered;
     private static long collisionVanilla, collisionSent, collisionDropped, ramVanilla, ramSent, ramDropped;
     private static long routedCollisionApplies;
 
@@ -48,6 +48,9 @@ internal static class NavalContactProbe
         else if (shipIsCopy) Interlocked.Increment(ref contactCopyOnOwn);
         else if (otherIsCopy) Interlocked.Increment(ref contactOwnOnCopy);
     }
+
+    /// <summary>[Physics thread] The contact filter refused a pair of copies.</summary>
+    internal static void CountFilteredCopyPair() => Interlocked.Increment(ref copyPairsFiltered);
 
     /// <summary>[Any thread] How the damage gate routed one DealCollisionDamage call.</summary>
     internal static void CountCollisionRoute(BattleShipDamageRoute route, bool isRamDamage)
@@ -124,6 +127,7 @@ internal static class NavalContactProbe
             ownOnCopy = Interlocked.Read(ref contactOwnOnCopy),
             copyOnOwn = Interlocked.Read(ref contactCopyOnOwn),
             copyOnCopy = Interlocked.Read(ref contactCopyOnCopy),
+            copyPairsFiltered = Interlocked.Read(ref copyPairsFiltered),
         },
         collisionDamage = new
         {
@@ -146,6 +150,7 @@ internal static class NavalContactProbe
         Interlocked.Exchange(ref contactOwnOnCopy, 0);
         Interlocked.Exchange(ref contactCopyOnOwn, 0);
         Interlocked.Exchange(ref contactCopyOnCopy, 0);
+        Interlocked.Exchange(ref copyPairsFiltered, 0);
         Interlocked.Exchange(ref collisionVanilla, 0);
         Interlocked.Exchange(ref collisionSent, 0);
         Interlocked.Exchange(ref collisionDropped, 0);

@@ -8,6 +8,7 @@ using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.ShipControl;
 using NavalDLC.ViewModelCollection.OrderOfBattle;
 using TaleWorlds.Core;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
@@ -89,6 +90,29 @@ internal class ForeignHullControllerPatch
         foreach (var ship in NavalForeignHulls.All)
             ship.SetController(ShipControllerType.None, autoUpdateController: false);
     }
+}
+
+// The native contact filter asks every script on both bodies. Nobody here simulates either of two copies, so their contact
+// is noise this client can't own; each owner resolves its own hull against the other's copy.
+[HarmonyPatch(typeof(MissionShip), nameof(MissionShip.CanPhysicsCollideBetweenTwoEntities))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class CopyPairCollisionFilterPatch
+{
+    [HarmonyPrefix]
+    private static bool Prefix(MissionShip __instance, WeakGameEntity otherEntity, ref bool __result)
+    {
+        if (!NavalForeignHulls.Contains(__instance)) return true;
+        if (AllowsCollision(mineIsCopy: true, NavalForeignHulls.ContainsRootOf(otherEntity))) return true;
+
+#if DEBUG
+        NavalContactProbe.CountFilteredCopyPair();
+#endif
+        __result = false;
+        return false;
+    }
+
+    /// <summary>Whether two hulls may touch on this client: not when both are copies of other owners' hulls.</summary>
+    internal static bool AllowsCollision(bool mineIsCopy, bool otherIsCopy) => !(mineIsCopy && otherIsCopy);
 }
 
 // Marks the initial plan of a side so the plan patch below shifts only that plan, not later Order of Battle replans.

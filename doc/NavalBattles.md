@@ -21,8 +21,10 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   constant. A large error or a jump between samples teleports it (`NavalShipsLogic.TeleportShip`, crew carried along).
   Heave, pitch and roll come from this client's water. A copy whose body isn't simulating when it spawns gets its owner's
   frames written instead (warning `has no simulating body`).
-- A copy collides like any hull, but its owner stays the authority of everything that happens to it: contact and ram
-  damage on a copy is routed to the owner (`BattleShipDamageRouter`).
+- A copy collides with this client's own hulls, but its owner stays the authority of everything that happens to it:
+  contact and ram damage on a copy is routed to the owner (`BattleShipDamageRouter`). Two copies never touch here
+  (`CopyPairCollisionFilterPatch`, a prefix on `MissionShip.CanPhysicsCollideBetweenTwoEntities`), since no client
+  simulates either; each owner resolves its hull against the other's copy.
 
 ### Streams
 
