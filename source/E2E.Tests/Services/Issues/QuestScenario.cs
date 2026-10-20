@@ -53,9 +53,16 @@ internal sealed class QuestScenario
 
     public QuestScenario(E2ETestEnvironment testEnvironment, Func<Hero, IssueBase>? createIssue,
         Action<EnvironmentInstance, Hero>? prepare)
-        : this(testEnvironment, createIssue == null ? null : (_, hero) => createIssue(hero))
     {
+        this.testEnvironment = testEnvironment;
+        this.issueFactory = createIssue == null ? null : (_, hero) => createIssue(hero);
         this.prepare = prepare;
+
+        NotableId = testEnvironment.CreateRegisteredObject<Hero>();
+        (OwnerHeroId, OwnerPartyId) = RegisterPlayer(ClientA, ControllerA);
+        (OtherHeroId, OtherPartyId) = RegisterPlayer(ClientB, ControllerB);
+
+        foreach (var instance in new[] { Server, ClientA, ClientB }) AddIssue(instance);
     }
 
     public void Accept(EnvironmentInstance client)
