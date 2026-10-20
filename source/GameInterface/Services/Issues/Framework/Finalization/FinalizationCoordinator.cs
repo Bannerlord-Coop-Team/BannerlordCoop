@@ -114,13 +114,13 @@ internal class FinalizationCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
-            if (!TryResolveOwnedIssue(data.IssueOwnerId, data.IssueId, player, out var issue, out _, out var playerHero))
+            if (!TryResolveOwnedIssue(data.IssueOwnerId, data.IssueId, player, out var issue, out var descriptor, out var playerHero))
             {
                 return;
             }
 
             if (data.Outcome == IssueOutcome.QuestSuccess &&
-                registry.TryGet(issue.GetType(), out var descriptor) && descriptor.FinalizationProofStrategy != null)
+                descriptor.SuccessOnlyThroughBranchProof)
             {
                 Logger.Warning("{issue} requires a finalization proof and cannot accept generic success", data.IssueId);
                 return;
