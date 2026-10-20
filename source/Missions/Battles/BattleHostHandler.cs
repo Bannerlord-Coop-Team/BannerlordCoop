@@ -585,7 +585,9 @@ internal class BattleHostHandler : IHandler
     private void RequestWithdrawalHealth(string mapEventId, MapEvent mapEvent, BattleRuntimeState state,
         PendingHealthWithdrawal pending)
     {
-        if (!hostRegistry.TryGet(mapEventId, out var assignment))
+        // No host, or a kept host that left and never answers again: the health already reported is all there is.
+        if (!hostRegistry.TryGet(mapEventId, out var assignment)
+            || (!state.PresentControllers.Contains(assignment.HostControllerId) && KeepsHostAfterResult(mapEventId)))
         {
             CompleteHealthWithdrawal(mapEventId, mapEvent, state, pending);
             return;
@@ -993,6 +995,16 @@ internal class BattleHostHandler : IHandler
             ServePendingReturn(pending, "the host departed before its flush ack");
     }
 
+    // [Server, game thread] A host kept after its result left: every withdrawal waits on it, and it never answers, so each
+    // completes from the health already reported.
+    private void CompleteWithdrawalsOfDepartedHost(string mapEventId, MapEvent mapEvent)
+    {
+        if (mapEvent == null || !battleRuntimeStates.TryGetValue(mapEventId, out var state)) return;
+
+        foreach (var withdrawal in state.HealthWithdrawals.ToArray())
+            CompleteHealthWithdrawal(mapEventId, mapEvent, state, withdrawal);
+    }
+
     // [Server, game thread] The RETURNER dropped again while its grant was still pending: cancel it — there
     // is no one to serve, and its next return restarts the handshake against the then-current scope.
     private void CancelPendingReturns(string mapEventId, string returnerControllerId)
@@ -1106,6 +1118,9 @@ internal class BattleHostHandler : IHandler
                 {
                     Logger.Information("[BattleHost] Host {Host} left resolved battle {MapEventId}; keeping the assignment at epoch {Epoch} without promoting",
                         controllerId, mapEventId, assignment.Epoch);
+                    // Nobody takes over what the kept host still owed, so its withdrawals and pending returns finish now.
+                    CompleteWithdrawalsOfDepartedHost(mapEventId, mapEvent);
+                    ServePendingReturnsAwaitingHost(mapEventId, controllerId);
                     return;
                 }
 
