@@ -224,8 +224,7 @@
     "playerWoundedBattleEntry": true,
 
     // Kingdom decision vote timeout in seconds.
-    // Positive integer; default is 60 seconds, 36000 is ten hours.
-    // Applies to the next hosted session. All final votes can finish a round early.
+    // Positive integer; default is 60 seconds. Set to 600 for ten minutes.
     "kingdomDecisionVoteTimeoutSeconds": 60
   }
 }

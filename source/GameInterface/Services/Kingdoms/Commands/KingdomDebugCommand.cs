@@ -1,5 +1,4 @@
 ﻿using Common.Commands;
-using GameInterface.Configuration;
 using Autofac;
 using Common;
 using Common.Extensions;
@@ -366,8 +365,6 @@ public class KingdomDebugCommand
             if (kingdom.ActivePolicies.Contains(policy) != policyWasActive)
                 return Failed($"Policy {args[2]} changed after fixture capture.");
 
-            if (!ContainerProvider.TryResolve<IModConfig>(out var modConfig)) return Failed("Unable to resolve ModConfig");
-
             var fixture = new PolicyTimeoutFixture(
                 kingdom,
                 proposerClan,
@@ -390,7 +387,7 @@ public class KingdomDebugCommand
                 fixture.KingdomId,
                 fixture.PolicyId,
                 decisionIndex,
-                votingDurationSeconds = (modConfig.Data.ModOptions?.KingdomDecisionVoteTimeoutSeconds ?? ModOptionsData.DefaultKingdomDecisionVoteTimeoutSeconds)
+                votingDurationSeconds = (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds
             }));
         }
     }

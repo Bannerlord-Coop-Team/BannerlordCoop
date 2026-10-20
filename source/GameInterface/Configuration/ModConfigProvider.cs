@@ -74,6 +74,8 @@ public readonly struct ModOptions
     public readonly bool BlockAiWarDeclarationsOnOfflinePlayers { get; } = false;
     [ProtoMember(26)]
     public readonly int SpawnRateWanderers { get; } = 1;
+    [ProtoMember(27)]
+    public readonly int KingdomDecisionVoteTimeoutSeconds { get; } = 60;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -83,6 +85,7 @@ public readonly struct ModOptions
 
     public ModOptions(ModOptionsData modOptionsData)
     {
+        KingdomDecisionVoteTimeoutSeconds = modOptionsData.KingdomDecisionVoteTimeoutSeconds ?? KingdomDecisionVoteTimeoutSeconds;
         VoiceEnabled = modOptionsData.VoiceEnabled ?? VoiceEnabled;
         FastForwardEnabled = modOptionsData.FastForwardEnabled ?? FastForwardEnabled;
         AutoPauseEnabled = modOptionsData.AutoPauseEnabled ?? AutoPauseEnabled;

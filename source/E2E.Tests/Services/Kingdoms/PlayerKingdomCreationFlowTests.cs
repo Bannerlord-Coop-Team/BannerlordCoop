@@ -81,6 +81,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
     private E2ETestEnvironment TestEnvironment { get; }
     private readonly ITestOutputHelper output;
+    private readonly ModOptions previousModOptions = ModConfigProvider.ModOptions;
     private EnvironmentInstance Server => TestEnvironment.Server;
     private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
     private static IKingdomDecisionVoteManager GetVoteManager(EnvironmentInstance instance) =>
@@ -97,6 +98,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     public void Dispose()
     {
         TestEnvironment.Dispose();
+        ModConfigProvider.ModOptions = previousModOptions;
     }
 
     [Fact]
@@ -1290,7 +1292,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             GetConcreteVoteManager(Server).ProcessVotingRounds(
-                DateTime.UtcNow + GetConcreteVoteManager(Server).VotingRoundDuration + TimeSpan.FromSeconds(1));
+                DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1));
         });
 
         Assert.Single(
@@ -2616,10 +2618,14 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
     [Theory]
     [InlineData(60)]
-    [InlineData(36000)]
+    [InlineData(600)]
+    [InlineData(0)]
+    [InlineData(-1)]
     public void KingdomDecisionVotes_MissingVoteTimesOutAfterVotingWindow(int timeoutSeconds)
     {
-        Server.Call(() => Server.Resolve<IModConfig>().Data.ModOptions.KingdomDecisionVoteTimeoutSeconds = timeoutSeconds);
+        ModConfigProvider.LoadModConfig(new ModOptionsData { KingdomDecisionVoteTimeoutSeconds = timeoutSeconds });
+        Assert.Equal(timeoutSeconds > 0 ? timeoutSeconds : 60, (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds);
+        timeoutSeconds = (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds;
         var player = CreateSyncedPlayerContext();
         var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
@@ -2673,7 +2679,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Same(decision, Assert.Single(kingdom.UnresolvedDecisions));
 
             GetConcreteVoteManager(Server).ProcessVotingRounds(
-                DateTime.UtcNow + GetConcreteVoteManager(Server).VotingRoundDuration);
+                DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration);
 
             Assert.Empty(kingdom.UnresolvedDecisions);
         });
@@ -2719,7 +2725,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
 
             GetConcreteVoteManager(Server).ProcessVotingRounds(
-                DateTime.UtcNow + GetConcreteVoteManager(Server).VotingRoundDuration);
+                DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration);
 
             Assert.Empty(kingdom.UnresolvedDecisions);
         });
@@ -3016,7 +3022,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             }
             Assert.True(decisionStates.Contains(decision));
 
-            voteManager.ProcessVotingRounds(DateTime.UtcNow + GetConcreteVoteManager(Server).VotingRoundDuration);
+            voteManager.ProcessVotingRounds(DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration);
 
             Assert.False(decisionStates.Contains(decision));
             Assert.Empty(voteManager.GetDecisionDebugInfo(kingdom));

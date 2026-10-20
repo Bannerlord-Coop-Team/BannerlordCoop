@@ -39,25 +39,6 @@ public class ModConfigTests : IDisposable
 
     private IModConfig NewModConfig() => new ModConfig(tempDir);
 
-    [Theory]
-    [InlineData("{}", 60)]
-    [InlineData("{\"kingdomDecisionVoteTimeoutSeconds\":36000}", 36000)]
-    [InlineData("{\"kingdomDecisionVoteTimeoutSeconds\":0}", 60)]
-    [InlineData("{\"kingdomDecisionVoteTimeoutSeconds\":-1}", 60)]
-    [InlineData("{\"kingdomDecisionVoteTimeoutSeconds\":\"invalid\"}", 60)]
-    [InlineData("{\"kingdomDecisionVoteTimeoutSeconds\":2147483648}", 60)]
-    public void DecisionVoteTimeout_LoadsOrFallsBackWithoutLosingOtherSettings(string json, int expected)
-    {
-        json = "{\"modOptions\":" + json.Insert(1, "\"autoPauseEnabled\":false" + (json.Length > 2 ? "," : "")) + "}";
-        File.WriteAllText(ConfigPath, json);
-
-        var data = NewModConfig().Data;
-
-        Assert.Equal(expected, data.ModOptions.KingdomDecisionVoteTimeoutSeconds);
-        Assert.False(data.ModOptions.AutoPauseEnabled);
-        Assert.True(data.ModOptions.UnknownKeys == null || !data.ModOptions.UnknownKeys.ContainsKey("kingdomDecisionVoteTimeoutSeconds"));
-    }
-
     [Fact]
     public void MissingFile_IsSeededFromTheShippedTemplate()
     {
@@ -313,6 +294,7 @@ public class ModConfigTests : IDisposable
         Assert.Equal(GoldFoodChangeMode.Disabled, options.GoldFoodInfluenceChangeInBattles);
         Assert.False(options.GoldFoodInfluenceChangeForDisconnectedPlayers);
         Assert.Equal(6, options.PlayerBattleAiJoinWindowHours);
+        Assert.Equal(60, options.KingdomDecisionVoteTimeoutSeconds);
         Assert.True(options.SpeedLimitWhilePlayersInBattle);
         Assert.True(options.EnsureUnaffiliatedWanderers);
         Assert.Equal(32, options.WandererLimit);
@@ -349,6 +331,7 @@ public class ModConfigTests : IDisposable
         // Read back a value rather than only the overflow: an unparsed block would leave every
         // property null, which the defaults comparison below would accept as a vacuous pass.
         Assert.Equal(1f, config.ModOptions.MaximumLootersMultiplier);
+        Assert.Equal(60, config.ModOptions.KingdomDecisionVoteTimeoutSeconds);
         Assert.True(config.ModOptions.CoopClansEnabled);
         Assert.Equal(ModConfigProvider.ModOptions, new ModOptions(config.ModOptions));
     }
@@ -363,6 +346,9 @@ public class ModConfigTests : IDisposable
     ""playerTroopsReceivedDamage"": ""Easy"",
     ""birthAndDeath"": false,
   },
+  ""modOptions"": {
+    ""KINGDOMDECISIONVOTETIMEOUTSECONDS"": 600,
+  },
 }");
 
         var config = NewModConfig().Data;
@@ -370,6 +356,7 @@ public class ModConfigTests : IDisposable
         Assert.Equal(DifficultyLevel.Realistic, config.Difficulty.PlayerReceivedDamage);
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.PlayerTroopsReceivedDamage);
         Assert.False(config.Difficulty.BirthAndDeath);
+        Assert.Equal(600, new ModOptions(config.ModOptions).KingdomDecisionVoteTimeoutSeconds);
         Assert.Equal(DifficultyLevel.VeryEasy, config.Difficulty.CombatAIDifficulty);
     }
 
@@ -380,12 +367,17 @@ public class ModConfigTests : IDisposable
   ""difficulty"": {
     ""playerReceivedDamage"": ""Medium"",
     ""battleDeath"": ""Easy""
+  },
+  ""modOptions"": {
+    ""kingdomDecisionVoteTimeoutSeconds"": ""invalid"",
+    ""wandererLimit"": 40,
   }
 }");
 
         var config = NewModConfig().Data;
 
         Assert.Null(config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(60, new ModOptions(config.ModOptions).KingdomDecisionVoteTimeoutSeconds);
         Assert.Equal(DifficultyLevel.Easy, config.Difficulty.BattleDeath);
     }
 
@@ -418,6 +410,7 @@ public class ModConfigTests : IDisposable
 
         Assert.NotNull(config);
         Assert.Null(config.Difficulty.PlayerReceivedDamage);
+        Assert.Equal(60, new ModOptions(config.ModOptions).KingdomDecisionVoteTimeoutSeconds);
     }
 
     [Fact]
