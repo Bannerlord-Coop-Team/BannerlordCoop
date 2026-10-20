@@ -38,18 +38,21 @@ public class LocationPopulationDirector : ILocationPopulationDirector
     private readonly ILocationSession session;
     private readonly ILocationAgentBindingMap bindingMap;
     private readonly ILocationPuppetSpawner puppetSpawner;
+    private readonly ILocationNpcAuthorityState authorityState;
     private bool populated;
 
     public LocationPopulationDirector(
         IMessageBroker messageBroker,
         ILocationSession session,
         ILocationAgentBindingMap bindingMap,
-        ILocationPuppetSpawner puppetSpawner)
+        ILocationPuppetSpawner puppetSpawner,
+        ILocationNpcAuthorityState authorityState)
     {
         this.messageBroker = messageBroker;
         this.session = session;
         this.bindingMap = bindingMap;
         this.puppetSpawner = puppetSpawner;
+        this.authorityState = authorityState;
 
         messageBroker.Subscribe<LocationHostAuthorityAcquired>(Handle_LocationHostAuthorityAcquired);
     }
@@ -95,17 +98,17 @@ public class LocationPopulationDirector : ILocationPopulationDirector
             Logger.Information("[LocationNpc] Confirmed NPC host of {InstanceId} — running the native population pass",
                 payload.What.InstanceId);
 
-            // The suppression gate lifted with the host confirmation, so these run natively; the
+            // Native spawn suppression lifted with the host confirmation, so these run natively; the
             // capture patches replicate everything they spawn. The seeded-RNG and civilian-count
             // patches wrap SpawnLocationCharacters exactly as they wrap the native AfterStart call.
-            LocationNpcGate.IsReplayingNativePopulation = true;
+            authorityState.IsReplayingNativePopulation = true;
             try
             {
                 agentHandler.SpawnLocationCharacters();
             }
             finally
             {
-                LocationNpcGate.IsReplayingNativePopulation = false;
+                authorityState.IsReplayingNativePopulation = false;
             }
 
             SandBoxHelpers.MissionHelper.SpawnHorses();

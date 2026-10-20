@@ -192,7 +192,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<LiveTestCommandDispatcher>().As<ILiveTestCommandDispatcher>().InstancePerDependency();
         builder.RegisterType<CoopModulePathResolver>().As<ICoopModulePathResolver>().InstancePerDependency();
         builder.RegisterType<FixedTownNpcService>().AsSelf().InstancePerLifetimeScope();
-        builder.RegisterType<LocationNpcGateState>().As<ILocationNpcGate>().InstancePerLifetimeScope();
+        builder.RegisterType<LocationNpcAuthorityState>().As<ILocationNpcAuthorityState>().InstancePerLifetimeScope();
         builder.RegisterType<LocationConversationClientState>()
             .As<ILocationConversationClientState>()
             .InstancePerLifetimeScope();

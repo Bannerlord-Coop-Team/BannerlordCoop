@@ -63,6 +63,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
     private readonly ILocationAgentSpawnBatchCodec spawnBatchCodec;
     private readonly ILocationAuthorityMigrator authorityMigrator;
     private readonly ILocationControllerWithdrawalState withdrawalState;
+    private readonly ILocationNpcAuthorityState authorityState;
 
     private readonly object pendingPuppetLock = new object();
     private readonly List<LocationAgentSpawnData> pendingPuppets = new List<LocationAgentSpawnData>();
@@ -92,7 +93,8 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         IBattleAgentBudget agentBudget,
         ILocationAgentSpawnBatchCodec spawnBatchCodec,
         ILocationAuthorityMigrator authorityMigrator,
-        ILocationControllerWithdrawalState withdrawalState)
+        ILocationControllerWithdrawalState withdrawalState,
+        ILocationNpcAuthorityState authorityState)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -106,6 +108,7 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         this.spawnBatchCodec = spawnBatchCodec;
         this.authorityMigrator = authorityMigrator;
         this.withdrawalState = withdrawalState;
+        this.authorityState = authorityState;
 
         messageBroker.Subscribe<NetworkSpawnLocationAgents>(Handle_NetworkSpawnLocationAgents);
         messageBroker.Subscribe<NetworkDespawnLocationAgents>(Handle_NetworkDespawnLocationAgents);
@@ -463,14 +466,14 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
             buildData.Equipment(data.SpawnEquipment);
 
         Agent agent;
-        LocationNpcGate.SuppressCapture = true;
+        authorityState.SuppressCapture = true;
         try
         {
             agent = Mission.Current.SpawnAgent(buildData);
         }
         finally
         {
-            LocationNpcGate.SuppressCapture = false;
+            authorityState.SuppressCapture = false;
         }
 
         // Native applies the civilian action set explicitly after SpawnAgent — mirror it, or puppets
@@ -503,14 +506,14 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         var position = data.Position;
         var direction = data.Direction;
 
-        LocationNpcGate.SuppressCapture = true;
+        authorityState.SuppressCapture = true;
         try
         {
             return Mission.Current.SpawnMonster(equipmentElement, harnessElement, in position, in direction);
         }
         finally
         {
-            LocationNpcGate.SuppressCapture = false;
+            authorityState.SuppressCapture = false;
         }
     }
 

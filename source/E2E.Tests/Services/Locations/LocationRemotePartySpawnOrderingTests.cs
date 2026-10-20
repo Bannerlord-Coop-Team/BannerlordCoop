@@ -25,7 +25,8 @@ public class LocationRemotePartySpawnOrderingTests
         var remotePuppet = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
         remotePuppet.Origin = (SimpleAgentOrigin)FormatterServices.GetUninitializedObject(typeof(SimpleAgentOrigin));
         partyAgentMap.Record(agentId);
-        LocationNpcGate.BeginMission(
+        using var authorityState = new LocationNpcAuthorityState();
+        authorityState.BeginMission(
             "settlement|tavern",
             agent => registry.TryGetAgentInfo(agent, out var info) && partyAgentMap.Contains(info.AgentId));
 
@@ -49,7 +50,7 @@ public class LocationRemotePartySpawnOrderingTests
                 });
                 GameThread.RunSafe(() =>
                 {
-                    resolvedDuringReplay = LocationNpcGate.IsPlayerPartyAgent(remotePuppet);
+                    resolvedDuringReplay = authorityState.IsPlayerPartyAgent(remotePuppet, mainAgent: null);
                 });
             });
             producerThread.Start();
@@ -69,7 +70,6 @@ public class LocationRemotePartySpawnOrderingTests
                 GameThread.Instance.Update(TimeSpan.Zero);
             GameThread.Instance.DiscardQueuedActions();
             GameThread.Instance.RestoreGameThread(previousGameThreadId);
-            LocationNpcGate.EndMission();
         }
     }
 }

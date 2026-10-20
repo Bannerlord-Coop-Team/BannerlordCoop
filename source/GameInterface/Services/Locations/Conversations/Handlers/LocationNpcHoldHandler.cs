@@ -26,15 +26,18 @@ internal class LocationNpcHoldHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly ILocationNpcHoldRegistry holdRegistry;
+    private readonly ILocationNpcAuthorityState authorityState;
 
     public LocationNpcHoldHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        ILocationNpcHoldRegistry holdRegistry)
+        ILocationNpcHoldRegistry holdRegistry,
+        ILocationNpcAuthorityState authorityState)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.holdRegistry = holdRegistry;
+        this.authorityState = authorityState;
 
         messageBroker.Subscribe<NetworkLocationNpcHold>(Handle_NetworkLocationNpcHold);
         messageBroker.Subscribe<NetworkLocationNpcReleased>(Handle_NetworkLocationNpcReleased);
@@ -48,7 +51,7 @@ internal class LocationNpcHoldHandler : IHandler
 
     private void Handle_NetworkLocationNpcHold(MessagePayload<NetworkLocationNpcHold> payload)
     {
-        // Tracked on EVERY client (before the host gate): a successor promoted mid-conversation must
+        // Tracked on EVERY client (before the host check): a successor promoted mid-conversation must
         // know the adopted NPC is held, or adoption un-pauses it under the remote conversation.
         holdRegistry.Hold(payload.What.LocationId, payload.What.CharacterId);
         SetNpcPaused(payload.What.LocationId, payload.What.CharacterId, paused: true);
@@ -63,7 +66,7 @@ internal class LocationNpcHoldHandler : IHandler
     private void SetNpcPaused(string locationId, string characterId, bool paused)
     {
         if (ModInformation.IsServer) return;
-        if (!LocationNpcGate.IsCoopLocationMissionActive || !LocationNpcGate.IsLocalHostConfirmed) return;
+        if (!authorityState.IsCoopLocationMissionActive || !authorityState.IsLocalHostConfirmed) return;
 
         GameThread.RunSafe(() =>
         {
