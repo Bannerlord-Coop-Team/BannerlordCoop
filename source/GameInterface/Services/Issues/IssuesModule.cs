@@ -28,6 +28,7 @@ internal class IssuesModule : Module
         builder.RegisterType<IssueAcceptPreconditions>().As<IIssueAcceptPreconditions>().InstancePerDependency();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
         builder.RegisterType<MerchantOutlawsProgress>().As<IMerchantOutlawsProgress>().InstancePerDependency();
+        builder.Register(context => context.Resolve<LordSolutionCoordinator>()).As<ILordSolutionCoordinator>();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
         builder.RegisterType<TheConquestOfSettlementService>()
             .As<ITheConquestOfSettlementService>()
