@@ -86,6 +86,7 @@ public class NavalScenarioStager : INavalScenarioStager
         if (config.ArmedShipsPerParty > 0)
             log.Append(" armedPlayers=").Append(string.Join(",", players.Select(party => ArmShips(party.Party, config.ArmedShipsPerParty))));
 
+        LeaveRafts(config, players, log);
         MobileParty engagingEnemy = null;
         bool started;
         if (config.Duel) started = TryStartDuel(config, players, log, out output);
@@ -136,6 +137,18 @@ public class NavalScenarioStager : INavalScenarioStager
         var position = player.Position.ToVec2();
         return MobileParty.All
                 .Where(party => party.IsBandit && StartNavalCoopCommand.IsNavalEnemy(party, player))
+    // A player released at sea sails on a raft until it lands, and PlayerRaftVisibilityPatches turns an engage order on a
+    // player's raft into GoToPoint, which left the encounter preset's fleet idle (R41b P4). The topped-up fleet replaces the raft.
+    private static void LeaveRafts(NavalScenarioConfig config, MobileParty[] players, StringBuilder log)
+    {
+        var rafted = config.ControllerIds.Where((id, i) => players[i].IsInRaftState).ToList();
+        if (rafted.Count == 0) return;
+
+        foreach (var party in players.Where(party => party.IsInRaftState))
+            RaftStateChangeAction.DeactivateRaftStateForParty(party);
+        log.Append(" leftRaft=").Append(string.Join(",", rafted));
+    }
+
                 .OrderBy(party => party.Position.ToVec2().DistanceSquared(position))
                 .FirstOrDefault()
             ?? StartNavalCoopCommand.FindNavalEnemy(player);
