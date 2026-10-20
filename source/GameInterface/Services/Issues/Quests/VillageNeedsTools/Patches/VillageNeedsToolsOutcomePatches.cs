@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -95,6 +96,25 @@ internal class VillageNeedsToolsOutcomePatches
         }
 
         return false;
+    }
+
+    // The server's daily issue tick has no player context, but the timeout relation penalty is owner-scoped.
+    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut))]
+    private static class TimeoutOwnerScopePatch
+    {
+        [HarmonyPrefix]
+        private static void Prefix(QuestBase __instance, out IDisposable __state)
+        {
+            __state = null;
+            if (!ModInformation.IsServer || !(__instance is Quest quest) || !quest.IsOngoing ||
+                !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) ||
+                !owners.TryResolveOwnerHero(IssueManager.GetIssueOfQuest(quest), out var ownerHero)) return;
+
+            __state = new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo);
+        }
+
+        [HarmonyFinalizer]
+        private static void Finalizer(IDisposable __state) => __state?.Dispose();
     }
 
     [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddLog))]

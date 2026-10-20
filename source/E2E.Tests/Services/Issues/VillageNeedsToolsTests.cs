@@ -399,6 +399,13 @@ public class VillageNeedsToolsTests : IDisposable
     [Fact]
     public void OwnersTimeout_RunsTheFailConsequencesOnTheServerOnly()
     {
+        var ownerRelationBefore = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            ownerRelationBefore = ownerHero.GetRelation(notable);
+        });
         Accept();
 
         ClientA.Call(() =>
@@ -424,6 +431,8 @@ public class VillageNeedsToolsTests : IDisposable
                 // Only the server's -30 is applied
                 Assert.True(settlement.Village.Hearth == 620f, $"{Describe(instance)} hearth was {settlement.Village.Hearth}");
                 Assert.True(notable.Power == -10f, $"{Describe(instance)} power was {notable.Power}");
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var ownerHero));
+                Assert.Equal(ownerRelationBefore - 5, ownerHero.GetRelation(notable));
             });
         }
     }
