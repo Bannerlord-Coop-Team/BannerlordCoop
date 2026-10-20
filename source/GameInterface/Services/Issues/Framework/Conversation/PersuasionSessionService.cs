@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Messages;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Resolvers;
