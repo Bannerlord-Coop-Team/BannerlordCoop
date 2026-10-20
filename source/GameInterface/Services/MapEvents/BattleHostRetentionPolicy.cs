@@ -22,10 +22,7 @@ public interface IBattleHostRetentionPolicy
     /// <summary>[Game thread] The host's own finalize waits for the server's conclusion, which it would otherwise drop.</summary>
     bool DefersHostFinalize(string mapEventId);
 
-    /// <summary>
-    /// A host outside its mission is one kept after its result, so it may not enter again: that would reset the result it
-    /// reported. The server's conclusion closes its encounter instead.
-    /// </summary>
+    /// <summary>A host kept after its result may not enter again, as that would reset the result it reported.</summary>
     bool RefusesEntry(string mapEventId, string controllerId);
 }
 
@@ -52,8 +49,8 @@ public class BattleHostRetentionPolicy : IBattleHostRetentionPolicy
         && mapEvent.IsNavalMapEvent && mapEvent.BattleState == BattleState.None;
 
     public bool RefusesEntry(string mapEventId, string controllerId) =>
-        IsNaval(mapEventId) && hostRegistry.TryGet(mapEventId, out var assignment)
-        && assignment.HostControllerId == controllerId;
+        !string.IsNullOrEmpty(mapEventId) && hostRegistry.TryGet(mapEventId, out var assignment)
+        && assignment.KeptAfterResult && assignment.HostControllerId == controllerId;
 
     // A battle at sea, read from its map event or, once that is gone, from the election's record on the host assignment.
     private bool IsNaval(string mapEventId)

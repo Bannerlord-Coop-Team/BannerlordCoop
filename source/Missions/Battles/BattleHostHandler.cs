@@ -1118,6 +1118,9 @@ internal class BattleHostHandler : IHandler
                 {
                     Logger.Information("[BattleHost] Host {Host} left resolved battle {MapEventId}; keeping the assignment at epoch {Epoch} without promoting",
                         controllerId, mapEventId, assignment.Epoch);
+                    // Server-only, so clients are not sent the unchanged assignment again.
+                    hostRegistry.Set(mapEventId, new BattleHostAssignment(assignment.HostControllerId,
+                        assignment.SuccessorControllerIds, assignment.Epoch, assignment.IsNaval, keptAfterResult: true));
                     // Nobody takes over what the kept host still owed, so its withdrawals and pending returns finish now.
                     CompleteWithdrawalsOfDepartedHost(mapEventId, mapEvent);
                     ServePendingReturnsAwaitingHost(mapEventId, controllerId);
@@ -1186,7 +1189,7 @@ internal class BattleHostHandler : IHandler
             {
                 // Successor-line cleanup: the host did not change, so the epoch is unchanged (BR-102).
                 var updated = new BattleHostAssignment(assignment.HostControllerId, successors, assignment.Epoch,
-                    assignment.IsNaval);
+                    assignment.IsNaval, assignment.KeptAfterResult);
                 SetServerAssignment(mapEventId, updated);
 
                 Logger.Information("[BattleHost] Successor {Controller} left battle {MapEventId}; successor line now: {Successors}",
@@ -1346,7 +1349,8 @@ internal class BattleHostHandler : IHandler
 
         // The host did not change, so the assignment stays in the same hosting generation (BR-102).
         var successors = new List<string>(existing.SuccessorControllerIds) { requesterId };
-        updated = new BattleHostAssignment(existing.HostControllerId, successors, existing.Epoch, existing.IsNaval);
+        updated = new BattleHostAssignment(existing.HostControllerId, successors, existing.Epoch, existing.IsNaval,
+            existing.KeptAfterResult);
         return true;
     }
 

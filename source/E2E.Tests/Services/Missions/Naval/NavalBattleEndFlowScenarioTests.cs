@@ -138,6 +138,37 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
         AssertMapEventRemoved(battle.MapEventId);
     }
 
+    // R41a fix-loop round 3: a naval host that crashed before reporting relaunches and presses Attack while its old peer is
+    // still a member. It was never kept after a result, so it is not refused.
+    [Fact]
+    public void HostRejoiningBeforeItsOldPeerTimesOut_IsNotRefused()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out _, out var concluded);
+        a.Commit();
+        battle.TickAll();
+        Server.Call(() => Server.Resolve<BattleMissionStartHandler>().GetOrCreateMissionInitializerSnapshot(battle.MapEventId,
+            () => new MissionInitializerRecord("test-naval")));
+        int startsToA = a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
+
+        bool navalDlcActive = ModInformation.IsNavalDlcActive;
+        try
+        {
+            ModInformation.IsNavalDlcActive = true;
+            RequestAttack(battle, a, "rejoined-host-attack");
+        }
+        finally
+        {
+            ModInformation.IsNavalDlcActive = navalDlcActive;
+        }
+
+        var reply = Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>()
+            .Single(sent => sent.RequestId == "rejoined-host-attack");
+        Assert.True(reply.Accepted);
+        Assert.Equal(startsToA + 1, a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count());
+        AssertHost(Server, battle.MapEventId, "A", "B");
+        Assert.Equal(0, concluded());
+    }
+
     // The player presses Attack at the battle's encounter menu.
     private void RequestAttack(NavalBattle battle, NavalPeer player, string requestId)
     {

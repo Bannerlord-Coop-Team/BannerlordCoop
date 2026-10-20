@@ -26,14 +26,17 @@ public class BattleHostRetentionPolicyTests
         Assert.False(policy.DefersHostFinalize(MapEventId));
     }
 
-    // C1: only the kept naval host is refused, never a member that was not the host.
+    // C1: only the naval host kept after its result is refused. A member, or a host still owing its result (one rejoining
+    // before its old peer timed out), may enter.
     [Theory]
-    [InlineData(true, "host", true)]
-    [InlineData(true, "member", false)]
-    [InlineData(false, "host", false)]
-    public void RefusesEntry_OnlyToTheNavalHost(bool naval, string controllerId, bool refused)
+    [InlineData(true, true, "host", true)]
+    [InlineData(true, true, "member", false)]
+    [InlineData(true, false, "host", false)]
+    [InlineData(false, false, "host", false)]
+    public void RefusesEntry_OnlyToTheKeptNavalHost(bool naval, bool kept, string controllerId, bool refused)
     {
-        var policy = Create(new BattleHostAssignment("host", new[] { "member" }, epoch: 1, isNaval: naval));
+        var policy = Create(new BattleHostAssignment("host", new[] { "member" }, epoch: 1, isNaval: naval,
+            keptAfterResult: kept));
 
         Assert.Equal(refused, policy.RefusesEntry(MapEventId, controllerId));
     }
