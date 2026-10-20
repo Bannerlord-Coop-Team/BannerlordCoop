@@ -69,6 +69,8 @@ public class ChatServiceTests
         Assert.True(service.IsPlayerChatEnabled);
     }
 
+    /// <summary>Verifies dispose stops the event log and survives the overlay's vanilla restore with no vanilla chat log view present.</summary>
+    /// <remarks>Only the null <c>GauntletChatLogView.Current</c> path is reachable here; the non-null restore needs the game runtime.</remarks>
     [Fact]
     public void Dispose_StopsEventLog()
     {
