@@ -198,6 +198,7 @@ public class LordNeedsHorsesTests : IDisposable
                 giver.Clan = clan;
                 clan.SetLeader(giver);
                 giver._partyBelongedTo = party;
+                troop.DefaultFormationClass = FormationClass.Infantry;
                 party.MemberRoster.AddToCounts(troop, 20);
             }
 
