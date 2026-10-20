@@ -130,7 +130,21 @@ public class QuestRequestOwnershipTests : IDisposable
 
         Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
         Assert.Equal(1, branches.CountFor(scenario.Server));
-        Assert.Equal(0, consequences.CountFor(scenario.Server));
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(1, consequences.CountFor(scenario.Server));
+    }
+
+    [Fact]
+    public void ABranchRequestBeforeTheClientRecordsTheVanillaStateIsIgnored()
+    {
+        scenario.Accept(scenario.ClientA);
+        var quest = scenario.QuestOf(scenario.ClientA);
+
+        scenario.ClientA.Call(() =>
+            scenario.ClientA.Resolve<IMessageBroker>().Publish(this, new QuestBranchRequested(quest, Branch)));
+
+        Assert.Equal(0, branches.CountFor(scenario.Server));
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
     [Fact]
