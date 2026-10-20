@@ -130,6 +130,16 @@ internal sealed class QuestScenario
         var heroId = testEnvironment.CreateRegisteredObject<Hero>();
         var partyId = testEnvironment.CreateRegisteredObject<MobileParty>();
 
+        foreach (var instance in new[] { Server, ClientA, ClientB })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+                using (new AllowedThread()) hero._partyBelongedTo = party;
+            });
+        }
+
         Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(controllerId, heroId, partyId, "", ""))));
         testEnvironment.ConnectRegisteredPlayer(client, controllerId);
         client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
