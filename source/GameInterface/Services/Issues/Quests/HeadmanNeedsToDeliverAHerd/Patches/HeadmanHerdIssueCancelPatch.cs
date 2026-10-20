@@ -38,7 +38,7 @@ internal class HeadmanHerdDismissalPatch
     private static void Prefix(IssueBase __instance)
     {
         if (ModInformation.IsClient || !(__instance is Issue)) return;
-        HeadmanHerdWorldEventPatches.ForgetGiverDeath((Issue)__instance);
+        if (ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var pending)) pending.ForgetGiverDeath((Issue)__instance);
         // Startup dismissal has no ownership registry, so the saved original party owns this cleanup.
         if (ContainerProvider.TryResolve<IHeadmanHerdCleanup>(out var cleanup)) cleanup.Finalize(__instance);
     }
