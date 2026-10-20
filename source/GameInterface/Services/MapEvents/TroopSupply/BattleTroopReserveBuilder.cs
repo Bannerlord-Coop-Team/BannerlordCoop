@@ -433,7 +433,10 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         foreach (var element in roster)
         {
             if (element.IsRouted || element.IsKilled)
+            {
+                LogSkippedHero(party, element.Troop, element.IsRouted ? "routed" : "killed");
                 continue;
+            }
 
             var character = element.Troop;
             if (character == null)
@@ -444,6 +447,7 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
             // Skip if the troop is not a player, or if the config option is disabled and they are a player + wounded.
             if (element.IsWounded && !(isPlayer && ModConfigProvider.ModOptions.PlayerWoundedBattleEntry))
             {
+                LogSkippedHero(party, character, isPlayer ? "wounded, PlayerWoundedBattleEntry off" : "wounded, not a player hero");
                 continue;
             }
 
@@ -473,6 +477,15 @@ public class BattleTroopReserveBuilder : IBattleTroopReserveBuilder
         if (supplyOrders != null)
             entries.Sort((left, right) => left.SupplyOrder.CompareTo(right.SupplyOrder));
         return entries;
+    }
+
+    // A reserve without its player hero can't be allocated on a naval deck (R41a-2 S), so a left-out hero is logged.
+    private static void LogSkippedHero(MapEventParty party, CharacterObject character, string reason)
+    {
+        if (character?.IsHero != true) return;
+
+        Logger.Debug("[TroopSupply] Left hero {Char} out of the reserve of {Party}: {Reason}",
+            character.StringId, party.Party?.Name?.ToString(), reason);
     }
 
     private FlattenedTroopRoster BuildSiegeAmbushPriorityRoster(

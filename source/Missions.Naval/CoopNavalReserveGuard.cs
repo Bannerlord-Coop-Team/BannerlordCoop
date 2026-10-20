@@ -34,6 +34,9 @@ public class CoopNavalReserveGuard : MissionLogic
 
     public bool ReservePresent { get; private set; }
 
+    /// <summary>Set once vanilla's naval team setup threw; the deployment controller must not run it again.</summary>
+    public bool SetupFailed { get; private set; }
+
     // Checks the own reserve as the spawn logic pulls it; a missing one ends the mission at its first tick.
     public override void EarlyStart()
     {
@@ -69,6 +72,19 @@ public class CoopNavalReserveGuard : MissionLogic
         // Mission.AfterStart sets the state back to Continuing after EarlyStart, and CheckMissionEnd then never ends an
         // already ended mission, so the end waits for the first tick (R41a).
         endPending = true;
+        return true;
+    }
+
+    /// <summary>
+    /// [Game thread] Records that the naval team setup threw and ends the mission; a retry would deploy every side again
+    /// and spawn a fresh hull per formation each tick (R41a-2 S). True only for the first failure.
+    /// </summary>
+    internal bool FailSetup()
+    {
+        if (SetupFailed) return false;
+
+        SetupFailed = true;
+        RequestEnd();
         return true;
     }
 

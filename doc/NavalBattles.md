@@ -161,8 +161,14 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   successor that must report again.
 - **A missing own reserve ends the mission.** `CoopNavalReserveGuard` checks the reserve in `EarlyStart` and ends the
   mission from its first `OnPreDisplayMissionTick` (an `EndMission` in `EarlyStart` is undone by `Mission.AfterStart`).
-  A player team with no troops gets no ship, so `CoopNavalShiplessPlayerTeamPatch` skips vanilla's initial player
-  allocation, which would put the player troop on that missing hull every tick, and has the guard end the mission.
+  A player team with no troops gets no ship, and a reserve without the player hero (a wounded hero left out of the
+  rebuilt reserve, R41a-2 S) has no player troop, so `CoopNavalPlayerTeamAllocationPatch` skips vanilla's initial player
+  allocation, which would throw every tick, and has the guard end the mission. The player sees the guard's message and
+  goes back to the map, as in vanilla where a wounded hero can't enter a battle.
+- **A failed naval team setup ends the mission.** A throw in `DeploymentMissionController.SetupTeams` leaves
+  `TeamSetupOver` unset, so vanilla re-runs it every tick and deploys every side again (R41a-2 S: 161 hulls, then a
+  native crash). `CoopNavalTeamSetupFailurePatches` marks the guard's `SetupFailed` on the first throw, which ends the
+  mission, and skips the deployment controller's tick from then on.
 - **Not written back:**
   - a hull's final HP and sunk state (snapshots are mission-local);
   - the captured-ship list vanilla `OnMissionEnd` builds (patched off by `CoopNavalShipCapturePatch`, because mission
