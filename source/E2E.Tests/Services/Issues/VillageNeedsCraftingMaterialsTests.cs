@@ -323,8 +323,8 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         Assert.Equal(IssueOutcome.QuestTimeOut, request.Outcome);
 
         // Vanilla fails the quest from inside its timeout, the fail is announced first
-        var finalized = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>();
-        Assert.Equal(IssueOutcome.QuestFail, finalized.First().Outcome);
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
 
         foreach (var instance in Instances)
         {
