@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common;
 using Missions;
 using Missions.Agents.Handlers;
 using Missions.Battles;
@@ -415,16 +416,24 @@ public class AgentStationUseReplicatorTests
         var stationHull = (MissionObject)hull;
         string stationKey = "oar";
         int pointIndex = 0;
-        engine.Setup(e => e.TryDescribeStation(point, out stationHull, out stationKey, out pointIndex)).Returns(true);
+        bool? describedOnGameThread = null;
+        engine.Setup(e => e.TryDescribeStation(point, out stationHull, out stationKey, out pointIndex))
+            .Callback(() => describedOnGameThread = GameThread.Instance.IsGameThread)
+            .Returns(true);
         var broker = new MessageBroker();
         using var replicator = CreateReplicator(engine.Object, registry.Object, ships.Object, broker);
 
+        // R41a-2 C6: agent ticks can run on a worker, so a use published off the game thread is announced on it.
+        bool publishedOnGameThread = GameThread.Instance.IsGameThread;
         broker.Publish(this, new AgentStationUseChanged(agent, point, inUse: true));
+        GameThread.Run(() => { }, blocking: true);
         replicator.Tick(0.1f);
         bool seatedWhileOwned = replicator.IsOwnSeat(agentId);
         locallyControlled = false;
         replicator.Tick(0.1f);
 
+        Assert.False(publishedOnGameThread);
+        Assert.True(describedOnGameThread);
         Assert.True(seatedWhileOwned);
         Assert.False(replicator.IsOwnSeat(agentId));
     }

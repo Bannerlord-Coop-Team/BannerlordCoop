@@ -93,10 +93,17 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
     }
 
-    // [Game thread] Published by the use/release patches; only agents this client drives are announced.
+    // [Any thread] Published by the use/release patches, which also run on an agent tick worker; the seats and revisions it
+    // updates live on the game thread, so it is announced there (inline when already on it).
     private void Handle_AgentStationUseChanged(MessagePayload<AgentStationUseChanged> payload)
     {
         var change = payload.What;
+        GameThread.RunSafe(() => AnnounceStationUse(change), context: nameof(Handle_AgentStationUseChanged));
+    }
+
+    // [Game thread] Sends a station use or release of an agent this client drives; a puppet's local release is only logged.
+    private void AnnounceStationUse(AgentStationUseChanged change)
+    {
         var agents = missionComponent.AgentRegistry;
         if (change.Agent == null || !agents.TryGetAgentInfo(change.Agent, out var info)) return;
 

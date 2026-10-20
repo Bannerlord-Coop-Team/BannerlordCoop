@@ -3,7 +3,7 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Messages;
 
-/// <summary>[Game thread] An agent started or stopped using a usable point in a naval mission.</summary>
+/// <summary>[Any thread, agent ticks can run on a worker] An agent started or stopped using a usable point in a naval mission.</summary>
 public readonly struct AgentStationUseChanged : IEvent
 {
     public readonly Agent Agent;
