@@ -378,7 +378,9 @@ DEBUG only.
 turns an engage order on a player's raft into `GoToPoint`; R41b P4). The server re-issues the fleet's engage order whenever
 it isn't `EngageParty` on the first player. If there is still no map event after 10 s and the fleet is within
 `EncounterModel.NeededMaximumNavalDistanceForEncounteringMobileParty`, the server calls
-`EncounterManager.StartPartyEncounter(fleet, player)`, which becomes the server-detected player conversation. While the
+`EncounterManager.StartPartyEncounter(fleet, player)`, which becomes the server-detected player conversation. Neither runs
+once the fleet is held in a player conversation (`ConversationPartyHold.IsInPlayerConversation`) or either party is in
+a map event, so the conversation's hold isn't overridden and no second encounter opens. While the
 engage step waits, each distinct stack that resets the fleet's movement is logged once. `scenario_status` reports the
 re-issue count and whether the fallback ran.
 

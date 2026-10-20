@@ -300,7 +300,7 @@ public class NavalScenarioStager : INavalScenarioStager
     {
         var enemy = wait.Enemy;
         var target = wait.Players[0];
-        if (enemy.MapEvent != null || (enemy.DefaultBehavior == AiBehavior.EngageParty && enemy.TargetParty == target)) return;
+        if (IsEncounterUnderWay(enemy, target) || (enemy.DefaultBehavior == AiBehavior.EngageParty && enemy.TargetParty == target)) return;
 
         string before = $"{enemy.DefaultBehavior}, target {enemy.TargetParty?.StringId ?? "none"}";
         OrderEngage(enemy, target);
@@ -311,6 +311,14 @@ public class NavalScenarioStager : INavalScenarioStager
             wait.Config.ScenarioId, enemy.StringId, before, enemy.DefaultBehavior);
     }
 
+    // A held conversation sets the fleet to hold with its AI off, so pushing engage or a second encounter would fight it.
+    private static bool IsEncounterUnderWay(MobileParty enemy, MobileParty player) => IsEncounterUnderWay(
+        enemy.MapEvent != null, player.MapEvent != null, ConversationPartyHold.IsInPlayerConversation(enemy));
+
+    /// <summary>Whether the fleet's encounter already started: a map event for either party or a player conversation with the fleet.</summary>
+    internal static bool IsEncounterUnderWay(bool enemyInMapEvent, bool playerInMapEvent, bool enemyInConversation) =>
+        enemyInMapEvent || playerInMapEvent || enemyInConversation;
+
     // Within the naval encounter distance the server starts the encounter the AI tick's OnPartyInteraction would, which
     // EncounterManagerPatches turns into the server-detected player conversation.
     private void TryFallbackEncounter(EngageWait wait)
@@ -318,7 +326,7 @@ public class NavalScenarioStager : INavalScenarioStager
         var enemy = wait.Enemy;
         var player = wait.Players[0];
         if (wait.FallbackStarted || DateTime.UtcNow < wait.FallbackAt) return;
-        if (enemy.MapEvent != null || player.MapEvent != null) return;
+        if (IsEncounterUnderWay(enemy, player)) return;
 
         float distance = enemy.Position.Distance(player.Position);
         float encounterDistance = Campaign.Current.Models.EncounterModel.NeededMaximumNavalDistanceForEncounteringMobileParty;

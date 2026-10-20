@@ -31,6 +31,18 @@ public class NavalScenarioStagerTests
         Assert.Equal(expected, NavalScenarioStager.TemplatesMissing(regulars, templates));
     }
 
+    // Once the fleet is held in the player's conversation or a map event exists, neither engage nor the fallback may run.
+    [Theory]
+    [InlineData(false, false, false, false)]
+    [InlineData(true, false, false, true)]
+    [InlineData(false, true, false, true)]
+    [InlineData(false, false, true, true)]
+    public void IsEncounterUnderWay_StopsTheEngagePushOnceAConversationOrMapEventExists(bool enemyInMapEvent, bool playerInMapEvent,
+        bool enemyInConversation, bool expected)
+    {
+        Assert.Equal(expected, NavalScenarioStager.IsEncounterUnderWay(enemyInMapEvent, playerInMapEvent, enemyInConversation));
+    }
+
     // BlockadeBattleMapEvent.CheckLiftingBlockade lifts the blockade with no battle above 1.2 times the blockade's sea power.
     [Theory]
     [InlineData(100f, 100f, false)]
