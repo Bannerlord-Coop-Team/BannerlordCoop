@@ -179,7 +179,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnPeerConnected(NetPeer peer)
     {
-        // Registered under admission, so a shutdown closing it either drains this peer or it never joins.
+        // Registered inside `TryAdmit`, so a shutdown closing joins either drains this peer or it never joins.
         if (joinAdmission.TryAdmit(() => messageBroker.Publish(this, new PlayerConnected(peer)))) return;
 
         Logger.Information("Client {Peer} disconnected before joining: the server is restarting", peer.Id);
