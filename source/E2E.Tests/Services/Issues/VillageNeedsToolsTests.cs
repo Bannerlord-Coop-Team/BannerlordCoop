@@ -18,6 +18,7 @@ using Helpers;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -39,6 +40,7 @@ public class VillageNeedsToolsTests : IDisposable
     private const int ServerPayment = 900;
 
     private static readonly FieldInfo PaymentField = AccessTools.Field(typeof(Issue), nameof(Issue._payment));
+    private static Hero ConversationHeroOverride;
 
     private static readonly MethodBase[] QuestLogTexts =
     {
@@ -128,6 +130,43 @@ public class VillageNeedsToolsTests : IDisposable
 
             Assert.False(Descriptor(Server).CreationCaptureStrategy.TryBuildDebugCapture(hero, out _));
         });
+    }
+
+    [Fact]
+    public void QuestSolutionOptionCondition_IsTrueAfterTheOfferQuoteForAnEligibleOwner()
+    {
+        var conversationHeroGetter = AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.OneToOneConversationHero));
+        var questOptionCondition = AccessTools.Method(typeof(IssuesCampaignBehavior), "issue_offer_player_accept_quest_condition");
+        Assert.NotNull(conversationHeroGetter);
+        Assert.NotNull(questOptionCondition);
+
+        ConversationHeroOverride = null;
+        var harmony = new Harmony("bannerlordcoop.3766.quest-option-condition-test");
+        harmony.Patch(conversationHeroGetter,
+            prefix: new HarmonyMethod(typeof(VillageNeedsToolsTests), nameof(GetConversationHeroPrefix)));
+
+        try
+        {
+            ClientA.Call(() =>
+            {
+                Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(notableId, out var giver));
+                Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+                ConversationHeroOverride = giver;
+
+                using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+                {
+                    Assert.True(giver.Issue.CheckPreconditions(giver, out _));
+                    Assert.True(giver.Issue.IsThereAlternativeSolution);
+                    _ = giver.Issue.IssueQuestSolutionExplanationByIssueGiver;
+                    Assert.True((bool)questOptionCondition.Invoke(null, null)!);
+                }
+            });
+        }
+        finally
+        {
+            ConversationHeroOverride = null;
+            harmony.Unpatch(conversationHeroGetter, HarmonyPatchType.Prefix, harmony.Id);
+        }
     }
 
     [Theory]
@@ -862,5 +901,11 @@ public class VillageNeedsToolsTests : IDisposable
                 notable.OnIssueCreatedForHero(issue);
             }
         });
+    }
+
+    private static bool GetConversationHeroPrefix(ref Hero __result)
+    {
+        __result = ConversationHeroOverride;
+        return false;
     }
 }
