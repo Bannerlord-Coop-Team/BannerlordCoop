@@ -42,7 +42,7 @@ internal static class LesserNobleRevoltWorldEventPatches
             if (notificationPending && quest._giveNotificationAfterHoursCounter == -1 &&
                 quest._visitedVillagesList.Count > 0)
             {
-                SendJournalUpdate(quest, quest._visitedVillagesList.Last(), quest._discreteLog.CurrentProgress, true);
+                SendJournalUpdate(quest, quest._visitedVillagesList.Last(), GetVisitProgress(quest), true);
             }
         });
     }
@@ -80,7 +80,7 @@ internal static class LesserNobleRevoltWorldEventPatches
             if (IsRevoltPartyVisit(quest, party))
             {
                 // Sent before vanilla runs, because the twentieth visit times the quest out.
-                SendJournalUpdate(quest, settlement, quest._discreteLog.CurrentProgress + 1, false);
+                SendJournalUpdate(quest, settlement, GetVisitProgress(quest) + 1, false);
             }
 
             quest.OnSettlementEntered(party, settlement, hero);
@@ -280,7 +280,7 @@ internal static class LesserNobleRevoltWorldEventPatches
     /// </summary>
     internal static bool ApplyClientSettlementProgress(Quest quest, Settlement settlement, int visitCount)
     {
-        if (settlement == null || quest._discreteLog.CurrentProgress >= visitCount)
+        if (settlement == null || GetVisitProgress(quest) >= visitCount)
         {
             return false;
         }
@@ -300,9 +300,12 @@ internal static class LesserNobleRevoltWorldEventPatches
     internal static bool ShouldApplyClientNotification(Quest quest, int visitCount)
     {
         return quest._giveNotificationAfterHoursCounter != -1 &&
-            quest._discreteLog.CurrentProgress > 0 &&
-            quest._discreteLog.CurrentProgress == visitCount;
+            GetVisitProgress(quest) > 0 &&
+            GetVisitProgress(quest) == visitCount;
     }
+
+    private static int GetVisitProgress(Quest quest) =>
+        quest._discreteLog?.CurrentProgress ?? quest._visitedVillagesList.Count;
 
     internal static void ApplyClientHourlyJournalNotification(Quest quest, Settlement settlement)
     {
