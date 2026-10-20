@@ -106,7 +106,7 @@ internal class VillageNeedsToolsOutcomePatches
         private static void Prefix(QuestBase __instance, out IDisposable __state)
         {
             __state = null;
-            if (!ModInformation.IsServer || !(__instance is Quest quest) || !quest.IsOngoing ||
+            if (ModInformation.IsClient || !(__instance is Quest quest) || !quest.IsOngoing ||
                 !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) ||
                 !owners.TryResolveOwnerHero(IssueManager.GetIssueOfQuest(quest), out var ownerHero)) return;
 
