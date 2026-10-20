@@ -85,8 +85,8 @@ internal class SiegeEnginesContainerPatches
         return true;
     }
 
-    // The container has no back-reference to its siege or side; client callers (e.g. SetSiegeEngineStatesAfterSiegeMission
-    // breaking engines after the player's siege battle) only touch the local player's siege, so that siege identifies it.
+    // The container has no back-reference to its siege or side; a client only touches its own siege's containers,
+    // so the player's siege identifies it.
     private static bool TryDescribeContainer(SiegeEnginesContainer container, out SiegeEvent siegeEvent, out BattleSideEnum side)
     {
         siegeEvent = PlayerSiege.PlayerSiegeEvent;
