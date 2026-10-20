@@ -17,7 +17,7 @@ namespace GameInterface.Services.Locations.Patches;
 /// so the location replicator can register + replicate it. Requires the CONFIRMED local host in
 /// <see cref="ILocationNpcAuthorityState"/> — before the assignment arrives nothing spawns natively anyway
 /// (<see cref="LocationNativeSpawnSuppressionPatches"/>), and puppet application brackets itself with
-/// <see cref="ILocationNpcAuthorityState.SuppressCapture"/>. Coexists with the battle capture patch on the
+/// <see cref="ILocationNpcAuthorityState.SuppressCapture"/> scope. Coexists with the battle capture patch on the
 /// same method: its <c>IsCoopBattleActive</c> check is false in a settlement, and no location mission is
 /// active in a battle.
 /// </summary>
@@ -56,7 +56,7 @@ internal class LocationAgentSpawnedPatch
         if (!authorityState.IsCoopLocationMissionActive) return false;
         if (!authorityState.IsLocalHostConfirmed) return false;
 
-        return !authorityState.SuppressCapture;
+        return !authorityState.IsCaptureSuppressed;
     }
 }
 

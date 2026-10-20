@@ -110,11 +110,12 @@ public class LocationCompanionAuthorityPatchTests
             "settlement|tavern",
             agent => ReferenceEquals(agent, remotePartyPuppet));
 
-        state.IsReplayingNativePopulation = true;
-        Assert.False(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(state, remotePartyPuppet, mainAgent: null));
-        Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(state, ambientNpc, mainAgent: null));
+        using (state.ReplayNativePopulation())
+        {
+            Assert.False(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(state, remotePartyPuppet, mainAgent: null));
+            Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(state, ambientNpc, mainAgent: null));
+        }
 
-        state.IsReplayingNativePopulation = false;
         Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(state, remotePartyPuppet, mainAgent: null));
     }
 

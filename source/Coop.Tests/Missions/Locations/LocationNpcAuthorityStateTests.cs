@@ -2,13 +2,14 @@
 using GameInterface.Services.Locations;
 using GameInterface.Services.Locations.Hosting;
 using System;
+using System.Threading;
 using Moq;
 using Xunit;
 
 namespace Coop.Tests.Missions.Locations;
 
 /// <summary>Covers the active location mission tracking and its registry-backed NPC host confirmation.</summary>
-public class LocationNpcAuthorityStateTests
+public class LocationNpcAuthorityStateTests : IDisposable
 {
     private const string TavernInstanceId = "settlement1|loc_tavern";
     private const string CenterInstanceId = "settlement1|loc_center";
@@ -20,6 +21,8 @@ public class LocationNpcAuthorityStateTests
     {
         state = new LocationNpcAuthorityState(hostRegistry.Object);
     }
+
+    public void Dispose() => state.Dispose();
 
     [Fact]
     public void Inactive_NothingSuppressed()
@@ -116,7 +119,6 @@ public class LocationNpcAuthorityStateTests
     {
         hostRegistry.Setup(registry => registry.IsHost(TavernInstanceId)).Returns(true);
         state.BeginMission(TavernInstanceId);
-        state.SuppressCapture = true;
 
         state.EndMission();
 
@@ -124,7 +126,6 @@ public class LocationNpcAuthorityStateTests
         Assert.Null(state.ActiveInstanceId);
         Assert.False(state.IsLocalHostConfirmed);
         Assert.False(state.ShouldSuppressNativeSpawns);
-        Assert.False(state.SuppressCapture);
     }
 
     [Fact]
@@ -132,22 +133,77 @@ public class LocationNpcAuthorityStateTests
     {
         hostRegistry.Setup(registry => registry.IsHost(TavernInstanceId)).Returns(true);
         state.BeginMission(TavernInstanceId);
-        state.SuppressCapture = true;
 
         state.BeginMission(CenterInstanceId);
 
         Assert.False(state.IsLocalHostConfirmed);
         Assert.True(state.ShouldSuppressNativeSpawns);
-        Assert.False(state.SuppressCapture);
     }
 
     [Fact]
-    public void SuppressCapture_RoundTrips()
+    public void SuppressCapture_IsRaisedOnlyInsideTheScope()
     {
-        Assert.False(state.SuppressCapture);
-        state.SuppressCapture = true;
-        Assert.True(state.SuppressCapture);
-        state.SuppressCapture = false;
-        Assert.False(state.SuppressCapture);
+        Assert.False(state.IsCaptureSuppressed);
+
+        using (state.SuppressCapture())
+            Assert.True(state.IsCaptureSuppressed);
+
+        Assert.False(state.IsCaptureSuppressed);
+    }
+
+    [Fact]
+    public void SuppressCapture_NestedScopeRestoresTheOuterScope()
+    {
+        using (state.SuppressCapture())
+        {
+            using (state.SuppressCapture())
+                Assert.True(state.IsCaptureSuppressed);
+
+            Assert.True(state.IsCaptureSuppressed);
+        }
+
+        Assert.False(state.IsCaptureSuppressed);
+    }
+
+    [Fact]
+    public void SuppressCapture_DisposingTwiceDoesNotClearAnOuterScope()
+    {
+        using (state.SuppressCapture())
+        {
+            IDisposable inner = state.SuppressCapture();
+            inner.Dispose();
+            inner.Dispose();
+
+            Assert.True(state.IsCaptureSuppressed);
+        }
+    }
+
+    [Fact]
+    public void SuppressCapture_IsPerThread()
+    {
+        bool otherThreadSuppressed = true;
+
+        using (state.SuppressCapture())
+        {
+            var thread = new Thread(() => otherThreadSuppressed = state.IsCaptureSuppressed);
+            thread.Start();
+            thread.Join();
+        }
+
+        Assert.False(otherThreadSuppressed);
+    }
+
+    [Fact]
+    public void ReplayNativePopulation_NestedScopeRestoresTheOuterScope()
+    {
+        using (state.ReplayNativePopulation())
+        {
+            using (state.ReplayNativePopulation())
+                Assert.True(state.IsReplayingNativePopulation);
+
+            Assert.True(state.IsReplayingNativePopulation);
+        }
+
+        Assert.False(state.IsReplayingNativePopulation);
     }
 }

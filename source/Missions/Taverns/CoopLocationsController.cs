@@ -224,8 +224,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         if (mission == null || location == null || agentHandler == null) return;
 
         _spawningOwnedCompanions = true;
-        bool previousSuppressCapture = authorityState.SuppressCapture;
-        authorityState.SuppressCapture = true;
+        IDisposable captureSuppression = authorityState.SuppressCapture();
         int ownedRosterEntries = 0;
         int recoverySpawns = 0;
         try
@@ -270,7 +269,7 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
         }
         finally
         {
-            authorityState.SuppressCapture = previousSuppressCapture;
+            captureSuppression.Dispose();
             _spawningOwnedCompanions = false;
             Logger.Information("[LocationCompanion] Owner roster reconciliation complete for {Location}: ownedRosterEntries={RosterCount}, recoverySpawns={RecoveryCount}",
                 location.StringId, ownedRosterEntries, recoverySpawns);
@@ -663,14 +662,9 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
             Agent agent;
             // Remote party puppets are not host-owned NPCs and must not be captured for replication.
-            authorityState.SuppressCapture = true;
-            try
+            using (authorityState.SuppressCapture())
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
-            }
-            finally
-            {
-                authorityState.SuppressCapture = false;
             }
 
             if (health > 0)

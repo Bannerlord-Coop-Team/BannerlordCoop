@@ -215,7 +215,7 @@ public class SettlementPopulationLifecycleTests : SettlementTestEnvironment
             Assert.Equal(activeInstanceId, state.ActiveInstanceId);
             Assert.Equal(activeInstanceId != null, state.IsCoopLocationMissionActive);
             Assert.Equal(localHostConfirmed, state.IsLocalHostConfirmed);
-            Assert.False(state.SuppressCapture);
+            Assert.False(state.IsCaptureSuppressed);
             Assert.False(state.IsReplayingNativePopulation);
         });
     }

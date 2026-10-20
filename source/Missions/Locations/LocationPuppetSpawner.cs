@@ -466,14 +466,9 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
             buildData.Equipment(data.SpawnEquipment);
 
         Agent agent;
-        authorityState.SuppressCapture = true;
-        try
+        using (authorityState.SuppressCapture())
         {
             agent = Mission.Current.SpawnAgent(buildData);
-        }
-        finally
-        {
-            authorityState.SuppressCapture = false;
         }
 
         // Native applies the civilian action set explicitly after SpawnAgent — mirror it, or puppets
@@ -506,14 +501,9 @@ public class LocationPuppetSpawner : ILocationPuppetSpawner
         var position = data.Position;
         var direction = data.Direction;
 
-        authorityState.SuppressCapture = true;
-        try
+        using (authorityState.SuppressCapture())
         {
             return Mission.Current.SpawnMonster(equipmentElement, harnessElement, in position, in direction);
-        }
-        finally
-        {
-            authorityState.SuppressCapture = false;
         }
     }
 

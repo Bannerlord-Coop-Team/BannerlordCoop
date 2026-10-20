@@ -101,14 +101,9 @@ public class LocationPopulationDirector : ILocationPopulationDirector
             // Native spawn suppression lifted with the host confirmation, so these run natively; the
             // capture patches replicate everything they spawn. The seeded-RNG and civilian-count
             // patches wrap SpawnLocationCharacters exactly as they wrap the native AfterStart call.
-            authorityState.IsReplayingNativePopulation = true;
-            try
+            using (authorityState.ReplayNativePopulation())
             {
                 agentHandler.SpawnLocationCharacters();
-            }
-            finally
-            {
-                authorityState.IsReplayingNativePopulation = false;
             }
 
             SandBoxHelpers.MissionHelper.SpawnHorses();

@@ -27,11 +27,17 @@ public interface ILocationNpcAuthorityState
     /// <summary>True while native population spawns must be skipped (active mission, host not confirmed).</summary>
     bool ShouldSuppressNativeSpawns { get; }
 
-    /// <summary>True on this thread while a spawn must not be captured for NPC replication.</summary>
-    bool SuppressCapture { get; set; }
+    /// <summary>True on this thread inside a <see cref="SuppressCapture"/> scope.</summary>
+    bool IsCaptureSuppressed { get; }
 
-    /// <summary>True on this thread while the elected host replays the native population pass.</summary>
-    bool IsReplayingNativePopulation { get; set; }
+    /// <summary>True on this thread inside a <see cref="ReplayNativePopulation"/> scope.</summary>
+    bool IsReplayingNativePopulation { get; }
+
+    /// <summary>Keeps spawns on this thread from being captured for NPC replication until the scope is disposed.</summary>
+    IDisposable SuppressCapture();
+
+    /// <summary>Marks this thread as replaying the native population pass until the scope is disposed.</summary>
+    IDisposable ReplayNativePopulation();
 
     /// <summary>True if the agent is the main agent, a local party member or a known remote party puppet.</summary>
     bool IsPlayerPartyAgent(Agent agent, Agent mainAgent);
@@ -96,18 +102,16 @@ public class LocationNpcAuthorityState : ILocationNpcAuthorityState, IDisposable
     }
 
     /// <inheritdoc/>
-    public bool SuppressCapture
-    {
-        get => suppressCapture.Value;
-        set => suppressCapture.Value = value;
-    }
+    public bool IsCaptureSuppressed => suppressCapture.Value;
 
     /// <inheritdoc/>
-    public bool IsReplayingNativePopulation
-    {
-        get => isReplayingNativePopulation.Value;
-        set => isReplayingNativePopulation.Value = value;
-    }
+    public bool IsReplayingNativePopulation => isReplayingNativePopulation.Value;
+
+    /// <inheritdoc/>
+    public IDisposable SuppressCapture() => new ThreadFlagScope(suppressCapture);
+
+    /// <inheritdoc/>
+    public IDisposable ReplayNativePopulation() => new ThreadFlagScope(isReplayingNativePopulation);
 
     /// <inheritdoc/>
     public bool IsPlayerPartyAgent(Agent agent, Agent mainAgent)
@@ -145,9 +149,6 @@ public class LocationNpcAuthorityState : ILocationNpcAuthorityState, IDisposable
             activeInstanceId = instanceId;
             this.partyAgentResolver = partyAgentResolver;
         }
-
-        SuppressCapture = false;
-        IsReplayingNativePopulation = false;
     }
 
     /// <inheritdoc/>
@@ -158,9 +159,6 @@ public class LocationNpcAuthorityState : ILocationNpcAuthorityState, IDisposable
             activeInstanceId = null;
             partyAgentResolver = null;
         }
-
-        SuppressCapture = false;
-        IsReplayingNativePopulation = false;
     }
 
     /// <summary>Releases the per-thread flag storage.</summary>
@@ -168,5 +166,32 @@ public class LocationNpcAuthorityState : ILocationNpcAuthorityState, IDisposable
     {
         suppressCapture.Dispose();
         isReplayingNativePopulation.Dispose();
+    }
+
+    /// <summary>
+    /// Sets a per-thread flag for its lifetime and restores the previous value on dispose, so nested scopes unwind correctly.
+    /// </summary>
+    private sealed class ThreadFlagScope : IDisposable
+    {
+        private readonly bool previousValue;
+        private ThreadLocal<bool> flag;
+
+        /// <summary>Raises the flag on the current thread, remembering its previous value.</summary>
+        public ThreadFlagScope(ThreadLocal<bool> flag)
+        {
+            this.flag = flag;
+            previousValue = flag.Value;
+            flag.Value = true;
+        }
+
+        /// <summary>Restores the flag's previous value; later calls do nothing.</summary>
+        public void Dispose()
+        {
+            ThreadLocal<bool> current = flag;
+            flag = null;
+            if (current == null) return;
+
+            current.Value = previousValue;
+        }
     }
 }
