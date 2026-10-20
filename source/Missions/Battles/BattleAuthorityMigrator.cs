@@ -142,7 +142,8 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     private void Handle_PeerEntered(MessagePayload<NetworkMissionPeerEntered> payload)
     {
         if (payload.What.InstanceId != null && payload.What.InstanceId != session.InstanceId) return;
-        withdrawnHosts.Remove(payload.What.ControllerId);
+        var controllerId = payload.What.ControllerId;
+        GameThread.RunSafe(() => withdrawnHosts.Remove(controllerId), context: nameof(Handle_PeerEntered));
     }
 
     public bool TrySurrenderPlayerHero(BattleAgentSpawnData data)
@@ -364,9 +365,13 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     {
         if (instanceId != null && instanceId != session.InstanceId) return;
         CancelProvisionalPlayerHandoff(controllerId);
+        GameThread.RunSafe(() => MarkPartyWithdrawal(controllerId, reason), context: nameof(HandlePartyWithdrawal));
+    }
 
-        // A departed HOST's own party withdraws, while the promoted successor adopts only the NPC forces it
-        // ran. Marking this before the migration message arrives keeps the despawn and adoption sets disjoint.
+    // [Game thread] A departed HOST's own party withdraws, while the promoted successor adopts only the NPC forces it ran.
+    // Host assignments apply on this thread, so the mark is read and made before the successor's migration.
+    private void MarkPartyWithdrawal(string controllerId, string reason)
+    {
         bool wasHost = session.IsHostController(controllerId);
         if (wasHost)
         {

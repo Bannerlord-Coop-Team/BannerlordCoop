@@ -867,10 +867,10 @@ public class BattleShipReplicator : IBattleShipReplicator
         var left = payload.What;
         if (!IsDepartureOfThisBattle(left.ControllerId, left.InstanceId)) return;
 
-        // Read now, as the migrator reads it for its withdrawn-host mark, before a migration names a successor.
-        bool wasHost = session.IsHostController(left.ControllerId);
         GameThread.RunSafe(() =>
         {
+            // Read here, as the migrator does, so it comes before the successor's host assignment applied on this thread.
+            bool wasHost = session.IsHostController(left.ControllerId);
             departedOwners.Add(left.ControllerId);
             ForgetReportedReserveOf(left.ControllerId);
             if (Mission.Current == null) return;
