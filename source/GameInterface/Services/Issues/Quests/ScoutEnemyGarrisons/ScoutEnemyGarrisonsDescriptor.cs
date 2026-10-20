@@ -15,6 +15,7 @@ internal class ScoutEnemyGarrisonsDescriptor : IQuestTypeDescriptor
     public IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy => null;
 
     public IFinalizationProofStrategy FinalizationProofStrategy { get; }
+    public bool SuccessOnlyThroughBranchProof => false;
 
     public ScoutEnemyGarrisonsDescriptor(
         ScoutEnemyGarrisonsCreationCaptureStrategy creationCaptureStrategy,

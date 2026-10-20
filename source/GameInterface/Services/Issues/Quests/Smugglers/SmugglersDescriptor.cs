@@ -15,6 +15,7 @@ internal class SmugglersDescriptor : IQuestTypeDescriptor
     public IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy { get; }
 
     public IFinalizationProofStrategy FinalizationProofStrategy { get; }
+    public bool SuccessOnlyThroughBranchProof => false;
 
     public SmugglersDescriptor(
         SmugglersCreationCaptureStrategy creationCaptureStrategy,

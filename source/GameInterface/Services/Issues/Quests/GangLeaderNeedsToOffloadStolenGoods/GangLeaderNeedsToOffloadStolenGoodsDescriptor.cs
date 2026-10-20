@@ -15,6 +15,7 @@ internal class GangLeaderNeedsToOffloadStolenGoodsDescriptor : IQuestTypeDescrip
     public IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy { get; }
 
     public IFinalizationProofStrategy FinalizationProofStrategy { get; }
+    public bool SuccessOnlyThroughBranchProof => false;
 
     public GangLeaderNeedsToOffloadStolenGoodsDescriptor(
         GangLeaderNeedsToOffloadStolenGoodsCreationCaptureStrategy creationCaptureStrategy,
