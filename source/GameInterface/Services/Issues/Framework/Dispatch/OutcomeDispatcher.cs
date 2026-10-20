@@ -155,6 +155,7 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         // The nested dispatch already announced the issue, so the outer postfix must not announce it again.
         if (ReferenceEquals(lastObservedIssue, observed))
         {
+            lastObservedIssue = null;
             return;
         }
 
