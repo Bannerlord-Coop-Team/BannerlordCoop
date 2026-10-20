@@ -1,4 +1,5 @@
-﻿using TaleWorlds.Core;
+﻿using GameInterface.Utils;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
@@ -17,7 +18,7 @@ public class CoopSiegeMissionPreparationHandler : SiegeMissionPreparationHandler
         string mapEventId)
         : base(isSallyOut, false, wallHitPointRatios, hasAnySiegeTower)
     {
-        SceneSeed = StableSeed(mapEventId);
+        SceneSeed = StableHash.FromString(mapEventId);
     }
 
     /// <summary>Runs vanilla scene setup (ArrangeDestructedMeshes draws from MBRandom) under the shared seed, then
@@ -34,18 +35,5 @@ public class CoopSiegeMissionPreparationHandler : SiegeMissionPreparationHandler
         {
             Game.Current.RandomGenerator = campaignRandom;
         }
-    }
-
-    /// <summary>FNV-1a over the id's chars, stable across processes unlike string.GetHashCode; never zero.</summary>
-    private static uint StableSeed(string id)
-    {
-        uint hash = 2166136261u;
-        foreach (char c in id)
-        {
-            hash ^= c;
-            hash *= 16777619u;
-        }
-
-        return hash == 0u ? 1u : hash;
     }
 }

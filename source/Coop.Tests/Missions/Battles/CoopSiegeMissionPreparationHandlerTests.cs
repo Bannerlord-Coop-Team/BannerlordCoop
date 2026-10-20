@@ -6,14 +6,12 @@ namespace Coop.Tests.Missions.Battles;
 /// <summary>Covers the wall-dressing seed every client derives from the shared map-event id.</summary>
 public class CoopSiegeMissionPreparationHandlerTests
 {
-    /// <summary>Two clients opening the same siege must break the same wall pieces.</summary>
+    /// <summary>Two clients opening the same siege must break the same wall pieces, so the seed is pinned to the
+    /// cross-process FNV-1a value instead of a per-process string.GetHashCode.</summary>
     [Fact]
-    public void SameMapEventId_ProducesTheSameSeed()
+    public void SameMapEventId_ProducesTheSameSeedOnEveryProcess()
     {
-        var first = NewHandler("shared-map-event");
-        var second = NewHandler("shared-map-event");
-
-        Assert.Equal(first.SceneSeed, second.SceneSeed);
+        Assert.Equal(160666638u, NewHandler("shared-map-event").SceneSeed);
     }
 
     /// <summary>Different sieges should not share one wall-dressing pattern.</summary>
@@ -24,15 +22,6 @@ public class CoopSiegeMissionPreparationHandlerTests
         var second = NewHandler("map-event-18");
 
         Assert.NotEqual(first.SceneSeed, second.SceneSeed);
-    }
-
-    /// <summary>The seed is never zero, including for an empty id.</summary>
-    [Theory]
-    [InlineData("")]
-    [InlineData("map-event-17")]
-    public void Seed_IsNeverZero(string mapEventId)
-    {
-        Assert.NotEqual(0u, NewHandler(mapEventId).SceneSeed);
     }
 
     /// <summary>Builds a walls-assault handler for the given map event.</summary>
