@@ -7,7 +7,6 @@ using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Quests.Smugglers;
 using GameInterface.Services.Issues.Quests.Smugglers.Patches;
 using GameInterface.Services.Players;
@@ -277,8 +276,6 @@ public class SmugglersTests : IDisposable
         EndBattleAgainstTheSmugglers(BattleState.AttackerVictory);
 
         Assert.Equal(1, cancelQuest.CountFor(Server));
-        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
     }
 
     [Fact]

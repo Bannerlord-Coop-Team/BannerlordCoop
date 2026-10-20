@@ -18,6 +18,9 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
 {
     private static readonly ILogger Logger = LogManager.GetLogger<OutcomeDispatcher>();
 
+    [ThreadStatic]
+    private static IssueBase lastObservedIssue;
+
     private readonly IMessageBroker messageBroker;
     private readonly IQuestTypeRegistry registry;
     private readonly IIssueOwnerResolver ownerResolver;
@@ -148,10 +151,19 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
             return;
         }
 
+        // Some vanilla timeout handlers complete a nested failure before the outer timeout returns.
+        // The nested dispatch already announced the issue, so the outer postfix must not announce it again.
+        if (ReferenceEquals(lastObservedIssue, observed))
+        {
+            return;
+        }
+
         if (observed.IssueOwner.Issue == observed)
         {
             return;
         }
+
+        lastObservedIssue = observed;
 
         messageBroker.Publish(observed, new IssueOutcomeObserved(observed, outcome));
     }
