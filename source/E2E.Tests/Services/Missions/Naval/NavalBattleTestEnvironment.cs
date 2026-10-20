@@ -572,9 +572,15 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             return RegisterAgent(agentId, owner, origin: origin);
         }
 
-        /// <summary>The use/release patch's event for an agent this client drives at a station of its local hull.</summary>
-        public void UseStation(Agent agent, UsableMissionObject point, bool inUse) =>
-            Call(() => Broker.Publish(this, new AgentStationUseChanged(agent, point, inUse)));
+        /// <summary>
+        /// The use/release patch's event for an agent this client drives at a station of its local hull, published after
+        /// vanilla seated or released it.
+        /// </summary>
+        public void UseStation(Agent agent, UsableMissionObject point, bool inUse) => Call(() =>
+        {
+            if (inUse || Engine.IsSeated(agent, point)) Engine.ApplyStationUse(agent, point, inUse);
+            Broker.Publish(this, new AgentStationUseChanged(agent, point, inUse));
+        });
 
         /// <summary>The ship damage patch's event for a hit this client decided on its local hull.</summary>
         public void Hit(Guid shipId, float damage) => Call(() =>

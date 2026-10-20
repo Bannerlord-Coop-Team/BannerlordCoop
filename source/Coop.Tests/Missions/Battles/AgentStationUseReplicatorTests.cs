@@ -9,6 +9,7 @@ using Moq;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Runtime.Serialization;
+using System.Threading.Tasks;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 
@@ -420,6 +421,7 @@ public class AgentStationUseReplicatorTests
         engine.Setup(e => e.TryDescribeStation(point, out stationHull, out stationKey, out pointIndex))
             .Callback(() => describedOnGameThread = GameThread.Instance.IsGameThread)
             .Returns(true);
+        engine.Setup(e => e.IsSeated(agent, point)).Returns(true);
         var broker = new MessageBroker();
         using var replicator = CreateReplicator(engine.Object, registry.Object, ships.Object, broker);
 
@@ -435,6 +437,73 @@ public class AgentStationUseReplicatorTests
         Assert.False(publishedOnGameThread);
         Assert.True(describedOnGameThread);
         Assert.True(seatedWhileOwned);
+        Assert.False(replicator.IsOwnSeat(agentId));
+    }
+
+    [Fact]
+    public void DeferredUse_OvertakenByAnInlineRelease_IsDroppedAndLeavesNoOwnSeat()
+    {
+        var agentId = Guid.NewGuid();
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+        var info = new CoopAgentInfo("local", "local", "battle", agent, agentId, 1);
+        var registry = new Mock<INetworkAgentRegistry>();
+        registry.Setup(r => r.TryGetAgentInfo(agent, out info)).Returns(true);
+        registry.Setup(r => r.IsLocallyControlled(agent)).Returns(true);
+        registry.Setup(r => r.IsLocallyControlled(agentId)).Returns(true);
+        var hull = ShipTestHulls.Create();
+        var ship = new NetworkShipInfo(Guid.NewGuid(), "local", "party", isNpcParty: false, hull, null!);
+        var ships = new Mock<INetworkShipRegistry>();
+        ships.Setup(s => s.TryGetByHull(hull, out ship)).Returns(true);
+        var point = CreatePoint();
+        var engine = new Mock<INavalShipEngine>();
+        StationOf(engine, point, hull);
+        bool seated = true;
+        engine.Setup(e => e.IsSeated(agent, point)).Returns(() => seated);
+        var broker = new MessageBroker();
+        using var replicator = CreateReplicator(engine.Object, registry.Object, ships.Object, broker);
+        GameThread.Run(() => broker.Publish(this, new AgentStationUseChanged(agent, point, inUse: true)), blocking: true);
+        bool seatedBefore = replicator.IsOwnSeat(agentId);
+
+        // A worker queues a use; before it drains, the game thread releases the agent inline.
+        GameThread.Run(() =>
+        {
+            Task.Run(() => broker.Publish(this, new AgentStationUseChanged(agent, point, inUse: true))).Wait();
+            seated = false;
+            broker.Publish(this, new AgentStationUseChanged(agent, point, inUse: false));
+        }, blocking: true);
+        GameThread.Run(() => { }, blocking: true);
+
+        Assert.True(seatedBefore);
+        Assert.False(replicator.IsOwnSeat(agentId));
+    }
+
+    [Fact]
+    public void AnnounceStationUse_QueuedBeforeDispose_DoesNothing()
+    {
+        var agentId = Guid.NewGuid();
+        var agent = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
+        var info = new CoopAgentInfo("local", "local", "battle", agent, agentId, 1);
+        var registry = new Mock<INetworkAgentRegistry>();
+        registry.Setup(r => r.TryGetAgentInfo(agent, out info)).Returns(true);
+        registry.Setup(r => r.IsLocallyControlled(agent)).Returns(true);
+        var hull = ShipTestHulls.Create();
+        var ship = new NetworkShipInfo(Guid.NewGuid(), "local", "party", isNpcParty: false, hull, null!);
+        var ships = new Mock<INetworkShipRegistry>();
+        ships.Setup(s => s.TryGetByHull(hull, out ship)).Returns(true);
+        var point = CreatePoint();
+        var engine = new Mock<INavalShipEngine>();
+        StationOf(engine, point, hull);
+        engine.Setup(e => e.IsSeated(agent, point)).Returns(true);
+        var broker = new MessageBroker();
+        var replicator = CreateReplicator(engine.Object, registry.Object, ships.Object, broker);
+
+        GameThread.Run(() =>
+        {
+            Task.Run(() => broker.Publish(this, new AgentStationUseChanged(agent, point, inUse: true))).Wait();
+            replicator.Dispose();
+        }, blocking: true);
+        GameThread.Run(() => { }, blocking: true);
+
         Assert.False(replicator.IsOwnSeat(agentId));
     }
 

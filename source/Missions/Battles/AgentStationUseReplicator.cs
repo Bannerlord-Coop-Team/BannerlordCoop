@@ -61,6 +61,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private float deploymentHeldAt;
     private bool seatsAnnounced;
     private bool applyingRemote;
+    // A game-thread closure queued before Dispose still runs; it must not send or seat for a torn-down battle.
+    private bool disposed;
     private long sent, applied, dropped, localPuppetReleases, pinned, ownerReleases, sinkingUseReleases, sinkingSafetyNetReleases,
         withdrawnReleases, removedHullSeats, departedHullReleases, detachedSeats;
 
@@ -88,6 +90,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
     public void Dispose()
     {
+        disposed = true;
         messageBroker.Unsubscribe<AgentStationUseChanged>(Handle_AgentStationUseChanged);
         messageBroker.Unsubscribe<NetworkAgentStationUse>(Handle_NetworkAgentStationUse);
         messageBroker.Unsubscribe<NetworkMissionPeerEntered>(Handle_PeerEntered);
@@ -104,6 +107,8 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     // [Game thread] Sends a station use or release of an agent this client drives; a puppet's local release is only logged.
     private void AnnounceStationUse(AgentStationUseChanged change)
     {
+        if (disposed) return;
+
         var agents = missionComponent.AgentRegistry;
         if (change.Agent == null || !agents.TryGetAgentInfo(change.Agent, out var info)) return;
 
@@ -116,6 +121,9 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
             }
             return;
         }
+
+        // A use deferred from a tick worker can come after a later release went out inline; the agent's state decides.
+        if (change.InUse != engine.IsSeated(change.Agent, change.Point)) return;
 
         if (!engine.TryDescribeStation(change.Point, out var hull, out var stationKey, out int pointIndex)
             || !missionComponent.ShipRegistry.TryGetByHull(hull, out var ship))
@@ -146,7 +154,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     /// <summary>[Game thread] Applies an owner's station use now, or keeps it pending until its agent and hull are here.</summary>
     internal void AcceptUse(NetworkAgentStationUse use)
     {
-        if (use == null) return;
+        if (disposed || use == null) return;
         pending.Add(new PendingUse(use, elapsed));
         DrainPending();
     }
@@ -402,7 +410,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         GameThread.RunSafe(() =>
         {
-            if (!seatsAnnounced || session.IsOwn(entered.ControllerId)) return;
+            if (disposed || !seatsAnnounced || session.IsOwn(entered.ControllerId)) return;
 
             foreach (var use in ownSeated.Values)
                 network.Send(entered.ControllerId, use);

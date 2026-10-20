@@ -310,8 +310,6 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - the ship replicator's `departedOwners` is a second membership view next to `IMissionContext`, which could own it;
   - `BattleShipReplicator.cs` (about 1090 lines) and `BattleAuthorityMigrator.cs` (about 860) are too big and should be
     split;
-  - a station use published on an agent tick worker is announced at the next game-thread drain, so a release of the same
-    agent on the game thread in that frame would be numbered first and leave the puppet seated on peers; not seen live;
   - the `migration` preset fixes who drops by the first host each client sees, so a client whose mission starts only
     after the host dropped would take the successor for it.
 - **Boarding.** Ropes and bridges replicate, but plank crossing and melee on a foreign deck were never seen live, and a
