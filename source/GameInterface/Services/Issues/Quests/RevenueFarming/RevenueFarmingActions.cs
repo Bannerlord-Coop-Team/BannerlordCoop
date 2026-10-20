@@ -45,11 +45,7 @@ internal sealed class RevenueFarmingActions : IRevenueFarmingActions
                 dispatcher.BeforeQuestBranch(quest, (byte)action);
             return;
         }
-        network.SendAll(new RequestRevenueFarmingAction
-        {
-            GiverId = giverId, QuestId = quest.StringId, Revision = session.Revision,
-            Action = action, Incident = incident, Option = option,
-        });
+        network.SendAll(new RequestRevenueFarmingAction(giverId, quest.StringId, session.Revision, action, incident, option));
     }
 
     public bool Execute(RevenueFarmingSession session, RequestRevenueFarmingAction request)

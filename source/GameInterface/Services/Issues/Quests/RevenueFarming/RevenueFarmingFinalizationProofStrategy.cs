@@ -23,10 +23,7 @@ internal sealed class RevenueFarmingFinalizationProofStrategy : IFinalizationPro
         if (action != RevenueFarmingAction.PayGiver && action != RevenueFarmingAction.BetrayGiver &&
             action != RevenueFarmingAction.PayDemand && action != RevenueFarmingAction.BetrayDemand &&
             action != RevenueFarmingAction.PaySteward) return false;
-        if (actions.Execute(session, new RequestRevenueFarmingAction
-        {
-            QuestId = quest.StringId, Action = action, Revision = session.Revision,
-        })) return true;
+        if (actions.Execute(session, new RequestRevenueFarmingAction(null, quest.StringId, session.Revision, action))) return true;
         if (session.AwaitingPayment && quest.QuestDueTime.IsPast && session.PlayerHero.Gold < revenue._totalRequestedDenars)
         {
             using (new RevenueFarmingExecutionScope(session)) quest.CompleteQuestWithTimeOut();

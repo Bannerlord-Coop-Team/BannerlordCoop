@@ -85,8 +85,7 @@ internal sealed class RevenueFarmingStateHandler : IHandler
             if (session?.PlayerHero != hero) return;
             if ((request.Action == RevenueFarmingAction.Refresh || !actions.Execute(session, request)) && quest.IsOngoing)
             {
-                var state = Capture(session);
-                state.RefreshPresentation = true;
+                var state = Capture(session).WithPresentation(refreshPresentation: true);
                 network.Send(peer, state);
             }
         });
@@ -118,18 +117,14 @@ internal sealed class RevenueFarmingStateHandler : IHandler
     {
         if (ModInformation.IsClient) return;
         var changed = payload.What;
-        var state = Capture(changed.Session);
-        state.Revision = ++changed.Session.Revision;
-        state.Menu = changed.Menu;
-        state.FinishEncounter = changed.FinishEncounter;
-        state.IsFinalizing = changed.IsFinalizing;
-        state.RefreshPresentation = changed.RefreshPresentation;
+        var revision = ++changed.Session.Revision;
+        var menuSettlementId = (string)null;
         if (changed.Menu != null && changed.Session.PlayerHero.PartyBelongedTo?.CurrentSettlement is { } settlement)
         {
             if (!objects.TryGetIdWithLogging(settlement, out var settlementId)) return;
-            state.MenuSettlementId = settlementId;
+            menuSettlementId = settlementId;
         }
-        network.SendAll(state);
+        network.SendAll(Capture(changed.Session).WithPresentation(revision, changed.Menu, changed.FinishEncounter, changed.RefreshPresentation, menuSettlementId, changed.IsFinalizing));
     }
 
     private NetworkRevenueFarmingState Capture(RevenueFarmingSession session)
@@ -140,39 +135,28 @@ internal sealed class RevenueFarmingStateHandler : IHandler
         string collectionId = null;
         if (session.CollectionSettlement != null && !objects.TryGetIdWithLogging(session.CollectionSettlement, out collectionId))
             throw new InvalidOperationException("Revenue Farming collection settlement is not registered.");
-        return new NetworkRevenueFarmingState
+        var villages = quest.RevenueVillages.Select(village =>
         {
-            GiverId = giverId,
-            QuestId = quest.StringId,
-            Revision = session.Revision,
-            RequestedDenars = quest._totalRequestedDenars,
-            Collecting = quest.CollectingRevenues,
-            AllCollected = quest._allRevenuesAreCollected,
-            Incident = session.Incident,
-            AwaitingPayment = session.AwaitingPayment,
-            CollectionSettlementId = collectionId,
-            Menu = null,
-            Villages = quest.RevenueVillages.Select(village =>
+            if (!objects.TryGetIdWithLogging(village.Village.Settlement, out var id))
+                throw new InvalidOperationException("Revenue Farming village is not registered.");
+            return new RevenueFarmingVillageState
             {
-                if (!objects.TryGetIdWithLogging(village.Village.Settlement, out var id))
-                    throw new InvalidOperationException("Revenue Farming village is not registered.");
-                return new RevenueFarmingVillageState
-                {
-                    SettlementId = id, CollectedAmount = village.CollectedAmount, HourlyGain = village.HourlyGain,
-                    Done = village._isDone, EventOccurred = village.EventOccurred, Raided = village.IsRaided,
-                    AdditionalProgress = village._customProgress,
-                };
-            }).ToArray(),
-            UsedIncidents = quest._currentVillageEvents.Where(pair => pair.Value).Select(pair => pair.Key).ToArray(),
-            Journal = quest.JournalEntries.Select(log => new RevenueFarmingJournalState
-            {
-                TimeTicks = log.LogTime.NumTicks, Text = log.LogText, TaskName = log.TaskName,
-                Progress = log.CurrentProgress, Range = log.Range, Type = (int)log.Type,
-            }).ToArray(),
-            ProgressLogIndex = quest._journalEntries.IndexOf(quest._questProgressLog),
-        };
+                SettlementId = id, CollectedAmount = village.CollectedAmount, HourlyGain = village.HourlyGain,
+                Done = village._isDone, EventOccurred = village.EventOccurred, Raided = village.IsRaided,
+                AdditionalProgress = village._customProgress,
+            };
+        }).ToArray();
+        var journal = quest.JournalEntries.Select(log => new RevenueFarmingJournalState
+        {
+            TimeTicks = log.LogTime.NumTicks, Text = log.LogText, TaskName = log.TaskName,
+            Progress = log.CurrentProgress, Range = log.Range, Type = (int)log.Type,
+        }).ToArray();
+        return new NetworkRevenueFarmingState(
+            giverId, quest.StringId, session.Revision, quest._totalRequestedDenars, quest.CollectingRevenues,
+            quest._allRevenuesAreCollected, session.Incident, session.AwaitingPayment, collectionId, villages,
+            quest._currentVillageEvents.Where(pair => pair.Value).Select(pair => pair.Key).ToArray(), journal,
+            quest._journalEntries.IndexOf(quest._questProgressLog), null, false, false, null, false);
     }
-
     private void HandleState(MessagePayload<NetworkRevenueFarmingState> payload)
     {
         if (ModInformation.IsServer) return;

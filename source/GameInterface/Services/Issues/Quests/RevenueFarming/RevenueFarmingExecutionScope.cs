@@ -85,7 +85,7 @@ internal sealed class RevenueFarmingExecutionScope : IDisposable
     }
 }
 
-internal readonly struct RevenueFarmingChanged : IEvent
+public readonly struct RevenueFarmingChanged : IEvent
 {
     internal RevenueFarmingSession Session { get; }
     internal string Menu { get; }
