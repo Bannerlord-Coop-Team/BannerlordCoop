@@ -142,7 +142,7 @@ internal class SiegeEntryFlowPatches
         if (ModInformation.IsServer || menuId != "join_siege_event") return true;
         if (!ContainerProvider.TryResolve<ISiegeJoinMenuDeferralTracker>(out var deferralTracker)) return true;
 
-        return !deferralTracker.TryDefer(PlayerEncounter.Current);
+        return !deferralTracker.TryDefer();
     }
 
     [HarmonyPatch(typeof(SiegeEventCampaignBehavior), nameof(SiegeEventCampaignBehavior.menu_siege_leave_on_consequence))]

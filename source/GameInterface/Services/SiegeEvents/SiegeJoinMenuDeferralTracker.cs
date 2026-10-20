@@ -13,12 +13,12 @@ public interface ISiegeJoinMenuDeferralTracker : IGameAbstraction
     /// <summary>Records a join request so its menu activation can be deferred; ignores non-siege battles.</summary>
     void Arm(MapEvent mapEvent, PartyBase joiningParty);
 
-    /// <summary>Returns true when the join_siege_event activation for <paramref name="encounter"/> should wait for the snapshot.</summary>
-    bool TryDefer(PlayerEncounter encounter);
+    /// <summary>Returns true when the current join_siege_event activation should wait for the snapshot, otherwise drops the deferral if the main party already joined.</summary>
+    bool TryDefer();
 
     /// <summary>Returns true when the snapshot for <paramref name="mapEvent"/> should open the deferred menu now.</summary>
-    /// <param name="encounterChanged">True when the deferral was dropped because the player's encounter changed.</param>
-    bool TryConsume(MapEvent mapEvent, PlayerEncounter currentEncounter, out bool encounterChanged);
+    /// <param name="droppedForChangedEncounter">Only meaningful when returning false: true when the deferral was dropped because the player's encounter changed.</param>
+    bool TryConsume(MapEvent mapEvent, out bool droppedForChangedEncounter);
 
     /// <summary>Drops any pending deferral.</summary>
     void Clear();
@@ -44,8 +44,9 @@ internal sealed class SiegeJoinMenuDeferralTracker : ISiegeJoinMenuDeferralTrack
     }
 
     /// <summary>Defers the activation when it belongs to the main party's pending join that is not applied yet.</summary>
-    public bool TryDefer(PlayerEncounter encounter)
+    public bool TryDefer()
     {
+        var encounter = PlayerEncounter.Current;
         var mapEvent = encounter?._mapEvent;
         if (!ReferenceEquals(mapEvent, pendingMapEvent) ||
             !ReferenceEquals(pendingJoiningParty, PartyBase.MainParty))
@@ -62,9 +63,9 @@ internal sealed class SiegeJoinMenuDeferralTracker : ISiegeJoinMenuDeferralTrack
     }
 
     /// <summary>Consumes the deferral once the main party is in <paramref name="mapEvent"/> under the same encounter.</summary>
-    public bool TryConsume(MapEvent mapEvent, PlayerEncounter currentEncounter, out bool encounterChanged)
+    public bool TryConsume(MapEvent mapEvent, out bool droppedForChangedEncounter)
     {
-        encounterChanged = false;
+        droppedForChangedEncounter = false;
         if (!ReferenceEquals(pendingMapEvent, mapEvent))
             return false;
 
@@ -74,10 +75,10 @@ internal sealed class SiegeJoinMenuDeferralTracker : ISiegeJoinMenuDeferralTrack
             return false;
         }
 
-        if (!ReferenceEquals(currentEncounter, pendingEncounter))
+        if (!ReferenceEquals(PlayerEncounter.Current, pendingEncounter))
         {
             Clear();
-            encounterChanged = true;
+            droppedForChangedEncounter = true;
             return false;
         }
 
