@@ -101,8 +101,9 @@ internal class CopyPairCollisionFilterPatch
     [HarmonyPrefix]
     private static bool Prefix(MissionShip __instance, WeakGameEntity otherEntity, ref bool __result)
     {
-        if (!NavalForeignHulls.Contains(__instance)) return true;
-        if (AllowsCollision(mineIsCopy: true, NavalForeignHulls.ContainsRootOf(otherEntity))) return true;
+        // The root scan only runs for a copy, since an own hull touches anything.
+        bool mineIsCopy = NavalForeignHulls.Contains(__instance);
+        if (AllowsCollision(mineIsCopy, mineIsCopy && NavalForeignHulls.ContainsRootOf(otherEntity))) return true;
 
 #if DEBUG
         NavalContactProbe.CountFilteredCopyPair();

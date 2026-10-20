@@ -755,27 +755,36 @@ public class NavalScenarioStager : INavalScenarioStager
     }
 
     // weapons=n: vanilla mounts a hull's ShipBallista from the piece in its fore slot (MissionShipFactory keeps only the
-    // equipped slot prefabs). A ship whose hull has no fore slot is swapped for an armed Battle Knarr, so the count stays.
-    private static string ArmShips(PartyBase party, int count)
+    // equipped slot prefabs), so a ship whose hull has no fore slot becomes an armed Battle Knarr.
+    private static string ArmShips(PartyBase party, int count) => FitPiece(party, count, NavalScenarioPresets.WeaponSlotTag,
+        NavalScenarioPresets.WeaponPieceId, NavalScenarioPresets.WeaponHullId, ship => true);
+
+    // ram=n: MissionShip finds its MissionShipRam on the bow piece's prefab. Ships carrying a fore ballista are skipped,
+    // since the bow hull swapped in has no fore slot.
+    private static string FitRams(PartyBase party, int count) => FitPiece(party, count, NavalScenarioPresets.RamSlotTag,
+        NavalScenarioPresets.RamPieceId, NavalScenarioPresets.RamHullId, ship => !IsArmed(ship));
+
+    // Fits the piece in the slot of the first count ships the filter takes; a ship whose hull lacks the slot is swapped for
+    // a new ship of the fitting hull carrying it, so the count stays.
+    private static string FitPiece(PartyBase party, int count, string slotTag, string pieceId, string hullId, Func<Ship, bool> filter)
     {
-        var piece = MBObjectManager.Instance.GetObject<ShipUpgradePiece>(NavalScenarioPresets.WeaponPieceId);
-        var weaponHull = MBObjectManager.Instance.GetObject<ShipHull>(NavalScenarioPresets.WeaponHullId);
-        if (piece == null || weaponHull == null)
-            return $"{party.Id}(none: no piece {NavalScenarioPresets.WeaponPieceId} or hull {NavalScenarioPresets.WeaponHullId})";
+        var piece = MBObjectManager.Instance.GetObject<ShipUpgradePiece>(pieceId);
+        var fittingHull = MBObjectManager.Instance.GetObject<ShipHull>(hullId);
+        if (piece == null || fittingHull == null) return $"{party.Id}(none: no piece {pieceId} or hull {hullId})";
 
         int equipped = 0, swapped = 0;
-        foreach (var ship in party.Ships.Take(count).ToList())
+        foreach (var ship in party.Ships.Where(filter).Take(count).ToList())
         {
-            if (ship.HasSlot(NavalScenarioPresets.WeaponSlotTag))
+            if (ship.HasSlot(slotTag))
             {
-                ship.EquipUpgradePiece(NavalScenarioPresets.WeaponSlotTag, piece);
+                ship.EquipUpgradePiece(slotTag, piece);
                 equipped++;
                 continue;
             }
 
-            var armed = new Ship(weaponHull);
-            ChangeShipOwnerAction.ApplyByProduction(party, armed);
-            armed.EquipUpgradePiece(NavalScenarioPresets.WeaponSlotTag, piece);
+            var fitted = new Ship(fittingHull);
+            ChangeShipOwnerAction.ApplyByProduction(party, fitted);
+            fitted.EquipUpgradePiece(slotTag, piece);
             DestroyShipAction.Apply(ship);
             swapped++;
         }
@@ -783,36 +792,7 @@ public class NavalScenarioStager : INavalScenarioStager
         return $"{party.Id}(equipped={equipped},swapped={swapped},ships={party.Ships.Count})";
     }
 
-    // ram=n: MissionShip finds its MissionShipRam on the bow piece's prefab, so only a hull with a bow slot can ram. Ships
-    // that carry a fore weapon are skipped, since the bow hull swapped in has no fore slot.
-    private static string FitRams(PartyBase party, int count)
-    {
-        var piece = MBObjectManager.Instance.GetObject<ShipUpgradePiece>(NavalScenarioPresets.RamPieceId);
-        var ramHull = MBObjectManager.Instance.GetObject<ShipHull>(NavalScenarioPresets.RamHullId);
-        if (piece == null || ramHull == null)
-            return $"{party.Id}(none: no piece {NavalScenarioPresets.RamPieceId} or hull {NavalScenarioPresets.RamHullId})";
-
-        int equipped = 0, swapped = 0;
-        foreach (var ship in party.Ships.Where(ship => !IsArmed(ship)).Take(count).ToList())
-        {
-            if (ship.HasSlot(NavalScenarioPresets.RamSlotTag))
-            {
-                ship.EquipUpgradePiece(NavalScenarioPresets.RamSlotTag, piece);
-                equipped++;
-                continue;
-            }
-
-            var rammer = new Ship(ramHull);
-            ChangeShipOwnerAction.ApplyByProduction(party, rammer);
-            rammer.EquipUpgradePiece(NavalScenarioPresets.RamSlotTag, piece);
-            DestroyShipAction.Apply(ship);
-            swapped++;
-        }
-
-        return $"{party.Id}(equipped={equipped},swapped={swapped},ships={party.Ships.Count})";
-    }
-
-    // Whether weapons=n put its ballista in the ship's fore slot.
+    // Whether the ship carries the fore ballista weapons=n fits, whoever fitted it.
     private static bool IsArmed(Ship ship) =>
         ship.HasSlot(NavalScenarioPresets.WeaponSlotTag)
         && ship.GetPieceAtSlot(NavalScenarioPresets.WeaponSlotTag)?.StringId == NavalScenarioPresets.WeaponPieceId;
