@@ -52,15 +52,15 @@ public class CoopNavalSetupGuard : MissionLogic
     public bool SetupFailed { get; private set; }
 
     /// <summary>
-    /// [Game thread] Ends <paramref name="mission"/> through its guard for <paramref name="reason"/>; true only for the first
-    /// request of its kind. A mission with no guard is logged and left running.
+    /// [Game thread] Ends <paramref name="mission"/> through its guard for <paramref name="reason"/>; false once any earlier
+    /// reason ends it, except a first setup failure, which is still recorded. With no guard it logs what the caller does.
     /// </summary>
-    internal static bool TryEnd(Mission mission, NavalSetupEndReason reason)
+    internal static bool TryEnd(Mission mission, NavalSetupEndReason reason, string outcome)
     {
         var guard = mission?.GetMissionBehavior<CoopNavalSetupGuard>();
         if (guard == null)
         {
-            Logger.Error("[NavalBattle] No setup guard ends the naval mission ({Reason}); vanilla carries on", reason);
+            Logger.Error("[NavalBattle] No setup guard ends the naval mission ({Reason}): {Outcome}", reason, outcome);
             return false;
         }
 

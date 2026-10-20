@@ -26,11 +26,14 @@ internal class CoopNavalTeamSetupFailurePatches
     [HarmonyPrefix]
     private static bool AllocationPrefix(NavalTeamSideSpawnContext __instance)
     {
+        if (!CoopNavalMissionScope.IsActive) return true;
+
         bool hasShip = __instance._shipsLogic.GetShipAssignment(TeamSideEnum.PlayerTeam, FormationClass.Infantry)?.HasMissionShip == true;
         bool hasPlayerOrigin = __instance._agentsLogic.FindTroopOrigin(__instance.TeamSide, origin => origin.Troop.IsPlayerCharacter) != null;
         if (hasShip && hasPlayerOrigin) return true;
 
-        if (CoopNavalSetupGuard.TryEnd(Mission.Current, NavalSetupEndReason.PlayerTeamNotAllocatable))
+        string outcome = $"player team allocation skipped (ship={hasShip} hero={hasPlayerOrigin}), the mission keeps running";
+        if (CoopNavalSetupGuard.TryEnd(Mission.Current, NavalSetupEndReason.PlayerTeamNotAllocatable, outcome))
             Logger.Warning("[NavalBattle] The player's team can't be allocated (ship={HasShip} hero={HasHero}); skipping its initial troop allocation and ending the mission",
                 hasShip, hasPlayerOrigin);
         return false;
@@ -44,7 +47,8 @@ internal class CoopNavalTeamSetupFailurePatches
         if (__exception == null || !CoopNavalMissionScope.IsActive || __instance is not NavalDeploymentMissionController)
             return __exception;
 
-        if (CoopNavalSetupGuard.TryEnd(__instance.Mission, NavalSetupEndReason.TeamSetupFailed))
+        if (CoopNavalSetupGuard.TryEnd(__instance.Mission, NavalSetupEndReason.TeamSetupFailed,
+                "team setup threw, vanilla retries it next tick"))
             Logger.Error(__exception, "[NavalBattle] Naval team setup failed; ending the mission instead of retrying it every tick");
         return __exception;
     }
