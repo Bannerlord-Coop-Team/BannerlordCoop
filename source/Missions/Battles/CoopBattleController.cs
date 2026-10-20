@@ -82,11 +82,11 @@ public class CoopBattleController : CoopMissionController
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly IBattleHostRegistry hostRegistryRef;
     private readonly ICoopBattleMissionRegistry missionRegistry;
-
-    // The window this controller opened in AfterStart, so Dispose closes exactly that one and never a newer mission's.
-    private bool missionStarted;
-    private string beganMissionId;
     private readonly IMissionContext debugMissionContext;
+
+    // The window id this controller opened in AfterStart, so Dispose closes exactly that one and never a newer
+    // mission's. Kept apart from Session.InstanceId, which can still change after AfterStart.
+    private string beganMissionId;
     private NetworkBattleResultSnapshot? pendingResultSnapshot;
     private int lastResultSnapshotEpochReported;
 
@@ -216,7 +216,24 @@ public class CoopBattleController : CoopMissionController
         coopMissionComponent.AgentVoiceHandler.WarmUp();
     }
 
+    // Tears down this battle and always closes the loaded-mission window it opened.
     public override void Dispose()
+    {
+        try
+        {
+            DisposeBattleServices();
+        }
+        finally
+        {
+            // Closed even when a teardown step throws, otherwise mission-less victories stay off the legacy relay.
+            missionRegistry.EndMission(beganMissionId);
+        }
+
+        base.Dispose();
+    }
+
+    // Tears down the battle sub-services and resets the siege authority flags this controller owns.
+    private void DisposeBattleServices()
     {
         messageBroker.Publish(this, new BattleMissionEnded(Session.InstanceId));
         lifecycle.Dispose();
@@ -245,10 +262,6 @@ public class CoopBattleController : CoopMissionController
         SiegeMissionAuthorityGate.IsLocalAuthority = false;
         SiegeMissionAuthorityGate.IsAuthorityKnown = false;
         SiegeMissionAuthorityGate.ResetClaimedMachines();
-        if (missionStarted)
-            missionRegistry.EndMission(beganMissionId);
-
-        base.Dispose();
     }
 
     // MISSION-READY (BR-010): the native MissionState.FinishMissionLoading fans Mission.AfterStart() out to
@@ -261,7 +274,6 @@ public class CoopBattleController : CoopMissionController
         base.AfterStart();
 
         beganMissionId = Session.InstanceId;
-        missionStarted = true;
         missionRegistry.BeginMission(beganMissionId);
 
         // BR-025: the deployment time limit begins when this player becomes mission-ready — right here.

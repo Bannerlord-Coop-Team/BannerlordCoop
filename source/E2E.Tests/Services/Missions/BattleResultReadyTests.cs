@@ -42,17 +42,23 @@ public class BattleResultReadyTests : MissionTestEnvironment
         host.Call(() =>
         {
             Assert.True(host.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
-            host.NetworkSentMessages.Clear();
             var missionRegistry = host.Resolve<ICoopBattleMissionRegistry>();
-            missionRegistry.BeginMission(mapEventId);
+            var controller = host.Resolve<CoopBattleController>();
             try
             {
+                Assert.True(controller.Session.TryBegin(mapEventId));
+                controller.AfterStart();
+                Assert.True(missionRegistry.IsMissionActive);
+
+                host.NetworkSentMessages.Clear();
                 mapEvent.BattleState = BattleState.DefenderVictory;
             }
             finally
             {
-                missionRegistry.EndMission(mapEventId);
+                controller.Dispose();
             }
+
+            Assert.False(missionRegistry.IsMissionActive);
         }, VictoryConclusionDisabledMethods());
 
         Assert.Empty(host.NetworkSentMessages.GetMessages<NetworkChangeBattleState>());

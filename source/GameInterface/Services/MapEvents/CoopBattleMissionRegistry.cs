@@ -12,10 +12,13 @@ public interface ICoopBattleMissionRegistry
     /// </summary>
     bool IsMissionActive { get; }
 
-    /// <summary>Opens the loaded-mission window for <paramref name="mapEventId"/>, replacing any earlier one.</summary>
+    /// <summary>
+    /// Opens the loaded-mission window for <paramref name="mapEventId"/>, replacing any earlier one. A null id is
+    /// allowed (no instance session yet), but two null-id windows cannot be told apart.
+    /// </summary>
     void BeginMission(string mapEventId);
 
-    /// <summary>Closes the loaded-mission window only if <paramref name="mapEventId"/> still owns it.</summary>
+    /// <summary>Closes the loaded-mission window only if <paramref name="mapEventId"/> (possibly null) still owns it.</summary>
     void EndMission(string mapEventId);
 }
 
