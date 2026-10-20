@@ -131,7 +131,8 @@ internal class CoopOrderOfBattleShipLayoutPatch
     internal static bool Prefix() => !CoopNavalMissionScope.IsActive;
 }
 
-// Owners announce station use; the replicator ignores agents this client does not drive.
+// Owners announce station use; the replicator ignores agents this client does not drive. An item pickup is no station
+// (it has its own sync) and runs on a parallel tick worker, so it is never published.
 [HarmonyPatch(typeof(Agent), nameof(Agent.UseGameObject))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class AgentStationUsePatch
@@ -139,7 +140,7 @@ internal class AgentStationUsePatch
     [HarmonyPostfix]
     private static void Postfix(Agent __instance, UsableMissionObject usedObject)
     {
-        if (!CoopNavalMissionScope.IsActive || usedObject == null) return;
+        if (!CoopNavalMissionScope.IsActive || usedObject == null || usedObject is SpawnedItemEntity) return;
 
         MessageBroker.Instance.Publish(__instance, new AgentStationUseChanged(__instance, usedObject, inUse: true));
     }
@@ -156,7 +157,9 @@ internal class AgentStationReleasePatch
     [HarmonyPostfix]
     private static void Postfix(Agent __instance, UsableMissionObject __state)
     {
-        if (!CoopNavalMissionScope.IsActive || __state == null || __instance.CurrentlyUsedGameObject == __state) return;
+        if (!CoopNavalMissionScope.IsActive || __state == null || __state is SpawnedItemEntity
+            || __instance.CurrentlyUsedGameObject == __state)
+            return;
 
         MessageBroker.Instance.Publish(__instance, new AgentStationUseChanged(__instance, __state, inUse: false));
     }

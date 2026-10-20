@@ -17,6 +17,9 @@ internal static class ShipTestHulls
 
     internal static RangedSiegeWeapon CreateWeapon() => Uninitialized<Ballista>();
 
+    // A dropped weapon lying on a deck, which vanilla also treats as a usable point.
+    internal static UsableMissionObject CreateWorldItem() => Uninitialized<SpawnedItemEntity>();
+
     private static T Uninitialized<T>()
     {
         var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;

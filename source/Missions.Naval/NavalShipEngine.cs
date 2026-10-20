@@ -419,7 +419,8 @@ public class NavalShipEngine : INavalShipEngine
         stationKey = null;
         pointIndex = -1;
         var shipsLogic = ShipsLogic;
-        if (point == null || shipsLogic == null || !point.GameEntity.IsValid) return false;
+        // A dropped weapon lying on a deck is a pickup with its own sync, never a ship station.
+        if (point == null || point is SpawnedItemEntity || shipsLogic == null || !point.GameEntity.IsValid) return false;
 
         var entity = point.GameEntity;
         for (int depth = 0; depth <= MaxPathDepth && entity.IsValid; depth++)
@@ -500,7 +501,8 @@ public class NavalShipEngine : INavalShipEngine
     {
         if (inUse)
         {
-            if (IsSeated(agent, point)) return;
+            // Agent.UseGameObject doesn't validate, so a deactivated point (a picked-up item, a broken machine) would bind the puppet.
+            if (IsSeated(agent, point) || point.IsDeactivated) return;
             if (agent.CurrentlyUsedGameObject != null) agent.StopUsingGameObject(isSuccessful: true, Agent.StopUsingGameObjectFlags.None);
             agent.UseGameObject(point);
 

@@ -62,7 +62,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private bool seatsAnnounced;
     private bool applyingRemote;
     private long sent, applied, dropped, localPuppetReleases, pinned, ownerReleases, sinkingUseReleases, sinkingSafetyNetReleases,
-        withdrawnReleases, removedHullSeats, departedHullReleases;
+        withdrawnReleases, removedHullSeats, departedHullReleases, detachedSeats;
 
     public AgentStationUseReplicator(
         IBattleNetwork network,
@@ -97,6 +97,9 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
     private void Handle_AgentStationUseChanged(MessagePayload<AgentStationUseChanged> payload)
     {
         var change = payload.What;
+        // An item pickup is no station: WeaponPickupHandler syncs it, and vanilla releases a puppet from it locally.
+        if (change.Point is SpawnedItemEntity) return;
+
         var agents = missionComponent.AgentRegistry;
         if (change.Agent == null || !agents.TryGetAgentInfo(change.Agent, out var info)) return;
 
@@ -206,6 +209,12 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
             if (!engine.IsSeated(seat.Agent, seat.Point))
             {
                 if (seat.Reseated) continue;
+                if (!IsStillStationOf(seat))
+                {
+                    leftAgents.Add(entry.Key);
+                    ForgetDetachedSeat(entry.Key);
+                    continue;
+                }
 
                 seat.Reseated = true;
                 localPuppetReleases++;
@@ -234,6 +243,17 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
 
         departedHullReleases += seated.Count;
         return seated.Count;
+    }
+
+    // A point vanilla consumed or detached (a picked-up item, a broken-off machine) is no longer a station of the seat's hull.
+    private bool IsStillStationOf(AppliedSeat seat) =>
+        engine.TryDescribeStation(seat.Point, out var hull, out _, out _) && ReferenceEquals(hull, seat.Hull);
+
+    // Re-seating onto a point that left its hull would bind the puppet to a freed object.
+    private void ForgetDetachedSeat(Guid agentId)
+    {
+        detachedSeats++;
+        Logger.Warning("[NavalSync] Puppet {AgentId}'s station left its hull; no longer seating it there", agentId);
     }
 
     // Safety net for an owner whose crew drowns seated without a release; normally the owner's releases arrive first.
@@ -329,6 +349,14 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         }
 
         var point = engine.ResolveStation(ship.Hull, use.StationKey, use.PointIndex);
+        if (point is SpawnedItemEntity)
+        {
+            dropped++;
+            Logger.Warning("[NavalSync] Dropped station use {Revision} of agent {AgentId}: {Station}#{Point} of hull {ShipId} is a world item",
+                use.Revision, use.AgentId, use.StationKey, use.PointIndex, use.ShipId);
+            return true;
+        }
+
         if (point == null)
         {
             dropped++;
@@ -409,6 +437,7 @@ public class AgentStationUseReplicator : IAgentStationUseReplicator
         withdrawnReleases,
         removedHullSeats,
         departedHullReleases,
+        detachedSeats,
         appliedSeats = appliedSeats.Count,
         pending = pending.Count,
         ownSeated = ownSeated.Count,
