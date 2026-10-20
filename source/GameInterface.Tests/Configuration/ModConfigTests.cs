@@ -301,7 +301,7 @@ public class ModConfigTests : IDisposable
         Assert.False(options.WandererLimitScalesWithPlayers);
         Assert.Equal(4, options.PlayerKingdomClanTierRequired);
         Assert.True(options.SmithingStaminaRecoveryOutsideSettlements);
-        Assert.Equal(0.1f, options.SmithingStaminaRecoveryMultiplier);
+        Assert.Equal(0.6f, options.SmithingStaminaRecoveryMultiplier);
         Assert.Equal(1f, options.MaximumLootersMultiplier);
         Assert.Equal(LordDefectionRetryMode.Vanilla, options.LordDefectionRetries);
         Assert.True(options.ShowPlayerNameplates);
