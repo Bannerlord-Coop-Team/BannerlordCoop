@@ -283,11 +283,11 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     }
 
     /// <summary>Hides the vanilla chat log and turns off its input while this overlay replaces it.</summary>
-    /// <remarks>Re-applied every tick because vanilla <c>LoadMovie</c> can re-enable the log; disabled vanilla still records messages.</remarks>
+    /// <remarks>Re-applied every tick because <c>shouldShow</c> flips on conversations/loading and other code can resume the layer; disabled vanilla still records messages.</remarks>
     private static void SetVanillaLogReplaced(bool replaced)
     {
         var vanillaLog = GauntletChatLogView.Current;
-        if (vanillaLog?.Layer == null) return;
+        if (vanillaLog == null) return;
 
         ScreenManager.SetSuspendLayer(vanillaLog.Layer, replaced);
         vanillaLog.SetEnabled(!replaced);
