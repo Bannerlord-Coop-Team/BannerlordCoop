@@ -258,7 +258,7 @@ internal class SiegeAftermathPatches
                         || (MobileParty.MainParty.Army != null && MobileParty.MainParty.Army.LeaderParty != MobileParty.MainParty));
                 if (ContainerProvider.TryResolve<ISiegeEventInterface>(out var siegeEventInterface))
                 {
-                    siegeEventInterface.SetLocalAftermathNarrationContext(settlement);
+                    siegeEventInterface.SetLocalAftermathNarrationContext(settlement, mapEvent);
                 }
                 // Don't guess _playerEncounterAftermath locally: DetermineAISiegeAftermath is a weighted
                 // RNG draw that would diverge from the server's pick. The applied-aftermath broadcast
