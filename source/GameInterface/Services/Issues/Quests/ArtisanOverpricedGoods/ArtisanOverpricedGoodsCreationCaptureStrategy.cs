@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using Helpers;
 using System;
 using System.IO;
 using System.Linq;
@@ -78,7 +79,28 @@ internal class ArtisanOverpricedGoodsCreationCaptureStrategy : ICreationCaptureS
             return false;
         }
 
-        captured = Capture(new Issue(issueOwner, merchant, DefaultItems.HardWood));
+        var item = DefaultItems.HardWood;
+        var difficulty = Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier();
+        var amount = Math.Max((int)(10000f / item.Value * difficulty), 1);
+        var reward = (int)(QuestHelper.GetAveragePriceOfItemInTheWorld(item) * 1.5f * amount);
+        if (!objectManager.TryGetIdWithLogging(merchant, out var merchantId) ||
+            !objectManager.TryGetIdWithLogging(item, out var itemId))
+        {
+            return false;
+        }
+
+        captured = Write(merchantId, itemId, amount, reward);
         return true;
+    }
+
+    private static byte[] Write(string merchantId, string itemId, int amount, int reward)
+    {
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream);
+        writer.Write(merchantId);
+        writer.Write(itemId);
+        writer.Write(amount);
+        writer.Write(reward);
+        return stream.ToArray();
     }
 }

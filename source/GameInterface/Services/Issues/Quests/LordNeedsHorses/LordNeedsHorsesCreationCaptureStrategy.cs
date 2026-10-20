@@ -1,11 +1,15 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using Helpers;
 using System.IO;
 using System.Reflection;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
+using Behavior = TaleWorlds.CampaignSystem.Issues.LordNeedsHorsesIssueBehavior;
 using Issue = TaleWorlds.CampaignSystem.Issues.LordNeedsHorsesIssueBehavior.LordNeedsHorsesIssue;
 
 namespace GameInterface.Services.Issues.Quests.LordNeedsHorses;
@@ -69,17 +73,35 @@ internal class LordNeedsHorsesCreationCaptureStrategy : ICreationCaptureStrategy
             return false;
         }
 
-        // Only rolls the mount and amount, the issue itself is created from the capture
-        var issue = new Issue(issueOwner);
-        CampaignEventDispatcher.Instance.RemoveListeners(issue);
-
-        // Only a clan or kingdom leader with few mounts keeps the issue alive past the next daily tick
-        if (!issue.IssueStayAliveConditions())
+        // Match IssueStayAliveConditions without constructing an Issue. Constructing one on the server
+        // registers a live issue and its roster before the real creation path runs.
+        if (issueOwner.IsDead || issueOwner.Clan == Clan.PlayerClan ||
+            !(issueOwner.IsKingdomLeader || issueOwner.Clan.Leader == issueOwner) ||
+            Behavior.ComputeMountsOverInfantryCountRatio(issueOwner.PartyBelongedTo, out _) >= 0.8f)
         {
             return false;
         }
 
-        captured = Capture(issue);
+        var mount = Items.All.Where(item => item.IsMountable && item.Culture == issueOwner.Culture &&
+            !item.NotMerchandise && item.Tierf > 2f && item.Tierf < 3f).ToList().GetRandomElement() ??
+            MBObjectManager.Instance.GetObject<ItemObject>("sumpter_horse");
+        if (mount == null)
+        {
+            return false;
+        }
+
+        var amount = 1 + (int)MathF.Ceiling(12f * Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier());
+        captured = Write(mount.StringId, amount, mount.Value);
         return true;
+    }
+
+    private static byte[] Write(string mountId, int amount, int value)
+    {
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream);
+        writer.Write(mountId ?? string.Empty);
+        writer.Write(amount);
+        writer.Write(value);
+        return stream.ToArray();
     }
 }
