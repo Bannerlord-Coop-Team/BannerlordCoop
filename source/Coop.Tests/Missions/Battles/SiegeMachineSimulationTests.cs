@@ -6,6 +6,7 @@ using Missions;
 using Moq;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Patches;
 using HarmonyLib;
 using TaleWorlds.Engine;
 using Missions.Battles;
@@ -113,7 +114,11 @@ public class SiegeMachineSimulationTests : IDisposable
             Assert.True(SiegeMissionAuthorityGate.TryGetRemoteAim(id, out float direction, out float releaseAngle));
             Assert.Equal(0.75f, direction);
             Assert.Equal(0.25f, releaseAngle);
-            if (machine is ManagedStonePile pile) Assert.Equal(7, pile.AmmoCount);
+            if (machine is ManagedStonePile pile)
+            {
+                Assert.Equal(7, pile.AmmoCount);
+                Assert.True(pile.LastAmmoMeshUpdateWasAllowed);
+            }
             else
             {
                 Assert.Equal(weaponState, animations[id]);
@@ -297,8 +302,8 @@ public class SiegeMachineSimulationTests : IDisposable
         }
     }
 
-    // A non-authority client blocks its own ladder, gate and teardown changes, but a received apply
-    // runs under AllowedThread and must reach vanilla.
+    // A non-authority client blocks its own ladder and gate changes, but a received apply runs under
+    // AllowedThread and must reach vanilla.
     [Fact]
     public void AuthorityReaders_LetVanillaRunOnlyInsideAllowedThread()
     {
@@ -306,16 +311,12 @@ public class SiegeMachineSimulationTests : IDisposable
         var ladder = (SiegeLadder)FormatterServices.GetUninitializedObject(typeof(SiegeLadder));
         var gate = (CastleGate)FormatterServices.GetUninitializedObject(typeof(CastleGate));
 #pragma warning restore SYSLIB0050
-        var assembly = typeof(BattleSpawnGate).Assembly;
-        var ladderPrefix = assembly.GetType("GameInterface.Services.MapEvents.Patches.SiegeLadderAuthorityPatches")
+        var ladderPrefix = typeof(SiegeLadderAuthorityPatches)
             .GetMethod("StateSetterPrefix", BindingFlags.Static | BindingFlags.NonPublic);
-        var gateToggle = assembly.GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches")
+        var gateToggle = typeof(SiegeMachineAuthorityPatches)
             .GetMethod("AllowGateToggle", BindingFlags.Static | BindingFlags.NonPublic);
-        var teardownPrefix = assembly.GetType("GameInterface.Services.MapEvents.Patches.SiegeDeploymentPatches")
-            .GetMethod("RemoveDeploymentPointsPrefix", BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(ladderPrefix);
         Assert.NotNull(gateToggle);
-        Assert.NotNull(teardownPrefix);
         bool previousKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
         bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
         bool previousEnabled = BattleSpawnConfig.Enabled;
@@ -330,12 +331,10 @@ public class SiegeMachineSimulationTests : IDisposable
             {
                 Assert.True((bool)ladderPrefix.Invoke(null, new object[] { ladder }));
                 Assert.True((bool)gateToggle.Invoke(null, new object[] { gate }));
-                Assert.True((bool)teardownPrefix.Invoke(null, Array.Empty<object>()));
             }
 
             Assert.False((bool)ladderPrefix.Invoke(null, new object[] { ladder }));
             Assert.False((bool)gateToggle.Invoke(null, new object[] { gate }));
-            Assert.False((bool)teardownPrefix.Invoke(null, Array.Empty<object>()));
         }
         finally
         {
@@ -354,8 +353,7 @@ public class SiegeMachineSimulationTests : IDisposable
 #pragma warning disable SYSLIB0050
         var point = (DeploymentPoint)FormatterServices.GetUninitializedObject(typeof(DeploymentPoint));
 #pragma warning restore SYSLIB0050
-        var publish = typeof(BattleSpawnGate).Assembly
-            .GetType("GameInterface.Services.MapEvents.Patches.SiegeDeploymentPatches")
+        var publish = typeof(SiegeDeploymentPatches)
             .GetMethod("PublishPlacement", BindingFlags.Static | BindingFlags.NonPublic);
         Assert.NotNull(publish);
         bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
@@ -731,10 +729,14 @@ public class SiegeMachineSimulationTests : IDisposable
         }
     }
 
+    // A stone pile without native mesh work that records whether its last ammo update ran under AllowedThread.
     private sealed class ManagedStonePile : StonePile
     {
+        public bool LastAmmoMeshUpdateWasAllowed { get; private set; }
+
         public void PickUpStone() => ConsumeAmmo();
-        protected override void UpdateAmmoMesh() { }
+        // Stands in for the native mesh refresh that SetAmmo and ConsumeAmmo run after changing the count.
+        protected override void UpdateAmmoMesh() => LastAmmoMeshUpdateWasAllowed = AllowedThread.IsThisThreadAllowed();
         protected override void CheckAmmo() { }
     }
 }

@@ -45,7 +45,6 @@ internal class SiegeDeploymentPatches
     private static bool RemoveDeploymentPointsPrefix()
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
-        if (AllowedThread.IsThisThreadAllowed()) return true;
 
         return SiegeMissionAuthorityGate.IsLocalAuthority;
     }
