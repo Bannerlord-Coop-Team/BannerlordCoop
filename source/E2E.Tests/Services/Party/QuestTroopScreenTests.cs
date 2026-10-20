@@ -31,7 +31,8 @@ public class QuestTroopScreenTests : IDisposable
 
     private ((int Regulars, int Heroes) BeforeDone, (int Regulars, int Heroes) AfterDone) SendTroopsAndPressDone(
         Helpers.PartyScreenHelper.PartyScreenMode mode,
-        bool doneDelegateResult = true)
+        bool doneDelegateResult = true,
+        bool doneConditionResult = true)
     {
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -65,7 +66,7 @@ public class QuestTroopScreenTests : IDisposable
                 RightOwnerParty = party.Party,
                 PartyPresentationDoneButtonDelegate = (_, _, _, _, _, _, _, _, _) => doneDelegateResult,
                 PartyPresentationDoneButtonConditionDelegate = mode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage
-                    ? (_, _, _, _, _, _) => Tuple.Create(true, (TaleWorlds.Localization.TextObject)null)
+                    ? (_, _, _, _, _, _) => Tuple.Create(doneConditionResult, (TaleWorlds.Localization.TextObject)null)
                     : null
             });
 
@@ -109,6 +110,18 @@ public class QuestTroopScreenTests : IDisposable
         var (beforeDone, afterDone) = SendTroopsAndPressDone(
             Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage,
             doneDelegateResult: false);
+
+        Assert.Equal((SentTroops, 1), beforeDone);
+        Assert.Equal(beforeDone, afterDone);
+    }
+
+    [Fact]
+    public void Done_InQuestMode_RefusesWhenTheVanillaConditionIsFalse()
+    {
+        var (beforeDone, afterDone) = SendTroopsAndPressDone(
+            Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage,
+            doneDelegateResult: false,
+            doneConditionResult: false);
 
         Assert.Equal((SentTroops, 1), beforeDone);
         Assert.Equal(beforeDone, afterDone);
