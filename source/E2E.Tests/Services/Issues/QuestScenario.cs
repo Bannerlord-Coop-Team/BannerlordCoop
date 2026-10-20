@@ -8,6 +8,7 @@ using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using System.Reflection;
 using AllowedIssue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue;
 
 namespace E2E.Tests.Services.Issues;
@@ -22,6 +23,7 @@ internal sealed class QuestScenario
 
     private readonly E2ETestEnvironment testEnvironment;
     private readonly Func<EnvironmentInstance, Hero, IssueBase>? issueFactory;
+    private readonly Action<EnvironmentInstance, Hero>? prepare;
 
     public string NotableId { get; }
     public string OwnerHeroId { get; }
@@ -49,6 +51,13 @@ internal sealed class QuestScenario
         }
     }
 
+    public QuestScenario(E2ETestEnvironment testEnvironment, Func<Hero, IssueBase>? createIssue,
+        Action<EnvironmentInstance, Hero>? prepare)
+        : this(testEnvironment, createIssue == null ? null : (_, hero) => createIssue(hero))
+    {
+        this.prepare = prepare;
+    }
+
     public void Accept(EnvironmentInstance client)
     {
         client.Call(() =>
@@ -57,6 +66,13 @@ internal sealed class QuestScenario
             notable.Issue.StartIssueWithQuest();
         });
     }
+
+    public void Accept(EnvironmentInstance client, IEnumerable<MethodBase>? disabledMethods) =>
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(NotableId, out var notable));
+            notable.Issue.StartIssueWithQuest();
+        }, disabledMethods);
 
     public QuestBase QuestOf(EnvironmentInstance instance)
     {
@@ -122,6 +138,7 @@ internal sealed class QuestScenario
             using (new AllowedThread())
             {
                 var issue = issueFactory?.Invoke(instance, notable) ?? new AllowedIssue(notable, null);
+                prepare?.Invoke(instance, notable);
                 issue.StringId = IssueId;
                 issue._issueState = IssueBase.IssueState.Ongoing;
 
