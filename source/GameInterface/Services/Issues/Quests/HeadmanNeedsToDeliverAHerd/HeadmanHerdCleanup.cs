@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.SaveSystem;
 using Behavior = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior;
 using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssueQuest;
+using Issue = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssue;
 
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsToDeliverAHerd;
 
