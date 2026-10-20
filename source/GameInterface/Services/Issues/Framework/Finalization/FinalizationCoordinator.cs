@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -29,6 +30,7 @@ internal class FinalizationCoordinator : IHandler
     private readonly IIssueResolver issueResolver;
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
+    private readonly IControllerIdProvider controller;
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -36,7 +38,8 @@ internal class FinalizationCoordinator : IHandler
         IObjectManager objectManager,
         IIssueResolver issueResolver,
         IIssueOwnershipRegistry ownership,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        IControllerIdProvider controller)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -44,6 +47,7 @@ internal class FinalizationCoordinator : IHandler
         this.issueResolver = issueResolver;
         this.ownership = ownership;
         this.playerManager = playerManager;
+        this.controller = controller;
 
         messageBroker.Subscribe<QuestOutcomeRequested>(Handle_QuestOutcomeRequested);
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
@@ -199,6 +203,7 @@ internal class FinalizationCoordinator : IHandler
 
         GameThread.RunSafe(() =>
         {
+            var isOwner = ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) && owner == controller.ControllerId;
             ownership.Remove(data.IssueOwnerId);
 
             if (!issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _))
@@ -209,7 +214,7 @@ internal class FinalizationCoordinator : IHandler
             using (new AllowedThread())
             using (new QuestEndingReplay())
             {
-                Replay(issue, data.Outcome);
+                Replay(issue, data.Outcome, isOwner);
             }
         }, context: nameof(FinalizationCoordinator));
     }
@@ -271,7 +276,7 @@ internal class FinalizationCoordinator : IHandler
         TryCompleteQuest(quest, outcome);
     }
 
-    private static void Replay(IssueBase issue, IssueOutcome outcome)
+    private static void Replay(IssueBase issue, IssueOutcome outcome, bool isOwner)
     {
         var quest = issue.IssueQuest;
 
@@ -294,7 +299,7 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
-        TryCompleteIssue(issue, outcome);
+        TryCompleteIssue(issue, outcome, isOwner);
 
         if (quest != null && quest.IsOngoing)
         {
@@ -331,7 +336,7 @@ internal class FinalizationCoordinator : IHandler
         }
     }
 
-    private static bool TryCompleteIssue(IssueBase issue, IssueOutcome outcome)
+    private static bool TryCompleteIssue(IssueBase issue, IssueOutcome outcome, bool isOwner)
     {
         switch (outcome)
         {
@@ -355,6 +360,14 @@ internal class FinalizationCoordinator : IHandler
                 issue.CompleteIssueWithStayAliveConditionsFailed();
                 return true;
             case IssueOutcome.AlternativeSolution:
+                issue.IssueFinalized();
+                return true;
+            case IssueOutcome.LordAcceptedCounterOffer:
+                if (isOwner) issue.AddLog(new JournalLog(CampaignTime.Now, issue.LordSolutionCounterOfferAcceptLog));
+                issue.IssueFinalized();
+                return true;
+            case IssueOutcome.LordRefusedCounterOffer:
+                if (isOwner) issue.AddLog(new JournalLog(CampaignTime.Now, issue.LordSolutionCounterOfferRefuseLog));
                 issue.IssueFinalized();
                 return true;
             default:

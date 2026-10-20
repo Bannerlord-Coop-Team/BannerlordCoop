@@ -29,6 +29,7 @@ internal class IssuesModule : Module
         builder.RegisterType<ArtisanProductsProgress>().As<IArtisanProductsProgress>().InstancePerDependency();
         builder.RegisterType<ArtisanProductsTroopReturns>().As<IArtisanProductsTroopReturns>().InstancePerLifetimeScope();
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
+        builder.Register(context => context.Resolve<LordSolutionCoordinator>()).As<ILordSolutionCoordinator>();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
         builder.RegisterType<TheConquestOfSettlementService>()
             .As<ITheConquestOfSettlementService>()

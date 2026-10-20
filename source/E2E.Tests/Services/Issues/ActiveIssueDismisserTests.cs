@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment;
@@ -111,7 +111,7 @@ public class ActiveIssueDismisserTests : IDisposable
     [Theory]
     [InlineData(IssueBase.IssueState.SolvingWithQuestSolution)]
     [InlineData(IssueBase.IssueState.SolvingWithLordSolution)]
-    public void ServerStart_DismissesAQuestIssueNobodyOwns(IssueBase.IssueState state)
+    public void ServerStart_DismissesAnIssueNobodyOwns(IssueBase.IssueState state)
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
         AddIssue(Server, notableId, state);
@@ -220,7 +220,7 @@ public class ActiveIssueDismisserTests : IDisposable
     [Theory]
     [InlineData(IssueBase.IssueState.SolvingWithQuestSolution)]
     [InlineData(IssueBase.IssueState.SolvingWithLordSolution)]
-    public void PlayerDisconnected_DismissesTheQuestOfAnOwnerThatLeftAndEveryClientEndsIt(IssueBase.IssueState state)
+    public void PlayerDisconnected_DismissesTheIssueOfAnOwnerThatLeftAndEveryClientEndsIt(IssueBase.IssueState state)
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
         RegisterPlayer(ControllerId);
@@ -244,13 +244,15 @@ public class ActiveIssueDismisserTests : IDisposable
         Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
     }
 
-    [Fact]
-    public void PlayerDisconnected_KeepsTheQuestOfAnOwnerThatIsStillConnected()
+    [Theory]
+    [InlineData(IssueBase.IssueState.SolvingWithQuestSolution)]
+    [InlineData(IssueBase.IssueState.SolvingWithLordSolution)]
+    public void PlayerDisconnected_KeepsTheIssueOfAnOwnerThatIsStillConnected(IssueBase.IssueState state)
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
         RegisterPlayer(ControllerId);
         TestEnvironment.ConnectRegisteredPlayer(Client, ControllerId);
-        AddIssue(Server, notableId, IssueBase.IssueState.SolvingWithQuestSolution);
+        AddIssue(Server, notableId, state);
         SetOwner(notableId, ControllerId);
 
         PublishDisconnected(Server, OtherClient);
@@ -288,3 +290,4 @@ public class ActiveIssueDismisserTests : IDisposable
         Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 }
+
