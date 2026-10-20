@@ -32,6 +32,9 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     // zero-troop response cannot produce a valid battle and is terminated through the normal mission lifecycle.
     private const float ReserveHoldDeadlineSeconds = 15f;
 
+    // Native "no limit" wave count; see CreateSharedBattleSpawnSettings.
+    internal const int SharedMaximumReinforcementWaveCount = 0;
+
     private readonly CoopTroopSupplier _defenderSupplier;
     private readonly CoopTroopSupplier _attackerSupplier;
     private readonly IMessageBroker _messageBroker;
@@ -256,30 +259,17 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         }
         else
         {
-            var settings = CreateSandBoxBattleWaveSpawnSettings();
+            authoritativeSettings = CreateSharedBattleSpawnSettings();
             var targets = ReinforcementFielder.RecoveryTargets.Calculate(
                 sizing.DefenderOwned,
                 sizing.AttackerOwned,
                 sizing.BattleSize,
-                settings.MaximumBattleSideRatio,
-                settings.DefenderAdvantageFactor);
+                authoritativeSettings.MaximumBattleSideRatio,
+                authoritativeSettings.DefenderAdvantageFactor);
             defenderTotal = sizing.DefenderOwned;
             attackerTotal = sizing.AttackerOwned;
             defenderInitial = targets.Defenders;
             attackerInitial = targets.Attackers;
-            authoritativeSettings = new MissionSpawnSettings(
-                MissionSpawnSettings.InitialSpawnMethod.FreeAllocation,
-                settings.ReinforcementTroopsTimingMethod,
-                settings.ReinforcementTroopsSpawnMethod,
-                settings.GlobalReinforcementInterval,
-                settings.ReinforcementBatchPercentage,
-                settings.DesiredReinforcementPercentage,
-                settings.ReinforcementWavePercentage,
-                settings.MaximumReinforcementWaveCount,
-                settings.DefenderReinforcementBatchPercentage,
-                settings.AttackerReinforcementBatchPercentage,
-                settings.DefenderAdvantageFactor,
-                settings.MaximumBattleSideRatio);
         }
 
         _missionAgentSpawnLogic.InitWithSinglePhase(defenderTotal, attackerTotal,
@@ -316,7 +306,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
         }
         else
         {
-            var settings = CreateSandBoxBattleWaveSpawnSettings();
+            var settings = CreateSharedBattleSpawnSettings();
             var targets = ReinforcementFielder.RecoveryTargets.Calculate(
                 sizing.DefenderOwned,
                 sizing.AttackerOwned,
@@ -529,6 +519,32 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     /// </summary>
     internal static int ReachableSpawnNumber(int sideNumber, int ownedShareOfSideNumber)
         => Math.Min(sideNumber, ownedShareOfSideNumber);
+
+    /// <summary>
+    /// The field and siege spawn policy every owner applies. It is the native sandbox wave policy with two
+    /// changes: initial troops use FreeAllocation because the server-authored battle size already set them, and
+    /// the wave count is unlimited (the native default) instead of this client's "Reinforcement Waves" option.
+    /// That option caps a phase's lifetime spawns, so a client set to 3 waves stranded its owned reserves
+    /// while other owners in the same battle fielded all of theirs. The shared battle size, not a wave count,
+    /// bounds how many agents are alive at once.
+    /// </summary>
+    internal static MissionSpawnSettings CreateSharedBattleSpawnSettings()
+    {
+        var sandbox = CreateSandBoxBattleWaveSpawnSettings();
+        return new MissionSpawnSettings(
+            MissionSpawnSettings.InitialSpawnMethod.FreeAllocation,
+            sandbox.ReinforcementTroopsTimingMethod,
+            sandbox.ReinforcementTroopsSpawnMethod,
+            sandbox.GlobalReinforcementInterval,
+            sandbox.ReinforcementBatchPercentage,
+            sandbox.DesiredReinforcementPercentage,
+            sandbox.ReinforcementWavePercentage,
+            SharedMaximumReinforcementWaveCount,
+            sandbox.DefenderReinforcementBatchPercentage,
+            sandbox.AttackerReinforcementBatchPercentage,
+            sandbox.DefenderAdvantageFactor,
+            sandbox.MaximumBattleSideRatio);
+    }
 
     internal static MissionSpawnSettings CreateSallyOutSpawnSettings()
         => SallyOutMissionController.CreateSallyOutSpawnSettings(0.01f, 0.1f);

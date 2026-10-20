@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -19,6 +20,17 @@ public interface IPlayerEncounterInterface : IGameAbstraction
 public class PlayerEncounterInterface : IPlayerEncounterInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterInterface>();
+
+    private readonly ISiegeEventInterface siegeEventInterface;
+
+    public PlayerEncounterInterface() : this(null)
+    {
+    }
+
+    public PlayerEncounterInterface(ISiegeEventInterface siegeEventInterface)
+    {
+        this.siegeEventInterface = siegeEventInterface;
+    }
 
     public void UpdateInternalAfterBattle(PlayerEncounter playerEncounter)
     {
@@ -114,6 +126,12 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
     {
         //playerEncounter.DoEnd(); // Default implementation's function. Might have some logic we need later
         playerEncounter._stateHandled = true;
+
+        // a won siege's army member sees the leader's aftermath, like vanilla DoEnd (#3903); this finishes
+        // the encounter itself, otherwise the stale assault menu stays up with only Leave
+        if (siegeEventInterface?.TryRouteArmyMemberToAftermath(playerEncounter._mapEvent) == true)
+            return;
+
         PlayerEncounter.Finish(true);
     }
 }

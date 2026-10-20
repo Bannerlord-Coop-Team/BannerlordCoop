@@ -1,5 +1,6 @@
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.MountAndBlade.ComponentInterfaces;
 
@@ -25,6 +26,10 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// (the native flatten excludes it, so it likewise never spawns).
 /// </para>
 /// <para>
+/// The gate also stays off for a sally-out defender, whose formations the native deployment UI never deploys, so
+/// that side starts the battle at once as in vanilla.
+/// </para>
+/// <para>
 /// Timing note: this gate is evaluated at the END of <c>DeploymentMissionController.SetupTeams</c>, i.e. AFTER the
 /// player side has spawned (<c>SetSpawnTroops(enforceSpawning)</c> → <c>CheckDeployment</c> runs synchronously).
 /// So a healthy hero already has its agent on the field by the time we read it here — only a genuinely absent hero
@@ -45,7 +50,15 @@ internal class CoopAllowPlayerDeploymentPatch
 
         // No local leader on the field → skip the OoB (auto-FinishDeployment) instead of softlocking on a
         // leaderless deploy screen. Otherwise force it on so every coop client deploys its own party.
-        __result = LocalPlayerHeroOnField();
+        __result = !NativeSkipsPlayerFormationDeployment() && LocalPlayerHeroOnField();
+    }
+
+    // MissionOrderDeploymentControllerVM.ExecuteDeployPlayerSide never deploys a sally-out defender's formations,
+    // so its Order of Battle is never initialized and finishing deployment with the gate on throws inside it.
+    private static bool NativeSkipsPlayerFormationDeployment()
+    {
+        var mission = Mission.Current;
+        return mission != null && mission.IsSallyOutBattle && mission.PlayerTeam.Side != BattleSideEnum.Attacker;
     }
 
     // True if the local player's own hero has a live agent in the current mission. False for a hero downed in a

@@ -3,6 +3,7 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using TaleWorlds.CampaignSystem;
@@ -16,9 +17,12 @@ namespace E2E.Tests.Services.Issues;
 public class AlternativeSolutionRejectTests : IDisposable
 {
     private const string IssueId = "issue_reject";
+    private const string HeldIssueId = "issue_held";
     private const string ControllerId = "player-A";
     private const int KeptTroops = 2;
     private const int SentTroops = 10;
+
+    private readonly StubIssuePreconditions preconditions = new(typeof(AllowedIssue));
 
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
@@ -32,9 +36,10 @@ public class AlternativeSolutionRejectTests : IDisposable
     public void Dispose()
     {
         TestEnvironment.Dispose();
+        preconditions.Dispose();
     }
 
-    private static IssueBase AddIssue(EnvironmentInstance instance, string notableId, IssueBase.IssueState state)
+    private static IssueBase AddIssue(EnvironmentInstance instance, string notableId, IssueBase.IssueState state, string issueId = IssueId)
     {
         IssueBase issue = null!;
 
@@ -45,7 +50,7 @@ public class AlternativeSolutionRejectTests : IDisposable
             using (new AllowedThread())
             {
                 issue = new AllowedIssue(notable, null);
-                issue.StringId = IssueId;
+                issue.StringId = issueId;
                 issue._issueState = state;
 
                 Campaign.Current.IssueManager._issues.Add(notable, issue);
@@ -56,8 +61,11 @@ public class AlternativeSolutionRejectTests : IDisposable
         return issue;
     }
 
-    [Fact]
-    public void RejectedAccept_PutsTheSentTroopsBackInTheOwnersPartyAndTheCompanionBackOnTheClient()
+    [Theory]
+    [InlineData(IssueBase.IssueState.SolvingWithQuestSolution, false, false)]
+    [InlineData(IssueBase.IssueState.Ongoing, true, false)]
+    [InlineData(IssueBase.IssueState.Ongoing, false, true)]
+    public void RejectedAccept_PutsTheSentTroopsBackInTheOwnersPartyAndTheCompanionBackOnTheClient(IssueBase.IssueState serverState, bool refusePreconditions, bool holdsSameType)
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
         var playerHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -85,7 +93,20 @@ public class AlternativeSolutionRejectTests : IDisposable
         });
         TestEnvironment.FlushCoalescer();
 
-        AddIssue(Server, notableId, IssueBase.IssueState.SolvingWithQuestSolution);
+        AddIssue(Server, notableId, serverState);
+
+        if (refusePreconditions)
+        {
+            preconditions.Refuse(Server);
+        }
+
+        if (holdsSameType)
+        {
+            var heldNotableId = TestEnvironment.CreateRegisteredObject<Hero>();
+            AddIssue(Server, heldNotableId, IssueBase.IssueState.SolvingWithQuestSolution, HeldIssueId);
+            Server.Call(() => Assert.True(Server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(heldNotableId, HeldIssueId, ControllerId)));
+        }
+
         var clientIssue = AddIssue(Client, notableId, IssueBase.IssueState.Ongoing);
 
         Client.Call(() =>
