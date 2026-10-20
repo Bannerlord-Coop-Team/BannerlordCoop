@@ -11,14 +11,14 @@ namespace Missions.Battles;
 public class CoopSiegeMissionPreparationHandler : SiegeMissionPreparationHandler
 {
     /// <summary>Seed derived from the server-assigned map-event id, identical on every client.</summary>
-    internal uint SceneSeed { get; }
+    private readonly uint _sceneSeed;
 
     /// <summary>Builds the vanilla walls-assault handler and derives the scene seed from the map event.</summary>
     public CoopSiegeMissionPreparationHandler(bool isSallyOut, float[] wallHitPointRatios, bool hasAnySiegeTower,
         string mapEventId)
         : base(isSallyOut, false, wallHitPointRatios, hasAnySiegeTower)
     {
-        SceneSeed = StableHash.FromString(mapEventId);
+        _sceneSeed = StableHash.FromString(mapEventId);
     }
 
     /// <summary>Runs vanilla scene setup (ArrangeDestructedMeshes draws from MBRandom) under the shared seed, then
@@ -26,7 +26,7 @@ public class CoopSiegeMissionPreparationHandler : SiegeMissionPreparationHandler
     public override void OnBehaviorInitialize()
     {
         var campaignRandom = Game.Current.RandomGenerator;
-        Game.Current.RandomGenerator = new MBFastRandom(SceneSeed);
+        Game.Current.RandomGenerator = new MBFastRandom(_sceneSeed);
         try
         {
             base.OnBehaviorInitialize();
