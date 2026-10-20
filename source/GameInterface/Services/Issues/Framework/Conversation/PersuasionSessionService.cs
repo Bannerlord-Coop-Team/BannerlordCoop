@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -152,36 +152,31 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
     private void HandleFinalized(MessagePayload<NetworkIssueFinalized> payload)
     {
         var data = payload.What;
-        foreach (var key in new List<SessionKey>(sessions.Keys))
-        {
-            if (key.IssueOwnerId == data.IssueOwnerId && key.IssueId == data.IssueId)
-            {
-                sessions.Remove(key);
-            }
-        }
+        GameThread.RunSafe(() => ClearIssue(data.IssueOwnerId, data.IssueId), context: nameof(PersuasionSessionService));
     }
 
     private void HandlePlayerRemoved(MessagePayload<NetworkPlayerRemoved> payload)
     {
-        foreach (var key in new List<SessionKey>(sessions.Keys))
-        {
-            if (key.OwnerHeroId == payload.What.HeroId)
-            {
-                sessions.Remove(key);
-            }
-        }
+        var heroId = payload.What.HeroId;
+        GameThread.RunSafe(() => ClearHero(heroId), context: nameof(PersuasionSessionService));
     }
 
     private void HandleOutcomeObserved(MessagePayload<IssueOutcomeObserved> payload)
     {
         if (!objectManager.TryGetId(payload.What.Issue.IssueOwner, out var ownerId)) return;
-        ClearIssue(ownerId, payload.What.Issue.StringId);
+        GameThread.RunSafe(() => ClearIssue(ownerId, payload.What.Issue.StringId), context: nameof(PersuasionSessionService));
     }
 
     private void ClearIssue(string ownerId, string issueId)
     {
         foreach (var key in new List<SessionKey>(sessions.Keys))
             if (key.IssueOwnerId == ownerId && key.IssueId == issueId) sessions.Remove(key);
+    }
+
+    private void ClearHero(string heroId)
+    {
+        foreach (var key in new List<SessionKey>(sessions.Keys))
+            if (key.OwnerHeroId == heroId) sessions.Remove(key);
     }
 
     private bool TryGetTargetParty(string targetId, out MobileParty party)

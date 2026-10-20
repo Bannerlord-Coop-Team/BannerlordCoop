@@ -122,7 +122,11 @@ public class QuestRequestOwnershipTests : IDisposable
         scenario.Accept(scenario.ClientA);
         var quest = scenario.QuestOf(scenario.ClientA);
 
-        scenario.ClientA.Call(() => scenario.ClientA.Resolve<IMessageBroker>().Publish(this, new QuestBranchRequested(quest, Branch)));
+        scenario.ClientA.Call(() =>
+        {
+            scenario.ClientA.Resolve<GangLeaderBranchEvidence>().Record(quest, Branch);
+            scenario.ClientA.Resolve<IMessageBroker>().Publish(this, new QuestBranchRequested(quest, Branch));
+        });
 
         Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
         Assert.Equal(1, branches.CountFor(scenario.Server));

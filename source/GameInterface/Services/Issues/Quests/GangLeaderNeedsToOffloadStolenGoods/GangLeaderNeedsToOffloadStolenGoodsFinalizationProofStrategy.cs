@@ -1,4 +1,4 @@
-using GameInterface.Services.Issues.Framework.Interface;
+﻿using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
 using Quest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest;
 
@@ -6,12 +6,22 @@ namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsToOffloadStolenGoo
 
 internal class GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy : IFinalizationProofStrategy
 {
+    private readonly GangLeaderBranchEvidence evidence;
+
+    public GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy(GangLeaderBranchEvidence evidence)
+    {
+        this.evidence = evidence;
+    }
+
     public bool TryRunBranch(QuestBase quest, byte proof)
     {
         if (!(quest is Quest gangLeaderQuest))
         {
             return false;
         }
+
+        var issue = IssueManager.GetIssueOfQuest(gangLeaderQuest);
+        if (issue == null || !evidence.Consume(issue, proof)) return true;
 
         switch ((GangLeaderNeedsToOffloadStolenGoodsBranch)proof)
         {

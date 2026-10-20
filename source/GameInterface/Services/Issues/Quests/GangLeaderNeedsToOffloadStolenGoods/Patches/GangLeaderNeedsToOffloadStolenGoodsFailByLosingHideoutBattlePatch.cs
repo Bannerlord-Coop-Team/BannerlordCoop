@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+using Common;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using Quest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest;
 
@@ -18,3 +19,4 @@ internal class GangLeaderNeedsToOffloadStolenGoodsFailByLosingHideoutBattlePatch
         return dispatcher.BeforeQuestBranch(__instance, (byte)GangLeaderNeedsToOffloadStolenGoodsBranch.FailByLosingHideoutBattle);
     }
 }
+
