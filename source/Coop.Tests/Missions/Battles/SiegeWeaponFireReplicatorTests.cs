@@ -63,7 +63,6 @@ public class SiegeWeaponFireReplicatorTests
     {
         const int machineId = 42;
         using var missionScope = new MissionCurrentScope();
-        SiegeMissionAuthorityGate.ResetClaimedMachines();
 
         var broker = new Mock<IMessageBroker>();
         Action<MessagePayload<NetworkSiegeWeaponFired>> receive = null;
@@ -78,7 +77,7 @@ public class SiegeWeaponFireReplicatorTests
             broker.Object,
             Mock.Of<INetworkAgentRegistry>(),
             Mock.Of<IBattleSession>(),
-            machineState.Object, Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy());
+            machineState.Object, Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy(), new SiegeMachineAuthorityRegistry());
 
         Assert.NotNull(receive);
         var future = Fire(machineId, "owner-a", 7, 4);
@@ -105,7 +104,6 @@ public class SiegeWeaponFireReplicatorTests
     {
         const int machineId = 42;
         using var missionScope = new MissionCurrentScope();
-        SiegeMissionAuthorityGate.ResetClaimedMachines();
         var broker = new Mock<IMessageBroker>();
         Action<MessagePayload<NetworkSiegeWeaponFired>> receive = null;
         broker.Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<NetworkSiegeWeaponFired>>>()))
@@ -114,7 +112,7 @@ public class SiegeWeaponFireReplicatorTests
         Assert.False(machineState.Object.TryGetMachineAuthority(machineId, out _, out _, out _));
         using var sut = new SiegeWeaponFireReplicator(Mock.Of<IBattleNetwork>(), broker.Object,
             Mock.Of<INetworkAgentRegistry>(), Mock.Of<IBattleSession>(), machineState.Object,
-            Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy());
+            Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy(), new SiegeMachineAuthorityRegistry());
 
         Assert.NotNull(receive);
         receive(new MessagePayload<NetworkSiegeWeaponFired>(this, Fire(machineId, "owner-a", 7, 3)));
@@ -145,60 +143,49 @@ public class SiegeWeaponFireReplicatorTests
         bool gateHit, bool bufferedBeforeMigration)
     {
         using var mission = new MissionCurrentScope();
-        bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
-        SiegeMissionAuthorityGate.IsLocalAuthority = false;
-        SiegeMissionAuthorityGate.ResetClaimedMachines();
-        try
+        var broker = new Mock<IMessageBroker>();
+        Action<MessagePayload<NetworkSiegeWeaponFired>> receiveFire = null;
+        Action<MessagePayload<NetworkGateHit>> receiveGateHit = null;
+        broker.Setup(x => x.Subscribe(It.IsAny<Action<MessagePayload<NetworkSiegeWeaponFired>>>()))
+            .Callback<Action<MessagePayload<NetworkSiegeWeaponFired>>>(handler => receiveFire = handler);
+        broker.Setup(x => x.Subscribe(It.IsAny<Action<MessagePayload<NetworkGateHit>>>()))
+            .Callback<Action<MessagePayload<NetworkGateHit>>>(handler => receiveGateHit = handler);
+        var state = new Mock<ISiegeMachineStateReplicator>();
+        ConfigureAuthority(state, "remote", 7, 3);
+        var session = new Mock<IBattleSession>();
+        session.SetupGet(x => x.HostEpoch).Returns(7);
+        session.SetupGet(x => x.IsLocalHost).Returns(true);
+        var applier = new Mock<ISiegeGateHitApplier>();
+        var policy = new HostEpochPolicy();
+        using var sut = new SiegeWeaponFireReplicator(Mock.Of<IBattleNetwork>(), broker.Object,
+            Mock.Of<INetworkAgentRegistry>(), session.Object, state.Object, applier.Object, policy, new SiegeMachineAuthorityRegistry());
+        void Receive(int epoch)
         {
-            var broker = new Mock<IMessageBroker>();
-            Action<MessagePayload<NetworkSiegeWeaponFired>> receiveFire = null;
-            Action<MessagePayload<NetworkGateHit>> receiveGateHit = null;
-            broker.Setup(x => x.Subscribe(It.IsAny<Action<MessagePayload<NetworkSiegeWeaponFired>>>()))
-                .Callback<Action<MessagePayload<NetworkSiegeWeaponFired>>>(handler => receiveFire = handler);
-            broker.Setup(x => x.Subscribe(It.IsAny<Action<MessagePayload<NetworkGateHit>>>()))
-                .Callback<Action<MessagePayload<NetworkGateHit>>>(handler => receiveGateHit = handler);
-            var state = new Mock<ISiegeMachineStateReplicator>();
-            ConfigureAuthority(state, "remote", 7, 3);
-            var session = new Mock<IBattleSession>();
-            session.SetupGet(x => x.HostEpoch).Returns(7);
-            session.SetupGet(x => x.IsLocalHost).Returns(true);
-            var applier = new Mock<ISiegeGateHitApplier>();
-            var policy = new HostEpochPolicy();
-            using var sut = new SiegeWeaponFireReplicator(Mock.Of<IBattleNetwork>(), broker.Object,
-                Mock.Of<INetworkAgentRegistry>(), session.Object, state.Object, applier.Object, policy);
-            void Receive(int epoch)
-            {
-                if (gateHit)
-                    receiveGateHit(new MessagePayload<NetworkGateHit>(this,
-                        new NetworkGateHit(44, 42, 250, "remote", epoch, 3)));
-                else
-                    receiveFire(new MessagePayload<NetworkSiegeWeaponFired>(this, Fire(42, "remote", epoch, 3)));
-                DrainGameThread();
-            }
-
-            if (bufferedBeforeMigration)
-            {
-                Receive(7);
-                Assert.Equal(1, PendingFireCount(sut) + PendingGateHitCount(sut));
-            }
-            // Another siege receiver accepts the new epoch before this machine's tuple catches up.
-            Assert.False(policy.IsStale(8, session.Object.HostEpoch));
-            applier.Invocations.Clear();
-            sut.Tick(0f);
+            if (gateHit)
+                receiveGateHit(new MessagePayload<NetworkGateHit>(this,
+                    new NetworkGateHit(44, 42, 250, "remote", epoch, 3)));
+            else
+                receiveFire(new MessagePayload<NetworkSiegeWeaponFired>(this, Fire(42, "remote", epoch, 3)));
             DrainGameThread();
-            Receive(7);
-            Assert.Equal(0, PendingFireCount(sut) + PendingGateHitCount(sut));
-            applier.Verify(x => x.TryApply(It.IsAny<NetworkGateHit>(), It.IsAny<bool>()), Times.Never);
+        }
 
-            ConfigureAuthority(state, "remote", 8, 3);
-            Receive(8);
+        if (bufferedBeforeMigration)
+        {
+            Receive(7);
             Assert.Equal(1, PendingFireCount(sut) + PendingGateHitCount(sut));
         }
-        finally
-        {
-            SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
-            SiegeMissionAuthorityGate.ResetClaimedMachines();
-        }
+        // Another siege receiver accepts the new epoch before this machine's tuple catches up.
+        Assert.False(policy.IsStale(8, session.Object.HostEpoch));
+        applier.Invocations.Clear();
+        sut.Tick(0f);
+        DrainGameThread();
+        Receive(7);
+        Assert.Equal(0, PendingFireCount(sut) + PendingGateHitCount(sut));
+        applier.Verify(x => x.TryApply(It.IsAny<NetworkGateHit>(), It.IsAny<bool>()), Times.Never);
+
+        ConfigureAuthority(state, "remote", 8, 3);
+        Receive(8);
+        Assert.Equal(1, PendingFireCount(sut) + PendingGateHitCount(sut));
     }
 
     private static Func<RangedSiegeWeapon, NetworkSiegeWeaponFired, bool> projectileReplay;
@@ -210,9 +197,6 @@ public class SiegeWeaponFireReplicatorTests
     {
         using var mission = new MissionCurrentScope();
         var harmony = new Harmony("coop.tests.buffered-siege-fire");
-        bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
-        SiegeMissionAuthorityGate.IsLocalAuthority = false;
-        SiegeMissionAuthorityGate.ResetClaimedMachines();
         try
         {
             harmony.Patch(AccessTools.Method(typeof(ScriptComponentBehavior), "CacheEditableFieldsForAllScriptComponents"),
@@ -240,7 +224,7 @@ public class SiegeWeaponFireReplicatorTests
             ConfigureAuthority(state, "remote", 7, 3);
             using var sut = new SiegeWeaponFireReplicator(Mock.Of<IBattleNetwork>(), broker.Object,
                 Mock.Of<INetworkAgentRegistry>(), Mock.Of<IBattleSession>(), state.Object,
-                Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy());
+                Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy(), new SiegeMachineAuthorityRegistry());
 
             receive(new MessagePayload<NetworkSiegeWeaponFired>(this, Fire(machineId, "remote", 7, 4)));
             DrainGameThread();
@@ -269,8 +253,6 @@ public class SiegeWeaponFireReplicatorTests
         {
             harmony.UnpatchAll(harmony.Id);
             projectileReplay = null;
-            SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
-            SiegeMissionAuthorityGate.ResetClaimedMachines();
         }
     }
 
@@ -287,7 +269,6 @@ public class SiegeWeaponFireReplicatorTests
     {
         const int ramId = 43;
         using var missionScope = new MissionCurrentScope();
-        SiegeMissionAuthorityGate.ResetClaimedMachines();
         var broker = new Mock<IMessageBroker>();
         Action<MessagePayload<NetworkGateHit>> receive = null;
         broker.Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<NetworkGateHit>>>()))
@@ -295,7 +276,7 @@ public class SiegeWeaponFireReplicatorTests
         var machineState = new Mock<ISiegeMachineStateReplicator>();
         ConfigureAuthority(machineState, "owner-a", 7, 3);
         using var sut = new SiegeWeaponFireReplicator(Mock.Of<IBattleNetwork>(), broker.Object,
-            Mock.Of<INetworkAgentRegistry>(), Mock.Of<IBattleSession>(), machineState.Object, Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy());
+            Mock.Of<INetworkAgentRegistry>(), Mock.Of<IBattleSession>(), machineState.Object, Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy(), new SiegeMachineAuthorityRegistry());
 
         receive(new MessagePayload<NetworkGateHit>(this,
             new NetworkGateHit(44, ramId, 250, "owner-b", 7, 4)));
@@ -325,56 +306,45 @@ public class SiegeWeaponFireReplicatorTests
     {
         const int ramId = 43;
         using var missionScope = new MissionCurrentScope();
-        bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
-        SiegeMissionAuthorityGate.IsLocalAuthority = false;
-        SiegeMissionAuthorityGate.ResetClaimedMachines();
-        try
-        {
-            var broker = new Mock<IMessageBroker>();
-            Action<MessagePayload<NetworkGateHit>> receive = null;
-            broker.Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<NetworkGateHit>>>()))
-                .Callback<Action<MessagePayload<NetworkGateHit>>>(handler => receive = handler);
-            var state = new Mock<ISiegeMachineStateReplicator>();
-            ConfigureAuthority(state, "remote", 7, 4);
-            var session = new Mock<IBattleSession>();
-            session.SetupGet(x => x.IsLocalHost).Returns(isHost);
-            var applier = new Mock<ISiegeGateHitApplier>();
-            bool registered = false;
-            int applications = 0;
-            applier.Setup(x => x.TryApply(It.IsAny<NetworkGateHit>(), isHost))
-                .Returns((NetworkGateHit message, bool damage) =>
-                {
-                    if (!registered) return false;
-                    applications++;
-                    if (throwsAfterApplication) throw new InvalidOperationException("after native apply");
-                    return true;
-                });
-            using var sut = new SiegeWeaponFireReplicator(Mock.Of<IBattleNetwork>(), broker.Object,
-                Mock.Of<INetworkAgentRegistry>(), session.Object, state.Object, applier.Object, new HostEpochPolicy());
-            receive(new MessagePayload<NetworkGateHit>(this, new NetworkGateHit(44, ramId, 250, "remote", 7, 4)));
-            DrainGameThread();
-            Assert.Equal(1, PendingGateHitCount(sut));
-            sut.Tick(0f);
-            DrainGameThread();
-            Assert.Equal(0, applications);
-            Assert.Equal(1, PendingGateHitCount(sut));
+        var broker = new Mock<IMessageBroker>();
+        Action<MessagePayload<NetworkGateHit>> receive = null;
+        broker.Setup(b => b.Subscribe(It.IsAny<Action<MessagePayload<NetworkGateHit>>>()))
+            .Callback<Action<MessagePayload<NetworkGateHit>>>(handler => receive = handler);
+        var state = new Mock<ISiegeMachineStateReplicator>();
+        ConfigureAuthority(state, "remote", 7, 4);
+        var session = new Mock<IBattleSession>();
+        session.SetupGet(x => x.IsLocalHost).Returns(isHost);
+        var applier = new Mock<ISiegeGateHitApplier>();
+        bool registered = false;
+        int applications = 0;
+        applier.Setup(x => x.TryApply(It.IsAny<NetworkGateHit>(), isHost))
+            .Returns((NetworkGateHit message, bool damage) =>
+            {
+                if (!registered) return false;
+                applications++;
+                if (throwsAfterApplication) throw new InvalidOperationException("after native apply");
+                return true;
+            });
+        using var sut = new SiegeWeaponFireReplicator(Mock.Of<IBattleNetwork>(), broker.Object,
+            Mock.Of<INetworkAgentRegistry>(), session.Object, state.Object, applier.Object, new HostEpochPolicy(), new SiegeMachineAuthorityRegistry());
+        receive(new MessagePayload<NetworkGateHit>(this, new NetworkGateHit(44, ramId, 250, "remote", 7, 4)));
+        DrainGameThread();
+        Assert.Equal(1, PendingGateHitCount(sut));
+        sut.Tick(0f);
+        DrainGameThread();
+        Assert.Equal(0, applications);
+        Assert.Equal(1, PendingGateHitCount(sut));
 
-            registered = true;
-            state.Raise(x => x.AuthorityChanged += null, ramId);
-            DrainGameThread();
-            Assert.Equal(1, applications);
-            Assert.Equal(0, PendingGateHitCount(sut));
-            sut.Tick(0f);
-            state.Raise(x => x.AuthorityChanged += null, ramId);
-            DrainGameThread();
-            Assert.Equal(1, applications);
-            applier.Verify(x => x.TryApply(It.IsAny<NetworkGateHit>(), !isHost), Times.Never);
-        }
-        finally
-        {
-            SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
-            SiegeMissionAuthorityGate.ResetClaimedMachines();
-        }
+        registered = true;
+        state.Raise(x => x.AuthorityChanged += null, ramId);
+        DrainGameThread();
+        Assert.Equal(1, applications);
+        Assert.Equal(0, PendingGateHitCount(sut));
+        sut.Tick(0f);
+        state.Raise(x => x.AuthorityChanged += null, ramId);
+        DrainGameThread();
+        Assert.Equal(1, applications);
+        applier.Verify(x => x.TryApply(It.IsAny<NetworkGateHit>(), !isHost), Times.Never);
     }
 
     [Fact]
@@ -390,7 +360,7 @@ public class SiegeWeaponFireReplicatorTests
         registry.Setup(x => x.IsLocallyControlled(shooter)).Returns(true);
         using var sut = new SiegeWeaponFireReplicator(Mock.Of<IBattleNetwork>(), Mock.Of<IMessageBroker>(),
             registry.Object, Mock.Of<IBattleSession>(), Mock.Of<ISiegeMachineStateReplicator>(),
-            Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy());
+            Mock.Of<ISiegeGateHitApplier>(), new HostEpochPolicy(), new SiegeMachineAuthorityRegistry());
         var message = new NetworkSiegeWeaponFired(42, id, default, default, default, 0f, 0f, "stone",
             "remote", 7, 4);
         var method = typeof(SiegeWeaponFireReplicator).GetMethod("TrySpawnProjectile",

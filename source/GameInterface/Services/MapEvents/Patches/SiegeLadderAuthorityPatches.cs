@@ -20,9 +20,10 @@ internal class SiegeLadderAuthorityPatches
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
         if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return false;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return true;
+        if (!authority.IsAuthorityKnown) return false;
 
-        return SiegeMissionAuthorityGate.IsMachineSimulatedLocally(__instance.Id.Id);
+        return authority.IsMachineSimulatedLocally(__instance.Id.Id);
     }
 
     [HarmonyPatch(typeof(SiegeLadder), "OnTick")]
@@ -128,8 +129,9 @@ internal class SiegeLadderAuthorityPatches
     {
         if (GameNetwork.IsClientOrReplay) return true;
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return false;
-        if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return true;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return false;
+        if (!authority.IsAuthorityKnown) return true;
 
-        return !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(ladder.Id.Id);
+        return !authority.IsMachineSimulatedLocally(ladder.Id.Id);
     }
 }

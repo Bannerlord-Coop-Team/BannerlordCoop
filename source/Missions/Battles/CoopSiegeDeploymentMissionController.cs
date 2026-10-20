@@ -13,11 +13,14 @@ namespace Missions.Battles;
 /// </summary>
 public class CoopSiegeDeploymentMissionController : SiegeDeploymentMissionController
 {
+    private readonly ISiegeMachineAuthorityRegistry _siegeAuthority;
     private CoopBattleMissionSpawnHandler _spawnHandler;
 
-    public CoopSiegeDeploymentMissionController(bool isPlayerAttacker)
+    /// <summary>Takes the siege authority that decides who runs the one-shot engine auto-deploys.</summary>
+    public CoopSiegeDeploymentMissionController(bool isPlayerAttacker, ISiegeMachineAuthorityRegistry siegeAuthority)
         : base(isPlayerAttacker)
     {
+        _siegeAuthority = siegeAuthority;
     }
 
     public override void OnBehaviorInitialize()
@@ -36,17 +39,17 @@ public class CoopSiegeDeploymentMissionController : SiegeDeploymentMissionContro
         // unknown-authority run would suppress them everywhere. Bounded so a lost election reply
         // cannot stall the mission in deployment forever.
         _authorityWait += dt;
-        if (!SiegeMissionAuthorityGate.IsAuthorityKnown && _authorityWait < AuthorityWaitDeadline) return;
+        if (!_siegeAuthority.IsAuthorityKnown && _authorityWait < AuthorityWaitDeadline) return;
 
-        if (!SiegeMissionAuthorityGate.IsAuthorityKnown) _deployedWithoutAuthority = true;
+        if (!_siegeAuthority.IsAuthorityKnown) _deployedWithoutAuthority = true;
 
         // The deadline path ran the one-shot auto-deploys suppressed everywhere; when the election
         // result lands late, the authority re-runs them once (still in deployment, so the placements
         // replicate normally) instead of leaving the siege engineless.
-        if (_deployedWithoutAuthority && SiegeMissionAuthorityGate.IsAuthorityKnown)
+        if (_deployedWithoutAuthority && _siegeAuthority.IsAuthorityKnown)
         {
             _deployedWithoutAuthority = false;
-            if (SiegeMissionAuthorityGate.IsLocalAuthority && Mission.Mode == MissionMode.Deployment)
+            if (_siegeAuthority.IsLocalAuthority && Mission.Mode == MissionMode.Deployment)
             {
                 _siegeDeploymentHandler.DeployAllSiegeWeaponsOfPlayer();
                 _siegeDeploymentHandler.DeployAllSiegeWeaponsOfAi();

@@ -28,8 +28,9 @@ internal class SiegeMachineAuthorityPatches
     private static bool TickAuxPrefix(SiegeWeapon __instance)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return true;
 
-        return SiegeMissionAuthorityGate.IsMachineSimulatedLocally(__instance.Id.Id);
+        return authority.IsMachineSimulatedLocally(__instance.Id.Id);
     }
 
     [HarmonyPatch(typeof(BatteringRam), "OnTick")]
@@ -159,9 +160,10 @@ internal class SiegeMachineAuthorityPatches
     {
         if (GameNetwork.IsClientOrReplay) return true;
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return false;
-        if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return true;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return false;
+        if (!authority.IsAuthorityKnown) return true;
 
-        return !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(machine.Id.Id);
+        return !authority.IsMachineSimulatedLocally(machine.Id.Id);
     }
 
     // A machine simulated elsewhere aims from the replicated targets: re-asserting them each weapon
@@ -172,7 +174,8 @@ internal class SiegeMachineAuthorityPatches
     private static void HandleUserAimingPrefix(RangedSiegeWeapon __instance)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
-        if (!SiegeMissionAuthorityGate.TryGetRemoteAim(__instance.Id.Id, out var direction, out var releaseAngle)) return;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return;
+        if (!authority.TryGetRemoteAim(__instance.Id.Id, out var direction, out var releaseAngle)) return;
 
         __instance.TargetDirection = direction;
         __instance.TargetReleaseAngle = releaseAngle;
@@ -185,7 +188,8 @@ internal class SiegeMachineAuthorityPatches
     private static bool ShootPrefix(RangedSiegeWeapon __instance, ref bool __result)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
-        if (SiegeMissionAuthorityGate.IsMachineSimulatedLocally(__instance.Id.Id)) return true;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return true;
+        if (authority.IsMachineSimulatedLocally(__instance.Id.Id)) return true;
 
         __result = false;
         return false;
@@ -221,8 +225,9 @@ internal class SiegeMachineAuthorityPatches
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
         if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return initializingGate;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return true;
+        if (!authority.IsAuthorityKnown) return initializingGate;
 
-        return SiegeMissionAuthorityGate.IsMachineSimulatedLocally(gate.Id.Id);
+        return authority.IsMachineSimulatedLocally(gate.Id.Id);
     }
 }

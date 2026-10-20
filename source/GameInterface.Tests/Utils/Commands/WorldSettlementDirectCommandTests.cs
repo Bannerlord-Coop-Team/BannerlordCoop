@@ -2,6 +2,7 @@
 using Common;
 using Common.Commands;
 using Common.Util;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 #if DEBUG
 using GameInterface.Services.Villages.Commands;
@@ -259,23 +260,23 @@ public class WorldSettlementDirectCommandTests
 
     private static ICoopCommand[] CreateCommands()
     {
-#if DEBUG
-        var fixture = new Mock<IRaidLootWarningFixture>().Object;
-#endif
         return GetCommandTypes()
-            .Select(type => (ICoopCommand)Activator.CreateInstance(
-                type,
-                type.GetConstructor(new[] { typeof(IObjectManager) }) != null
-                    ? new object[] { new ObjectManager(Serilog.Core.Logger.None) }
-                    :
-#if DEBUG
-                type.GetConstructor(new[] { typeof(IRaidLootWarningFixture) }) != null
-                    ? new object[] { fixture }
-                    : Array.Empty<object>()))
-#else
-                Array.Empty<object>()))
-#endif
+            .Select(type => (ICoopCommand)Activator.CreateInstance(type, CreateConstructorArgs(type)))
             .ToArray();
+    }
+
+    // Supplies the single dependency a migrated command's constructor takes, or none.
+    private static object[] CreateConstructorArgs(Type type)
+    {
+        if (type.GetConstructor(new[] { typeof(IObjectManager) }) != null)
+            return new object[] { new ObjectManager(Serilog.Core.Logger.None) };
+        if (type.GetConstructor(new[] { typeof(ISiegeMachineAuthorityRegistry) }) != null)
+            return new object[] { new SiegeMachineAuthorityRegistry() };
+#if DEBUG
+        if (type.GetConstructor(new[] { typeof(IRaidLootWarningFixture) }) != null)
+            return new object[] { new Mock<IRaidLootWarningFixture>().Object };
+#endif
+        return Array.Empty<object>();
     }
 
     private static Type[] GetCommandTypes()

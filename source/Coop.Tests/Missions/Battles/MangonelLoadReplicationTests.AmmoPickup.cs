@@ -116,8 +116,8 @@ public sealed partial class MangonelLoadReplicationTests
         Assert.True(after.HasMangonelAmmo);
         Assert.Equal(0, after.MangonelAmmo);
         var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "Apply");
-        apply.Invoke(null, new object[] { joiner.Machine, after });
-        apply.Invoke(null, new object[] { joiner.Machine, before });
+        apply.Invoke(null, new object[] { joiner.Machine, after, false });
+        apply.Invoke(null, new object[] { joiner.Machine, before, false });
         Assert.Equal(0, joiner.Machine.AmmoCount);
         Assert.True(PickupPoint(joiner.Machine).IsDeactivated);
     }
