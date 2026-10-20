@@ -22,7 +22,7 @@ internal class SmugglersBranchPatches
         return false;
     }
 
-    [HarmonyPatch(typeof(Quest), "GetPersuasionTask")]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.GetPersuasionTask))]
     [HarmonyPostfix]
     private static void PersuasionStarted(Quest __instance)
     {

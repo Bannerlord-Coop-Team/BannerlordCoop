@@ -9,6 +9,8 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Players;
+using GameInterface.Services.MapEvents;
+using GameInterface.Services.Players.Messages;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -29,6 +31,7 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
     private readonly IObjectManager objectManager;
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
+    private readonly ConversationPartyTracker partyTracker;
     private readonly Dictionary<SessionKey, string> sessions = new();
 
     public PersuasionSessionService(
@@ -36,24 +39,28 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
         INetwork network,
         IObjectManager objectManager,
         IIssueOwnershipRegistry ownership,
-        IPlayerManager playerManager)
+        IPlayerManager playerManager,
+        ConversationPartyTracker partyTracker)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.ownership = ownership;
         this.playerManager = playerManager;
+        this.partyTracker = partyTracker;
 
         messageBroker.Subscribe<PersuasionStarted>(HandleStarted);
         messageBroker.Subscribe<NetworkIssueFinalized>(HandleFinalized);
-        messageBroker.Subscribe<PlayerDisconnected>(HandleDisconnected);
+        messageBroker.Subscribe<IssueOutcomeObserved>(HandleOutcomeObserved);
+        messageBroker.Subscribe<NetworkPlayerRemoved>(HandlePlayerRemoved);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PersuasionStarted>(HandleStarted);
         messageBroker.Unsubscribe<NetworkIssueFinalized>(HandleFinalized);
-        messageBroker.Unsubscribe<PlayerDisconnected>(HandleDisconnected);
+        messageBroker.Unsubscribe<IssueOutcomeObserved>(HandleOutcomeObserved);
+        messageBroker.Unsubscribe<NetworkPlayerRemoved>(HandlePlayerRemoved);
     }
 
     public void Start(QuestBase quest, object target)
@@ -154,20 +161,27 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
         }
     }
 
-    private void HandleDisconnected(MessagePayload<PlayerDisconnected> payload)
+    private void HandlePlayerRemoved(MessagePayload<NetworkPlayerRemoved> payload)
     {
-        if (payload.What.PlayerId == null || !playerManager.TryGetPlayer(payload.What.PlayerId, out var player))
-        {
-            return;
-        }
-
         foreach (var key in new List<SessionKey>(sessions.Keys))
         {
-            if (key.OwnerHeroId == player.HeroId)
+            if (key.OwnerHeroId == payload.What.HeroId)
             {
                 sessions.Remove(key);
             }
         }
+    }
+
+    private void HandleOutcomeObserved(MessagePayload<IssueOutcomeObserved> payload)
+    {
+        if (!objectManager.TryGetId(payload.What.Issue.IssueOwner, out var ownerId)) return;
+        ClearIssue(ownerId, payload.What.Issue.StringId);
+    }
+
+    private void ClearIssue(string ownerId, string issueId)
+    {
+        foreach (var key in new List<SessionKey>(sessions.Keys))
+            if (key.IssueOwnerId == ownerId && key.IssueId == issueId) sessions.Remove(key);
     }
 
     private bool TryGetTargetParty(string targetId, out MobileParty party)
@@ -194,10 +208,13 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
             (issue = owner.Issue) != null && issue.StringId == issueId;
     }
 
-    private static bool AreTogether(MobileParty owner, MobileParty target)
+    private bool AreTogether(MobileParty owner, MobileParty target)
     {
-        return owner.CurrentSettlement != null && owner.CurrentSettlement == target.CurrentSettlement ||
-            owner.MapEvent != null && owner.MapEvent == target.MapEvent;
+        if (owner.CurrentSettlement != null && owner.CurrentSettlement == target.CurrentSettlement) return true;
+        return owner.Party != null && target.Party != null &&
+            objectManager.TryGetId(owner.Party, out var ownerId) &&
+            objectManager.TryGetId(target.Party, out var targetId) &&
+            partyTracker.IsEngagerParty(targetId, ownerId);
     }
 
     private readonly struct SessionKey : IEquatable<SessionKey>
