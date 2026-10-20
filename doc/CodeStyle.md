@@ -1,15 +1,46 @@
 # Code Style & Naming
 
-Use C# conventions: four-space indentation, PascalCase for public types and members, camelCase for locals and parameters, and descriptive names for synchronization messages, services, and patches. Keep changes scoped to the owning project and follow existing service/registry/patch patterns before adding new abstractions. Write the positive role check — `ModInformation.IsServer` or `ModInformation.IsClient` — rather than negating the other (`!ModInformation.IsClient`); since `IsClient` is defined as `!IsServer`, the negation just reads as a double-negative.
+## Basics
 
-**Don't invent new patterns or naming schemes.** Before naming a type or choosing a design, find how the codebase already solves the same problem and match it, reusing the existing suffixes (`*Handler`, `*Patches`, `*Registry`, `*Interface`) and mechanisms. A novel concept such as a `SomeFeatureSentinel` class, or a homegrown mechanism alongside an existing one, makes the code harder to navigate and gets flagged in review. If nothing existing fits, ask before introducing something new.
+- Four-space indentation, PascalCase for public types and members, camelCase for locals and parameters.
+- Give synchronization messages, services, and patches descriptive names.
+- Keep changes scoped to the owning project.
+- Write the positive role check, `ModInformation.IsServer` or `ModInformation.IsClient`, not `!ModInformation.IsClient`. `IsClient` is defined as `!IsServer`, so the negation reads as a double negative.
+- Don't add `#region`/`#endregion` blocks; the codebase doesn't use them.
 
-When an interface and its concrete implementation share a file, name the file after the concrete implementation, without the interface's leading `I` (e.g. `AlleyCampaignBehaviorInterface.cs` for `IAlleyCampaignBehaviorInterface` and `AlleyCampaignBehaviorInterface`, and `SessionAlleyPlayerDataInterface.cs` for the session pair).
+## Fit the Existing Codebase
 
-When you create a new class or group of related classes, declare the interface at the top of the file, put the implementation directly below it, and register the type with the appropriate Autofac module (or confirm it is already registered) so consumers resolve it from the DI container instead of constructing it directly. Default to this even for a single class — it keeps the seam explicit and the type fakeable, and it is the layout the shared-collaborator preference below assumes.
+- **Don't invent new patterns or naming schemes.** Find how the codebase already solves the same problem and match it, reusing the existing suffixes (`*Handler`, `*Patches`, `*Registry`, `*Interface`) and mechanisms.
+- A novel concept such as a `SomeFeatureSentinel` class, or a homegrown mechanism next to an existing one, makes the code harder to navigate and gets flagged in review. If nothing existing fits, ask before introducing something new.
+- Before adding a helper, grep for an existing one of the same shape and reuse it.
 
-Prefer new shared collaborator logic as a **transient DI'd class** instead of a `static` helper class. Use an interface plus an `InstancePerDependency` registration in the owning Autofac module, constructor-injected, because transient dependencies are much easier to fake and unit test. garrettluskey flags a new `static` helper on review (e.g. `AgentFormationAssigner` started as a static class and was asked to become an injected transient). For the manually-composed battle sub-services (`PuppetSpawner`, `ReinforcementFielder`, `BattleAuthorityMigrator`, all `new`ed in `CoopBattleController`), that means registering the helper in `MissionModule` and injecting it into `CoopBattleController`, which hands it to the services it constructs — the leaf helper is container-managed even though its consumers are hand-composed. Existing static helpers like `AgentAiWaker` predate this and are fine to leave; the preference is for new shared logic.
+## Classes, Interfaces, and DI
 
-For campaign behaviors, prefer letting vanilla `RegisterEvents` register its listeners and Harmony-patching the individual event-handler methods to control which side may run them, with the positive role check on each handler patch (for example, `OnSessionLaunched => ModInformation.IsClient`). Don't patch `RegisterEvents` just to rebuild a selected listener list with reflection or hand-made delegates unless individual handler patches cannot express the required behavior.
+- Declare the interface at the top of the file and the implementation directly below it. Do this even for a single class; it keeps the seam explicit and the type fakeable.
+- Name the file after the implementation, without the interface's leading `I`. For example, `AlleyCampaignBehaviorInterface.cs` holds `IAlleyCampaignBehaviorInterface` and `AlleyCampaignBehaviorInterface`.
+- Register the type in the owning Autofac module (or confirm it's already registered) so consumers resolve it from the container instead of constructing it.
+- Write new shared logic as a **transient DI class** (an interface plus an `InstancePerDependency` registration, constructor-injected), not a `static` helper, because transient dependencies are much easier to fake in tests. `AgentFormationAssigner` started as a static class and was asked in review to become an injected transient. Existing static helpers like `AgentAiWaker` predate this and can stay.
+- The battle sub-services `PuppetSpawner`, `ReinforcementFielder`, and `BattleAuthorityMigrator` are `new`ed in `CoopBattleController`. For a helper they share, register it in `MissionModule` and inject it into `CoopBattleController`, which hands it to the services it constructs.
 
-Source `.cs` files are UTF-8 with a BOM, but files written through the editor land with no BOM, so add one after creating a new file (and don't re-run the add-BOM step on an already-BOM'd file, that gives a double BOM). An on-save formatter may rewrite a file, so re-read before a follow-up edit. Don't add `#region`/`#endregion` blocks; the codebase doesn't use them. Keep comments short: one line stating the non-obvious why is the norm, two or three lines are fine when the mechanism genuinely needs them, but never a 6+ line block — put that rationale in the commit message so `git blame` surfaces it instead of a paragraph-long narration of vanilla behavior sitting in a patch comment. Don't write `->`/`→` arrow chains in comments. Match the null-validation idiom: don't use the `x ?? throw new ArgumentNullException(...)` expression form; plumbing uses the statement form `if (x == null) throw ...`, and data/message types just assign. Before adding a helper, grep for an existing one of the same shape and reuse it. `GameInterface` targets netstandard2.0, so newer BCL conveniences aren't there (for example plain `Dictionary.TryAdd`). CodeFactor flags `new T[0]` (use `Array.Empty<T>()`) and unparenthesized mixed-operator arithmetic (`4L + ((long)n * 4)`); its `Complex method` annotation is advisory, so don't contort code to satisfy it.
+## Null Checks
+
+- Plumbing uses the statement form `if (x == null) throw ...`, not the expression form `x ?? throw new ArgumentNullException(...)`.
+- Data and message types just assign.
+
+## Campaign Behaviors
+
+- Let vanilla `RegisterEvents` register its listeners, and Harmony-patch the individual event-handler methods to control which side runs them, with the positive role check on each patch (for example, `OnSessionLaunched => ModInformation.IsClient`).
+- Don't patch `RegisterEvents` to rebuild the listener list with reflection or hand-made delegates, unless individual handler patches can't express the behavior.
+
+## Comments
+
+- One line stating the non-obvious why is the norm. Two or three lines are fine when the mechanism needs them; never write a 6+ line block.
+- Put longer rationale in the commit message, where `git blame` surfaces it, instead of narrating vanilla behavior in a patch comment.
+- Don't write `->`/`→` arrow chains.
+
+## Files and Tooling
+
+- `.cs` files are UTF-8 with a BOM. Files written through the editor have no BOM, so add one after creating a file, and only once, because a second pass doubles it.
+- An on-save formatter may rewrite a file, so re-read it before a follow-up edit.
+- `GameInterface` targets netstandard2.0, so newer BCL conveniences such as plain `Dictionary.TryAdd` aren't available.
+- CodeFactor flags `new T[0]` (use `Array.Empty<T>()`) and unparenthesized mixed-operator arithmetic (write `4L + ((long)n * 4)`). Its `Complex method` note is advisory, so don't contort code to satisfy it.
