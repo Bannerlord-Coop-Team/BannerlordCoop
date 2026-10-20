@@ -380,10 +380,13 @@ internal sealed class ChatVM : ViewModel
 
     private void UpdateGroupChannel(string channelId, ref string previousFactionId, string factionId)
     {
-        if (!string.Equals(previousFactionId, factionId, StringComparison.Ordinal))
+        bool membershipChanged = !string.Equals(previousFactionId, factionId, StringComparison.Ordinal);
+        if (membershipChanged && !string.IsNullOrEmpty(previousFactionId))
+            ClearGroupChannelHistory(channelId);
+
+        if (membershipChanged)
         {
             previousFactionId = factionId;
-            ClearGroupChannelHistory(channelId);
         }
 
         SetFixedChannelListed(channelId, !string.IsNullOrEmpty(factionId));
