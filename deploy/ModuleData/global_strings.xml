@@ -107,5 +107,10 @@
     <string id="str_coop_clan_status" text="{=str_coop_clan_status}Clan Status" />
     <string id="str_coop_ransom_no_longer_enough_gold" text="{=str_coop_ransom_no_longer_enough_gold}You no longer have enough gold to pay the ransom." />
     <string id="str_coop_education_stage_rejected" text="{=str_coop_education_stage_rejected}{CHILD}'s education choices were not applied because this stage is no longer valid." />
+    <string id="str_coop_prison_break_not_enough_gold" text="{=str_coop_prison_break_not_enough_gold}You no longer have enough gold to pay the guard." />
+    <string id="str_coop_prison_break_prisoner_unavailable" text="{=str_coop_prison_break_prisoner_unavailable}The prisoner is no longer held here." />
+    <string id="str_coop_prison_break_prisoner_lost" text="{=str_coop_prison_break_prisoner_lost}{PRISONER.NAME} is no longer held in this prison." />
+    <string id="str_coop_prison_break_player_prisoner" text="{=str_coop_prison_break_player_prisoner}Players can't be broken out of prison." />
+    <string id="str_coop_prison_break_in_progress" text="{=str_coop_prison_break_in_progress}Another player is breaking a prisoner out of this dungeon." />
     <!-- Add other custom text here in the future-->
 </strings>
