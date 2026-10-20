@@ -19,6 +19,7 @@ public class QuestRequestOwnershipTests : IDisposable
     private readonly StubIssueQuestGenerator quests = new();
     private readonly StubIssuePreconditions preconditions = new(QuestScenario.IssueType);
     private readonly MethodCallRecorder branches;
+    private readonly MethodCallRecorder consequences;
     private readonly QuestScenario scenario;
 
     private E2ETestEnvironment TestEnvironment { get; }
@@ -30,11 +31,15 @@ public class QuestRequestOwnershipTests : IDisposable
         branches = new MethodCallRecorder(AccessTools.Method(
             typeof(GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy),
             nameof(GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy.TryRunBranch)));
+        consequences = new MethodCallRecorder(AccessTools.Method(
+            typeof(TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest),
+            "SucceedQuestByPayingAndKeepingTheGoods"));
     }
 
     public void Dispose()
     {
         branches.Dispose();
+        consequences.Dispose();
         TestEnvironment.Dispose();
         quests.Dispose();
         preconditions.Dispose();
@@ -121,6 +126,7 @@ public class QuestRequestOwnershipTests : IDisposable
 
         Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
         Assert.Equal(1, branches.CountFor(scenario.Server));
+        Assert.Equal(0, consequences.CountFor(scenario.Server));
     }
 
     [Fact]

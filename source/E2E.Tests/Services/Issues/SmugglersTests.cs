@@ -134,11 +134,33 @@ public class SmugglersTests : IDisposable
     }
 
     [Fact]
-    public void Persuasion_IsRunOnTheServerForTheOwner()
+    public void PersuasionWithoutALiveSession_IsRejected()
     {
-        ClientA.Call(() => QuestOf(ClientA).SucceedQuest(null));
+        ClientA.Call(() =>
+        {
+            var quest = QuestOf(ClientA);
+            quest.GetPersuasionTask();
+            quest.SucceedQuest(null);
+        });
 
-        Assert.Equal(1, succeedQuest.CountFor(Server));
+        Assert.Equal(0, succeedQuest.CountFor(Server));
+    }
+
+    [Fact]
+    public void PersuasionWithoutALiveSession_DuplicateSuccessDoesNotFinalize()
+    {
+        ClientA.Call(() =>
+        {
+            var quest = QuestOf(ClientA);
+            quest.GetPersuasionTask();
+            quest.SucceedQuest(null);
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+
+        ClientA.Call(() => QuestOf(ClientA)?.SucceedQuest(null));
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
     [Fact]

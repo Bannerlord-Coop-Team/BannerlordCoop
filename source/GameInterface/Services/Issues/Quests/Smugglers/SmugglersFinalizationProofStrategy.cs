@@ -10,6 +10,12 @@ namespace GameInterface.Services.Issues.Quests.Smugglers;
 internal class SmugglersFinalizationProofStrategy : IFinalizationProofStrategy
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SmugglersFinalizationProofStrategy>();
+    private readonly IPersuasionSessionService persuasionSessions;
+
+    public SmugglersFinalizationProofStrategy(IPersuasionSessionService persuasionSessions)
+    {
+        this.persuasionSessions = persuasionSessions;
+    }
 
     public bool TryRunBranch(QuestBase quest, byte proof)
     {
@@ -21,6 +27,11 @@ internal class SmugglersFinalizationProofStrategy : IFinalizationProofStrategy
         switch ((SmugglersBranch)proof)
         {
             case SmugglersBranch.SuccessByPersuasion:
+                if (!persuasionSessions.TryConsume(smugglersQuest, smugglersQuest._smugglerParty))
+                {
+                    return true;
+                }
+
                 smugglersQuest.SucceedQuest(smugglersQuest.QuestSuccessWithPersuasionLog);
                 return true;
             case SmugglersBranch.SuccessByBribe:

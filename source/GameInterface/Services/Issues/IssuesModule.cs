@@ -28,6 +28,7 @@ internal class IssuesModule : Module
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
         builder.Register(context => context.Resolve<LordSolutionCoordinator>()).As<ILordSolutionCoordinator>();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
+        builder.Register(context => context.Resolve<PersuasionSessionService>()).As<IPersuasionSessionService>();
         builder.RegisterType<TheConquestOfSettlementService>()
             .As<ITheConquestOfSettlementService>()
             .InstancePerLifetimeScope();

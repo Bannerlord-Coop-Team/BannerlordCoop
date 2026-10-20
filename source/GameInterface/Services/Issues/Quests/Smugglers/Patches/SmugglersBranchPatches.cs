@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Issues.Framework.Interface;
+using Common;
+using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Encounters;
 using Quest = TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior.SmugglersIssueQuest;
@@ -17,18 +18,24 @@ internal class SmugglersBranchPatches
             return true;
         }
 
-        // The server pays the bribe as the owner, leaving the encounter is this client's part
         PlayerEncounter.LeaveEncounter = true;
         return false;
     }
 
-    // On a client only the persuasion reaches SucceedQuest, the fight is decided on the server and the bribe is patched above
+    [HarmonyPatch(typeof(Quest), "GetPersuasionTask")]
+    [HarmonyPostfix]
+    private static void PersuasionStarted(Quest __instance)
+    {
+        if (ModInformation.IsClient && ContainerProvider.TryResolve<IPersuasionSessionService>(out var sessions))
+        {
+            sessions.Start(__instance, __instance._smugglerParty);
+        }
+    }
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.SucceedQuest))]
     [HarmonyPrefix]
-    private static bool SuccessByPersuasionPrefix(Quest __instance)
-    {
-        return BeforeBranch(__instance, SmugglersBranch.SuccessByPersuasion);
-    }
+    private static bool SuccessByPersuasionPrefix(Quest __instance) =>
+        BeforeBranch(__instance, SmugglersBranch.SuccessByPersuasion);
 
     private static bool BeforeBranch(Quest quest, SmugglersBranch branch)
     {
