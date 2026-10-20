@@ -5,6 +5,7 @@ using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using HarmonyLib;
 using ProtoBuf;
 using System.Linq;
@@ -45,9 +46,11 @@ internal class ArtisanJournalHandler : IHandler
     private readonly IIssueResolver resolver;
     private readonly IIssueOwnerResolver owners;
     private readonly IControllerIdProvider controller;
+    private readonly IPlayerManager players;
 
     public ArtisanJournalHandler(IMessageBroker broker, INetwork network, IObjectManager objects,
-        IIssueResolver resolver, IIssueOwnerResolver owners, IControllerIdProvider controller)
+        IIssueResolver resolver, IIssueOwnerResolver owners, IControllerIdProvider controller,
+        IPlayerManager players)
     {
         this.broker = broker;
         this.network = network;
@@ -55,6 +58,7 @@ internal class ArtisanJournalHandler : IHandler
         this.resolver = resolver;
         this.owners = owners;
         this.controller = controller;
+        this.players = players;
         broker.Subscribe<ArtisanJournalObserved>(HandleObserved);
         broker.Subscribe<NetworkArtisanJournal>(HandleJournal);
     }
@@ -71,7 +75,9 @@ internal class ArtisanJournalHandler : IHandler
         var issue = payload.What.Issue;
         if (issue.IsSolvingWithLordSolution || !objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
         var entries = issue.IssueQuest?.JournalEntries ?? issue.JournalEntries;
-        network.SendAll(new NetworkArtisanJournal(giverId, issue.StringId, entries.Select(log => log.LogText).ToArray()));
+        if (players.TryGetPlayer(issue.IssueOwner, out var player) &&
+            players.TryGetPeer(player.ControllerId, out var peer))
+            network.Send(peer, new NetworkArtisanJournal(giverId, issue.StringId, entries.Select(log => log.LogText).ToArray()));
     }
 
     private void HandleJournal(MessagePayload<NetworkArtisanJournal> payload)

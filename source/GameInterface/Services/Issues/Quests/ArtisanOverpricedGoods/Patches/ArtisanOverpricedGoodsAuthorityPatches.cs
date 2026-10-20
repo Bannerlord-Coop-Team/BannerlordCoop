@@ -40,9 +40,7 @@ internal class ArtisanOverpricedGoodsAuthorityPatches
     {
         if (ModInformation.IsClient) return true;
         var companion = troopRoster.GetTroopRoster().FirstOrDefault(element => element.Character.IsHero).Character?.HeroObject;
-        var skill = companion == null ? default : __instance.GetAlternativeSolutionSkill(companion);
-        if (Hero.MainHero.Gold >= __instance.RequiredGoldForAlternativeSolution && companion != null &&
-            companion.GetSkillValue(skill.Item1) >= skill.Item2) return true;
+        if (Hero.MainHero.Gold >= __instance.RequiredGoldForAlternativeSolution && companion != null) return true;
 
         __result = false;
         explanation = new TextObject("{=!}The companion or purchase funding is unavailable.");

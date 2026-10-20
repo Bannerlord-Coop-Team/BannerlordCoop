@@ -14,6 +14,7 @@ using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -22,6 +23,7 @@ namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 /// <summary>The server accepts a decree and applies its counter-offer as the owning player.</summary>
 internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<LordSolutionCoordinator>();
     private readonly IMessageBroker broker;
     private readonly INetwork network;
     private readonly IObjectManager objects;
@@ -77,13 +79,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
     private void HandleFinalized(MessagePayload<NetworkIssueFinalized> payload)
     {
         if (ModInformation.IsServer) return;
-        var issueId = payload.What.IssueId;
-        var issueOwnerId = payload.What.IssueOwnerId;
-        GameThread.RunSafe(() =>
-        {
-            if (!objects.TryGetObject<Hero>(issueOwnerId, out var owner)) return;
-            pendingDecisions.RemoveWhere(issue => issue.StringId == issueId && issue.IssueOwner == owner);
-        },
+        GameThread.RunSafe(() => ClearPending(payload.What.IssueOwnerId, payload.What.IssueId),
             context: nameof(LordSolutionCoordinator));
     }
 
@@ -130,27 +126,35 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
                     return;
                 }
 
-                IssueOutcome outcome;
-                switch (data.Operation)
+                try
                 {
-                    case LordSolutionOperation.AcceptCounterOffer:
-                        issue.CompleteIssueWithLordSolutionWithAcceptCounterOffer();
-                        outcome = IssueOutcome.LordAcceptedCounterOffer;
-                        break;
-                    case LordSolutionOperation.RefuseCounterOffer:
-                        if (Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution)
-                        {
+                    IssueOutcome outcome;
+                    switch (data.Operation)
+                    {
+                        case LordSolutionOperation.AcceptCounterOffer:
+                            issue.CompleteIssueWithLordSolutionWithAcceptCounterOffer();
+                            outcome = IssueOutcome.LordAcceptedCounterOffer;
+                            break;
+                        case LordSolutionOperation.RefuseCounterOffer:
+                            if (Clan.PlayerClan.Influence < issue.NeededInfluenceForLordSolution)
+                            {
+                                Reject(peer, data);
+                                return;
+                            }
+                            issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
+                            outcome = IssueOutcome.LordRefusedCounterOffer;
+                            break;
+                        default:
                             Reject(peer, data);
                             return;
-                        }
-                        issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
-                        outcome = IssueOutcome.LordRefusedCounterOffer;
-                        break;
-                    default:
-                        Reject(peer, data);
-                        return;
+                    }
+                    broker.Publish(issue, new IssueOutcomeObserved(issue, outcome));
                 }
-                broker.Publish(issue, new IssueOutcomeObserved(issue, outcome));
+                catch (Exception e)
+                {
+                    Logger.Error(e, "Applying the lord solution of {issue} failed", data.IssueId);
+                    Reject(peer, data);
+                }
             }
         }, context: nameof(LordSolutionCoordinator));
     }
@@ -170,12 +174,14 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         if (ModInformation.IsServer) return;
 
         var data = payload.What;
-        GameThread.RunSafe(() =>
-        {
-            if (!objects.TryGetObject<Hero>(data.IssueOwnerId, out var owner)) return;
-            pendingDecisions.RemoveWhere(issue => issue.StringId == data.IssueId && issue.IssueOwner == owner);
-        },
+        GameThread.RunSafe(() => ClearPending(data.IssueOwnerId, data.IssueId),
             context: nameof(LordSolutionCoordinator));
+    }
+
+    private void ClearPending(string issueOwnerId, string issueId)
+    {
+        if (!objects.TryGetObject<Hero>(issueOwnerId, out var owner)) return;
+        pendingDecisions.RemoveWhere(issue => issue.StringId == issueId && issue.IssueOwner == owner);
     }
 
     private void HandleStarted(MessagePayload<NetworkLordSolutionStarted> payload)

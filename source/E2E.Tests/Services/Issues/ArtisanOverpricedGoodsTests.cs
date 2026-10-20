@@ -454,9 +454,10 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void CompanionSolution_ChargesOnceAndReturnsTroopsOnlyToItsOwner(bool failure)
+    [InlineData(false, 150)]
+    [InlineData(true, 150)]
+    [InlineData(false, 100)]
+    public void CompanionSolution_ChargesOnceAndReturnsTroopsOnlyToItsOwner(bool failure, int companionSkill)
     {
         using var nativeState = new NativeHeroStateScope();
         var companionId = environment.CreateRegisteredObject<Hero>();
@@ -471,7 +472,7 @@ public class ArtisanOverpricedGoodsTests : IDisposable
                 {
                     var companion = Get<Hero>(instance, companionId);
                     companion.HeroState = Hero.CharacterStates.Active;
-                    companion.SetSkillValue(DefaultSkills.Trade, 150);
+                    companion.SetSkillValue(DefaultSkills.Trade, companionSkill);
                     var troop = Get<CharacterObject>(instance, troopId);
                     troop.Level = 20;
                     troop.UpgradeTargets = Array.Empty<CharacterObject>();
