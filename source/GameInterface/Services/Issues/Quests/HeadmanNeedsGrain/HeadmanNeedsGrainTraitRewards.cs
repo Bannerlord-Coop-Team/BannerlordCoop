@@ -208,10 +208,9 @@ internal class HeadmanNeedsGrainTraitRewardHandler : IHandler
             var model = Campaign.Current.Models.CharacterDevelopmentModel;
             var currentXp = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(trait);
             model.GetTraitLevelForTraitXp(owner, trait, currentXp, out var previousLevel, out _);
-            model.GetTraitLevelForTraitXp(owner, trait, currentXp + data.Amount, out var level, out var xp);
-            Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(trait, xp);
-            using (new Common.Util.AllowedThread()) owner.SetTraitLevel(trait, level);
-            if (previousLevel != level) CampaignEventDispatcher.Instance.OnPlayerTraitChanged(trait, previousLevel);
+            Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(trait, data.RemainingXp);
+            using (new Common.Util.AllowedThread()) owner.SetTraitLevel(trait, data.Level);
+            if (previousLevel != data.Level) CampaignEventDispatcher.Instance.OnPlayerTraitChanged(trait, previousLevel);
             rewards.RequestSeed();
             LogEntry.AddLogEntry(new PlayerReputationChangesLogEntry(trait, giver, (ActionNotes)data.Note));
         }, context: nameof(HeadmanNeedsGrainTraitRewardHandler));

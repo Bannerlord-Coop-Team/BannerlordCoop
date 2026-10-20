@@ -317,6 +317,7 @@ public class HeadmanNeedsGrainTests : IDisposable
             Game.Current.PlayerTroop = local.CharacterObject;
             var rewards = ClientA.Resolve<IHeadmanNeedsGrainTraitRewards>();
             rewards.SyncData(new TestDataStore(false, records));
+            Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(trait, 999);
 
             var model = Campaign.Current.Models.CharacterDevelopmentModel;
             model.GetTraitLevelForTraitXp(owner, trait, startingXp + amount, out var level, out var remainingXp);

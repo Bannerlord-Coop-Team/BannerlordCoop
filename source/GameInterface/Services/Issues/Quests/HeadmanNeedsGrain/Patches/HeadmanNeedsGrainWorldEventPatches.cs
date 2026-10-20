@@ -13,32 +13,6 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 [HarmonyPatch]
 internal class HeadmanNeedsGrainWorldEventPatches
 {
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
-    [HarmonyPostfix]
-    private static void WarPostfix(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail)
-    {
-        // CrimeRatingService raises this event as the responsible player.
-        var instigator = Hero.MainHero;
-        RunAsOwners(quest =>
-        {
-            if (declareWarDetail == DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange && Hero.MainHero != instigator)
-            {
-                QuestHelper.CheckWarDeclarationAndFailOrCancelTheQuest(quest, faction1, faction2, declareWarDetail,
-                    quest.PlayerDeclaredWarQuestLogText, quest.CancelLogOnWarDeclared, forceCancel: true);
-                return;
-            }
-            quest.OnWarDeclared(faction1, faction2, declareWarDetail);
-        });
-    }
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
-    [HarmonyPostfix]
-    private static void KingdomPostfix(Clan clan, Kingdom oldKingdom, Kingdom newKingdom,
-        ChangeKingdomAction.ChangeKingdomActionDetail actionDetail, bool showNotification)
-    {
-        RunAsOwners(quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
-    }
-
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnVillageBeingRaided))]
     [HarmonyPostfix]
     private static void RaidPostfix(Village village) => RunAsOwners(quest => quest.OnVillageBeingRaided(village));
