@@ -17,7 +17,8 @@ namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CheckPreconditions))]
 internal class SimilarCommitmentsPatch
 {
-    /// <summary>Marks other players' issues of the same type as untaken for the check, keeping their states in __state.</summary>
+    /// <summary>Hides same-type issues other players are solving, and shows this player's lord solutions as quest solutions,
+    /// for the check, keeping their states in __state.</summary>
     [HarmonyPrefix]
     private static void Prefix(IssueBase __instance, out List<(IssueBase Issue, IssueBase.IssueState State)> __state)
     {
