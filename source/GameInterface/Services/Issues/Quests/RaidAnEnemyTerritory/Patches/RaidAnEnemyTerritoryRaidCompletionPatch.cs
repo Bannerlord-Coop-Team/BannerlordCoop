@@ -42,11 +42,7 @@ internal sealed class RaidAnEnemyTerritoryRaidCompletionPatch
             return;
         }
 
-        // RaidCompleted runs while the map event is unwinding. Apply only after the vanilla callback has
-        // returned so owner substitution cannot re-enter map-event finalization or release the owner party.
-        GameThread.RunSafe(
-            () => dispatcher.RunAsOwners<Quest>(quest => ResolveForOwner(quest, winnerSide, raidEvent)),
-            context: nameof(RaidCompletedPostfix));
+        dispatcher.RunAsOwners<Quest>(quest => ResolveForOwner(quest, winnerSide, raidEvent));
     }
 
     private static void ResolveForOwner(Quest quest, BattleSideEnum winnerSide, RaidEventComponent raidEvent)
