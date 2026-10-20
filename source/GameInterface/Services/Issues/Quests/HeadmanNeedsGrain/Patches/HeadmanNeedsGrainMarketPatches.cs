@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 
-[HarmonyPatch(typeof(HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue), "NearbySuitableSettlement", MethodType.Getter)]
+[HarmonyPatch(typeof(HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue), nameof(HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue.NearbySuitableSettlement), MethodType.Getter)]
 internal sealed class HeadmanNeedsGrainMarketPatches
 {
     [HarmonyPrefix]

@@ -10,11 +10,11 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 [HarmonyPatch(typeof(HeadmanNeedsGrainIssueBehavior))]
 internal class HeadmanNeedsGrainPriceCachePatches
 {
-    [HarmonyPatch("CacheGrainPrice")]
+    [HarmonyPatch(nameof(HeadmanNeedsGrainIssueBehavior.CacheGrainPrice))]
     [HarmonyPrefix]
     internal static bool Prefix() => CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer;
 
-    [HarmonyPatch("CacheGrainPrice")]
+    [HarmonyPatch(nameof(HeadmanNeedsGrainIssueBehavior.CacheGrainPrice))]
     [HarmonyPostfix]
     private static void Postfix(HeadmanNeedsGrainIssueBehavior __instance)
     {
