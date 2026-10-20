@@ -108,8 +108,10 @@ internal class VillageNeedsToolsOutcomePatches
         {
             __state = null;
             if (ModInformation.IsClient || !(__instance is Quest quest) || !quest.IsOngoing ||
-                !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners) ||
-                !owners.TryResolveOwnerHero(IssueManager.GetIssueOfQuest(quest), out var ownerHero)) return;
+                !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners)) return;
+
+            var issue = IssueManager.GetIssueOfQuest(quest);
+            if (issue == null || !owners.TryResolveOwnerHero(issue, out var ownerHero)) return;
 
             __state = new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo);
         }
