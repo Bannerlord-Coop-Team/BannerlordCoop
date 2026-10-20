@@ -380,7 +380,9 @@ DEBUG only.
 `retreat`, `encounter`, `blockade` (`GameInterface/Services/MapEvents/NavalScenarios/NavalScenarioPresets.cs`).
 
 `encounter` takes scenario players off a raft first (a player released at sea is on one, and `PlayerRaftVisibilityPatches`
-turns an engage order on a player's raft into `GoToPoint`; R41b P4). The server re-issues the fleet's engage order whenever
+turns an engage order on a player's raft into `GoToPoint`; R41b P4), as landing would: the raft ends, the raft's `DisableAi`
+is undone with no server-side behavior recalculation, and the fleet cached at the stranding comes back
+(`IPlayerRaftFleetInterface.ReturnFleet`) before the top-up. The server re-issues the fleet's engage order whenever
 it isn't `EngageParty` on the first player. If there is still no map event after 10 s and the fleet is within
 `EncounterModel.NeededMaximumNavalDistanceForEncounteringMobileParty`, the server calls
 `EncounterManager.StartPartyEncounter(fleet, player)`, which becomes the server-detected player conversation. Neither runs

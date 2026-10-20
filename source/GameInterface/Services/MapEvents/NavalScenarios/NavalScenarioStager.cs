@@ -7,6 +7,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Commands;
+using GameInterface.Services.Rafts.Interfaces;
 using GameInterface.Services.Villages.Commands;
 using Serilog;
 using System;
@@ -53,14 +54,16 @@ public class NavalScenarioStager : INavalScenarioStager
     private readonly INetwork network;
     private readonly INavalScenarioState state;
     private readonly INavalEngageResetTracer resetTracer;
+    private readonly IPlayerRaftFleetInterface raftFleets;
 
     public NavalScenarioStager(IObjectManager objectManager, INetwork network, INavalScenarioState state,
-        INavalEngageResetTracer resetTracer)
+        INavalEngageResetTracer resetTracer, IPlayerRaftFleetInterface raftFleets)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.state = state;
         this.resetTracer = resetTracer;
+        this.raftFleets = raftFleets;
     }
 
     public bool TryStage(NavalScenarioConfig config, out string output)
@@ -81,12 +84,13 @@ public class NavalScenarioStager : INavalScenarioStager
 
         var log = new StringBuilder($"NAVAL_SCENARIO preset={config.Preset} scenario={config.ScenarioId}");
 
+        // The fleet cached at a stranding comes back first, so the top-up counts it.
+        LeaveRafts(config, players, log);
         foreach (var party in players)
         {
             TopUpShips(party.Party, config.ShipsPerPlayer, hull);
             TopUpTroops(party, config.TroopTemplatesPerPlayer);
         }
-        LeaveRafts(config, players, log);
         log.Append(" players=").Append(string.Join(",", config.ControllerIds.Zip(players,
             (id, party) => $"{id}(ships={party.Ships.Count},troops={party.MemberRoster.TotalManCount})")));
         if (config.ArmedShipsPerParty > 0)
@@ -140,15 +144,26 @@ public class NavalScenarioStager : INavalScenarioStager
     }
 
     // A player released at sea sails on a raft until it lands, and PlayerRaftVisibilityPatches turns an engage order on a
-    // player's raft into GoToPoint, which left the encounter preset's fleet idle (R41b P4). The topped-up fleet replaces the raft.
-    private static void LeaveRafts(NavalScenarioConfig config, MobileParty[] players, StringBuilder log)
+    // player's raft into GoToPoint, which left the encounter preset's fleet idle (R41b P4). Ends the raft as landing does.
+    private void LeaveRafts(NavalScenarioConfig config, MobileParty[] players, StringBuilder log)
     {
         var rafted = config.ControllerIds.Where((id, i) => players[i].IsInRaftState).ToList();
         if (rafted.Count == 0) return;
 
         foreach (var party in players.Where(party => party.IsInRaftState))
-            RaftStateChangeAction.DeactivateRaftStateForParty(party);
+            LeaveRaft(party);
         log.Append(" leftRaft=").Append(string.Join(",", rafted));
+    }
+
+    // RaftStateChangeAction.DeactivateRaftStateForParty without the server's short-term behavior and AI rethink for a party its
+    // client moves; EnableAi only undoes the raft's DisableAi, which would otherwise keep the client's party from moving.
+    // Then the fleet cached at the stranding comes back, as on landing (PlayerRaftFleetPatches).
+    private void LeaveRaft(MobileParty party)
+    {
+        party.IsInRaftState = false;
+        party.Ai.EnableAi();
+        CampaignEventDispatcher.Instance.OnMobilePartyRaftStateChanged(party);
+        raftFleets.ReturnFleet(party);
     }
 
     // The nearest hostile AI fleet at sea, a pirate (bandit) one when there is one.
