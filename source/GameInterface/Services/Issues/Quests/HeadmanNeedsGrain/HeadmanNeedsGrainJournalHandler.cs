@@ -10,7 +10,7 @@ using TaleWorlds.Localization;
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkHeadmanNeedsGrainEffectsResolved : IServerToClientCommand
+public readonly struct NetworkHeadmanNeedsGrainEffectsResolved : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
@@ -23,7 +23,7 @@ internal readonly struct NetworkHeadmanNeedsGrainEffectsResolved : IServerToClie
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkHeadmanNeedsGrainLog : IServerToClientCommand
+public readonly struct NetworkHeadmanNeedsGrainLog : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
@@ -40,7 +40,7 @@ internal readonly struct NetworkHeadmanNeedsGrainLog : IServerToClientCommand
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkHeadmanNeedsGrainAiCompleted : IServerToClientCommand
+public readonly struct NetworkHeadmanNeedsGrainAiCompleted : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;

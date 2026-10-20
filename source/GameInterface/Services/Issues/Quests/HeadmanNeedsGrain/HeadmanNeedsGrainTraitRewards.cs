@@ -115,14 +115,14 @@ internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct RequestHeadmanNeedsGrainTraitSeed : ICommand
+public readonly struct RequestHeadmanNeedsGrainTraitSeed : ICommand
 {
     [ProtoMember(1)] public readonly Dictionary<string, int> Values;
     public RequestHeadmanNeedsGrainTraitSeed(Dictionary<string, int> values) => Values = values;
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct NetworkHeadmanNeedsGrainTraitReward : IServerToClientCommand
+public readonly struct NetworkHeadmanNeedsGrainTraitReward : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string OwnerId;
     [ProtoMember(2)] public readonly string GiverId;
