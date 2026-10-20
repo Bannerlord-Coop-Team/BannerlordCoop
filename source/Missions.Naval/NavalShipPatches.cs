@@ -29,6 +29,28 @@ internal class NavalShipSpawnPatch
     }
 }
 
+// Vanilla readies a ship weapon's AI targets only when deployment ends, so a hull spawned later (AI fleet, foreign copy,
+// hull swap) would tick a ballista AI with no target list and throw in ThreatSeeker.GetAllThreats.
+[HarmonyPatch(typeof(NavalShipsLogic), nameof(NavalShipsLogic.SpawnShip),
+    new[] { typeof(Formation), typeof(MatrixFrame), typeof(bool), typeof(bool) },
+    new[] { ArgumentType.Normal, ArgumentType.Ref, ArgumentType.Normal, ArgumentType.Normal })]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class LateHullWeaponAiPatch
+{
+    // RangedSiegeWeapon.OnDeploymentFinished only initializes its AI's threat seeker, as MissionShip.OnDeploymentFinished would.
+    [HarmonyPostfix]
+    private static void Postfix(MissionShip __result)
+    {
+        if (__result?.ShipSiegeWeapon == null) return;
+        if (!ReadiesWeaponAi(CoopNavalMissionScope.IsActive, Mission.Current?.IsDeploymentFinished == true)) return;
+
+        __result.ShipSiegeWeapon.OnDeploymentFinished();
+    }
+
+    // Hulls spawned before deployment ends get it from vanilla's own deployment pass.
+    internal static bool ReadiesWeaponAi(bool coopNavalBattle, bool deploymentFinished) => coopNavalBattle && deploymentFinished;
+}
+
 // Only the owner runs a hull's ship order; a foreign copy follows the owner's frames.
 [HarmonyPatch(typeof(ShipOrder), nameof(ShipOrder.Tick))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
