@@ -376,6 +376,19 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
     public void AClientThatDidNotStartTheMission_TicksItsDayWithOneQuietLogEntry()
     {
         AcceptTheCompanionMission();
+        var missionStarted = false;
+
+        for (var attempt = 0; attempt < 5 && !missionStarted; attempt++)
+        {
+            TestEnvironment.FlushCoalescer();
+            ClientB.Call(() =>
+            {
+                Assert.True(ClientB.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+                missionStarted = giver.Issue.IsSolvingWithAlternative;
+            });
+        }
+
+        Assert.True(missionStarted);
 
         ClientB.Call(() =>
         {
