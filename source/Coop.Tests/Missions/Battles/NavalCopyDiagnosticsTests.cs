@@ -47,7 +47,7 @@ public class NavalCopyDiagnosticsTests
     public void MeasureApproach_SideBySideHullsAreTheirSpacingApart()
     {
         // Two 30 m by 8 m hulls heading north, 20 m apart centre to centre.
-        var measured = NavalCopyBodyLogic.MeasureApproach(new Vec2(0f, 0f), new Vec2(0f, 1f), 15f, 4f,
+        var measured = NavalCopyProbeLogic.MeasureApproach(new Vec2(0f, 0f), new Vec2(0f, 1f), 15f, 4f,
             new Vec2(20f, 0f), new Vec2(0f, 1f), 15f, 4f);
 
         Assert.Equal(20f, measured.CenterDistance, 3);
@@ -58,7 +58,7 @@ public class NavalCopyDiagnosticsTests
     public void MeasureApproach_ABowAtTheBeamIsTheBowDistance()
     {
         // The rammer heads east, its bow 6 m from the target's keel; the target lies north-south.
-        var measured = NavalCopyBodyLogic.MeasureApproach(new Vec2(-21f, 0f), new Vec2(1f, 0f), 15f, 4f,
+        var measured = NavalCopyProbeLogic.MeasureApproach(new Vec2(-21f, 0f), new Vec2(1f, 0f), 15f, 4f,
             new Vec2(0f, 0f), new Vec2(0f, 1f), 15f, 4f);
 
         // 6 m from the keel is 2 m from the target's side.
@@ -68,7 +68,7 @@ public class NavalCopyDiagnosticsTests
     [Fact]
     public void MeasureApproach_CrossingKeelsOverlap()
     {
-        var measured = NavalCopyBodyLogic.MeasureApproach(new Vec2(0f, 0f), new Vec2(1f, 0f), 15f, 4f,
+        var measured = NavalCopyProbeLogic.MeasureApproach(new Vec2(0f, 0f), new Vec2(1f, 0f), 15f, 4f,
             new Vec2(0f, 0f), new Vec2(0f, 1f), 15f, 4f);
 
         Assert.Equal(-8f, measured.Gap, 3);
@@ -77,7 +77,7 @@ public class NavalCopyDiagnosticsTests
     [Fact]
     public void SegmentDistance_MeasuresEndToEnd()
     {
-        Assert.Equal(5f, NavalCopyBodyLogic.SegmentDistance(new Vec2(0f, 0f), new Vec2(10f, 0f), new Vec2(15f, 0f),
+        Assert.Equal(5f, NavalCopyProbeLogic.SegmentDistance(new Vec2(0f, 0f), new Vec2(10f, 0f), new Vec2(15f, 0f),
             new Vec2(20f, 0f)), 3);
     }
 }

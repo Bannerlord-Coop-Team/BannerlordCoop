@@ -34,11 +34,15 @@ public class NavalShipEngine : INavalShipEngine
     private readonly ICoopShipSnapshotBuilder snapshotBuilder;
     private readonly IObjectManager objectManager;
 
-    public NavalShipEngine(ICoopShipSnapshotBuilder snapshotBuilder, IObjectManager objectManager)
+    public NavalShipEngine(ICoopShipSnapshotBuilder snapshotBuilder, IObjectManager objectManager, INavalSteeredCopies steeredCopies)
     {
         this.snapshotBuilder = snapshotBuilder;
         this.objectManager = objectManager;
+        SteeredCopies = steeredCopies;
     }
+
+    /// <summary>This engine's copies and their steering knobs (DEBUG probes and copy_steer read them).</summary>
+    public INavalSteeredCopies SteeredCopies { get; }
 
     private static NavalShipsLogic ShipsLogic => Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
 
@@ -91,18 +95,10 @@ public class NavalShipEngine : INavalShipEngine
         var frame = NetworkBattleShipSample.ToFrame(data.Frame);
         var ship = shipsLogic.SpawnShip(origin, in frame, team, formation, spawnAnchored: false, checkForFreeArea: false);
 
-        // The owner simulates this hull: no local controller, no auto controller, a kinematic body.
+        // The owner decides this hull: no local controller and no auto controller; its body is steered toward the samples.
         ship.SetController(ShipControllerType.None, autoUpdateController: false);
-        bool keepsDynamicBody = false;
-#if DEBUG
-        // A copy_body steered copy keeps its dynamic body, which cannot be turned back on later.
-        keepsDynamicBody = NavalCopyBodies.SpawnsSteered(data.ShipId);
-#endif
-        if (!keepsDynamicBody) ship.GameEntity.DisableDynamicBodySimulation();
         NavalForeignHulls.Add(ship);
-#if DEBUG
-        NavalCopyBodies.Track(ship, data.ShipId);
-#endif
+        SteeredCopies.Track(ship);
         formation = ship.Formation;
         return ship;
     }
@@ -112,7 +108,7 @@ public class NavalShipEngine : INavalShipEngine
         var ship = (MissionShip)hull;
         NavalForeignHulls.Add(ship);
         ship.SetController(ShipControllerType.None, autoUpdateController: false);
-        if (ship.GameEntity.IsValid) ship.GameEntity.DisableDynamicBodySimulation();
+        if (ship.GameEntity.IsValid) SteeredCopies.Track(ship);
     }
 
     // Vanilla only removes a hull nobody it keeps stands on (Quest5 frees crewless hulls, ShipRetreatLogic fades the crew
@@ -158,8 +154,7 @@ public class NavalShipEngine : INavalShipEngine
     private static bool UsesMachineOf(Agent agent, MissionShip ship) =>
         agent.CurrentlyUsedGameObject is UsableMissionObject used && used.GameEntity.IsValid && used.GameEntity.Root == ship.GameEntity;
 
-    // EnableDynamicBody does not undo DisableDynamicBodySimulation (live: the body stayed inactive), and the engine has
-    // no other inverse, so the hull is swapped for one spawned the way the host spawned it.
+    // The new authority simulates a hull spawned the way the host spawned it, not the copy it steered.
     public MissionObject ReplaceHull(MissionObject hull)
     {
         var ship = (MissionShip)hull;
@@ -324,16 +319,22 @@ public class NavalShipEngine : INavalShipEngine
 
     public MatrixFrame GetFrame(MissionObject hull) => ((MissionShip)hull).GlobalFrame;
 
-    public void ApplyForeignFrame(MissionObject hull, MatrixFrame frame)
+    public void ApplyForeignSample(MissionObject hull, MatrixFrame frame, BattleShipMotion motion) =>
+        SteeredCopies.Observe((MissionShip)hull, frame, motion);
+
+    public BattleShipMotion ReadMotion(MissionObject hull)
     {
         var entity = ((MissionShip)hull).GameEntity;
-        if (!entity.IsValid) return;
-#if DEBUG
-        if (NavalCopyBodies.ObserveOwnerFrame((MissionShip)hull, in frame)) return;
-#endif
+        if (!entity.IsValid) return default;
 
-        entity.SetGlobalFrame(frame, isTeleportation: false);
-        entity.UpdateAttachedNavigationMeshFaces();
+        return new BattleShipMotion(entity.GetLinearVelocity().AsVec2, entity.GetAngularVelocity().z);
+    }
+
+    public void TickCopies(float fixedDt) => SteeredCopies.Tick(fixedDt);
+
+    public void ForgetHull(MissionObject hull)
+    {
+        if (hull is MissionShip ship) SteeredCopies.Forget(ship);
     }
 
     public BattleShipInput ReadInput(MissionObject hull)
@@ -527,7 +528,7 @@ public class NavalShipEngine : INavalShipEngine
     public bool IsSeated(Agent agent, UsableMissionObject point) =>
         agent != null && point != null && agent.IsActive() && point.UserAgent == agent && agent.CurrentlyUsedGameObject == point;
 
-    // Re-pinned on each hull frame write, because vanilla's seat lock alone lets a seated foreign actor slide.
+    // Re-pinned every tick, because vanilla's seat lock alone lets a seated foreign actor slide.
     public void PinToStation(Agent agent, UsableMissionObject point)
     {
         if (!point.LockUserFrames) return;

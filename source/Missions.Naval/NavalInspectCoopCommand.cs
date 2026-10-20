@@ -44,8 +44,8 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             shipDamage = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipDamageRouter.Inspect(),
             shipDamageGate = NavalShipDamageGate.Inspect(),
 #if DEBUG
-            // copy_body modes, drift and correction per copy, contact counters, closest approaches and frame cost.
-            copyBodies = mission.GetMissionBehavior<NavalCopyBodyLogic>()?.Inspect(),
+            // Steering knobs, drift and correction per copy, contact counters, closest approaches and frame cost.
+            copyProbe = mission.GetMissionBehavior<NavalCopyProbeLogic>()?.Inspect(),
 #endif
             shipWeapons = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipWeaponReplicator.Inspect(),
             shipDecks = controller.MissionComponent.AgentMovementHandler.InspectShipDecks(),

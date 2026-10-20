@@ -25,13 +25,25 @@ public interface INavalShipEngine
     /// <summary>The hull's campaign ship description, side, formation and frame under the given identity.</summary>
     BattleShipSpawnData Describe(MissionObject hull, NetworkShipInfo identity);
 
-    /// <summary>Spawns a kinematic copy of another owner's hull on <paramref name="team"/>; null when it cannot.</summary>
+    /// <summary>
+    /// Spawns a copy of another owner's hull on <paramref name="team"/>: its body keeps simulating and is steered toward the
+    /// owner's samples. Null when it cannot.
+    /// </summary>
     MissionObject SpawnForeignHull(BattleShipSpawnData data, Team team, out Formation formation);
 
     MatrixFrame GetFrame(MissionObject hull);
 
-    /// <summary>Moves a foreign hull's kinematic body and its attached navmesh.</summary>
-    void ApplyForeignFrame(MissionObject hull, MatrixFrame frame);
+    /// <summary>[Game thread] Takes the owner's latest sample of a copy as the target its steering closes on.</summary>
+    void ApplyForeignSample(MissionObject hull, MatrixFrame frame, BattleShipMotion motion);
+
+    /// <summary>The hull body's planar velocity and yaw rate, sent with its samples.</summary>
+    BattleShipMotion ReadMotion(MissionObject hull);
+
+    /// <summary>[Fixed physics step] Steers every copy toward its owner's latest sample.</summary>
+    void TickCopies(float fixedDt);
+
+    /// <summary>[Game thread] Drops the steering state of a hull that left the mission.</summary>
+    void ForgetHull(MissionObject hull);
 
     /// <summary>The hull's effective helm input this frame.</summary>
     BattleShipInput ReadInput(MissionObject hull);
@@ -69,7 +81,7 @@ public interface INavalShipEngine
     /// <summary>[Game thread] Re-targets a seated puppet at its station's user frame on the current hull frame.</summary>
     void PinToStation(Agent agent, UsableMissionObject point);
 
-    /// <summary>[Game thread] Hands an AI (NPC) hull's simulation away from this client: it becomes a kinematic copy following its owner's samples.</summary>
+    /// <summary>[Game thread] Hands an AI (NPC) hull's simulation away from this client: it becomes a copy steered toward its owner's samples.</summary>
     void ReleaseNpcHull(MissionObject hull);
 
     /// <summary>
@@ -80,7 +92,7 @@ public interface INavalShipEngine
 
     /// <summary>
     /// [Mission tick] Second step: removes the hull and spawns a fresh simulated hull of the same ship at the same frame
-    /// under the AI controller, because a copy's body cannot be re-activated. Null when the hull cannot be replaced.
+    /// under the AI controller, so the new authority simulates a hull vanilla spawned. Null when the hull cannot be replaced.
     /// </summary>
     MissionObject ReplaceHull(MissionObject hull);
 

@@ -18,17 +18,17 @@ namespace Missions.Battles;
 
 /// <summary>
 /// Replicates naval hulls over the mission mesh. Own hulls register when they spawn, are announced to peers at
-/// the first deployment commit and stream their frame, helm input and ropes at 20 Hz; other owners' hulls are
-/// spawned as kinematic copies once this client's deployment is over and follow those samples. Ropes ride the samples
-/// because each one carries every station's generation-ordered state, so a later sample repairs a rejected one; leaving
-/// sends them once more. Owners also send a hull's damage state and fieldable reserve when either changes, and copies take
-/// them on. Every stream drops traffic from a controller not in the mission. A hull that leaves
+/// the first deployment commit and stream their frame, body motion, helm input and ropes at 20 Hz; other owners'
+/// hulls are spawned as copies once this client's deployment is over and the engine steers them toward those samples.
+/// Ropes ride the samples because each one carries every station's generation-ordered state, so a later sample repairs a
+/// rejected one; leaving sends them once more. Owners also send a hull's damage state and fieldable reserve when either
+/// changes, and copies take them on. Every stream drops traffic from a controller not in the mission. A hull that leaves
 /// with its owner (retreat, leave or disconnect) is removed on every client, after its seats and deck are cleared; only the
 /// AI hulls move to the next battle host.
 /// </summary>
 public interface IBattleShipReplicator : IDisposable
 {
-    /// <summary>[Game thread] Announce, stream and interpolate hulls for this frame.</summary>
+    /// <summary>[Game thread] Announce hulls, stream own samples and expire stale ones for this frame.</summary>
     void Tick(float dt);
 
     /// <summary>[Game thread] Registry and stream state per hull (diagnostics).</summary>
@@ -87,7 +87,6 @@ public class BattleShipReplicator : IBattleShipReplicator
     private static readonly ILogger Logger = LogManager.GetLogger<BattleShipReplicator>();
 
     internal const float SendIntervalSeconds = 0.05f;
-    internal const float InterpolationSeconds = 0.05f;
     // Measured on this client's mission clock from receipt, since peers' wall clocks are not in step.
     internal const float SampleLifetimeSeconds = 1f;
     // A foreign hull that cannot spawn (no free formation or ships logic yet) is retried this often before it is dropped.
@@ -248,7 +247,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         bool isOwn = hullAuthority.Transfer(ship, newAuthority);
 
-        // The old owner's interpolation target must not keep writing frames to a hull this client now simulates.
+        // The old owner's samples no longer describe the hull, whoever simulates it now.
         var stream = GetStream(ship.ShipId);
         stream.Target = null;
         stream.Accepted = 0;
@@ -285,7 +284,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (spawnRecordsSent)
             SendOwnSamples(dt);
 
-        ApplyForeignFrames(dt);
+        ExpireStaleSamples();
     }
 
     // Withdraws a departed party once its hulls settled; run before the hull step, so a removal that finished last tick has its
@@ -491,7 +490,7 @@ public class BattleShipReplicator : IBattleShipReplicator
             stream.Sent++;
             network.SendAll(new NetworkBattleShipSample(ship.ShipId, session.OwnControllerId, stream.Sent,
                 NetworkBattleShipSample.FromFrame(engine.GetFrame(ship.Hull)), engine.ReadInput(ship.Hull),
-                engine.CaptureRopes(ship.Hull, ShipIdOf), session.HostEpoch));
+                engine.CaptureRopes(ship.Hull, ShipIdOf), session.HostEpoch, engine.ReadMotion(ship.Hull)));
             conditions.SendIfChanged(ship);
         }
     }
@@ -743,15 +742,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         {
             held.Sample = null;
             if (ValidateSample(ship, session.OwnControllerId, sample, stream.Accepted, stream.AcceptedEpoch, null) == null)
-            {
                 TakeSample(ship, stream, sample);
-                // The move clears the interpolation target, so the frame is written now.
-                var frame = NetworkBattleShipSample.ToFrame(sample.Frame);
-                engine.ApplyForeignFrame(ship.Hull, frame);
-                stream.Written = frame;
-                stream.HasWritten = true;
-                stream.Applied = sample.Sequence;
-            }
         }
 
         var final = held.FinalRopes;
@@ -804,7 +795,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         }, context: nameof(Handle_NetworkBattleShipSample));
     }
 
-    /// <summary>[Game thread] Takes an owner's sample as the copied hull's next interpolation target.</summary>
+    /// <summary>[Game thread] Takes an owner's sample as the copied hull's steering target.</summary>
     internal void AcceptSample(NetworkBattleShipSample sample)
     {
         if (sample == null) return;
@@ -838,11 +829,11 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         engine.ApplyInput(ship.Hull, sample.Input);
         engine.ApplyRopes(ship.Hull, sample.Ropes, HullOf, final: false);
-        stream.Start = stream.HasWritten ? stream.Written : engine.GetFrame(ship.Hull);
+        engine.ApplyForeignSample(ship.Hull, NetworkBattleShipSample.ToFrame(sample.Frame), sample.Motion);
         stream.Target = sample;
         stream.TargetReceivedAt = elapsed;
         stream.Accepted = sample.Sequence;
-        stream.Elapsed = 0;
+        stream.Applied = sample.Sequence;
     }
 
     // The owner reports it with the hull's condition, on change, so no frame length expires it: vanilla latches a depleted
@@ -910,36 +901,21 @@ public class BattleShipReplicator : IBattleShipReplicator
             controllersInMission);
         if (rejection != null) return rejection;
         if (!sample.HasValidFrame) return "invalid_frame";
+        if (!sample.Motion.IsValid) return "invalid_motion";
         if (!sample.Input.IsValid) return "invalid_input";
         if (!BattleRopeState.AreValid(sample.Ropes)) return "invalid_ropes";
         return null;
     }
 
-    private void ApplyForeignFrames(float dt)
+    // A copy's stream stops counting as live once no sample came for the lifetime; the engine's steering ages it on its own.
+    private void ExpireStaleSamples()
     {
-        if (float.IsNaN(dt) || float.IsInfinity(dt) || dt <= 0) return;
-
-        foreach (var entry in streams)
+        foreach (var stream in streams.Values)
         {
-            var stream = entry.Value;
-            var target = stream.Target;
-            if (target == null || !Registry.TryGet(entry.Key, out var ship) || IsOwnHull(ship)) continue;
+            if (stream.Target == null || elapsed - stream.TargetReceivedAt <= SampleLifetimeSeconds) continue;
 
-            if (elapsed - stream.TargetReceivedAt > SampleLifetimeSeconds)
-            {
-                stream.Target = null;
-                stream.Reject("expired");
-                continue;
-            }
-
-            if (stream.Elapsed >= InterpolationSeconds) continue;
-
-            stream.Elapsed = Math.Min(InterpolationSeconds, stream.Elapsed + dt);
-            var frame = MatrixFrame.Lerp(stream.Start, NetworkBattleShipSample.ToFrame(target.Frame), stream.Elapsed / InterpolationSeconds);
-            engine.ApplyForeignFrame(ship.Hull, frame);
-            stream.Written = frame;
-            stream.HasWritten = true;
-            stream.Applied = target.Sequence;
+            stream.Target = null;
+            stream.Reject("expired");
         }
     }
 
@@ -1069,10 +1045,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         public NetworkBattleShipSample Target;
         /// <summary>This client's mission clock when <see cref="Target"/> arrived.</summary>
         public float TargetReceivedAt;
-        public MatrixFrame Start;
-        public MatrixFrame Written;
-        public bool HasWritten;
-        public float Elapsed;
         public long Sent;
         public long Accepted;
         public int AcceptedEpoch;

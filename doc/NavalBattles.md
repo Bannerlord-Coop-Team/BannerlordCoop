@@ -14,13 +14,22 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 - `OriginalOwner` is the player who fielded it. `IsNpcParty` marks an AI party's hull.
 - Every client spawns its own hulls through vanilla team setup. They register on spawn and are announced to the others at
   the first deployment commit (`NetworkSpawnBattleShips`).
-- Every other owner's hull is a copy on this client: spawned from the record, made kinematic
-  (`DisableDynamicBodySimulation`), and driven only by its owner's streams. A copy never collides and never simulates.
+- Every other owner's hull is a copy on this client: spawned from the record with its dynamic body, no controller, and
+  driven only by its owner's streams (D3 option B). It replays the owner's helm input, and `NavalSteeredCopies`
+  (`Missions.Naval`) steers it every fixed physics step toward the owner's latest sample extrapolated by the owner's
+  velocity and yaw rate: target velocity = owner velocity + clamped, soft-zoned correction, blended in with a time
+  constant. A large error or a jump between samples teleports it (`NavalShipsLogic.TeleportShip`, crew carried along).
+  Heave, pitch and roll come from this client's water. A copy whose body isn't simulating when it spawns gets its owner's
+  frames written instead (warning `has no simulating body`).
+- A copy collides like any hull, but its owner stays the authority of everything that happens to it: contact and ram
+  damage on a copy is routed to the owner (`BattleShipDamageRouter`).
 
 ### Streams
 
-- `BattleShipReplicator` sends each own hull's frame, helm input and rope state every 0.05 s (20 Hz,
-  `SendIntervalSeconds`). Copies interpolate to the latest sample and drop samples older than 1 s on the receiver's clock.
+- `BattleShipReplicator` sends each own hull's frame, body velocity and yaw rate, helm input and rope state every 0.05 s
+  (20 Hz, `SendIntervalSeconds`). Each accepted sample goes straight to the engine as the copy's steering target. A
+  stream counts as expired after 1 s without samples on the receiver's clock, and the steering stops feeding the
+  owner's velocity forward after the same time.
 - `BattleShipConditionStream` sends a hull's damage state (HP, sails, fire, sinking) and its fieldable reserve whenever
   either changes. A late joiner gets the last one on entry.
 - `BattleShipWeaponReplicator` sends a ship weapon's aim and ammo state at 10 Hz plus each shot. A copy replays the shot
@@ -75,9 +84,9 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 
 ### Host migration swap
 
-- A copy's body can't be re-activated (`EnableDynamicBody` does not undo `DisableDynamicBodySimulation`). So a client
-  that takes a hull over replaces it with a freshly spawned simulated hull of the same ship, keeping the ship id
-  (`Missions/Battles/NavalHullAuthority.cs`).
+- A client that takes a hull over replaces its copy with a freshly spawned simulated hull of the same ship, keeping the
+  ship id (`Missions/Battles/NavalHullAuthority.cs`). The swap dates from kinematic copies, whose body could not be
+  re-activated, and is live-proven. Follow-up: replace it by a controller switch on the steered copy.
 - One phase per mission tick:
   1. `ParkHullAgents`: everyone aboard stops using machines, is lifted clear with physics force-closed and untracked from
      the hull.
@@ -85,7 +94,7 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
      is carried over and the trajectory planner rebuilt. The registry rebinds the ship id.
   3. `BoardHullAgents`: the parked agents go back to their deck positions on the new hull and vanilla seats the helm and oars.
 - If the replace fails or throws, the parked agents go back aboard the old hull. A client that hands a hull away turns it
-  back into a copy (`ReleaseNpcHull`).
+  back into a steered copy (`ReleaseNpcHull`).
 - `coop.debug.naval.reswap` runs a swap without a migration.
 
 ### Departure
@@ -200,7 +209,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | Goal | Status | Proven by |
 |---|---|---|
 | G1 Beat a pirate fleet to a natural end, with ship weapons | Natural end done and live-passed (R40 A, B1, B2). Weapons live-passed in R41a-2 W1 (ballistas for 156 s, no crash). | `vs_pirates`, `sinking`, `fleet`, `migration`, `weapons=n`; `NavalNaturalEndScenarioTests`, `NavalShipWeaponScenarioTests`, `NavalVsPiratesScenarioTests` |
-| G2 Ramming and boarding between any two hulls | Not started. Probes in code (copy_body, contact counters); peer ram does no damage (R37), copies never collide. | `ramming`, `boarding`; no E2E |
+| G2 Ramming and boarding between any two hulls | In progress (M10a): copies are steered dynamic bodies (D3 option B) and collide with own hulls; contact damage routes to the owner (R41b). Not live yet. | `ramming`, `boarding`; `NavalCopySteeringTests` |
 | G3 Retreat, leave or disconnect without breaking the battle | Retreat and leave live-passed in R41a (A, B, C). Disconnect is a leave (D4); hard drops of a non-host and of the host live-passed in R41a-2 (D, E). Done: the R41a-2 W2 and S fixes and the departure order (parked N of N, then withdrew N) live-passed in R41a-3. | `retreat`, `migration who=nonhost`; `NavalDepartureScenarioTests`, `BattleReserveReconnectScopeTests` |
 | G4 Results match vanilla | Pending (M6). HP, sunk ships and captured ships are not written back. | none yet |
 | G5 Battles from real campaign play | Presets done (WP4), never live. | `encounter`, `blockade`; preset unit tests |
@@ -229,8 +238,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | R41a-2 fixes (pickup stations, player allocation, setup failure, departure order, late-join record, preset) | done, live in R41a-3 (member hold and W2 pickup not hit) |
 | R41a-3 live run | done: W2, D, E, S, K, W1 pass |
 | R41a retreat, leave and disconnect live validation | done (R41a, R41a-2, R41a-3) |
-| R41b probes | next |
-| M7 contact probe (live), M10a ram and contact, M10b plank crossing and melee | pending, needs D3 |
+| R41b probes | done, D3 decided |
+| M10a ram and contact (steered copies) | in progress, R42 next |
+| M10b plank crossing and melee | pending, needs M10a |
 | M6 results parity | pending |
 | M11 allied fleets | pending |
 
@@ -268,10 +278,10 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   to a team with no troops) and was never exercised live. Cost: a side whose only hull belonged to the disconnected
   player can lose the battle while the player is away. This differs from land, where the host adopts a disconnected
   player's troops and hands them back (BR-031, BR-033).
-- **D3, contact model.** Ramming between owners needs contact with a copy. Option A keeps the copy kinematic and only
-  routes ram damage. Option B (`copy_body steered`) keeps the copy's dynamic body and steers it toward the owner's
-  samples. Option C (`copy_body static`) gives it a moveable static collider. The pick waits on the R41 `copy_body`
-  probe data; helm capture is part of D3.
+- **D3, contact model (decided 2026-10-20): option B, steered copies.** A copy keeps its dynamic body and is steered
+  toward the owner's samples, so hulls of different owners touch. R41b measured steered copies at 0.16 to 0.26 m mean
+  drift with contact damage routed to the owner and identical HP on both clients; option C (static collider) could not
+  be built (`AddPhysics(isStatic)` left no static body). Kinematic and static copies and `copy_body` were deleted.
 - **D2.** A failed AI fleet counts as a players' victory (the land precedent); an aborted battle would need a new
   result state.
 - **Water is not shared.** The water clock is native and can't be set from managed code, and `WaterQuality` and
@@ -282,8 +292,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - the campaign side of a mid-battle retreat (the party at sea, rafts) is his;
   - ship loot and distribution are his;
   - the PvP loser's ships vanish (R39).
-- **Ramming is absent across owners.** Copies don't collide, so only two hulls simulated on the same client (the
-  battle host's own hull and the AI hulls it simulates) can ram each other.
+- **Ramming across owners is not gated yet.** Copies collide now, but a copy's `MissionShipRam` still runs its damage
+  tick on every client that holds the copy (M10a step 3).
 - **Allied fleets.** An AI lord on the players' side fields no hulls. Agents refused by a formation with no hull are not
   re-assigned.
 - **Late join and reconnect.** A late joiner gets every record, condition, weapon state and seat; a returning player is
@@ -335,13 +345,12 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 |---|---|---|
 | `scenario <preset> [knobs] [ids]` | server | Stages a preset and starts the battle. |
 | `scenario_status` | client | Preset steps, knobs and `battle.hulls[]` with owner, AI flag and weapon. |
-| `inspect` | client | Session, host epoch, hull streams, damage, weapons, decks, stations, AI fleet, end tally, agents, ships; DEBUG adds copy body modes, drift and contact counters. |
+| `inspect` | client | Session, host epoch, hull streams, damage, weapons, decks, stations, AI fleet, end tally, agents, ships; DEBUG adds `copyProbe`: steering knobs, drift and correction per copy, steering cost and contact counters. |
 | `win`, `lose` | battle host | Ends the battle as a victory or defeat for the host's side; peers follow. |
 | `damage <ship> <amount>`, `sink <ship>` | client | Hits a hull as a ship weapon would; another owner's hull takes it through its owner. |
 | `reswap <ship>` | battle host | Replaces an AI hull without a migration. |
 | `helm <rudder> <row> <sail> [seconds]` | client | Drives the own hull. |
 | `rope_list`, `rope_throw`, `rope_status` | client | Lists, throws and shows ropes. |
-| `copy_body <ship\|all> kinematic\|steered\|static [knobs]` | client | Switches how copies exist here (D3 options A, B, C). |
 | `water_probe start [grid=5] [spacing=40] [seconds=120] \| status \| stop` | client | Samples the water grid for the shared-clock test. |
 
 `coop.debug.map_event.start_naval` starts a naval battle directly. Everything above except `inspect` and `rope_status` is

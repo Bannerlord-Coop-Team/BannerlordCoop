@@ -7,7 +7,7 @@ namespace Missions.Messages;
 
 /// <summary>
 /// Owner to peers over the mission mesh: the hulls this owner fielded, sent at its first deployment commit so
-/// peers can spawn kinematic copies before its crew records need them.
+/// peers can spawn copies before its crew records need them.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public sealed class NetworkSpawnBattleShips : IEvent

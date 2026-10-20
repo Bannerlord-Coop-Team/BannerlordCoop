@@ -54,11 +54,20 @@ public class CoopNavalBattleBehavior : MissionLogic
 
     public IBattleShipWeaponReplicator ShipWeaponReplicator => services.ShipWeaponReplicator;
 
+    public INavalShipEngine Engine => services.Engine;
+
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);
         services.Tick(dt, tickNpcFleet);
         LogAgentCountDrop();
+    }
+
+    // Copies are steered with the physics step, so a velocity change lands on the body before it integrates.
+    public override void OnFixedMissionTick(float fixedDt)
+    {
+        base.OnFixedMissionTick(fixedDt);
+        services.Engine.TickCopies(fixedDt);
     }
 
     // Runs after DefaultNavalMissionLogic's deployment finish, so this is the hull set the battle starts with.
@@ -85,10 +94,6 @@ public class CoopNavalBattleBehavior : MissionLogic
         bool retreatOrdered = ship.IsShipOrderActive && ship.ShipOrder.MovementOrderEnum == ShipOrder.ShipMovementOrderEnum.Retreat;
         var reason = retreated || retreatOrdered ? ShipRemovalReason.Retreat : ShipRemovalReason.Leave;
         ShipReplicator.AnnounceRemoval(ship, reason, shipsLogic.IsMissionEnding);
-#if DEBUG
-        // A pooled or removed hull leaves as the kinematic copy it was spawned as.
-        NavalCopyBodies.OnRemoving(ship);
-#endif
     }
 
     // A removed hull is pooled during deployment and its entity removed later, so no copy reference may outlive it.
@@ -96,6 +101,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     {
         bool wasCopy = NavalForeignHulls.Contains(ship);
         if (wasCopy) NavalForeignHulls.Remove(ship);
+        services.Engine.ForgetHull(ship);
         if (shipsLogic.IsMissionEnding) return;
 
         Logger.Information("[NavalSync] Hull {Index} on {Team} formation {Formation} removed (copy {Copy}, pooled {Pooled})",
@@ -123,7 +129,6 @@ public class CoopNavalBattleBehavior : MissionLogic
         NavalRopes.Clear();
 #if DEBUG
         NavalHelmOverride.Clear();
-        NavalCopyBodies.Clear();
         NavalContactProbe.Clear();
 #endif
         NavalForeignHulls.Clear();

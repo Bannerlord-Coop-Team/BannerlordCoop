@@ -168,7 +168,7 @@ internal static class NavalShipDamageGate
     }
 
 #if DEBUG
-    // Probe: whether hull contact callbacks fire against kinematic copies at all, at most once a second per hull pair.
+    // Probe: how often hull contact callbacks fire against copies, at most once a second per hull pair.
     internal static void LogHullContact(MissionShip ship, WeakGameEntity other)
     {
         if (!CoopNavalMissionScope.IsActive || !other.IsValid) return;

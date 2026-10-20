@@ -2,6 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using NavalDLC.Missions.Objects;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
 
 namespace Missions.Naval;
@@ -56,16 +58,14 @@ internal sealed class RollingWindow
     public void Clear() => samples.Clear();
 }
 
-/// <summary>
-/// DEBUG: how far one copy sits from its owner's latest frame, and how hard its correction pushes, over the last 10 s.
-/// </summary>
+/// <summary>DEBUG: how far one copy sits from its owner's latest sample, and how hard its steering pushes, over the last 10 s.</summary>
 internal sealed class CopyDiagnostics
 {
     public RollingWindow Distance { get; } = new RollingWindow();
 
     public RollingWindow HeadingDegrees { get; } = new RollingWindow();
 
-    /// <summary>Height difference to the owner's frame, which the local water decides in every mode.</summary>
+    /// <summary>Height difference to the owner's sample, which the local water decides.</summary>
     public RollingWindow Heave { get; } = new RollingWindow();
 
     public RollingWindow Correction { get; } = new RollingWindow();
@@ -73,6 +73,14 @@ internal sealed class CopyDiagnostics
     /// <summary>The correction along the heading, whose sign changes over the window count as oscillations.</summary>
     public RollingWindow CorrectionAlongHeading { get; } = new RollingWindow();
 
+    /// <summary>Records one steering step's velocity change.</summary>
+    public void RecordStep(float time, CopySteeringStep step)
+    {
+        Correction.Add(time, step.DeltaVelocity.Length);
+        CorrectionAlongHeading.Add(time, step.AlongHeading);
+    }
+
+    /// <summary>The drift, heading, heave and correction windows with the steering's counters.</summary>
     public object Inspect(CopySteering steering) => new
     {
         drift = new { samples = Distance.Count, meanM = Round(Distance.Mean), maxM = Round(Distance.Max) },
@@ -86,9 +94,16 @@ internal sealed class CopyDiagnostics
             oscillations10s = CorrectionAlongHeading.SignChanges(CopySteering.OscillationEpsilon),
             oscillationsTotal = steering?.Oscillations,
             snaps = steering?.Snaps,
-            ownerFrameAgeS = steering == null ? (float?)null : Round(steering.SecondsSinceOwnerFrame),
+            sampleAgeS = steering == null ? (float?)null : Round(steering.SecondsSinceSample),
         },
     };
+
+    /// <summary>"own", "steered" or "written" (a copy whose body does not simulate), for the probes.</summary>
+    internal static string ModeName(MissionShip hull)
+    {
+        if (!NavalForeignHulls.Contains(hull)) return "own";
+        return hull.GameEntity.IsValid && hull.GameEntity.HasDynamicRigidBodyAndActiveSimulation() ? "steered" : "written";
+    }
 
     internal static float Round(float value) => (float)Math.Round(value, 3);
 }

@@ -5,7 +5,7 @@ namespace Missions.Messages;
 
 /// <summary>
 /// A hull's effective helm input (vanilla ShipInputRecord as integers). Replayed on a copied hull so its oars and sails
-/// move like the owner's; the copy's body is not simulated, so the input produces no force there.
+/// move like the owner's; the copy's body simulates, so the input drives it as it drives the owner's hull.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public struct BattleShipInput

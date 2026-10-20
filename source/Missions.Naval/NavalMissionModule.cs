@@ -29,6 +29,9 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalShipEngine>()
             .As<INavalShipEngine>()
             .InstancePerDependency();
+        builder.RegisterType<NavalSteeredCopies>()
+            .As<INavalSteeredCopies>()
+            .InstancePerDependency();
         // Registered after MissionModule's AgentFormationAssigner, so it is the one resolved.
         builder.RegisterType<NavalAgentFormationAssigner>()
             .As<IAgentFormationAssigner>()
@@ -68,9 +71,6 @@ public class NavalMissionModule : Module
             .As<ICoopCommand>()
             .InstancePerDependency();
         builder.RegisterType<NavalScenarioStatusCoopCommand>()
-            .As<ICoopCommand>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalCopyBodyCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
         builder.RegisterType<NavalWaterProbeCoopCommand>()

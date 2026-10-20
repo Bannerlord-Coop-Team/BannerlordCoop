@@ -11,6 +11,9 @@ namespace Missions.Battles;
 /// </summary>
 public interface INavalBattleServices : IDisposable
 {
+    /// <summary>The hull operations the services share; its copies are stepped on the fixed physics tick.</summary>
+    INavalShipEngine Engine { get; }
+
     IBattleShipReplicator ShipReplicator { get; }
 
     IAgentStationUseReplicator StationUseReplicator { get; }
@@ -40,6 +43,7 @@ public class NavalBattleServices : INavalBattleServices
     {
         // These services exist only in a naval mission and open with it.
         context.Session.MarkNaval();
+        Engine = shipEngine;
         hullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, shipEngine, context.TroopWithdrawal);
         var conditions = new BattleShipConditionStream(network, context.Session, shipEngine, context.HostEpochPolicy,
             context.MissionContext);
@@ -56,6 +60,8 @@ public class NavalBattleServices : INavalBattleServices
         ShipWeaponReplicator = new BattleShipWeaponReplicator(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, ShipReplicator, context.HostEpochPolicy, context.MissionContext);
     }
+
+    public INavalShipEngine Engine { get; }
 
     public IBattleShipReplicator ShipReplicator { get; }
 

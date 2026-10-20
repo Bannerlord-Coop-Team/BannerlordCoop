@@ -22,12 +22,20 @@ public sealed class NetworkBattleShipSample : IEvent
     [ProtoMember(7)] public readonly BattleRopeState[] Ropes;
     /// <summary>The sender's battle host epoch; AI-hull samples from a superseded host generation are dropped.</summary>
     [ProtoMember(8)] public readonly int HostEpoch;
+    /// <summary>The owner's planar body velocity in m/s, which copies extrapolate the frame with.</summary>
+    [ProtoMember(9)] public readonly float VelocityX;
+    [ProtoMember(10)] public readonly float VelocityY;
+    /// <summary>The owner's body yaw rate in rad/s.</summary>
+    [ProtoMember(11)] public readonly float YawRate;
 
     public NetworkBattleShipSample(Guid shipId, string ownerControllerId, long sequence, float[] frame,
-        BattleShipInput input = default, BattleRopeState[] ropes = null, int hostEpoch = 0)
+        BattleShipInput input = default, BattleRopeState[] ropes = null, int hostEpoch = 0, BattleShipMotion motion = default)
     {
         Ropes = ropes;
         HostEpoch = hostEpoch;
+        VelocityX = motion.Velocity.x;
+        VelocityY = motion.Velocity.y;
+        YawRate = motion.YawRate;
         ShipId = shipId;
         OwnerControllerId = ownerControllerId;
         Sequence = sequence;
@@ -38,6 +46,8 @@ public sealed class NetworkBattleShipSample : IEvent
     public AuthorityStamp Stamp => new AuthorityStamp(OwnerControllerId, HostEpoch, Sequence);
 
     public bool HasValidFrame => IsValidFrame(Frame);
+
+    public BattleShipMotion Motion => new BattleShipMotion(new Vec2(VelocityX, VelocityY), YawRate);
 
     public static float[] FromFrame(MatrixFrame frame) => new[]
     {

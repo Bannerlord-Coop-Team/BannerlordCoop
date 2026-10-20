@@ -135,7 +135,7 @@ public class NavalWaterProbeLogic : MissionLogic
 
             var frame = hull.GlobalFrame;
             bool isCopy = NavalForeignHulls.Contains(hull);
-            yield return new NavalWaterProbeHull(NavalContactProbe.Short(ship.ShipId), isCopy ? "copy" : "own", NavalCopyBodies.ModeName(hull),
+            yield return new NavalWaterProbeHull(NavalContactProbe.Short(ship.ShipId), isCopy ? "copy" : "own", CopyDiagnostics.ModeName(hull),
                 frame.origin.z, AxisTiltDegrees(frame.rotation.f.z), AxisTiltDegrees(frame.rotation.s.z),
                 scene.GetWaterLevelAtPosition(frame.origin.AsVec2, true, false));
         }

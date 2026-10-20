@@ -271,7 +271,7 @@ public class NavalHullAuthority : INavalHullAuthority
         switch (swap.Phase)
         {
             case HullSwapPhase.ParkAgents:
-                // A hull removed during deployment is pooled and spawning its ship again returns that same kinematic copy.
+                // A hull removed during deployment is pooled and spawning its ship again returns that same copy.
                 if (engine.IsDeploymentMode) return;
 
                 swap.Agents = engine.ParkHullAgents(ship.Hull);

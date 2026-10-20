@@ -109,7 +109,7 @@ public class BattleShipReplicatorTests
         Assert.False((bool)inspected["streaming"]!);
         Assert.Equal("expired", (string)inspected["lastReject"]!);
         Assert.Equal(2, (long)inspected["applied"]!);
-        harness.Engine.Verify(e => e.ApplyForeignFrame(copy, It.IsAny<MatrixFrame>()), Times.Exactly(2));
+        harness.Engine.Verify(e => e.ApplyForeignSample(copy, It.IsAny<MatrixFrame>(), It.IsAny<BattleShipMotion>()), Times.Exactly(2));
     }
 
     // K4, R7: only a hull's owner tracks its reserve queue, so it rides the hull's on-change condition to the battle host's
@@ -1184,6 +1184,52 @@ public class BattleShipReplicatorTests
         Assert.Equal(7, copy.Sequence);
     }
 
+    // M10: copies extrapolate the owner's frame with the body velocity and yaw rate the sample carries.
+    [Fact]
+    public void Sample_RoundTripsTheOwnersBodyMotion()
+    {
+        var motion = new BattleShipMotion(new Vec2(4.5f, -1.25f), 0.2f);
+        var sample = new NetworkBattleShipSample(Guid.NewGuid(), Peer, 7,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), motion: motion);
+
+        var copy = Serializer.DeepClone(sample);
+
+        Assert.Equal(4.5f, copy.Motion.Velocity.x);
+        Assert.Equal(-1.25f, copy.Motion.Velocity.y);
+        Assert.Equal(0.2f, copy.Motion.YawRate);
+    }
+
+    [Theory]
+    [InlineData(float.NaN, 0f, 0f)]
+    [InlineData(0f, float.PositiveInfinity, 0f)]
+    [InlineData(0f, 0f, float.NegativeInfinity)]
+    public void ValidateSample_RejectsANonFiniteMotion(float velocityX, float velocityY, float yawRate)
+    {
+        var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, null, false, CreateHull(), null);
+        var sample = new NetworkBattleShipSample(ship.ShipId, Peer, 1, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity),
+            motion: new BattleShipMotion(new Vec2(velocityX, velocityY), yawRate));
+
+        Assert.Equal("invalid_motion", BattleShipReplicator.ValidateSample(ship, Own, sample, 0, 0, InMission));
+    }
+
+    [Fact]
+    public void Tick_SendsTheOwnHullsBodyMotion_AndACopyHandsTheSampleToTheEngine()
+    {
+        var harness = new Harness(committed: true);
+        var motion = new BattleShipMotion(new Vec2(3f, 1f), -0.1f);
+        harness.Engine.Setup(e => e.ReadMotion(harness.OwnHull)).Returns(motion);
+        var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: false);
+
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.AcceptSample(new NetworkBattleShipSample(ship.ShipId, Peer, 1,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), motion: motion));
+
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkBattleShipSample
+            && ((NetworkBattleShipSample)m).VelocityX == 3f && ((NetworkBattleShipSample)m).YawRate == -0.1f)), Times.Once);
+        harness.Engine.Verify(e => e.ApplyForeignSample(copy, It.IsAny<MatrixFrame>(),
+            It.Is<BattleShipMotion>(m => m.Velocity.x == 3f && m.Velocity.y == 1f && m.YawRate == -0.1f)), Times.Once);
+    }
+
     [Fact]
     public void SpawnRecord_RoundTripsTheHullDescriptor()
     {
@@ -1485,7 +1531,8 @@ public class BattleShipReplicatorTests
         Assert.Equal(Own, ship.CurrentAuthority);
         Assert.Equal(Peer, ship.OriginalOwner);
         harness.Engine.Verify(e => e.ApplyCondition(copy, heldCondition.Condition), Times.Once);
-        harness.Engine.Verify(e => e.ApplyForeignFrame(copy, It.Is<MatrixFrame>(f => f.origin.x == 5f)), Times.Once);
+        harness.Engine.Verify(e => e.ApplyForeignSample(copy, It.Is<MatrixFrame>(f => f.origin.x == 5f), It.IsAny<BattleShipMotion>()),
+            Times.Once);
         harness.Engine.Verify(e => e.ParkHullAgents(copy), Times.Once);
     }
 

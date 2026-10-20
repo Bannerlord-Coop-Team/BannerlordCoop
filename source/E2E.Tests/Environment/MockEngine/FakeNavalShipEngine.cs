@@ -137,18 +137,31 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
 
     public MatrixFrame GetFrame(MissionObject hull) => Of(hull).Frame;
 
-    public void ApplyForeignFrame(MissionObject hull, MatrixFrame frame)
+    // Stands in for the steered copy reaching the owner's sample at once.
+    public void ApplyForeignSample(MissionObject hull, MatrixFrame frame, BattleShipMotion motion)
     {
         var fake = Of(hull);
         fake.Frame = frame;
+        fake.Motion = motion;
         fake.FrameWrites++;
+    }
+
+    public BattleShipMotion ReadMotion(MissionObject hull) => default;
+
+    public void TickCopies(float fixedDt)
+    {
+    }
+
+    public void ForgetHull(MissionObject hull)
+    {
     }
 
     public BattleShipInput ReadInput(MissionObject hull) => Of(hull).Input;
 
     public void ApplyInput(MissionObject hull, BattleShipInput input) => Of(hull).Input = input;
 
-    public bool IsBodyActive(MissionObject hull) => !Of(hull).IsCopy;
+    // A steered copy keeps its body simulating, as an own hull does.
+    public bool IsBodyActive(MissionObject hull) => true;
 
     public string ControllerName(MissionObject hull) => Of(hull).IsCopy ? "copy" : "simulated";
 
@@ -532,7 +545,7 @@ public sealed class FakeHull
     public MissionObject Hull { get; }
     public BattleSideEnum Side { get; }
     public int FormationIndex { get; }
-    /// <summary>A kinematic copy of another owner's hull, or a hull this client handed away.</summary>
+    /// <summary>A copy of another owner's hull, or a hull this client handed away.</summary>
     public bool IsCopy { get; set; }
     public MatrixFrame Frame { get; set; } = MatrixFrame.Identity;
     public BattleShipInput Input { get; set; }
@@ -565,7 +578,10 @@ public sealed class FakeHull
     public Formation? Formation { get; set; }
     public BattleShipSpawnData? SpawnData { get; set; }
     public BattleRopeState[] Ropes { get; set; } = Array.Empty<BattleRopeState>();
+    /// <summary>How many owner samples the copy took.</summary>
     public int FrameWrites { get; set; }
+    /// <summary>The owner's body motion the copy's latest sample carried.</summary>
+    public BattleShipMotion Motion { get; set; }
     public int FinalRopesApplied { get; set; }
     public int AppliedConditions { get; set; }
     public int StationUses { get; set; }

@@ -15,7 +15,7 @@ public class NavalShipEngineTests
     [Fact]
     public void ApplyStationUse_NeverSeatsOnAnItemOrARemovedPoint()
     {
-        var engine = new NavalShipEngine(null!, null!);
+        var engine = new NavalShipEngine(null!, null!, null!);
 
         engine.ApplyStationUse(null!, ShipTestHulls.CreateWorldItem(), inUse: true);
         engine.ApplyStationUse(null!, ShipTestHulls.CreatePoint(), inUse: true);
@@ -25,7 +25,7 @@ public class NavalShipEngineTests
     [Fact]
     public void ApplyStationUse_StillSeatsOnADeactivatedMachine()
     {
-        var engine = new NavalShipEngine(null!, null!);
+        var engine = new NavalShipEngine(null!, null!, null!);
         var point = ShipTestHulls.CreatePoint();
         AccessTools.Field(typeof(UsableMissionObject), "_isDeactivated").SetValue(point, true);
         AccessTools.Field(typeof(ScriptComponentBehavior), "_gameEntity").SetValue(point, ValidEntity());

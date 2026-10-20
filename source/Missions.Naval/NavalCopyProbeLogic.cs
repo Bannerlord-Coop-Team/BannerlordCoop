@@ -3,7 +3,6 @@ using Missions.Battles;
 using NavalDLC.Missions.Objects;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
@@ -12,39 +11,33 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread] DEBUG: keeps every copy in the mode its copy_body rule asks for and steers the steered ones once per
-/// physics step. Copies the engine did not spawn itself (a hull handed to another owner) are picked up from the registry.
-/// Also measures each copy's drift from its owner's frames, the closest approach of every hull pair and the frame cost.
+/// [Game thread] DEBUG: measures each copy's drift from its owner's latest sample, the closest approach of every hull pair,
+/// the frame cost and the steering cost.
 /// </summary>
-public class NavalCopyBodyLogic : MissionLogic
+public class NavalCopyProbeLogic : MissionLogic
 {
-    // Without a fixed step for this long the correction runs once per frame instead.
-    private const float FixedTickTimeoutSeconds = 0.5f;
-
     private readonly INetworkShipRegistry registry;
+    private readonly INavalSteeredCopies steeredCopies;
     private readonly Dictionary<MissionShip, HullOutline> outlines = new Dictionary<MissionShip, HullOutline>();
     private readonly RollingWindow frameMilliseconds = new RollingWindow();
     private readonly RollingWindow steerMilliseconds = new RollingWindow();
-    private readonly Stopwatch steerClock = new Stopwatch();
-    private float sinceFixedTick = float.MaxValue;
     private long fixedTicks;
 
-    public NavalCopyBodyLogic(INetworkShipRegistry registry)
+    public NavalCopyProbeLogic(INetworkShipRegistry registry, INavalSteeredCopies steeredCopies)
     {
         this.registry = registry;
+        this.steeredCopies = steeredCopies;
     }
+
+    /// <summary>The steered copies whose knobs <c>copy_steer</c> tunes.</summary>
+    internal INavalSteeredCopies SteeredCopies => steeredCopies;
 
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);
         float time = Mission.CurrentTime;
         frameMilliseconds.Add(time, dt * 1000f);
-        TrackRegisteredCopies();
-        NavalCopyBodies.Table.ReconcileAll();
-
-        sinceFixedTick += dt;
-        if (sinceFixedTick > FixedTickTimeoutSeconds) TimedSteer(dt, time);
-
+        steerMilliseconds.Add(time, steeredCopies.LastTickMilliseconds);
         MeasureDrift(time);
         MeasureApproaches(time);
     }
@@ -53,38 +46,19 @@ public class NavalCopyBodyLogic : MissionLogic
     {
         base.OnFixedMissionTick(fixedDt);
         fixedTicks++;
-        sinceFixedTick = 0f;
-        TimedSteer(fixedDt, Mission.CurrentTime);
     }
 
-    private void TimedSteer(float dt, float time)
+    // Against the owner's latest raw sample, which a steered copy is pushed toward and a written one is set to.
+    private void MeasureDrift(float time)
     {
-        steerClock.Restart();
-        NavalCopyBodies.Steer(dt);
-        steerMilliseconds.Add(time, (float)steerClock.Elapsed.TotalMilliseconds);
-    }
-
-    private void TrackRegisteredCopies()
-    {
-        foreach (var ship in registry.Ships)
-        {
-            if (!(ship.Hull is MissionShip hull) || !NavalForeignHulls.Contains(hull) || NavalCopyBodies.Table.IsTracked(hull)) continue;
-
-            NavalCopyBodies.Track(hull, ship.ShipId);
-        }
-    }
-
-    // Against the owner's latest frame, which a kinematic or static copy is written to and a steered one is pushed toward.
-    private static void MeasureDrift(float time)
-    {
-        foreach (var entry in NavalCopyBodies.Table.Entries)
+        foreach (var entry in steeredCopies.Copies)
         {
             var ship = entry.Key;
-            var owner = entry.Value.OwnerFrame;
-            if (owner == null || ship.IsRemoved || !ship.GameEntity.IsValid) continue;
+            var steering = entry.Value.Steering;
+            if (!steering.HasTarget || ship.IsRemoved || !ship.GameEntity.IsValid) continue;
 
             var frame = ship.GlobalFrame;
-            var target = owner.Value;
+            var target = steering.SampleFrame;
             var diagnostics = entry.Value.Diagnostics;
             diagnostics.Distance.Add(time, (frame.origin.AsVec2 - target.origin.AsVec2).Length);
             diagnostics.HeadingDegrees.Add(time, Math.Abs(CopySteering.WrapAngle(
@@ -170,13 +144,14 @@ public class NavalCopyBodyLogic : MissionLogic
 
     private static float Cross(Vec2 a, Vec2 b) => (a.x * b.y) - (a.y * b.x);
 
-    /// <summary>Modes, drift, correction, contact and frame cost on this client (diagnostics).</summary>
+    /// <summary>Knobs, drift, correction, contact and frame cost on this client (diagnostics).</summary>
     internal object Inspect()
     {
         var hulls = Mission.GetMissionBehavior<NavalDLC.Missions.MissionLogics.NavalShipsLogic>()?.AllShips;
         return new
         {
             fixedTicks,
+            knobs = steeredCopies.Knobs.ToString(),
             frameCost = new
             {
                 meanMs = CopyDiagnostics.Round(frameMilliseconds.Mean),
@@ -184,10 +159,24 @@ public class NavalCopyBodyLogic : MissionLogic
                 steerMeanMs = CopyDiagnostics.Round(steerMilliseconds.Mean),
                 steerMaxMs = CopyDiagnostics.Round(steerMilliseconds.Max),
                 simulatedHulls = hulls?.Count(ship => ship.GameEntity.IsValid && ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation()),
-                steeredCopies = NavalCopyBodies.Table.Entries.Count(entry => entry.Value.Mode == CopyBodyMode.Steered),
+                steeredCopies = steeredCopies.Copies.Count(entry => !entry.Value.WritesFrames),
                 hulls = hulls?.Count,
             },
-            copyBodies = NavalCopyBodies.Inspect(),
+            copies = registry.Ships
+                .Where(ship => ship.Hull is MissionShip hull && steeredCopies.Copies.ContainsKey(hull))
+                .Select(ship =>
+                {
+                    var hull = (MissionShip)ship.Hull;
+                    var copy = steeredCopies.Copies[hull];
+                    return new
+                    {
+                        shipId = ship.ShipId,
+                        mode = CopyDiagnostics.ModeName(hull),
+                        writesFrames = copy.WritesFrames,
+                        diagnostics = copy.Diagnostics.Inspect(copy.Steering),
+                    };
+                })
+                .ToArray(),
             contact = NavalContactProbe.Inspect(),
         };
     }
