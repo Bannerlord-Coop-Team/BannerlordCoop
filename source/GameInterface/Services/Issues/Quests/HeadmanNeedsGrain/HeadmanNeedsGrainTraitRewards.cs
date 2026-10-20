@@ -205,9 +205,7 @@ internal class HeadmanNeedsGrainTraitRewardHandler : IHandler
                 return;
             }
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.GiverId, out var giver)) return;
-            var model = Campaign.Current.Models.CharacterDevelopmentModel;
-            var currentXp = Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(trait);
-            model.GetTraitLevelForTraitXp(owner, trait, currentXp, out var previousLevel, out _);
+            var previousLevel = owner.GetTraitLevel(trait);
             Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(trait, data.RemainingXp);
             using (new Common.Util.AllowedThread()) owner.SetTraitLevel(trait, data.Level);
             if (previousLevel != data.Level) CampaignEventDispatcher.Instance.OnPlayerTraitChanged(trait, previousLevel);
