@@ -421,6 +421,35 @@ public class BattleShipReplicatorTests
         Assert.Contains(second, excluded!);
     }
 
+    // R41a fix-loop C3: a host and a player drop together. The successor is swapping an AI hull when the player's hull leaves,
+    // so an AI boarder on the player's deck goes to another friendly hull, not onto the hull the swap replaces next tick.
+    [Fact]
+    public void AcceptRemoval_MovesNobodyOntoAHullMidSwap()
+    {
+        var harness = new Harness(committed: true);
+        var aiHull = CreateHull();
+        var ai = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_9", true, aiHull, null);
+        harness.Registry.TryRegister(ai);
+        harness.LiveHulls.Add(aiHull);
+        harness.Engine.Setup(e => e.ParkHullAgents(aiHull)).Returns(Array.Empty<HullSwapAgent>());
+        var (playerCopy, player) = RegisterPeerCopy(harness, isNpcParty: false);
+        var boarder = CreateAgent();
+        harness.Engine.Setup(e => e.AgentsOnDeck(playerCopy)).Returns(new[] { boarder });
+        harness.Engine.Setup(e => e.CrewHullOf(boarder)).Returns(aiHull);
+        IReadOnlyCollection<MissionObject>? excluded = null;
+        harness.Engine.Setup(e => e.NearestFriendlyHull(boarder, It.IsAny<IReadOnlyCollection<MissionObject>>()))
+            .Callback<Agent, IReadOnlyCollection<MissionObject>>((_, hulls) => excluded = hulls)
+            .Returns(harness.OwnHull);
+        harness.Replicator.TransferHostHulls(Own);
+        harness.Replicator.Tick(0.1f);
+
+        harness.Replicator.AcceptRemoval(new NetworkShipRemoved(player.ShipId, Peer, ShipRemovalReason.Leave, missionEnding: true));
+
+        harness.Engine.Verify(e => e.MoveAgentToHull(boarder, aiHull), Times.Never);
+        harness.Engine.Verify(e => e.MoveAgentToHull(boarder, harness.OwnHull), Times.Once);
+        Assert.Contains(aiHull, excluded!);
+    }
+
     // M8a: a player who left takes its hulls and its records still waiting here; AI hulls it held move with the host instead.
     [Fact]
     public void RemoveHullsOf_RemovesTheDepartedPlayersHullsAndWaitingRecords_AndKeepsTheAiHullsItHeld()

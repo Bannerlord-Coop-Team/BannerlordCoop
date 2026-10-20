@@ -174,6 +174,39 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(-20f, c.Hull(pirate).Frame.origin.x, 3);
     }
 
+    // R41a fix-loop C3: the host and a player drop together. The successor is mid-swap on the AI hull it took over when the
+    // player's hull leaves, so an AI boarder on that deck goes to a friendly hull that stays, never onto the hull the swap
+    // replaces next tick (the R33, R40 crash class).
+    [Fact]
+    public void PlayerLeavesWhileTheSuccessorSwapsAnAiHull_ItsAiBoarderGoesToAHullThatStays()
+    {
+        using var battle = StartNavalBattle(new[]
+        {
+            ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Attacker), ("C", BattleSideEnum.Attacker),
+        });
+        var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
+        var hullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
+        var hullC = battle.FieldPlayerHull(c, new Vec3(80f, 0f, 0f));
+        var allied = battle.FieldAiHull(a, BattleSideEnum.Attacker, new Vec3(60f, 20f, 0f));
+        var boarder = RegisterEverywhere(battle, Guid.NewGuid(), "A");
+        battle.CommitAll();
+        battle.TickAll(2);
+        foreach (var peer in battle.Peers)
+            peer.Engine.PlaceAgent(boarder[peer], peer.Ship(hullC).Hull, peer.Ship(allied).Hull);
+
+        battle.MigrateHost(a, "B");
+        b.Tick();
+        Assert.Equal("ReplaceHull", (string)b.Stream(allied)["swapPhase"]!);
+        battle.Leave(c);
+        battle.TickAll(3);
+
+        Assert.Null((string?)b.Stream(allied)["swapPhase"]);
+        Assert.False(b.Hull(allied).IsCopy);
+        Assert.Same(b.Ship(hullB).Hull, b.Engine.DeckOf(boarder[b])!.Hull);
+        Assert.True(boarder[b].IsActive());
+        AssertRemovedWithClearDeck(b, hullC);
+    }
+
     // D4: a player that disconnected comes back as a late joiner with a fresh hull, which every member spawns as a new copy;
     // its old hull never comes back.
     [Fact]

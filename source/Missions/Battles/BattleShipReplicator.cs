@@ -404,8 +404,9 @@ public class BattleShipReplicator : IBattleShipReplicator
     // A departing hull's crew leaves with it; anyone else on its deck goes to the hull they crew, or the nearest friendly one.
     private void MoveDeckAgents(NetworkShipInfo ship, IReadOnlyCollection<MissionObject> departingHulls)
     {
-        // A hull queued in an earlier frame is removed with whoever stands on it then, so it takes nobody in either.
-        var excluded = departingHulls.Concat(hullAuthority.HullsBeingRemoved).ToList();
+        // A hull queued in an earlier frame is removed with whoever stands on it then, and a hull mid-swap is replaced with
+        // whoever stands on it then (R33, R40), so neither takes anybody in.
+        var excluded = departingHulls.Concat(hullAuthority.HullsBeingRemoved).Concat(HullsBeingReplaced()).ToList();
         foreach (var agent in engine.AgentsOnDeck(ship.Hull))
         {
             var crewHull = engine.CrewHullOf(agent);
@@ -426,6 +427,10 @@ public class BattleShipReplicator : IBattleShipReplicator
             agentsMovedOffDepartedHulls++;
         }
     }
+
+    // The hulls a takeover is swapping for freshly simulated ones on this client right now.
+    private IEnumerable<MissionObject> HullsBeingReplaced() =>
+        Registry.Ships.Where(ship => hullAuthority.IsReplacing(ship.ShipId)).Select(ship => ship.Hull);
 
     /// <summary>[Game thread] Removes every hull a player who left the battle owned, and drops its records still waiting here.</summary>
     internal void RemoveHullsOf(string controllerId)
