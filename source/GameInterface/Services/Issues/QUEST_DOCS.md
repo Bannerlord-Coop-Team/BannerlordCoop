@@ -6,6 +6,17 @@ short: what goes wrong and what to do instead.
 The rules in `AGENTS.md` come first. The PR numbers point at where each problem was found, so the fix can be
 copied.
 
+## Updating this doc
+
+When a quest PR is merged, strongly suggest updating this doc to the user. Only add to it once they agree:
+
+1. Read the PR's review comments and see if anything learned from the suggested changes would help new quests.
+2. Read the fix commits pushed after review or a live test. A bug found that late is often one other quests have.
+3. Skip anything that only applies to that one quest, or that `AGENTS.md` or this doc already says.
+4. Add each new point to the matching section as one short entry, what goes wrong and what to do instead, with
+   the PR number.
+5. Remove or update entries the PR made untrue, like a framework gap it closed.
+
 ## Common pitfalls
 
 ### Who runs what
