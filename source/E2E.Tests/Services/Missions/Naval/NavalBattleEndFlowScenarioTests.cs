@@ -1,12 +1,17 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
+using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.Players;
+using HarmonyLib;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Missions.Naval;
@@ -89,6 +94,61 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
         LeaveMission(battle, b);
         Assert.Equal(1, concluded());
         AssertMapEventRemoved(battle.MapEventId);
+    }
+
+    // R41a fix-loop C1: the kept naval host is still in the map event at its encounter. Its own Attack is refused, and another
+    // member's Attack neither pulls it back into the mission nor holds the conclusion for it as a joiner.
+    [Fact]
+    public void KeptHost_CannotEnterAgain_AndAnotherMembersAttackLeavesItOut()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out var b, out var concluded);
+        a.Commit();
+        battle.TickAll();
+        ReportWin(a);
+        LeaveMission(battle, a);
+        Server.Call(() => Server.Resolve<BattleMissionStartHandler>().GetOrCreateMissionInitializerSnapshot(battle.MapEventId,
+            () => new MissionInitializerRecord("test-naval")));
+        int startsToA = a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count();
+
+        bool navalDlcActive = ModInformation.IsNavalDlcActive;
+        try
+        {
+            ModInformation.IsNavalDlcActive = true;
+            RequestAttack(battle, a, "kept-host-attack");
+            RequestAttack(battle, b, "member-attack");
+        }
+        finally
+        {
+            ModInformation.IsNavalDlcActive = navalDlcActive;
+        }
+
+        var replies = Server.NetworkSentMessages.GetMessages<NetworkBattleStartReply>().ToArray();
+        Assert.False(replies.Single(reply => reply.RequestId == "kept-host-attack").Accepted);
+        Assert.True(replies.Single(reply => reply.RequestId == "member-attack").Accepted);
+        Assert.Equal(startsToA, a.Instance.InternalMessages.GetMessages<NetworkStartAttackMission>().Count());
+        AssertHost(Server, battle.MapEventId, "A", "B");
+        Assert.Equal(0, concluded());
+
+        b.Call(() =>
+        {
+            b.Controller.Deployment.OnLocalDeploymentFinished();
+            b.Controller.ResultCommitter.ReportAcceptedResult();
+        }, VictoryConclusionDisabledMethods());
+        Assert.Equal(1, concluded());
+        AssertMapEventRemoved(battle.MapEventId);
+    }
+
+    // The player presses Attack at the battle's encounter menu.
+    private void RequestAttack(NavalBattle battle, NavalPeer player, string requestId)
+    {
+        // The headless manager uses Default without loading the engine's BannerlordConfig.
+        var spawnSettings = new[] { AccessTools.PropertyGetter(typeof(MBGameManager), nameof(MBGameManager.UnitSpawnPrioritization)) };
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(player.Id, out var registered));
+            Server.SimulateMessage(player.Instance.NetPeer, new NetworkBattleStartRequest(requestId, (int)BattleStartMode.Mission,
+                battle.MapEventId, registered.MobilePartyId));
+        }, spawnSettings);
     }
 
     // The member's mission ends and the server observes it leave.

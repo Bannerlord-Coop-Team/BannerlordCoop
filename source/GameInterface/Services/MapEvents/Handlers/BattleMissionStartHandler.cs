@@ -58,6 +58,7 @@ internal class BattleMissionStartHandler : IHandler
     private readonly IMapEventLogger mapEventLogger;
     private readonly IBattleMissionInitializerResolver missionInitializerResolver;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
+    private readonly IBattleHostRetentionPolicy retentionPolicy;
     private readonly HideoutRaidHandler hideoutRaids;
     private static long attackMissionStartSequence;
 
@@ -79,6 +80,7 @@ internal class BattleMissionStartHandler : IHandler
         IMapEventLogger mapEventLogger,
         IBattleMissionInitializerResolver missionInitializerResolver,
         IBattleTroopReserveBuilder reserveBuilder,
+        IBattleHostRetentionPolicy retentionPolicy,
         HideoutRaidHandler hideoutRaids = null)
     {
         this.messageBroker = messageBroker;
@@ -88,6 +90,7 @@ internal class BattleMissionStartHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         this.missionInitializerResolver = missionInitializerResolver;
         this.reserveBuilder = reserveBuilder;
+        this.retentionPolicy = retentionPolicy;
         this.hideoutRaids = hideoutRaids;
 
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
@@ -151,6 +154,17 @@ internal class BattleMissionStartHandler : IHandler
                 {
                     Logger.Warning("Rejecting attack mission start for map event {MapEventId}: requester is not an authoritative participant",
                         payload.What.MapEventId);
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                    return;
+                }
+
+                // A kept naval host stays at the encounter until the server concludes the result it reported (R41a).
+                operation = "validate kept naval host";
+                if (playerManager.TryGetPlayer(requester, out var requestingPlayer)
+                    && retentionPolicy.RefusesEntry(payload.What.MapEventId, requestingPlayer.ControllerId))
+                {
+                    Logger.Information("Rejecting attack mission start for map event {MapEventId}: host {ControllerId} already reported its naval result",
+                        payload.What.MapEventId, requestingPlayer.ControllerId);
                     network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
                     return;
                 }
@@ -280,7 +294,7 @@ internal class BattleMissionStartHandler : IHandler
                 }
 
                 operation = "snapshot mission participants";
-                var participants = GetMissionParticipants(mapEvent);
+                var participants = GetMissionParticipants(payload.What.MapEventId, mapEvent);
 
                 operation = "reserve mission participants";
                 ReserveMissionParticipants(payload.What.MapEventId, participants);
@@ -333,12 +347,14 @@ internal class BattleMissionStartHandler : IHandler
         return mapEvent.FindMapEventParty(party.Party) != null;
     }
 
-    private IReadOnlyList<MissionParticipant> GetMissionParticipants(MapEvent mapEvent)
+    // The connected players in the map event that open the mission; a kept naval host waits for the conclusion instead.
+    private IReadOnlyList<MissionParticipant> GetMissionParticipants(string mapEventId, MapEvent mapEvent)
     {
         var participants = new List<MissionParticipant>();
         foreach (var player in playerManager.Players)
         {
-            if (!playerManager.TryGetPeer(player.ControllerId, out var peer) ||
+            if (retentionPolicy.RefusesEntry(mapEventId, player.ControllerId) ||
+                !playerManager.TryGetPeer(player.ControllerId, out var peer) ||
                 !objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ||
                 mapEvent.FindMapEventParty(party.Party, out var side) is not MapEventParty mapEventParty ||
                 !objectManager.TryGetIdWithLogging(side, out var sideId) ||

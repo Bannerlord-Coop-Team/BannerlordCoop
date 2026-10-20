@@ -152,10 +152,12 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   reconciles every mission member, then concludes the map event once. Casualties come from each agent's owner
   (`BattleCasualtyHandler`), since the host's vanilla casualty accounting is off.
 - **The host stays once it reported (R41a).** A naval host that reported a resolved result is not replaced when it
-  leaves (`BattleHostHandler.KeepsHostAfterResult`). Its report still concludes the battle once the remaining members
-  match it, and an instance that empties without them concludes with it (`BattleCompletionTracker`,
-  `keepsDepartedHostReport`). Until then the server refuses the departed host's own finalize, which would drop the result
-  (`BattleFinalizeHandler`); the conclusion closes its encounter. Land still promotes a successor that must report again.
+  leaves. Its report still concludes the battle once the remaining members match it, and an instance that empties
+  without them concludes with it (`BattleCompletionTracker`). Until then the server refuses the departed host's own
+  finalize, which would drop the result, and its Attack, which would reset it, and leaves it out of another member's
+  mission start (`BattleMissionStartHandler`); the conclusion closes its encounter. These rules live in one place,
+  `IBattleHostRetentionPolicy` (`GameInterface/Services/MapEvents/BattleHostRetentionPolicy.cs`). Land still promotes a
+  successor that must report again.
 - **A missing own reserve ends the mission.** `CoopNavalReserveGuard` checks the reserve in `EarlyStart` and ends the
   mission from its first `OnPreDisplayMissionTick` (an `EndMission` in `EarlyStart` is undone by `Mission.AfterStart`).
   A player team with no troops gets no ship, so `CoopNavalShiplessPlayerTeamPatch` skips vanilla's initial player

@@ -27,7 +27,7 @@ public class BattleMissionStartHandlerTests
             null!,
             null!,
             null!,
-            null!);
+            null!, null!);
 
         var initial = new MissionInitializerRecord("battle_terrain_026")
         {
