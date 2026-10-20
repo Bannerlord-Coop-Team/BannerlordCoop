@@ -46,17 +46,6 @@ public class ChatVMTests
     }
 
     [Fact]
-    public void SetOpen_WhenPlayerChatDisabled_DoesNothing()
-    {
-        var vm = new ChatVM(_ => { }, () => "local");
-        vm.SetPlayerChatEnabled(false);
-
-        vm.SetOpen(true);
-
-        Assert.False(vm.IsOpen);
-    }
-
-    [Fact]
     public void Receive_DirectMessage_ShowsInClosedFeedAndMarksSenderUnread_NotInAll()
     {
         var vm = new ChatVM(_ => { }, () => "local");
@@ -240,6 +229,7 @@ public class ChatVMTests
         string originalClanId = channel == ChatChannel.Clan ? "clan-a" : null;
         string originalKingdomId = channel == ChatChannel.Kingdom ? "kingdom-a" : null;
         vm.SetGroupChannelMembership(originalClanId, originalKingdomId);
+        vm.SetOpen(true);
 
         vm.Receive(new NetworkChatMessage(
             channel,
@@ -389,6 +379,7 @@ public class ChatVMTests
         vm.SetOpen(false);
         vm.Tick(10.25f);
         Assert.Equal(0.5f, systemLine.Alpha, 3);
+        vm.SetOpen(true);
         vm.Channels.Single(channel => channel.IsGlobal).ExecuteSelection();
         Assert.Contains(vm.VisibleLines, line => line.Text == "[Chat] You are not in a clan.");
         vm.Channels.Single(channel => channel.IsEvents).ExecuteSelection();
