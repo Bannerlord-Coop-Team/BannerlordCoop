@@ -69,7 +69,7 @@ internal class VillageNeedsToolsJournalHandler : IHandler
     }
 }
 
-internal readonly struct VillageNeedsToolsJournalAdded : IEvent
+public readonly struct VillageNeedsToolsJournalAdded : IEvent
 {
     public readonly Quest Quest;
     public readonly string Text;
