@@ -87,7 +87,9 @@ public class QuestTroopScreenTests : IDisposable
 
             var beforeDone = (sentTroops.TotalRegulars, sentTroops.TotalHeroes);
 
-            Assert.True(logic.DoneLogic(false));
+            Assert.Equal(
+                doneDelegateResult || mode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage && doneConditionResult,
+                logic.DoneLogic(false));
 
             result = (beforeDone, (sentTroops.TotalRegulars, sentTroops.TotalHeroes));
         });
