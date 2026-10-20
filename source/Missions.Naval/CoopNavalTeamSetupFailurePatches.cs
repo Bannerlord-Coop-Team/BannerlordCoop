@@ -1,15 +1,18 @@
 ﻿using Common.Logging;
 using HarmonyLib;
+using NavalDLC;
 using NavalDLC.Missions.Deployment;
+using NavalDLC.Missions.MissionLogics;
 using Serilog;
 using System;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
 
 /// <summary>
-/// A throw in a naval team setup leaves <c>TeamSetupOver</c> unset, so vanilla re-runs it every tick and spawns a hull per
-/// formation each time until the game dies natively (R41a-2 S); the first failure ends the mission and setup never reruns.
+/// Naval team setups vanilla would retry every tick end the mission through <see cref="CoopNavalSetupGuard"/> instead: a
+/// player team it can't allocate (R41a, R41a-2 S) and a setup that threw, which would spawn a hull per formation each time.
 /// </summary>
 [HarmonyPatch]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
@@ -17,21 +20,31 @@ internal class CoopNavalTeamSetupFailurePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CoopNavalTeamSetupFailurePatches>();
 
-    // Records a naval setup failure on the reserve guard, which ends the mission; the exception still reaches the tick's log.
+    // Runs the player team's initial allocation only with a ship and a player origin to put on it; it would throw every tick
+    // otherwise. The mission ends, as in vanilla where a wounded hero can't enter a battle.
+    [HarmonyPatch(typeof(NavalTeamSideSpawnContext), nameof(NavalTeamSideSpawnContext.AllocateAndDeployInitialTroopsOfPlayerTeam))]
+    [HarmonyPrefix]
+    private static bool AllocationPrefix(NavalTeamSideSpawnContext __instance)
+    {
+        bool hasShip = __instance._shipsLogic.GetShipAssignment(TeamSideEnum.PlayerTeam, FormationClass.Infantry)?.HasMissionShip == true;
+        bool hasPlayerOrigin = __instance._agentsLogic.FindTroopOrigin(__instance.TeamSide, origin => origin.Troop.IsPlayerCharacter) != null;
+        if (hasShip && hasPlayerOrigin) return true;
+
+        if (CoopNavalSetupGuard.TryEnd(Mission.Current, NavalSetupEndReason.PlayerTeamNotAllocatable))
+            Logger.Warning("[NavalBattle] The player's team can't be allocated (ship={HasShip} hero={HasHero}); skipping its initial troop allocation and ending the mission",
+                hasShip, hasPlayerOrigin);
+        return false;
+    }
+
+    // Records a naval setup failure on the guard, which ends the mission; the exception still reaches the tick's log.
     [HarmonyPatch(typeof(DeploymentMissionController), nameof(DeploymentMissionController.SetupTeams))]
     [HarmonyFinalizer]
     private static Exception SetupTeamsFinalizer(DeploymentMissionController __instance, Exception __exception)
     {
-        if (__exception == null || __instance is not NavalDeploymentMissionController) return __exception;
-
-        var guard = __instance.Mission?.GetMissionBehavior<CoopNavalReserveGuard>();
-        if (guard == null)
-        {
-            Logger.Error("[NavalBattle] Naval team setup failed and no reserve guard ends the mission; vanilla will retry it");
+        if (__exception == null || !CoopNavalMissionScope.IsActive || __instance is not NavalDeploymentMissionController)
             return __exception;
-        }
 
-        if (guard.FailSetup())
+        if (CoopNavalSetupGuard.TryEnd(__instance.Mission, NavalSetupEndReason.TeamSetupFailed))
             Logger.Error(__exception, "[NavalBattle] Naval team setup failed; ending the mission instead of retrying it every tick");
         return __exception;
     }
@@ -43,9 +56,6 @@ internal class CoopNavalTeamSetupFailurePatches
     {
         if (!CoopNavalMissionScope.IsActive || __instance is not NavalDeploymentMissionController) return true;
 
-        return RunsDeploymentTick(__instance.Mission?.GetMissionBehavior<CoopNavalReserveGuard>()?.SetupFailed == true);
+        return __instance.Mission?.GetMissionBehavior<CoopNavalSetupGuard>()?.SetupFailed != true;
     }
-
-    // Whether the deployment controller may tick: never again after its naval team setup failed.
-    internal static bool RunsDeploymentTick(bool setupFailed) => !setupFailed;
 }

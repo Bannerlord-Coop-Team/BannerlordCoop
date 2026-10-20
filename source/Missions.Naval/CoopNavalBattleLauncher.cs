@@ -163,7 +163,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
                     ownTeamLimit, allyTeamLimit, enemyLimit),
                 new NavalTrajectoryPlanningLogic(),
                 // Must precede the spawn logic: it pulls every troop from the suppliers once, in EarlyStart.
-                new CoopNavalReserveGuard(ownSupplier, playerSide, messageBroker),
+                new CoopNavalSetupGuard(ownSupplier, playerSide, messageBroker),
                 new DefaultNavalMissionAgentSpawnLogic(new IMissionTroopSupplier[] { defenderSupplier, attackerSupplier },
                     playerSide, deployableOwnShipCount, maxDeployableTroopCountPerTeam),
                 new NavalMissionDeploymentPlanningLogic(naval),
