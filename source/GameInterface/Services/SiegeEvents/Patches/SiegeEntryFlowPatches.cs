@@ -134,14 +134,15 @@ internal class SiegeEntryFlowPatches
         return false;
     }
 
+    /// <summary>[Client] Holds back join_siege_event while the main party's join waits for its involved-party snapshot.</summary>
     [HarmonyPatch(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) })]
     [HarmonyPrefix]
     private static bool ActivateJoinSiegeMenuPrefix(string menuId)
     {
         if (ModInformation.IsServer || menuId != "join_siege_event") return true;
-        if (!ContainerProvider.TryResolve<ISiegeJoinMenuActivationGate>(out var activationGate)) return true;
+        if (!ContainerProvider.TryResolve<ISiegeJoinMenuDeferralTracker>(out var deferralTracker)) return true;
 
-        return !activationGate.TryDeferActivation();
+        return !deferralTracker.TryDefer(PlayerEncounter.Current);
     }
 
     [HarmonyPatch(typeof(SiegeEventCampaignBehavior), nameof(SiegeEventCampaignBehavior.menu_siege_leave_on_consequence))]

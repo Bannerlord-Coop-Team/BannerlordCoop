@@ -605,12 +605,14 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             encounter._mapEvent = mapEvent;
             Campaign.Current.PlayerEncounter = encounter;
 
-            var activationGate = client.Container.Resolve<ISiegeJoinMenuActivationGate>();
-            activationGate.ArmJoinRequest(mapEvent, party.Party);
-            Assert.True(activationGate.TryDeferActivation());
+            var deferralTracker = client.Container.Resolve<ISiegeJoinMenuDeferralTracker>();
+            deferralTracker.Arm(mapEvent, party.Party);
+            Assert.True(deferralTracker.TryDefer(encounter));
 
-            Campaign.Current.PlayerEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
-            Assert.True(activationGate.ResumeAfterSnapshot(mapEvent));
+            var changedEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            Campaign.Current.PlayerEncounter = changedEncounter;
+            Assert.False(deferralTracker.TryConsume(mapEvent, changedEncounter, out var encounterChanged));
+            Assert.True(encounterChanged);
         }, MapEventDisabledMethods);
     }
 
