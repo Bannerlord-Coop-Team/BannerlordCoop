@@ -3,7 +3,7 @@ using Common.Messaging;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
-using GameInterface.Services.Issues.Framework.Gating;
+using GameInterface.Services.Issues.Framework.Dismissal;
 using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;

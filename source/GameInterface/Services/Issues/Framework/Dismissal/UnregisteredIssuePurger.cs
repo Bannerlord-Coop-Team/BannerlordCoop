@@ -8,7 +8,7 @@ using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Issues.Framework.Gating;
+namespace GameInterface.Services.Issues.Framework.Dismissal;
 
 /// <summary>
 /// Ran into an issue where generating a new campaign and then switching to hosting left issues
@@ -22,6 +22,7 @@ internal class UnregisteredIssuePurger : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IQuestTypeRegistry registry;
 
+    /// <summary>Subscribes the purge to campaign readiness.</summary>
     public UnregisteredIssuePurger(IMessageBroker messageBroker, IQuestTypeRegistry registry)
     {
         this.messageBroker = messageBroker;
@@ -30,11 +31,13 @@ internal class UnregisteredIssuePurger : IHandler
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignReady);
     }
 
+    /// <summary>Unsubscribes from campaign readiness.</summary>
     public void Dispose()
     {
         messageBroker.Unsubscribe<CampaignReady>(Handle_CampaignReady);
     }
 
+    /// <summary>Purges unregistered issues on the server once the campaign is ready.</summary>
     private void Handle_CampaignReady(MessagePayload<CampaignReady> payload)
     {
         if (ModInformation.IsClient)
@@ -52,6 +55,7 @@ internal class UnregisteredIssuePurger : IHandler
         }
     }
 
+    /// <summary>Finalizes every unregistered issue that nobody is solving yet.</summary>
     internal void Purge()
     {
         var issueManager = Campaign.Current?.IssueManager;

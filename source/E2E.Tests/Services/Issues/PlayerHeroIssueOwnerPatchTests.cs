@@ -10,12 +10,13 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Issues;
 
-public class PlayerHeroIssueOwnerGateTests : IDisposable
+/// <summary>Checks that player heroes and their clans never offer issues on the server.</summary>
+public class PlayerHeroIssueOwnerPatchTests : IDisposable
 {
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
 
-    public PlayerHeroIssueOwnerGateTests(ITestOutputHelper output)
+    public PlayerHeroIssueOwnerPatchTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
     }
