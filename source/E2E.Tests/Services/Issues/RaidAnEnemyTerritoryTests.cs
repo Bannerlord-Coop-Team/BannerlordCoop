@@ -4,10 +4,9 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Quests.RaidAnEnemyTerritory.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
-using HarmonyLib;
-using SandBox.GauntletUI.Map;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -97,21 +96,12 @@ public class RaidAnEnemyTerritoryTests : IDisposable
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
             settlement.SettlementHitPoints = 0f;
 
-            var defenderParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
-            mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
-            var raid = new RaidEventComponent(mapEvent);
-            mapEvent.Initialize(ownerParty.Party, defenderParty.Party, raid, MapEvent.BattleTypes.Raid);
-            mapEvent.MapEventSettlement = settlement;
-            mapEvent.State = MapEventState.Wait;
-            Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
-
-            CampaignEventDispatcher.Instance.RaidCompleted(BattleSideEnum.Attacker, raid);
+            RaidAnEnemyTerritoryRaidCompletionPatch.Resolve(quest, settlement, ownerParty);
 
             Assert.True(quest.IsOngoing);
             Assert.Single(quest._raidedVillages);
             Assert.Contains(settlement, quest._raidedVillages);
-        }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
+        });
 
         owner.Call(() =>
         {
