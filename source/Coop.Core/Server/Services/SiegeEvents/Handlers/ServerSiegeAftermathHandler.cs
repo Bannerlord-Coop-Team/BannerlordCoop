@@ -33,6 +33,7 @@ internal class ServerSiegeAftermathHandler : IHandler
         this.siegeEventInterface = siegeEventInterface;
         messageBroker.Subscribe<NetworkRequestSiegeAftermath>(HandleRequest);
         messageBroker.Subscribe<SiegeAftermathApplied>(HandleApplied);
+        messageBroker.Subscribe<SiegeAftermathDiscarded>(HandleDiscarded);
         messageBroker.Subscribe<SiegeAftermathChoicePrompted>(HandlePrompted);
         messageBroker.Subscribe<PlayerCampaignEntered>(HandlePlayerCampaignEntered);
     }
@@ -59,6 +60,15 @@ internal class ServerSiegeAftermathHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
 
         network.SendAll(new NetworkSiegeAftermathApplied(settlementId, obj.AftermathType));
+    }
+
+    // Runs on the game thread already, published from the server's pending-aftermath discard; tells the leader's
+    // client to stop holding a choice that will never be applied.
+    private void HandleDiscarded(MessagePayload<SiegeAftermathDiscarded> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.Settlement, out var settlementId)) return;
+
+        network.SendAll(new NetworkSiegeAftermathDiscarded(settlementId));
     }
 
     private void HandleRequest(MessagePayload<NetworkRequestSiegeAftermath> payload)
@@ -102,6 +112,7 @@ internal class ServerSiegeAftermathHandler : IHandler
     {
         messageBroker.Unsubscribe<NetworkRequestSiegeAftermath>(HandleRequest);
         messageBroker.Unsubscribe<SiegeAftermathApplied>(HandleApplied);
+        messageBroker.Unsubscribe<SiegeAftermathDiscarded>(HandleDiscarded);
         messageBroker.Unsubscribe<SiegeAftermathChoicePrompted>(HandlePrompted);
         messageBroker.Unsubscribe<PlayerCampaignEntered>(HandlePlayerCampaignEntered);
     }

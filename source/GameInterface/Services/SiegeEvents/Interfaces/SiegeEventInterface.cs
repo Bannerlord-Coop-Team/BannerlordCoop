@@ -179,6 +179,11 @@ public interface ISiegeEventInterface : IGameAbstraction
     void SetLocalAftermathNarration(Settlement settlement, int aftermathType);
 
     /// <summary>
+    /// Drops the local capture choice the server discarded without applying, so the leader's menus stop holding it.
+    /// </summary>
+    void ReleaseLocalAftermathChoice(Settlement settlement);
+
+    /// <summary>
     /// Marks the settlement whose applied aftermath the local winning participant's menus need.
     /// This is separate from the leader-only choice/hold identity.
     /// </summary>
@@ -419,7 +424,7 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 
         if (!pending.MatchesCurrentCapture(settlement))
         {
-            Patches.SiegeAftermathPatches.PendingAftermaths.TryRemove(settlement, out _);
+            Patches.SiegeAftermathPatches.DiscardPending(settlement);
             Logger.Warning("Rejected stale siege aftermath choice for {Settlement}: the capture owner or capturer changed",
                 settlement.Name?.ToString());
             return;
@@ -967,6 +972,17 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
                 GameMenu.SwitchToMenu("menu_settlement_taken");
             }
         }
+    }
+
+    public void ReleaseLocalAftermathChoice(Settlement settlement)
+    {
+        if (localAftermathChoiceSettlement == settlement)
+        {
+            localAftermathChoiceSettlement = null;
+        }
+
+        // A parked retry and the encounter End route both key off the hold, so releasing it drops them too.
+        SiegeCaptureMenuHoldPatch.Release(settlement);
     }
 
     public void SetLocalAftermathNarrationContext(Settlement settlement, MapEvent wonSiege)

@@ -1,9 +1,10 @@
-using Common.Tests.Utils;
+﻿using Common.Tests.Utils;
 using Coop.Core.Server.Services.SiegeEvents.Handlers;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using Coop.Tests.Mocks;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.SiegeEvents.Messages;
 using Moq;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -70,6 +71,25 @@ public sealed class ServerSiegeAftermathHandlerTests
         var prompt = Assert.Single(network.GetPeerMessages(peer).OfType<NetworkPromptSiegeAftermathChoice>());
         Assert.Equal(settlementId, prompt.SettlementId);
         Assert.Null(prompt.PreviousOwnerClanId);
+    }
+
+    [Fact]
+    public void DiscardedAftermath_IsBroadcastSoTheLeaderReleasesItsChoice()
+    {
+        var broker = new TestMessageBroker();
+        var network = new TestNetwork();
+        var peer = network.CreatePeer();
+        var settlement = CreateUninitialized<Settlement>();
+        var objectManager = new Mock<IObjectManager>();
+        string settlementId = "settlement-1";
+        objectManager.Setup(manager => manager.TryGetIdWithLogging(settlement, out settlementId)).Returns(true);
+        using var handler = new ServerSiegeAftermathHandler(
+            broker, network, objectManager.Object, Mock.Of<ISiegeEventInterface>());
+
+        broker.Publish(this, new SiegeAftermathDiscarded(settlement));
+
+        var discarded = Assert.Single(network.GetPeerMessages(peer).OfType<NetworkSiegeAftermathDiscarded>());
+        Assert.Equal(settlementId, discarded.SettlementId);
     }
 
 #pragma warning disable SYSLIB0050 // Identity-only test doubles; no native constructors are invoked.

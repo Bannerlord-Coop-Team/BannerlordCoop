@@ -116,6 +116,31 @@ public sealed class SiegeCaptureTransitionRetryHandlerTests : IDisposable
     }
 
     [Fact]
+    public void CampaignTick_ServerDiscardedChoice_DropsTheRetry()
+    {
+        // the server dropped the parked aftermath (the settlement changed hands) while the scoreboard was still up
+        mapState._battleSimulation = ObjectHelper.SkipConstructor<BattleSimulation>();
+        SiegeCaptureMenuHoldPatch.HoldFor(settlement);
+        SiegeCaptureTransitionRetryHandler.Arm(leaderParty, settlement);
+
+        var realSiegeEventInterface = new SiegeEventInterface();
+        try
+        {
+            realSiegeEventInterface.ReleaseLocalAftermathChoice(settlement);
+        }
+        finally
+        {
+            realSiegeEventInterface.Dispose();
+        }
+
+        mapState.EndBattleSimulation();
+        messageBroker.Publish(this, new CampaignTick());
+
+        Assert.False(SiegeCaptureMenuHoldPatch.IsHeld(settlement));
+        VerifyPrompted(Times.Never());
+    }
+
+    [Fact]
     public void VassalCapturePrompt_HoldsTheDefeatedOwnerAfterTheFiefMovesToTheRuler()
     {
         var defeatedClan = ObjectHelper.SkipConstructor<Clan>();

@@ -30,6 +30,7 @@ internal class ClientSiegeAftermathHandler : IHandler
         this.siegeEventInterface = siegeEventInterface;
         messageBroker.Subscribe<SiegeAftermathAttempted>(HandleAttempt);
         messageBroker.Subscribe<NetworkSiegeAftermathApplied>(HandleApplied);
+        messageBroker.Subscribe<NetworkSiegeAftermathDiscarded>(HandleDiscarded);
         messageBroker.Subscribe<NetworkPromptSiegeAftermathChoice>(HandleChoicePrompt);
     }
 
@@ -60,6 +61,19 @@ internal class ClientSiegeAftermathHandler : IHandler
         });
     }
 
+    // Releases the leader's held choice for an aftermath the server dropped without applying.
+    private void HandleDiscarded(MessagePayload<NetworkSiegeAftermathDiscarded> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
+
+            siegeEventInterface.ReleaseLocalAftermathChoice(settlement);
+        });
+    }
+
     // Runs on the game thread already — published from the ApplyAftermath prefix; only resolves ids and sends, so no GameThread.RunSafe.
     private void HandleAttempt(MessagePayload<SiegeAftermathAttempted> payload)
     {
@@ -75,6 +89,7 @@ internal class ClientSiegeAftermathHandler : IHandler
     {
         messageBroker.Unsubscribe<SiegeAftermathAttempted>(HandleAttempt);
         messageBroker.Unsubscribe<NetworkSiegeAftermathApplied>(HandleApplied);
+        messageBroker.Unsubscribe<NetworkSiegeAftermathDiscarded>(HandleDiscarded);
         messageBroker.Unsubscribe<NetworkPromptSiegeAftermathChoice>(HandleChoicePrompt);
     }
 }

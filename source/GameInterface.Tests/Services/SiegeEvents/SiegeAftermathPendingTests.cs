@@ -1,5 +1,7 @@
-﻿using GameInterface.Services.SiegeEvents.Patches;
+﻿using Common.Messaging;
+using GameInterface.Services.SiegeEvents.Patches;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.SiegeEvents.Messages;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -91,6 +93,35 @@ public sealed class SiegeAftermathPendingTests : IDisposable
     }
 
     [Fact]
+    public void RecapturedPending_EvictionTellsTheLeaderClient()
+    {
+        // otherwise the leader keeps holding a choice the server no longer accepts
+        var recaptured = AddBoundPending();
+        recaptured.Settlement.Town.LastCapturedBy = CreateUninitialized<Clan>();
+
+        var discarded = CaptureDiscards(() =>
+            SiegeAftermathPatches.EvictStalePending(CreateUninitialized<SiegeAftermathCampaignBehavior>()));
+
+        Assert.Same(recaptured.Settlement, Assert.Single(discarded));
+        Assert.Empty(SiegeAftermathPatches.PendingAftermaths);
+    }
+
+    [Fact]
+    public void RecapturedPending_ResolveTellsTheLeaderClientInsteadOfApplying()
+    {
+        var recaptured = AddBoundPending();
+        recaptured.Settlement.Town.LastCapturedBy = CreateUninitialized<Clan>();
+
+        var discarded = CaptureDiscards(() => Assert.False(SiegeAftermathPatches.ResolvePending(
+            CreateUninitialized<SiegeAftermathCampaignBehavior>(), recaptured.Settlement, "a newer settlement capture began",
+            (_, _, _) => throw new InvalidOperationException("a discarded aftermath must not be determined"),
+            (_, _, _, _, _) => throw new InvalidOperationException("a discarded aftermath must not be applied"))));
+
+        Assert.Same(recaptured.Settlement, Assert.Single(discarded));
+        Assert.Empty(SiegeAftermathPatches.PendingAftermaths);
+    }
+
+    [Fact]
     public void SyncData_RoundTripsPendingGenerationWithoutApplyingIt()
     {
         var saved = AddBoundPending();
@@ -169,6 +200,25 @@ public sealed class SiegeAftermathPendingTests : IDisposable
         {
             Campaign.Current = previousCampaign;
         }
+    }
+
+    // Runs the action and returns the settlements whose parked aftermath it told the clients was discarded.
+    private static List<Settlement> CaptureDiscards(Action action)
+    {
+        var discarded = new List<Settlement>();
+        void Handle(MessagePayload<SiegeAftermathDiscarded> payload) => discarded.Add(payload.What.Settlement);
+
+        MessageBroker.Instance.Subscribe<SiegeAftermathDiscarded>(Handle);
+        try
+        {
+            action();
+        }
+        finally
+        {
+            MessageBroker.Instance.Unsubscribe<SiegeAftermathDiscarded>(Handle);
+        }
+
+        return discarded;
     }
 
     private static (Settlement Settlement, SiegeAftermathPatches.PendingAftermath Pending) AddBoundPending()

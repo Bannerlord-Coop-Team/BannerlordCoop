@@ -171,7 +171,7 @@ internal class SiegeAftermathPatches
         }
         else
         {
-            PendingAftermaths.TryRemove(settlement, out _);
+            DiscardPending(settlement);
             Logger.Error("Discarded pending siege aftermath for {Settlement}: behavior unavailable before owner transfer",
                 settlement.Name?.ToString());
         }
@@ -297,7 +297,7 @@ internal class SiegeAftermathPatches
         {
             if (!pair.Value.MatchesCurrentCapture(pair.Key))
             {
-                if (PendingAftermaths.TryRemove(pair.Key, out _))
+                if (DiscardPending(pair.Key))
                 {
                     Logger.Warning("Discarded stale siege aftermath for {Settlement}: capture identity no longer matches",
                         pair.Key?.Name?.ToString());
@@ -407,7 +407,7 @@ internal class SiegeAftermathPatches
 
         if (pending.MatchesCurrentCapture(settlement)) return;
 
-        PendingAftermaths.TryRemove(settlement, out _);
+        DiscardPending(settlement);
         Logger.Warning("Invalidated pending siege aftermath for {Settlement}: settlement ownership no longer matches the capture",
             settlement.Name?.ToString());
     }
@@ -479,6 +479,7 @@ internal class SiegeAftermathPatches
 
         if (!pending.MatchesCurrentCapture(settlement))
         {
+            PublishDiscarded(settlement);
             Logger.Warning("Discarded pending siege aftermath for {Settlement} ({Reason}): capture identity no longer matches",
                 settlement.Name?.ToString(), reason);
             return false;
@@ -494,5 +495,21 @@ internal class SiegeAftermathPatches
         Logger.Information("Resolved pending siege aftermath for {Settlement} because {Reason}",
             settlement.Name?.ToString(), reason);
         return true;
+    }
+
+    // Drops a parked aftermath without applying it. Only an applied one is broadcast otherwise, so the leader's
+    // client would keep holding a choice the server no longer accepts.
+    internal static bool DiscardPending(Settlement settlement)
+    {
+        if (settlement == null || !PendingAftermaths.TryRemove(settlement, out _)) return false;
+
+        PublishDiscarded(settlement);
+        return true;
+    }
+
+    // Tells the clients a parked aftermath is gone without an apply.
+    private static void PublishDiscarded(Settlement settlement)
+    {
+        MessageBroker.Instance.Publish(null, new SiegeAftermathDiscarded(settlement));
     }
 }
