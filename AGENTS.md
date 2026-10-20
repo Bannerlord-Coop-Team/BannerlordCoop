@@ -41,7 +41,7 @@ The main solution is `source/Coop.sln`. Game-facing code lives in `source/Coop`,
 
 ### Area-Specific Instructions (Read Before Editing)
 
-Some folders have their own `AGENTS.md` with rules that apply only there and add to this file. Before you edit anything in one of these folders, read its `AGENTS.md` in full.
+Some folders have their own `AGENTS.md` with rules that apply only there and add to this file. Before you work in one of these folders, read its `AGENTS.md` in full.
 
 - Issues and quests: [`source/GameInterface/Services/Issues/AGENTS.md`](source/GameInterface/Services/Issues/AGENTS.md)
 
