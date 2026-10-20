@@ -53,9 +53,9 @@ public class SystemDeveloperDirectCommandTests
         Type[] commandTypes = GetCommandTypes();
 
 #if DEBUG
-        Assert.Equal(102, commandTypes.Length);
+        Assert.Equal(103, commandTypes.Length);
 #else
-        Assert.Equal(90, commandTypes.Length);
+        Assert.Equal(91, commandTypes.Length);
 #endif
         Assert.All(commandTypes, type =>
         {
@@ -116,6 +116,7 @@ public class SystemDeveloperDirectCommandTests
                 "instrument",
                 "is_ironman_mode",
                 "set_time_mode",
+                "social_parameter",
             },
             countReaders);
 #else
@@ -126,6 +127,7 @@ public class SystemDeveloperDirectCommandTests
                 "force_autosave",
                 "instrument",
                 "is_ironman_mode",
+                "social_parameter",
             },
             countReaders);
 #endif
@@ -169,6 +171,30 @@ public class SystemDeveloperDirectCommandTests
 
             Assert.False(result.Succeeded);
             Assert.Equal("command_failed", result.ErrorCode);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
+    }
+
+    [Fact]
+    public void SocialParameterWrite_RunOnClient_ReturnsExplicitFailure()
+    {
+        bool wasServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = false;
+            ICoopCommand command = Assert.Single(
+                CreateCommands(),
+                candidate => candidate.Prefix == "coop.debug.hero_developer" && candidate.Name == "social_parameter");
+            Assert.Equal(CoopCommandSide.Both, command.Side);
+
+            CoopCommandResult result = command.ProcessCommand(new TestArgs(new[] { "hero", "mercy", "1", "0" }));
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("command_failed", result.ErrorCode);
+            Assert.Equal("The 'coop.debug.hero_developer.social_parameter' command cannot be used on the client. It is intended for server use only.", result.Output);
         }
         finally
         {
