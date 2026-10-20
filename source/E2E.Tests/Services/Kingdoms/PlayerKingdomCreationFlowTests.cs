@@ -14,6 +14,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.MockEngine;
 using E2E.Tests.Util;
+using GameInterface.Configuration;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.Entity;
@@ -1350,6 +1351,49 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
             message => message.KingdomId == kingdomId);
+    }
+
+    [Fact]
+    public void KingdomDecisionVotes_MissionHoldLimitResolvesRound()
+    {
+        const string instanceId = "kingdom_vote_long_battle";
+        TimeSpan holdLimit = TimeSpan.FromMinutes(10);
+        TimeSpan pastRound = KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1);
+        ModOptions previousOptions = ModConfigProvider.ModOptions;
+        ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData
+        {
+            KingdomDecisionMissionHoldLimitMinutes = (int)holdLimit.TotalMinutes,
+        });
+        try
+        {
+            var (client1, client2, _, _, kingdomId) = SetUpPlayerDeclareWarVotes("TargetKingdomLongBattleVoter");
+
+            // The hold can't start before the voter enters the mission, so this bounds the limit from below.
+            DateTime enteredMission = DateTime.UtcNow;
+            Server.Call(() => Assert.True(Server.Resolve<IMissionManager>().TryEnterMission(
+                client2.NetPeer,
+                SecondControllerId,
+                instanceId,
+                out _)));
+            client1.SimulateMessage(
+                this,
+                new KingdomDecisionVoteRequested(CreateDeclareWarVote(kingdomId, isFinal: true)));
+
+            DateTime beforeLimit = enteredMission + holdLimit - TimeSpan.FromSeconds(1);
+            Server.Call(() => GetConcreteVoteManager(Server).ProcessVotingRounds(beforeLimit));
+
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
+
+            Server.Call(() => GetConcreteVoteManager(Server).ProcessVotingRounds(beforeLimit + pastRound));
+
+            Assert.Single(
+                Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
+                message => message.KingdomId == kingdomId);
+        }
+        finally
+        {
+            ModConfigProvider.ModOptions = previousOptions;
+        }
     }
 
     [Fact]

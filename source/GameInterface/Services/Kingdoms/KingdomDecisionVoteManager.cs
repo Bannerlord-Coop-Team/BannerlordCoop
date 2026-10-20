@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Configuration;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Extentions;
@@ -1819,19 +1820,45 @@ namespace GameInterface.Services.Kingdoms
         {
             if (TryGetOutstandingVoterInMission(state, out string heldClanId))
             {
-                state.IsHeldForMission = true;
+                if (!state.MissionHoldStartedUtc.HasValue) state.MissionHoldStartedUtc = utcNow;
                 if (utcNow < state.RoundDeadlineUtc.Value) return;
+                if (HasMissionHoldLimitPassed(state, utcNow))
+                {
+                    LogMissionHoldLimitReached(state, heldClanId);
+                    return;
+                }
 
                 state.SetRoundDeadline(utcNow + VotingRoundDuration);
                 LogRoundDeadlineMoved(state, $"extended because clan {heldClanId} is in a mission");
                 return;
             }
 
-            if (!state.IsHeldForMission) return;
+            if (!state.MissionHoldStartedUtc.HasValue) return;
 
-            state.IsHeldForMission = false;
+            state.MissionHoldStartedUtc = null;
             state.SetRoundDeadline(utcNow + VotingRoundDuration);
             LogRoundDeadlineMoved(state, "restarted because no unvoted voter is in a mission");
+        }
+
+        // Checks the server's optional limit on how long a round may wait for voters in a mission; 0 means no limit.
+        private static bool HasMissionHoldLimitPassed(KingdomDecisionVoteState state, DateTime utcNow)
+        {
+            int limitMinutes = ModConfigProvider.ModOptions.KingdomDecisionMissionHoldLimitMinutes;
+            if (limitMinutes <= 0) return false;
+
+            return utcNow - state.MissionHoldStartedUtc.Value >= TimeSpan.FromMinutes(limitMinutes);
+        }
+
+        // Records that a round stopped waiting for a voter in a mission, so its resolution can be traced in the server log.
+        private static void LogMissionHoldLimitReached(KingdomDecisionVoteState state, string heldClanId)
+        {
+            Logger.Information(
+                "Kingdom decision voting round for {KingdomId} decision {DecisionIndex} stopped waiting for clan " +
+                "{ClanId} after the {LimitMinutes} minute mission hold limit",
+                state.KingdomId,
+                state.DecisionIndex,
+                heldClanId,
+                ModConfigProvider.ModOptions.KingdomDecisionMissionHoldLimitMinutes);
         }
 
         // Finds a voter who has not submitted a final ballot and is currently in a mission.
@@ -2195,7 +2222,7 @@ namespace GameInterface.Services.Kingdoms
             public KingdomDecisionRoundStatusData LastPublishedRoundStatus { get; set; }
             public DateTime? RoundDeadlineUtc { get; private set; }
             public bool IsResolved { get; set; }
-            public bool IsHeldForMission { get; set; }
+            public DateTime? MissionHoldStartedUtc { get; set; }
             public bool HasRoundSnapshot => RoundClans.Count > 0;
 
             public bool HasAllVotes => EligibleClanIds.Count > 0 && EligibleClanIds.All(clanId => FinalVotes.ContainsKey(clanId));
