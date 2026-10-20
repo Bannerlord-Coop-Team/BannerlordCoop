@@ -39,6 +39,12 @@ Network-receive handlers run on the single `Poller` thread, but the object an id
 
 The main solution is `source/Coop.sln`. Game-facing code lives in `source/Coop`, shared networking/serialization in `source/Common`, sync/domain logic in `source/Coop.Core`, and Bannerlord API adapters in `source/GameInterface`. Tests sit beside the code in `source/*.Tests`, `source/Coop.IntegrationTests`, and `source/E2E.Tests`. Deploy templates are in `deploy`, UI prefabs in `UIMovies`, docs in `doc`, and workshop/media assets in `Workshop` and `Images`.
 
+### Area-Specific Instructions (Read Before Editing)
+
+Some folders have their own `AGENTS.md` with rules that apply only there and add to this file. Before you edit anything in one of these folders, read its `AGENTS.md` in full.
+
+- **Issues and quests** (`source/GameInterface/Services/Issues/`): [`source/GameInterface/Services/Issues/AGENTS.md`](source/GameInterface/Services/Issues/AGENTS.md) owns the rules for the issue and quest framework. The game calls quests "issues". It links [`QUEST_DOCS.md`](source/GameInterface/Services/Issues/QUEST_DOCS.md), the shared quest pitfalls and review learnings. Read that before working on a quest too.
+
 ### Build & Test Commands
 
 Run from the repo root on Windows; the repo expects `mb2` to be a junction to the local Bannerlord install. Prefer the Windows MSBuild/PowerShell for builds, and don't deploy into the live `mb2\Modules` folder unless explicitly asked.
