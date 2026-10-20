@@ -579,7 +579,8 @@ public class HeadmanNeedsGrainTests : IDisposable
             Assert.Equal(progress, ownerIssue.JournalEntries[0].CurrentProgress);
             Assert.Single(ownerIssue.JournalEntries.Where(log => log.LogText.Value == ownerIssue.AlternativeSolutionEndLogDefault.Value));
         }, Texts);
-        ClientB.Call(() => Assert.Empty(IssueHere(ClientB).JournalEntries));
+        // The framework gives non-owners a placeholder entry so their daily tick has a progress log.
+        ClientB.Call(() => Assert.Single(IssueHere(ClientB).JournalEntries));
         foreach (var instance in Instances)
             instance.Call(() =>
             {
