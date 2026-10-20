@@ -11,6 +11,8 @@ internal class GangLeaderNeedsToOffloadStolenGoodsSuccessByGivingGoodsBackPatch
     [HarmonyPrefix]
     private static bool Prefix(Quest __instance)
     {
+        if (ModInformation.IsClient && ContainerProvider.TryResolve<GangLeaderBranchEvidence>(out var evidence))
+            evidence.Record(__instance, (byte)GangLeaderNeedsToOffloadStolenGoodsBranch.SuccessByGivingGoodsBack);
         if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
         {
             return true;
@@ -19,4 +21,6 @@ internal class GangLeaderNeedsToOffloadStolenGoodsSuccessByGivingGoodsBackPatch
         return dispatcher.BeforeQuestBranch(__instance, (byte)GangLeaderNeedsToOffloadStolenGoodsBranch.SuccessByGivingGoodsBack);
     }
 }
+
+
 
