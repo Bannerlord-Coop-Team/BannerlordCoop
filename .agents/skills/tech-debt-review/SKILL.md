@@ -39,7 +39,7 @@ It greps the added lines and prints `path:line [lens: rule] text`. Hand each len
 | flow | `lenses/flow.md` | sync invariants, temporary code, dead code |
 | tests | `lenses/tests.md` | tests worth their upkeep, missing tests |
 
-- **Small change** (under about 10 files and 300 changed lines): run all four lenses yourself, one after another as separate passes.
+- **Small change** (under about ~10 files and/or ~400 changed lines): run all four lenses yourself, one after another as separate passes.
 - **Larger change:** give each lens to its own subagent, in parallel if your agent supports it, with the brief, its lens file, and its scan hits. Without subagent support, run them as separate passes.
 
 Each lens returns candidate findings; it doesn't rank or filter across lenses.
