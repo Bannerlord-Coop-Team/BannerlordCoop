@@ -45,7 +45,9 @@ public class NavalScenarioMissionLogic : MissionLogic
     private readonly IBattleSession session;
     private readonly INetworkShipRegistry registry;
     private readonly IMessageBroker messageBroker;
-    private readonly NavalScenarioConfig config;
+    private readonly string mapEventId;
+    // The scenario of this battle; adopted late when a returner's re-sent scenario arrives after it was pulled in.
+    private NavalScenarioConfig config;
     private readonly INavalScenarioReadyPress readyPress = new NavalScenarioReadyPress(
         press => GameThread.EnqueueSafe(press, context: "NavalScenarioMissionLogic.PressReady"));
     // The retreat confirmation's OK ends the mission, so its presses run off the mission tick as Ready's do.
@@ -63,19 +65,21 @@ public class NavalScenarioMissionLogic : MissionLogic
     private MissionShip placedTarget;
 
     public NavalScenarioMissionLogic(INavalScenarioState state, INavalDebugHulls hulls, IBattleSession session,
-        INetworkShipRegistry registry, IMessageBroker messageBroker)
+        INetworkShipRegistry registry, IMessageBroker messageBroker, string mapEventId)
     {
         this.state = state;
         this.hulls = hulls;
         this.session = session;
         this.registry = registry;
         this.messageBroker = messageBroker;
-        config = state.Current;
+        this.mapEventId = mapEventId;
     }
 
     public override void OnMissionTick(float dt)
     {
-        if (config == null || state.Current != config) return;
+        if (!TryAdoptScenario() || state.Current != config) return;
+
+        TickInBattleBookkeeping();
 
         if (Mission.MissionEnded)
         {
@@ -99,6 +103,29 @@ public class NavalScenarioMissionLogic : MissionLogic
 
         sinceDeployment += dt;
         TickTimeline(dt);
+    }
+
+    // Takes this battle's scenario once it is current; a returner's re-sent scenario can arrive after it entered the battle.
+    private bool TryAdoptScenario()
+    {
+        if (config != null) return true;
+
+        var current = state.Current;
+        if (current == null || current.MapEventId != mapEventId) return false;
+
+        config = current;
+        Logger.Information("[NavalScenario] Running {Preset} {ScenarioId} in the battle of {MapEventId}", config.Preset,
+            config.ScenarioId, mapEventId);
+        return true;
+    }
+
+    // Fixes who disconnects while the first host is known, and settles a returner's re-entry when it is already in the battle.
+    private void TickInBattleBookkeeping()
+    {
+        if (config.DisconnectBattleHost) config.ResolveDisconnectingControllerId(session.HostControllerId, session.HostEpoch);
+
+        // Another player's mission start can pull a returner in before its re-sent scenario arrived (R41a-2 E).
+        Complete(NavalScenarioState.RejoinAttackStep, true, "already in the battle: a mission start pulled this client in");
     }
 
     public override void OnRemoveBehavior()
@@ -318,7 +345,7 @@ public class NavalScenarioMissionLogic : MissionLogic
 
     private void Disconnect()
     {
-        var disconnecting = config.DisconnectingControllerId(session.HostControllerId);
+        var disconnecting = config.ResolveDisconnectingControllerId(session.HostControllerId, session.HostEpoch);
         if (disconnecting == null || !session.IsOwn(disconnecting))
         {
             var detail = disconnecting == null ? "no player to disconnect" : $"{disconnecting} disconnects, so this client stays connected";

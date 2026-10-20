@@ -54,6 +54,25 @@ public class NavalScenarioStateTests
         Assert.Null(Config("vs_pirates", "PlayerOne", "PlayerTwo").DisconnectingControllerId("PlayerOne"));
     }
 
+    // R41a-2 E: who=host resolved at each client's step, so after the migration the successor matched "host" and dropped too.
+    // The first known host fixes it; a client that first sees a later epoch never disconnects.
+    [Fact]
+    public void ResolveDisconnectingControllerId_IsFixedByTheFirstHost_AndNoneForAClientThatFirstSeesALaterEpoch()
+    {
+        var config = Config("migration", "PlayerOne", "PlayerTwo");
+        var lateViewer = Config("migration", "PlayerOne", "PlayerTwo");
+
+        var beforeAHost = config.ResolveDisconnectingControllerId(null, 0);
+        var atFirstHost = config.ResolveDisconnectingControllerId("PlayerOne", 1);
+        var afterMigration = config.ResolveDisconnectingControllerId("PlayerTwo", 2);
+
+        Assert.Null(beforeAHost);
+        Assert.Equal("PlayerOne", atFirstHost);
+        Assert.Equal("PlayerOne", afterMigration);
+        Assert.Null(lateViewer.ResolveDisconnectingControllerId("PlayerTwo", 2));
+        Assert.Null(lateViewer.ResolveDisconnectingControllerId("PlayerTwo", 1));
+    }
+
     // D4: a player that reconnected into the running migration battle has its disconnect done and re-enters through Attack.
     [Fact]
     public void Start_Rejoining_MarksTheDisconnectDone_AndOnlyReentersTheBattle()

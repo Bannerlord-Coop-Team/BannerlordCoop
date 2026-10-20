@@ -233,14 +233,13 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     }
 
 #if DEBUG
-    // A DEBUG naval scenario staged this battle, so its client steps run inside the mission.
+    // Runs the client steps of a DEBUG naval scenario of this battle; attached to every battle, since a returner's re-sent
+    // scenario can arrive after another player's mission start pulled it in (R41a-2 E).
     private void AttachScenario(Mission mission, string mapEventId)
     {
-        if (scenarioState.Current?.MapEventId != mapEventId) return;
-
         var controller = mission.GetMissionBehavior<CoopBattleController>();
         mission.AddMissionBehavior(new NavalScenarioMissionLogic(scenarioState, debugHulls, controller.Session,
-            controller.MissionComponent.ShipRegistry, messageBroker));
+            controller.MissionComponent.ShipRegistry, messageBroker, mapEventId));
     }
 #endif
 
