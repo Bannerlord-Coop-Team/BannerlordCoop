@@ -975,6 +975,53 @@ public class BattleShipReplicatorTests
         Assert.Equal(1, harness.Replicator.DepartedHulls(BattleSideEnum.Defender));
     }
 
+    // R41a-2: a departed party withdraws the tick after its hull removal finished, so the removal took its crew first and the
+    // removal's unparked agents are back on physics; whether it hosted is read when the leave arrives.
+    [Fact]
+    public void MissionPeerLeft_WithdrawsThePartyTheTickAfterItsHullRemovalFinished()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: true);
+        harness.Session.Setup(s => s.IsHostController(Peer)).Returns(true);
+        var departedShip = RegisterForeign(harness, Peer, isNpcParty: false);
+
+        harness.Members.Remove(Peer);
+        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
+        GameThread.Run(() => { }, blocking: true);
+        harness.Session.Setup(s => s.IsHostController(Peer)).Returns(false);
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+        harness.Engine.Verify(e => e.RemoveHull(departedShip.Hull), Times.Once);
+        harness.PartyWithdrawal.Verify(w => w.WithdrawParty(It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+
+        harness.PartyWithdrawal.Verify(w => w.WithdrawParty(Peer, true), Times.Once);
+        harness.PartyWithdrawal.Verify(w => w.WithdrawParty(It.IsAny<string>(), It.IsAny<bool>()), Times.Once);
+    }
+
+    // R41a-2 C1: a returner re-entered before its old hulls settled; the withdrawal would select its fresh troops by party.
+    [Fact]
+    public void MissionPeerLeft_ReEntryBeforeTheHullsSettled_DropsThePartyWithdrawal()
+    {
+        using var mission = new MissionCurrentScope();
+        var harness = new Harness(committed: true);
+        RegisterForeign(harness, Peer, isNpcParty: false);
+
+        harness.Members.Remove(Peer);
+        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
+        GameThread.Run(() => { }, blocking: true);
+        harness.Replicator.Tick(0.1f);
+        harness.Members.Add(Peer);
+        harness.Broker.Publish(this, new NetworkMissionPeerEntered(Peer, Instance));
+        GameThread.Run(() => { }, blocking: true);
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+        harness.Replicator.Tick(0.1f);
+
+        harness.PartyWithdrawal.Verify(w => w.WithdrawParty(It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
+    }
+
     private static NetworkShipInfo RegisterForeign(Harness harness, string owner, bool isNpcParty)
     {
         var hull = CreateHull();
@@ -1654,6 +1701,7 @@ public class BattleShipReplicatorTests
         public Mock<IBattleDeploymentCoordinator> Deployment { get; } = new Mock<IBattleDeploymentCoordinator>();
         public Mock<IAgentStationUseReplicator> Stations { get; } = new Mock<IAgentStationUseReplicator>();
         public Mock<IBattleSession> Session { get; } = new Mock<IBattleSession>();
+        public Mock<IBattlePartyWithdrawal> PartyWithdrawal { get; } = new Mock<IBattlePartyWithdrawal>();
         /// <summary>The server-announced mission members the membership gate reads.</summary>
         public List<string> Members { get; } = new List<string>(InMission);
         public MessageBroker Broker { get; } = new MessageBroker();
@@ -1701,8 +1749,7 @@ public class BattleShipReplicatorTests
             var members = new Mock<IMissionContext>();
             members.SetupGet(m => m.ControllersInMission).Returns(() => Members.ToArray());
             var context = new BattleContext(session.Object, deployment.Object, component.Object, epochs, resultCommitter.Object,
-                Mock.Of<IReinforcementFielder>(), members.Object, Mock.Of<IBattleTroopWithdrawal>(),
-                Mock.Of<IBattlePartyWithdrawal>());
+                Mock.Of<IReinforcementFielder>(), members.Object, Mock.Of<IBattleTroopWithdrawal>(), PartyWithdrawal.Object);
             Replicator = new BattleShipReplicator(Network.Object, Broker, context, engine.Object, TeamResolver.Object,
                 Mock.Of<IObjectManager>(), new NavalHullAuthority(session.Object, component.Object, engine.Object, context.TroopWithdrawal),
                 new BattleShipConditionStream(Network.Object, session.Object, engine.Object, epochs, members.Object), Stations.Object);

@@ -265,6 +265,39 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         }
     }
 
+    // R41a-2 C1: B leaves and enters again before its old hull settled, as a late joiner still loading gets both back to back.
+    // The party withdrawal selects by party, so it must go with the re-entry or it would fade B's fresh troops.
+    [Fact]
+    public void LeavingPlayer_ReEnteringBeforeItsHullSettled_KeepsItsFreshTroops()
+    {
+        using var battle = StartServerBattle(atSea: true, out _, "A", "B", "C");
+        var (a, b, c) = (battle["A"], battle["B"], battle["C"]);
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f));
+        var hullB = battle.FieldPlayerHull(b, new Vec3(40f, 0f, 0f));
+        battle.FieldPlayerHull(c, new Vec3(80f, 0f, 0f));
+        battle.CommitAll();
+        battle.TickAll(2);
+        var survivors = new[] { a, c };
+
+        battle.Leave(b);
+        foreach (var peer in survivors) peer.Tick();
+        Assert.All(survivors, peer => Assert.Equal(1, CopyOf(peer, hullB).Parkings));
+        battle.AnnounceEntry(b);
+        var fresh = survivors.ToDictionary(peer => peer, peer => peer.RegisterPartyTroop(Guid.NewGuid(), "B"));
+        foreach (var peer in survivors)
+            peer.Engine.PlaceAgent(fresh[peer], peer.Ship(hullA).Hull);
+        foreach (var peer in survivors) peer.Ticks(3);
+
+        foreach (var peer in survivors)
+        {
+            Assert.True(CopyOf(peer, hullB).IsRemoved);
+            Assert.True(fresh[peer].IsActive(), $"{peer.Id} faded B's fresh troop with its old party");
+            bool registered = false;
+            peer.Call(() => registered = peer.Agents.TryGetAgentInfo(fresh[peer], out _));
+            Assert.True(registered, $"{peer.Id} deregistered B's fresh troop with its old party");
+        }
+    }
+
     // R41a fix-loop C3: the host and a player drop together. The successor is mid-swap on the AI hull it took over when the
     // player's hull leaves, so an AI boarder on that deck goes to a friendly hull that stays, never onto the hull the swap
     // replaces next tick (the R33, R40 crash class).

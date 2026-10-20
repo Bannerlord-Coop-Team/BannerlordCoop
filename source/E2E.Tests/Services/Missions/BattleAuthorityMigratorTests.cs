@@ -106,7 +106,6 @@ public class BattleAuthorityMigratorTests
             GameThread.Instance.RestoreGameThread(previousGameThread);
         }
 
-        Assert.Equal(expectWithdrawal, BattleAuthorityMigrator.WithdrawsPartyOnDeparture(isNaval));
         registry.Verify(value => value.GetControllerIds(), expectWithdrawal ? Times.Once() : Times.Never());
     }
 

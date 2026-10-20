@@ -116,6 +116,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly Dictionary<Guid, HeldShip> heldShips = new Dictionary<Guid, HeldShip>();
     // [Game thread] Players that left and have not entered again; a late record of theirs never spawns a hull here.
     private readonly HashSet<string> departedOwners = new HashSet<string>();
+    // [Game thread] Departed players whose party withdrawal waits for their hulls to settle, with whether each was the host.
+    private readonly Dictionary<string, bool> pendingWithdrawals = new Dictionary<string, bool>();
     private long recordsHeld;
     // The host AI hulls last migrated to, so an AI copy whose record was still waiting registers under it too.
     private string npcHullHost;
@@ -269,6 +271,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     public void Tick(float dt)
     {
         elapsed += Math.Max(0f, dt);
+        WithdrawSettledParties();
         hullAuthority.Tick();
         PruneRemovedHulls();
         DrainHeldShips();
@@ -283,6 +286,19 @@ public class BattleShipReplicator : IBattleShipReplicator
             SendOwnSamples(dt);
 
         ApplyForeignFrames(dt);
+    }
+
+    // Withdraws a departed party once its hulls settled; run before the hull step, so a removal that finished last tick has its
+    // unparked agents back on physics first. A returner's re-entry dropped its entry, so its fresh troops never fade.
+    private void WithdrawSettledParties()
+    {
+        if (pendingWithdrawals.Count == 0) return;
+
+        foreach (var entry in pendingWithdrawals.Where(entry => hullAuthority.IsSettledFor(entry.Key)).ToList())
+        {
+            pendingWithdrawals.Remove(entry.Key);
+            if (departedOwners.Contains(entry.Key)) partyWithdrawal.WithdrawParty(entry.Key, entry.Value);
+        }
     }
 
     private void PruneRemovedHulls()
@@ -577,7 +593,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     {
         foreach (var record in records.Where(record => record != null))
         {
-            // A player who left or disconnected takes its hulls; an AI hull still spawns, then moves to the host.
+            // A player who left or disconnected takes its hulls; an AI hull still spawns, then moves to the host. A returner's
+            // fresh records follow its deployment commit, long after the server introduced it to every member (PeerEntered).
             if (!record.FollowsBattleHost && departedOwners.Contains(record.OwnerControllerId))
             {
                 Logger.Information("[NavalSync] Dropped hull record {ShipId} of departed {Owner}", record.ShipId, record.OwnerControllerId);
@@ -850,6 +867,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         var left = payload.What;
         if (!IsDepartureOfThisBattle(left.ControllerId, left.InstanceId)) return;
 
+        // Read now, as the migrator reads it for its withdrawn-host mark, before a migration names a successor.
+        bool wasHost = session.IsHostController(left.ControllerId);
         GameThread.RunSafe(() =>
         {
             departedOwners.Add(left.ControllerId);
@@ -858,7 +877,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
             // At sea the hull removal takes the leaver's crew, so its party is withdrawn only once the hulls are gone.
             RemoveHullsOf(left.ControllerId);
-            hullAuthority.AfterRemovalsOf(left.ControllerId, () => partyWithdrawal.WithdrawParty(left.ControllerId));
+            pendingWithdrawals[left.ControllerId] = wasHost;
         }, context: nameof(Handle_MissionPeerLeft));
     }
 
@@ -932,6 +951,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         GameThread.RunSafe(() =>
         {
             departedOwners.Remove(entered.ControllerId);
+            pendingWithdrawals.Remove(entered.ControllerId);
             if (!spawnRecordsSent || session.IsOwn(entered.ControllerId)) return;
 
             SendSpawnRecords(entered.ControllerId);
@@ -972,7 +992,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         pendingForeignHulls = heldShips.Values.Count(held => held.Record != null),
         heldForDeployment = heldShips.Values.Count(held => held.HeldForDeployment),
         heldSamples = heldShips.Values.Count(held => held.Sample != null),
-        ships = Registry.Ships.Select(ship =>
+        pendingWithdrawals = pendingWithdrawals.Keys.ToArray(),
+        ships =Registry.Ships.Select(ship =>
         {
             streams.TryGetValue(ship.ShipId, out var stream);
             var condition = engine.ReadCondition(ship.Hull);

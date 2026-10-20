@@ -26,8 +26,11 @@ namespace Missions.Battles;
 /// </summary>
 public interface IBattlePartyWithdrawal
 {
-    /// <summary>[Any thread] Fades out the departed controller's own-party troops still in the battle, whoever holds them now.</summary>
-    void WithdrawParty(string controllerId);
+    /// <summary>
+    /// [Any thread] Fades out the departed controller's own-party troops still in the battle, whoever holds them now;
+    /// <paramref name="wasHost"/> is whether it hosted the battle when it left.
+    /// </summary>
+    void WithdrawParty(string controllerId, bool wasHost);
 }
 
 /// <summary>
@@ -82,8 +85,6 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
     // which all run on the relay's receive thread, so no locking. Entries are consumed by the promotion and
     // cleared if the controller re-enters (a later drop of the same controller must not be treated as a retreat).
     private readonly HashSet<string> withdrawnHosts = new HashSet<string>();
-    // [Game thread] Departed hosts whose party withdrawal is still to run; a host's AI must never be taken for its party.
-    private readonly HashSet<string> hostsAwaitingWithdrawal = new HashSet<string>();
     private readonly Dictionary<string, NetworkRetainedPlayerHero> playerHandoffs = new();
     private readonly HashSet<Guid> confirmedPlayerHandoffs = new();
     private readonly Dictionary<Guid, (Agent Agent, AgentControllerType Controller)> provisionalPlayerControllers = new();
@@ -366,30 +367,25 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
 
         // A departed HOST's own party withdraws, while the promoted successor adopts only the NPC forces it
         // ran. Marking this before the migration message arrives keeps the despawn and adoption sets disjoint.
-        if (session.IsHostController(controllerId))
+        bool wasHost = session.IsHostController(controllerId);
+        if (wasHost)
         {
             withdrawnHosts.Add(controllerId);
-            GameThread.RunSafe(() => hostsAwaitingWithdrawal.Add(controllerId), context: nameof(HandlePartyWithdrawal));
             Logger.Information("[BattleSync] Host {Controller} {Reason} — withdrawing its own party; migration adopts the AI it ran", controllerId, reason);
         }
 
-        if (!WithdrawsPartyOnDeparture(session.IsNaval)) return;
+        // At sea the hull removal must take the leaver's crew first (the removal invariant), so the ship replicator withdraws
+        // the party after it.
+        if (session.IsNaval) return;
 
-        WithdrawParty(controllerId);
+        WithdrawParty(controllerId, wasHost);
     }
 
-    /// <summary>
-    /// Whether a departure fades the party at once. At sea the hull removal must take the leaver's crew first (the removal
-    /// invariant), so the ship replicator withdraws the party after it instead.
-    /// </summary>
-    internal static bool WithdrawsPartyOnDeparture(bool isNavalMission) => !isNavalMission;
-
-    public void WithdrawParty(string controllerId)
+    public void WithdrawParty(string controllerId, bool wasHost)
     {
         if (string.IsNullOrEmpty(controllerId) || session.IsOwn(controllerId)) return;
 
-        GameThread.RunSafe(() => DespawnPartyTroops(controllerId, hostsAwaitingWithdrawal.Remove(controllerId)),
-            context: nameof(WithdrawParty));
+        GameThread.RunSafe(() => DespawnPartyTroops(controllerId, wasHost), context: nameof(WithdrawParty));
     }
 
     // [Game thread] Fades a departed player's own-party troops, by ownership (not side, BR-051, nor holder: at sea a host
