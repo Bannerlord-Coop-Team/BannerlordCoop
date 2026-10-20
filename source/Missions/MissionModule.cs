@@ -20,6 +20,7 @@ using Missions.Diagnostics;
 #endif
 using Missions.Locations;
 using Missions.Hideouts;
+using Missions.Missiles;
 using Missions.Missiles.Handlers;
 using Missions.Missiles.Patches;
 using Missions.Services.Network;
@@ -261,6 +262,7 @@ public class MissionModule : Module
         //builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>().InstancePerDependency();
         builder.RegisterType<NetworkWorldItemRegistry>().As<INetworkWorldItemRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerDependency();
+        builder.RegisterType<MissilePickupArbiter>().As<IMissilePickupArbiter>().InstancePerDependency();
         builder.RegisterType<AgentEquipmentApplier>().As<IAgentEquipmentApplier>().InstancePerDependency();
         builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerDependency();
         builder.RegisterType<AgentVisualActionAccessor>()

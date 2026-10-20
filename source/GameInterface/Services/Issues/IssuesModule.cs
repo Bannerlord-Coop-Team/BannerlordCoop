@@ -29,6 +29,7 @@ internal class IssuesModule : Module
         builder.RegisterType<OutcomeDispatcher>().As<IOutcomeDispatcher>().InstancePerLifetimeScope();
         builder.RegisterType<CaravanAmbushStatePublisher>().As<ICaravanAmbushStatePublisher>().InstancePerLifetimeScope();
         builder.RegisterType<CaravanAmbushEvents>().As<ICaravanAmbushEvents>().InstancePerLifetimeScope();
+        builder.Register(context => context.Resolve<LordSolutionCoordinator>()).As<ILordSolutionCoordinator>();
         builder.RegisterType<IssueConversationTracker>().As<IIssueConversationTracker>().InstancePerLifetimeScope();
         builder.RegisterType<TheConquestOfSettlementService>()
             .As<ITheConquestOfSettlementService>()
