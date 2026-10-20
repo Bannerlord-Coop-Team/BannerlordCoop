@@ -25,6 +25,10 @@ internal sealed class QuestScenario
     public string NotableId { get; }
     public Player PlayerA { get; }
     public Player PlayerB { get; }
+    public string OwnerHeroId => PlayerA.HeroId;
+    public string OwnerPartyId => PlayerA.MobilePartyId;
+    public string OtherHeroId => PlayerB.HeroId;
+    public string OtherPartyId => PlayerB.MobilePartyId;
 
     public EnvironmentInstance Server => testEnvironment.Server;
     public EnvironmentInstance ClientA => testEnvironment.Clients.First();
