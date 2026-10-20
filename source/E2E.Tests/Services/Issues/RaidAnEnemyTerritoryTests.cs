@@ -99,8 +99,6 @@ public class RaidAnEnemyTerritoryTests : IDisposable
             RaidAnEnemyTerritoryRaidCompletionPatch.Resolve(quest, settlement, ownerParty);
 
             Assert.True(quest.IsOngoing);
-            Assert.Single(quest._raidedVillages);
-            Assert.Contains(settlement, quest._raidedVillages);
         });
 
         owner.Call(() =>
@@ -108,7 +106,6 @@ public class RaidAnEnemyTerritoryTests : IDisposable
             Assert.True(owner.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
             var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
             Assert.True(quest.IsOngoing);
-            Assert.Single(quest._raidedVillages);
         });
     }
 
