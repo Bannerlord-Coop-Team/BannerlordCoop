@@ -42,10 +42,12 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
             !players.TryGetPeer(controllerId, out var peer)) return;
         var caravanId = IdOf(quest._caravanParty);
         var banditId = IdOf(quest._banditParty);
+        var journalCount = quest.JournalEntries.Count;
+        if (published.TryGetValue(quest, out var previous) && previous.Matches(ownerId, issue.StringId,
+            controllerId, caravanId, banditId, quest._isCaravanSaved, quest._vicinityCheckFailCounter, journalCount)) return;
         var journal = quest.JournalEntries.Select(entry => entry.LogText.ToString()).ToArray();
         var state = new State(ownerId, issue.StringId, controllerId, caravanId, banditId,
-            quest._isCaravanSaved, quest._vicinityCheckFailCounter, journal);
-        if (published.TryGetValue(quest, out var previous) && previous.Equals(state)) return;
+            quest._isCaravanSaved, quest._vicinityCheckFailCounter, journalCount, journal);
         published[quest] = state;
         network.Send(peer, new NetworkCaravanAmbushState(ownerId, issue.StringId, controllerId, caravanId,
             banditId, quest._isCaravanSaved, quest._vicinityCheckFailCounter, journal));
@@ -69,10 +71,11 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
         private readonly string banditId;
         private readonly bool saved;
         private readonly int warnings;
+        private readonly int journalCount;
         private readonly string[] journal;
 
         public State(string ownerId, string issueId, string controllerId, string caravanId, string banditId,
-            bool saved, int warnings, string[] journal)
+            bool saved, int warnings, int journalCount, string[] journal)
         {
             this.ownerId = ownerId;
             this.issueId = issueId;
@@ -81,12 +84,18 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
             this.banditId = banditId;
             this.saved = saved;
             this.warnings = warnings;
+            this.journalCount = journalCount;
             this.journal = journal;
         }
 
+        public bool Matches(string ownerId, string issueId, string controllerId, string caravanId, string banditId,
+            bool saved, int warnings, int journalCount) => this.ownerId == ownerId && this.issueId == issueId &&
+            this.controllerId == controllerId && this.caravanId == caravanId && this.banditId == banditId &&
+            this.saved == saved && this.warnings == warnings && this.journalCount == journalCount;
+
         public bool Equals(State other) => ownerId == other.ownerId && issueId == other.issueId &&
             controllerId == other.controllerId && caravanId == other.caravanId && banditId == other.banditId &&
-            saved == other.saved && warnings == other.warnings && journal.SequenceEqual(other.journal);
+            saved == other.saved && warnings == other.warnings && journalCount == other.journalCount && journal.SequenceEqual(other.journal);
 
         public override bool Equals(object obj) => obj is State other && Equals(other);
 

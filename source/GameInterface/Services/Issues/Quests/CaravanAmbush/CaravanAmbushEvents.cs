@@ -1,11 +1,7 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
-using Common.Logging;
 using Common.Network;
-using Serilog;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -27,24 +23,20 @@ internal interface ICaravanAmbushEvents
 
 internal class CaravanAmbushEvents : ICaravanAmbushEvents
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<CaravanAmbushEvents>();
     private readonly IOutcomeDispatcher dispatcher;
     private readonly ICaravanAmbushStatePublisher publisher;
     private readonly INetwork network;
     private readonly IObjectManager objects;
     private readonly IIssueOwnerResolver owners;
-    private readonly IPlayerManager players;
-    private readonly HashSet<Quest> pendingConversations = new();
 
     public CaravanAmbushEvents(IOutcomeDispatcher dispatcher, ICaravanAmbushStatePublisher publisher,
-        INetwork network, IObjectManager objects, IIssueOwnerResolver owners, IPlayerManager players)
+        INetwork network, IObjectManager objects, IIssueOwnerResolver owners)
     {
         this.dispatcher = dispatcher;
         this.publisher = publisher;
         this.network = network;
         this.objects = objects;
         this.owners = owners;
-        this.players = players;
     }
 
     public void Run(Action<Quest> action)
@@ -53,11 +45,7 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         {
             action(quest);
             if (quest.IsOngoing)
-            {
                 publisher.Publish(quest);
-                if (pendingConversations.Contains(quest)) OpenOwnerConversation(quest);
-            }
-            else pendingConversations.Remove(quest);
         });
     }
 
@@ -88,7 +76,6 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
         }
         else
         {
-            publisher.Publish(quest);
             OpenOwnerConversation(quest);
         }
     }
@@ -100,20 +87,11 @@ internal class CaravanAmbushEvents : ICaravanAmbushEvents
             !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
             !objects.TryGetIdWithLogging(quest._caravanParty, out var caravanId) ||
             !owners.TryGetOwnerControllerId(issue, out var controllerId)) return;
-        if (!players.TryGetPeer(controllerId, out var peer))
-        {
-            if (pendingConversations.Add(quest))
-                Logger.Warning("The owner peer for {quest} is not connected, retrying the reward conversation", issue.StringId);
-            return;
-        }
-
-        pendingConversations.Remove(quest);
-        network.Send(peer, new NetworkCaravanAmbushConversation(ownerId, issue.StringId, controllerId, caravanId));
+        network.SendAll(new NetworkCaravanAmbushConversation(ownerId, issue.StringId, controllerId, caravanId));
     }
 
     public void Release(Quest quest, bool completing = false)
     {
-        pendingConversations.Remove(quest);
         if (!completing && quest._isCaravanSaved && quest._caravanParty?.IsActive == true)
         {
             // Keep the caravan available for the owner's reward conversation.

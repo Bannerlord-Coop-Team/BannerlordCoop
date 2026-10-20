@@ -87,8 +87,7 @@ internal class CaravanAmbushPatches
     private static void Finalize(QuestBase __instance)
     {
         if (ModInformation.IsClient || !(__instance is Quest quest)) return;
-        ContainerProvider.TryResolve<ICaravanAmbushStatePublisher>(out var publisher);
-        if (publisher != null) publisher.Publish(quest);
+        if (ContainerProvider.TryResolve<ICaravanAmbushStatePublisher>(out var publisher)) publisher.Publish(quest);
         if (ContainerProvider.TryResolve<ICaravanAmbushEvents>(out var events)) events.Release(quest, completing: true);
         publisher?.Forget(quest);
     }

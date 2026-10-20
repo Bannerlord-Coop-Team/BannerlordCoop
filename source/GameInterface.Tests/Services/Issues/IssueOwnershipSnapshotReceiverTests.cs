@@ -90,6 +90,22 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
     }
 
     [Fact]
+    public void ASnapshotForADifferentIssueKeepsTheNewIssueOwner()
+    {
+        Receive(new NetworkIssueOwnershipSnapshot(new[]
+        {
+            new IssueOwnershipData("hero_1", "issue_2", "new-player"),
+        }));
+
+        Assert.True(registry.TryGetOwner("hero_1", "issue_2", out var owner));
+        Assert.Equal("new-player", owner);
+
+        registry.Remove("hero_1", "issue_1");
+        Assert.True(registry.TryGetOwner("hero_1", "issue_2", out owner));
+        Assert.Equal("new-player", owner);
+    }
+
+    [Fact]
     public void AnEmptySnapshotThatWentThroughTheWireClearsWhatTheClientRemembered()
     {
         var received = ThroughTheWire(new NetworkIssueOwnershipSnapshot(Array.Empty<IssueOwnershipData>()));
