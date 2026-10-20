@@ -411,7 +411,8 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
     {
         if (!Patches.SiegeAftermathPatches.PendingAftermaths.TryGetValue(settlement, out var pending))
         {
-            Logger.Error("No pending siege aftermath for {Settlement}", settlement.Name?.ToString());
+            // Expected for a pick made after the server discarded the aftermath, before the release reached the client.
+            Logger.Warning("No pending siege aftermath for {Settlement}", settlement.Name?.ToString());
             return;
         }
 
@@ -938,20 +939,15 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
 
     public void SetLocalAftermathNarration(Settlement settlement, int aftermathType)
     {
-        if (localAftermathChoiceSettlement == settlement)
-        {
-            localAftermathChoiceSettlement = null;
-        }
+        // The choice is resolved (ours, or the server auto-applied a stale one); without this release a
+        // client whose pick never happened keeps bouncing its town menu back to menu_settlement_taken.
+        ReleaseLocalAftermathChoice(settlement);
 
         var matchesLocalNarration = localAftermathNarrationSettlement == settlement;
         if (matchesLocalNarration)
         {
             localAftermathNarrationSettlement = null;
         }
-
-        // The choice is resolved (ours, or the server auto-applied a stale one); without this release a
-        // client whose pick never happened keeps bouncing its town menu back to menu_settlement_taken.
-        SiegeCaptureMenuHoldPatch.Release(settlement);
 
         // Ignore another settlement's broadcast. The participant-bound identity remains valid throughout
         // the settlement-taken flow, including the short transition where Settlement.CurrentSettlement is null.

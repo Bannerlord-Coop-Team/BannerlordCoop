@@ -69,7 +69,8 @@ public sealed class SiegeAftermathPendingTests : IDisposable
         Assert.True(SiegeAftermathPatches.PendingAftermaths.TryAdd(settlement, pending));
 
         bool applied = false;
-        bool resolved = SiegeAftermathPatches.ResolvePending(
+        bool resolved = false;
+        var discarded = CaptureDiscards(() => resolved = SiegeAftermathPatches.ResolvePending(
             CreateUninitialized<SiegeAftermathCampaignBehavior>(), settlement, "settlement ownership changed",
             (_, party, capturedSettlement) =>
             {
@@ -85,10 +86,12 @@ public sealed class SiegeAftermathPendingTests : IDisposable
                 Assert.Equal(SiegeAftermathAction.SiegeAftermath.ShowMercy, aftermath);
                 Assert.Same(previousOwner, oldOwner);
                 Assert.Same(pending.Contributions, contributions);
-            });
+            }));
 
         Assert.True(resolved);
         Assert.True(applied);
+        // the applied broadcast already releases the leader's choice
+        Assert.Empty(discarded);
         Assert.Empty(SiegeAftermathPatches.PendingAftermaths);
     }
 

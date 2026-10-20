@@ -475,15 +475,17 @@ internal class SiegeAftermathPatches
             Dictionary<MobileParty, float>> applyAftermath = null)
     {
         if (behavior == null || settlement == null) return false;
-        if (!PendingAftermaths.TryRemove(settlement, out var pending)) return false;
+        if (!PendingAftermaths.TryGetValue(settlement, out var pending)) return false;
 
         if (!pending.MatchesCurrentCapture(settlement))
         {
-            PublishDiscarded(settlement);
+            DiscardPending(settlement);
             Logger.Warning("Discarded pending siege aftermath for {Settlement} ({Reason}): capture identity no longer matches",
                 settlement.Name?.ToString(), reason);
             return false;
         }
+
+        PendingAftermaths.TryRemove(settlement, out _);
 
         determineAftermath ??= static (aftermathBehavior, leaderParty, capturedSettlement) =>
             aftermathBehavior.DetermineAISiegeAftermath(leaderParty, capturedSettlement);
@@ -501,15 +503,9 @@ internal class SiegeAftermathPatches
     // client would keep holding a choice the server no longer accepts.
     internal static bool DiscardPending(Settlement settlement)
     {
-        if (settlement == null || !PendingAftermaths.TryRemove(settlement, out _)) return false;
+        if (!PendingAftermaths.TryRemove(settlement, out _)) return false;
 
-        PublishDiscarded(settlement);
-        return true;
-    }
-
-    // Tells the clients a parked aftermath is gone without an apply.
-    private static void PublishDiscarded(Settlement settlement)
-    {
         MessageBroker.Instance.Publish(null, new SiegeAftermathDiscarded(settlement));
+        return true;
     }
 }
