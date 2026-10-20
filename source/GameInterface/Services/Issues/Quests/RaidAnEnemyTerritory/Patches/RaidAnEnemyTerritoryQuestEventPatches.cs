@@ -80,37 +80,28 @@ internal sealed class RaidAnEnemyTerritoryQuestEventPatches
         });
     }
 
-    [HarmonyPatch(typeof(Quest), nameof(Quest.CompleteQuestWithCancel))]
+    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithCancel))]
     [HarmonyPrefix]
-    private static void CompleteCancelPrefix(Quest __instance)
+    private static void CompleteCancelPrefix(QuestBase __instance)
     {
         Logger.Information("Raid quest cancel issue={issue} giver={giver} count={count} ongoing={ongoing}",
-            __instance.QuestGiver?.Issue?.StringId,
-            __instance.QuestGiver?.StringId,
-            __instance._raidedVillages?.Count,
-            __instance.IsOngoing);
+            (__instance as Quest)?.QuestGiver?.Issue?.StringId,`r`n            (__instance as Quest)?.QuestGiver?.StringId,`r`n            (__instance as Quest)?._raidedVillages?.Count,`r`n            __instance.IsOngoing);
     }
 
-    [HarmonyPatch(typeof(Quest), nameof(Quest.CompleteQuestWithFail))]
+    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithFail))]
     [HarmonyPrefix]
-    private static void CompleteFailPrefix(Quest __instance)
+    private static void CompleteFailPrefix(QuestBase __instance)
     {
         Logger.Information("Raid quest fail issue={issue} giver={giver} count={count} ongoing={ongoing}",
-            __instance.QuestGiver?.Issue?.StringId,
-            __instance.QuestGiver?.StringId,
-            __instance._raidedVillages?.Count,
-            __instance.IsOngoing);
+            (__instance as Quest)?.QuestGiver?.Issue?.StringId,`r`n            (__instance as Quest)?.QuestGiver?.StringId,`r`n            (__instance as Quest)?._raidedVillages?.Count,`r`n            __instance.IsOngoing);
     }
 
-    [HarmonyPatch(typeof(Quest), nameof(Quest.CompleteQuestWithTimeOut))]
+    [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut))]
     [HarmonyPrefix]
-    private static void CompleteTimeoutPrefix(Quest __instance)
+    private static void CompleteTimeoutPrefix(QuestBase __instance)
     {
         Logger.Information("Raid quest timeout issue={issue} giver={giver} count={count} ongoing={ongoing}",
-            __instance.QuestGiver?.Issue?.StringId,
-            __instance.QuestGiver?.StringId,
-            __instance._raidedVillages?.Count,
-            __instance.IsOngoing);
+            (__instance as Quest)?.QuestGiver?.Issue?.StringId,`r`n            (__instance as Quest)?.QuestGiver?.StringId,`r`n            (__instance as Quest)?._raidedVillages?.Count,`r`n            __instance.IsOngoing);
     }
 
     [HarmonyPatch(typeof(Quest), "OnHeroKilled")]
