@@ -15,7 +15,6 @@ internal class VillageNeedsCraftingMaterialsDescriptor : IQuestTypeDescriptor
     public IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy { get; }
 
     public IFinalizationProofStrategy FinalizationProofStrategy { get; }
-    public bool SuccessOnlyThroughBranchProof => false;
 
     public VillageNeedsCraftingMaterialsDescriptor(
         VillageNeedsCraftingMaterialsCreationCaptureStrategy creationCaptureStrategy,

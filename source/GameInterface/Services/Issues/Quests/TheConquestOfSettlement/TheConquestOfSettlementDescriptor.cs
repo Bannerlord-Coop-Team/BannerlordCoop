@@ -21,5 +21,4 @@ internal sealed class TheConquestOfSettlementDescriptor : IQuestTypeDescriptor
         CreationCaptureStrategy = creationCaptureStrategy;
         QuestSolutionAcceptStrategy = questSolutionAcceptStrategy;
     }
-    public bool SuccessOnlyThroughBranchProof => false;
 }

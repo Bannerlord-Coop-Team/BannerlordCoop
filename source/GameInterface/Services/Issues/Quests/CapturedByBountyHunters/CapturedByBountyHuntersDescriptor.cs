@@ -26,5 +26,4 @@ internal class CapturedByBountyHuntersDescriptor : IQuestTypeDescriptor
         QuestSolutionAcceptStrategy = questSolutionAcceptStrategy;
         AlternativeSolutionAcceptStrategy = alternativeSolutionAcceptStrategy;
     }
-    public bool SuccessOnlyThroughBranchProof => false;
 }

@@ -11,7 +11,6 @@ internal class HeadmanNeedsToDeliverAHerdDescriptor : IQuestTypeDescriptor
     public IQuestSolutionAcceptStrategy QuestSolutionAcceptStrategy { get; }
     public IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy { get; }
     public IFinalizationProofStrategy FinalizationProofStrategy { get; }
-    public bool SuccessOnlyThroughBranchProof => true;
 
     public HeadmanNeedsToDeliverAHerdDescriptor(
         HeadmanNeedsToDeliverAHerdCreationCaptureStrategy creation,

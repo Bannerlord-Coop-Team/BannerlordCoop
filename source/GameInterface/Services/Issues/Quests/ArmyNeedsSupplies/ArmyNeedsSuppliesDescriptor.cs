@@ -15,7 +15,6 @@ internal class ArmyNeedsSuppliesDescriptor : IQuestTypeDescriptor
     public IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy => null;
 
     public IFinalizationProofStrategy FinalizationProofStrategy { get; }
-    public bool SuccessOnlyThroughBranchProof => false;
 
     public ArmyNeedsSuppliesDescriptor(
         ArmyNeedsSuppliesCreationCaptureStrategy creationCaptureStrategy,
