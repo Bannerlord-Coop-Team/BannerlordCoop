@@ -259,6 +259,24 @@ public class ArtisanProductsTests : IDisposable
     }
 
     [Fact]
+    public void GenericQuestSuccess_WithNoGoodsDoesNotBypassArtisanBranchValidation()
+    {
+        Accept();
+
+        Server.SimulateMessage(Owner.NetPeer,
+            new RequestQuestOutcome(scenario.NotableId, QuestScenario.IssueId, IssueOutcome.QuestSuccess));
+
+        Server.Call(() =>
+        {
+            var issue = Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+            Assert.NotNull(issue);
+            Assert.True(issue.IsSolvingWithQuest);
+            Assert.True(((Quest)issue.IssueQuest).IsOngoing);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        });
+    }
+
+    [Fact]
     public void FullDelivery_FinishesEverywhereAndPaysOnlyTheOwner()
     {
         Accept();
