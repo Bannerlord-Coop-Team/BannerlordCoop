@@ -163,17 +163,18 @@ internal class BattleJoinLeaveHandler : IHandler
     /// <summary>Opens the join menu deferred until this snapshot, otherwise moves an already-open siege joiner to the encounter.</summary>
     private void OpenSiegeJoinMenuIfNeeded(MapEvent mapEvent)
     {
-        if (siegeJoinMenuDeferralTracker.TryConsume(mapEvent, out var droppedForChangedEncounter))
+        switch (siegeJoinMenuDeferralTracker.Consume(mapEvent))
         {
-            GameMenu.ActivateGameMenu("join_siege_event");
-            GameMenu.SwitchToMenu("encounter");
-            return;
+            case SiegeJoinMenuDeferralResult.Open:
+                GameMenu.ActivateGameMenu("join_siege_event");
+                GameMenu.SwitchToMenu("encounter");
+                return;
+            case SiegeJoinMenuDeferralResult.DroppedForChangedEncounter:
+                return;
+            case SiegeJoinMenuDeferralResult.NotReady:
+                SwitchSiegeJoinerToEncounterIfNeeded(mapEvent);
+                return;
         }
-
-        if (droppedForChangedEncounter)
-            return;
-
-        SwitchSiegeJoinerToEncounterIfNeeded(mapEvent);
     }
 
     private static void SwitchSiegeJoinerToEncounterIfNeeded(MapEvent mapEvent)

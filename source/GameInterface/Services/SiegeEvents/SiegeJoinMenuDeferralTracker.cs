@@ -6,6 +6,21 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.SiegeEvents;
 
 /// <summary>
+/// What an involved-party snapshot should do about a deferred join_siege_event menu.
+/// </summary>
+public enum SiegeJoinMenuDeferralResult
+{
+    /// <summary>No deferred menu is ready for this map event, so the caller takes its normal path.</summary>
+    NotReady,
+
+    /// <summary>The deferred menu should open now.</summary>
+    Open,
+
+    /// <summary>The deferral was dropped because the player's encounter changed, so the caller does nothing.</summary>
+    DroppedForChangedEncounter,
+}
+
+/// <summary>
 /// Tracks the client's one pending siege assault or sally-out join whose join_siege_event menu waits for the server's involved-party snapshot.
 /// </summary>
 public interface ISiegeJoinMenuDeferralTracker : IGameAbstraction
@@ -16,9 +31,8 @@ public interface ISiegeJoinMenuDeferralTracker : IGameAbstraction
     /// <summary>Returns true when the current join_siege_event activation should wait for the snapshot, otherwise drops the deferral if the main party already joined.</summary>
     bool TryDefer();
 
-    /// <summary>Returns true when the snapshot for <paramref name="mapEvent"/> should open the deferred menu now.</summary>
-    /// <param name="droppedForChangedEncounter">Only meaningful when returning false: true when the deferral was dropped because the player's encounter changed.</param>
-    bool TryConsume(MapEvent mapEvent, out bool droppedForChangedEncounter);
+    /// <summary>Decides what the snapshot for <paramref name="mapEvent"/> does with the deferred menu, consuming the deferral unless it is not ready.</summary>
+    SiegeJoinMenuDeferralResult Consume(MapEvent mapEvent);
 
     /// <summary>Drops any pending deferral.</summary>
     void Clear();
@@ -63,30 +77,28 @@ internal sealed class SiegeJoinMenuDeferralTracker : ISiegeJoinMenuDeferralTrack
     }
 
     /// <summary>Consumes the deferral once the main party is in <paramref name="mapEvent"/> under the same encounter.</summary>
-    public bool TryConsume(MapEvent mapEvent, out bool droppedForChangedEncounter)
+    public SiegeJoinMenuDeferralResult Consume(MapEvent mapEvent)
     {
-        droppedForChangedEncounter = false;
         if (!ReferenceEquals(pendingMapEvent, mapEvent))
-            return false;
+            return SiegeJoinMenuDeferralResult.NotReady;
 
         if (pendingEncounter == null)
         {
             Clear();
-            return false;
+            return SiegeJoinMenuDeferralResult.NotReady;
         }
 
         if (!ReferenceEquals(PlayerEncounter.Current, pendingEncounter))
         {
             Clear();
-            droppedForChangedEncounter = true;
-            return false;
+            return SiegeJoinMenuDeferralResult.DroppedForChangedEncounter;
         }
 
         if (!ReferenceEquals(MobileParty.MainParty?.MapEvent, mapEvent))
-            return false;
+            return SiegeJoinMenuDeferralResult.NotReady;
 
         Clear();
-        return true;
+        return SiegeJoinMenuDeferralResult.Open;
     }
 
     /// <summary>Drops any pending deferral.</summary>
