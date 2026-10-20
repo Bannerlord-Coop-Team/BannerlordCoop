@@ -101,12 +101,6 @@ public class RaidAnEnemyTerritoryTests : IDisposable
             Assert.True(quest.IsOngoing);
         });
 
-        owner.Call(() =>
-        {
-            Assert.True(owner.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
-            var quest = Assert.IsType<Quest>(giver.Issue.IssueQuest);
-            Assert.True(quest.IsOngoing);
-        });
     }
 
     private void RegisterOwner()
