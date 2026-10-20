@@ -756,13 +756,11 @@ public class PuppetSpawner : IPuppetSpawner
         MarkControllerWithdrawn(payload.What.ControllerId, payload.What.InstanceId, disconnected: false);
     }
 
-    // A land disconnect keeps the player's puppets for the host to adopt; at sea it withdraws them like a leave (D4).
     private void Handle_PeerDisconnected(MessagePayload<MissionPeerDisconnected> payload)
     {
         string controllerId = payload.What.ControllerId;
-        MarkControllerWithdrawn(controllerId, payload.What.InstanceId, disconnected: !session.IsNaval);
+        MarkControllerWithdrawn(controllerId, payload.What.InstanceId, disconnected: true);
         if (payload.What.InstanceId != null && payload.What.InstanceId != session.InstanceId) return;
-        if (session.IsNaval) return;
         if (!session.IsHostController(controllerId))
             TransferPendingAuthority(controllerId, session.HostControllerId, sweepAbsentControllers: false);
     }

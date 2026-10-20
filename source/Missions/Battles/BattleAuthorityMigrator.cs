@@ -326,19 +326,13 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
         HandlePartyWithdrawal(payload.What.ControllerId, payload.What.InstanceId, "retreated");
     }
 
-    // A land disconnect preserves both the remaining reserve and already-fielded agents. The current host adopts a
+    // A disconnect preserves both the remaining reserve and already-fielded agents. The current host adopts a
     // non-host's agents immediately; a departed host's successor adopts them when the migration assignment lands.
-    // At sea a disconnect withdraws the party like a leave, since its hulls leave with it (D4).
+    // The server sends a naval disconnect as a leave (D4), so this is only ever a land one.
     private void Handle_PeerDisconnected(MessagePayload<MissionPeerDisconnected> payload)
     {
         var controllerId = payload.What.ControllerId;
         if (payload.What.InstanceId != null && payload.What.InstanceId != session.InstanceId) return;
-        if (session.IsNaval)
-        {
-            HandlePartyWithdrawal(controllerId, payload.What.InstanceId, "disconnected");
-            return;
-        }
-
         CancelProvisionalPlayerHandoff(controllerId);
         if (session.IsHostController(controllerId)) return;
         if (!session.IsLocalHost)
@@ -474,7 +468,7 @@ public class BattleAuthorityMigrator : IBattleAuthorityMigrator
             foreach (var holderId in controllers)
                 CleanUpDepartedMounts(holderId, despawnedRiders, allMounts: holderId == controllerId);
 
-            // A naval departure already withdrew the hulls' crew, so a miss only matters while agents are still keyed to the leaver.
+            // At sea the hull removal can withdraw the crew first, so a miss only matters while agents are still keyed to the leaver.
             int stillKeyed = registry.GetAgents(controllerId).Count(info => info.Agent != null && !info.Agent.IsMount);
             if (despawned > 0)
                 Logger.Information("[BattleSync] Despawned {Count} withdrawn troop(s) of {Controller}", despawned, controllerId);

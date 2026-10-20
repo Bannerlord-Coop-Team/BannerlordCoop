@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
@@ -108,6 +109,18 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         host.Controller.ResultCommitter.AcceptResolvedState(state);
         host.Controller.ResultCommitter.ReportAcceptedResult();
     }, VictoryConclusionDisabledMethods());
+
+    /// <summary>
+    /// <paramref name="departed"/>'s connection drops: it leaves the mesh and the server's own disconnect path tells every
+    /// other member, which at sea is a leave (D4).
+    /// </summary>
+    protected void DropConnection(NavalPeer departed)
+    {
+        departed.Instance.Call(departed.Network.Stop);
+        Server.Call(() => Server.SimulateMessage(this, new PlayerDisconnected(departed.Instance.NetPeer, default)),
+            VictoryConclusionDisabledMethods());
+        Server.PumpGameThread();
+    }
 
     protected void AssertMapEventRemoved(string mapEventId) =>
         Server.Call(() => Assert.False(Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _)));
@@ -222,13 +235,14 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         }
 
         /// <summary>
-        /// <paramref name="departed"/> drops off the mesh without leaving, and the server tells every other member it disconnected.
+        /// <paramref name="departed"/> drops off the mesh without leaving, and the server tells every other member it left, as
+        /// it sends a naval disconnect (D4).
         /// </summary>
         public void Disconnect(NavalPeer departed)
         {
             departed.Instance.Call(departed.Network.Stop);
             foreach (var peer in Peers)
-                peer.Instance.Call(() => peer.Broker.Publish(peer, new MissionPeerDisconnected(departed.Id, MapEventId)));
+                peer.Instance.Call(() => peer.Broker.Publish(peer, new MissionPeerLeft(departed.Id, MapEventId)));
         }
 
         /// <summary>

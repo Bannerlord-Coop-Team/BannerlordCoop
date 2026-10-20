@@ -1,10 +1,12 @@
 ﻿using Common;
+using Common.Network.Messages;
 using Common.Network.Session;
 using Common.Tests.Utils;
 using Coop.Core.Common.Session;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using Coop.Tests.Mocks;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
@@ -12,6 +14,7 @@ using Missions.Messages;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Reflection;
 using Xunit;
@@ -21,6 +24,7 @@ namespace Coop.Tests.Server.Services.Instances;
 public class ServerMissionMembershipHandlerTests
 {
     private const string InstanceId = "battle-1";
+    private static readonly IBattleHostRetentionPolicy LandPolicy = Mock.Of<IBattleHostRetentionPolicy>();
     private static readonly ConstructorInfo PeerConstructor = typeof(NetPeer).GetConstructor(
         BindingFlags.NonPublic | BindingFlags.Instance,
         binder: null,
@@ -132,7 +136,7 @@ public class ServerMissionMembershipHandlerTests
         MissionMemberEntered? entered = null;
         messageBroker.Subscribe<MissionMemberEntered>(payload => entered = payload.What);
         using var handler = new ServerMissionMembershipHandler(
-            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object);
+            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object, LandPolicy);
 
         messageBroker.Publish(peer, new NetworkMissionEntered("first", InstanceId));
         DrainGameThread();
@@ -160,7 +164,7 @@ public class ServerMissionMembershipHandlerTests
             .Setup(manager => manager.TryEnterMission(peer, "current", InstanceId, out entry))
             .Returns(true);
         using var handler = new ServerMissionMembershipHandler(
-            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object);
+            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object, LandPolicy);
 
         messageBroker.Publish(peer, new NetworkMissionEntered("stale", InstanceId));
         DrainGameThread();
@@ -189,7 +193,7 @@ public class ServerMissionMembershipHandlerTests
         MissionMemberEntered? entered = null;
         messageBroker.Subscribe<MissionMemberEntered>(payload => entered = payload.What);
         using var handler = new ServerMissionMembershipHandler(
-            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object);
+            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object, LandPolicy);
 
         messageBroker.Publish(peer, new NetworkMissionEntered("current", InstanceId));
         DrainGameThread();
@@ -225,7 +229,7 @@ public class ServerMissionMembershipHandlerTests
         messageBroker.Subscribe<MissionMemberEntered>(payload => entered = payload.What);
         var network = new TestNetwork();
         using var handler = new ServerMissionMembershipHandler(
-            messageBroker, missionManager.Object, network, playerManager.Object);
+            messageBroker, missionManager.Object, network, playerManager.Object, LandPolicy);
 
         messageBroker.Publish(peer, new NetworkMissionEntered("current", InstanceId));
         DrainGameThread();
@@ -259,7 +263,7 @@ public class ServerMissionMembershipHandlerTests
         var missionManager = new Mock<IMissionManager>();
         var messageBroker = new TestMessageBroker();
         using var handler = new ServerMissionMembershipHandler(
-            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object);
+            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object, LandPolicy);
 
         messageBroker.Publish(oldPeer, new NetworkMissionEntered("current", InstanceId));
 
@@ -283,7 +287,7 @@ public class ServerMissionMembershipHandlerTests
             .Setup(manager => manager.TryLeaveMission(peer, "current", InstanceId, out published))
             .Returns(false);
         using var handler = new ServerMissionMembershipHandler(
-            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object);
+            messageBroker, missionManager.Object, new TestNetwork(), playerManager.Object, LandPolicy);
 
         messageBroker.Publish(peer, new NetworkMissionLeft("stale", InstanceId));
         DrainGameThread();
@@ -299,7 +303,7 @@ public class ServerMissionMembershipHandlerTests
         var playerManager = CreatePlayerManager(peer, "current");
         var missionManager = new MissionManager(playerManager.Object);
         using var handler = new ServerMissionMembershipHandler(
-            messageBroker, missionManager, new TestNetwork(), playerManager.Object);
+            messageBroker, missionManager, new TestNetwork(), playerManager.Object, LandPolicy);
 
         messageBroker.Publish(peer, new NetworkMissionEntered("current", InstanceId));
         messageBroker.Publish(peer, new NetworkMissionLeft("current", InstanceId));
@@ -307,6 +311,37 @@ public class ServerMissionMembershipHandlerTests
 
         Assert.False(missionManager.TryGetControllers(InstanceId, out _));
         Assert.False(missionManager.TryGetRelayTarget(peer, InstanceId, "current", out _));
+    }
+
+    // D4: a naval disconnect reaches the remaining members as a leave, so they withdraw the party as on a leave; a land one
+    // stays a disconnect for the host to adopt. The server's own handlers still see no retreat, so no final health came.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void PlayerDisconnected_ReachesTheMembersAsALeaveOnlyAtSea(bool naval)
+    {
+        var dropped = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51016), 16);
+        var remaining = CreatePeer(new IPEndPoint(IPAddress.Loopback, 51017), 17);
+        var messageBroker = new TestMessageBroker();
+        var missionManager = new Mock<IMissionManager>();
+        missionManager.Setup(manager => manager.HandleDisconnect(dropped)).Returns(new[]
+        {
+            new MissionDeparture("dropped", InstanceId, new[] { ("remaining", remaining) }),
+        });
+        var policy = Mock.Of<IBattleHostRetentionPolicy>(rules => rules.DisconnectWithdraws(InstanceId) == naval);
+        MissionMemberDeparted? departed = null;
+        messageBroker.Subscribe<MissionMemberDeparted>(payload => departed = payload.What);
+        var network = new TestNetwork();
+        using var handler = new ServerMissionMembershipHandler(
+            messageBroker, missionManager.Object, network, CreatePlayerManager(dropped, "dropped").Object, policy);
+
+        messageBroker.Publish(this, new PlayerDisconnected(dropped, default));
+        DrainGameThread();
+
+        Assert.Equal(naval ? 1 : 0, network.GetPeerMessagesFromType<MissionPeerLeft>(remaining).Count());
+        Assert.Equal(naval ? 0 : 1, network.GetPeerMessagesFromType<MissionPeerDisconnected>(remaining).Count());
+        Assert.True(departed.HasValue);
+        Assert.False(departed.Value.WasRetreat);
     }
 
     [Fact]
@@ -318,7 +353,7 @@ public class ServerMissionMembershipHandlerTests
         var missionManager = new MissionManager(playerManager.Object);
         var broker = new TestMessageBroker();
         var network = new TestNetwork();
-        using var handler = new ServerMissionMembershipHandler(broker, missionManager, network, playerManager.Object);
+        using var handler = new ServerMissionMembershipHandler(broker, missionManager, network, playerManager.Object, LandPolicy);
         var request = new NetworkRequestMissionIntroduction(InstanceId, Guid.NewGuid());
 
         broker.Publish(unknownPeer, request);
@@ -342,7 +377,7 @@ public class ServerMissionMembershipHandlerTests
         var missionManager = new MissionManager(playerManager.Object);
         var broker = new TestMessageBroker();
         var network = new TestNetwork();
-        using var handler = new ServerMissionMembershipHandler(broker, missionManager, network, playerManager.Object);
+        using var handler = new ServerMissionMembershipHandler(broker, missionManager, network, playerManager.Object, LandPolicy);
         missionManager.HandleDisconnect(peer);
 
         broker.Publish(peer, new NetworkRequestMissionIntroduction(InstanceId, Guid.NewGuid()));
@@ -384,7 +419,7 @@ public class ServerMissionMembershipHandlerTests
 
         var network = new TestNetwork();
         using var handler = new ServerMissionMembershipHandler(
-            messageBroker, missionManager.Object, network, playerManager.Object, tunnelHost);
+            messageBroker, missionManager.Object, network, playerManager.Object, LandPolicy, tunnelHost);
 
         messageBroker.Publish(newcomer, new NetworkMissionEntered(newcomerControllerId, InstanceId));
         DrainGameThread();

@@ -163,7 +163,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Subscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
         messageBroker.Subscribe<NetworkShipCondition>(Handle_NetworkShipCondition);
         messageBroker.Subscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
-        messageBroker.Subscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
         messageBroker.Subscribe<NetworkShipRemoved>(Handle_NetworkShipRemoved);
     }
 
@@ -178,7 +177,6 @@ public class BattleShipReplicator : IBattleShipReplicator
         messageBroker.Unsubscribe<BattleHostMigrated>(Handle_BattleHostMigrated);
         messageBroker.Unsubscribe<NetworkShipCondition>(Handle_NetworkShipCondition);
         messageBroker.Unsubscribe<MissionPeerLeft>(Handle_MissionPeerLeft);
-        messageBroker.Unsubscribe<MissionPeerDisconnected>(Handle_MissionPeerDisconnected);
         messageBroker.Unsubscribe<NetworkShipRemoved>(Handle_NetworkShipRemoved);
         heldShips.Clear();
     }
@@ -827,30 +825,18 @@ public class BattleShipReplicator : IBattleShipReplicator
         Registry.TryGetByHull(hull, out var ship) && !IsOwnHull(ship) ? ReportedReserveOf(hull) : engine.ReadSpawnableReserve(hull);
 
     // A player who left takes its hulls with it, whether or not its own removal reached this client first.
+    // A player who left or disconnected (the server sends a naval disconnect as a leave, D4) takes its hulls; a departed
+    // host's AI hulls stay and move to its successor with the host migration.
     private void Handle_MissionPeerLeft(MessagePayload<MissionPeerLeft> payload)
     {
         var left = payload.What;
-        RemoveDepartedOwner(left.ControllerId, left.InstanceId, nameof(Handle_MissionPeerLeft));
-    }
-
-    // A disconnect is a leave at sea (D4): the player's hulls go too, and a returning player joins late with fresh ones. A
-    // disconnected host's AI hulls stay and move to its successor with the host migration.
-    private void Handle_MissionPeerDisconnected(MessagePayload<MissionPeerDisconnected> payload)
-    {
-        var disconnected = payload.What;
-        RemoveDepartedOwner(disconnected.ControllerId, disconnected.InstanceId, nameof(Handle_MissionPeerDisconnected));
-    }
-
-    // Drops a departed player's reported reserve and removes its hulls on the game thread.
-    private void RemoveDepartedOwner(string controllerId, string instanceId, string context)
-    {
-        if (!IsDepartureOfThisBattle(controllerId, instanceId)) return;
+        if (!IsDepartureOfThisBattle(left.ControllerId, left.InstanceId)) return;
 
         GameThread.RunSafe(() =>
         {
-            ForgetReportedReserveOf(controllerId);
-            if (Mission.Current != null) RemoveHullsOf(controllerId);
-        }, context: context);
+            ForgetReportedReserveOf(left.ControllerId);
+            if (Mission.Current != null) RemoveHullsOf(left.ControllerId);
+        }, context: nameof(Handle_MissionPeerLeft));
     }
 
     private bool IsDepartureOfThisBattle(string controllerId, string instanceId) =>

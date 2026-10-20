@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Messages;
 using Common.Network.Session;
 using Coop.Core.Common.Session;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Missions.Messages;
@@ -16,7 +17,7 @@ namespace Coop.Core.Server.Services.Instances.Handlers;
 
 /// <summary>
 /// Tracks relay membership, introduces both sides with <see cref="NetworkMissionPeerEntered"/>, and fans
-/// graceful or disconnected departures to the remaining mission members.
+/// graceful or disconnected departures to the remaining mission members; a naval disconnect reaches them as a leave (D4).
 /// </summary>
 public class ServerMissionMembershipHandler : IHandler
 {
@@ -26,14 +27,16 @@ public class ServerMissionMembershipHandler : IHandler
     private readonly IMissionManager missionManager;
     private readonly INetwork network;
     private readonly IPlayerManager playerManager;
+    private readonly IBattleHostRetentionPolicy retentionPolicy;
     private readonly ISessionTunnelIdentityResolver tunnelIdentityResolver;
 
     public ServerMissionMembershipHandler(
         IMessageBroker messageBroker,
         IMissionManager missionManager,
         INetwork network,
-        IPlayerManager playerManager)
-        : this(messageBroker, missionManager, network, playerManager, null)
+        IPlayerManager playerManager,
+        IBattleHostRetentionPolicy retentionPolicy)
+        : this(messageBroker, missionManager, network, playerManager, retentionPolicy, null)
     {
     }
 
@@ -42,12 +45,14 @@ public class ServerMissionMembershipHandler : IHandler
         IMissionManager missionManager,
         INetwork network,
         IPlayerManager playerManager,
+        IBattleHostRetentionPolicy retentionPolicy,
         ISessionTunnelIdentityResolver tunnelIdentityResolver)
     {
         this.messageBroker = messageBroker;
         this.missionManager = missionManager;
         this.network = network;
         this.playerManager = playerManager;
+        this.retentionPolicy = retentionPolicy;
         this.tunnelIdentityResolver = tunnelIdentityResolver;
 
         messageBroker.Subscribe<NetworkRequestMissionIntroduction>(Handle_RequestMissionIntroduction);
@@ -208,11 +213,14 @@ public class ServerMissionMembershipHandler : IHandler
         return true;
     }
 
+    // [Game thread] Tells the remaining members and the server's own handlers that a member left. A naval disconnect goes
+    // to the members as a leave (D4), but the server still sees it was no retreat, so no final health snapshot came.
     private void PublishDeparture(MissionDeparture departure, bool wasRetreat)
     {
+        bool leaves = wasRetreat || retentionPolicy.DisconnectWithdraws(departure.InstanceId);
         foreach (var (_, otherPeer) in departure.RemainingMembers)
         {
-            if (wasRetreat)
+            if (leaves)
                 network.Send(otherPeer, new MissionPeerLeft(departure.ControllerId, departure.InstanceId));
             else
                 network.Send(otherPeer, new MissionPeerDisconnected(departure.ControllerId, departure.InstanceId));

@@ -92,10 +92,11 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   removal is announced without `missionEnding`.
 - **Leave:** the same as retreat on the leaver. If its removal never arrives, the server's `MissionPeerLeft` removes its
   hulls on every client (`RemoveHullsOf`).
-- **Disconnect (D4):** a leave. Peers remove the player's hulls on `MissionPeerDisconnected` through the same
-  `RemoveHullsOf`, and the agent and puppet side withdraws its party (`BattleAuthorityMigrator`, `PuppetSpawner`). The
-  server withdraws the party's reserve (`WithdrawPartyReserves`) on the disconnect, so the host never gets it. A
-  disconnected host's AI hulls move to its successor with the migration; its own hull leaves.
+- **Disconnect (D4):** a leave. The server sends a naval disconnect to the remaining members as `MissionPeerLeft`
+  (`ServerMissionMembershipHandler`, `IBattleHostRetentionPolicy.DisconnectWithdraws`), so every client runs the leave
+  path above; no client code tells a naval drop apart. The server's own `MissionMemberDeparted` still says it was no
+  retreat, and it withdraws the party's reserve (`WithdrawPartyReserves`), so the host never gets it. A disconnected
+  host's AI hulls move to its successor with the migration; its own hull leaves.
 - **Reconnect:** a late join. The returning player lands in the encounter menu and re-enters through Attack (BR-054); its
   launcher fields fresh hulls from a fresh, casualty-reduced reserve, announced like any late joiner's. Nothing of its old
   hulls comes back.

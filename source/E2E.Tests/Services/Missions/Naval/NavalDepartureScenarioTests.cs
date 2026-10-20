@@ -98,8 +98,8 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         Assert.Single(c.Engine.AllHulls, hull => hull.SpawnData?.ShipId == hullB);
     }
 
-    // D4: B drops without leaving. The server tells A and C it disconnected, and that is a leave at sea: its hull goes with a
-    // clear deck and its crew withdraws, its late traffic changes nothing, and the host keeps simulating the AI fleet.
+    // D4: B's connection drops without a leave. The server tells A and C it left, as it sends every naval disconnect: its hull
+    // goes with a clear deck and its crew withdraws, its late traffic changes nothing, and the host keeps simulating the AI fleet.
     [Fact]
     public void DisconnectedPlayer_LosesItsHullOnEveryPeer_AndTheHostKeepsFighting()
     {
@@ -116,7 +116,7 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
         SeatAndBoard(battle, b, hullB, helmsman, ally, hullA);
         var lateSample = b.SentSamples(hullB).Last();
 
-        battle.Disconnect(b);
+        DropConnection(b);
         battle.TickAll(2);
         c.Call(() => c.Broker.Publish(c, lateSample));
         long pirateStreamed = (long)c.Stream(pirate)["accepted"]!;
@@ -125,6 +125,8 @@ public class NavalDepartureScenarioTests : NavalBattleTestEnvironment
 
         foreach (var peer in new[] { a, c })
         {
+            Assert.Single(peer.Instance.InternalMessages.GetMessages<MissionPeerLeft>(), left => left.ControllerId == "B");
+            Assert.Empty(peer.Instance.InternalMessages.GetMessages<MissionPeerDisconnected>());
             AssertRemovedWithClearDeck(peer, hullB, ally[peer], hullA);
             AssertCrewWithdrawn(peer, helmsman[peer]);
             Assert.False(peer.Has(hullB));

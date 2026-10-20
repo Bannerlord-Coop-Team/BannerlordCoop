@@ -208,7 +208,7 @@ public class BattleShipReplicatorTests
         harness.Replicator.AcceptCondition(PeerCondition(ship, 1, reserve: 12));
 
         harness.Members.Remove(Peer);
-        harness.Broker.Publish(this, new MissionPeerDisconnected(Peer, Instance));
+        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
         GameThread.Run(() => { }, blocking: true);
         harness.Replicator.AcceptCondition(PeerCondition(ship, 2, reserve: 9));
         int afterLateCondition = harness.Replicator.ReportedReserveOf(copy);
@@ -254,9 +254,10 @@ public class BattleShipReplicatorTests
             Times.Never);
     }
 
-    // D4: a disconnect is a leave at sea, so a record the player sent before it dropped spawns nothing here either.
+    // D4: the server sends a naval disconnect as a leave, so a record the player sent before it dropped spawns nothing here
+    // either, once that leave arrived.
     [Fact]
-    public void AcceptSpawnRecords_FromADisconnectedPlayer_SpawnsNothing()
+    public void AcceptSpawnRecords_FromAPlayerWhoseLeaveArrived_SpawnsNothing()
     {
         using var mission = new MissionCurrentScope();
         var harness = new Harness(committed: true);
@@ -264,7 +265,7 @@ public class BattleShipReplicatorTests
         var record = ForeignRecord(Guid.NewGuid());
 
         harness.Members.Remove(Peer);
-        harness.Broker.Publish(this, new MissionPeerDisconnected(Peer, Instance));
+        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
         GameThread.Run(() => { }, blocking: true);
         harness.Replicator.AcceptSpawnRecords(new[] { record });
 
@@ -863,10 +864,10 @@ public class BattleShipReplicatorTests
         harness.Engine.Verify(e => e.ParkHullAgents(It.IsAny<MissionObject>()), Times.Never);
     }
 
-    // D4: a disconnect removes the player's hulls as a leave does, after parking their decks; the AI hulls it simulated stay
-    // and move to the next host with the migration, while another player's hull stays with its owner.
+    // D4: a leave, which is also how a naval disconnect arrives, removes the player's hulls after parking their decks; the AI
+    // hulls it simulated stay and move to the next host with the migration, while another player's hull stays with its owner.
     [Fact]
-    public void MissionPeerDisconnected_RemovesThePlayersHulls_AndTheAiHullsItHeldMoveWithTheMigration()
+    public void MissionPeerLeft_RemovesThePlayersHulls_AndTheAiHullsItHeldMoveWithTheMigration()
     {
         using var mission = new MissionCurrentScope();
         var harness = new Harness(committed: true);
@@ -875,7 +876,7 @@ public class BattleShipReplicatorTests
         var presentShip = RegisterForeign(harness, "someone_else", isNpcParty: false);
 
         harness.Members.Remove(Peer);
-        harness.Broker.Publish(this, new MissionPeerDisconnected(Peer, Instance));
+        harness.Broker.Publish(this, new MissionPeerLeft(Peer, Instance));
         GameThread.Run(() => { }, blocking: true);
         harness.Replicator.Tick(0.1f);
         harness.Engine.Verify(e => e.ParkHullAgents(departedShip.Hull), Times.Once);
