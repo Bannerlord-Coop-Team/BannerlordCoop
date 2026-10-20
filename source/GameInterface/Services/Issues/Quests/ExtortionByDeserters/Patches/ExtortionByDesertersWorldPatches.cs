@@ -37,21 +37,36 @@ internal class ExtortionByDesertersWorldPatches
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPrefix]
-    private static void FinalizeEventPrefix(MapEvent __instance, out List<Quest> __state)
+    private static void FinalizeEventPrefix(MapEvent __instance, out List<(Quest Quest, MapEvent MapEvent)> __state)
     {
-        var affected = new List<Quest>();
-        Run(quest => { if (quest._deserterMobileParty?.MapEvent == __instance) affected.Add(quest); });
+        var affected = new List<(Quest, MapEvent)>();
+        Run(quest => { if (quest._deserterMobileParty?.MapEvent == __instance) affected.Add((quest, __instance)); });
         __state = affected;
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPostfix]
-    private static void FinalizeEventPostfix(List<Quest> __state)
+    private static void FinalizeEventPostfix(List<(Quest Quest, MapEvent MapEvent)> __state)
     {
         if (__state == null || __state.Count == 0) return;
         Run(quest =>
         {
-            if (!__state.Contains(quest)) return;
+            var affected = __state.FirstOrDefault(item => item.Quest == quest);
+            if (affected.Quest == null) return;
+            if (!quest._deserterBattleFinalizedForTheFirstTime)
+                MapEventEndedPrefix(quest, affected.MapEvent);
+            if (quest.IsOngoing && quest._currentState == State.DesertersMovingToSettlement)
+            {
+                var owner = Hero.MainHero.PartyBelongedTo?.Party;
+                if (owner != null && affected.MapEvent.InvolvedParties.Contains(owner) &&
+                    affected.MapEvent.WinningSide == owner.Side)
+                {
+                    quest._deserterBattleFinalizedForTheFirstTime = true;
+                    quest._currentState = State.DesertersAreDefeated;
+                    quest.AddLog(quest.OnDeserterPartyDefeatedLogText);
+                    Sync(quest, ExtortionByDesertersNotice.DesertersDefeated);
+                }
+            }
             if (quest._deserterBattleFinalizedForTheFirstTime)
             {
                 if (ContainerProvider.TryResolve<ExtortionByDesertersFinalizationProofStrategy>(out var proof))
