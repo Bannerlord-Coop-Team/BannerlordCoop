@@ -13,6 +13,21 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 [HarmonyPatch]
 internal class HeadmanNeedsGrainWorldEventPatches
 {
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
+    [HarmonyPostfix]
+    private static void CrimeWarPostfix(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail)
+    {
+        if (declareWarDetail != DeclareWarAction.DeclareWarDetail.CausedByCrimeRatingChange) return;
+
+        var instigator = Hero.MainHero;
+        RunAsOwners(quest =>
+        {
+            if (Hero.MainHero == instigator) return;
+            QuestHelper.CheckWarDeclarationAndFailOrCancelTheQuest(quest, faction1, faction2, declareWarDetail,
+                quest.PlayerDeclaredWarQuestLogText, quest.CancelLogOnWarDeclared, forceCancel: true);
+        });
+    }
+
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnVillageBeingRaided))]
     [HarmonyPostfix]
     private static void RaidPostfix(Village village) => RunAsOwners(quest => quest.OnVillageBeingRaided(village));
