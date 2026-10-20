@@ -161,6 +161,10 @@ Every PR must retain an exact `## Bot Changelog Entry` heading. For War Sails up
 - **Search before filing.** Run `gh issue list --search "<keywords>"` first and comment on an existing issue instead of opening a duplicate.
 - **Apply existing labels only** (`gh label list`), e.g. `enhancement`, `refactor`, `verification`, `has-client-logs`/`has-server-logs`. Don't create new labels.
 - **Open PRs as drafts while work is in progress** (`gh pr create --draft`), and mark them ready (`gh pr ready`) only once the build and tests pass.
+- **Offer a tech debt review before a PR leaves draft.** Before running `gh pr ready` (or opening a PR as non-draft), ask the user whether to run the tech-debt-review skill (`.agents/skills/tech-debt-review/SKILL.md`) with the following options.
+  - Review/Fix Loop (suggested)
+  - Review and report
+  - Skip
 - **Don't take maintainer actions unasked.** No merging, approving, closing or reopening PRs/issues, requesting reviewers, or force-pushing a branch someone else is reviewing, unless explicitly told to.
 
 ### Unowned AI Contributions Are Not Accepted
