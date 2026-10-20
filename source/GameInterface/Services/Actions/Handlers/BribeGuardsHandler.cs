@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.Services.Actions.Messages;
 using GameInterface.Services.Inventory.TradeSkills.Interfaces;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -23,17 +24,20 @@ internal class BribeGuardsHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ISessionTradePlayerDataInterface sessionTradePlayerDataInterface;
+    private readonly IPlayerManager playerManager;
 
     public BribeGuardsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        ISessionTradePlayerDataInterface sessionTradePlayerDataInterface)
+        ISessionTradePlayerDataInterface sessionTradePlayerDataInterface,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.sessionTradePlayerDataInterface = sessionTradePlayerDataInterface;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<PlayerBribesGuard>(Handle_PlayerBribesGuard);
         messageBroker.Subscribe<NetworkPlayerBribesGuard>(Handle_NetworkPlayerBribesGuard);
@@ -64,6 +68,7 @@ internal class BribeGuardsHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.SettlementId, out var settlement)) return;
 
