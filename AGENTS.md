@@ -43,7 +43,7 @@ The main solution is `source/Coop.sln`. Game-facing code lives in `source/Coop`,
 
 Some folders have their own `AGENTS.md` with rules that apply only there and add to this file. Before you edit anything in one of these folders, read its `AGENTS.md` in full.
 
-- **Issues and quests** (`source/GameInterface/Services/Issues/`): [`source/GameInterface/Services/Issues/AGENTS.md`](source/GameInterface/Services/Issues/AGENTS.md) owns the rules for the issue and quest framework. The game calls quests "issues". It links [`QUEST_DOCS.md`](source/GameInterface/Services/Issues/QUEST_DOCS.md), the shared quest pitfalls and review learnings. Read that before working on a quest too.
+- Issues and quests: [`source/GameInterface/Services/Issues/AGENTS.md`](source/GameInterface/Services/Issues/AGENTS.md)
 
 ### Build & Test Commands
 
