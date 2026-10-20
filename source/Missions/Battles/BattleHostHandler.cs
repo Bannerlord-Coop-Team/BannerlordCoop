@@ -995,8 +995,8 @@ internal class BattleHostHandler : IHandler
             ServePendingReturn(pending, "the host departed before its flush ack");
     }
 
-    // [Server, game thread] A host kept after its result left: every withdrawal waits on it, and it never answers, so each
-    // completes from the health already reported.
+    // [Server, game thread] A host left that nobody takes over from: every withdrawal waits on it, and it never answers, so
+    // each completes from the health already reported.
     private void CompleteWithdrawalsOfDepartedHost(string mapEventId, MapEvent mapEvent)
     {
         if (mapEvent == null || !battleRuntimeStates.TryGetValue(mapEventId, out var state)) return;
@@ -1152,9 +1152,7 @@ internal class BattleHostHandler : IHandler
                     if (objectManager.TryGetObject<MapEvent>(mapEventId, out var abandonedEvent))
                     {
                         reserveBuilder.ForgetMapEvent(abandonedEvent, preserveHealth: true);
-                        if (battleRuntimeStates.TryGetValue(mapEventId, out var state))
-                            foreach (var withdrawal in state.HealthWithdrawals.ToArray())
-                                CompleteHealthWithdrawal(mapEventId, abandonedEvent, state, withdrawal);
+                        CompleteWithdrawalsOfDepartedHost(mapEventId, abandonedEvent);
                     }
 
                     // A returner whose grant was pending on the departed host's flush ack must still be
