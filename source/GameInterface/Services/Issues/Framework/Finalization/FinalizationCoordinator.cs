@@ -275,7 +275,15 @@ internal class FinalizationCoordinator : IHandler
     {
         var quest = issue.IssueQuest;
 
-        if (quest != null && !Campaign.Current.QuestManager.Quests.Contains(quest))
+        // Non-owner mirrors have no quest object. Finalize the issue without replaying vanilla's
+        // outcome consequence, which would add the owner's journal entry to every client.
+        if (quest == null)
+        {
+            issue.IssueFinalized();
+            return;
+        }
+
+        if (!Campaign.Current.QuestManager.Quests.Contains(quest))
         {
             issue.IssueQuest = null;
             issue.IsTriedToSolveBefore = false;

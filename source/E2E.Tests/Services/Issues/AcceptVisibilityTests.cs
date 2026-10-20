@@ -365,6 +365,12 @@ public class AcceptVisibilityTests : IDisposable
         ListenForIssueUpdatesOnTheOtherClient();
 
         Other.SimulateMessage(this, new NetworkQuestSolutionAccepted(notableId, IssueId, OwnerControllerId, 1f, Array.Empty<byte>()));
+        IssueBase mirrorIssue = null;
+        Other.Call(() =>
+        {
+            Assert.True(Other.ObjectManager.TryGetObject<Hero>(notableId, out var mirror));
+            mirrorIssue = mirror.Issue;
+        });
         Other.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, IssueOutcome.QuestSuccess));
 
         Other.Call(() =>
@@ -376,5 +382,6 @@ public class AcceptVisibilityTests : IDisposable
         var update = Assert.Single(otherUpdates);
         Assert.Equal(IssueBase.IssueUpdateDetails.IssueFinishedWithSuccess, update.Details);
         Assert.Null(update.Solver);
+        Other.Call(() => Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog(entry => entry.IsRelatedTo(mirrorIssue))));
     }
 }
