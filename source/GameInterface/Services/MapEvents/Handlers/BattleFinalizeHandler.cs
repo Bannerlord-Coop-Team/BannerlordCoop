@@ -143,12 +143,21 @@ internal class BattleFinalizeHandler : IHandler
         // on a refusal — the finalized reply would pull the refused client off the menu vanilla parked
         // it on. Server-local publishes (requester null) and battles with no elected host pass.
         if (requester != null && hostRegistry.TryGet(payload.What.MapEventId, out var hostAssignment)
-            && playerManager.TryGetPlayer(requester, out var requestingPlayer)
-            && requestingPlayer.ControllerId != hostAssignment.HostControllerId)
+            && playerManager.TryGetPlayer(requester, out var requestingPlayer))
         {
-            Logger.Information("Refused finalize of {MapEventId} from non-host {ControllerId}",
-                payload.What.MapEventId, requestingPlayer.ControllerId);
-            return;
+            if (requestingPlayer.ControllerId != hostAssignment.HostControllerId)
+            {
+                Logger.Information("Refused finalize of {MapEventId} from non-host {ControllerId}",
+                    payload.What.MapEventId, requestingPlayer.ControllerId);
+                return;
+            }
+
+            if (IsAwaitingNavalConclusion(payload.What.MapEventId))
+            {
+                Logger.Information("Refused finalize of {MapEventId} from host {ControllerId}: its naval result waits for the server's conclusion",
+                    payload.What.MapEventId, requestingPlayer.ControllerId);
+                return;
+            }
         }
 
         if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent))
@@ -181,6 +190,12 @@ internal class BattleFinalizeHandler : IHandler
         if (requester != null)
             network.Send(requester, new NetworkMapEventFinalized());
     }
+
+    // A naval host that left a resolved battle stays host until the server concludes it; finalizing first would drop the
+    // result, and the conclusion closes the host's encounter anyway.
+    private bool IsAwaitingNavalConclusion(string mapEventId) =>
+        objectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent)
+        && mapEvent.IsNavalMapEvent && mapEvent.BattleState == BattleState.None;
 
     private bool TryLeaveSharedHideout(NetPeer requester, string mapEventId)
     {

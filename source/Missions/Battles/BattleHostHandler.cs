@@ -1099,11 +1099,12 @@ internal class BattleHostHandler : IHandler
 
             if (assignment.HostControllerId == controllerId)
             {
-                // A promotion after the commit would hand the ended naval mission's AI and hulls to a peer (the R32 helm
-                // crash); a land battle still promotes, so the AI the host ran keeps moving for the remaining players.
-                if (KeepsHostAfterConclusion(mapEventId))
+                // A promotion after the result would hand the ended naval mission's AI and hulls to a peer (the R32 helm
+                // crash), or the host role to a member that never reports (R41a); a land battle still promotes, so the AI
+                // the host ran keeps moving for the remaining players.
+                if (KeepsHostAfterResult(mapEventId))
                 {
-                    Logger.Information("[BattleHost] Host {Host} left concluded battle {MapEventId}; keeping the assignment at epoch {Epoch} without promoting",
+                    Logger.Information("[BattleHost] Host {Host} left resolved battle {MapEventId}; keeping the assignment at epoch {Epoch} without promoting",
                         controllerId, mapEventId, assignment.Epoch);
                     return;
                 }
@@ -1315,9 +1316,10 @@ internal class BattleHostHandler : IHandler
         mapEvent?.IsNavalMapEvent
         ?? (battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) && runtimeState.IsNaval);
 
-    // [Server, game thread] The map event applied this battle's result while the instance was still occupied.
-    private bool KeepsHostAfterConclusion(string mapEventId) =>
-        battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) && runtimeState.Concluded && runtimeState.IsNaval;
+    // [Server, game thread] A naval host that reported its result, or whose result the map event applied, stays the host.
+    private bool KeepsHostAfterResult(string mapEventId) =>
+        battleRuntimeStates.TryGetValue(mapEventId, out var runtimeState) && runtimeState.IsNaval
+        && (runtimeState.Concluded || runtimeState.ResolvedState != BattleState.None);
 
     // Append the requester to the successor line unless it is already the host or already queued. Returns the
     // new immutable assignment via <paramref name="updated"/>, or false when nothing changed.

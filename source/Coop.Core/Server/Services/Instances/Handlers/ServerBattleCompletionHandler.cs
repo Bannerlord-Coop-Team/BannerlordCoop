@@ -127,7 +127,8 @@ public class ServerBattleCompletionHandler : IHandler
                     assignment.HostControllerId,
                     assignment.Epoch,
                     out var concludedState,
-                    canConclude);
+                    canConclude,
+                    KeepsDepartedHostReport(instanceId));
 
             if (isCurrentHostResult)
                 messageBroker.Publish(this, new BattleResolvedStateRecorded(instanceId, result.BattleState));
@@ -174,7 +175,8 @@ public class ServerBattleCompletionHandler : IHandler
                 completionTracker.HostAssigned(
                     mapEventId,
                     assignment.HostControllerId,
-                    assignment.Epoch);
+                    assignment.Epoch,
+                    KeepsDepartedHostReport(mapEventId));
             }
 
             TryConcludeReportedBattle(mapEventId);
@@ -209,7 +211,8 @@ public class ServerBattleCompletionHandler : IHandler
                     assignment.HostControllerId,
                     assignment.Epoch,
                     out var concludedState,
-                    !hasPendingJoiners))
+                    !hasPendingJoiners,
+                    KeepsDepartedHostReport(instanceId)))
             {
                 return;
             }
@@ -220,6 +223,10 @@ public class ServerBattleCompletionHandler : IHandler
             PublishConclusion(instanceId, currentMembers.Count, concludedState, assignment.Epoch);
         }
     }
+
+    // A naval battle keeps its host after the host reported a result, so that report still concludes it (D4, R41a).
+    private bool KeepsDepartedHostReport(string instanceId) =>
+        objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent) && mapEvent.IsNavalMapEvent;
 
     private bool HasPendingJoiners(string instanceId)
     {

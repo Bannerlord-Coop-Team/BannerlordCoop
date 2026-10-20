@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.Players;
 using Missions.Messages;
 using TaleWorlds.CampaignSystem;
@@ -12,8 +13,8 @@ namespace E2E.Tests.Services.Missions.Naval;
 
 /// <summary>
 /// The naval end flow through the server: the battle host's result reaches its peers over the mesh and the server applies
-/// it once every member reported, also when the host leaves before that. A host leaving the concluded battle keeps the
-/// naval assignment, while a land battle still promotes (M2 K23).
+/// it once every member reported, also when the host leaves before that. A host leaving a battle it resolved keeps the
+/// naval assignment, while a land battle still promotes (M2 K23, R41a).
 /// </summary>
 public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
 {
@@ -36,8 +37,10 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(1, concluded());
     }
 
+    // R41a D: the host's reported result keeps it the naval host after it leaves, so the peer's later report concludes the
+    // battle with it instead of a promotion that waits on the peer as the new host.
     [Fact]
-    public void HostLeavesMidEnd_ThePromotedPeerReportsAndTheServerConcludesOnce()
+    public void HostLeavesMidEnd_KeepsTheAssignment_AndThePeersReportConcludesOnce()
     {
         using var battle = StartServerBattle(atSea: true, out var a, out var b, out var concluded);
         var pirate = battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f));
@@ -46,13 +49,12 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
 
         ReportWin(a);
         Assert.Equal(0, concluded());
-        a.Call(a.Network.Stop);
-        Server.Call(() => Server.SimulateMessage(a.Instance.NetPeer, new NetworkMissionLeft("A", battle.MapEventId)),
-            VictoryConclusionDisabledMethods());
+        LeaveMission(battle, a);
 
-        AssertHost(b.Instance, battle.MapEventId, "B");
+        AssertHost(Server, battle.MapEventId, "A", "B");
+        AssertHost(b.Instance, battle.MapEventId, "A", "B");
         Assert.Equal(0, concluded());
-        // B already holds the result, so its naval mission takes over no AI hull from the departed host.
+        // B holds the result, so its naval mission takes over no AI hull from the departed host.
         Assert.Equal("A", b.Ship(pirate).CurrentAuthority);
         b.Ticks(3);
         Assert.True(b.Hull(pirate).IsCopy);
@@ -65,6 +67,36 @@ public class NavalBattleEndFlowScenarioTests : NavalBattleTestEnvironment
         }, VictoryConclusionDisabledMethods());
         Assert.Equal(1, concluded());
         AssertMapEventRemoved(battle.MapEventId);
+    }
+
+    // R41a D: the host resolves and leaves first while a member never reports (stuck in deployment). The host's finalize
+    // waits for the server, and the member leaving empties the instance, which concludes with the host's result.
+    [Fact]
+    public void HostLeavesFirst_AndAMemberNeverReports_TheBattleConcludesOnceTheMemberLeaves()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out var b, out var concluded);
+        a.Commit();
+        battle.TickAll();
+
+        ReportWin(a);
+        LeaveMission(battle, a);
+        Server.Call(() => Server.SimulateMessage(a.Instance.NetPeer, new NetworkMapEventFinalizeAttempted(battle.MapEventId)));
+
+        Server.Call(() => Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(battle.MapEventId, out var mapEvent)
+            && !mapEvent.IsFinalized, "the departed host's finalize ended the battle before the server concluded it"));
+        Assert.Equal(0, concluded());
+
+        LeaveMission(battle, b);
+        Assert.Equal(1, concluded());
+        AssertMapEventRemoved(battle.MapEventId);
+    }
+
+    // The member's mission ends and the server observes it leave.
+    private void LeaveMission(NavalBattle battle, NavalPeer leaver)
+    {
+        leaver.Call(leaver.Network.Stop);
+        Server.Call(() => Server.SimulateMessage(leaver.Instance.NetPeer, new NetworkMissionLeft(leaver.Id, battle.MapEventId)),
+            VictoryConclusionDisabledMethods());
     }
 
     [Theory]
