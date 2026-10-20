@@ -49,6 +49,7 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
         }
 
         party.MemberRoster.Add(issue.AlternativeSolutionSentTroops);
+        issue.AlternativeSolutionSentTroops.Clear();
         return true;
     }
 

@@ -200,6 +200,26 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     }
 
     [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void GenericSuccessRequest_IsRefusedWithoutAFullDelivery(int livestock)
+    {
+        Accept(ClientA);
+        ClientA.Call(() =>
+        {
+            var party = Party(ClientA, QuestScenario.ControllerA);
+            party.ItemRoster.AddToCounts(Object<ItemObject>(ClientA, livestockId), -party.ItemRoster.GetItemNumber(Object<ItemObject>(ClientA, livestockId)));
+            party.ItemRoster.AddToCounts(Object<ItemObject>(ClientA, livestockId), livestock);
+            accepted[ClientA].CompleteQuestWithSuccess();
+        });
+        environment.FlushCoalescer();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Server.Call(() => Assert.True(Object<Hero>(Server, scenario.NotableId).Issue.IsSolvingWithQuest));
+        ClientA.Call(() => Assert.Contains(accepted[ClientA], Campaign.Current.QuestManager.Quests));
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void Delivery_IsRefusedOutsideTheDestinationOrWithoutTheFullHerd(bool insufficient)
@@ -485,6 +505,23 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
                 Assert.True(Party(instance, QuestScenario.ControllerA).MemberRoster.Contains(Object<Hero>(instance, companionId).CharacterObject));
             });
         }
+    }
+
+    [Fact]
+    public void ReturningAlternativeTroopsTwice_AddsThemOnlyOnce()
+    {
+        var (_, troopId) = StartCompanions();
+        Server.Call(() =>
+        {
+            var issue = Object<Hero>(Server, scenario.NotableId).Issue;
+            var cleanup = Server.Resolve<IHeadmanHerdCleanup>();
+            Assert.True(cleanup.ReturnAlternativeTroops(issue));
+            var first = Party(Server, QuestScenario.ControllerA).MemberRoster.GetTroopCount(Object<CharacterObject>(Server, troopId));
+            Assert.True(cleanup.ReturnAlternativeTroops(issue));
+            var second = Party(Server, QuestScenario.ControllerA).MemberRoster.GetTroopCount(Object<CharacterObject>(Server, troopId));
+            Assert.Equal(first, second);
+            Assert.Empty(issue.AlternativeSolutionSentTroops.GetTroopRoster());
+        });
     }
 
     [Fact]

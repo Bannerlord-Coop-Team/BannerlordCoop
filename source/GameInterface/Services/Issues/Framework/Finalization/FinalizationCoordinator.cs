@@ -119,6 +119,13 @@ internal class FinalizationCoordinator : IHandler
                 return;
             }
 
+            if (data.Outcome == IssueOutcome.QuestSuccess &&
+                registry.TryGet(issue.GetType(), out var descriptor) && descriptor.FinalizationProofStrategy != null)
+            {
+                Logger.Warning("{issue} requires a finalization proof and cannot accept generic success", data.IssueId);
+                return;
+            }
+
             using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
             {
                 CompleteOnServer(issue, data.Outcome);
