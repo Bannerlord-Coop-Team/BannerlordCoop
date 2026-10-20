@@ -77,7 +77,7 @@ public class RaidAnEnemyTerritoryTests : IDisposable
     }
 
     [Fact]
-    public void RaidCompletedThroughCampaignDispatcher_UpdatesTheOwnersQuestAndLeavesItActive()
+    // This fixture checks the owner-scoped resolver only; it does not reproduce the live map-event path.\n    public void OwnerScopedCompletionResolverRunsSafelyOnTheServer()
     {
         var server = testEnvironment.Server;
         var owner = testEnvironment.Clients.First();
