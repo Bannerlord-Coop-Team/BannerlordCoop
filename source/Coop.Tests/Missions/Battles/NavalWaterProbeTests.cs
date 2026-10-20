@@ -60,7 +60,7 @@ public class NavalWaterProbeTests
     [Fact]
     public void Tick_IsATaggedJsonLineWithEveryClockHeightAndHull()
     {
-        var hull = new NavalWaterProbeHull("1d93665a", "copy", "steered", 0.123456f, -1.5f, 2.25f, 0.5f);
+        var hull = new NavalWaterProbeHull("1d93665a", "copy", "steered", 512.34567f, -20.5f, 135.1234f, 0.123456f, -1.5f, 2.25f, 0.5f);
 
         var line = NavalWaterProbeLogic.Tick("abcd1234", 7, 9, 0.016666f, 12.5f, 13f, 140.25f, 1700000000123L,
             new[] { 0.12345f, -0.5f }, new[] { hull });
@@ -78,6 +78,9 @@ public class NavalWaterProbeTests
         Assert.Equal("1d93665a", (string)probed["id"]);
         Assert.Equal("copy", (string)probed["role"]);
         Assert.Equal("steered", (string)probed["mode"]);
+        Assert.Equal(512.346, (double)probed["x"]);
+        Assert.Equal(-20.5, (double)probed["y"]);
+        Assert.Equal(135.123, (double)probed["yaw"]);
         Assert.Equal(0.1235, (double)probed["z"]);
         Assert.Equal(-1.5, (double)probed["pitch"]);
         Assert.Equal(2.25, (double)probed["roll"]);
@@ -117,6 +120,17 @@ public class NavalWaterProbeTests
     public void AxisTiltDegrees_IsTheAxisAngleAboveTheHorizon(float axisZ, float degrees)
     {
         Assert.Equal(degrees, NavalWaterProbeLogic.AxisTiltDegrees(axisZ), 3);
+    }
+
+    [Theory]
+    [InlineData(1f, 0f, 0f, 0f)]
+    [InlineData(0f, 1f, 0f, 90f)]
+    [InlineData(-1f, 0f, 0f, 180f)]
+    [InlineData(0f, -1f, 0f, -90f)]
+    [InlineData(0.5f, 0.5f, 0.7f, 45f)]
+    public void YawDegrees_IsTheForwardAxisHeadingOnTheWaterPlane(float x, float y, float z, float degrees)
+    {
+        Assert.Equal(degrees, NavalWaterProbeLogic.YawDegrees(new Vec3(x, y, z)), 3);
     }
 }
 #endif

@@ -1,5 +1,6 @@
 ﻿#if DEBUG
 using GameInterface.Services.MapEvents.NavalScenarios;
+using System;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents.NavalScenarios;
@@ -39,6 +40,67 @@ public class NavalScenarioStagerTests
     public void IsBlockadeLiftedWithoutBattle_MatchesVanillasLiftRatio(float attackers, float blockade, bool lifted)
     {
         Assert.Equal(lifted, NavalScenarioStager.IsBlockadeLiftedWithoutBattle(attackers, blockade));
+    }
+
+    [Theory]
+    [InlineData(true, true, NavalScenarioStager.BlockadeLordStanding.Excluded)]
+    [InlineData(true, false, NavalScenarioStager.BlockadeLordStanding.Excluded)]
+    [InlineData(false, true, NavalScenarioStager.BlockadeLordStanding.AtWarWithBoth)]
+    [InlineData(false, false, NavalScenarioStager.BlockadeLordStanding.ThirdFaction)]
+    public void ClassifyBlockadeLord_NeverUsesTheTownsOrPlayersFaction(bool ownFaction, bool atWar,
+        NavalScenarioStager.BlockadeLordStanding expected)
+    {
+        Assert.Equal(expected, NavalScenarioStager.ClassifyBlockadeLord(ownFaction, atWar));
+    }
+
+    [Fact]
+    public void PickBlockadeLord_PrefersALordAtWarWithBothOverANearerThirdFaction()
+    {
+        var lords = new[] { Lord("third", ThirdFaction, 1f), Lord("far_at_war", AtWar, 50f), Lord("near_at_war", AtWar, 9f) };
+
+        Assert.Equal("near_at_war", Pick(lords, allowThirdFaction: true)?.Id);
+        Assert.Equal("near_at_war", Pick(lords, allowThirdFaction: false)?.Id);
+    }
+
+    [Fact]
+    public void PickBlockadeLord_TakesTheNearestThirdFactionOnlyWhenAllowed()
+    {
+        var lords = new[] { Lord("own", Excluded, 0f), Lord("far_third", ThirdFaction, 30f), Lord("near_third", ThirdFaction, 4f) };
+
+        Assert.Equal("near_third", Pick(lords, allowThirdFaction: true)?.Id);
+        Assert.Null(Pick(lords, allowThirdFaction: false));
+    }
+
+    [Fact]
+    public void PickBlockadeLord_FindsNoneAmongExcludedLords()
+    {
+        Assert.Null(Pick(new[] { Lord("town", Excluded, 1f), Lord("player", Excluded, 2f) }, allowThirdFaction: true));
+        Assert.Null(Pick(Array.Empty<TestLord>(), allowThirdFaction: true));
+    }
+
+    private const NavalScenarioStager.BlockadeLordStanding Excluded = NavalScenarioStager.BlockadeLordStanding.Excluded;
+    private const NavalScenarioStager.BlockadeLordStanding AtWar = NavalScenarioStager.BlockadeLordStanding.AtWarWithBoth;
+    private const NavalScenarioStager.BlockadeLordStanding ThirdFaction = NavalScenarioStager.BlockadeLordStanding.ThirdFaction;
+
+    private static TestLord Lord(string id, NavalScenarioStager.BlockadeLordStanding standing, float distanceSquared) =>
+        new TestLord(id, standing, distanceSquared);
+
+    private static TestLord? Pick(TestLord[] lords, bool allowThirdFaction) =>
+        NavalScenarioStager.PickBlockadeLord(lords, lord => lord.Standing, lord => lord.DistanceSquared, allowThirdFaction);
+
+    // A lord party reduced to what the pick reads.
+    private sealed class TestLord
+    {
+        public TestLord(string id, NavalScenarioStager.BlockadeLordStanding standing, float distanceSquared)
+        {
+            Id = id;
+            Standing = standing;
+            DistanceSquared = distanceSquared;
+        }
+
+        public string Id { get; }
+        public NavalScenarioStager.BlockadeLordStanding Standing { get; }
+        public float DistanceSquared { get; }
     }
 }
 #endif

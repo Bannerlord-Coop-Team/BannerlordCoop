@@ -10,6 +10,7 @@ using GameInterface.Services.Party.Commands;
 using GameInterface.Services.Villages.Commands;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -45,16 +46,21 @@ public class NavalScenarioStager : INavalScenarioStager
 
     internal const float EngageWaitSeconds = 120f;
     private const int EngagePollMilliseconds = 500;
+    // With no map event this long after staging, the server starts the encounter itself (R41b P4).
+    internal const float EngageFallbackSeconds = 10f;
 
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly INavalScenarioState state;
+    private readonly INavalEngageResetTracer resetTracer;
 
-    public NavalScenarioStager(IObjectManager objectManager, INetwork network, INavalScenarioState state)
+    public NavalScenarioStager(IObjectManager objectManager, INetwork network, INavalScenarioState state,
+        INavalEngageResetTracer resetTracer)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.state = state;
+        this.resetTracer = resetTracer;
     }
 
     public bool TryStage(NavalScenarioConfig config, out string output)
@@ -80,6 +86,7 @@ public class NavalScenarioStager : INavalScenarioStager
             TopUpShips(party.Party, config.ShipsPerPlayer, hull);
             TopUpTroops(party, config.TroopTemplatesPerPlayer);
         }
+        LeaveRafts(config, players, log);
         log.Append(" players=").Append(string.Join(",", config.ControllerIds.Zip(players,
             (id, party) => $"{id}(ships={party.Ships.Count},troops={party.MemberRoster.TotalManCount})")));
         if (config.ArmedShipsPerParty > 0)
@@ -109,7 +116,8 @@ public class NavalScenarioStager : INavalScenarioStager
         {
             output = log.Append(" mapEvent=pending(engage)").ToString();
             Logger.Information("[NavalScenario] {Output}", output);
-            WatchEngage(config, engagingEnemy, players, DateTime.UtcNow.AddSeconds(EngageWaitSeconds));
+            resetTracer.Watch(engagingEnemy);
+            WatchEngage(new EngageWait(config, engagingEnemy, players, DateTime.UtcNow));
             return true;
         }
 
@@ -129,6 +137,18 @@ public class NavalScenarioStager : INavalScenarioStager
         state.Start(config, localControllerId: null, isServer: true);
         state.Complete(step, false, output);
         state.Advance(NavalScenarioPhase.Ended);
+    }
+
+    // A player released at sea sails on a raft until it lands, and PlayerRaftVisibilityPatches turns an engage order on a
+    // player's raft into GoToPoint, which left the encounter preset's fleet idle (R41b P4). The topped-up fleet replaces the raft.
+    private static void LeaveRafts(NavalScenarioConfig config, MobileParty[] players, StringBuilder log)
+    {
+        var rafted = config.ControllerIds.Where((id, i) => players[i].IsInRaftState).ToList();
+        if (rafted.Count == 0) return;
+
+        foreach (var party in players.Where(party => party.IsInRaftState))
+            RaftStateChangeAction.DeactivateRaftStateForParty(party);
+        log.Append(" leftRaft=").Append(string.Join(",", rafted));
     }
 
     // The nearest hostile AI fleet at sea, a pirate (bandit) one when there is one.
@@ -166,10 +186,7 @@ public class NavalScenarioStager : INavalScenarioStager
         foreach (var player in players)
             StartNavalCoopCommand.PlaceAtSea(player, enemy.Position);
 
-        enemy.SetMoveEngageParty(players[0], MobileParty.NavigationType.Naval);
-        enemy.Ai.DoNotMakeNewDecisions = true;
-        // Unforced, so the change keeps the fleet's sea state; a forced one would carry isCurrentlyAtSea false to every machine.
-        MessageBroker.Instance.Publish(this, new PartyBehaviorChangeAttempted(enemy));
+        OrderEngage(enemy, players[0]);
 
         log.Append($" enemy={enemy.StringId}(bandit={enemy.IsBandit},ships={enemyShipsBefore}->{enemy.Ships.Count}," +
             $"troops={enemy.MemberRoster.TotalManCount}) engages={config.ControllerIds[0]}");
@@ -177,41 +194,79 @@ public class NavalScenarioStager : INavalScenarioStager
         return true;
     }
 
-    private void WatchEngage(NavalScenarioConfig config, MobileParty enemy, MobileParty[] players, DateTime deadline)
+    // DoNotMakeNewDecisions keeps the order. Unforced, so the change keeps the fleet's sea state; a forced one would carry
+    // isCurrentlyAtSea false to every machine.
+    private void OrderEngage(MobileParty enemy, MobileParty target)
     {
-        Task.Delay(EngagePollMilliseconds).ContinueWith(_ =>
-            GameThread.RunSafe(() => PollEngage(config, enemy, players, deadline), context: nameof(WatchEngage)));
+        enemy.SetMoveEngageParty(target, MobileParty.NavigationType.Naval);
+        enemy.Ai.DoNotMakeNewDecisions = true;
+        MessageBroker.Instance.Publish(this, new PartyBehaviorChangeAttempted(enemy));
     }
 
-    private void PollEngage(NavalScenarioConfig config, MobileParty enemy, MobileParty[] players, DateTime deadline)
+    // The encounter preset's wait for its map event: the parties, the deadlines and what the poll did so far.
+    private sealed class EngageWait
     {
-        if (state.Current?.ScenarioId != config.ScenarioId || !state.IsPending(NavalScenarioState.EngageStep)) return;
+        public EngageWait(NavalScenarioConfig config, MobileParty enemy, MobileParty[] players, DateTime startedUtc)
+        {
+            Config = config;
+            Enemy = enemy;
+            Players = players;
+            Deadline = startedUtc.AddSeconds(EngageWaitSeconds);
+            FallbackAt = startedUtc.AddSeconds(EngageFallbackSeconds);
+        }
+
+        public NavalScenarioConfig Config { get; }
+        public MobileParty Enemy { get; }
+        public MobileParty[] Players { get; }
+        public DateTime Deadline { get; }
+        public DateTime FallbackAt { get; }
+        public int Reissues { get; set; }
+        public bool FallbackStarted { get; set; }
+
+        public string Summary => $"engage re-issued {Reissues} time(s), fallback encounter {(FallbackStarted ? "started" : "not started")}";
+    }
+
+    // Polls the engage again on the game thread after a short delay.
+    private void WatchEngage(EngageWait wait)
+    {
+        Task.Delay(EngagePollMilliseconds).ContinueWith(_ =>
+            GameThread.RunSafe(() => PollEngage(wait), context: nameof(WatchEngage)));
+    }
+
+    // Keeps the engage going until the players' map event exists, then joins the others and tells the clients the scenario.
+    private void PollEngage(EngageWait wait)
+    {
+        var config = wait.Config;
+        var enemy = wait.Enemy;
+        var players = wait.Players;
+        if (state.Current?.ScenarioId != config.ScenarioId || !state.IsPending(NavalScenarioState.EngageStep))
+        {
+            resetTracer.Stop(enemy);
+            return;
+        }
 
         var mapEvent = players[0].MapEvent;
         if (mapEvent == null || enemy.MapEvent != mapEvent)
         {
-            if (DateTime.UtcNow < deadline)
+            if (DateTime.UtcNow < wait.Deadline)
             {
-                WatchEngage(config, enemy, players, deadline);
+                KeepEngageOrder(wait);
+                TryFallbackEncounter(wait);
+                WatchEngage(wait);
                 return;
             }
 
             string detail = $"no map event between {enemy.StringId} and {config.ControllerIds[0]} after {EngageWaitSeconds:0} s " +
                 $"(enemy behavior {enemy.DefaultBehavior}, target {enemy.TargetParty?.StringId ?? "none"}, distance " +
                 $"{enemy.Position.ToVec2().Distance(players[0].Position.ToVec2()):0.00}, enemy in a map event {enemy.MapEvent != null}, " +
-                $"player in a map event {mapEvent != null}); check the client for an open conversation or encounter menu";
-            state.Complete(NavalScenarioState.EngageStep, false, detail);
-            state.Advance(NavalScenarioPhase.Ended);
-            Logger.Error("[NavalScenario] Encounter {ScenarioId}: {Detail}", config.ScenarioId, detail);
+                $"player in a map event {mapEvent != null}, {wait.Summary}); check the client for an open conversation or encounter menu";
+            FailEngage(config, enemy, detail);
             return;
         }
 
         if (!objectManager.TryGetId(mapEvent, out string mapEventId))
         {
-            const string unregistered = "the encounter's map event is not registered";
-            state.Complete(NavalScenarioState.EngageStep, false, unregistered);
-            state.Advance(NavalScenarioPhase.Ended);
-            Logger.Error("[NavalScenario] Encounter {ScenarioId}: {Detail}", config.ScenarioId, unregistered);
+            FailEngage(config, enemy, "the encounter's map event is not registered");
             return;
         }
 
@@ -223,11 +278,58 @@ public class NavalScenarioStager : INavalScenarioStager
             joined.Append($" {config.ControllerIds[i]}={(ok ? "joined" : error)}");
         }
 
-        string outcome = $"the campaign AI started {mapEventId} (naval={mapEvent.IsNavalMapEvent}, type={mapEvent.EventType})" +
-            (joined.Length > 0 ? ";" + joined : "");
+        string outcome = $"the campaign AI started {mapEventId} (naval={mapEvent.IsNavalMapEvent}, type={mapEvent.EventType}, " +
+            $"{wait.Summary})" + (joined.Length > 0 ? ";" + joined : "");
+        resetTracer.Stop(enemy);
         state.Complete(NavalScenarioState.EngageStep, true, outcome);
         network.SendAll(new NetworkNavalScenarioStarted(config));
         Logger.Information("[NavalScenario] Encounter {ScenarioId}: {Outcome}", config.ScenarioId, outcome);
+    }
+
+    // Ends the encounter scenario with the engage step failed for detail.
+    private void FailEngage(NavalScenarioConfig config, MobileParty enemy, string detail)
+    {
+        resetTracer.Stop(enemy);
+        state.Complete(NavalScenarioState.EngageStep, false, detail);
+        state.Advance(NavalScenarioPhase.Ended);
+        Logger.Error("[NavalScenario] Encounter {ScenarioId}: {Detail}", config.ScenarioId, detail);
+    }
+
+    // Puts the fleet back on its engage order when something replaced it; the reset tracer logs what did.
+    private void KeepEngageOrder(EngageWait wait)
+    {
+        var enemy = wait.Enemy;
+        var target = wait.Players[0];
+        if (enemy.MapEvent != null || (enemy.DefaultBehavior == AiBehavior.EngageParty && enemy.TargetParty == target)) return;
+
+        string before = $"{enemy.DefaultBehavior}, target {enemy.TargetParty?.StringId ?? "none"}";
+        OrderEngage(enemy, target);
+        wait.Reissues++;
+        if (wait.Reissues > 1) return;
+
+        Logger.Warning("[NavalScenario] Encounter {ScenarioId}: re-issued {Enemy}'s engage order (was {Before}, now {After})",
+            wait.Config.ScenarioId, enemy.StringId, before, enemy.DefaultBehavior);
+    }
+
+    // Within the naval encounter distance the server starts the encounter the AI tick's OnPartyInteraction would, which
+    // EncounterManagerPatches turns into the server-detected player conversation.
+    private void TryFallbackEncounter(EngageWait wait)
+    {
+        var enemy = wait.Enemy;
+        var player = wait.Players[0];
+        if (wait.FallbackStarted || DateTime.UtcNow < wait.FallbackAt) return;
+        if (enemy.MapEvent != null || player.MapEvent != null) return;
+
+        float distance = enemy.Position.Distance(player.Position);
+        float encounterDistance = Campaign.Current.Models.EncounterModel.NeededMaximumNavalDistanceForEncounteringMobileParty;
+        if (distance > encounterDistance) return;
+
+        wait.FallbackStarted = true;
+        EncounterManager.StartPartyEncounter(enemy.Party, player.Party);
+        Logger.Information("[NavalScenario] Encounter {ScenarioId}: no map event after {Seconds:0} s, so the server started " +
+            "{Enemy}'s encounter with {Player} (distance {Distance:0.00} <= {EncounterDistance:0.00}, behavior {Behavior})",
+            wait.Config.ScenarioId, EngageFallbackSeconds, enemy.StringId, wait.Config.ControllerIds[0], distance, encounterDistance,
+            enemy.DefaultBehavior);
     }
 
     // The players attack an AI siege's active blockade from the sea, as a player choosing to attack it would: the server
@@ -236,7 +338,7 @@ public class NavalScenarioStager : INavalScenarioStager
         out string error)
     {
         var player = players[0];
-        if (!TryFindBlockade(config, player, hull, log, out var town, out var besieger, out bool isNewSiege, out error)) return false;
+        if (!TryFindBlockade(config, players, hull, log, out var town, out var besieger, out bool isNewSiege, out error)) return false;
 
         // BlockadeBattleMapEvent.OnInitialize lifts the blockade with no battle when the attackers are this much stronger.
         float attackerPower = players.Sum(party =>
@@ -290,13 +392,15 @@ public class NavalScenarioStager : INavalScenarioStager
         attackerPower > blockadePower * LiftBlockadePowerRatio;
 
     // An AI siege already blockading a port, or a new one: the lord at war with the town and the players nearest to a coastal
-    // town gets its hulls and besieges it, which activates the blockade since a besieger has ships (SiegeEvent's constructor).
-    private bool TryFindBlockade(NavalScenarioConfig config, MobileParty player, ShipHull hull, StringBuilder log,
+    // town, else the nearest third-faction lord after its missing wars are declared, gets its hulls and besieges it, which
+    // activates the blockade since a besieger has ships (SiegeEvent's constructor).
+    private bool TryFindBlockade(NavalScenarioConfig config, MobileParty[] players, ShipHull hull, StringBuilder log,
         out Settlement town, out MobileParty besieger, out bool isNewSiege, out string error)
     {
         town = null;
         besieger = null;
         isNewSiege = false;
+        var player = players[0];
         var position = player.Position.ToVec2();
         var towns = Settlement.All
             .Where(settlement => settlement.IsTown && settlement.HasPort)
@@ -321,38 +425,124 @@ public class NavalScenarioStager : INavalScenarioStager
             return true;
         }
 
-        foreach (var candidate in towns.Where(settlement => settlement.SiegeEvent == null && settlement.MapFaction != player.MapFaction))
+        var playerFactions = players.Select(party => party.MapFaction).Where(faction => faction != null).Distinct().ToArray();
+        var freeTowns = towns.Where(settlement => settlement.SiegeEvent == null && !playerFactions.Contains(settlement.MapFaction));
+        if (!TryPickBlockadeSiege(freeTowns.ToList(), MobileParty.AllLordParties.Where(IsFreeLord).ToList(), playerFactions,
+                out var siegeTown, out var lord))
         {
-            var lord = MobileParty.AllLordParties
-                .Where(party => IsFreeLord(party) && party.MapFaction.IsAtWarWith(candidate.MapFaction)
-                    && party.MapFaction.IsAtWarWith(player.MapFaction))
-                .OrderBy(party => party.Position.ToVec2().DistanceSquared(candidate.Position.ToVec2()))
-                .FirstOrDefault();
-            if (lord == null) continue;
-
-            SizeFleet(lord.Party, Math.Max(1, config.EnemyHulls), hull);
-            lord.Position = candidate.GatePosition;
-            lord.SetMoveBesiegeSettlement(candidate, MobileParty.NavigationType.Default);
-            Campaign.Current.SiegeEventManager.StartSiegeEvent(candidate, lord);
-            if (candidate.SiegeEvent?.IsBlockadeActive != true)
-            {
-                error = $"{lord.StringId} besieged {candidate.StringId} with {lord.Ships.Count} ship(s), but the siege started with no " +
-                    $"active blockade (siege started {candidate.SiegeEvent != null})";
-                return false;
-            }
-
-            town = candidate;
-            besieger = lord;
-            isNewSiege = true;
-            log.Append($" blockade={town.StringId}(new siege, besieger={besieger.StringId},ships={besieger.Ships.Count}," +
-                $"troops={besieger.MemberRoster.TotalManCount})");
-            error = null;
-            return true;
+            error = "No free AI lord party is at war with both a coastal town's faction and the players' faction " +
+                $"{player.MapFaction?.Name} or belongs to a third faction, and no AI siege already blockades a port the players can attack.";
+            return false;
         }
 
-        error = "No free AI lord party is at war with both a coastal town's faction and the players' faction " +
-            $"{player.MapFaction?.Name}, and no AI siege already blockades a port the players can attack.";
+        if (!TryDeclareBlockadeWars(lord, siegeTown, playerFactions, log, out error)) return false;
+
+        SizeFleet(lord.Party, Math.Max(1, config.EnemyHulls), hull);
+        lord.Position = siegeTown.GatePosition;
+        lord.SetMoveBesiegeSettlement(siegeTown, MobileParty.NavigationType.Default);
+        Campaign.Current.SiegeEventManager.StartSiegeEvent(siegeTown, lord);
+        if (siegeTown.SiegeEvent?.IsBlockadeActive != true)
+        {
+            error = $"{lord.StringId} besieged {siegeTown.StringId} with {lord.Ships.Count} ship(s), but the siege started with no " +
+                $"active blockade (siege started {siegeTown.SiegeEvent != null})";
+            return false;
+        }
+
+        town = siegeTown;
+        besieger = lord;
+        isNewSiege = true;
+        log.Append($" blockade={town.StringId}(new siege, besieger={besieger.StringId},ships={besieger.Ships.Count}," +
+            $"troops={besieger.MemberRoster.TotalManCount})");
+        error = null;
+        return true;
+    }
+
+    // A lord already at war with both sides near any town wins over a third-faction lord, so the towns are tried twice.
+    private static bool TryPickBlockadeSiege(List<Settlement> towns, List<MobileParty> lords, IFaction[] playerFactions,
+        out Settlement town, out MobileParty lord)
+    {
+        foreach (bool allowThirdFaction in new[] { false, true })
+        {
+            foreach (var candidate in towns)
+            {
+                var townPosition = candidate.Position.ToVec2();
+                lord = PickBlockadeLord(lords, party => StandingOf(party.MapFaction, candidate.MapFaction, playerFactions),
+                    party => party.Position.ToVec2().DistanceSquared(townPosition), allowThirdFaction);
+                if (lord == null) continue;
+
+                town = candidate;
+                return true;
+            }
+        }
+
+        town = null;
+        lord = null;
         return false;
+    }
+
+    // Like duel, the scenario declares the wars a third-faction besieger lacks with the town and with each player's faction.
+    private static bool TryDeclareBlockadeWars(MobileParty lord, Settlement town, IFaction[] playerFactions, StringBuilder log,
+        out string error)
+    {
+        var declared = new List<string>();
+        foreach (var enemy in new[] { town.MapFaction }.Concat(playerFactions).Distinct())
+        {
+            if (FactionManager.IsAtWarAgainstFaction(lord.MapFaction, enemy)) continue;
+
+            DeclareWarAction.ApplyByDefault(lord.MapFaction, enemy);
+            declared.Add($"{lord.MapFaction.Name}->{enemy.Name}");
+            if (!FactionManager.IsAtWarAgainstFaction(lord.MapFaction, enemy))
+            {
+                error = $"DeclareWarAction did not put {lord.MapFaction.Name} at war with {enemy.Name} for {lord.StringId}'s blockade.";
+                return false;
+            }
+        }
+
+        if (declared.Count > 0) log.Append(" declaredWar=").Append(string.Join(",", declared));
+        error = null;
+        return true;
+    }
+
+    // Reads the lord's wars with the town's and every player's faction for ClassifyBlockadeLord.
+    private static BlockadeLordStanding StandingOf(IFaction lordFaction, IFaction townFaction, IFaction[] playerFactions) =>
+        ClassifyBlockadeLord(lordFaction == townFaction || playerFactions.Contains(lordFaction),
+            FactionManager.IsAtWarAgainstFaction(lordFaction, townFaction) &&
+            playerFactions.All(faction => FactionManager.IsAtWarAgainstFaction(lordFaction, faction)));
+
+    /// <summary>How a lord's faction stands to a blockade: usable as it is, usable once wars are declared, or never.</summary>
+    public enum BlockadeLordStanding
+    {
+        Excluded = 0,
+        AtWarWithBoth = 1,
+        ThirdFaction = 2,
+    }
+
+    /// <summary>The town's and the players' own factions never besiege; any other is at war with both already or a third faction.</summary>
+    internal static BlockadeLordStanding ClassifyBlockadeLord(bool isTownOrPlayersFaction, bool atWarWithTownAndPlayers)
+    {
+        if (isTownOrPlayersFaction) return BlockadeLordStanding.Excluded;
+
+        return atWarWithTownAndPlayers ? BlockadeLordStanding.AtWarWithBoth : BlockadeLordStanding.ThirdFaction;
+    }
+
+    /// <summary>
+    /// The nearest lord already at war with the town and the players, else, when <paramref name="allowThirdFaction"/>, the
+    /// nearest third-faction lord; null when none qualifies.
+    /// </summary>
+    internal static T PickBlockadeLord<T>(IEnumerable<T> lords, Func<T, BlockadeLordStanding> standingOf,
+        Func<T, float> distanceSquaredOf, bool allowThirdFaction) where T : class
+    {
+        var candidates = lords
+            .Select(lord => (Lord: lord, Standing: standingOf(lord)))
+            .Where(candidate => candidate.Standing == BlockadeLordStanding.AtWarWithBoth ||
+                (allowThirdFaction && candidate.Standing == BlockadeLordStanding.ThirdFaction))
+            .ToList();
+
+        return candidates
+            .OrderBy(candidate => candidate.Standing == BlockadeLordStanding.AtWarWithBoth ? 0 : 1)
+            .ThenBy(candidate => distanceSquaredOf(candidate.Lord))
+            .Select(candidate => candidate.Lord)
+            .FirstOrDefault();
     }
 
     private static bool IsBlockadeAttackable(MobileParty besieger, MobileParty player) =>

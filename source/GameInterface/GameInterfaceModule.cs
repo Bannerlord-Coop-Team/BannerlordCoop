@@ -169,6 +169,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<NavalScenarioState>().As<INavalScenarioState>().InstancePerLifetimeScope();
         builder.RegisterType<NavalScenarioResolver>().As<INavalScenarioResolver>().InstancePerDependency();
         builder.RegisterType<NavalScenarioStager>().As<INavalScenarioStager>().InstancePerDependency();
+        builder.RegisterType<NavalEngageResetTracer>().As<INavalEngageResetTracer>().InstancePerLifetimeScope();
 #endif
         builder.RegisterType<SiegeMapEventLeaderReconciler>().As<ISiegeMapEventLeaderReconciler>().InstancePerDependency();
         builder.RegisterType<AiSiegeAssaultReadiness>().As<IAiSiegeAssaultReadiness>().InstancePerDependency();
