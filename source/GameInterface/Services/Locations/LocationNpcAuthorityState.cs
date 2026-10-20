@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Services.Locations.Hosting;
 using Serilog;
 using System;
 using System.Threading;
@@ -20,7 +21,7 @@ public interface ILocationNpcAuthorityState
     /// <summary>The active location instance id, or null when no location mission is active.</summary>
     string ActiveInstanceId { get; }
 
-    /// <summary>True once the server confirmed this client as NPC host of the active instance.</summary>
+    /// <summary>True while the server's host assignment for the active instance names this client.</summary>
     bool IsLocalHostConfirmed { get; }
 
     /// <summary>True while native population spawns must be skipped (active mission, host not confirmed).</summary>
@@ -38,26 +39,29 @@ public interface ILocationNpcAuthorityState
     /// <summary>Starts tracking a location mission; native spawns stay suppressed until host confirmation.</summary>
     void BeginMission(string instanceId, Func<Agent, bool> partyAgentResolver = null);
 
-    /// <summary>Stops tracking the active location mission and clears its host confirmation.</summary>
+    /// <summary>Stops tracking the active location mission.</summary>
     void EndMission();
-
-    /// <summary>Applies the server's host assignment when it names the active instance.</summary>
-    void SetLocalHost(string instanceId, bool isLocalHost);
 }
 
 /// <summary>
-/// Tracks the active settlement location mission and whether this client is its confirmed NPC host.
+/// Tracks the active settlement location mission; NPC host confirmation is read from <see cref="ILocationHostRegistry"/>.
 /// </summary>
 public class LocationNpcAuthorityState : ILocationNpcAuthorityState, IDisposable
 {
     private static readonly ILogger Logger = LogManager.GetLogger<LocationNpcAuthorityState>();
 
+    private readonly ILocationHostRegistry hostRegistry;
     private readonly object stateLock = new object();
     private readonly ThreadLocal<bool> suppressCapture = new ThreadLocal<bool>();
     private readonly ThreadLocal<bool> isReplayingNativePopulation = new ThreadLocal<bool>();
     private string activeInstanceId;
-    private bool localHostConfirmed;
     private Func<Agent, bool> partyAgentResolver;
+
+    /// <summary>Reads NPC host confirmation from this client's location host assignments.</summary>
+    public LocationNpcAuthorityState(ILocationHostRegistry hostRegistry)
+    {
+        this.hostRegistry = hostRegistry;
+    }
 
     /// <inheritdoc/>
     public bool IsCoopLocationMissionActive
@@ -74,13 +78,21 @@ public class LocationNpcAuthorityState : ILocationNpcAuthorityState, IDisposable
     /// <inheritdoc/>
     public bool IsLocalHostConfirmed
     {
-        get { lock (stateLock) return localHostConfirmed; }
+        get
+        {
+            string instanceId = ActiveInstanceId;
+            return instanceId != null && hostRegistry.IsHost(instanceId);
+        }
     }
 
     /// <inheritdoc/>
     public bool ShouldSuppressNativeSpawns
     {
-        get { lock (stateLock) return activeInstanceId != null && !localHostConfirmed; }
+        get
+        {
+            string instanceId = ActiveInstanceId;
+            return instanceId != null && !hostRegistry.IsHost(instanceId);
+        }
     }
 
     /// <inheritdoc/>
@@ -131,7 +143,6 @@ public class LocationNpcAuthorityState : ILocationNpcAuthorityState, IDisposable
             }
 
             activeInstanceId = instanceId;
-            localHostConfirmed = false;
             this.partyAgentResolver = partyAgentResolver;
         }
 
@@ -145,22 +156,11 @@ public class LocationNpcAuthorityState : ILocationNpcAuthorityState, IDisposable
         lock (stateLock)
         {
             activeInstanceId = null;
-            localHostConfirmed = false;
             partyAgentResolver = null;
         }
 
         SuppressCapture = false;
         IsReplayingNativePopulation = false;
-    }
-
-    /// <inheritdoc/>
-    public void SetLocalHost(string instanceId, bool isLocalHost)
-    {
-        lock (stateLock)
-        {
-            if (activeInstanceId == null || activeInstanceId != instanceId) return;
-            localHostConfirmed = isLocalHost;
-        }
     }
 
     /// <summary>Releases the per-thread flag storage.</summary>

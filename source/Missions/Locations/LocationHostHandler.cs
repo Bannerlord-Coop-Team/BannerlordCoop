@@ -26,7 +26,8 @@ namespace Missions.Locations;
 /// Client: once the location mission has FINISHED LOADING (<see cref="LocationMissionReady"/>, published
 /// by <c>CoopLocationsController</c>) it asks the server to elect via
 /// <see cref="NetworkRequestLocationHost"/> and stores the reply
-/// (<see cref="NetworkLocationHostAssigned"/>), driving <see cref="ILocationNpcAuthorityState"/>.
+/// (<see cref="NetworkLocationHostAssigned"/>) in <see cref="ILocationHostRegistry"/>, which
+/// <see cref="ILocationNpcAuthorityState"/> reads for the active instance.
 /// Server: the first MISSION-READY client becomes the instance's host (SR-010); later ready clients
 /// append to the successor line in mission-ready order. Departures promote the first successor
 /// (SR-014) or clear the assignment when the instance empties (SR-016). Departures for instance ids
@@ -44,7 +45,6 @@ internal class LocationHostHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ILocationHostRegistry hostRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
-    private readonly ILocationNpcAuthorityState authorityState;
 
     // [Server] Highest host epoch ever issued per location instance (SR-016), retained across assignment
     // removal: clients keep their last assignment when an instance empties (only the server's entry is
@@ -59,8 +59,7 @@ internal class LocationHostHandler : IHandler
         IObjectManager objectManager,
         IPlayerManager playerManager,
         ILocationHostRegistry hostRegistry,
-        IControllerIdProvider controllerIdProvider,
-        ILocationNpcAuthorityState authorityState)
+        IControllerIdProvider controllerIdProvider)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -68,7 +67,6 @@ internal class LocationHostHandler : IHandler
         this.playerManager = playerManager;
         this.hostRegistry = hostRegistry;
         this.controllerIdProvider = controllerIdProvider;
-        this.authorityState = authorityState;
 
         messageBroker.Subscribe<LocationMissionReady>(Handle_LocationMissionReady);
         messageBroker.Subscribe<NetworkRequestLocationHost>(Handle_NetworkRequestLocationHost);
@@ -257,9 +255,6 @@ internal class LocationHostHandler : IHandler
         bool isLocalHost = message.HostControllerId == controllerIdProvider.ControllerId;
         bool hostChanged = previousHost != null && previousHost != message.HostControllerId;
         bool isMigrationToUs = hostChanged && isLocalHost;
-
-        // The authority state ignores assignments for instances other than the active mission.
-        authorityState.SetLocalHost(message.InstanceId, isLocalHost);
 
         if (isLocalHost && (!wasLocalHost || previous?.Epoch != message.Epoch))
             messageBroker.Publish(this, new LocationHostAuthorityAcquired(message.InstanceId, isMigrationToUs));

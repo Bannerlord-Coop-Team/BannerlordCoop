@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Hosting;
 using Missions;
 using Missions.Locations;
 using Moq;
@@ -25,7 +26,7 @@ public class LocationRemotePartySpawnOrderingTests
         var remotePuppet = (Agent)FormatterServices.GetUninitializedObject(typeof(Agent));
         remotePuppet.Origin = (SimpleAgentOrigin)FormatterServices.GetUninitializedObject(typeof(SimpleAgentOrigin));
         partyAgentMap.Record(agentId);
-        using var authorityState = new LocationNpcAuthorityState();
+        using var authorityState = new LocationNpcAuthorityState(Mock.Of<ILocationHostRegistry>());
         authorityState.BeginMission(
             "settlement|tavern",
             agent => registry.TryGetAgentInfo(agent, out var info) && partyAgentMap.Contains(info.AgentId));

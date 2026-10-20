@@ -24,7 +24,6 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Education.Interfaces;
 using GameInterface.Services.Kingdoms;
-using GameInterface.Services.Locations;
 using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MobileParties;
@@ -158,7 +157,6 @@ internal abstract class TestComponentBase
         RegisterMock<IRetreatedMapEventPartyTracker>(builder);
         // LocationHostHandler (MissionModule, auto-activated) needs its registry the same way.
         RegisterMock<ILocationHostRegistry>(builder);
-        RegisterMock<ILocationNpcAuthorityState>(builder);
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);
         RegisterMock<ITacticalUnitSymbolsConfigInterface>(builder);
         RegisterMock<IVillageHostileActionInterface>(builder);

@@ -434,7 +434,8 @@ public class CoopLocationsController : CoopMissionController, ILocationMissionBe
 
         // A fresh mission has no host yet: drop any assignment left from a PREVIOUS visit to this
         // settlement (the server clears only its own entry when an instance empties), or a stale
-        // host would read as "previous host" and fake a migration when the new election lands.
+        // host would read as "previous host" and fake a migration when the new election lands. It also
+        // keeps the authority state from confirming a stale host when BeginMission activates the instance.
         hostRegistry.Remove(instanceId);
 
         // Native population spawning is suppressed on every client until the server's host assignment

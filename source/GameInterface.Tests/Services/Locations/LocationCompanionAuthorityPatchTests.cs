@@ -1,4 +1,6 @@
-﻿using GameInterface.Services.Locations;
+﻿using GameInterface.Services.Entity;
+using GameInterface.Services.Locations;
+using GameInterface.Services.Locations.Hosting;
 using GameInterface.Services.Locations.Patches;
 using System;
 using TaleWorlds.CampaignSystem.AgentOrigins;
@@ -93,7 +95,9 @@ public class LocationCompanionAuthorityPatchTests
     {
         var mainAgent = CreateAgentWithSimpleOrigin();
 
-        Assert.True(new LocationNpcAuthorityState().IsPlayerPartyAgent(mainAgent, mainAgent));
+        using var state = CreateAuthorityState();
+
+        Assert.True(state.IsPlayerPartyAgent(mainAgent, mainAgent));
     }
 
     [Fact]
@@ -101,7 +105,7 @@ public class LocationCompanionAuthorityPatchTests
     {
         var remotePartyPuppet = CreateAgentWithSimpleOrigin();
         var ambientNpc = CreateAgentWithSimpleOrigin();
-        using var state = new LocationNpcAuthorityState();
+        using var state = CreateAuthorityState();
         state.BeginMission(
             "settlement|tavern",
             agent => ReferenceEquals(agent, remotePartyPuppet));
@@ -113,6 +117,9 @@ public class LocationCompanionAuthorityPatchTests
         state.IsReplayingNativePopulation = false;
         Assert.True(LocationNativeSpawnSuppressionPatches.ShouldSimulateAgent(state, remotePartyPuppet, mainAgent: null));
     }
+
+    private static LocationNpcAuthorityState CreateAuthorityState()
+        => new LocationNpcAuthorityState(new LocationHostRegistry(new ControllerIdProvider()));
 
     private static Agent CreateAgentWithSimpleOrigin()
     {
