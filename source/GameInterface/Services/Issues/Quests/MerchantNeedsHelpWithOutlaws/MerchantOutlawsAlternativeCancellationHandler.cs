@@ -13,7 +13,7 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
 
-internal readonly struct MerchantOutlawsAlternativeCancelled : IEvent
+public readonly struct MerchantOutlawsAlternativeCancelled : IEvent
 {
     public IssueBase Issue { get; }
 
@@ -21,7 +21,7 @@ internal readonly struct MerchantOutlawsAlternativeCancelled : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-internal class RequestMerchantOutlawsAlternativeCancellation : ICommand
+public readonly struct RequestMerchantOutlawsAlternativeCancellation : ICommand
 {
     [ProtoMember(1)] public string GiverId { get; }
     [ProtoMember(2)] public string IssueId { get; }
