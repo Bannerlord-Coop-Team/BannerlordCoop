@@ -14,6 +14,10 @@ using E2E.Tests.Environment.Instance;
 using Quest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.Core;
+using GameInterface.Services.Entity;
+using SandBox.GauntletUI.Map;
 
 namespace E2E.Tests.Services.Issues;
 
@@ -32,9 +36,9 @@ public class QuestRequestOwnershipTests : IDisposable
     {
         TestEnvironment = new E2ETestEnvironment(output);
         scenario = new QuestScenario(TestEnvironment);
-        consequences = new MethodCallRecorder(Priority.Last, AccessTools.Method(
-            typeof(TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest),
-            nameof(TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest.SucceedQuestByPayingAndKeepingTheGoods)));
+        consequences = new MethodCallRecorder(Priority.Last,
+            AccessTools.Method(typeof(Quest), nameof(Quest.SucceedQuestByPayingAndKeepingTheGoods)),
+            AccessTools.Method(typeof(Quest), nameof(Quest.SucceedQuestByPayingAndGivingTheGoodsBack)));
     }
 
     public void Dispose()
@@ -146,8 +150,10 @@ public class QuestRequestOwnershipTests : IDisposable
         return quest;
     }
 
-    [Fact]
-    public void ServerValidatedPurchase_AllowsOneRealQuestBranchAndChargesOnce()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ServerValidatedPurchase_AllowsOneRealQuestBranchAndChargesOnce(bool giveBack)
     {
         scenario.Accept(scenario.ClientA);
         var clientQuest = AttachRealQuest(scenario.ClientA);
@@ -177,9 +183,76 @@ public class QuestRequestOwnershipTests : IDisposable
             Assert.Equal(900, hero.Gold);
         });
 
-        scenario.ClientA.Call(() => clientQuest.SucceedQuestByPayingAndKeepingTheGoods());
-        scenario.ClientA.Call(() => clientQuest.SucceedQuestByPayingAndKeepingTheGoods());
+        scenario.ClientA.Call(() =>
+        {
+            if (giveBack) clientQuest.SucceedQuestByPayingAndGivingTheGoodsBack();
+            else clientQuest.SucceedQuestByPayingAndKeepingTheGoods();
+        });
+        scenario.ClientA.Call(() =>
+        {
+            if (giveBack) clientQuest.SucceedQuestByPayingAndGivingTheGoodsBack();
+            else clientQuest.SucceedQuestByPayingAndKeepingTheGoods();
+        });
         Assert.Equal(1, consequences.CountFor(scenario.Server));
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void ServerBattleResult_AuthorizesGoodsOrFailsOnce(bool won, bool giveBack)
+    {
+        scenario.Accept(scenario.ClientA);
+        var clientQuest = AttachRealQuest(scenario.ClientA);
+        var serverQuest = AttachRealQuest(scenario.Server);
+        using var failures = new MethodCallRecorder(Priority.Last,
+            AccessTools.Method(typeof(Quest), nameof(Quest.FailQuestByKeepingTheGoods)),
+            AccessTools.Method(typeof(Quest), nameof(Quest.FailQuestByGivingBackTheGoods)),
+            AccessTools.Method(typeof(Quest), nameof(Quest.FailQuestByLosingHideoutBattle)));
+        var hideoutId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        scenario.Server.Call(() =>
+        {
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Settlement>(hideoutId, out var hideout));
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var ownerParty));
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var hero));
+            AccessTools.Field(typeof(Quest), nameof(Quest._questHideout)).SetValue(serverQuest, hideout);
+            var enemy = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var battle = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            using (new AllowedThread())
+            {
+                hero.PartyBelongedTo = ownerParty;
+                battle.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+                battle.Initialize(ownerParty.Party, enemy.Party, new FieldBattleEventComponent(battle), MapEvent.BattleTypes.Hideout);
+                battle.MapEventVisual = null;
+                battle.MapEventSettlement = hideout;
+                battle.BattleState = won ? BattleState.AttackerVictory : BattleState.DefenderVictory;
+            }
+            var service = scenario.Server.Resolve<IGangLeaderGoodsService>();
+            using (new MainHeroSubstitutionScope(hero, ownerParty))
+            {
+                service.ObserveBattle(serverQuest, battle);
+                // Defeat can remove the player's party before the completion callback.
+                if (!won) hero.PartyBelongedTo = null;
+                service.BattleEnded(serverQuest, battle);
+                service.BattleEnded(serverQuest, battle);
+            }
+            Assert.Equal(won, serverQuest._playerHasTheGoods);
+        }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
+
+        if (won)
+        {
+            scenario.ClientA.Call(() =>
+            {
+                if (giveBack) clientQuest.FailQuestByGivingBackTheGoods();
+                else clientQuest.FailQuestByKeepingTheGoods();
+            });
+            scenario.ClientA.Call(() =>
+            {
+                if (giveBack) clientQuest.FailQuestByGivingBackTheGoods();
+                else clientQuest.FailQuestByKeepingTheGoods();
+            });
+        }
+        Assert.Equal(1, failures.CountFor(scenario.Server));
     }
 
     [Fact]

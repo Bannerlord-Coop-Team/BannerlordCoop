@@ -169,6 +169,8 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
 
         var success = branch == GangLeaderNeedsToOffloadStolenGoodsBranch.SuccessByKeepingGoods ||
             branch == GangLeaderNeedsToOffloadStolenGoodsBranch.SuccessByGivingGoodsBack;
+        if (!success && branch != GangLeaderNeedsToOffloadStolenGoodsBranch.BetrayalByKeepingGoods &&
+            branch != GangLeaderNeedsToOffloadStolenGoodsBranch.BetrayalByGivingGoodsBack) return false;
         if (!quest._playerHasTheGoods || quest._isPayingForGoods != success || !consumed.Add(quest))
         {
             Logger.Warning("Rejected stolen goods branch {branch} for {quest}", branch, quest.StringId);
@@ -185,6 +187,7 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
         var attacker = mapEvent.AttackerSide.Parties.Any(p => p.Party.MobileParty == ownerParty);
         var defender = mapEvent.DefenderSide.Parties.Any(p => p.Party.MobileParty == ownerParty);
         if (!attacker && !defender) return;
+        if (mapEvent.MapEventSettlement == quest._questHideout) quest._isFightingForGoods = true;
         if (!participants.TryGetValue(mapEvent, out var quests)) participants.Add(mapEvent, quests = new Dictionary<Quest, BattleSideEnum>());
         quests[quest] = attacker ? BattleSideEnum.Attacker : BattleSideEnum.Defender;
     }
