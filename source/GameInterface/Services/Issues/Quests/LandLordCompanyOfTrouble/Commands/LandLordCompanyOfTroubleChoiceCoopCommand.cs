@@ -1,4 +1,5 @@
 ﻿using Common.Commands;
+using System.Linq;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -26,7 +27,7 @@ internal sealed class LandLordCompanyOfTroubleChoiceCoopCommand : ICoopCommand
     public CoopCommandSide Side => CoopCommandSide.Client;
 
     public IExpectedArgs[] ExpectedArgs { get; } = {
-        new ExpectedArgs("choice", "accept (Rhagaea's offer), sell (a lord buys the contract), leave (\"Just leave\"), fight (\"So be it!\") or steal (the daily food theft)."),
+        new ExpectedArgs("choice", "accept (Rhagaea's offer), sell (a lord buys the contract), leave (\"Just leave\"), fight (\"So be it!\"), steal (the daily food theft) or persuade1, persuade2, persuade3 (a persuasion option while selling the contract)."),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -64,6 +65,10 @@ internal sealed class LandLordCompanyOfTroubleChoiceCoopCommand : ICoopCommand
             case "fight":
                 quest.CreateCompanyEnemyParty();
                 return Succeeded("The mercenaries turned hostile");
+            case "persuade1":
+            case "persuade2":
+            case "persuade3":
+                return Persuade(args[0].Substring("persuade".Length));
             case "steal":
                 var food = DescribeFood();
                 if (food == null)
@@ -76,6 +81,20 @@ internal sealed class LandLordCompanyOfTroubleChoiceCoopCommand : ICoopCommand
             default:
                 return Failed($"Unknown choice '{args[0]}'");
         }
+    }
+
+    private static CoopCommandResult Persuade(string option)
+    {
+        var conversation = Campaign.Current.ConversationManager;
+        var optionId = $"company_of_trouble_persuasion_select_option_{option}";
+
+        if (!conversation.CurOptions.Any(sentence => sentence.Id == optionId))
+        {
+            return Failed($"Persuasion option {option} is not on screen");
+        }
+
+        conversation.DoOption(optionId);
+        return Succeeded($"Picked persuasion option {option}");
     }
 
     private static string DescribeFood()
