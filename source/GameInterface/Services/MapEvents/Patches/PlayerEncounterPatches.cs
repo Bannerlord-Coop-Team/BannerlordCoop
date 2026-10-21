@@ -319,6 +319,18 @@ internal class PlayerEncounterPatches
         return false;
     }
 
+    [HarmonyPatch(nameof(PlayerEncounter.Finish))]
+    [HarmonyPrefix]
+    private static bool FinishPrefix()
+    {
+        if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate())
+            return true;
+
+        // Server teardown detaches the party before closing its encounter; receive callbacks must wait for it.
+        var mapEvent = MobileParty.MainParty?.MapEvent;
+        return !mapEvent.IsRaidHostileAction() || mapEvent.IsFinalized;
+    }
+
     // When an open-map encounter finishes on a client (e.g. you close a conversation with a lord party), the
     // player party is usually still engaging that party. PlayerEncounter.Current then becomes null, so on the next
     // tick EncounterManager.HandleEncounterForMobileParty re-fires RestartPlayerEncounter, which we gate and the

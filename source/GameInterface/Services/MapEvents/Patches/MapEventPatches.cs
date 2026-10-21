@@ -138,6 +138,11 @@ internal class MapEventPatches
         if (__instance.IsFinalized)
             return false;
 
+        // A receive callback's AllowedThread does not authorize ending a server-owned raid.
+        if (ModInformation.IsClient && __instance.IsRaidHostileAction() &&
+            !CallOriginalPolicy.IsOriginalAllowedForOwnershipGate())
+            return false;
+
         if (ModInformation.IsServer)
             MessageBroker.Instance.Publish(__instance, new MapEventContributionFlushRequested(__instance));
 
