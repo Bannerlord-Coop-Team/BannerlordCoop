@@ -2,8 +2,6 @@
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using LiteNetLib;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Issues;
@@ -47,7 +45,7 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
             controllerId, caravanId, banditId, quest._isCaravanSaved, quest._vicinityCheckFailCounter, journalCount)) return;
         var journal = quest.JournalEntries.Select(entry => entry.LogText.ToString()).ToArray();
         var state = new State(ownerId, issue.StringId, controllerId, caravanId, banditId,
-            quest._isCaravanSaved, quest._vicinityCheckFailCounter, journalCount, journal);
+            quest._isCaravanSaved, quest._vicinityCheckFailCounter, journalCount);
         published[quest] = state;
         network.Send(peer, new NetworkCaravanAmbushState(ownerId, issue.StringId, controllerId, caravanId,
             banditId, quest._isCaravanSaved, quest._vicinityCheckFailCounter, journal));
@@ -74,7 +72,7 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
         private readonly int journalCount;
 
         public State(string ownerId, string issueId, string controllerId, string caravanId, string banditId,
-            bool saved, int warnings, int journalCount, string[] journal)
+            bool saved, int warnings, int journalCount)
         {
             this.ownerId = ownerId;
             this.issueId = issueId;
@@ -90,6 +88,5 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
             bool saved, int warnings, int journalCount) => this.ownerId == ownerId && this.issueId == issueId &&
             this.controllerId == controllerId && this.caravanId == caravanId && this.banditId == banditId &&
             this.saved == saved && this.warnings == warnings && this.journalCount == journalCount;
-
     }
 }
