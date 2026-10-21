@@ -276,6 +276,12 @@ public class QuestRequestOwnershipTests : IDisposable
         {
             scenario.ClientA.Call(() =>
             {
+                Assert.True(clientQuest._playerHasTheGoods);
+                Assert.False(clientQuest._isPayingForGoods);
+                Assert.True(clientQuest._isFightingForGoods);
+            });
+            scenario.ClientA.Call(() =>
+            {
                 if (giveBack) clientQuest.FailQuestByGivingBackTheGoods();
                 else clientQuest.FailQuestByKeepingTheGoods();
             });
