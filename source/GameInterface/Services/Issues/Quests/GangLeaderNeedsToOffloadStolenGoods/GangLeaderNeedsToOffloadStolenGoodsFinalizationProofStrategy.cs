@@ -64,9 +64,9 @@ internal class GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy : IF
             return false;
         }
 
-        var keepsGoods = branch is GangLeaderNeedsToOffloadStolenGoodsBranch.SuccessByKeepingGoods or
-            GangLeaderNeedsToOffloadStolenGoodsBranch.BetrayalByKeepingGoods;
-        return quest._playerHasTheGoods == keepsGoods;
+        // Vanilla does not clear _playerHasTheGoods when the player gives the goods back,
+        // so that field cannot distinguish the keeping and giving branches.
+        return true;
     }
 
 }
