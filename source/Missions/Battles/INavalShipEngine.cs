@@ -63,6 +63,9 @@ public interface INavalShipEngine
     /// <summary>The hull an on-foot agent stands on: its stepped ship, or a connected plank's source hull; null off ships.</summary>
     MissionObject GetSupportHull(Agent agent);
 
+    /// <summary>The hull's planar footprint in its local frame, from vanilla's physics bounding box; false when it has none.</summary>
+    bool TryGetFootprint(MissionObject hull, out Vec2 min, out Vec2 max);
+
     /// <summary>The hull a usable point belongs to and the point's content path below that hull; false off ships.</summary>
     bool TryDescribeStation(UsableMissionObject point, out MissionObject hull, out string stationKey, out int pointIndex);
 

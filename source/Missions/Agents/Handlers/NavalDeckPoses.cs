@@ -23,6 +23,10 @@ public interface INavalDeckPoses : IShipDeckSeam, IDisposable
 /// <inheritdoc cref="INavalDeckPoses"/>
 public class NavalDeckPoses : INavalDeckPoses
 {
+    // A connected plank reaches past the side of its source hull; vanilla connects a bridge within 10 m
+    // (ShipAttachmentMachine.BridgeConnectedInteractionDistanceSquared = 100).
+    internal const float FootprintMarginMetres = 15f;
+
     private readonly ICoopMissionComponent missionComponent;
     private readonly INavalShipEngine engine;
     private readonly IAgentStationUseReplicator stations;
@@ -72,10 +76,22 @@ public class NavalDeckPoses : INavalDeckPoses
 
         deckLocal = frame.TransformToLocalNonOrthogonal(worldPosition);
         if (!deckLocal.IsValid) return false;
+        // Vanilla's on-ship check has no distance, so a latched stepped ship can report an agent hundreds of metres off it.
+        if (engine.TryGetFootprint(hull, out var min, out var max) && !IsOverFootprint(deckLocal, min, max))
+        {
+            deckLocal = Vec3.Zero;
+            return false;
+        }
 
         deckShip = ship.ShipId;
         return true;
     }
+
+    /// <summary>Whether a hull-local position is over the hull's footprint widened by <see cref="FootprintMarginMetres"/>;
+    /// a pose farther out goes as a world pose, since the copy's small attitude difference times that lever arm misplaces it.</summary>
+    internal static bool IsOverFootprint(Vec3 local, Vec2 min, Vec2 max) =>
+        local.x >= min.x - FootprintMarginMetres && local.x <= max.x + FootprintMarginMetres
+        && local.y >= min.y - FootprintMarginMetres && local.y <= max.y + FootprintMarginMetres;
 
     // Finite difference of hull-local positions, so the puppet's walk throttle never includes hull motion.
     private float DeckSpeed(Guid agentId, Guid shipId, Vec3 local)
