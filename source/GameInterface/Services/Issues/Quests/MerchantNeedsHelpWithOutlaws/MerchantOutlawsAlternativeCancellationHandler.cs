@@ -41,18 +41,16 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
-    private readonly IIssueResolver issueResolver;
     private readonly IAlternativeSolutionTroopValidator troops;
 
     public MerchantOutlawsAlternativeCancellationHandler(IMessageBroker messageBroker, INetwork network,
-        IObjectManager objectManager, IPlayerManager playerManager, IIssueResolver issueResolver,
+        IObjectManager objectManager, IPlayerManager playerManager,
         IAlternativeSolutionTroopValidator troops)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
-        this.issueResolver = issueResolver;
         this.troops = troops;
         messageBroker.Subscribe<MerchantOutlawsAlternativeCancelled>(Handle_Local);
         messageBroker.Subscribe<RequestMerchantOutlawsAlternativeCancellation>(Handle_Request);
@@ -83,9 +81,7 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
         {
             if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out var player) ||
                 !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) ||
-                !issueResolver.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _) ||
-                !(issue is MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssue) ||
-                !issue.IsOngoingWithoutQuest || hero.PartyBelongedTo == null) return;
+                hero.PartyBelongedTo == null) return;
 
             // The roster screen already committed troop removal; declining the follow-up must undo it on the server.
             troops.ReturnTroopsToParty(hero.PartyBelongedTo, data.Troops);

@@ -585,11 +585,12 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, false, false)]
-    [InlineData(true, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(false, true, true)]
-    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker)
+    [InlineData(false, false, false, false)]
+    [InlineData(true, false, false, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, true, true, false)]
+    [InlineData(false, true, false, true)]
+    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker, bool otherAccepts)
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
@@ -653,6 +654,13 @@ public class MerchantOutlawsTests : IDisposable
                 Assert.True(logic.DoneLogic(false));
                 Assert.Equal(sent, issue.AlternativeSolutionSentTroops.GetTroopCount(troop));
             }
+        }, TextHelpers);
+        environment.FlushCoalescer();
+
+        if (otherAccepts) scenario.Accept(ClientB);
+
+        ClientA.Call(() =>
+        {
             var agent = new Mock<IAgent>();
             agent.SetupGet(value => value.Character).Returns(Get<Hero>(ClientA, scenario.NotableId).CharacterObject);
             Campaign.Current.ConversationManager._conversationAgents.Add(agent.Object);
@@ -667,8 +675,9 @@ public class MerchantOutlawsTests : IDisposable
             Server.Call(() =>
             {
                 Assert.Equal(sent + 5, Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId)));
-                Assert.True(Get<Hero>(Server, scenario.NotableId).Issue.IsOngoingWithoutQuest);
+                Assert.Equal(!otherAccepts, Get<Hero>(Server, scenario.NotableId).Issue.IsOngoingWithoutQuest);
             });
+            if (otherAccepts) Assert.Equal(QuestScenario.ControllerB, scenario.OwnerOnServer());
             return;
         }
 
