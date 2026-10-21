@@ -338,9 +338,9 @@ internal class PlayerEncounterPatches
     // SetMoveModeHold to disengage; do the same here so the party stops engaging and the loop ends.
     [HarmonyPatch(nameof(PlayerEncounter.Finish))]
     [HarmonyPostfix]
-    private static void FinishPostfix()
+    private static void FinishPostfix(bool __runOriginal)
     {
-        if (ModInformation.IsServer) return;
+        if (!__runOriginal || ModInformation.IsServer) return;
 
         // The server holds the AI party this player was conversing with; tell it the encounter is over.
         MessageBroker.Instance.Publish(null, new ConversationEnded());
