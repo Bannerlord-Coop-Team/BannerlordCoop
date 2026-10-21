@@ -21,7 +21,7 @@ public interface IRoutedBlowTracker
 }
 
 /// <inheritdoc cref="IRoutedBlowTracker"/>
-public class RoutedBlowTracker : IRoutedBlowTracker, IDisposable
+public class RoutedBlowTracker : IRoutedBlowTracker
 {
     // Per thread because the scope wraps a single synchronous Agent.RegisterBlow call on the game thread.
     private readonly ThreadLocal<RoutedBlow> current = new ThreadLocal<RoutedBlow>();
@@ -37,9 +37,6 @@ public class RoutedBlowTracker : IRoutedBlowTracker, IDisposable
     {
         return new ThreadLocalValueScope<RoutedBlow>(current, new RoutedBlow(attackerWeapon, sourceControllerId));
     }
-
-    /// <summary>Releases the per-thread slot when the owning container is disposed.</summary>
-    public void Dispose() => current.Dispose();
 
     /// <summary>The weapon and source peer of one routed blow.</summary>
     private sealed class RoutedBlow

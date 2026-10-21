@@ -168,7 +168,7 @@ public class AgentHitSoundTests : MissionTestEnvironment
                 call => call.Mission == missions[2].Shell && call.AttackerIndex == -1 && call.VictimIndex == -1);
             Assert.True(AgentMirror.TryGet(victims[0], out var victimMirror));
             Assert.Equal(99f, victimMirror.Health);
-            Assert.Null(clients[1].Resolve<IRoutedBlowTracker>().SourceControllerId);
+            Assert.Null(clients[0].Resolve<IRoutedBlowTracker>().SourceControllerId);
         }
         finally
         {

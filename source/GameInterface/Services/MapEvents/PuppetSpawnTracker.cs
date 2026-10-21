@@ -17,7 +17,7 @@ public interface IPuppetSpawnTracker
 }
 
 /// <inheritdoc cref="IPuppetSpawnTracker"/>
-public class PuppetSpawnTracker : IPuppetSpawnTracker, IDisposable
+public class PuppetSpawnTracker : IPuppetSpawnTracker
 {
     // Per thread because the scope wraps a single synchronous Mission.SpawnAgent call on the game thread.
     private readonly ThreadLocal<bool> spawningPuppet = new ThreadLocal<bool>();
@@ -27,7 +27,4 @@ public class PuppetSpawnTracker : IPuppetSpawnTracker, IDisposable
 
     /// <inheritdoc/>
     public IDisposable BeginPuppetSpawn() => new ThreadLocalValueScope<bool>(spawningPuppet, true);
-
-    /// <summary>Releases the per-thread slot when the owning container is disposed.</summary>
-    public void Dispose() => spawningPuppet.Dispose();
 }

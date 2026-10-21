@@ -14,7 +14,7 @@ public class ReplicatedDeathTrackerTests
     [Fact]
     public void BeginReplicatedDeath_AnswersOnlyForTheDyingAgent()
     {
-        using var tracker = new ReplicatedDeathTracker();
+        var tracker = new ReplicatedDeathTracker();
         var dying = ObjectHelper.SkipConstructor<Agent>();
         var other = ObjectHelper.SkipConstructor<Agent>();
         var affector = ObjectHelper.SkipConstructor<Agent>();
@@ -41,7 +41,7 @@ public class ReplicatedDeathTrackerTests
     [Fact]
     public void BeginReplicatedDeath_NestedScopeRestoresOuterDeath()
     {
-        using var tracker = new ReplicatedDeathTracker();
+        var tracker = new ReplicatedDeathTracker();
         var outer = ObjectHelper.SkipConstructor<Agent>();
         var inner = ObjectHelper.SkipConstructor<Agent>();
 

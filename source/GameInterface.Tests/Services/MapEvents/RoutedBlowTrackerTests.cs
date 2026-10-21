@@ -13,7 +13,7 @@ public class RoutedBlowTrackerTests
     [Fact]
     public void BeginRoutedBlow_RestoresWeaponAndSourceAfterNestedFailure()
     {
-        using var tracker = new RoutedBlowTracker();
+        var tracker = new RoutedBlowTracker();
         var outerWeapon = ObjectHelper.SkipConstructor<WeaponComponentData>();
         var innerWeapon = ObjectHelper.SkipConstructor<WeaponComponentData>();
 
@@ -48,7 +48,7 @@ public class RoutedBlowTrackerTests
     [Fact]
     public void BeginRoutedBlow_SecondDisposeDoesNothing()
     {
-        using var tracker = new RoutedBlowTracker();
+        var tracker = new RoutedBlowTracker();
         var weapon = ObjectHelper.SkipConstructor<WeaponComponentData>();
 
         var first = tracker.BeginRoutedBlow(weapon, "first");

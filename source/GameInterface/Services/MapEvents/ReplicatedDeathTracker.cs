@@ -6,8 +6,8 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.MapEvents;
 
 /// <summary>
-/// Carries the owner's death result while a peer kills its puppet through native damage, so death, kill-feed
-/// and blow code use the owner's affector, killing blow and agent state instead of re-deriving them.
+/// Carries the owner's death result while a peer kills its puppet through native damage, so death and kill-feed
+/// code use the owner's affector, killing blow and agent state instead of re-deriving them.
 /// </summary>
 public interface IReplicatedDeathTracker
 {
@@ -25,7 +25,7 @@ public interface IReplicatedDeathTracker
 }
 
 /// <inheritdoc cref="IReplicatedDeathTracker"/>
-public class ReplicatedDeathTracker : IReplicatedDeathTracker, IDisposable
+public class ReplicatedDeathTracker : IReplicatedDeathTracker
 {
     // Per thread because the scope wraps a single synchronous Agent.RegisterBlow call on the game thread.
     private readonly ThreadLocal<ReplicatedDeath> current = new ThreadLocal<ReplicatedDeath>();
@@ -61,9 +61,6 @@ public class ReplicatedDeathTracker : IReplicatedDeathTracker, IDisposable
         agentState = death.AgentState;
         return true;
     }
-
-    /// <summary>Releases the per-thread slot when the owning container is disposed.</summary>
-    public void Dispose() => current.Dispose();
 
     // Finds the replicated death open on this thread when it belongs to affectedAgent.
     private bool TryGetCurrent(Agent affectedAgent, out ReplicatedDeath death)

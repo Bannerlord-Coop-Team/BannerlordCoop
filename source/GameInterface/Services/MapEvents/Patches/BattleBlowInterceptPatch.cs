@@ -41,8 +41,6 @@ internal class BattleBlowInterceptPatch
         if (AllowedThread.IsThisThreadAllowed()) return true;
 
         if (__instance == null) return true;
-        if (!ContainerProvider.TryResolve<IReplicatedDeathTracker>(out var replicatedDeathTracker)
-            || replicatedDeathTracker.IsReplicatedDeath(__instance)) return true;
 
         // A missile blow credited to a puppet (another client's agent) is the replicated cosmetic siege stone;
         // its owner routes the real agent damage, so drop it here. Wall damage lands on a different path, so the

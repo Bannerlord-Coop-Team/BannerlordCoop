@@ -11,7 +11,7 @@ public class PuppetSpawnTrackerTests
     [Fact]
     public void BeginPuppetSpawn_NestedScopeRestoresOuterSpawn()
     {
-        using var tracker = new PuppetSpawnTracker();
+        var tracker = new PuppetSpawnTracker();
 
         Assert.False(tracker.IsSpawningPuppet);
         using (tracker.BeginPuppetSpawn())
@@ -31,7 +31,7 @@ public class PuppetSpawnTrackerTests
     [Fact]
     public void BeginPuppetSpawn_IsNotVisibleOnOtherThreads()
     {
-        using var tracker = new PuppetSpawnTracker();
+        var tracker = new PuppetSpawnTracker();
 
         using (tracker.BeginPuppetSpawn())
         {

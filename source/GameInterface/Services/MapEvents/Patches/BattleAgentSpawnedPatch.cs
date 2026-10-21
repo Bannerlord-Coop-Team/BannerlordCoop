@@ -21,7 +21,7 @@ namespace GameInterface.Services.MapEvents.Patches;
 internal class BattleAgentSpawnedPatch
 {
     [HarmonyPostfix]
-    private static void Postfix(Agent __result)
+    internal static void Postfix(Agent __result)
     {
         if (!BattleSpawnConfig.Enabled) return;
         if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)

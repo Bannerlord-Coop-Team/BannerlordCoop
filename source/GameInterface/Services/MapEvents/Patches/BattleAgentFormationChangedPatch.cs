@@ -15,13 +15,13 @@ internal class BattleAgentFormationChangedPatch
     }
 
     [HarmonyPostfix]
-    private static void Postfix(Agent __instance, Formation __state)
+    internal static void Postfix(Agent __instance, Formation __state)
     {
         if (!BattleSpawnConfig.Enabled || __state == __instance.Formation) return;
-        if (!ContainerProvider.TryResolve<IPuppetSpawnTracker>(out var puppetSpawnTracker)
-            || puppetSpawnTracker.IsSpawningPuppet) return;
         if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
             || !missionRegistry.IsCoopBattleActive) return;
+        if (!ContainerProvider.TryResolve<IPuppetSpawnTracker>(out var puppetSpawnTracker)
+            || puppetSpawnTracker.IsSpawningPuppet) return;
 
         MessageBroker.Instance.Publish(__instance, new BattleAgentFormationChanged(__instance));
     }
