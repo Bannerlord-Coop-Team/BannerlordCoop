@@ -130,7 +130,7 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
             prefix: new HarmonyMethod(typeof(MangonelLoadReplicationTests), nameof(NotAi)));
         harmony.Patch(AccessTools.PropertySetter(typeof(RangedSiegeWeapon), nameof(RangedSiegeWeapon.State)),
             prefix: new HarmonyMethod(typeof(MangonelLoadReplicationTests), nameof(NativeState)));
-        var patchType = typeof(BattleSpawnGate).Assembly
+        var patchType = typeof(CoopBattleMissionRegistry).Assembly
             .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
         harmony.CreateClassProcessor(patchType).Patch();
         harmony.CreateClassProcessor(typeof(MangonelAmmoConsumedPatch)).Patch();

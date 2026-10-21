@@ -138,7 +138,7 @@ public class SiegeMachineSimulationTests : IDisposable
         Type type, string methodName, string patchName, int expectedChecks, int keptChecks)
     {
         var original = AccessTools.DeclaredMethod(type, methodName);
-        var patchType = typeof(BattleSpawnGate).Assembly
+        var patchType = typeof(CoopBattleMissionRegistry).Assembly
             .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
         var transpiler = AccessTools.Method(patchType, patchName);
         var nativeCheck = AccessTools.PropertyGetter(typeof(GameNetwork), nameof(GameNetwork.IsClientOrReplay));
@@ -272,7 +272,7 @@ public class SiegeMachineSimulationTests : IDisposable
         try
         {
             Assert.False(GameNetwork.IsClientOrReplay);
-            var patchType = typeof(BattleSpawnGate).Assembly
+            var patchType = typeof(CoopBattleMissionRegistry).Assembly
                 .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
             var check = patchType.GetMethod("IsClientForMachine", BindingFlags.Static | BindingFlags.NonPublic);
             Assert.NotNull(check);
@@ -424,7 +424,7 @@ public class SiegeMachineSimulationTests : IDisposable
     private static IEnumerable<CodeInstruction> RamTickWithoutNativeNavigation(
         IEnumerable<CodeInstruction> instructions, ILGenerator generator)
     {
-        var patchType = typeof(BattleSpawnGate).Assembly
+        var patchType = typeof(CoopBattleMissionRegistry).Assembly
             .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
         var patched = (IEnumerable<CodeInstruction>)AccessTools.Method(patchType, "RamOnTickTranspiler")
             .Invoke(null, new object[] { instructions, generator });

@@ -154,6 +154,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PuppetSpawnTracker>().As<IPuppetSpawnTracker>().InstancePerLifetimeScope();
         builder.RegisterType<RoutedBlowTracker>().As<IRoutedBlowTracker>().InstancePerLifetimeScope();
         builder.RegisterType<ReplicatedDeathTracker>().As<IReplicatedDeathTracker>().InstancePerLifetimeScope();
+        builder.RegisterType<RoutedPlayerHitNotificationTracker>().As<IRoutedPlayerHitNotificationTracker>().InstancePerLifetimeScope();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<LocationConversationAgentGuard>().As<ILocationConversationAgentGuard>().InstancePerDependency();
         builder.RegisterType<BattleAgentBudget>().As<IBattleAgentBudget>().InstancePerDependency();

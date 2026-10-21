@@ -485,7 +485,8 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 client.Resolve<IMapEventLogger>(),
                 client.Resolve<IBattleMissionInitializerResolver>(),
                 null!,
-                missionRegistry);
+                missionRegistry,
+                client.Resolve<IRoutedPlayerHitNotificationTracker>());
 
             try
             {
@@ -757,7 +758,8 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 client.Resolve<IMapEventLogger>(),
                 resolver,
                 null!,
-                missionRegistry);
+                missionRegistry,
+                client.Resolve<IRoutedPlayerHitNotificationTracker>());
 
             try
             {

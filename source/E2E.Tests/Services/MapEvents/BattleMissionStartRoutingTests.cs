@@ -43,7 +43,8 @@ public class BattleMissionStartRoutingTests
         var missionRegistry = new CoopBattleMissionRegistry();
         using var messageBroker = new MessageBroker();
         using var handler = new BattleMissionStartHandler(
-            messageBroker, null!, null!, null!, null!, null!, null!, missionRegistry);
+            messageBroker, null!, null!, null!, null!, null!, null!, missionRegistry,
+            new RoutedPlayerHitNotificationTracker());
         missionRegistry.BeginBattle("battle-1");
 
         handler.CloseBattleWindowAfterFailedOpen(battleWindowOpened: true);

@@ -382,7 +382,7 @@ public class CoopDeploymentPatchTests
         return (bool)args[1]!;
     }
 
-    private static Type GetPatchType() => typeof(BattleSpawnGate).Assembly
+    private static Type GetPatchType() => typeof(CoopBattleMissionRegistry).Assembly
         .GetType("GameInterface.Services.MapEvents.Patches.CoopEmptyTeamDeploymentPatch", throwOnError: true)!;
 
     private static MethodInfo GetPatchMethod(string name) =>

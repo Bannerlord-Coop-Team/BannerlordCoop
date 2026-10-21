@@ -6,7 +6,7 @@ using System;
 namespace Coop.Tests.Missions.Battles;
 
 /// <summary>
-/// Installs a container whose coop battle registry has a battle window open, plus the battle call-context trackers,
+/// Installs a container whose coop battle registry has a battle window open, plus the battle call-context and kill-feed trackers,
 /// so patches invoked without an environment see a coop battle. Restores the previous container when disposed.
 /// </summary>
 // GameInterface.Tests holds the copy E2E uses, because Coop.Tests cannot reference it.
@@ -24,6 +24,7 @@ internal sealed class ActiveCoopBattleScope : IDisposable
         builder.RegisterType<PuppetSpawnTracker>().As<IPuppetSpawnTracker>().SingleInstance();
         builder.RegisterType<RoutedBlowTracker>().As<IRoutedBlowTracker>().SingleInstance();
         builder.RegisterType<ReplicatedDeathTracker>().As<IReplicatedDeathTracker>().SingleInstance();
+        builder.RegisterType<RoutedPlayerHitNotificationTracker>().As<IRoutedPlayerHitNotificationTracker>().SingleInstance();
         container = builder.Build();
         Registry = container.Resolve<ICoopBattleMissionRegistry>();
 

@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using TaleWorlds.Core;
 using Xunit;
@@ -19,7 +20,8 @@ public class BattleMissionStartHandlerTests
             null!,
             null!,
             null!,
-            null!);
+            null!,
+            new RoutedPlayerHitNotificationTracker());
 
         var initial = new MissionInitializerRecord("battle_terrain_026")
         {

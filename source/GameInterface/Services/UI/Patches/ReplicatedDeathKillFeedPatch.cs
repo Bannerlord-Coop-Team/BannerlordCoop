@@ -29,8 +29,11 @@ internal class ReplicatedDeathKillFeedPatch
         if (!ContainerProvider.TryResolve<IReplicatedDeathTracker>(out var replicatedDeathTracker)
             || !replicatedDeathTracker.TryGetReplicatedDeath(affectedAgent, out var replicatedAffector, out var replicatedKillingBlow)) return;
 
-        if (replicatedAffector == Agent.Main && affectedAgent.IsHuman && replicatedKillingBlow.IsValid)
-            BattleSpawnGate.RemoveRoutedPlayerHitNotification(affectedAgent, replicatedKillingBlow.InflictedDamage);
+        if (replicatedAffector == Agent.Main
+            && affectedAgent.IsHuman
+            && replicatedKillingBlow.IsValid
+            && ContainerProvider.TryResolve<IRoutedPlayerHitNotificationTracker>(out var notificationTracker))
+            notificationTracker.RemoveRoutedPlayerHitNotification(affectedAgent, replicatedKillingBlow.InflictedDamage);
 
         if (replicatedAffector != null)
             affectorAgent = replicatedAffector;
@@ -51,13 +54,14 @@ internal class RoutedPlayerHitNotificationPatch
     {
         if (!BattleSpawnConfig.Enabled) return;
         if (isMountDamage || __instance.NotificationList.Count == 0) return;
-        if (!BattleSpawnGate.TryGetCurrentRoutedPlayerHit(out var affectedAgent, out int routedDamage)) return;
+        if (!ContainerProvider.TryResolve<IRoutedPlayerHitNotificationTracker>(out var notificationTracker)
+            || !notificationTracker.TryGetCurrentRoutedPlayerHit(out var affectedAgent, out int routedDamage)) return;
         if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
             || !missionRegistry.IsCoopBattleActive) return;
         if (routedDamage != damageAmount) return;
 
         var notification = __instance.NotificationList[__instance.NotificationList.Count - 1];
-        BattleSpawnGate.TrackRoutedPlayerHitNotification(affectedAgent, damageAmount, notification.ExecuteRemove);
+        notificationTracker.TrackRoutedPlayerHitNotification(affectedAgent, damageAmount, notification.ExecuteRemove);
     }
 }
 
@@ -65,20 +69,24 @@ internal class RoutedPlayerHitNotificationPatch
 [HarmonyPatch(typeof(Mission), nameof(Mission.AddCombatLogSafe))]
 internal class RoutedPlayerHitCombatLogPatch
 {
+    // Holds the tracker's lock across vanilla's enqueue, because AddCombatLogSafe can run on several threads.
     [HarmonyPrefix]
-    private static void Prefix(out bool __state)
+    internal static void Prefix(out IRoutedPlayerHitNotificationTracker __state)
     {
-        __state = BattleSpawnConfig.Enabled
-            && ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
-            && missionRegistry.IsCoopBattleActive;
-        if (__state)
-            BattleSpawnGate.BeginCombatLogEnqueue();
+        __state = null;
+        if (!BattleSpawnConfig.Enabled) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return;
+        if (!ContainerProvider.TryResolve(out __state)) return;
+
+        __state.BeginCombatLogEnqueue();
     }
 
+    // Mirrors the entry vanilla just enqueued, marking it when it is the player's hit on a routed puppet.
     [HarmonyPostfix]
-    private static void Postfix(Agent attackerAgent, Agent victimAgent, CombatLogData combatLog, bool __state)
+    internal static void Postfix(Agent attackerAgent, Agent victimAgent, CombatLogData combatLog, IRoutedPlayerHitNotificationTracker __state)
     {
-        if (!__state) return;
+        if (__state == null) return;
 
         bool isRoutedPlayerHit = !AllowedThread.IsThisThreadAllowed()
             && attackerAgent == Agent.Main
@@ -88,14 +96,14 @@ internal class RoutedPlayerHitCombatLogPatch
             && !combatLog.IsFatalDamage
             && combatLog.TotalDamage > 0;
 
-        BattleSpawnGate.EnqueueCombatLogContext(isRoutedPlayerHit ? victimAgent : null, combatLog.TotalDamage);
+        __state.EnqueueCombatLogContext(isRoutedPlayerHit ? victimAgent : null, combatLog.TotalDamage);
     }
 
+    // Releases the lock even when vanilla's enqueue throws.
     [HarmonyFinalizer]
-    private static Exception Finalizer(Exception __exception, bool __state)
+    internal static Exception Finalizer(Exception __exception, IRoutedPlayerHitNotificationTracker __state)
     {
-        if (__state)
-            BattleSpawnGate.EndCombatLogEnqueue();
+        __state?.EndCombatLogEnqueue();
         return __exception;
     }
 }
@@ -104,15 +112,19 @@ internal class RoutedPlayerHitCombatLogPatch
 [HarmonyPatch(typeof(CombatLogManager), nameof(CombatLogManager.GenerateCombatLog))]
 internal class RoutedPlayerHitCombatLogContextPatch
 {
+    // Exposes the mirror of the combat log vanilla is about to publish.
     [HarmonyPrefix]
-    private static void Prefix()
+    internal static void Prefix(out IRoutedPlayerHitNotificationTracker __state)
     {
-        BattleSpawnGate.BeginCombatLog();
+        if (!ContainerProvider.TryResolve(out __state)) return;
+
+        __state.BeginCombatLog();
     }
 
+    // Clears the exposed routed hit once vanilla has published the log.
     [HarmonyPostfix]
-    private static void Postfix()
+    internal static void Postfix(IRoutedPlayerHitNotificationTracker __state)
     {
-        BattleSpawnGate.EndCombatLog();
+        __state?.EndCombatLog();
     }
 }

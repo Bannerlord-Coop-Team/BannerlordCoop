@@ -37,8 +37,8 @@ internal class BattleTroopSupplierInjectionPatch
         // for any spawn logic the native path constructs while a coop battle is active.
         if (suppliers.Length > 0 && suppliers[0] is CoopTroopSupplier) return;
 
-        // No DI here (static patch), so resolve the object manager and BR-110 agent budget ONCE and hand them
-        // to the suppliers (they no longer hit the service locator per agent on the supply path).
+        // Resolve the object manager and BR-110 agent budget ONCE and hand them to the suppliers, so they
+        // don't hit the service locator per agent on the supply path.
         ContainerProvider.TryResolve<IObjectManager>(out var objectManager);
         ContainerProvider.TryResolve<IBattleAgentBudget>(out var agentBudget);
 

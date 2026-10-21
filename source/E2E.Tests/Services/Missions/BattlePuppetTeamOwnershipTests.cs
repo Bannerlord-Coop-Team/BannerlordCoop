@@ -156,7 +156,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
         var harmony = new Harmony(harmonyId);
         try
         {
-            var patchType = typeof(BattleSpawnGate).Assembly.GetType(
+            var patchType = typeof(CoopBattleMissionRegistry).Assembly.GetType(
                 "GameInterface.Services.MapEvents.Patches.CoopPlayerAllyTeamPatch");
             Assert.NotNull(patchType);
             harmony.CreateClassProcessor(patchType).Patch();

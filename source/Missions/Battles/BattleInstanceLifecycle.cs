@@ -54,6 +54,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
     private readonly IBattleSession session;
     private readonly IMissionContext missionContext;
     private readonly ICoopBattleMissionRegistry missionRegistry;
+    private readonly IRoutedPlayerHitNotificationTracker notificationTracker;
     private bool healthReported;
     private readonly Dictionary<string, Dictionary<int, float>> healthByParty = new();
     private readonly Dictionary<string, Dictionary<int, float>> routedByParty = new();
@@ -68,7 +69,8 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
         INetworkWorldItemRegistry worldItemRegistry,
         IBattleSession session,
         IMissionContext missionContext,
-        ICoopBattleMissionRegistry missionRegistry)
+        ICoopBattleMissionRegistry missionRegistry,
+        IRoutedPlayerHitNotificationTracker notificationTracker)
     {
         this.network = network;
         this.relayNetwork = relayNetwork;
@@ -79,6 +81,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
         this.session = session;
         this.missionContext = missionContext;
         this.missionRegistry = missionRegistry;
+        this.notificationTracker = notificationTracker;
 
         messageBroker.Subscribe<PlayerEnteredBattle>(Handle_PlayerEnteredBattle);
         messageBroker.Subscribe<NetworkMissionLeft>(Handle_LeaveMission);
@@ -132,7 +135,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
     {
         ReportFinalHealth();
         missionRegistry.EndBattle();
-        BattleSpawnGate.ResetCombatFeedback();
+        notificationTracker.Reset();
 
         if (session.HasInstance)
         {

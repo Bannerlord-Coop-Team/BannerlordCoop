@@ -105,7 +105,6 @@ public class E2ETestEnvironment : IDisposable
     {
         ServerBattleModeArbiter.Reset();
         BattleModeRegistry.End();
-        BattleSpawnGate.ResetCombatFeedback();
         BattleSimulationReplay.Reset();
     }
 
