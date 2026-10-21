@@ -683,6 +683,44 @@ public class LadysKnightOutTests : IDisposable
     }
 
     [Fact]
+    public void LordCompletionInsideSettlementReplayStillRunsOnTheServer()
+    {
+        PrepareLordSolution();
+        IssueBase ownerIssue = null!;
+        var previousStates = GameStateManager.Current;
+        try
+        {
+            scenario.ClientA.Call(() =>
+            {
+                Campaign.Current.ConversationManager.IsConversationInProgress = true;
+                ownerIssue = scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+                using (new IssueDifficultyOverride(0.1f)) ownerIssue.StartIssueWithLordSolution();
+                Campaign.Current.ConversationManager.IsConversationInProgress = false;
+                var states = Game.Current.GameStateManager;
+                states._gameStates.Add(states.CreateState<MapState>());
+                GameStateManager._current = states;
+                using (new AllowedThread()) ownerIssue.BeforeGameMenuOpened(null);
+            });
+
+            var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+            Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
+            Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
+            environment.FlushCoalescer();
+            scenario.Server.Call(() =>
+            {
+                Assert.Null(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
+                Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var owner));
+                Assert.Equal(82, scenario.Server.GetRegisteredObject<Hero>(owner.HeroId).Clan.Influence);
+                Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerB, out var other));
+                Assert.Equal(0, scenario.Server.GetRegisteredObject<Hero>(other.HeroId).Clan.Influence);
+            });
+            scenario.ClientA.Call(() => Assert.Equal(2, ownerIssue.JournalEntries.Count));
+            scenario.ClientB.Call(() => Assert.Null(scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
+        }
+        finally { GameStateManager._current = previousStates; }
+    }
+
+    [Fact]
     public void AStaleDirectAcceptCannotOverwriteAKnownLordOwner()
     {
         PrepareLordSolution();
