@@ -189,7 +189,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     // This is the one point where an empty side becomes intentional rather than merely late. Record exactly
     // which reserve timed out so the controller can eventually release BattleEndLogic and the depletion patch
     // can call only that side depleted; the populated side must still field an agent.
-    private void AcceptMissingReserveSides(SideSizing sizing)
+    internal void AcceptMissingReserveSides(SideSizing sizing)
     {
         if (sizing.Ready) return;
         if (!sizing.DefenderPopulated)

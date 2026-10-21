@@ -9,7 +9,7 @@ namespace Coop.Tests.Missions.Battles;
 /// Installs a container whose coop battle registry has a battle window open, so patches invoked without an
 /// environment see a coop battle. Holds the container slot until disposed, then restores the previous one.
 /// </summary>
-internal sealed class ActiveCoopBattleScope : IDisposable
+public sealed class ActiveCoopBattleScope : IDisposable
 {
     private readonly IContainer container;
     private readonly IDisposable containerUse;

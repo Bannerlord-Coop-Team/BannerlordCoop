@@ -43,7 +43,7 @@ internal class BattleMissionEntryPatch
     // reports mission-ready (BattleHostHandler). BeginBattle only marks the coop battle active for the
     // spawn/battle patches.
     [HarmonyPrefix]
-    private static void Prefix()
+    internal static void Prefix()
     {
         if (ModInformation.IsServer) return;
         if (!BattleSpawnConfig.Enabled) return;

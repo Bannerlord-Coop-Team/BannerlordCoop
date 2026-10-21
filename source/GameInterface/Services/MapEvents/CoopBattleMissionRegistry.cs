@@ -35,7 +35,10 @@ public interface ICoopBattleMissionRegistry
     /// <summary>Opens the battle window for <paramref name="mapEventId"/> and clears any reserve timeouts.</summary>
     void BeginBattle(string mapEventId);
 
-    /// <summary>Closes the battle window and clears any reserve timeouts. Repeated calls do nothing extra.</summary>
+    /// <summary>
+    /// Closes the battle window and clears any reserve timeouts. Not keyed like <see cref="EndMission"/>, because its
+    /// only callers (leaving the battle, or a failed open) both mean no coop battle should stay active.
+    /// </summary>
     void EndBattle();
 
     /// <summary>

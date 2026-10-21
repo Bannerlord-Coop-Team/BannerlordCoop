@@ -6,7 +6,7 @@ using Common;
 using Common.Commands;
 using Common.Util;
 using GameInterface.Services.MapEvents;
-using GameInterface.Tests.Services.MapEvents;
+using Coop.Tests.Missions.Battles;
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using TaleWorlds.Core;

@@ -23,6 +23,7 @@ public class CoopBattleReserveTimeoutTests : MissionTestEnvironment
 
     public CoopBattleReserveTimeoutTests(ITestOutputHelper output) : base(output) { }
 
+    // A defender reserve timeout accepted on one instance depletes that side there and nowhere else.
     [Fact]
     public void AcceptedMissingReserve_IsDepletedOnlyOnTheAcceptingInstance()
     {
@@ -41,8 +42,7 @@ public class CoopBattleReserveTimeoutTests : MissionTestEnvironment
             var sizing = new CoopBattleMissionSpawnHandler.SideSizing(
                 defenderPopulated: false, attackerPopulated: true, defenderOwned: 0, attackerOwned: 5,
                 battleSize: 1000);
-            AccessTools.Method(typeof(CoopBattleMissionSpawnHandler), "AcceptMissingReserveSides")
-                .Invoke(handler, new object[] { sizing });
+            handler.AcceptMissingReserveSides(sizing);
 
             Assert.True(IsSideDepleted(BattleSideEnum.Defender));
             Assert.False(IsSideDepleted(BattleSideEnum.Attacker));
