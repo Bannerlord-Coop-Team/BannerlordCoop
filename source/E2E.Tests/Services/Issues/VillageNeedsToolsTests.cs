@@ -20,6 +20,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -495,9 +496,12 @@ public class VillageNeedsToolsTests : IDisposable
         }
     }
 
-    [Fact]
-    public void AlternativeSolution_ChargesTheOwnerAndReturnsTroopsWithTheVanillaReward()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AlternativeSolution_ChargesTheOwnerAndReturnsTroopsWithTheVanillaReward(bool exchange)
     {
+        if (exchange) SetExchangeOffer();
         var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var otherGoldBefore = 0;
@@ -584,13 +588,42 @@ public class VillageNeedsToolsTests : IDisposable
             });
         }
 
-        Server.Call(() =>
+        Issue ownerIssue = null;
+        ClientA.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
-            notable.Issue._failureChance = 0f;
-            notable.Issue.CompleteIssueWithAlternativeSolution();
-        }, AlternativeSolutionLogTexts);
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            ownerIssue = (Issue)notable.Issue;
+        });
+        var successLogGetter = AccessTools.PropertyGetter(typeof(Issue), nameof(Issue.IssueAlternativeSolutionSuccessLog));
+        var journalHarmony = new Harmony("bannerlordcoop.3766.companion-ending-journal-test");
+        journalHarmony.Patch(successLogGetter,
+            prefix: new HarmonyMethod(typeof(VillageNeedsToolsTests), nameof(GetAlternativeSuccessLogPrefix)));
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+                notable.Issue._failureChance = 0f;
+                notable.Issue.CompleteIssueWithAlternativeSolution();
+            }, AlternativeSolutionLogTexts.Where(method => method != successLogGetter));
+        }
+        finally
+        {
+            journalHarmony.Unpatch(successLogGetter, HarmonyPatchType.Prefix, journalHarmony.Id);
+        }
         TestEnvironment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            Assert.Contains(ownerIssue.JournalEntries, entry => entry.LogText?.ToString() == "Your companion delivered the promised tools.");
+            var archived = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs(
+                (JournalLogEntry log) => log.IsRelatedTo(ownerIssue)));
+            Assert.True(archived.IsEnded());
+            Assert.False(archived.IsEndedUnsuccessfully());
+            Assert.Contains(archived.GetEntries(), entry => entry.LogText?.ToString() == "Your companion delivered the promised tools.");
+        });
+        ClientB.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs(
+            (JournalLogEntry log) => log.RelatedHero.StringId == ownerIssue.IssueOwner.StringId)));
 
         foreach (var instance in Instances)
         {
@@ -931,6 +964,12 @@ public class VillageNeedsToolsTests : IDisposable
     private static bool GetSuccessLogPrefix(ref TaleWorlds.Localization.TextObject __result)
     {
         __result = new TaleWorlds.Localization.TextObject("{=!}You brought the promised tools.");
+        return false;
+    }
+
+    private static bool GetAlternativeSuccessLogPrefix(ref TaleWorlds.Localization.TextObject __result)
+    {
+        __result = new TaleWorlds.Localization.TextObject("{=!}Your companion delivered the promised tools.");
         return false;
     }
 }
