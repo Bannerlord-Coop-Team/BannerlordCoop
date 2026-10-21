@@ -889,9 +889,10 @@ public class VillageHostileActionTests : MapEventTestBase
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void RaidFinalization_ClientReceiveScopeWaitsForServer(bool finishEncounter)
+    [InlineData("finalize")]
+    [InlineData("finish")]
+    [InlineData("stale-reply")]
+    public void RaidFinalization_ClientActionsWaitForServer(string action)
     {
         var owner = Clients.First();
         var (heroId, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
@@ -940,6 +941,8 @@ public class VillageHostileActionTests : MapEventTestBase
             {
                 Campaign.Current.MainParty = party;
                 settlement.SetSettlementComponent(settlement.Village);
+                settlement.GatePosition = new CampaignVec2(new Vec2(42f, 24f), true);
+                party.Position = new CampaignVec2(new Vec2(40f, 24f), true);
             }
             var mapEvent = events[owner];
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
@@ -947,20 +950,29 @@ public class VillageHostileActionTests : MapEventTestBase
             encounter.ForceRaid = true;
             Campaign.Current.PlayerEncounter = encounter;
             Campaign.Current.MapStateData.GameMenuId = "raiding_village";
+            var raidPosition = party.Position;
 
             // Campaign ticks are blocked, but receive callbacks must not bypass raid authority either.
             mapEvent.Update();
-            using (new AllowedThread())
+            if (action == "stale-reply")
             {
-                if (finishEncounter)
-                    PlayerEncounter.Finish(true);
-                else
-                    mapEvent.FinalizeEvent();
+                owner.SimulateMessage(Server.NetPeer, new NetworkMapEventFinalized());
+            }
+            else
+            {
+                using (new AllowedThread())
+                {
+                    if (action == "finish")
+                        PlayerEncounter.Finish(true);
+                    else
+                        mapEvent.FinalizeEvent();
+                }
             }
 
             Assert.False(mapEvent.IsFinalized);
             Assert.Same(mapEvent, party.MapEvent);
             Assert.Same(encounter, PlayerEncounter.Current);
+            Assert.Equal(raidPosition, party.Position);
             Assert.Equal("raiding_village", Campaign.Current.MapStateData.GameMenuId);
         }, disabledMethods);
 
