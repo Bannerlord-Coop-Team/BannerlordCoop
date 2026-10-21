@@ -388,8 +388,10 @@ public class SiegeMachineSimulationTests : IDisposable
     }
 
     // A received placement re-runs vanilla Disband/Deploy under AllowedThread, so the capture patch doesn't echo it.
-    [Fact]
-    public void ReceivedPlacementApply_RunsVanillaInsideAllowedThread()
+    [Theory]
+    [InlineData(null)]
+    [InlineData(nameof(Ballista))]
+    public void ReceivedPlacementApply_RunsVanillaInsideAllowedThread(string? weaponTypeName)
     {
         using var mission = new MissionCurrentScope();
         AccessTools.Property(typeof(Mission), nameof(Mission.CurrentState))
@@ -399,7 +401,12 @@ public class SiegeMachineSimulationTests : IDisposable
             .SetValue(point, Uninitialized<Ballista>());
         ((ICollection<MissionObject>)mission.Instance.MissionObjects).Add(point);
         disbandRanAllowed = null;
+        deployRanAllowed = null;
         Stub(AccessTools.Method(typeof(DeploymentPoint), nameof(DeploymentPoint.Disband)), nameof(RecordDisband));
+        Stub(AccessTools.Method(typeof(DeploymentPoint), nameof(DeploymentPoint.Deploy), new[] { typeof(Type) }),
+            nameof(RecordDeploy));
+        Stub(AccessTools.PropertyGetter(typeof(DeploymentPoint), nameof(DeploymentPoint.DeployableWeaponTypes)),
+            nameof(DeployableBallista));
         var session = new Mock<IBattleSession>();
         using var replicator = new SiegeEngineDeploymentReplicator(Mock.Of<IBattleNetwork>(),
             new TestMessageBroker(), session.Object, new HostEpochPolicy());
@@ -407,13 +414,30 @@ public class SiegeMachineSimulationTests : IDisposable
             .GetMethod("TryApplyPlacement", BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(apply);
 
-        Assert.True((bool)apply.Invoke(replicator, new object[] { point.Id.Id, null }));
+        Assert.True((bool)apply.Invoke(replicator, new object[] { point.Id.Id, weaponTypeName }));
 
         Assert.True(disbandRanAllowed);
+        Assert.Equal(weaponTypeName == null ? null : (bool?)true, deployRanAllowed);
         Assert.False(AllowedThread.IsThisThreadAllowed());
     }
 
+    private static bool? deployRanAllowed;
+    // Records whether the received Deploy ran inside AllowedThread and skips the native deploy.
+    private static bool RecordDeploy()
+    {
+        deployRanAllowed = AllowedThread.IsThisThreadAllowed();
+        return false;
+    }
+
+    // Offers a ballista without reading the uninitialized point's weapon list.
+    private static bool DeployableBallista(ref IEnumerable<Type> __result)
+    {
+        __result = new[] { typeof(Ballista) };
+        return false;
+    }
+
     private static bool? disbandRanAllowed;
+    // Records whether the received Disband ran inside AllowedThread and skips the native disband.
     private static bool RecordDisband(ref ScriptComponentBehavior __result)
     {
         disbandRanAllowed = AllowedThread.IsThisThreadAllowed();
