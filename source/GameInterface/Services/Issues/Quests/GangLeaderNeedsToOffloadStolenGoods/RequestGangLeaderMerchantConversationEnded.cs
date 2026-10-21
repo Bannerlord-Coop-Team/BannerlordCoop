@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsToOffloadStolenGoods;
 
 [ProtoContract(SkipConstructor = true)]
-internal readonly struct RequestGangLeaderMerchantConversationEnded : ICommand
+public readonly struct RequestGangLeaderMerchantConversationEnded : ICommand
 {
     [ProtoMember(1)] public readonly string IssueOwnerId;
     [ProtoMember(2)] public readonly string IssueId;
