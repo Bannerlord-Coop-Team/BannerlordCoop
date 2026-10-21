@@ -1,6 +1,8 @@
 ﻿using System;
 using Common.Commands;
 using Common;
+using GameInterface.Services.Heroes.Interfaces;
+using System.IO;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -25,6 +27,20 @@ namespace GameInterface.Services.Save.Commands
 
         public sealed class SaveSaveAsCoopCommand : ICoopCommand
         {
+            private readonly ISaveInterface saves;
+
+            public SaveSaveAsCoopCommand(ISaveInterface saves)
+            {
+                this.saves = saves;
+            }
+
+            private byte[] ReadFile(string name)
+            {
+                try { return saves.ReadSaveFile(name); }
+                catch (FileNotFoundException) { return null; }
+                catch (DirectoryNotFoundException) { return null; }
+            }
+
             public string Prefix => "coop.debug.save";
 
             public string Name => "save_as";
@@ -45,14 +61,32 @@ namespace GameInterface.Services.Save.Commands
                 if (!SafeSaveName.IsMatch(args[0]))
                     return Failed("Save name must contain 1 through 64 letters, digits, underscores, or hyphens.");
 
-                SaveHandler saveHandler = Campaign.Current?.SaveHandler;
-                if (saveHandler == null)
+                if (!saves.CanQueueSave)
                     return Failed("No active campaign / SaveHandler.");
-                if (saveHandler.IsSaving)
+                if (saves.IsSaving)
                     return Failed("A save is already queued.");
 
-                saveHandler.SaveAs(args[0]);
-                return Succeeded($"Enqueued save as {args[0]} on the server.");
+                string name = args[0];
+                try
+                {
+                    // A fresh name prevents an old pair from hiding a suppressed or failed write.
+                    if (ReadFile(name + ".sav") != null || ReadFile(name + ".json") != null)
+                        return Failed("Save name already exists. Choose a fresh name.");
+
+                    var result = saves.SaveCurrentGameToFile(name);
+                    if (!result.Success || result.Data == null || result.Data.Length == 0)
+                        return Failed("Campaign save was not written.");
+                    var campaign = ReadFile(name + ".sav");
+                    var sidecar = ReadFile(name + ".json");
+                    if (campaign == null || campaign.Length == 0 || sidecar == null || sidecar.Length == 0)
+                        return Failed("Save pair is incomplete; both .sav and .json are required.");
+
+                    return Succeeded($"Saved {name}.sav ({campaign.Length} bytes) and {name}.json ({sidecar.Length} bytes).");
+                }
+                catch (Exception exception)
+                {
+                    return Failed("Save failed: " + exception.Message);
+                }
             }
         }
 
