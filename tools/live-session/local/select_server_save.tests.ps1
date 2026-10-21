@@ -16,5 +16,8 @@ try {
     $actual = Get-Content $config -Raw | ConvertFrom-Json
     if ($actual.saveName -ne 'proof' -or $actual.port -ne 4200) { throw 'Selection failed or changed other settings.' }
     if (@(Get-ChildItem $root -Filter '*.bak-*').Count -ne 1) { throw 'Config backup missing.' }
+    Remove-Item -LiteralPath $config
+    & $subject -PreparationLog $log -SaveName proof
+    if ((Get-Content $config -Raw | ConvertFrom-Json).saveName -ne 'proof') { throw 'Fresh prepared data must support save selection before launcher seeds config.' }
     'PASS save selector: missing save rejected, selected save applied, other config preserved, backup retained'
 } finally { Remove-Item -LiteralPath $root -Recurse -Force }

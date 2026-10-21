@@ -14,9 +14,12 @@ foreach ($extension in @('sav','json')) {
     }
 }
 $configPath = Join-Path $data 'server-config.json'
-$original = [IO.File]::ReadAllText($configPath)
-$config = ($original -replace '(?m)^\s*//.*$', '') | ConvertFrom-Json
-$config.saveName = $SaveName
-[IO.File]::WriteAllText("$configPath.bak-$([DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfff'))", $original)
+$config = [pscustomobject]@{ saveName = $SaveName }
+if (Test-Path -LiteralPath $configPath -PathType Leaf) {
+    $original = [IO.File]::ReadAllText($configPath)
+    $config = ($original -replace '(?m)^\s*//.*$', '') | ConvertFrom-Json
+    $config | Add-Member -NotePropertyName saveName -NotePropertyValue $SaveName -Force
+    [IO.File]::WriteAllText("$configPath.bak-$([DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfff'))", $original)
+}
 [IO.File]::WriteAllText($configPath, ($config | ConvertTo-Json -Depth 20), [Text.UTF8Encoding]::new($false))
 [ordered]@{ saveName=$SaveName; serverData=$data; configPath=$configPath } | ConvertTo-Json -Compress
