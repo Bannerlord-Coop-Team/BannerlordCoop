@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Coalescing;
 using GameInterface.Services.Heroes.Messages.LordConversations;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -19,6 +20,7 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
+    private readonly IPlayerManager playerManager;
 
     private const int PrisonerLiberationRelationReward = 10;
     private const int LetLordGoReward = 4;
@@ -26,11 +28,13 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
     public LordConversationsCampaignBehaviorHandler(
         IObjectManager objectManager,
         INetwork network,
-        IMessageBroker messageBroker)
+        IMessageBroker messageBroker,
+        IPlayerManager playerManager)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<LiberateLordPrisoner>(Handle_LiberateLordPrisoner);
         messageBroker.Subscribe<NetworkLiberateLordPrisoner>(Handle_NetworkLiberateLordPrisoner);
@@ -80,6 +84,7 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var playerHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
             if (!conversationHero.IsPrisoner) return;
@@ -154,6 +159,7 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
 
@@ -185,6 +191,7 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.ConversationHeroId, out var conversationHero)) return;
             if (!conversationHero.IsPrisoner) return;
