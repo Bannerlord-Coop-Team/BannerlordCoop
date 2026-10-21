@@ -411,6 +411,18 @@ public class HeadmanNeedsGrainTests : IDisposable
     private static bool SkipMapCharacterSwitch() => false;
 
     [Fact]
+    public void JoinReady_RefreshesCompanionFundingAfterTheServerCachedItsPrice()
+    {
+        Server.Call(() => Campaign.Current.GetCampaignBehavior<Behavior>()._averageGrainPriceInCalradia = 18);
+        ClientA.Call(() => Campaign.Current.GetCampaignBehavior<Behavior>()._averageGrainPriceInCalradia = 0);
+        ClientA.SimulateMessage(this, new GameInterface.Registry.Messages.AllGameObjectsRegistered());
+        environment.FlushCoalescer();
+        var expected = 0;
+        Server.Call(() => expected = IssueHere(Server).AlternativeSolutionNeededGold);
+        Assert.True(expected > 0);
+        ClientA.Call(() => Assert.Equal(expected, IssueHere(ClientA).AlternativeSolutionNeededGold));
+    }
+    [Fact]
     public void LateJoin_LoadsAverageGrainPriceWithoutAnIssueCreationPayload()
     {
         var records = new Dictionary<string, object>();
