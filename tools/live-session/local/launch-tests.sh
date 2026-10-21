@@ -36,7 +36,7 @@ cat > "$tmp/start-test.sh" <<'START'
 set -euo pipefail
 out=$1; reused=$2; steps=start; server_save=proof; hidden=unused; powershell=unused
 prepare=(unused); run_token=owned-run; head=abc; tree=def
-wslpath() { printf '%s\n' "$2"; }
+cygpath() { printf '%s\n' "$2"; }
 step() { if [[ $1 == dedicated-start ]]; then printf 'startedPid=123 reused=%s\n' "$reused" > "$out/dedicated-start.stdout.log"; fi; }
 source "$out/start-body.sh"
 START

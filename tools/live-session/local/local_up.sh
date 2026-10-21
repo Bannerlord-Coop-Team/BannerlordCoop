@@ -48,7 +48,7 @@ for s in $steps; do case $s in
             --dedicated-server-inputs-root "$inputs" --expected-dedicated-server-tree "$dedicated_tree" \
             --expected-dedicated-server-ensure-script-sha256 "$ensure_sha" --expected-dedicated-server-run-windows-script-sha256 "$run_sha" ;;
   start) if [[ -n "$server_save" ]]; then
-            step select-save "$hidden" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -File "$(wslpath -w "$(dirname "$0")/select_server_save.ps1")" -PreparationLog "$(wslpath -w "$out/dedicated-prepare.stdout.log")" -SaveName "$server_save"
+            step select-save "$hidden" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -File "$(cygpath -w "$(dirname "$0")/select_server_save.ps1")" -PreparationLog "$(cygpath -w "$out/dedicated-prepare.stdout.log")" -SaveName "$server_save"
           fi
           step dedicated-start "${prepare[@]}" --start
           if [[ -n "$server_save" ]] && grep -Eq 'startedPid=[0-9]+ reused=true' "$out/dedicated-start.stdout.log"; then
@@ -56,12 +56,12 @@ for s in $steps; do case $s in
             exit 1
           fi ;;
   readiness) step dedicated-readiness timeout 660s "$hidden" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass \
-            -File "$(wslpath -w "$skill/verify_local_dedicated_server_readiness.ps1")" \
-            -DedicatedServerRoot "$(wslpath -w "$dedicated_root")" -InputsRoot "$(wslpath -w "$inputs")" \
+            -File "$(cygpath -w "$skill/verify_local_dedicated_server_readiness.ps1")" \
+            -DedicatedServerRoot "$(cygpath -w "$dedicated_root")" -InputsRoot "$(cygpath -w "$inputs")" \
             -ExpectedRunToken "$run_token" -ExpectedServerHead "$dedicated_head" -ExpectedServerTree "$dedicated_tree" \
             -ExpectedCoopHead "$head" -ExpectedCoopTree "$tree" -ExpectedEnsureScriptSha256 "$ensure_sha" \
             -ExpectedRunWindowsScriptSha256 "$run_sha" -PreparationStartedUtc "$(date -u +%Y-%m-%dT%H:%M:%SZ -d '-30 min')" \
-            -ArtifactPath "$(wslpath -w "$out/dedicated-readiness.json")" -TimeoutSeconds 600 ;;
+            -ArtifactPath "$(cygpath -w "$out/dedicated-readiness.json")" -TimeoutSeconds 600 ;;
   *) echo "unknown step $s"; exit 2 ;;
 esac; done
 echo "LOCAL_UP_DONE token=$run_token head=$head tree=$tree"

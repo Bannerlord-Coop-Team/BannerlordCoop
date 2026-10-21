@@ -31,11 +31,11 @@ public static class LogManager
 #if DEBUG
     internal static void ConfigureDedicatedLiveTestLog(LoggerConfiguration configuration, string[] arguments)
     {
-        if (Array.IndexOf(arguments, "/dedicatedcustomserver") < 0 ||
-            Array.IndexOf(arguments, "/cooptestrun") < 0)
+        if (Array.FindIndex(arguments, value => string.Equals(value, "/dedicatedcustomserver", StringComparison.OrdinalIgnoreCase)) < 0 ||
+            Array.FindIndex(arguments, value => string.Equals(value, "/cooptestrun", StringComparison.OrdinalIgnoreCase)) < 0)
             return;
 
-        var logArgument = Array.IndexOf(arguments, "/cooptestlog");
+        var logArgument = Array.FindIndex(arguments, value => string.Equals(value, "/cooptestlog", StringComparison.OrdinalIgnoreCase));
         if (logArgument < 0 || logArgument + 1 >= arguments.Length ||
             !Path.IsPathRooted(arguments[logArgument + 1]))
             return;

@@ -379,11 +379,13 @@ function Enter-LiveTestEngineProfile {
 function Exit-LiveTestEngineProfile {
     param([Parameter(Mandatory = $true)] $Lease)
 
+    if ($Lease.PSObject.Properties['Exited'] -and $Lease.Exited) { return }
     $lockPath = "$($Lease.ConfigPath).codex-live-test.lock"
     $gateStream = Open-LiveTestEngineProfileGate -Path "$lockPath.gate" -Deadline ([DateTime]::UtcNow.AddSeconds(30))
     if ($null -ne $Lease.LockStream) { $Lease.LockStream.Dispose(); $Lease.LockStream = $null }
     try { $Lease.LockStream = [IO.File]::Open($lockPath, 'Open', 'ReadWrite', 'None') }
     catch [IO.IOException] {
+        $Lease | Add-Member -NotePropertyName Exited -NotePropertyValue $true -Force
         $gateStream.Dispose()
         return
     }
@@ -430,6 +432,7 @@ function Exit-LiveTestEngineProfile {
         if ($null -ne $Lease.LockStream) {
             $Lease.LockStream.Dispose()
         }
+        $Lease | Add-Member -NotePropertyName Exited -NotePropertyValue $true -Force
         $gateStream.Dispose()
     }
 

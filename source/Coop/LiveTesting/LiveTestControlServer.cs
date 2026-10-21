@@ -761,7 +761,9 @@ namespace Coop.LiveTesting
                         false);
                 }
 
-                bool started = startAsClient();
+                bool started;
+                try { started = startAsClient(); }
+                catch { clientJoinState.CompleteStart(false); throw; }
                 clientJoinState.CompleteStart(started);
                 Logger.Information("[LiveTest] Deferred StartAsClient() returned {Started}", started);
                 return Success(request.Id, new

@@ -18,7 +18,7 @@ public class LoggingTests
             File.WriteAllText(path, "launcher banner");
             var configuration = new LoggerConfiguration();
             LogManager.ConfigureDedicatedLiveTestLog(configuration, new[] {
-                "dotnet", "/dedicatedcustomserver", "7210", "/cooptestrun", "logging-proof", "/cooptestlog", path });
+                "dotnet", "/DedicatedCustomServer", "7210", "/CoopTestRun", "logging-proof", "/CoopTestLog", path });
             using (var logger = configuration.CreateLogger())
                 logger.Debug(new InvalidOperationException("fixture exception"), "server marker");
 

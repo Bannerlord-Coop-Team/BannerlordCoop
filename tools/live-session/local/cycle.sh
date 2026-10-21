@@ -34,7 +34,7 @@ LOCAL_SERVER_SAVE="$server_save" bash "$here/local_up.sh" "$root" "$base" "issue
   'Get-CimInstance Win32_Process | Where-Object { $_.Name -eq "VBCSCompiler.exe" -or ($_.CommandLine -match "MSBuild\.(dll|exe)" -and $_.CommandLine -match "nodemode") } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }' || true
 # Start the clients outside this process tree: an agent's shell tool kills everything it started when its call returns,
 # and that took `nohup ... &` with it, leaving runs with a server and no clients (2026-10-19, #3979 up1, #3810, #3954).
-[[ $out != *[\'\"\ ]* ]] || { echo "out dir must not contain quotes or spaces: $out" >&2; exit 2; }
+[[ $out =~ ^[A-Za-z0-9_./:@-]+$ && $here =~ ^[A-Za-z0-9_./:@-]+$ ]] || { echo 'orchestration and output paths must contain only letters, digits, underscores, dots, slashes, colons, @ or hyphens' >&2; exit 2; }
 client_pid=$("$hidden" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass \
   -File "$(cygpath -w "$here/detach_hidden.ps1")" \
   -CommandLine "\"$(cygpath -w "$(command -v bash)")\" -lc 'bash $here/clients_up.sh $out visual >$out/clients.log 2>&1'" | tr -d '\r')

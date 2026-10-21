@@ -108,11 +108,13 @@ try {
     $borrowerLast = Enter-LiveTestEngineProfile -Profile functional -RunToken owner-first -EvidenceDirectory (Join-Path $testRoot 'borrower-last') -EngineConfigPath $configPath -LockTimeoutSeconds 0
     $ownedBytes = [IO.File]::ReadAllBytes($configPath)
     Exit-LiveTestEngineProfile -Lease $ownerFirst
+    Exit-LiveTestEngineProfile -Lease $ownerFirst
     Assert-True -Condition ((Get-LiveTestBytesSha256 ([IO.File]::ReadAllBytes($configPath))) -ceq (Get-LiveTestBytesSha256 $ownedBytes)) -Message 'Owner exit restored config beneath the replacement launcher.'
     $foreignBlocked = $false
     try { $null = Enter-LiveTestEngineProfile -Profile visual -RunToken foreign-run -EvidenceDirectory (Join-Path $testRoot 'foreign') -EngineConfigPath $configPath -LockTimeoutSeconds 0 }
     catch { $foreignBlocked = $_.Exception.Message -like '*engine-profile lease*' }
     Assert-True -Condition $foreignBlocked -Message 'Foreign run acquired the lease while the replacement still owned it.'
+    Exit-LiveTestEngineProfile -Lease $borrowerLast
     Exit-LiveTestEngineProfile -Lease $borrowerLast
     Assert-True -Condition ((Get-LiveTestBytesSha256 ([IO.File]::ReadAllBytes($configPath))) -ceq (Get-LiveTestBytesSha256 $originalBytes)) -Message 'Last replacement failed to restore the original config.'
 
