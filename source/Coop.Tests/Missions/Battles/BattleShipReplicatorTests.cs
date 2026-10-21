@@ -135,6 +135,31 @@ public class BattleShipReplicatorTests
         harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m => m is NetworkBattleShipSample)), Times.Exactly(3));
     }
 
+    // R42: a frame longer than the interval carries its overshoot, so 35 ms frames still send at 20 Hz on average.
+    [Theory]
+    [InlineData(0.07f, 0.02f)]
+    [InlineData(0.05f, 0f)]
+    [InlineData(1f, BattleShipReplicator.SendIntervalSeconds)]
+    public void CarryAfterSend_KeepsTheOvershootUpToOneInterval(float elapsed, float expected)
+    {
+        Assert.Equal(expected, BattleShipReplicator.CarryAfterSend(elapsed), 4);
+    }
+
+    // A long frame is followed by one catch-up sample, not a burst of the samples it missed.
+    [Fact]
+    public void Tick_AfterALongFrame_SendsOneCatchUpSampleOnly()
+    {
+        var harness = new Harness(committed: true);
+
+        harness.Replicator.Tick(1f);
+        harness.Replicator.Tick(0.001f);
+        harness.Replicator.Tick(0.001f);
+        harness.Replicator.Tick(0.001f);
+
+        harness.Network.Verify(n => n.SendAll(It.Is<IMessage>(m =>
+            m is NetworkBattleShipSample && ((NetworkBattleShipSample)m).OwnerControllerId == Own)), Times.Exactly(2));
+    }
+
     // M9: vanilla latches a depleted side the first frame it reads one; the report rides the condition, so no frame length
     // expires it.
     [Fact]

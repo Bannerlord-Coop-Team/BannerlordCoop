@@ -39,7 +39,8 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 ### Streams
 
 - `BattleShipReplicator` sends each own hull's frame, body velocity and yaw rate, helm input and rope state every 0.05 s
-  (20 Hz, `SendIntervalSeconds`). Each accepted sample goes straight to the engine as the copy's steering target. A
+  (20 Hz, `SendIntervalSeconds`; a long frame's overshoot carries into the next interval, capped at one, so heavy frames
+  keep the rate without a burst). Each accepted sample goes straight to the engine as the copy's steering target. A
   stream counts as expired after 1 s without samples on the receiver's clock, and the steering stops feeding the
   owner's velocity forward after the same time.
 - `BattleShipConditionStream` sends a hull's damage state (HP, sails, fire, sinking) and its fieldable reserve whenever

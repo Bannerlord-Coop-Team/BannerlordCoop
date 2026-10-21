@@ -475,11 +475,12 @@ public class BattleShipReplicator : IBattleShipReplicator
         Logger.Information("[NavalSync] Sent {Count} own hull record(s) to {Target}", records.Length, controllerId ?? "all peers");
     }
 
+    // Sends every own hull's sample and changed condition once per send interval.
     private void SendOwnSamples(float dt)
     {
         sendElapsed += dt;
         if (sendElapsed < SendIntervalSeconds) return;
-        sendElapsed = 0;
+        sendElapsed = CarryAfterSend(sendElapsed);
 
         foreach (var ship in Registry.Ships.Where(IsOwnHull))
         {
@@ -494,6 +495,12 @@ public class BattleShipReplicator : IBattleShipReplicator
             conditions.SendIfChanged(ship);
         }
     }
+
+    /// <summary>
+    /// The time a send carries into the next interval, so heavy frames keep 20 Hz; at most one interval, so a long frame is
+    /// followed by one catch-up send instead of a burst.
+    /// </summary>
+    internal static float CarryAfterSend(float elapsed) => Math.Min(elapsed - SendIntervalSeconds, SendIntervalSeconds);
 
     private void Handle_NetworkShipCondition(MessagePayload<NetworkShipCondition> payload)
     {
