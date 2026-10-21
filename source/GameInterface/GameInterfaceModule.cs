@@ -23,6 +23,7 @@ using GameInterface.Services.GameDebug.Metrics;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Heroes.RomanceFlow;
 using GameInterface.Services.Hideouts;
 using GameInterface.Services.Issues;
 using GameInterface.Services.Kingdoms;
@@ -183,6 +184,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PartyScreenRosterBaselineProvider>().As<IPartyScreenRosterBaselineProvider>().InstancePerDependency();
         builder.RegisterType<BanditPartyHomeSettlementRepairer>().As<IBanditPartyHomeSettlementRepairer>().InstancePerDependency();
         builder.RegisterType<DeadHeroCaptivityRepairer>().As<IDeadHeroCaptivityRepairer>().InstancePerDependency();
+        builder.RegisterType<PlayerDivorceRules>().As<IPlayerDivorceRules>().InstancePerDependency();
         builder.RegisterType<WorkshopRepairer>().As<IWorkshopRepairer>().InstancePerDependency();
         builder.RegisterType<MapEventLogger>().As<IMapEventLogger>().InstancePerLifetimeScope();
         builder.RegisterType<TroopRosterLogger>().As<ITroopRosterLogger>().InstancePerLifetimeScope();

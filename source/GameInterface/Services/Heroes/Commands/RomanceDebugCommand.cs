@@ -73,11 +73,14 @@ internal class RomanceDebugCommand
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return Succeeded($"{CommandNamespace}.list; {CommandNamespace}.status <player_hero_id> <npc_hero_id>; " +
-                $"{CommandNamespace}.start|compatible|agree|marry|divorce <player_hero_id> <npc_hero_id>; " +
+            return Succeeded($"{CommandNamespace}.list; {CommandNamespace}.status <player_hero_id> <target_hero_id>; " +
+                $"{CommandNamespace}.start|compatible|agree|marry <player_hero_id> <npc_hero_id>; " +
+                $"{CommandNamespace}.divorce <player_hero_id> <target_hero_id>; " +
                 $"{CommandNamespace}.fail_practicalities <first_hero_id> <second_hero_id>. " +
                 "Only start, compatible, fail_practicalities, agree, marry, and divorce require the server console. " +
-                "Divorce does not restore pre-marriage clan or party changes.");
+                "Divorce accepts player or NPC spouses. Player spouses sharing a clan leave through normal clan departure rules. " +
+                "The nonleader returns to their original clan; source-clan settlements, renown and influence stay with that clan. " +
+                "NPC divorce does not change clan or party membership.");
         }
     }
 
@@ -87,18 +90,18 @@ internal class RomanceDebugCommand
 
         public string Name => "status";
 
-        public string Description => "Reports romance state for a player and NPC.";
+        public string Description => "Reports romance state for a player and another hero.";
 
         public CoopCommandSide Side => CoopCommandSide.Both;
 
-        public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments();
+        public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments(allowPlayerTarget: true);
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             const string command = CommandNamespace + ".status";
             return RunOnGameThread(command, () =>
             {
-                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                if (!TryGetPlayerPair(args, out var playerHero, out var targetHero, out string error, allowPlayerTarget: true))
                     return Failed(error);
                 if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
                     return Failed(error);
@@ -131,7 +134,7 @@ internal class RomanceDebugCommand
 
             return RunOnGameThread(command, () =>
             {
-                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                if (!TryGetPlayerPair(args, out var playerHero, out var targetHero, out string error))
                     return Failed(error);
                 if (!TryGetRomanceAuthority(out var romanceAuthority, out error))
                     return Failed(error);
@@ -170,7 +173,7 @@ internal class RomanceDebugCommand
 
             return RunOnGameThread(command, () =>
             {
-                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                if (!TryGetPlayerPair(args, out var playerHero, out var targetHero, out string error))
                     return Failed(error);
                 if (!TryGetRomanceAuthority(out var romanceAuthority, out error))
                     return Failed(error);
@@ -251,7 +254,7 @@ internal class RomanceDebugCommand
 
             return RunOnGameThread(command, () =>
             {
-                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                if (!TryGetPlayerPair(args, out var playerHero, out var targetHero, out string error))
                     return Failed(error);
                 if (!TryGetRomanceAuthority(out var romanceAuthority, out error))
                     return Failed(error);
@@ -290,7 +293,7 @@ internal class RomanceDebugCommand
 
             return RunOnGameThread(command, () =>
             {
-                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                if (!TryGetPlayerPair(args, out var playerHero, out var targetHero, out string error))
                     return Failed(error);
                 if (!TryGetRomanceAuthority(out var romanceAuthority, out error))
                     return Failed(error);
@@ -311,11 +314,11 @@ internal class RomanceDebugCommand
 
         public string Name => "divorce";
 
-        public string Description => "Divorces a player hero and NPC hero.";
+        public string Description => "Divorces a player from a player or NPC spouse, separating shared player clans through normal departure rules.";
 
         public CoopCommandSide Side => CoopCommandSide.Server;
 
-        public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments();
+        public IExpectedArgs[] ExpectedArgs { get; } = CreatePairArguments(allowPlayerTarget: true);
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -324,34 +327,42 @@ internal class RomanceDebugCommand
 
             return RunOnGameThread(command, () =>
             {
-                if (!TryGetPlayerNpcPair(args, out var playerHero, out var targetHero, out string error))
+                if (!TryGetPlayerPair(args, out var playerHero, out var targetHero, out string error, allowPlayerTarget: true))
                     return Failed(error);
-                if (playerHero.Spouse != targetHero || targetHero.Spouse != playerHero)
-                    return Failed($"{playerHero.Name} and {targetHero.Name} are not married to each other.");
+                if (!ContainerProvider.TryResolve<IPlayerDivorceRules>(out var divorceRules))
+                    return Failed("Could not resolve player divorce rules.");
+                if (!divorceRules.CanDivorce(playerHero, targetHero, out error))
+                    return Failed(error);
 
                 playerHero.Spouse = null;
                 ChangeRomanticStateAction.Apply(playerHero, targetHero, Romance.RomanceLevelEnum.Ended);
 
-                return playerHero.Spouse == null &&
-                       targetHero.Spouse == null &&
-                       Romance.GetRomanticLevel(playerHero, targetHero) == Romance.RomanceLevelEnum.Ended
-                    ? Succeeded($"Divorced {playerHero.Name} and {targetHero.Name}.")
-                    : Failed($"Divorce between {playerHero.Name} and {targetHero.Name} did not complete.");
+                if (playerHero.Spouse != null || targetHero.Spouse != null ||
+                    Romance.GetRomanticLevel(playerHero, targetHero) != Romance.RomanceLevelEnum.Ended)
+                    return Failed($"Divorce between {playerHero.Name} and {targetHero.Name} did not complete.");
+
+                if (!divorceRules.TrySeparateClans(playerHero, targetHero))
+                    return Succeeded($"Divorced {playerHero.Name} and {targetHero.Name}. " +
+                        "Clan separation could not complete under the normal departure rules; clan membership is unchanged.");
+
+                return Succeeded($"Divorced {playerHero.Name} and {targetHero.Name}.");
             });
         }
     }
 
-    private static IExpectedArgs[] CreatePairArguments() => new IExpectedArgs[]
+    private static IExpectedArgs[] CreatePairArguments(bool allowPlayerTarget = false) => new IExpectedArgs[]
     {
         new ExpectedArgs("player_hero_id", "The registered player hero id."),
-        new ExpectedArgs("npc_hero_id", "The registered NPC hero id."),
+        new ExpectedArgs(allowPlayerTarget ? "target_hero_id" : "npc_hero_id",
+            allowPlayerTarget ? "The registered player or NPC hero id." : "The registered NPC hero id."),
     };
 
-    private static bool TryGetPlayerNpcPair(
+    private static bool TryGetPlayerPair(
         IReadOnlyList<string> args,
         out Hero playerHero,
         out Hero targetHero,
-        out string error)
+        out string error,
+        bool allowPlayerTarget = false)
     {
         playerHero = null;
         targetHero = null;
@@ -366,7 +377,7 @@ internal class RomanceDebugCommand
 
         if (!objectManager.TryGetObject<Hero>(args[1], out targetHero))
         {
-            error = $"Unable to find NPC hero with id: {args[1]}";
+            error = $"Unable to find target hero with id: {args[1]}";
             return false;
         }
 
@@ -376,7 +387,7 @@ internal class RomanceDebugCommand
             return false;
         }
 
-        if (targetHero.IsPlayerHero())
+        if (!allowPlayerTarget && targetHero.IsPlayerHero())
         {
             error = "Player-to-player romance is not supported.";
             return false;

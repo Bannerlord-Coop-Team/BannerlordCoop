@@ -156,6 +156,7 @@ public class CharacterFactionCoopCommandTests
     [Theory]
     [InlineData("coop.debug.army", "create", "Command is only available to run on the server", "empire", "town_ES1", "hero", "Raider")]
     [InlineData("coop.debug.romance", "marry", "Command can only be run on the server.", "player", "npc")]
+    [InlineData("coop.debug.romance", "divorce", "Command can only be run on the server.", "player", "spouse")]
     [InlineData("coop.debug.hero", "kill_npc", "The 'coop.debug.hero.kill_npc' command cannot be used on the client. It is intended for server use only.", "npc", "old_age", "player")]
     [InlineData("coop.debug.kingdom", "force_ally", "Command is only available to run on the server", "empire", "empire_s")]
     [InlineData("coop.debug.kingdom", "force_trade_agreement", "Command is only available to run on the server", "empire", "empire_s")]

@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Commands;
+using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using Coop.Core.Server.Services.Kingdoms.Messages;
@@ -11,6 +12,7 @@ using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
+using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
@@ -620,6 +622,102 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
                 Assert.Same(successor, Get<MobileParty>(instance, member.MobilePartyId).LeaderHero);
                 Assert.True(instance.Resolve<IPlayerManager>().TryGetPlayer(member.ControllerId, out var player));
                 Assert.Equal(member.HeroId, player.HeroId);
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DivorcePlayerSpouses_RestoresIndependentClanAndPreservesParties(bool leaderFirst)
+    {
+        Join();
+        int memberTroops = 0;
+        int leaderTroops = 0;
+        Server.Call(() =>
+        {
+            var leaderHero = Get<Hero>(Server, leader.HeroId);
+            var memberHero = Get<Hero>(Server, member.HeroId);
+            leaderHero.Spouse = memberHero;
+            ChangeRomanticStateAction.Apply(leaderHero, memberHero, Romance.RomanceLevelEnum.Marriage);
+            memberTroops = Get<MobileParty>(Server, member.MobilePartyId).MemberRoster.TotalManCount;
+            leaderTroops = Get<MobileParty>(Server, leader.MobilePartyId).MemberRoster.TotalManCount;
+        });
+        Flush();
+
+        Server.Call(() =>
+        {
+            var args = new CoopCommandArgsFactory().FromValues(new[]
+            {
+                leaderFirst ? leader.HeroId : member.HeroId,
+                leaderFirst ? member.HeroId : leader.HeroId,
+            });
+            var result = new RomanceDebugCommand.RomanceDivorceCoopCommand().ProcessCommand(args);
+            Assert.True(result.Succeeded, result.Output);
+            Assert.DoesNotContain("could not complete", result.Output);
+        });
+        Flush();
+
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var leaderHero = Get<Hero>(instance, leader.HeroId);
+                var memberHero = Get<Hero>(instance, member.HeroId);
+                Assert.Null(leaderHero.Spouse);
+                Assert.Null(memberHero.Spouse);
+                Assert.Equal(Romance.RomanceLevelEnum.Ended, Romance.GetRomanticLevel(leaderHero, memberHero));
+                Assert.Same(Get<Clan>(instance, leader.ClanId), leaderHero.Clan);
+                Assert.Same(Get<Clan>(instance, member.ClanId), memberHero.Clan);
+                Assert.Same(memberHero, memberHero.Clan.Leader);
+                Assert.Equal(10000, leaderHero.Gold);
+                Assert.Equal(10000, memberHero.Gold);
+
+                var memberParty = Get<MobileParty>(instance, member.MobilePartyId);
+                var leaderParty = Get<MobileParty>(instance, leader.MobilePartyId);
+                Assert.Same(memberParty, memberHero.PartyBelongedTo);
+                Assert.Same(leaderParty, leaderHero.PartyBelongedTo);
+                Assert.Same(memberHero.Clan, memberParty.ActualClan);
+                Assert.Equal(memberTroops, memberParty.MemberRoster.TotalManCount);
+                Assert.Equal(leaderTroops, leaderParty.MemberRoster.TotalManCount);
+                Assert.True(instance.Resolve<IPlayerManager>().TryGetPlayer(member.ControllerId, out var registered));
+                Assert.Equal(member.HeroId, registered.HeroId);
+                Assert.Equal(member.MobilePartyId, registered.MobilePartyId);
+                Assert.Equal(member.CharacterObjectId, registered.CharacterObjectId);
+                Assert.Equal(member.ClanId, registered.ClanId);
+                Assert.Equal(member.OriginalClanId, registered.OriginalClanId);
+            });
+        }
+    }
+
+    [Fact]
+    public void DivorceNpcSpouse_EndsMarriageWithoutChangingPlayerClan()
+    {
+        var spouseId = TestEnvironment.CreateRegisteredObject<Hero>();
+        Server.Call(() =>
+        {
+            var playerHero = Get<Hero>(Server, leader.HeroId);
+            var spouse = Get<Hero>(Server, spouseId);
+            playerHero.Spouse = spouse;
+            ChangeRomanticStateAction.Apply(playerHero, spouse, Romance.RomanceLevelEnum.Marriage);
+
+            var result = new RomanceDebugCommand.RomanceDivorceCoopCommand().ProcessCommand(
+                new CoopCommandArgsFactory().FromValues(new[] { leader.HeroId, spouseId }));
+            Assert.True(result.Succeeded, result.Output);
+        });
+        Flush();
+
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var playerHero = Get<Hero>(instance, leader.HeroId);
+                var spouse = Get<Hero>(instance, spouseId);
+                Assert.Null(playerHero.Spouse);
+                Assert.Null(spouse.Spouse);
+                Assert.Equal(Romance.RomanceLevelEnum.Ended, Romance.GetRomanticLevel(playerHero, spouse));
+                Assert.Same(Get<Clan>(instance, leader.ClanId), playerHero.Clan);
+                Assert.Same(Get<MobileParty>(instance, leader.MobilePartyId), playerHero.PartyBelongedTo);
             });
         }
     }
