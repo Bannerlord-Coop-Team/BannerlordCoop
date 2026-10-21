@@ -117,7 +117,7 @@ public class QuestRequestOwnershipTests : IDisposable
     }
 
     [Fact]
-    public void ABranchRequestFromTheOwnerRunsTheBranchOnTheServer()
+    public void ABranchRequestFromTheOwnerReachesTheServerProofStrategy()
     {
         scenario.Accept(scenario.ClientA);
         var quest = scenario.QuestOf(scenario.ClientA);
