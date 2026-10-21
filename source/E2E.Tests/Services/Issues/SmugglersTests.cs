@@ -6,6 +6,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.Smugglers;
 using GameInterface.Services.Issues.Quests.Smugglers.Patches;
@@ -413,6 +414,85 @@ public class SmugglersTests : IDisposable
                 conversation._conversationParty = null;
             }
         });
+    }
+
+    [Fact]
+    public void ServerTimeout_AnnouncesOnlyTheNestedFailureAndReplaysTheOwnersQuest()
+    {
+        var targetId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var originId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var questTexts = new[]
+        {
+            AccessTools.Method(typeof(Quest), nameof(Quest.SetDialogs)),
+            AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestFailedLog)),
+        };
+        Quest serverQuest = null!;
+        Quest ownerQuest = null!;
+
+        foreach (var instance in new[] { Server, ClientA })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(targetId, out var target));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(originId, out var origin));
+                var issue = IssueOf(instance);
+
+                using (new AllowedThread())
+                {
+                    var quest = new Quest("smugglers_timeout", issue.IssueOwner, target, origin, 0f, CampaignTime.Now, RewardGold);
+                    issue.IssueQuest = quest;
+                    Campaign.Current.QuestManager.AddTrackedObjectForQuest(target, quest);
+                    Campaign.Current.QuestManager.AddTrackedObjectForQuest(origin, quest);
+
+                    if (instance == ClientA)
+                    {
+                        quest.StartQuest();
+                        ownerQuest = quest;
+                        Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
+                        Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(issueOwnerId, IssueId, ControllerA));
+                    }
+                    else
+                    {
+                        serverQuest = quest;
+                    }
+                }
+            }, questTexts);
+        }
+
+        var timeoutCalls = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(ControllerA, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(owner.HeroId, out var ownerHero));
+
+            Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(quest =>
+            {
+                Assert.Same(serverQuest, quest);
+                Assert.Same(ownerHero, Hero.MainHero);
+                timeoutCalls++;
+                quest.CompleteQuestWithTimeOut();
+            });
+        }, questTexts);
+
+        Assert.Equal(1, timeoutCalls);
+        Assert.Equal(-10, serverQuest.RelationshipChangeWithQuestGiver);
+        Assert.True(serverQuest.IsFinalized);
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
+        Assert.Equal(issueOwnerId, finalized.IssueOwnerId);
+        Assert.Equal(IssueId, finalized.IssueId);
+        Assert.True(ownerQuest.IsFinalized);
+
+        foreach (var instance in new[] { Server, ClientA, ClientB })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(issueOwnerId, out var giver));
+                Assert.Null(giver.Issue);
+                Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(issueOwnerId, IssueId, out _));
+                Assert.DoesNotContain(ownerQuest, Campaign.Current.QuestManager.Quests);
+            });
+        }
     }
 
     [Fact]
