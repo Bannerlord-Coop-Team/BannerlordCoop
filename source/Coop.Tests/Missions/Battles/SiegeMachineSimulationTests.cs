@@ -387,6 +387,40 @@ public class SiegeMachineSimulationTests : IDisposable
         }
     }
 
+    // A received placement re-runs vanilla Disband/Deploy under AllowedThread, so the capture patch doesn't echo it.
+    [Fact]
+    public void ReceivedPlacementApply_RunsVanillaInsideAllowedThread()
+    {
+        using var mission = new MissionCurrentScope();
+        AccessTools.Property(typeof(Mission), nameof(Mission.CurrentState))
+            .SetValue(mission.Instance, Mission.State.Continuing);
+        var point = Uninitialized<DeploymentPoint>();
+        AccessTools.Property(typeof(DeploymentPoint), nameof(DeploymentPoint.DeployedWeapon))
+            .SetValue(point, Uninitialized<Ballista>());
+        ((ICollection<MissionObject>)mission.Instance.MissionObjects).Add(point);
+        disbandRanAllowed = null;
+        Stub(AccessTools.Method(typeof(DeploymentPoint), nameof(DeploymentPoint.Disband)), nameof(RecordDisband));
+        var session = new Mock<IBattleSession>();
+        using var replicator = new SiegeEngineDeploymentReplicator(Mock.Of<IBattleNetwork>(),
+            new TestMessageBroker(), session.Object, new HostEpochPolicy());
+        var apply = typeof(SiegeEngineDeploymentReplicator)
+            .GetMethod("TryApplyPlacement", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(apply);
+
+        Assert.True((bool)apply.Invoke(replicator, new object[] { point.Id.Id, null }));
+
+        Assert.True(disbandRanAllowed);
+        Assert.False(AllowedThread.IsThisThreadAllowed());
+    }
+
+    private static bool? disbandRanAllowed;
+    private static bool RecordDisband(ref ScriptComponentBehavior __result)
+    {
+        disbandRanAllowed = AllowedThread.IsThisThreadAllowed();
+        __result = null;
+        return false;
+    }
+
     [Fact]
     public void ReplicatedRamArrival_EnablesPullPointsBeforeClaimingWithoutReplicaStrikes()
     {
