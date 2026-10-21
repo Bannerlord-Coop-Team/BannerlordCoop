@@ -35,11 +35,11 @@ internal class MerchantOutlawsAlternativeJournalPatches
     [HarmonyPrefix]
     private static void FinalizedPrefix(IssueBase __instance)
     {
-        if (ModInformation.IsClient && __instance is Issue && !__instance.IsSolvingWithAlternative &&
+        if (ModInformation.IsClient && __instance is Issue &&
             __instance.AlternativeSolutionSentTroops.TotalManCount > 0)
         {
             // A different solver can finish while this client's committed picker selection is pending.
-            MessageBroker.Instance.Publish(__instance, new MerchantOutlawsAlternativeCancelled(__instance));
+            MessageBroker.Instance.Publish(__instance, new MerchantOutlawsAlternativeCancelled(__instance, finalizing: true));
         }
 
         // Framework dismissal ends the issue directly, without finalizing its unstarted server quest.
