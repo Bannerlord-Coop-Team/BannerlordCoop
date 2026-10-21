@@ -16,7 +16,7 @@ public interface ISiegeJoinMenuDeferralTracker : IGameAbstraction
     /// <summary>Returns true when the current join_siege_event activation should wait for the snapshot, otherwise drops the deferral if the main party already joined.</summary>
     bool TryDefer(PlayerEncounter currentEncounter, PartyBase mainParty);
 
-    /// <summary>Decides what the snapshot for <paramref name="mapEvent"/> does with the deferred menu, consuming the deferral unless it is not ready.</summary>
+    /// <summary>Decides what the snapshot for <paramref name="mapEvent"/> does with the deferred menu; keeps the deferral only for another map event or a main party that has not joined yet.</summary>
     SiegeJoinMenuDeferralResult Consume(MapEvent mapEvent, PlayerEncounter currentEncounter, PartyBase mainParty);
 
     /// <summary>Drops any pending deferral.</summary>
@@ -64,12 +64,12 @@ internal sealed class SiegeJoinMenuDeferralTracker : ISiegeJoinMenuDeferralTrack
     public SiegeJoinMenuDeferralResult Consume(MapEvent mapEvent, PlayerEncounter currentEncounter, PartyBase mainParty)
     {
         if (!ReferenceEquals(pendingMapEvent, mapEvent))
-            return SiegeJoinMenuDeferralResult.NotReady;
+            return SiegeJoinMenuDeferralResult.None;
 
         if (pendingEncounter == null)
         {
             Clear();
-            return SiegeJoinMenuDeferralResult.NotReady;
+            return SiegeJoinMenuDeferralResult.None;
         }
 
         if (!ReferenceEquals(currentEncounter, pendingEncounter))
@@ -79,7 +79,7 @@ internal sealed class SiegeJoinMenuDeferralTracker : ISiegeJoinMenuDeferralTrack
         }
 
         if (!ReferenceEquals(mainParty?.MapEvent, mapEvent))
-            return SiegeJoinMenuDeferralResult.NotReady;
+            return SiegeJoinMenuDeferralResult.None;
 
         Clear();
         return SiegeJoinMenuDeferralResult.Open;
@@ -99,8 +99,8 @@ internal sealed class SiegeJoinMenuDeferralTracker : ISiegeJoinMenuDeferralTrack
 /// </summary>
 public enum SiegeJoinMenuDeferralResult
 {
-    /// <summary>No deferred menu is ready for this map event, so the caller takes its normal path.</summary>
-    NotReady,
+    /// <summary>No deferred menu opens for this snapshot, so the caller takes its normal path; a deferral whose main party has not joined yet stays pending.</summary>
+    None,
 
     /// <summary>The deferred menu should open now.</summary>
     Open,

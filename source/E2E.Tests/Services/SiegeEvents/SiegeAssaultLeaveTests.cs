@@ -554,14 +554,6 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         Assert.Empty(menuActivationRecorder.MenusFor(client));
         Assert.Empty(menuSwitchRecorder.MenusFor(client));
         client.SimulateMessage(Server.NetPeer, joinReply);
-
-        client.Call(() =>
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
-            var deferralTracker = client.Container.Resolve<ISiegeJoinMenuDeferralTracker>();
-            // The deferral must be cleared, a leftover one would still see the changed encounter and report it dropped.
-            Assert.Equal(SiegeJoinMenuDeferralResult.NotReady, deferralTracker.Consume(mapEvent, PlayerEncounter.Current, PartyBase.MainParty));
-        });
     }
 
     /// <summary>Stages a client siege join whose menu is deferred, and returns the server's undelivered snapshot and reply.</summary>

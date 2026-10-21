@@ -50,7 +50,10 @@ public class SiegeJoinMenuDeferralTrackerTests
         AttachToMapEvent(mainParty, siege);
 
         Assert.False(tracker.TryDefer(encounter, mainParty));
-        Assert.Equal(SiegeJoinMenuDeferralResult.NotReady, tracker.Consume(siege, encounter, mainParty));
+
+        // A leftover deferral would defer again once the main party is off the map event.
+        mainParty._mapEventSide = null;
+        Assert.False(tracker.TryDefer(encounter, mainParty));
     }
 
     [Fact]
@@ -62,7 +65,7 @@ public class SiegeJoinMenuDeferralTrackerTests
         AttachToMapEvent(mainParty, siege);
 
         Assert.Equal(SiegeJoinMenuDeferralResult.Open, tracker.Consume(siege, encounter, mainParty));
-        Assert.Equal(SiegeJoinMenuDeferralResult.NotReady, tracker.Consume(siege, encounter, mainParty));
+        Assert.Equal(SiegeJoinMenuDeferralResult.None, tracker.Consume(siege, encounter, mainParty));
     }
 
     [Fact]
@@ -72,7 +75,7 @@ public class SiegeJoinMenuDeferralTrackerTests
         var encounter = CreateEncounter(siege);
         Assert.True(tracker.TryDefer(encounter, mainParty));
 
-        Assert.Equal(SiegeJoinMenuDeferralResult.NotReady, tracker.Consume(siege, encounter, mainParty));
+        Assert.Equal(SiegeJoinMenuDeferralResult.None, tracker.Consume(siege, encounter, mainParty));
 
         AttachToMapEvent(mainParty, siege);
         Assert.Equal(SiegeJoinMenuDeferralResult.Open, tracker.Consume(siege, encounter, mainParty));
@@ -87,7 +90,7 @@ public class SiegeJoinMenuDeferralTrackerTests
         AttachToMapEvent(mainParty, siege);
 
         Assert.Equal(SiegeJoinMenuDeferralResult.DroppedForChangedEncounter, tracker.Consume(siege, changedEncounter, mainParty));
-        Assert.Equal(SiegeJoinMenuDeferralResult.NotReady, tracker.Consume(siege, changedEncounter, mainParty));
+        Assert.Equal(SiegeJoinMenuDeferralResult.None, tracker.Consume(siege, changedEncounter, mainParty));
     }
 
     [Fact]
@@ -96,7 +99,7 @@ public class SiegeJoinMenuDeferralTrackerTests
         tracker.Arm(siege, mainParty);
         var encounter = CreateEncounter(siege);
 
-        Assert.Equal(SiegeJoinMenuDeferralResult.NotReady, tracker.Consume(siege, encounter, mainParty));
+        Assert.Equal(SiegeJoinMenuDeferralResult.None, tracker.Consume(siege, encounter, mainParty));
         Assert.False(tracker.TryDefer(encounter, mainParty));
     }
 
@@ -107,7 +110,7 @@ public class SiegeJoinMenuDeferralTrackerTests
         var encounter = CreateEncounter(siege);
         Assert.True(tracker.TryDefer(encounter, mainParty));
 
-        Assert.Equal(SiegeJoinMenuDeferralResult.NotReady,
+        Assert.Equal(SiegeJoinMenuDeferralResult.None,
             tracker.Consume(CreateMapEvent(MapEvent.BattleTypes.Siege), encounter, mainParty));
 
         AttachToMapEvent(mainParty, siege);
@@ -124,7 +127,7 @@ public class SiegeJoinMenuDeferralTrackerTests
         tracker.Clear();
         AttachToMapEvent(mainParty, siege);
 
-        Assert.Equal(SiegeJoinMenuDeferralResult.NotReady, tracker.Consume(siege, encounter, mainParty));
+        Assert.Equal(SiegeJoinMenuDeferralResult.None, tracker.Consume(siege, encounter, mainParty));
     }
 
     /// <summary>Creates a bare map event of the given battle type.</summary>

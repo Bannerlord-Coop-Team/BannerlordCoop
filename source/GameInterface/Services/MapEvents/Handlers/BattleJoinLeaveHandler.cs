@@ -164,18 +164,18 @@ internal class BattleJoinLeaveHandler : IHandler
     private void OpenSiegeJoinMenuIfNeeded(MapEvent mapEvent)
     {
         var campaign = Campaign.Current;
-        switch (siegeJoinMenuDeferralTracker.Consume(mapEvent, campaign?.PlayerEncounter, campaign?.MainParty?.Party))
+        var result = siegeJoinMenuDeferralTracker.Consume(mapEvent, campaign?.PlayerEncounter, campaign?.MainParty?.Party);
+        if (result == SiegeJoinMenuDeferralResult.None)
         {
-            case SiegeJoinMenuDeferralResult.Open:
-                GameMenu.ActivateGameMenu("join_siege_event");
-                GameMenu.SwitchToMenu("encounter");
-                return;
-            case SiegeJoinMenuDeferralResult.DroppedForChangedEncounter:
-                return;
-            case SiegeJoinMenuDeferralResult.NotReady:
-                SwitchSiegeJoinerToEncounterIfNeeded(mapEvent);
-                return;
+            SwitchSiegeJoinerToEncounterIfNeeded(mapEvent);
+            return;
         }
+
+        if (result != SiegeJoinMenuDeferralResult.Open)
+            return;
+
+        GameMenu.ActivateGameMenu("join_siege_event");
+        GameMenu.SwitchToMenu("encounter");
     }
 
     private static void SwitchSiegeJoinerToEncounterIfNeeded(MapEvent mapEvent)
