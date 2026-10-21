@@ -261,7 +261,7 @@ public class AcceptVisibilityTests : IDisposable
         {
             Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out var ownerControllerId));
             Assert.Equal(OwnerControllerId, ownerControllerId);
-            Assert.True(otherIssue.IsOngoing);
+            Assert.Equal(IssueBase.IssueState.Ongoing, otherIssue._issueState);
         });
     }
 
