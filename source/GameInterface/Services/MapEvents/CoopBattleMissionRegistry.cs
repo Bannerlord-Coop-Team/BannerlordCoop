@@ -13,8 +13,8 @@ public interface ICoopBattleMissionRegistry
     bool IsMissionActive { get; }
 
     /// <summary>
-    /// Opens the loaded-mission window for <paramref name="mapEventId"/>, replacing any earlier one. A null id is
-    /// allowed (no instance session yet), but two null-id windows cannot be told apart.
+    /// Opens the loaded-mission window for <paramref name="mapEventId"/>, replacing any earlier one. Windows that
+    /// share an id (two on one map event, or two null-id windows) cannot be told apart, so they must not overlap.
     /// </summary>
     void BeginMission(string mapEventId);
 
