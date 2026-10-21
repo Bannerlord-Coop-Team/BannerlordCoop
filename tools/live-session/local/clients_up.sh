@@ -6,6 +6,8 @@ set -euo pipefail
 unset PSModulePath
 source "$(dirname "${BASH_SOURCE[0]}")/local_env.sh"
 out=$1; profile=${2:-visual}
+[[ $profile == visual || $profile == functional ]] || { echo 'Unknown runtime profile' >&2; exit 2; }
+printf '%s\n' "$profile" > "$out/runtime-profile.txt"
 source "$out/identity.env"
 mkdir -p "$out/crash-dialogs"
 fixture_args=()

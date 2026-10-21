@@ -30,6 +30,13 @@ for name in clients_up.sh client_relaunch.sh; do
     grep -Fxq -- '--defer-client-autoconnect' "$tmp/arguments"
     grep -Fxq -- 'owned-run' "$tmp/arguments"
 done
+PSModulePath=wrong bash "$tmp/clients_up.sh" "$tmp" functional > "$tmp/arguments"
+[[ $(cat "$tmp/runtime-profile.txt") == functional ]]
+rm "$tmp/fixture.env"
+PSModulePath=wrong bash "$tmp/client_relaunch.sh" "$tmp" > "$tmp/arguments"
+grep -Fxq -- 'functional' "$tmp/arguments"
+if grep -Fxq -- '--debug-fixture-manifest' "$tmp/arguments"; then echo 'Replacement required absent fixture' >&2; exit 1; fi
+printf 'PASS replacement preserves functional profile without an optional fixture\n'
 sed -n '/^for s in /,$p' "$here/local_up.sh" > "$tmp/start-body.sh"
 cat > "$tmp/start-test.sh" <<'START'
 #!/usr/bin/env bash

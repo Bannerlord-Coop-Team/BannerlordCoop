@@ -4,7 +4,16 @@ using System.Threading;
 namespace Common.LiveTesting;
 
 /// <summary>Tracks deferred join attempts until the client session has fully torn down.</summary>
-public sealed class LiveTestClientJoinState
+public interface ILiveTestClientJoinState
+{
+    bool Attempted { get; }
+    bool Refresh(bool atMainMenu, bool campaignLoaded, bool sessionActive);
+    bool TryBegin();
+    void CompleteStart(bool started);
+}
+
+/// <inheritdoc />
+public sealed class LiveTestClientJoinState : ILiveTestClientJoinState
 {
     private int attempted;
 

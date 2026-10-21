@@ -60,7 +60,7 @@ namespace Coop.LiveTesting
         private readonly string endpointDirectory;
         private readonly string endpointRegistrationPath;
         private int shutdownScheduled;
-        private readonly LiveTestClientJoinState clientJoinState = new LiveTestClientJoinState();
+        private readonly ILiveTestClientJoinState clientJoinState;
         private bool trackedRenderingEnabled = true;
         private bool renderStateTrackable = true;
         private int renderToggleCount;
@@ -81,7 +81,9 @@ namespace Coop.LiveTesting
 
             var uiBuilder = new ContainerBuilder();
             uiBuilder.RegisterModule<LiveTestUiModule>();
+            uiBuilder.RegisterType<LiveTestClientJoinState>().As<ILiveTestClientJoinState>().InstancePerDependency();
             uiContainer = uiBuilder.Build();
+            clientJoinState = uiContainer.Resolve<ILiveTestClientJoinState>();
             ui = uiContainer.Resolve<ILiveTestUi>();
             this.isServer = isServer;
             this.logFilePath = logFilePath;
