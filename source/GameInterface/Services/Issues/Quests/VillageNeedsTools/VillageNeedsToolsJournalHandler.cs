@@ -87,7 +87,7 @@ internal class VillageNeedsToolsJournalHandler : IHandler
             || !ownership.TryGetOwner(giverId, issue.StringId, out var controllerId)) return;
 
         network.SendAll(new NetworkVillageNeedsToolsAlternativeJournal(giverId, issue.StringId, controllerId,
-            issue.JournalEntries.Select(log => log.LogText.ToString()).ToArray(),
+            issue.JournalEntries.Select(log => log.LogText?.ToString() ?? string.Empty).ToArray(),
             issue.JournalEntries.Select(log => log.LogTime.NumTicks).ToArray(), payload.What.Status));
     }
 
