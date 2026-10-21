@@ -10,6 +10,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.TroopRosters.Messages;
@@ -42,6 +43,7 @@ internal class PartyDoneLogicHandler : IHandler
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
     private readonly IRecruitmentSideEffects recruitmentSideEffects;
+    private readonly IPlayerManager playerManager;
 
     public PartyDoneLogicHandler(
         IMessageBroker messageBroker,
@@ -49,7 +51,8 @@ internal class PartyDoneLogicHandler : IHandler
         INetwork network,
         ITroopRosterInterface troopRosterInterface,
         IVillageHostileActionInterface villageHostileActionInterface,
-        IRecruitmentSideEffects recruitmentSideEffects)
+        IRecruitmentSideEffects recruitmentSideEffects,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -57,6 +60,7 @@ internal class PartyDoneLogicHandler : IHandler
         this.troopRosterInterface = troopRosterInterface;
         this.villageHostileActionInterface = villageHostileActionInterface;
         this.recruitmentSideEffects = recruitmentSideEffects;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<PartyDoneLogicAttempted>(Handle_PartyDoneLogicAttempted);
         messageBroker.Subscribe<NetworkCompleteDoneLogic>(Handle_CompletePartyDoneLogic);
@@ -161,6 +165,7 @@ internal class PartyDoneLogicHandler : IHandler
         
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, message.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.MainHeroId, out var mainHero)) return;
 
             if (!TryResolveCompleteDoneLogic(

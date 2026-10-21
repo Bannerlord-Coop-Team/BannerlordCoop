@@ -11,29 +11,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class SettlementSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public SettlementSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void Settlement_Serialize()
-        {
-            Settlement testSettlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            SettlementBinaryPackage package = new SettlementBinaryPackage(testSettlement, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

@@ -11,29 +11,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class PartyBaseSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public PartyBaseSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void PartyBase_Serialize()
-        {
-            PartyBase testPartyObject = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            PartyBaseBinaryPackage package = new PartyBaseBinaryPackage(testPartyObject, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]

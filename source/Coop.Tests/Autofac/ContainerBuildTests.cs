@@ -51,6 +51,10 @@ namespace Coop.Tests.Autofac
                 $"{command.Prefix}.{command.Name}" == "coop.debug.workshop.set_workshop_custom_name");
             Assert.Contains(registeredCommands, command =>
                 $"{command.Prefix}.{command.Name}" == "coop.debug.map_event.kms");
+            Assert.Contains(registeredCommands, command =>
+                $"{command.Prefix}.{command.Name}" == "coop.debug.hero.set_gold");
+            Assert.Contains(registeredCommands, command =>
+                $"{command.Prefix}.{command.Name}" == "coop.debug.kingdom.add_decision");
 
             ICoopCommand[] missionCommands = registeredCommands
                 .Where(command => command.GetType().Assembly == typeof(MissionModule).Assembly)

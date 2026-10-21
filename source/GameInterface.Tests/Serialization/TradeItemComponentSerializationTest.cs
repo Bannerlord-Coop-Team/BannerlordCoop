@@ -10,29 +10,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class TradeItemComponentSerializationTest
     {
-        IContainer container;
+        ILifetimeScope container;
         public TradeItemComponentSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
-        }
-
-        [Fact]
-        public void TradeItemComponent_Serialize()
-        {
-            TradeItemComponent tradeItemComponent = new TradeItemComponent();
-
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            TradeItemComponentBinaryPackage package = new TradeItemComponentBinaryPackage(tradeItemComponent, factory);
-
-            package.Pack();
-
-            byte[] bytes = BinaryPackageSerializer.Serialize(package);
-            
-            Assert.NotEmpty(bytes);
+            container = SerializationTestContainer.BeginScope();
         }
 
         [Fact]
