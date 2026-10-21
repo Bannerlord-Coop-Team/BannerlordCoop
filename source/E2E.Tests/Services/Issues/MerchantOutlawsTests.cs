@@ -605,16 +605,17 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, false, false, false, false, false, false)]
-    [InlineData(true, false, false, false, false, false, false)]
-    [InlineData(false, true, false, false, false, false, false)]
-    [InlineData(false, true, true, false, false, false, false)]
-    [InlineData(false, true, false, true, false, false, false)]
-    [InlineData(false, true, false, true, true, false, false)]
-    [InlineData(false, true, true, true, true, false, false)]
-    [InlineData(false, true, false, true, true, true, false)]
-    [InlineData(false, true, false, true, true, false, true)]
-    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker, bool otherAccepts, bool otherDisconnects, bool acceptInFlight, bool otherAlternative)
+    [InlineData(false, false, false, false, false, false, false, false)]
+    [InlineData(true, false, false, false, false, false, false, false)]
+    [InlineData(false, true, false, false, false, false, false, false)]
+    [InlineData(false, true, true, false, false, false, false, false)]
+    [InlineData(false, true, false, true, false, false, false, false)]
+    [InlineData(false, true, false, true, true, false, false, false)]
+    [InlineData(false, true, true, true, true, false, false, false)]
+    [InlineData(false, true, false, true, true, true, false, false)]
+    [InlineData(false, true, false, true, true, false, true, false)]
+    [InlineData(false, true, false, true, true, false, false, true)]
+    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker, bool otherAccepts, bool otherDisconnects, bool acceptInFlight, bool otherAlternative, bool reopenPicker)
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
@@ -682,6 +683,32 @@ public class MerchantOutlawsTests : IDisposable
             }
         }, TextHelpers);
         environment.FlushCoalescer();
+
+        if (reopenPicker)
+        {
+            ClientA.Call(() =>
+            {
+                var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+                var party = Get<MobileParty>(ClientA, scenario.PlayerA.MobilePartyId);
+                pickerLogic = new PartyScreenLogic();
+                pickerLogic.Initialize(new PartyScreenLogicInitializationData
+                {
+                    LeftMemberRoster = issue.AlternativeSolutionSentTroops,
+                    RightMemberRoster = party.MemberRoster,
+                    LeftPrisonerRoster = TroopRoster.CreateDummyTroopRoster(),
+                    RightPrisonerRoster = party.PrisonRoster,
+                    RightOwnerParty = party.Party,
+                    RightLeaderHero = Get<Hero>(ClientA, scenario.PlayerA.HeroId),
+                    PartyPresentationDoneButtonDelegate = PartyScreenHelper.ManageTroopsAndPrisonersDoneHandler,
+                });
+                pickerLogic._partyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+                var transfer = new PartyScreenLogic.PartyCommand();
+                transfer.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right,
+                    PartyScreenLogic.TroopType.Member, Get<CharacterObject>(ClientA, troopId), 1, 0, -1);
+                using (new AllowedThread()) pickerLogic.TransferTroop(transfer, false);
+                Assert.Equal(sent + 1, issue.AlternativeSolutionSentTroops.GetTroopCount(Get<CharacterObject>(ClientA, troopId)));
+            }, TextHelpers);
+        }
 
         if (otherAlternative)
         {
@@ -782,7 +809,7 @@ public class MerchantOutlawsTests : IDisposable
                 Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId))));
             ClientA.Call(() =>
             {
-                if (cancelPicker)
+                if (cancelPicker || reopenPicker)
                 {
                     using (new AllowedThread()) pickerLogic.Reset(true);
                 }

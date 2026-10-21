@@ -114,16 +114,29 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
         if (payload.What.Finalizing && !localSelections.Remove(issue.AlternativeSolutionSentTroops)) return;
         localSelections.Remove(issue.AlternativeSolutionSentTroops);
         if (payload.What.Finalizing && acceptedSelections.Remove(issue.AlternativeSolutionSentTroops)) return;
+        var refundRoster = issue.AlternativeSolutionSentTroops;
         if (payload.What.Finalizing && openPickers.TryGetValue(issue.AlternativeSolutionSentTroops, out var picker))
         {
-            // Reset must keep the companion return rather than restore the pre-picker absence.
-            foreach (var element in issue.AlternativeSolutionSentTroops.GetTroopRoster())
+            refundRoster = picker._initialData.LeftMemberRoster.CloneRosterData();
+            using (new AllowedThread())
             {
-                if (!element.Character.IsHero) continue;
-                picker._initialData.LeftMemberRoster.AddToCounts(element.Character,
-                    -picker._initialData.LeftMemberRoster.GetTroopCount(element.Character));
-                if (!picker._initialData.RightMemberRoster.Contains(element.Character))
-                    picker._initialData.RightMemberRoster.AddToCounts(element.Character, 1);
+                if (committedSelections.Contains(issue.AlternativeSolutionSentTroops))
+                {
+                    foreach (var element in refundRoster.GetTroopRoster())
+                    {
+                        if (!element.Character.IsHero) picker._initialData.RightMemberRoster.Add(element);
+                    }
+                }
+                // Reset must keep the companion return rather than restore the pre-picker absence.
+                foreach (var element in issue.AlternativeSolutionSentTroops.GetTroopRoster())
+                {
+                    if (!element.Character.IsHero) continue;
+                    picker._initialData.LeftMemberRoster.AddToCounts(element.Character,
+                        -picker._initialData.LeftMemberRoster.GetTroopCount(element.Character));
+                    if (!picker._initialData.RightMemberRoster.Contains(element.Character))
+                        picker._initialData.RightMemberRoster.AddToCounts(element.Character, 1);
+                }
+                picker._initialData.LeftMemberRoster.Clear();
             }
         }
         openPickers.Remove(issue.AlternativeSolutionSentTroops);
@@ -131,7 +144,7 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
         if (committedSelections.Remove(issue.AlternativeSolutionSentTroops))
         {
             network.SendAll(new RequestMerchantOutlawsAlternativeCancellation(
-                troops.ToData(issue.AlternativeSolutionSentTroops)));
+                troops.ToData(refundRoster)));
         }
         using (new AllowedThread()) troops.ReturnToMainParty(issue);
     }
