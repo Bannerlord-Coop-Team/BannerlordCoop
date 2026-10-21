@@ -485,12 +485,12 @@ public class CapturedByBountyHuntersTests : IDisposable
         AssertGiverPowerChangedOnceBy(0);
     }
 
-    // Only the server runs the consequences, no client applies them locally
+    // Only the server runs the consequences, then the resulting power syncs to every client
     private void AssertGiverPowerChangedOnceBy(float change)
     {
         foreach (var instance in Instances)
         {
-            var expected = instance == Server ? InitialPower + change : InitialPower;
+            var expected = InitialPower + change;
 
             instance.Call(() =>
             {
