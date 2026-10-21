@@ -148,6 +148,45 @@ public class SmugglersTests : IDisposable
     }
 
     [Fact]
+    public void PersuasionSuccess_FinalizesOnceAndReplaysTheOwnersStartedQuest()
+    {
+        succeedQuest.Dispose();
+        successLogs.Dispose();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var townId = TestEnvironment.CreateRegisteredObject<Town>();
+        Quest ownerQuest = null!;
+        foreach (var instance in new[] { Server, ClientA })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<Town>(townId, out var town));
+                var issue = IssueOf(instance);
+                using (new AllowedThread())
+                {
+                    settlement.SetSettlementComponent(town);
+                    issue.IssueOwner.StayingInSettlement = settlement;
+                    var quest = new Quest("smugglers_completion", issue.IssueOwner, settlement, settlement, 1f, CampaignTime.Never, RewardGold);
+                    issue.IssueQuest = quest;
+                    if (instance == ClientA)
+                    {
+                        quest.StartQuest();
+                        ownerQuest = quest;
+                    }
+                }
+            });
+        }
+
+        StartPersuasionSession();
+        ClientA.Call(() => ownerQuest.SucceedQuest(null));
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
+        ClientA.Call(() => Assert.True(ownerQuest.IsFinalized));
+        Server.SimulateMessage(ClientA.NetPeer, new RequestQuestBranch(issueOwnerId, IssueId, (byte)SmugglersBranch.SuccessByPersuasion));
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    [Fact]
     public void ConversationEnd_InvalidatesPersuasionSession()
     {
         StartPersuasionSession();

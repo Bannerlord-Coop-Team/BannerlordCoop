@@ -5,6 +5,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using Common.Network;
 using Common.Network.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.MapEvents;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
@@ -80,17 +81,19 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
     private readonly IPlayerManager players;
     private readonly IIssueOwnershipRegistry ownership;
     private readonly HashSet<Quest> consumed = new();
-    private readonly Dictionary<Quest, NetPeer> merchantConversations = new();
+    private readonly Dictionary<Quest, (NetPeer Peer, string RequestId)> merchantConversations = new();
+    private readonly ConversationPartyTracker partyTracker;
     private readonly Dictionary<MapEvent, Dictionary<Quest, BattleSideEnum>> participants = new();
 
     public GangLeaderGoodsService(IMessageBroker broker, INetwork network, IObjectManager objects,
-        IPlayerManager players, IIssueOwnershipRegistry ownership)
+        IPlayerManager players, IIssueOwnershipRegistry ownership, ConversationPartyTracker partyTracker)
     {
         this.broker = broker;
         this.network = network;
         this.objects = objects;
         this.players = players;
         this.ownership = ownership;
+        this.partyTracker = partyTracker;
         broker.Subscribe<RequestGangLeaderGoodsPurchase>(HandlePurchase);
         broker.Subscribe<NetworkGangLeaderGoodsAcquired>(HandleAcquired);
         broker.Subscribe<NetworkConversationEnded>(HandleConversationEnded);
@@ -199,12 +202,16 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
         if (ModInformation.IsClient || party != MobileParty.MainParty || settlement != quest._questHideout ||
             !quest._playerHasTheGoods) return;
         if (players.TryGetPlayer(Hero.MainHero, out var player) && players.TryGetPeer(player.ControllerId, out var peer))
-            merchantConversations[quest] = peer;
+            merchantConversations[quest] = (peer, partyTracker.TryGetEngagement(peer, out var engagement) ? engagement.RequestId : null);
     }
 
     private void HandleConversationEnded(MessagePayload<NetworkConversationEnded> payload)
     {
-        if (payload.Who is NetPeer peer) GameThread.RunSafe(() => ClearPeer(peer), context: nameof(GangLeaderGoodsService));
+        if (payload.Who is NetPeer peer)
+        {
+            var requestId = payload.What.RequestId;
+            GameThread.RunSafe(() => ClearPeer(peer, requestId, true), context: nameof(GangLeaderGoodsService));
+        }
     }
 
     private void HandleDisconnected(MessagePayload<PlayerDisconnected> payload)
@@ -213,9 +220,10 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
         GameThread.RunSafe(() => ClearPeer(peer), context: nameof(GangLeaderGoodsService));
     }
 
-    private void ClearPeer(NetPeer peer)
+    private void ClearPeer(NetPeer peer, string requestId = null, bool requireRequestIdMatch = false)
     {
-        foreach (var quest in merchantConversations.Where(p => p.Value == peer).Select(p => p.Key).ToArray())
+        foreach (var quest in merchantConversations.Where(p => p.Value.Peer == peer &&
+            (!requireRequestIdMatch || p.Value.RequestId == requestId)).Select(p => p.Key).ToArray())
             merchantConversations.Remove(quest);
     }
 

@@ -32,7 +32,7 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
     private readonly ConversationPartyTracker partyTracker;
-    private readonly Dictionary<SessionKey, (string Target, NetPeer Peer)> sessions = new();
+    private readonly Dictionary<SessionKey, (string Target, NetPeer Peer, string RequestId)> sessions = new();
 
     public PersuasionSessionService(
         IMessageBroker messageBroker,
@@ -140,7 +140,8 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
                 return;
             }
 
-            sessions.Add(key, (data.TargetId, peer));
+            var requestId = partyTracker.TryGetEngagement(peer, out var engagement) ? engagement.RequestId : null;
+            sessions.Add(key, (data.TargetId, peer, requestId));
         }, context: nameof(PersuasionSessionService));
     }
 
@@ -148,7 +149,8 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
     {
         if (payload.Who is NetPeer peer)
         {
-            GameThread.RunSafe(() => ClearPeer(peer), context: nameof(PersuasionSessionService));
+            var requestId = payload.What.RequestId;
+            GameThread.RunSafe(() => ClearPeer(peer, requestId, true), context: nameof(PersuasionSessionService));
         }
     }
 
@@ -158,11 +160,12 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
         GameThread.RunSafe(() => ClearPeer(peer), context: nameof(PersuasionSessionService));
     }
 
-    private void ClearPeer(NetPeer peer)
+    private void ClearPeer(NetPeer peer, string requestId = null, bool requireRequestIdMatch = false)
     {
         foreach (var key in new List<SessionKey>(sessions.Keys))
         {
-            if (sessions[key].Peer == peer) sessions.Remove(key);
+            var session = sessions[key];
+            if (session.Peer == peer && (!requireRequestIdMatch || session.RequestId == requestId)) sessions.Remove(key);
         }
     }
     private void HandleOutcomeObserved(MessagePayload<IssueOutcomeObserved> payload)
