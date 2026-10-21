@@ -251,7 +251,7 @@ public class AcceptVisibilityTests : IDisposable
     public void SendTroops_TheSnapshotReplacesAnOwnerTheClientRememberedFromBefore()
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
-        AddIssue(Other, notableId);
+        var otherIssue = AddIssue(Other, notableId);
         ServerKnowsTheOwner(notableId);
         Other.Call(() => Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, "stale-player")));
 
