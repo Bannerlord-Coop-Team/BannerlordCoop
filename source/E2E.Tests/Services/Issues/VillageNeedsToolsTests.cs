@@ -371,6 +371,7 @@ public class VillageNeedsToolsTests : IDisposable
         if (exchange) SetExchangeOffer();
         Accept();
 
+        var ownerQuest = QuestOf(ClientA);
         var amount = QuestOf(Server)._numberOfRequestedGood;
         var otherGoldBefore = 0;
 
@@ -393,17 +394,33 @@ public class VillageNeedsToolsTests : IDisposable
             otherGoldBefore = otherHero.Gold;
         });
 
-        ClientA.Call(() =>
+        var successLogGetter = AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestSuccessLog));
+        var journalHarmony = new Harmony("bannerlordcoop.3766.delivery-ending-journal-test");
+        journalHarmony.Patch(successLogGetter,
+            prefix: new HarmonyMethod(typeof(VillageNeedsToolsTests), nameof(GetSuccessLogPrefix)));
+        try
         {
-            var quest = (Quest)QuestOfHere(ClientA);
-            quest.FinishQuestSuccess1();
-        }, QuestLogTexts);
+            ClientA.Call(() =>
+            {
+                var quest = (Quest)QuestOfHere(ClientA);
+                quest.FinishQuestSuccess1();
+            }, QuestLogTexts.Where(method => method != successLogGetter));
+        }
+        finally
+        {
+            journalHarmony.Unpatch(successLogGetter, HarmonyPatchType.Prefix, journalHarmony.Id);
+        }
 
         var request = Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
         Assert.Equal((byte)VillageNeedsToolsBranch.DeliverTools, request.Proof);
 
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
+
+        var ending = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
+        Assert.Equal(ControllerA, ending.ControllerId);
+        Assert.Equal("You brought the promised tools.", ending.Text);
+        Assert.Contains(ownerQuest.JournalEntries, log => log.LogText?.ToString() == ending.Text);
 
         TestEnvironment.FlushCoalescer();
         foreach (var instance in Instances)
@@ -906,6 +923,12 @@ public class VillageNeedsToolsTests : IDisposable
     private static bool GetConversationHeroPrefix(ref Hero __result)
     {
         __result = ConversationHeroOverride;
+        return false;
+    }
+
+    private static bool GetSuccessLogPrefix(ref TaleWorlds.Localization.TextObject __result)
+    {
+        __result = new TaleWorlds.Localization.TextObject("{=!}You brought the promised tools.");
         return false;
     }
 }
