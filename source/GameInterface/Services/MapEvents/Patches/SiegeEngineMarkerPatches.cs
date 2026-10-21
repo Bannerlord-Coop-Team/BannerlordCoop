@@ -16,7 +16,9 @@ internal class SiegeEngineMarkerPatches
     [HarmonyPostfix]
     private static void RefreshSiegeEngineListPostfix(MissionSiegeEngineMarkerVM __instance)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+        if (!BattleSpawnConfig.Enabled) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return;
 
         for (int i = __instance._siegeEngines.Count - 1; i >= 0; i--)
         {

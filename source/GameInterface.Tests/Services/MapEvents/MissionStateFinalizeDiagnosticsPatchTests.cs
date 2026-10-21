@@ -12,6 +12,7 @@ using Xunit;
 namespace GameInterface.Tests.Services.MapEvents;
 
 /// <summary>Verifies mission lifecycle identifiers survive until finalization.</summary>
+[Collection(ActiveCoopBattleCollection.Name)]
 public class MissionStateFinalizeDiagnosticsPatchTests
 {
     [Fact]
@@ -38,7 +39,7 @@ public class MissionStateFinalizeDiagnosticsPatchTests
         var logs = new ConcurrentQueue<string>();
         Action<string> capture = logs.Enqueue;
         OutputSinkManager.AddLogCallback(capture);
-        BattleSpawnGate.BeginBattle("diagnostic-battle");
+        var battleScope = new ActiveCoopBattleScope("diagnostic-battle");
         try
         {
             var state = mission.CurrentState;
@@ -53,14 +54,14 @@ public class MissionStateFinalizeDiagnosticsPatchTests
                 log.Contains("diagnostic-battle")));
 
             logs.Clear();
-            BattleSpawnGate.EndBattle();
+            battleScope.Registry.EndBattle();
             MissionStateFinalizeDiagnosticsPatch.EndMissionPrefix(mission);
             MissionStateFinalizeDiagnosticsPatch.MissionResultReadyPrefix(mission, new MissionResult());
             Assert.Empty(logs.Where(log => log.Contains("[BattleMissionLifecycle]")));
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            battleScope.Dispose();
             OutputSinkManager.RemoveLogCallback(capture);
         }
     }

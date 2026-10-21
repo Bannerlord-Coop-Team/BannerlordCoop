@@ -1,6 +1,7 @@
 ﻿using System;
 using Common.Util;
 using GameInterface.Services.MapEvents;
+using GameInterface.Tests.Services.MapEvents;
 using GameInterface.Services.UI.Patches;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -10,17 +11,18 @@ using Xunit;
 namespace GameInterface.Tests.Services.UI;
 
 /// <summary>Regression coverage for replicated death kill-feed context.</summary>
+[Collection(ActiveCoopBattleCollection.Name)]
 public class ReplicatedDeathKillFeedPatchTests : IDisposable
 {
     public void Dispose()
     {
-        BattleSpawnGate.EndBattle();
+        BattleSpawnGate.ResetCombatFeedback();
     }
 
     [Fact]
     public void Prefix_RestoresAffectorAndKillingBlow_OnlyInsideMatchingDeathScope()
     {
-        BattleSpawnGate.BeginBattle("battle-1");
+        using var battleScope = new ActiveCoopBattleScope("battle-1");
         var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
         var otherAgent = ObjectHelper.SkipConstructor<Agent>();
         var affectorAgent = ObjectHelper.SkipConstructor<Agent>();
@@ -56,7 +58,7 @@ public class ReplicatedDeathKillFeedPatchTests : IDisposable
     [Fact]
     public void RemoveRoutedPlayerHitNotification_RemovesOnlyMatchingVictimNotification()
     {
-        BattleSpawnGate.BeginBattle("battle-1");
+        BattleSpawnGate.ResetCombatFeedback();
         var firstAgent = ObjectHelper.SkipConstructor<Agent>();
         var secondAgent = ObjectHelper.SkipConstructor<Agent>();
         bool firstRemoved = false;
@@ -74,7 +76,7 @@ public class ReplicatedDeathKillFeedPatchTests : IDisposable
     [Fact]
     public void TrackRoutedPlayerHitNotification_RemovesNotification_WhenDeathArrivesFirst()
     {
-        BattleSpawnGate.BeginBattle("battle-1");
+        BattleSpawnGate.ResetCombatFeedback();
         var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
         bool notificationRemoved = false;
 
@@ -88,7 +90,7 @@ public class ReplicatedDeathKillFeedPatchTests : IDisposable
     [Fact]
     public void CombatLogContext_PreservesUntrackedEntryBeforeRoutedHit()
     {
-        BattleSpawnGate.BeginBattle("battle-1");
+        BattleSpawnGate.ResetCombatFeedback();
         var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
 
         BattleSpawnGate.EnqueueCombatLogContext(null!, 50);

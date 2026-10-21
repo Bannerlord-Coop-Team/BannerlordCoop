@@ -59,8 +59,9 @@ internal class CoopEmptyTeamDeploymentPatch
     private static void IsPlanMade_Postfix(Team team, ref bool __result)
     {
         if (!__result && !_inMakeTeamPlans
-            && BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive
-            && IsForeignTeam(team))
+            && BattleSpawnConfig.Enabled && IsForeignTeam(team)
+            && ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            && missionRegistry.IsCoopBattleActive)
         {
             __result = true;
 #if DEBUG
@@ -73,6 +74,14 @@ internal class CoopEmptyTeamDeploymentPatch
     /// <summary>Reports non-owning deployment observations without changing campaign state.</summary>
     public sealed class DeploymentRetentionStateCoopCommand : ICoopCommand
     {
+        private readonly ICoopBattleMissionRegistry missionRegistry;
+
+        // Takes the registry whose battle window blocks collect/reset while a coop battle is open.
+        public DeploymentRetentionStateCoopCommand(ICoopBattleMissionRegistry missionRegistry)
+        {
+            this.missionRegistry = missionRegistry;
+        }
+
         public string Prefix => "coop.debug.map_event";
         public string Name => "deployment_retention_state";
         public string Description => "Reports deployment overrides and weak-reference survival; collect/reset require mission exit.";
@@ -97,7 +106,7 @@ internal class CoopEmptyTeamDeploymentPatch
 
             bool collect = string.Equals(action, "collect", StringComparison.OrdinalIgnoreCase);
             bool reset = string.Equals(action, "reset", StringComparison.OrdinalIgnoreCase);
-            if ((collect || reset) && (Mission.Current != null || BattleSpawnGate.IsCoopBattleActive))
+            if ((collect || reset) && (Mission.Current != null || missionRegistry.IsCoopBattleActive))
                 return new CoopCommandResult(false, "Leave the mission and co-op battle before collecting or resetting observations.", "battle_active");
 
             if (collect)
@@ -135,7 +144,7 @@ internal class CoopEmptyTeamDeploymentPatch
                 totalObservedMissions = observedMissionCount,
                 aliveMissions = observedMissions.Count,
                 currentMissionActive = Mission.Current != null,
-                coopBattleActive = BattleSpawnGate.IsCoopBattleActive,
+                coopBattleActive = missionRegistry.IsCoopBattleActive,
                 overrideCalls,
                 emptyTeamOverrideCalls,
                 lastOverrideSide,

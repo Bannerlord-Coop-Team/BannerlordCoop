@@ -6,6 +6,7 @@ using Common;
 using Common.Commands;
 using Common.Util;
 using GameInterface.Services.MapEvents;
+using GameInterface.Tests.Services.MapEvents;
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using TaleWorlds.Core;
@@ -322,7 +323,7 @@ public class CoopDeploymentPatchTests
     {
         var type = GetPatchType().GetNestedType("DeploymentRetentionStateCoopCommand", BindingFlags.Public);
         Assert.NotNull(type);
-        return Assert.IsAssignableFrom<ICoopCommand>(Activator.CreateInstance(type!));
+        return Assert.IsAssignableFrom<ICoopCommand>(Activator.CreateInstance(type!, battleRegistry));
     }
 
     private static CoopCommandResult RunCommand(params string[] args) =>
@@ -389,8 +390,12 @@ public class CoopDeploymentPatchTests
 
     private static void InvokePatch(string name) => GetPatchMethod(name).Invoke(null, null);
 
-    private static void SetBattleActive(bool active) =>
-        AccessTools.Field(typeof(BattleSpawnGate), "_activeMapEventId").SetValue(null, active ? "synthetic-deployment" : null);
+    // Opens or closes the coop battle window on the registry the current PatchState installed.
+    private static void SetBattleActive(bool active)
+    {
+        if (active) battleRegistry.BeginBattle("synthetic-deployment");
+        else battleRegistry.EndBattle();
+    }
 
     private static bool StoresMissionGraph(Type type, HashSet<Type> visited)
     {
@@ -406,18 +411,20 @@ public class CoopDeploymentPatchTests
             (type.BaseType != null && StoresMissionGraph(type.BaseType, visited));
     }
 
+    // The registry of the active PatchState's container, read by the static scenario helpers.
+    private static ICoopBattleMissionRegistry battleRegistry = null!;
+
     private sealed class PatchState : IDisposable
     {
         private readonly Mission previousMission = Mission._current;
         private readonly bool previousEnabled = BattleSpawnConfig.Enabled;
         private readonly bool previousServer = ModInformation.IsServer;
-        private readonly FieldInfo battleField = AccessTools.Field(typeof(BattleSpawnGate), "_activeMapEventId");
-        private readonly object? previousBattle;
+        private readonly ActiveCoopBattleScope battleScope = new(null);
         private readonly List<(FieldInfo Field, object? Value)> previousFields = new();
 
         public PatchState()
         {
-            previousBattle = battleField.GetValue(null);
+            battleRegistry = battleScope.Registry;
             foreach (var field in GetPatchType().GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
             {
                 var value = field.GetValue(null);
@@ -442,7 +449,8 @@ public class CoopDeploymentPatchTests
             Mission._current = previousMission;
             BattleSpawnConfig.Enabled = previousEnabled;
             ModInformation.IsServer = previousServer;
-            battleField.SetValue(null, previousBattle);
+            battleScope.Dispose();
+            battleRegistry = null!;
             foreach (var entry in previousFields)
             {
                 if (entry.Field.GetValue(null) is IList list)

@@ -34,6 +34,7 @@ public class MissileHandler : IMissileHandler
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly INetworkAgentRegistry networkAgentRegistry;
+    private readonly ICoopBattleMissionRegistry missionRegistry;
     private readonly ConcurrentQueue<(NetworkAgentShoot Shot, int Attempts)> pendingShots = new();
     private readonly ConcurrentDictionary<(Guid AgentId, long ShotSequence), byte> pendingReconstructions = new();
     private readonly ConcurrentDictionary<(Guid AgentId, long ShotSequence), ImpactHint> impactHints = new();
@@ -58,11 +59,12 @@ public class MissileHandler : IMissileHandler
     }
 
     public MissileHandler(IBattleNetwork network, IMessageBroker messageBroker,
-        INetworkAgentRegistry networkAgentRegistry)
+        INetworkAgentRegistry networkAgentRegistry, ICoopBattleMissionRegistry missionRegistry)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.networkAgentRegistry = networkAgentRegistry;
+        this.missionRegistry = missionRegistry;
         messageBroker.Subscribe<AgentShoot>(AgentShootSend);
         messageBroker.Subscribe<NetworkAgentShoot>(AgentShootReceive);
         messageBroker.Subscribe<MissileItemDropped>(Handle_MissileItemDropped);
@@ -278,7 +280,7 @@ public class MissileHandler : IMissileHandler
         {
             agent = info.Agent;
         }
-        else if (BattleSpawnGate.IsCoopBattleActive)
+        else if (missionRegistry.IsCoopBattleActive)
         {
             agent = FindStandInShooter(mission);
         }

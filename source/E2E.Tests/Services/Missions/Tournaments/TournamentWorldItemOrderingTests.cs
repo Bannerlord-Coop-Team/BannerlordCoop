@@ -3,6 +3,7 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Missions;
@@ -1414,7 +1415,7 @@ public class TournamentWorldItemOrderingTests : MissionTestEnvironment
         {
             this.agentRegistry = agentRegistry;
             this.shotMap = shotMap;
-            missiles = new MissileHandler(network, Broker, agentRegistry);
+            missiles = new MissileHandler(network, Broker, agentRegistry, observer.Resolve<ICoopBattleMissionRegistry>());
             drops = CreateHandler(observer, agentRegistry, Items, objectManager, Spawner, Broker);
             pickups = new WeaponPickupHandler(agentRegistry, Items, network, Broker, objectManager);
         }

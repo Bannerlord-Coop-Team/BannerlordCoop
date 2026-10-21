@@ -368,7 +368,7 @@ public partial class ActionEquipmentSyncTests
             using var seats = new PilotSeatFixture(context);
             var agent = seats.Spawn("owner", out var id);
             var contender = seats.Spawn("peer", out _);
-            BattleSpawnGate.BeginBattle("pilot-battle");
+            BeginCoopBattle("pilot-battle", context.Instance);
             try
             {
                 var hosts = context.Instance.Resolve<IBattleHostRegistry>();
@@ -384,7 +384,7 @@ public partial class ActionEquipmentSyncTests
                 context.Component.AgentActionHandler.ApplyRemoteGuardStates();
                 Assert.Equal(stopped ? null : seats.Point, agent.CurrentlyUsedGameObject);
             }
-            finally { BattleSpawnGate.EndBattle(); }
+            finally { EndCoopBattle(context.Instance); }
         });
     }
 
@@ -423,7 +423,7 @@ public partial class ActionEquipmentSyncTests
         {
             using var seats = new PilotSeatFixture(context);
             var agent = seats.Spawn("owner", out var id);
-            BattleSpawnGate.BeginBattle("pilot-battle");
+            BeginCoopBattle("pilot-battle", context.Instance);
             try
             {
                 context.Instance.Resolve<IBattleHostRegistry>().Set("pilot-battle",
@@ -435,7 +435,7 @@ public partial class ActionEquipmentSyncTests
                 context.Component.AgentActionHandler.ApplyRemoteGuardStates();
                 Assert.Equal(stopped ? null : seats.Point, agent.CurrentlyUsedGameObject);
             }
-            finally { BattleSpawnGate.EndBattle(); }
+            finally { EndCoopBattle(context.Instance); }
         });
     }
 
@@ -448,7 +448,7 @@ public partial class ActionEquipmentSyncTests
         {
             using var seats = new PilotSeatFixture(context);
             var agent = seats.Spawn("old-owner", out var id);
-            BattleSpawnGate.BeginBattle("pilot-battle");
+            BeginCoopBattle("pilot-battle", context.Instance);
             try
             {
                 context.Instance.Resolve<IBattleHostRegistry>().Set("pilot-battle",
@@ -463,7 +463,7 @@ public partial class ActionEquipmentSyncTests
                 context.Component.AgentActionHandler.ApplyRemoteGuardStates();
                 Assert.Equal(stopped ? null : seats.Point, agent.CurrentlyUsedGameObject);
             }
-            finally { BattleSpawnGate.EndBattle(); }
+            finally { EndCoopBattle(context.Instance); }
         });
     }
 
@@ -596,7 +596,7 @@ public partial class ActionEquipmentSyncTests
             var prefix = AccessTools.Method(patchType, "Prefix");
             bool enabled = BattleSpawnConfig.Enabled;
             BattleSpawnConfig.Enabled = true;
-            BattleSpawnGate.BeginBattle("pilot-battle");
+            BeginCoopBattle("pilot-battle", context.Instance);
             try
             {
                 agent.UseGameObject(seats.Point);
@@ -610,7 +610,7 @@ public partial class ActionEquipmentSyncTests
             }
             finally
             {
-                BattleSpawnGate.EndBattle();
+                EndCoopBattle(context.Instance);
                 BattleSpawnConfig.Enabled = enabled;
             }
         });

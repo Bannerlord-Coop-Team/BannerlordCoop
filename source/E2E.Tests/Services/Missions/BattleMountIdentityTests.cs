@@ -760,7 +760,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
 
                 controller.Session.TryBegin(mapEventId);
                 successor.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("A", new[] { "B" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, successor);
 
                 Assert.True(successor.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var hostParty));
                 var character = (CharacterObject)Game.Current.PlayerTroop;
@@ -802,7 +802,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(successor);
         }
     }
 
@@ -831,7 +831,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
                 var registry = observer.Resolve<INetworkAgentRegistry>();
 
                 controller.Session.TryBegin("mapEvent1");
-                BattleSpawnGate.BeginBattle("mapEvent1");
+                BeginCoopBattle("mapEvent1", observer);
 
                 // The non-host retreat despawn selects A's troops by the player team's side.
                 mock.PlayerTeam = mock.DefenderTeam;
@@ -872,7 +872,7 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(observer);
         }
     }
 }

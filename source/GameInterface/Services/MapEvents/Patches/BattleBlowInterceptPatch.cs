@@ -36,7 +36,8 @@ internal class BattleBlowInterceptPatch
     private static bool Prefix(Agent __instance, Blow blow, ref AttackCollisionData collisionData)
     {
         if (!BattleSpawnConfig.Enabled) return true;
-        if (!BattleSpawnGate.IsCoopBattleActive) return true;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return true;
         if (AllowedThread.IsThisThreadAllowed()) return true;
 
         if (__instance == null) return true;

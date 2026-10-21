@@ -24,7 +24,8 @@ internal class BattleAgentSpawnedPatch
     private static void Postfix(Agent __result)
     {
         if (!BattleSpawnConfig.Enabled) return;
-        if (!BattleSpawnGate.IsCoopBattleActive) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return;
         // A puppet being spawned from another owner's broadcast is NOT our troop — don't re-capture it.
         if (BattleSpawnGate.SuppressCapture) return;
         if (__result == null) return;

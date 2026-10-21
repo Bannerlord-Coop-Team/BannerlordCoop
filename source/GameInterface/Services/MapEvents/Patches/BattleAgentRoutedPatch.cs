@@ -19,8 +19,9 @@ internal class BattleAgentRoutedPatch
     private static void Postfix(Agent affectedAgent, AgentState agentState)
     {
         if (!BattleSpawnConfig.Enabled) return;
-        if (!BattleSpawnGate.IsCoopBattleActive) return;
         if (agentState != AgentState.Routed || affectedAgent == null) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return;
 
         MessageBroker.Instance.Publish(affectedAgent, new BattleAgentRouted(affectedAgent));
     }

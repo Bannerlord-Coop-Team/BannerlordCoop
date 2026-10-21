@@ -87,6 +87,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
             Assert.NotSame(clientBattle, PlayerEncounter.Battle);
 
             using var messageBroker = new MessageBroker();
+            var missionRegistry = client.Resolve<ICoopBattleMissionRegistry>();
             using var handler = new BattleMissionStartHandler(
                 messageBroker,
                 client.ObjectManager,
@@ -94,7 +95,8 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
                 missionInitializerResolver,
-                null!);
+                null!,
+                missionRegistry);
 
             try
             {
@@ -144,11 +146,11 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 hideoutLauncher.Verify(
                     l => l.OpenCoopHideoutMission(It.IsAny<MissionInitializerRecord>(), isDirectAssault),
                     isHideout ? Times.Once() : Times.Never());
-                Assert.False(BattleSpawnGate.IsCoopBattleActive);
+                Assert.False(missionRegistry.IsCoopBattleActive);
             }
             finally
             {
-                BattleSpawnGate.EndBattle();
+                missionRegistry.EndBattle();
                 Campaign.Current.MainParty = previousMainParty;
                 Campaign.Current.PlayerEncounter = null;
                 ContainerProvider.SetContainer(client.Container);
@@ -185,6 +187,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
             var previousDifficultyModel = campaign.Models.DifficultyModel;
             var previousWeatherModel = campaign.Models.MapWeatherModel;
             var previousScene = campaign._mapSceneWrapper;
+            var missionRegistry = client.Resolve<ICoopBattleMissionRegistry>();
 
             try
             {
@@ -224,7 +227,8 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 using var messageBroker = new MessageBroker();
                 using var handler = new BattleMissionStartHandler(messageBroker, client.ObjectManager,
                     client.Resolve<IPlayerManager>(), client.Resolve<INetwork>(),
-                    client.Resolve<IMapEventLogger>(), new RecordingMissionInitializerResolver(), null!);
+                    client.Resolve<IMapEventLogger>(), new RecordingMissionInitializerResolver(), null!,
+                    missionRegistry);
                 ContainerProvider.SetContainer(launcherScope);
                 messageBroker.Publish(this, new NetworkStartSiegeMission(mapEvent.MapEventId, 0,
                     new[] { 1f, 1f }, Array.Empty<SiegeEngineState>(), Array.Empty<SiegeEngineState>(),
@@ -234,11 +238,11 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 Assert.True(opened);
                 Assert.Same(battle, PlayerEncounter.Battle);
                 Assert.Equal(localSide == BattleSideEnum.Attacker, PlayerEncounter.PlayerIsAttacker);
-                Assert.False(BattleSpawnGate.IsCoopBattleActive);
+                Assert.False(missionRegistry.IsCoopBattleActive);
             }
             finally
             {
-                BattleSpawnGate.EndBattle();
+                missionRegistry.EndBattle();
                 campaign.MainParty = previousMainParty;
                 campaign.PlayerEncounter = previousEncounter;
                 campaign.Models.LocationModel = previousLocationModel;
@@ -307,7 +311,8 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                     client.Resolve<INetwork>(),
                     client.Resolve<IMapEventLogger>(),
                     missionInitializerResolver,
-                    null!);
+                    null!,
+                    client.Resolve<ICoopBattleMissionRegistry>());
 
                 messageBroker.Publish(this, new NetworkStartAttackMission(
                     mapEvent.MapEventId,

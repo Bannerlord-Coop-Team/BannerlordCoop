@@ -447,7 +447,8 @@ public partial class ActionEquipmentSyncTests : MissionTestEnvironment
         RunScenario(context =>
         {
             const string mapEventId = "mapEvent1";
-            BattleSpawnGate.BeginBattle(mapEventId);
+            var missionRegistry = context.Instance.Resolve<ICoopBattleMissionRegistry>();
+            missionRegistry.BeginBattle(mapEventId);
             try
             {
                 var broker = context.Instance.Resolve<IMessageBroker>();
@@ -512,7 +513,7 @@ public partial class ActionEquipmentSyncTests : MissionTestEnvironment
             }
             finally
             {
-                BattleSpawnGate.EndBattle();
+                missionRegistry.EndBattle();
             }
         });
     }
@@ -640,7 +641,8 @@ public partial class ActionEquipmentSyncTests : MissionTestEnvironment
         RunScenario(context =>
         {
             const string battleId = "equipment-epoch";
-            BattleSpawnGate.BeginBattle(battleId);
+            var missionRegistry = context.Instance.Resolve<ICoopBattleMissionRegistry>();
+            missionRegistry.BeginBattle(battleId);
             try
             {
                 var hosts = context.Instance.Resolve<IBattleHostRegistry>();
@@ -666,7 +668,7 @@ public partial class ActionEquipmentSyncTests : MissionTestEnvironment
                 context.Component.AgentActionHandler.PollActionsAfterNativeTick();
                 Assert.Single(context.Network.NetworkSentPackets.GetPackets<AgentActionPacket>());
             }
-            finally { BattleSpawnGate.EndBattle(); }
+            finally { missionRegistry.EndBattle(); }
         });
     }
 

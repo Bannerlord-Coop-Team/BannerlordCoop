@@ -14,8 +14,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// field battle. The campaign builds the native suppliers in <c>CampaignMission.OpenBattleMission</c> and
 /// passes the array to this constructor; replacing the array's entries here (before the constructor body
 /// reads them) means the native deployment/reinforcement logic drives our supplier instead, with no other
-/// changes. Only active in a coop battle (see <see cref="BattleSpawnGate"/>); ordinary battles keep their
-/// native suppliers.
+/// changes. Only active in a coop battle (see <see cref="ICoopBattleMissionRegistry.IsCoopBattleActive"/>);
+/// ordinary battles keep their native suppliers.
 /// </summary>
 [HarmonyPatch(typeof(DefaultBattleMissionAgentSpawnLogic), MethodType.Constructor,
     new Type[] { typeof(IMissionTroopSupplier[]), typeof(BattleSideEnum), typeof(Mission.BattleSizeType) })]
@@ -27,9 +27,9 @@ internal class BattleTroopSupplierInjectionPatch
     private static void Prefix(IMissionTroopSupplier[] suppliers)
     {
         if (!BattleSpawnConfig.Enabled) return;
-        if (!BattleSpawnGate.IsCoopBattleActive) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)) return;
 
-        var mapEventId = BattleSpawnGate.ActiveMapEventId;
+        var mapEventId = missionRegistry.ActiveMapEventId;
         if (mapEventId == null || suppliers == null) return;
 
         // The coop field-battle launcher (CoopFieldBattleLauncher) now builds the spawn logic with our

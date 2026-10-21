@@ -13,6 +13,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
 
+[Collection(ActiveCoopBattleCollection.Name)]
 public class CoopAllowPlayerDeploymentPatchTests
 {
     [Fact]
@@ -42,6 +43,7 @@ public class CoopAllowPlayerDeploymentPatchTests
         var previousMission = Mission._current;
         var modelsField = AccessTools.Field(typeof(MissionGameModels), "<Current>k__BackingField");
         var previousModels = modelsField.GetValue(null);
+        ActiveCoopBattleScope battleScope = null;
         try
         {
             var mission = ObjectHelper.SkipConstructor<Mission>();
@@ -52,7 +54,7 @@ public class CoopAllowPlayerDeploymentPatchTests
             AccessTools.Field(typeof(Team), "<Side>k__BackingField").SetValue(playerTeam, playerSide);
             mission.Teams._playerTeam = playerTeam;
             Mission._current = mission;
-            BattleSpawnGate.BeginBattle("sally-out-deployment");
+            battleScope = new ActiveCoopBattleScope("sally-out-deployment");
 
             // The native model answers false for every sally-out; the coop gate decides on top of it.
             var model = new SandboxBattleInitializationModel();
@@ -70,7 +72,7 @@ public class CoopAllowPlayerDeploymentPatchTests
         finally
         {
             harmony.UnpatchAll(harmony.Id);
-            BattleSpawnGate.EndBattle();
+            battleScope?.Dispose();
             modelsField.SetValue(null, previousModels);
             Mission._current = previousMission;
         }

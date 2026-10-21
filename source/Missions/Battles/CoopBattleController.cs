@@ -143,8 +143,10 @@ public class CoopBattleController : CoopMissionController
             coopMissionComponent,
             worldItemRegistry,
             session,
-            missionContext);
-        deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, coopMissionComponent, session, casualties);
+            missionContext,
+            missionRegistry);
+        deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, coopMissionComponent, session,
+            casualties, missionRegistry);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties, lifecycle);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         puppetDeathApplier = new PuppetDeathApplier(
@@ -385,8 +387,8 @@ public class CoopBattleController : CoopMissionController
             Deployment.IsActivated,
             attackerFielded,
             defenderFielded,
-            BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Attacker),
-            BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
+            missionRegistry.IsMissingReserveSideAccepted(BattleSideEnum.Attacker),
+            missionRegistry.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
     }
 
     /// <summary>

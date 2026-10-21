@@ -40,7 +40,7 @@ public class AgentHitSoundTests : MissionTestEnvironment
         var victimId = Guid.NewGuid();
         var attackerId = Guid.NewGuid();
         int owner = crossOwnerHit ? 1 : 0;
-        BattleSpawnGate.BeginBattle("hit-sound-test");
+        BeginCoopBattle("hit-sound-test", clients);
         try
         {
             for (int i = 0; i < clients.Length; i++)
@@ -90,7 +90,7 @@ public class AgentHitSoundTests : MissionTestEnvironment
         finally
         {
             foreach (var handler in handlers) handler.Dispose();
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(clients);
         }
     }
 
@@ -109,7 +109,7 @@ public class AgentHitSoundTests : MissionTestEnvironment
         Guid victimId = Guid.NewGuid();
         Guid horseId = Guid.NewGuid();
         var position = new Vec3(4f, 5f, 6f);
-        BattleSpawnGate.BeginBattle("routed-hit-sound-test");
+        BeginCoopBattle("routed-hit-sound-test", clients);
         try
         {
             for (int i = 0; i < clients.Length; i++)
@@ -173,7 +173,7 @@ public class AgentHitSoundTests : MissionTestEnvironment
         finally
         {
             foreach (var controller in controllers) controller?.Dispose();
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(clients);
         }
     }
 
@@ -187,8 +187,8 @@ public class AgentHitSoundTests : MissionTestEnvironment
         using var sounds = new SoundRecorder();
         var client = Clients.First();
         SetControllerId(client, "owner");
-        if (inBattle) BattleSpawnGate.BeginBattle("hit-sound-capture");
-        else BattleSpawnGate.EndBattle();
+        if (inBattle) BeginCoopBattle("hit-sound-capture", client);
+        else EndCoopBattle(client);
         try
         {
             client.Call(() =>
@@ -205,7 +205,7 @@ public class AgentHitSoundTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(client);
         }
     }
 
@@ -224,7 +224,8 @@ public class AgentHitSoundTests : MissionTestEnvironment
             Assert.True(registry.TryRegisterAgent("attacker", Guid.NewGuid(), attacker));
             Assert.True(registry.TryRegisterAgent("victim-owner", Guid.NewGuid(), victim));
             var network = new Moq.Mock<IBattleNetwork>();
-            using var handler = new CombatHitPresentationHandler(registry, network.Object, client.Resolve<IMessageBroker>());
+            using var handler = new CombatHitPresentationHandler(registry, network.Object, client.Resolve<IMessageBroker>(),
+                client.Resolve<ICoopBattleMissionRegistry>());
 
             client.Resolve<IMessageBroker>().Publish(this,
                 new AgentHitSound(victim, attacker, null, 123, new Vec3(1f, 2f, 3f), 0.5f));
@@ -247,7 +248,7 @@ public class AgentHitSoundTests : MissionTestEnvironment
         sounds.StubShieldSound();
         var client = Clients.First();
         SetControllerId(client, "observer");
-        BattleSpawnGate.BeginBattle("presentation-receive-test");
+        BeginCoopBattle("presentation-receive-test", client);
         try
         {
             client.Call(() =>
@@ -279,7 +280,7 @@ public class AgentHitSoundTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(client);
         }
     }
 

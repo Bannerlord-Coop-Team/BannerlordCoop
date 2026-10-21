@@ -9,15 +9,9 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.MapEvents;
 
 /// <summary>
-/// Static bridge that lets the (GameInterface) battle-spawn Harmony patches know whether a coop field battle is
-/// the active mission (and which map event it is): the Missions battle stack marks one active on entry
-/// (<see cref="BeginBattle"/>) and clears it on exit (<see cref="EndBattle"/>). The patches are static methods
-/// that cannot resolve DI services, hence this static bridge.
-/// <para>
-/// It holds NO host/ownership state: which client fields (spawns) a party is decided server-side by the troop
-/// reserve assignment — each client's <c>CoopTroopSupplier</c> only contains the troops it owns, so there is no
-/// host-based spawn suppression to gate here. The live host source for the controller is <c>IBattleHostRegistry</c>.
-/// </para>
+/// Static bridge for the battle patches' remaining per-call state: puppet-spawn capture suppression, authority
+/// probes, routed-blow and replicated-death context, and kill-feed bookkeeping. Whether a coop battle is active
+/// lives in <see cref="ICoopBattleMissionRegistry"/>.
 /// </summary>
 public static class BattleSpawnGate
 {
@@ -27,9 +21,6 @@ public static class BattleSpawnGate
     private static readonly object Gate = new object();
     private static readonly Queue<CombatLogContext> CombatLogContexts = new Queue<CombatLogContext>();
     private static readonly List<RoutedPlayerHitNotification> RoutedPlayerHitNotifications = new List<RoutedPlayerHitNotification>();
-    private static string _activeMapEventId;
-    private static bool _defenderReserveTimedOut;
-    private static bool _attackerReserveTimedOut;
 
     [System.ThreadStatic]
     private static bool _suppressCapture;
@@ -67,12 +58,6 @@ public static class BattleSpawnGate
     {
         get => _suppressCapture;
         set => _suppressCapture = value;
-    }
-
-    /// <summary>True while a coop field battle is the active mission.</summary>
-    public static bool IsCoopBattleActive
-    {
-        get { lock (Gate) { return _activeMapEventId != null; } }
     }
 
     /// <summary>
@@ -293,67 +278,11 @@ public static class BattleSpawnGate
         notificationToRemove?.Invoke();
     }
 
-    public static string ActiveMapEventId
-    {
-        get { lock (Gate) { return _activeMapEventId; } }
-    }
-
-    /// <summary>
-    /// Marks a side whose reserve never arrived before the spawn handler's explicit fallback deadline.
-    /// Battle-end checks may treat that side as intentionally absent once deployment is active; an ordinary
-    /// not-yet-spawned side is never marked and remains protected from premature depletion.
-    /// </summary>
-    public static void AcceptMissingReserveSide(BattleSideEnum side)
+    /// <summary>Drops kill-feed bookkeeping left from an earlier battle; runs when a coop battle window opens or closes.</summary>
+    public static void ResetCombatFeedback()
     {
         lock (Gate)
         {
-            if (side == BattleSideEnum.Defender) _defenderReserveTimedOut = true;
-            else if (side == BattleSideEnum.Attacker) _attackerReserveTimedOut = true;
-        }
-    }
-
-    /// <summary>Clear the timeout fallback when a late authoritative reserve arrives for this side.</summary>
-    public static void RestoreReserveSide(BattleSideEnum side)
-    {
-        lock (Gate)
-        {
-            if (side == BattleSideEnum.Defender) _defenderReserveTimedOut = false;
-            else if (side == BattleSideEnum.Attacker) _attackerReserveTimedOut = false;
-        }
-    }
-
-    /// <summary>Whether the spawn handler deliberately proceeded without this side's reserve.</summary>
-    public static bool IsMissingReserveSideAccepted(BattleSideEnum side)
-    {
-        lock (Gate)
-        {
-            if (side == BattleSideEnum.Defender) return _defenderReserveTimedOut;
-            if (side == BattleSideEnum.Attacker) return _attackerReserveTimedOut;
-            return false;
-        }
-    }
-
-    /// <summary>[Controller] Mark a coop battle active.</summary>
-    public static void BeginBattle(string mapEventId)
-    {
-        lock (Gate)
-        {
-            _activeMapEventId = mapEventId;
-            _defenderReserveTimedOut = false;
-            _attackerReserveTimedOut = false;
-            CombatLogContexts.Clear();
-            RoutedPlayerHitNotifications.Clear();
-        }
-    }
-
-    /// <summary>[Controller] Clear on mission end.</summary>
-    public static void EndBattle()
-    {
-        lock (Gate)
-        {
-            _activeMapEventId = null;
-            _defenderReserveTimedOut = false;
-            _attackerReserveTimedOut = false;
             CombatLogContexts.Clear();
             RoutedPlayerHitNotifications.Clear();
         }

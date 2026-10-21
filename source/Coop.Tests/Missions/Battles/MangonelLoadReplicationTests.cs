@@ -140,7 +140,7 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         bool oldKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
         bool oldEnabled = BattleSpawnConfig.Enabled;
         BattleSpawnConfig.Enabled = true;
-        BattleSpawnGate.BeginBattle("mangonel-former-simulator");
+        var battleScope = new ActiveCoopBattleScope("mangonel-former-simulator");
         SiegeMissionAuthorityGate.IsLocalAuthority = false;
         SiegeMissionAuthorityGate.IsAuthorityKnown = authorityKnown;
         SiegeMissionAuthorityGate.SetClaimedMachines(localSimulator
@@ -162,7 +162,7 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            battleScope.Dispose();
             BattleSpawnConfig.Enabled = oldEnabled;
             SiegeMissionAuthorityGate.IsLocalAuthority = oldHost;
             SiegeMissionAuthorityGate.IsAuthorityKnown = oldKnown;

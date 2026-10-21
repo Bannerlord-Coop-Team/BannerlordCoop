@@ -15,7 +15,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// spawn front-to-back and charges each troop its own slot cost (a mounted troop spawns rider + horse in one
 /// call — two slots), stopping at the first troop that no longer fits. A cavalry drip with a single slot left
 /// therefore spawns nothing — never 2001. Deferred troops stay reserved and the drip retries as removals free
-/// slots. Only active inside a coop battle (see <see cref="BattleSpawnGate"/>); ordinary battles are untouched.
+/// slots. Only active inside a coop battle (see <see cref="ICoopBattleMissionRegistry.IsCoopBattleActive"/>);
+/// ordinary battles are untouched.
 /// </summary>
 [HarmonyPatch(typeof(MissionBattleSideSpawnContext), nameof(MissionBattleSideSpawnContext.SpawnTroops),
     new[] { typeof(int), typeof(bool) })]
@@ -24,7 +25,9 @@ internal class MissionSpawnCapacityPatch
     [HarmonyPrefix]
     private static void Prefix(MissionBattleSideSpawnContext __instance, ref int number)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+        if (!BattleSpawnConfig.Enabled) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return;
         if (!ContainerProvider.TryResolve<IBattleAgentBudget>(out var budget)) return;
 
         number = ClampSpawnNumber(Mission.Current, budget, number,

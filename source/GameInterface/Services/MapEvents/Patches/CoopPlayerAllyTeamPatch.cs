@@ -11,7 +11,9 @@ internal static class CoopPlayerAllyTeamPatch
     [HarmonyPostfix]
     private static void Postfix(MissionCombatantsLogic __instance)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+        if (!BattleSpawnConfig.Enabled) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return;
 
         var mission = __instance.Mission;
         var playerTeam = mission?.PlayerTeam;

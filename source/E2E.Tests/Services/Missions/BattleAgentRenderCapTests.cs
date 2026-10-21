@@ -123,7 +123,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
 
                 controller.Session.TryBegin(mapEventId);
                 hosts.Set(mapEventId, new BattleHostAssignment(startsAsNonHost ? "B" : "A", new[] { "B" }, epoch: 1));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, receiver);
 
                 Assert.True(receiver.ObjectManager.TryGetObject<MobileParty>(partyIds[2], out var npcParty));
                 var mapEventParty = npcParty.MapEvent.AttackerSide.Parties.Single(p => p.Party == npcParty.Party);
@@ -259,7 +259,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(receiver);
         }
     }
 
@@ -309,7 +309,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 var registry = host.Resolve<INetworkAgentRegistry>();
                 controller.Session.TryBegin(mapEventId);
                 host.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("host", new[] { "peer" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, host);
 
                 Assert.True(host.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var peerParty));
                 var mep = peerParty.MapEvent.DefenderSide.Parties.Single(p => p.Party == peerParty.Party);
@@ -359,7 +359,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
         finally
         {
             harmony.UnpatchAll(harmony.Id);
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(host);
         }
     }
 
@@ -395,7 +395,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 var registry = host.Resolve<INetworkAgentRegistry>();
                 controller.Session.TryBegin(mapEventId);
                 host.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("host", new[] { "peer" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, host);
 
                 Assert.True(host.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var peerParty));
                 var mep = peerParty.MapEvent.DefenderSide.Parties.Single(p => p.Party == peerParty.Party);
@@ -423,7 +423,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(host);
         }
     }
 
@@ -455,7 +455,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 var registry = host.Resolve<INetworkAgentRegistry>();
                 controller.Session.TryBegin(mapEventId);
                 host.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("host", new[] { "peer", "joiner" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, host);
 
                 Assert.True(host.ObjectManager.TryGetObject<MobileParty>(partyIds[2], out var joinerParty));
                 var mep = joinerParty.MapEvent.AttackerSide.Parties.Single(p => p.Party == joinerParty.Party);
@@ -492,7 +492,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(host);
         }
     }
 
@@ -521,7 +521,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 var registry = host.Resolve<INetworkAgentRegistry>();
                 controller.Session.TryBegin(mapEventId);
                 host.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("host", new[] { "peer" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, host);
 
                 Assert.True(host.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var peerParty));
                 var mep = peerParty.MapEvent.DefenderSide.Parties.Single(p => p.Party == peerParty.Party);
@@ -551,7 +551,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(host);
         }
     }
 
@@ -579,7 +579,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
                 var registry = host.Resolve<INetworkAgentRegistry>();
                 controller.Session.TryBegin(mapEventId);
                 host.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("host", new[] { "peer" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, host);
 
                 Assert.True(host.ObjectManager.TryGetObject<MobileParty>(partyIds[1], out var peerParty));
                 var mep = peerParty.MapEvent.DefenderSide.Parties.Single(p => p.Party == peerParty.Party);
@@ -608,7 +608,7 @@ public class BattleAgentRenderCapTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(host);
         }
     }
 

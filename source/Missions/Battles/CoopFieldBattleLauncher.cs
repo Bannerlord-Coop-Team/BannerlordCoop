@@ -45,17 +45,20 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
     private readonly IObjectManager objectManager;
     private readonly ICoopBattleBehaviorAttacher behaviorAttacher;
     private readonly IBattleAgentBudget agentBudget;
+    private readonly ICoopBattleMissionRegistry missionRegistry;
 
     public CoopFieldBattleLauncher(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         ICoopBattleBehaviorAttacher behaviorAttacher,
-        IBattleAgentBudget agentBudget)
+        IBattleAgentBudget agentBudget,
+        ICoopBattleMissionRegistry missionRegistry)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.behaviorAttacher = behaviorAttacher;
         this.agentBudget = agentBudget;
+        this.missionRegistry = missionRegistry;
     }
 
     public Mission OpenCoopFieldBattle(MissionInitializerRecord rec)
@@ -121,7 +124,7 @@ internal class CoopFieldBattleLauncher : ICoopFieldBattleLauncher
                 new BattlePowerCalculationLogic(),
                 new BattleSpawnLogic("battle_set"),
                 new CoopBattleMissionSpawnHandler(defenderSupplier, attackerSupplier, messageBroker,
-                    PartyBase.MainParty.Side),
+                    missionRegistry, PartyBase.MainParty.Side),
                 new CampaignMissionComponent(),
                 new BattleAgentLogic(),
                 new MountAgentLogic(),

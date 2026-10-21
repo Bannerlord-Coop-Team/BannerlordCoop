@@ -30,7 +30,7 @@ internal static class AgentHitSoundDiagnostics
     {
         Mission mission = Mission.Current;
         var session = mission?.GetMissionBehavior<CoopBattleController>()?.Session;
-        if (mission == null || session == null || !BattleSpawnGate.IsCoopBattleActive)
+        if (mission == null || session == null || !IsCoopBattleActive())
             return false;
 
         lock (Gate)
@@ -118,8 +118,13 @@ internal static class AgentHitSoundDiagnostics
     {
         lock (Gate)
             return recording && ReferenceEquals(observedMission, mission) &&
-                BattleSpawnGate.IsCoopBattleActive;
+                IsCoopBattleActive();
     }
+
+    // Reads this client's coop battle window; no container means a vanilla battle.
+    private static bool IsCoopBattleActive()
+        => ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+           && missionRegistry.IsCoopBattleActive;
 
     private static string AgentId(INetworkAgentRegistry registry, Agent agent) =>
         registry != null && agent != null &&

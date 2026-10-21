@@ -40,6 +40,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     private readonly IBattleHostRegistry battleHostRegistry;
     private readonly IMissionContext missionContext;
     private readonly IAgentVisualActionAccessor agentVisualActionAccessor;
+    private readonly ICoopBattleMissionRegistry missionRegistry;
 
     // All receive-side state for one agent stays together so authority changes clear it atomically.
     private readonly Dictionary<Guid, RemoteAgentActionState> _agentStates =
@@ -246,18 +247,20 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         IControllerIdProvider controllerIdProvider,
         IBattleHostRegistry battleHostRegistry,
         IMissionContext missionContext,
-        IAgentVisualActionAccessor agentVisualActionAccessor)
+        IAgentVisualActionAccessor agentVisualActionAccessor,
+        ICoopBattleMissionRegistry missionRegistry)
     {
         this.agentRegistry = agentRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.battleHostRegistry = battleHostRegistry;
         this.missionContext = missionContext;
         this.agentVisualActionAccessor = agentVisualActionAccessor;
+        this.missionRegistry = missionRegistry;
     }
 
     public int GetOutgoingBattleHostEpoch()
     {
-        string mapEventId = BattleSpawnGate.ActiveMapEventId;
+        string mapEventId = missionRegistry.ActiveMapEventId;
         if (mapEventId == null
             || !battleHostRegistry.TryGet(mapEventId, out var assignment)
             || assignment.HostControllerId != controllerIdProvider.ControllerId)
@@ -518,7 +521,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
     public void HandleBattleHostAssigned(NetworkBattleHostAssigned message)
     {
         if (_disposed) return;
-        if (message.MapEventId != BattleSpawnGate.ActiveMapEventId)
+        if (message.MapEventId != missionRegistry.ActiveMapEventId)
             return;
         if (!battleHostRegistry.TryGet(message.MapEventId, out var assignment)
             || assignment.Epoch != message.Epoch
@@ -562,7 +565,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         {
             if (_disposed
                 || Mission.Current == null
-                || BattleSpawnGate.ActiveMapEventId != mapEventId)
+                || missionRegistry.ActiveMapEventId != mapEventId)
             {
                 return;
             }
@@ -1500,7 +1503,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         string controllerId,
         int battleHostEpoch)
     {
-        string mapEventId = BattleSpawnGate.ActiveMapEventId;
+        string mapEventId = missionRegistry.ActiveMapEventId;
         return mapEventId != null
             && battleHostRegistry.TryGet(mapEventId, out var assignment)
             && assignment.HostControllerId == controllerId
@@ -1512,7 +1515,7 @@ public partial class RemoteAgentActionProcessor : IRemoteAgentActionProcessor
         if (packet.BattleHostEpoch <= 0)
             return false;
 
-        string mapEventId = BattleSpawnGate.ActiveMapEventId;
+        string mapEventId = missionRegistry.ActiveMapEventId;
         if (mapEventId == null)
             return false;
         if (!battleHostRegistry.TryGet(mapEventId, out var assignment))

@@ -27,7 +27,7 @@ namespace Missions.Battles;
 public interface IBattleInstanceLifecycle : IDisposable
 {
     /// <summary>
-    /// Tear the instance down on mission end: optionally announce an unresolved battle retreat, end the spawn gate, clear this battle's troop suppliers,
+    /// Tear the instance down on mission end: optionally announce an unresolved battle retreat, close the coop battle window, clear this battle's troop suppliers,
     /// announce MissionLeft over the relay, stop the mesh socket, and clear the battle agent registry and
     /// local mission-membership mirror so stale mission state cannot survive into a later re-entry.
     /// </summary>
@@ -53,6 +53,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
     private readonly INetworkWorldItemRegistry worldItemRegistry;
     private readonly IBattleSession session;
     private readonly IMissionContext missionContext;
+    private readonly ICoopBattleMissionRegistry missionRegistry;
     private bool healthReported;
     private readonly Dictionary<string, Dictionary<int, float>> healthByParty = new();
     private readonly Dictionary<string, Dictionary<int, float>> routedByParty = new();
@@ -66,7 +67,8 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
         ICoopMissionComponent coopMissionComponent,
         INetworkWorldItemRegistry worldItemRegistry,
         IBattleSession session,
-        IMissionContext missionContext)
+        IMissionContext missionContext,
+        ICoopBattleMissionRegistry missionRegistry)
     {
         this.network = network;
         this.relayNetwork = relayNetwork;
@@ -76,6 +78,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
         this.worldItemRegistry = worldItemRegistry;
         this.session = session;
         this.missionContext = missionContext;
+        this.missionRegistry = missionRegistry;
 
         messageBroker.Subscribe<PlayerEnteredBattle>(Handle_PlayerEnteredBattle);
         messageBroker.Subscribe<NetworkMissionLeft>(Handle_LeaveMission);
@@ -93,7 +96,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
 
     // The battle mission was opened locally and the controller attached by BattleMissionEntryPatch before the
     // event was published, so this is the live, mission-scoped owner of the P2P connection.
-    // The spawn gate is engaged earlier, in BattleMissionEntryPatch's prefix (before the mission's troops
+    // The coop battle window is opened earlier, in BattleMissionEntryPatch's prefix (before the mission's troops
     // spawn). This handler only owns the P2P instance connect; BattleHostHandler requests the entry reserves
     // here and the host election later, at mission-ready (CoopBattleController.AfterStart).
     private void Handle_PlayerEnteredBattle(MessagePayload<PlayerEnteredBattle> payload)
@@ -128,7 +131,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
     public void Leave(bool wasRetreat)
     {
         ReportFinalHealth();
-        BattleSpawnGate.EndBattle();
+        missionRegistry.EndBattle();
 
         if (session.HasInstance)
         {

@@ -264,7 +264,7 @@ public class SiegeMachineSimulationTests : IDisposable
         bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
         bool previousEnabled = BattleSpawnConfig.Enabled;
         BattleSpawnConfig.Enabled = true;
-        BattleSpawnGate.BeginBattle("ram-authority-test");
+        var battleScope = new ActiveCoopBattleScope("ram-authority-test");
         SiegeMissionAuthorityGate.IsAuthorityKnown = authorityKnown;
         SiegeMissionAuthorityGate.IsLocalAuthority = false;
         SiegeMissionAuthorityGate.SetClaimedMachines(
@@ -277,12 +277,12 @@ public class SiegeMachineSimulationTests : IDisposable
             var check = patchType.GetMethod("IsClientForMachine", BindingFlags.Static | BindingFlags.NonPublic);
             Assert.NotNull(check);
             Assert.Equal(replicaBranch, (bool)check.Invoke(null, new object[] { ram }));
-            BattleSpawnGate.EndBattle();
+            battleScope.Registry.EndBattle();
             Assert.False((bool)check.Invoke(null, new object[] { ram }));
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            battleScope.Dispose();
             BattleSpawnConfig.Enabled = previousEnabled;
             SiegeMissionAuthorityGate.IsAuthorityKnown = previousKnown;
             SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
@@ -329,7 +329,7 @@ public class SiegeMachineSimulationTests : IDisposable
         bool oldKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
         bool oldEnabled = BattleSpawnConfig.Enabled;
         BattleSpawnConfig.Enabled = true;
-        BattleSpawnGate.BeginBattle("ram-arrival-test");
+        var battleScope = new ActiveCoopBattleScope("ram-arrival-test");
         SiegeMissionAuthorityGate.IsLocalAuthority = false;
         SiegeMissionAuthorityGate.IsAuthorityKnown = true;
         SiegeMissionAuthorityGate.ResetClaimedMachines();
@@ -383,7 +383,7 @@ public class SiegeMachineSimulationTests : IDisposable
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            battleScope.Dispose();
             BattleSpawnConfig.Enabled = oldEnabled;
             SiegeMissionAuthorityGate.IsLocalAuthority = oldHost;
             SiegeMissionAuthorityGate.IsAuthorityKnown = oldKnown;

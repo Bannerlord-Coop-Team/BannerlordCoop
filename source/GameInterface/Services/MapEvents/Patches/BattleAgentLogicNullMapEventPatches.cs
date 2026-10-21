@@ -39,7 +39,9 @@ internal class BattleAgentLogicNullMapEventPatches
     {
         get
         {
-            if (!BattleSpawnGate.IsCoopBattleActive) return true; // vanilla battles untouched
+            // Vanilla battles, and no container, stay untouched.
+            if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+                || !missionRegistry.IsCoopBattleActive) return true;
 
             var playerMapEvent = MapEvent.PlayerMapEvent;
             return playerMapEvent != null && playerMapEvent.TroopUpgradeTracker != null;

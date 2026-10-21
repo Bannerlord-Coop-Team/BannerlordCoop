@@ -1,8 +1,10 @@
-﻿namespace GameInterface.Services.MapEvents;
+﻿using TaleWorlds.Core;
+
+namespace GameInterface.Services.MapEvents;
 
 /// <summary>
-/// Tracks which coop battle windows are open on this machine, so GameInterface patches can tell a coop battle
-/// mission apart from a mission-less battle. Each window is keyed by the battle's map-event id.
+/// Tracks the coop battle windows open on this machine, so GameInterface patches can tell a coop battle apart from
+/// a vanilla or mission-less one. The battle window spans entry to leave; the mission window spans the controller.
 /// </summary>
 public interface ICoopBattleMissionRegistry
 {
@@ -20,6 +22,33 @@ public interface ICoopBattleMissionRegistry
 
     /// <summary>Closes the loaded-mission window only if <paramref name="mapEventId"/> (possibly null) still owns it.</summary>
     void EndMission(string mapEventId);
+
+    /// <summary>
+    /// True from just before a coop battle mission is built (its initial wave spawns during the build) until the
+    /// battle instance is left. Opens earlier and closes later than <see cref="IsMissionActive"/>.
+    /// </summary>
+    bool IsCoopBattleActive { get; }
+
+    /// <summary>The map-event id of the open battle window, or null when no coop battle is active.</summary>
+    string ActiveMapEventId { get; }
+
+    /// <summary>Opens the battle window for <paramref name="mapEventId"/> and clears any reserve timeouts.</summary>
+    void BeginBattle(string mapEventId);
+
+    /// <summary>Closes the battle window and clears any reserve timeouts. Repeated calls do nothing extra.</summary>
+    void EndBattle();
+
+    /// <summary>
+    /// Marks a side whose reserve never arrived before the spawn handler's fallback deadline, so battle-end checks
+    /// may treat it as intentionally absent. An ordinary not-yet-spawned side is never marked.
+    /// </summary>
+    void AcceptMissingReserveSide(BattleSideEnum side);
+
+    /// <summary>Clears the timeout fallback when a late authoritative reserve arrives for this side.</summary>
+    void RestoreReserveSide(BattleSideEnum side);
+
+    /// <summary>Whether the spawn handler deliberately proceeded without this side's reserve.</summary>
+    bool IsMissingReserveSideAccepted(BattleSideEnum side);
 }
 
 /// <inheritdoc cref="ICoopBattleMissionRegistry"/>
@@ -28,6 +57,9 @@ public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
     private readonly object sync = new();
     private bool isMissionActive;
     private string missionId;
+    private string activeMapEventId;
+    private bool defenderReserveTimedOut;
+    private bool attackerReserveTimedOut;
 
     public bool IsMissionActive
     {
@@ -59,5 +91,87 @@ public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
             isMissionActive = false;
             missionId = null;
         }
+    }
+
+    public bool IsCoopBattleActive
+    {
+        get
+        {
+            lock (sync)
+            {
+                return activeMapEventId != null;
+            }
+        }
+    }
+
+    public string ActiveMapEventId
+    {
+        get
+        {
+            lock (sync)
+            {
+                return activeMapEventId;
+            }
+        }
+    }
+
+    public void BeginBattle(string mapEventId)
+    {
+        lock (sync)
+        {
+            activeMapEventId = mapEventId;
+            ClearReserveTimeouts();
+        }
+
+        // Kill-feed bookkeeping is still process-wide on BattleSpawnGate, so each battle window starts it clean.
+        BattleSpawnGate.ResetCombatFeedback();
+    }
+
+    public void EndBattle()
+    {
+        lock (sync)
+        {
+            activeMapEventId = null;
+            ClearReserveTimeouts();
+        }
+
+        BattleSpawnGate.ResetCombatFeedback();
+    }
+
+    public void AcceptMissingReserveSide(BattleSideEnum side)
+    {
+        SetReserveTimedOut(side, timedOut: true);
+    }
+
+    public void RestoreReserveSide(BattleSideEnum side)
+    {
+        SetReserveTimedOut(side, timedOut: false);
+    }
+
+    public bool IsMissingReserveSideAccepted(BattleSideEnum side)
+    {
+        lock (sync)
+        {
+            if (side == BattleSideEnum.Defender) return defenderReserveTimedOut;
+            if (side == BattleSideEnum.Attacker) return attackerReserveTimedOut;
+            return false;
+        }
+    }
+
+    // Records whether a side's reserve timed out; sides other than attacker and defender are ignored.
+    private void SetReserveTimedOut(BattleSideEnum side, bool timedOut)
+    {
+        lock (sync)
+        {
+            if (side == BattleSideEnum.Defender) defenderReserveTimedOut = timedOut;
+            else if (side == BattleSideEnum.Attacker) attackerReserveTimedOut = timedOut;
+        }
+    }
+
+    // Forgets both sides' reserve timeouts; callers hold the lock.
+    private void ClearReserveTimeouts()
+    {
+        defenderReserveTimedOut = false;
+        attackerReserveTimedOut = false;
     }
 }

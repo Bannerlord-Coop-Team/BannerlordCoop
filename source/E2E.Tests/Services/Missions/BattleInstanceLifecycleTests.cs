@@ -44,7 +44,7 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
             var broker = client.Resolve<IMessageBroker>();
             using var lifecycle = new BattleInstanceLifecycle(client.Resolve<IBattleNetwork>(), client.Resolve<INetwork>(),
                 broker, client.ObjectManager, component.Object, new RecordingWorldItemRegistry(), session,
-                client.Resolve<IMissionContext>());
+                client.Resolve<IMissionContext>(), client.Resolve<ICoopBattleMissionRegistry>());
             using var reporter = new AgentRoutReporter(client.Resolve<IBattleNetwork>(), broker, component.Object,
                 session, new CasualtyAttributionMap(), lifecycle);
             var character = (CharacterObject)Game.Current.PlayerTroop;
@@ -87,7 +87,7 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
             var broker = client.Resolve<IMessageBroker>();
             using var lifecycle = new BattleInstanceLifecycle(client.Resolve<IBattleNetwork>(), client.Resolve<INetwork>(),
                 broker, client.ObjectManager, component.Object, new RecordingWorldItemRegistry(), session,
-                client.Resolve<IMissionContext>());
+                client.Resolve<IMissionContext>(), client.Resolve<ICoopBattleMissionRegistry>());
             var character = (CharacterObject)Game.Current.PlayerTroop;
             var origin = new CoopAgentOrigin(character, null, 0, null, new UniqueTroopDescriptor(77), "withdrawn-party");
             var agent = Mission.Current.SpawnAgent(new AgentBuildData(character)
@@ -153,7 +153,8 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
                 coopMissionComponent: missionComponent.Object,
                 worldItemRegistry: worldItemRegistry,
                 session: session,
-                missionContext: context);
+                missionContext: context,
+                missionRegistry: client.Resolve<ICoopBattleMissionRegistry>());
 
             lifecycle.Leave(wasRetreat: false);
 
@@ -190,7 +191,7 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
                 coopMissionComponent: missionComponent.Object,
                 worldItemRegistry: new RecordingWorldItemRegistry(),
                 session: session,
-                missionContext: client.Resolve<IMissionContext>());
+                missionContext: client.Resolve<IMissionContext>(), missionRegistry: client.Resolve<ICoopBattleMissionRegistry>());
 
             lifecycle.Leave(wasRetreat);
 

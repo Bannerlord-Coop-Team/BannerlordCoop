@@ -38,6 +38,7 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     private readonly CoopTroopSupplier _defenderSupplier;
     private readonly CoopTroopSupplier _attackerSupplier;
     private readonly IMessageBroker _messageBroker;
+    private readonly ICoopBattleMissionRegistry _missionRegistry;
     private readonly BattleSideEnum _playerSide;
     private readonly bool _isSallyOut;
 
@@ -54,11 +55,13 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     public bool IsSized => _sized;
 
     public CoopBattleMissionSpawnHandler(CoopTroopSupplier defenderSupplier, CoopTroopSupplier attackerSupplier,
-        IMessageBroker messageBroker, BattleSideEnum playerSide, bool isSallyOut = false)
+        IMessageBroker messageBroker, ICoopBattleMissionRegistry missionRegistry, BattleSideEnum playerSide,
+        bool isSallyOut = false)
     {
         _defenderSupplier = defenderSupplier;
         _attackerSupplier = attackerSupplier;
         _messageBroker = messageBroker;
+        _missionRegistry = missionRegistry;
         _playerSide = playerSide;
         _isSallyOut = isSallyOut;
     }
@@ -186,13 +189,13 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
     // This is the one point where an empty side becomes intentional rather than merely late. Record exactly
     // which reserve timed out so the controller can eventually release BattleEndLogic and the depletion patch
     // can call only that side depleted; the populated side must still field an agent.
-    private static void AcceptMissingReserveSides(SideSizing sizing)
+    private void AcceptMissingReserveSides(SideSizing sizing)
     {
         if (sizing.Ready) return;
         if (!sizing.DefenderPopulated)
-            BattleSpawnGate.AcceptMissingReserveSide(BattleSideEnum.Defender);
+            _missionRegistry.AcceptMissingReserveSide(BattleSideEnum.Defender);
         if (!sizing.AttackerPopulated)
-            BattleSpawnGate.AcceptMissingReserveSide(BattleSideEnum.Attacker);
+            _missionRegistry.AcceptMissingReserveSide(BattleSideEnum.Attacker);
     }
 
     private static void LogSizingCompleted(SideSizing sizing)
@@ -342,8 +345,8 @@ public class CoopBattleMissionSpawnHandler : SandBoxMissionSpawnHandler
             || defenderSnapshot.BattleSize != attackerSnapshot.BattleSize)
             return;
 
-        BattleSpawnGate.RestoreReserveSide(BattleSideEnum.Defender);
-        BattleSpawnGate.RestoreReserveSide(BattleSideEnum.Attacker);
+        _missionRegistry.RestoreReserveSide(BattleSideEnum.Defender);
+        _missionRegistry.RestoreReserveSide(BattleSideEnum.Attacker);
 
         var settings = _missionAgentSpawnLogic.SpawnSettings;
         int defenderLifetimeTarget;

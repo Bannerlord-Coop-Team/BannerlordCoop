@@ -37,6 +37,7 @@ public class AgentDeathReporter : IAgentDeathReporter
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly IBattleSession session;
     private readonly ICasualtyAttributionMap casualties;
+    private readonly ICoopBattleMissionRegistry missionRegistry;
 
     public AgentDeathReporter(
         IBattleNetwork network,
@@ -44,7 +45,8 @@ public class AgentDeathReporter : IAgentDeathReporter
         IMessageBroker messageBroker,
         ICoopMissionComponent coopMissionComponent,
         IBattleSession session,
-        ICasualtyAttributionMap casualties)
+        ICasualtyAttributionMap casualties,
+        ICoopBattleMissionRegistry missionRegistry)
     {
         this.network = network;
         this.relayNetwork = relayNetwork;
@@ -52,6 +54,7 @@ public class AgentDeathReporter : IAgentDeathReporter
         this.coopMissionComponent = coopMissionComponent;
         this.session = session;
         this.casualties = casualties;
+        this.missionRegistry = missionRegistry;
 
         messageBroker.Subscribe<BattleAgentDied>(Handle_BattleAgentDied);
     }
@@ -64,7 +67,7 @@ public class AgentDeathReporter : IAgentDeathReporter
     public void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)
     {
         if (!BattleSpawnConfig.Enabled) return;
-        if (!BattleSpawnGate.IsCoopBattleActive) return;
+        if (!missionRegistry.IsCoopBattleActive) return;
         if (BattleSpawnGate.IsReplicatedDeath(affectedAgent)) return;
         if (agentState != AgentState.Killed && agentState != AgentState.Unconscious) return;
 

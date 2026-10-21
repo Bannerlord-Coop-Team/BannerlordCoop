@@ -11,7 +11,10 @@ internal class ReplicatedPilotPointPatch
 {
     private static bool Prefix(StandingPoint __instance)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive || __instance.UserAgent == null)
+        if (!BattleSpawnConfig.Enabled || __instance.UserAgent == null)
+            return true;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive)
             return true;
         // The owner's action/equipment stream owns this puppet, including automatic sheathing and release.
         return !ContainerProvider.TryResolve<INetworkAgentRegistry>(out var registry) ||

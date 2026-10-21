@@ -1,6 +1,8 @@
 ﻿using Common;
+using Autofac;
 using Common.Commands;
 using GameInterface;
+using GameInterface.Services.MapEvents;
 using Serilog;
 using System;
 using System.Collections;
@@ -83,9 +85,9 @@ public class DirectMigratedCommandTests
     [Fact]
     public void ProcessCommand_ReadsCountOnlyForOptionalArguments()
     {
-        string[] countReaders = GetCommandTypes()
-            .Where(type => CallsArgumentCount(type.GetMethod(nameof(ICoopCommand.ProcessCommand))))
-            .Select(type => ((ICoopCommand)Activator.CreateInstance(type)).Name)
+        string[] countReaders = CreateCommands()
+            .Where(command => CallsArgumentCount(command.GetType().GetMethod(nameof(ICoopCommand.ProcessCommand))))
+            .Select(command => command.Name)
             .OrderBy(name => name)
             .ToArray();
 
@@ -270,10 +272,18 @@ public class DirectMigratedCommandTests
             .ToArray();
     }
 
+    // Builds every migrated command through a container, as the module does, so injected dependencies resolve.
     private static ICoopCommand[] CreateCommands()
     {
-        return GetCommandTypes()
-            .Select(type => (ICoopCommand)Activator.CreateInstance(type))
+        var commandTypes = GetCommandTypes();
+        var builder = new ContainerBuilder();
+        builder.RegisterType<CoopBattleMissionRegistry>().As<ICoopBattleMissionRegistry>();
+        foreach (var type in commandTypes)
+            builder.RegisterType(type);
+
+        using var container = builder.Build();
+        return commandTypes
+            .Select(type => (ICoopCommand)container.Resolve(type))
             .ToArray();
     }
 

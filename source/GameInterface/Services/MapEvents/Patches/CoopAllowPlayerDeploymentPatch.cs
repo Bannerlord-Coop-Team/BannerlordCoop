@@ -43,9 +43,10 @@ internal class CoopAllowPlayerDeploymentPatch
     [HarmonyPostfix]
     private static void Postfix(ref bool __result)
     {
-        // BattleSpawnGate is active for the lifetime of a coop battle mission (engaged in OpenAttackMission on
+        // The coop battle window is open for the lifetime of a coop battle mission (opened in OpenAttackMission on
         // every client). Only override inside one, so native single-player deployment is untouched.
-        if (!BattleSpawnGate.IsCoopBattleActive)
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive)
             return;
 
         // No local leader on the field → skip the OoB (auto-FinishDeployment) instead of softlocking on a

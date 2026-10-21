@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using HarmonyLib;
@@ -19,7 +20,10 @@ public static class AgentHitSoundPatch
     private static void Postfix(Mission __instance, int soundIndex, Vec3 position,
         int relatedAgent1, int relatedAgent2, ref SoundEventParameter parameter)
     {
-        if (!BattleSpawnGate.IsCoopBattleActive || parameter.ParamName != "Armor Type" || relatedAgent2 < 0)
+        if (parameter.ParamName != "Armor Type" || relatedAgent2 < 0)
+            return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive)
             return;
 
         Agent victim = __instance.FindAgentWithIndex(relatedAgent2);

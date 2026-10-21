@@ -24,8 +24,9 @@ internal class ReplicatedDeathKillFeedPatch
         ref KillingBlow killingBlow)
     {
         if (!BattleSpawnConfig.Enabled) return;
-        if (!BattleSpawnGate.IsCoopBattleActive) return;
         if (!BattleSpawnGate.TryGetReplicatedDeath(affectedAgent, out var replicatedAffector, out var replicatedKillingBlow)) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return;
 
         if (replicatedAffector == Agent.Main && affectedAgent.IsHuman && replicatedKillingBlow.IsValid)
             BattleSpawnGate.RemoveRoutedPlayerHitNotification(affectedAgent, replicatedKillingBlow.InflictedDamage);
@@ -48,9 +49,10 @@ internal class RoutedPlayerHitNotificationPatch
         bool isMountDamage)
     {
         if (!BattleSpawnConfig.Enabled) return;
-        if (!BattleSpawnGate.IsCoopBattleActive) return;
         if (isMountDamage || __instance.NotificationList.Count == 0) return;
         if (!BattleSpawnGate.TryGetCurrentRoutedPlayerHit(out var affectedAgent, out int routedDamage)) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return;
         if (routedDamage != damageAmount) return;
 
         var notification = __instance.NotificationList[__instance.NotificationList.Count - 1];
@@ -65,7 +67,9 @@ internal class RoutedPlayerHitCombatLogPatch
     [HarmonyPrefix]
     private static void Prefix(out bool __state)
     {
-        __state = BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive;
+        __state = BattleSpawnConfig.Enabled
+            && ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            && missionRegistry.IsCoopBattleActive;
         if (__state)
             BattleSpawnGate.BeginCombatLogEnqueue();
     }

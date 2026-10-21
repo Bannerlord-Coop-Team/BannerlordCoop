@@ -174,7 +174,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                 host.Resolve<IBattleHostRegistry>().Set(
                     mapEventId,
                     new BattleHostAssignment("host", new[] { "enemy", "ally" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, host);
 
                 var mapEventParties = ownParty.MapEvent.AttackerSide.Parties;
                 var ownMapEventParty = mapEventParties.Single(party => party.Party == ownParty.Party);
@@ -235,7 +235,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
         finally
         {
             harmony.UnpatchAll(harmonyId);
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(host);
         }
     }
 

@@ -17,7 +17,7 @@ internal class SiegeLadderAuthorityPatches
     [HarmonyPrefix]
     private static bool StateSetterPrefix(SiegeLadder __instance)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
+        if (!BattleSpawnConfig.Enabled || !IsCoopBattleActive()) return true;
         if (SiegeMissionAuthorityGate.SuppressCapture) return true;
         if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return false;
 
@@ -126,9 +126,14 @@ internal class SiegeLadderAuthorityPatches
     private static bool IsClientForSiegeLadder(SiegeLadder ladder)
     {
         if (GameNetwork.IsClientOrReplay) return true;
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return false;
+        if (!BattleSpawnConfig.Enabled || !IsCoopBattleActive()) return false;
         if (!SiegeMissionAuthorityGate.IsAuthorityKnown) return true;
 
         return !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(ladder.Id.Id);
     }
+
+    // Reads this client's coop battle window; no container means a vanilla battle.
+    private static bool IsCoopBattleActive()
+        => ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+           && missionRegistry.IsCoopBattleActive;
 }

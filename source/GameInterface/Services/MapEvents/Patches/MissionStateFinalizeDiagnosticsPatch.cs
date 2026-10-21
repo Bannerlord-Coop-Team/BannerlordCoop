@@ -54,11 +54,12 @@ internal class MissionStateFinalizeDiagnosticsPatch
     [HarmonyPrefix]
     internal static void EndMissionPrefix(Mission __instance)
     {
-        if (!BattleSpawnGate.IsCoopBattleActive || __instance.MissionEnded) return;
+        if (__instance.MissionEnded) return;
+        if (!TryGetActiveMapEventId(out var mapEventId)) return;
 
         Logger.Information(
             "[BattleMissionLifecycle] Mission end requested: mapEvent={MapEventId} state={State} result={Result} caller={Caller}",
-            BattleSpawnGate.ActiveMapEventId,
+            mapEventId,
             __instance.CurrentState,
             __instance.MissionResult?.BattleState,
             System.Environment.StackTrace);
@@ -68,15 +69,25 @@ internal class MissionStateFinalizeDiagnosticsPatch
     [HarmonyPrefix]
     internal static void MissionResultReadyPrefix(Mission __instance, MissionResult missionResult)
     {
-        if (!BattleSpawnGate.IsCoopBattleActive) return;
+        if (!TryGetActiveMapEventId(out var mapEventId)) return;
 
         Logger.Information(
             "[BattleMissionLifecycle] Mission result ready: mapEvent={MapEventId} state={State} resolved={Resolved} result={Result} caller={Caller}",
-            BattleSpawnGate.ActiveMapEventId,
+            mapEventId,
             __instance.CurrentState,
             missionResult?.BattleResolved,
             missionResult?.BattleState,
             System.Environment.StackTrace);
+    }
+
+    // Reads the open coop battle window's map-event id; false for a vanilla battle or when no container exists.
+    private static bool TryGetActiveMapEventId(out string mapEventId)
+    {
+        mapEventId = null;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)) return false;
+
+        mapEventId = missionRegistry.ActiveMapEventId;
+        return mapEventId != null;
     }
 
     /// <summary>Identifies the attack-mission start that created a mission.</summary>

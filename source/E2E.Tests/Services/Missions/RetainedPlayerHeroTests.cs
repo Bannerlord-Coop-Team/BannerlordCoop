@@ -100,7 +100,8 @@ public class RetainedPlayerHeroTests
     {
         var supplier = Supplier(new[] { new TroopReserveEntry(1141, "hero", 0) });
         var other = new CoopTroopSupplier("battle", BattleSideEnum.Defender, null, new BattleAgentBudget());
-        var handler = new CoopBattleMissionSpawnHandler(other, supplier, null, BattleSideEnum.Attacker);
+        var handler = new CoopBattleMissionSpawnHandler(other, supplier, null, new CoopBattleMissionRegistry(),
+            BattleSideEnum.Attacker);
         Assert.True(handler.HasSuppliedPlayerOrigin(Record()));
         Assert.False(CoopBattleMissionSpawnHandler.HasLocalPlayerOrigin(BattleSideEnum.Attacker, "player-party", other, supplier));
         Assert.Equal(0, supplier.GetRemainingForParty("player-party"));

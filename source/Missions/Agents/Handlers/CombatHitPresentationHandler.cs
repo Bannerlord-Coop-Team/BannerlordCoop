@@ -34,15 +34,18 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
     private readonly INetworkAgentRegistry agentRegistry;
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
+    private readonly ICoopBattleMissionRegistry missionRegistry;
 
     public CombatHitPresentationHandler(
         INetworkAgentRegistry agentRegistry,
         IBattleNetwork network,
-        IMessageBroker messageBroker)
+        IMessageBroker messageBroker,
+        ICoopBattleMissionRegistry missionRegistry)
     {
         this.agentRegistry = agentRegistry;
         this.network = network;
         this.messageBroker = messageBroker;
+        this.missionRegistry = missionRegistry;
 
         messageBroker.Subscribe<MeleeHitPresentation>(Handle_LocalPresentation);
         messageBroker.Subscribe<NetworkMeleeHitPresentation>(Handle_NetworkPresentation);
@@ -247,9 +250,9 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
         }
     }
 
-    private static void PlayBodyImpact(Mission mission, NetworkMeleeHitPresentation presentation)
+    private void PlayBodyImpact(Mission mission, NetworkMeleeHitPresentation presentation)
     {
-        if (!BattleSpawnGate.IsCoopBattleActive || presentation.SoundIndex < 0 ||
+        if (!missionRegistry.IsCoopBattleActive || presentation.SoundIndex < 0 ||
             !IsFinite(presentation.CollisionPosition) || !IsFinite(presentation.ArmorType))
         {
             return;
