@@ -1,5 +1,6 @@
 ﻿using Common;
 using HarmonyLib;
+using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using Quest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest;
@@ -30,7 +31,8 @@ internal class GangLeaderGoodsPatches
     [HarmonyPrefix]
     private static void BattleEnded(MapEvent mapEvent)
     {
-        if (ModInformation.IsServer && ContainerProvider.TryResolve<IGangLeaderGoodsService>(out var service))
-            service.BattleEnded(mapEvent);
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<IGangLeaderGoodsService>(out var service) &&
+            ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+            dispatcher.RunAsOwners<Quest>(quest => service.BattleEnded(quest, mapEvent));
     }
 }

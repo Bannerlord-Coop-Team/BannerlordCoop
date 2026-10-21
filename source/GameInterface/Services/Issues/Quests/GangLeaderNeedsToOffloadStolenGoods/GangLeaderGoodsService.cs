@@ -41,7 +41,7 @@ internal interface IGangLeaderGoodsService
 {
     void Purchase(Quest quest);
     bool TryConsume(Quest quest, byte branch);
-    void BattleEnded(MapEvent mapEvent);
+    void BattleEnded(Quest quest, MapEvent mapEvent);
 }
 
 internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
@@ -52,18 +52,16 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
     private readonly IObjectManager objects;
     private readonly IPlayerManager players;
     private readonly IIssueOwnershipRegistry ownership;
-    private readonly IOutcomeDispatcher dispatcher;
     private readonly HashSet<Quest> consumed = new();
 
     public GangLeaderGoodsService(IMessageBroker broker, INetwork network, IObjectManager objects,
-        IPlayerManager players, IIssueOwnershipRegistry ownership, IOutcomeDispatcher dispatcher)
+        IPlayerManager players, IIssueOwnershipRegistry ownership)
     {
         this.broker = broker;
         this.network = network;
         this.objects = objects;
         this.players = players;
         this.ownership = ownership;
-        this.dispatcher = dispatcher;
         broker.Subscribe<RequestGangLeaderGoodsPurchase>(HandlePurchase);
     }
 
@@ -126,11 +124,9 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
         return true;
     }
 
-    public void BattleEnded(MapEvent mapEvent)
+    public void BattleEnded(Quest quest, MapEvent mapEvent)
     {
         if (ModInformation.IsClient || !mapEvent.IsHideoutBattle) return;
-        dispatcher.RunAsOwners<Quest>(quest =>
-        {
             var ownerParty = MobileParty.MainParty.Party;
             var attacker = mapEvent.AttackerSide.Parties.Any(p => p.Party == ownerParty);
             var defender = mapEvent.DefenderSide.Parties.Any(p => p.Party == ownerParty);
@@ -145,6 +141,5 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
                 quest._isFightingForGoods = true;
                 quest._playerHasTheGoods = true;
             }
-        });
     }
 }
