@@ -100,6 +100,37 @@ public class BattleMountIdentityTests : MissionTestEnvironment
         GC.KeepAlive(attackerController);
     }
 
+    // The live controller answers BattleBlowInterceptPatch's mount ownership question until it is disposed.
+    [Fact]
+    public void MountAuthority_AnswersForTheLiveBattle_AndClearsOnDispose()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        SetControllerId(client, "attacker");
+
+        client.Call(() =>
+        {
+            var mock = fixture.CreateMission(client);
+            var controller = client.Resolve<CoopBattleController>();
+            var agentRegistry = client.Resolve<INetworkAgentRegistry>();
+            var agentAuthority = client.Resolve<IBattleAgentAuthorityRegistry>();
+
+            var (_, ownHorse) = RegisterMountedRider(
+                mock, agentRegistry, "attacker", Guid.NewGuid(), Guid.NewGuid(), AgentControllerType.AI);
+            var (_, puppetHorse) = RegisterMountedRider(
+                mock, agentRegistry, "owner", Guid.NewGuid(), Guid.NewGuid(), AgentControllerType.None);
+            var looseHorse = mock.SpawnMount();
+
+            Assert.False(agentAuthority.IsMountRemotelyOwned(ownHorse));
+            Assert.True(agentAuthority.IsMountRemotelyOwned(puppetHorse));
+            Assert.Null(agentAuthority.IsMountRemotelyOwned(looseHorse));
+
+            controller.Dispose();
+
+            Assert.Null(agentAuthority.IsMountRemotelyOwned(puppetHorse));
+        });
+    }
+
     /// <summary>
     /// The #1750 race: the rider dismounts and remounts a DIFFERENT horse inside the routed message's flight
     /// time. Resolution is by the struck horse's own id, so the blow still lands on the original horse — under
