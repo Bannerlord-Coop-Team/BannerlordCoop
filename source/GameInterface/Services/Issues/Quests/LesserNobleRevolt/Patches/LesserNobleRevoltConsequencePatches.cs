@@ -43,5 +43,8 @@ internal static class LesserNobleRevoltConsequencePatches
         {
             DestroyPartyAction.Apply(null, quest._lesserNobleParty);
         }
+
+        // A dismissed mirror quest never reaches AfterFinalize, so its trackers would stay in the save a joiner loads.
+        Campaign.Current.QuestManager.RemoveAllTrackedObjectsForQuest(quest);
     }
 }
