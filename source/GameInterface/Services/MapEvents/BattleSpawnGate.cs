@@ -2,16 +2,15 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents;
 
 /// <summary>
-/// Static bridge for the battle patches' remaining per-call state: puppet-spawn capture suppression, authority
-/// probes, routed-blow and replicated-death context, and kill-feed bookkeeping. Whether a coop battle is active
-/// lives in <see cref="ICoopBattleMissionRegistry"/>.
+/// Static bridge for the battle patches' remaining per-call state: puppet-spawn capture suppression, routed-blow
+/// and replicated-death context, and kill-feed bookkeeping. Whether a coop battle is active lives in
+/// <see cref="ICoopBattleMissionRegistry"/>, and agent ownership in <see cref="IBattleAgentAuthorityRegistry"/>.
 /// </summary>
 public static class BattleSpawnGate
 {
@@ -59,18 +58,6 @@ public static class BattleSpawnGate
         get => _suppressCapture;
         set => _suppressCapture = value;
     }
-
-    /// <summary>
-    /// Set by the live battle's <c>BattleDamageRouter</c>: resolves whether a MOUNT agent is registered in the
-    /// battle's agent registry and, if so, whether its authority is remote. <c>true</c> → the horse is another
-    /// client's — <c>BattleBlowInterceptPatch</c> suppresses the local blow and routes it (even for a masterless
-    /// horse, whose rider-based gate would otherwise apply it locally and diverge). <c>false</c> → the horse is
-    /// ours — apply locally. <c>null</c> (or no probe installed) → unregistered — the patch falls back to
-    /// rider-keyed gating. Process-global like the rest of this gate: one live battle per game process.
-    /// </summary>
-    public static Func<Agent, bool?> MountAuthorityProbe { get; set; }
-
-    public static Func<Hero, bool?> HeroAgentAuthorityProbe { get; set; }
 
     /// <summary>Exposes the routed blow's weapon and originating peer during native damage and sound playback.</summary>
     public static void RunWithRoutedBlow(

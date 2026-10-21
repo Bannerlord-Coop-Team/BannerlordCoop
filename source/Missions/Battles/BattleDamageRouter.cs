@@ -41,7 +41,6 @@ public class BattleDamageRouter : IBattleDamageRouter
     private readonly IAgentNativeMountState agentNativeMountState;
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
     private readonly IBattleDamageDataMapper battleDamageDataMapper;
-    private readonly Func<Agent, bool?> mountAuthorityProbe;
     private readonly object inboundDamageGate = new();
     private readonly ConcurrentQueue<NetworkApplyBattleDamage> inboundDamage = new();
     private readonly Queue<PendingLocalDamage> pendingLocalDamage = new();
@@ -150,8 +149,6 @@ public class BattleDamageRouter : IBattleDamageRouter
         messageBroker.Subscribe<BattlePuppetHit>(Handle_BattlePuppetHit);
         messageBroker.Subscribe<NetworkApplyBattleDamage>(Handle_NetworkApplyBattleDamage);
         messageBroker.Subscribe<MissileReconstructed>(Handle_MissileReconstructed);
-        mountAuthorityProbe = ProbeMountAuthority;
-        BattleSpawnGate.MountAuthorityProbe = mountAuthorityProbe;
     }
 
     public void Dispose()
@@ -174,17 +171,7 @@ public class BattleDamageRouter : IBattleDamageRouter
         noHealthReductionWarnings.Clear();
         while (inboundDamage.TryDequeue(out _)) { }
 
-        if (BattleSpawnGate.MountAuthorityProbe == mountAuthorityProbe)
-            BattleSpawnGate.MountAuthorityProbe = null;
-
         guardedHitWindow.Dispose();
-    }
-
-    private bool? ProbeMountAuthority(Agent mount)
-    {
-        if (!coopMissionComponent.AgentRegistry.TryGetAgentInfo(mount, out var info))
-            return null;
-        return info.CurrentAuthority != session.OwnControllerId;
     }
 
     private void Handle_MissileReconstructed(MessagePayload<MissileReconstructed> payload)

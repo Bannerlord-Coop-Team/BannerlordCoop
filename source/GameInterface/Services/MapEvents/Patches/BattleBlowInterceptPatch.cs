@@ -24,8 +24,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// <para>
 /// Mounts are registered with their own identity (see <c>OwnedAgentReplicator</c>/<c>PuppetSpawner</c>), so a
 /// blow against a registered horse is gated by the HORSE's own authority (via
-/// <see cref="BattleSpawnGate.MountAuthorityProbe"/> — this static patch cannot reach the per-mission
-/// registry). That also covers a masterless horse whose rider died. An UNregistered horse (e.g. a loose
+/// <see cref="IBattleAgentAuthorityRegistry"/>, since this patch cannot reach the per-mission agent registry).
+/// That also covers a masterless horse whose rider died. An UNregistered horse (e.g. a loose
 /// native one) falls back to its rider's ownership.
 /// </para>
 /// </summary>
@@ -56,7 +56,7 @@ internal class BattleBlowInterceptPatch
         bool isMount = !__instance.IsHuman;
         if (isMount)
         {
-            bool? remotelyOwned = BattleSpawnGate.MountAuthorityProbe?.Invoke(__instance);
+            bool? remotelyOwned = IsMountRemotelyOwned(__instance);
             if (remotelyOwned == false) return true; // our registered horse — we are its authority
             if (remotelyOwned == null)
             {
@@ -87,6 +87,14 @@ internal class BattleBlowInterceptPatch
             MessageBroker.Instance.Publish(__instance, new BattlePuppetHit(__instance, attacker, blow, collisionData, isMount));
         }
         return false;
+    }
+
+    // Asks the live battle who owns the horse; null when it is unregistered or no battle answers.
+    private static bool? IsMountRemotelyOwned(Agent mount)
+    {
+        if (!ContainerProvider.TryResolve<IBattleAgentAuthorityRegistry>(out var agentAuthority)) return null;
+
+        return agentAuthority.IsMountRemotelyOwned(mount);
     }
 
     private static void PlaySuppressedHitSound(Agent victim, Agent attacker, Blow blow, AttackCollisionData collisionData)
