@@ -61,6 +61,7 @@ public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
     private bool defenderReserveTimedOut;
     private bool attackerReserveTimedOut;
 
+    /// <inheritdoc/>
     public bool IsMissionActive
     {
         get
@@ -72,6 +73,7 @@ public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
         }
     }
 
+    /// <inheritdoc/>
     public void BeginMission(string mapEventId)
     {
         lock (sync)
@@ -81,6 +83,7 @@ public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
         }
     }
 
+    /// <inheritdoc/>
     // Keyed so a stale controller disposed after a newer mission began cannot close the newer window.
     public void EndMission(string mapEventId)
     {

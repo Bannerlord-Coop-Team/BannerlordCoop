@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using Common.Network;
 using Common.Network.Messages;
 using Coop.Core.Server.Services.Instances;
@@ -12,6 +13,7 @@ using GameInterface.Services.Players;
 using HarmonyLib;
 using Missions.Battles;
 using Missions.Messages;
+using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -63,6 +65,39 @@ public class BattleResultReadyTests : MissionTestEnvironment
 
         Assert.Empty(host.NetworkSentMessages.GetMessages<NetworkChangeBattleState>());
         AssertMapEventPresent(mapEventId);
+    }
+
+    [Fact]
+    [Trait("Requirement", "BR-005")]
+    // A throwing teardown step must not leave mission-less victories off the legacy state relay.
+    public void ControllerTeardownThrows_StillClosesMissionWindow()
+    {
+        var host = Clients.First();
+        var broker = new Mock<IMessageBroker>();
+        broker.Setup(b => b.Publish(It.IsAny<object>(), It.IsAny<BattleMissionEnded>()))
+            .Throws(new InvalidOperationException("teardown failed"));
+
+        host.Call(() =>
+        {
+            var missionRegistry = host.Resolve<ICoopBattleMissionRegistry>();
+            var controller = host.Container.Resolve<CoopBattleController>(
+                new TypedParameter(typeof(IMessageBroker), broker.Object));
+            try
+            {
+                controller.AfterStart();
+                Assert.True(missionRegistry.IsMissionActive);
+
+                Assert.Throws<InvalidOperationException>(() => controller.Dispose());
+
+                Assert.False(missionRegistry.IsMissionActive);
+            }
+            finally
+            {
+                // Finish the skipped teardown, otherwise its statics leak and the container's dispose rethrows.
+                broker.Reset();
+                controller.Dispose();
+            }
+        });
     }
 
     [Fact]
