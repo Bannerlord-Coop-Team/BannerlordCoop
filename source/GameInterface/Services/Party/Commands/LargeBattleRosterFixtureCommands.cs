@@ -548,6 +548,9 @@ internal static class LargeBattleRosterFixtureCommands
             return true;
         }
 
+        if (error != null && !error.StartsWith("Several ", StringComparison.Ordinal))
+            error += $" No player controller with id '{id}' was found either.";
+
         return false;
     }
 

@@ -78,20 +78,6 @@ internal class CompanionsCommands
     }
 
     /// <summary>
-    /// Resolves a mobile party argument by name or id and returns the id to print in fixture output.
-    /// </summary>
-    private static bool TryResolvePartyWithId(
-        ICommandObjectResolver resolver, string query,
-        out MobileParty party, out string partyId, out string error)
-    {
-        partyId = null;
-        if (!resolver.TryResolveMobileParty(query, out party, out error)) return false;
-
-        partyId = resolver.DisplayId(party);
-        return true;
-    }
-
-    /// <summary>
     /// View a list of all wanderers in the game
     /// </summary>
 
@@ -385,17 +371,19 @@ internal class CompanionsCommands
         };
 
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public CompanionRoleFixtureStateCoopCommand(ICommandObjectResolver resolver)
+        public CompanionRoleFixtureStateCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!TryResolvePartyWithId(resolver, args[0], out var party, out var partyId, out var error))
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error))
                 return Failed(error);
+            var partyId = resolver.DisplayId(party);
             var companion = FindRoleFixtureCompanion();
             if (companion == null) return Failed("The companion-role fixture hero was not found.");
 
@@ -427,17 +415,19 @@ internal class CompanionsCommands
         };
 
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public CompanionScoutRoleStateCoopCommand(ICommandObjectResolver resolver)
+        public CompanionScoutRoleStateCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!TryResolvePartyWithId(resolver, args[0], out var party, out var partyId, out var error))
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error))
                 return Failed(error);
+            var partyId = resolver.DisplayId(party);
 
             var scout = party.GetRoleHolder(PartyRole.Scout);
             string scoutId = "none";

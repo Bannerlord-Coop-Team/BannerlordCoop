@@ -347,8 +347,6 @@ namespace GameInterface.Services.GameDebug.Commands
                 if (!int.TryParse(args[1], out int count) || count < 1 || count > 10)
                     return Failed($"Heir count must be an integer from 1 through 10: {args[1]}.");
 
-                if (!TryGetObjectManager(out var objectManager))
-                    return Failed($"Unable to resolve {nameof(IObjectManager)}");
                 if (!resolver.TryResolveClan(args[0], out Clan playerClan, out error))
                     return Failed(error);
 
@@ -358,10 +356,8 @@ namespace GameInterface.Services.GameDebug.Commands
                 Hero playerHero = playerClan.Leader;
                 if (args.Count == 3)
                 {
-                    if (!resolver.TryResolveHero(args[2], out playerHero, out error))
+                    if (!resolver.TryResolve(args[2], playerClan.Heroes.Where(hero => hero.IsPlayerHero()), hero => hero.Name?.ToString(), out playerHero, out error))
                         return Failed(error);
-                    if (!playerHero.IsPlayerHero() || playerHero.Clan != playerClan)
-                        return Failed("The parent must be a player in the selected clan.");
                 }
 
                 var templates = playerHero.Culture?.LordTemplates?
@@ -407,20 +403,14 @@ namespace GameInterface.Services.GameDebug.Commands
                     bool eligible = eligibleHeirs.TryGetValue(relative, out int selectionPoints);
                     if (eligible) eligibleCount++;
 
-                    string heroId = objectManager.TryGetId(relative, out string registeredId)
-                        ? registeredId
-                        : relative.StringId;
                     output.AppendLine(
-                        $"HEIR hero={heroId} name='{relative.Name}' age={relative.Age:F0} " +
+                        $"HEIR hero={resolver.DisplayId(relative)} name='{relative.Name}' age={relative.Age:F0} " +
                         $"relation=child eligible={eligible} points={(eligible ? selectionPoints : 0)}");
                 }
 
-                string clanId = objectManager.TryGetId(playerClan, out string registeredClanId)
-                    ? registeredClanId
-                    : playerClan.StringId;
                 output.Insert(
                     0,
-                    $"ADD_HEIRS clan={clanId} player={playerHero.StringId} " +
+                    $"ADD_HEIRS clan={resolver.DisplayId(playerClan)} player={playerHero.StringId} " +
                     $"created={createdHeroes.Count} eligible={eligibleCount}\n");
                 return Succeeded(output.ToString());
             }
@@ -1132,7 +1122,7 @@ namespace GameInterface.Services.GameDebug.Commands
                     return Failed(error);
 
                 var sb = new StringBuilder();
-                sb.AppendLine($"Name:{clan.Name}");
+                sb.AppendLine($"Name: {clan.Name}");
                 sb.AppendLine($"StringId: {clan.StringId}");
                 sb.AppendLine($"Leader: {clan.Leader?.Name.ToString() ?? "none"}");
                 sb.AppendLine($"Kingdom: {clan.Kingdom?.Name.ToString() ?? "none"}");

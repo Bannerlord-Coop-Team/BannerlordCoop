@@ -27,6 +27,7 @@ public sealed class StanceLinkHandleDebugCommand : ICoopCommand
     private readonly ICommandObjectResolver resolver;
     private readonly IObjectManager manager;
 
+    // Receives the resolver for kingdom lookup and the object manager for stance registry ids.
     public StanceLinkHandleDebugCommand(ICommandObjectResolver resolver, IObjectManager manager)
     {
         this.resolver = resolver;
@@ -41,7 +42,7 @@ public sealed class StanceLinkHandleDebugCommand : ICoopCommand
     {
         new ExpectedArgs("action", "prepare, state, send, conflicts, or restore."),
         new ExpectedArgs("faction1", "First kingdom name or id, e.g. Vlandia or Kingdom_vlandia; quote names with spaces."),
-        new ExpectedArgs("faction2", "Second kingdom name or id, e.g. Southern Empire or Kingdom_empire; quote names with spaces."),
+        new ExpectedArgs("faction2", "Second kingdom name or id, e.g. Northern Empire or Kingdom_empire; quote names with spaces."),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)

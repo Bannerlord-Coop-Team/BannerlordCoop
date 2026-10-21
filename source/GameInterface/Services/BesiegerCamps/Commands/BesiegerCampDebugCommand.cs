@@ -178,7 +178,11 @@ public class BesiegerCampDebugCommand
             SiegeStrategy siegeStrategy = SiegeStrategy.All.FirstOrDefault(x => string.Equals(x.StringId, strategyId, StringComparison.OrdinalIgnoreCase));
             if (siegeStrategy == null && !resolver.TryResolve(strategyId, SiegeStrategy.All, s => s.Name?.ToString(), out siegeStrategy, out var error))
             {
-                return Failed(error);
+                if (error.StartsWith("Several ", StringComparison.Ordinal))
+                    return Failed(error);
+
+                var possibleIds = string.Join(Environment.NewLine, SiegeStrategy.All.Select(x => x.StringId));
+                return Failed($"{error}{Environment.NewLine}SiegeStrategy Id must be one of the following:{possibleIds}");
             }
 
             // Assign the strategy to the besieger camp
@@ -321,7 +325,7 @@ public class BesiegerCampDebugCommand
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("besiegerCampId", "The besieger camp id."),
-            new ExpectedArgs("partyId", "Party name or id of one of the camp's besieger parties; quote names with spaces."),
+            new ExpectedArgs("partyId", "Party name or id; quote names with spaces."),
         };
 
         private readonly ICommandObjectResolver resolver;
@@ -346,7 +350,7 @@ public class BesiegerCampDebugCommand
                 return Failed($"BesiegerCamp with ID: '{besiegerCampId}' not found");
             }
 
-            if (!resolver.TryResolve(args[1], besiegerCamp._besiegerParties, p => p.Name?.ToString(), out var mobileParty, out var error))
+            if (!resolver.TryResolveMobileParty(args[1], out var mobileParty, out var error))
             {
                 return Failed(error);
             }

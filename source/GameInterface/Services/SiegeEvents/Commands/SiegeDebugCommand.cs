@@ -2495,9 +2495,10 @@ public class SiegeDebugCommand
             }
             else if (!resolver.TryResolveMobileParty(arg, out party, out var partyError))
             {
-                if (!resolver.TryResolveHero(arg, out var hero, out _))
+                if (!resolver.TryResolveHero(arg, out var hero, out var heroError))
                 {
-                    return Failed(partyError);
+                    // An ambiguous hero name is more useful than the party miss.
+                    return Failed(heroError.StartsWith("Several ", StringComparison.Ordinal) ? heroError : partyError);
                 }
 
                 party = hero.PartyBelongedTo;

@@ -195,7 +195,9 @@ internal static class PeaceBattleFixtureCommands
             var parties = new MobileParty[5];
             for (var index = 0; index < parties.Length; index++)
             {
-                if (!resolver.TryResolveMobileParty(args[index + 1], out parties[index], out var partyError))
+                // A missing party stays null so StateJson reports that role as absent; only an ambiguous name is a hard failure.
+                if (!resolver.TryResolveMobileParty(args[index + 1], out parties[index], out var partyError) &&
+                    partyError.StartsWith("Several ", StringComparison.Ordinal))
                     return Failed(partyError);
             }
             return Succeeded(StateJson(objects, args[0], parties, partialMode: args.Count == 7));

@@ -20,7 +20,6 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Party.Commands;

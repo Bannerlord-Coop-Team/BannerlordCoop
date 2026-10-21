@@ -384,10 +384,12 @@ public class HeroDebugCommand
     public sealed class HeroGoldStateCoopCommand : ICoopCommand
     {
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public HeroGoldStateCoopCommand(ICommandObjectResolver resolver)
+        public HeroGoldStateCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public string Prefix => "coop.debug.hero";
@@ -407,8 +409,6 @@ public class HeroDebugCommand
         {
             if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
                 return Failed(heroError);
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-                return Failed("Unable to resolve ObjectManager.");
             if (!objectManager.TryGetId(hero, out var heroId))
                 return Failed($"Hero '{hero.Name}' is not registered with the object manager.");
 
@@ -419,10 +419,12 @@ public class HeroDebugCommand
     public sealed class HeroSetGoldStateCoopCommand : ICoopCommand
     {
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public HeroSetGoldStateCoopCommand(ICommandObjectResolver resolver)
+        public HeroSetGoldStateCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public string Prefix => "coop.debug.hero";
@@ -447,8 +449,6 @@ public class HeroDebugCommand
                 return Failed($"Unable to parse non-negative gold amount: {args[1]}.");
             if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
                 return Failed(heroError);
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-                return Failed("Unable to resolve ObjectManager.");
             if (!objectManager.TryGetId(hero, out var heroId))
                 return Failed($"Hero '{hero.Name}' is not registered with the object manager.");
 

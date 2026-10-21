@@ -8,6 +8,7 @@ using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Utils.Commands;
 using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -98,9 +99,17 @@ public sealed class ArmyRemovalFixtureStateCommand : ICoopCommand
             return new CoopCommandResult(false, "Expected army, leader and member ids.", "command_failed");
         objectManager.TryGetObject<Army>(args[0], out var army);
         var ids = new[] { args[1], args[2] };
-        var parties = ids.Select(id =>
+        var resolvedParties = new List<MobileParty>();
+        foreach (var id in ids)
         {
-            resolver.TryResolveMobileParty(id, out var party, out _);
+            var resolved = resolver.TryResolveMobileParty(id, out var party, out var resolveError);
+            if (!resolved && resolveError.StartsWith("Several ", StringComparison.Ordinal))
+                return new CoopCommandResult(false, resolveError, "command_failed");
+            resolvedParties.Add(party);
+        }
+        var parties = ids.Select((id, index) =>
+        {
+            var party = resolvedParties[index];
             // Echo the canonical registry id when the argument was a name, the raw argument when nothing resolved.
             if (party == null || !objectManager.TryGetId(party, out var canonicalId))
                 canonicalId = id;

@@ -47,6 +47,7 @@ internal class SmithingCommands
     {
         private readonly ICommandObjectResolver resolver;
 
+        // Takes the resolver used to look command arguments up by name or id.
         public CraftingGiveSuppliesCoopCommand(ICommandObjectResolver resolver)
         {
             this.resolver = resolver;
@@ -156,6 +157,7 @@ internal class SmithingCommands
     {
         private readonly ICommandObjectResolver resolver;
 
+        // Takes the resolver used to look command arguments up by name or id.
         public CraftingTownOrdersCoopCommand(ICommandObjectResolver resolver)
         {
             this.resolver = resolver;
@@ -177,6 +179,7 @@ internal class SmithingCommands
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
             if (!resolver.TryResolveTown(strings[0], out var town, out var error)) return Failed(error);
+            if (!town.Settlement.IsTown) return Failed($"{town.Name} is not a town");
 
             StringBuilder stringBuilder = new StringBuilder();
             stringBuilder.AppendLine("Target town " + town.Name.ToString() + " has orders:");
@@ -197,6 +200,7 @@ internal class SmithingCommands
     {
         private readonly ICommandObjectResolver resolver;
 
+        // Takes the resolver used to look command arguments up by name or id.
         public CraftingAddTownOrderCoopCommand(ICommandObjectResolver resolver)
         {
             this.resolver = resolver;
@@ -237,6 +241,7 @@ internal class SmithingCommands
     {
         private readonly ICommandObjectResolver resolver;
 
+        // Takes the resolver used to look command arguments up by name or id.
         public CraftingAddCraftedItemsCoopCommand(ICommandObjectResolver resolver)
         {
             this.resolver = resolver;

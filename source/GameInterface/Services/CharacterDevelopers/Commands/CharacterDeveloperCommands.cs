@@ -4,7 +4,6 @@ using GameInterface.Utils.Commands;
 using GameInterface.Services.CharacterDevelopers.Handlers;
 using Serilog;
 using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;

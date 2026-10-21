@@ -5,6 +5,7 @@ using GameInterface.Services.Locations.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Interfaces;
 using GameInterface.Utils.Commands;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -341,7 +342,7 @@ public class LocationDebugCommand
             // The real mutator runs so the patched chokepoint broadcasts the change.
             GameThread.Run(() => location.AddCharacter(locationCharacter));
 
-            return Succeeded($"Added '{args[1]}' to '{args[0]}'");
+            return Succeeded($"Added '{resolver.DisplayId(character)}' to '{resolver.DisplayId(location)}'");
 
         }
     }
@@ -384,17 +385,17 @@ public class LocationDebugCommand
             if (TryResolveLocation(resolver, args[0], out var location, out var error) == false) return Failed(error);
             var presentCharacters = location.GetCharacterList()
                 .Select(locationCharacter => locationCharacter.Character);
-            if (resolver.TryResolve(args[1], presentCharacters, candidate => candidate.Name?.ToString(), out var character, out error) == false) return Failed(error);
+            if (resolver.TryResolve(args[1], presentCharacters, candidate => candidate.Name?.ToString(), out var character, out error) == false)
+            {
+                if (error.StartsWith("Several ", StringComparison.Ordinal)) return Failed(error);
+                return Failed($"'{args[1]}' is not a character in {resolver.DisplayId(location)}.");
+            }
 
             var entry = SyncedLocationCharacters.Find(location, character);
-            if (entry == null)
-            {
-                return Failed($"No character '{args[1]}' in '{args[0]}'");
-            }
 
             GameThread.Run(() => location.RemoveLocationCharacter(entry));
 
-            return Succeeded($"Removed '{args[1]}' from '{args[0]}'");
+            return Succeeded($"Removed '{resolver.DisplayId(character)}' from '{resolver.DisplayId(location)}'");
 
         }
     }
@@ -437,7 +438,7 @@ public class LocationDebugCommand
 
             GameThread.Run(() => location.RemoveAllCharacters());
 
-            return Succeeded($"Cleared '{args[0]}'");
+            return Succeeded($"Cleared '{resolver.DisplayId(location)}'");
 
         }
     }
@@ -482,7 +483,7 @@ public class LocationDebugCommand
 
             GameThread.Run(() => location.AddSpecialItem(item));
 
-            return Succeeded($"Added '{args[1]}' to '{args[0]}'");
+            return Succeeded($"Added '{resolver.DisplayId(item)}' to '{resolver.DisplayId(location)}'");
 
         }
     }
@@ -525,7 +526,11 @@ public class LocationDebugCommand
 
             if (TryResolveLocation(resolver, args[0], out var location, out var error) == false) return Failed(error);
             var presentItems = location.SpecialItems ?? new List<ItemObject>();
-            if (resolver.TryResolve(args[1], presentItems, candidate => candidate.Name?.ToString(), out var item, out error) == false) return Failed(error);
+            if (resolver.TryResolve(args[1], presentItems, candidate => candidate.Name?.ToString(), out var item, out error) == false)
+            {
+                if (error.StartsWith("Several ", StringComparison.Ordinal)) return Failed(error);
+                return Failed($"'{args[1]}' is not a special item in {resolver.DisplayId(location)}.");
+            }
 
             GameThread.Run(() =>
             {
@@ -533,7 +538,7 @@ public class LocationDebugCommand
                 MessageBroker.Instance.Publish(location, new LocationSpecialItemRemoved(location, item));
             });
 
-            return Succeeded($"Removed '{args[1]}' from '{args[0]}'");
+            return Succeeded($"Removed '{resolver.DisplayId(item)}' from '{resolver.DisplayId(location)}'");
 
         }
     }

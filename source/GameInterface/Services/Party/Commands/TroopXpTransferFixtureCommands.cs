@@ -18,7 +18,6 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
-using TaleWorlds.ObjectSystem;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Party.Commands;

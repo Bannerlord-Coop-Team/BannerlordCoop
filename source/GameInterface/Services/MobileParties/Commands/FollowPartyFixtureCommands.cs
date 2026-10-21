@@ -55,9 +55,9 @@ internal static class FollowPartyFixtureCommands
             if (!resolver.TryResolveMobileParty(args[0], out MobileParty playerParty, out var error))
                 return Failed(error);
             if (!playerParty.IsPlayerParty())
-                return Failed($"Party '{args[0]}' is not registered as a player party.");
+                return Failed($"Party '{resolver.DisplayId(playerParty)}' is not registered as a player party.");
             if (!IsAvailableOnMap(playerParty))
-                return Failed($"Player party '{args[0]}' must be active on the campaign map and outside a map event, settlement, or army.");
+                return Failed($"Player party '{resolver.DisplayId(playerParty)}' must be active on the campaign map and outside a map event, settlement, or army.");
 
             MobileParty targetParty = MobileParty.All
                 .Where(party => party != playerParty &&

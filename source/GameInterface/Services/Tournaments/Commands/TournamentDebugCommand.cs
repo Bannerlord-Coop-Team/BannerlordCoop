@@ -43,6 +43,7 @@ public class TournamentDebugCommand
     {
         private readonly ICommandObjectResolver resolver;
 
+        // Takes the resolver used to look the town up by name or id.
         public AddTournamentToTownCoopCommand(ICommandObjectResolver resolver)
         {
             this.resolver = resolver;

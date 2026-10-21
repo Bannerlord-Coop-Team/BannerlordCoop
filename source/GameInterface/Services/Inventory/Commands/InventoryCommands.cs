@@ -224,7 +224,7 @@ internal class InventoryCommands
                 }
             }
 
-            stringBuilder.AppendLine(strings[0] + " was given animals.");
+            stringBuilder.AppendLine($"{hero.Name} was given animals.");
 
             return Succeeded(stringBuilder.ToString());
         }
@@ -283,7 +283,7 @@ internal class InventoryCommands
                 }
             }
 
-            stringBuilder.AppendLine(strings[0] + " was given war horses.");
+            stringBuilder.AppendLine($"{hero.Name} was given war horses.");
 
             return Succeeded(stringBuilder.ToString());
         }

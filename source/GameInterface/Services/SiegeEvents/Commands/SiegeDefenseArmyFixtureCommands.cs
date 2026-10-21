@@ -339,7 +339,7 @@ internal static class SiegeDefenseArmyFixtureCommands
         kingdom = null;
         var settlement = fixture.Settlement;
         if (!TryResolvePlayerContext(fixture.ControllerId, out var player, out manager, out error)) return false;
-        if (player != fixture.Player.Party || settlement != fixture.Settlement
+        if (player != fixture.Player.Party
             || GetId(manager, settlement) != fixture.SettlementId)
         {
             error = "The captured player or settlement identity changed";

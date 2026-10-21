@@ -67,6 +67,7 @@ internal class VillageDebugCommand
     {
         private readonly ICommandObjectResolver resolver;
 
+        // Takes the resolver used to look the village up by name or id.
         public InfoCoopCommand(ICommandObjectResolver resolver)
         {
             this.resolver = resolver;
@@ -93,7 +94,7 @@ internal class VillageDebugCommand
 
             StringBuilder sb = new();
 
-            sb.AppendFormat("ID: '{0}'\n", args[0]);
+            sb.AppendFormat("ID: '{0}'\n", village.StringId);
             sb.AppendFormat("Name: '{0}'\n", village.Name);
             sb.AppendFormat("Owner: '{0}'\n", village.Owner.Name);
             sb.AppendFormat("State: '{0}'\n", village.VillageState.ToString());
@@ -122,6 +123,7 @@ internal class VillageDebugCommand
     {
         private readonly ICommandObjectResolver resolver;
 
+        // Takes the resolver used to look the village up by name or id.
         public SetVillageStateCoopCommand(ICommandObjectResolver resolver)
         {
             this.resolver = resolver;
@@ -173,6 +175,7 @@ internal class VillageDebugCommand
     {
         private readonly ICommandObjectResolver resolver;
 
+        // Takes the resolver used to look the village up by name or id.
         public SetVillageHearthCoopCommand(ICommandObjectResolver resolver)
         {
             this.resolver = resolver;
@@ -227,6 +230,7 @@ internal class VillageDebugCommand
     {
         private readonly ICommandObjectResolver resolver;
 
+        // Takes the resolver used to look the village up by name or id.
         public SetTradeTaxAccumulatedCoopCommand(ICommandObjectResolver resolver)
         {
             this.resolver = resolver;
@@ -283,6 +287,7 @@ internal class VillageDebugCommand
     {
         private readonly ICommandObjectResolver resolver;
 
+        // Takes the resolver used to look the village up by name or id.
         public SetLastDemandTimeSatisifiedCoopCommand(ICommandObjectResolver resolver)
         {
             this.resolver = resolver;

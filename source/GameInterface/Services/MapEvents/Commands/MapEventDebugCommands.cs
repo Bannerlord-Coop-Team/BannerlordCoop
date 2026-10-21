@@ -2814,7 +2814,7 @@ public class MapEventDebugCommands
                 return Failed(error);
             if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
                 !playerManager.TryGetPeer(args[0], out var peer))
-                return Failed("The connected player peer or AI lord is unavailable.");
+                return Failed("The connected player peer is unavailable.");
             if (!resolver.TryResolveHero(args[1], out var aiHero, out error))
                 return Failed(error);
 

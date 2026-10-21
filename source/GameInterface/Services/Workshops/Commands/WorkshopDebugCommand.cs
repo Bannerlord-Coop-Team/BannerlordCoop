@@ -53,6 +53,7 @@ namespace GameInterface.Services.Workshops.Commands
         {
             private readonly ICommandObjectResolver resolver;
 
+            // Takes the resolver used to look command arguments up by name or id.
             public SetWorkshopCustomNameCoopCommand(ICommandObjectResolver resolver)
             {
                 this.resolver = resolver;
@@ -104,6 +105,7 @@ namespace GameInterface.Services.Workshops.Commands
         {
             private readonly ICommandObjectResolver resolver;
 
+            // Takes the resolver used to look command arguments up by name or id.
             public SetWorkshopOwnerCoopCommand(ICommandObjectResolver resolver)
             {
                 this.resolver = resolver;
@@ -167,6 +169,7 @@ namespace GameInterface.Services.Workshops.Commands
         {
             private readonly ICommandObjectResolver resolver;
 
+            // Takes the resolver used to look command arguments up by name or id.
             public OwnersInSettlementCommandCoopCommand(ICommandObjectResolver resolver)
             {
                 this.resolver = resolver;
@@ -215,6 +218,7 @@ namespace GameInterface.Services.Workshops.Commands
         {
             private readonly ICommandObjectResolver resolver;
 
+            // Takes the resolver used to look command arguments up by name or id.
             public HeroOwnedWorkshopsCommandCoopCommand(ICommandObjectResolver resolver)
             {
                 this.resolver = resolver;
@@ -328,6 +332,7 @@ namespace GameInterface.Services.Workshops.Commands
         {
             private readonly ICommandObjectResolver resolver;
 
+            // Takes the resolver used to look command arguments up by name or id.
             public ViewWorkshopInfoCommandCoopCommand(ICommandObjectResolver resolver)
             {
                 this.resolver = resolver;
