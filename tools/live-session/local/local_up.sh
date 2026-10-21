@@ -3,20 +3,12 @@
 # prepare/start the standalone dedicated server -> readiness. Clients are launched separately.
 # usage: local_up.sh <source-worktree> <base-head> <run-token> <out-dir> [steps...]
 set -euo pipefail
-export HOME=/home/pwisorlowska
 # Windows PowerShell 5.1 must build its own module path; one inherited from pwsh 7 hides Get-FileHash and friends.
 unset PSModulePath
 source_root=$1; base_head=$2; run_token=$3; out=$4; shift 4
 steps=${*:-rotate build prepare record start readiness}
 server_save=${LOCAL_SERVER_SAVE:-}
-skill=/home/pwisorlowska/.codex/skills/issue-to-pr/scripts
-integration=/home/pwisorlowska/.codex/skills/start-integration-test/scripts/start-integration-test.sh
-rotate=/home/pwisorlowska/.codex/skills/rotate/scripts/rotate.sh
-hidden=/home/pwisorlowska/.codex/runtime/hidden-windows-exec/hidden_windows_exec.sh
-powershell=/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe
-live_root=/mnt/c/Users/Andrew/.codex-runtime/live-testing/BannerlordCoop
-dedicated_root=/mnt/c/Users/Andrew/.codex-runtime/live-testing/BannerlordCoop.DedicatedServer
-inputs=/home/pwisorlowska/.codex/runtime/issue-to-pr/local-dedicated-server
+source "$(dirname "${BASH_SOURCE[0]}")/local_env.sh"
 dedicated_head=$(/usr/bin/git -C "$dedicated_root" rev-parse 'refs/remotes/origin/main^{commit}')
 dedicated_tree=$(/usr/bin/git -C "$dedicated_root" rev-parse "$dedicated_head^{tree}")
 ensure_sha=$(/usr/bin/git -C "$dedicated_root" cat-file --filters --path=scripts/ensure-local-live-server.ps1 "$dedicated_head:scripts/ensure-local-live-server.ps1" | sha256sum | cut -d' ' -f1)

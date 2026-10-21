@@ -178,6 +178,17 @@ function Restore-InterruptedLiveTestEngineProfile {
     }
 }
 
+function Open-LiveTestEngineProfileGate {
+    param([string] $Path, [datetime] $Deadline)
+    do {
+        try { return [IO.File]::Open($Path, 'OpenOrCreate', 'ReadWrite', 'None') }
+        catch [IO.IOException] {
+            if ([DateTime]::UtcNow -ge $Deadline) { throw "Timed out waiting for the Bannerlord engine-profile lease gate: $Path" }
+            Start-Sleep -Milliseconds 100
+        }
+    } while ($true)
+}
+
 function Enter-LiveTestEngineProfile {
     param(
         [Parameter(Mandatory = $true)]
@@ -211,6 +222,7 @@ function Enter-LiveTestEngineProfile {
     $lockDeadline = [DateTime]::UtcNow.AddSeconds($LockTimeoutSeconds)
     $lockStream = $null
     do {
+        $gateStream = Open-LiveTestEngineProfileGate -Path "$lockPath.gate" -Deadline $lockDeadline
         try {
             $lockStream = [IO.File]::Open(
                 $lockPath,
@@ -234,12 +246,17 @@ function Enter-LiveTestEngineProfile {
                     [string]$owner.profile -ceq $Profile -and
                     [string]$owner.engineConfigPath -ieq $EngineConfigPath -and
                     $profileMatches) {
+                    $receiptPath = Join-Path ([string]$owner.evidenceDirectory) 'engine-profile.json'
                     return [pscustomobject]@{
                         Borrowed = $true
-                        LockStream = $null
+                        ConfigPath = $EngineConfigPath
+                        EvidenceDirectory = [string]$owner.evidenceDirectory
+                        RecoveryPath = $recoveryPath
+                        OriginalBytes = [Convert]::FromBase64String([string]$owner.originalBytesBase64)
+                        LockStream = [IO.File]::Open($lockPath, 'Open', 'Read', 'Read')
                         InterruptedRecovery = $null
-                        ReceiptPath = (Join-Path ([string]$owner.evidenceDirectory) 'engine-profile.json')
-                        Receipt = $owner
+                        ReceiptPath = $receiptPath
+                        Receipt = (Get-Content -LiteralPath $receiptPath -Raw | ConvertFrom-Json)
                     }
                 }
             }
@@ -247,6 +264,9 @@ function Enter-LiveTestEngineProfile {
                 throw "Timed out waiting for the Bannerlord engine-profile lease: $lockPath"
             }
             Start-Sleep -Milliseconds 100
+        }
+        finally {
+            if ($null -eq $lockStream) { $gateStream.Dispose() }
         }
     } while ($null -eq $lockStream)
 
@@ -310,6 +330,9 @@ function Enter-LiveTestEngineProfile {
         $receiptPath = Write-LiveTestEngineProfileReceipt `
             -EvidenceDirectory $EvidenceDirectory `
             -Receipt $receipt
+        # Every participating launcher retains a shared reader; only the last one restores.
+        $lockStream.Dispose()
+        $lockStream = [IO.File]::Open($lockPath, 'Open', 'Read', 'Read')
         return [pscustomobject]@{
             ConfigPath = $EngineConfigPath
             EvidenceDirectory = [IO.Path]::GetFullPath($EvidenceDirectory)
@@ -350,12 +373,21 @@ function Enter-LiveTestEngineProfile {
         }
         throw
     }
+    finally { $gateStream.Dispose() }
 }
 
 function Exit-LiveTestEngineProfile {
     param([Parameter(Mandatory = $true)] $Lease)
 
-    if ($Lease.PSObject.Properties['Borrowed'] -and $Lease.Borrowed) { return }
+    $lockPath = "$($Lease.ConfigPath).codex-live-test.lock"
+    $gateStream = Open-LiveTestEngineProfileGate -Path "$lockPath.gate" -Deadline ([DateTime]::UtcNow.AddSeconds(30))
+    if ($null -ne $Lease.LockStream) { $Lease.LockStream.Dispose(); $Lease.LockStream = $null }
+    try { $Lease.LockStream = [IO.File]::Open($lockPath, 'Open', 'ReadWrite', 'None') }
+    catch [IO.IOException] {
+        $gateStream.Dispose()
+        return
+    }
+    catch { $gateStream.Dispose(); throw }
 
     $restoreFailure = $null
     try {
@@ -398,6 +430,7 @@ function Exit-LiveTestEngineProfile {
         if ($null -ne $Lease.LockStream) {
             $Lease.LockStream.Dispose()
         }
+        $gateStream.Dispose()
     }
 
     if ($null -ne $restoreFailure) {

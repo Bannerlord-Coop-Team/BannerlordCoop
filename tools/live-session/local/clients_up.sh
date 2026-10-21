@@ -4,10 +4,9 @@
 # usage: clients_up.sh <out-dir-with-identity.env> [visual|functional]
 set -euo pipefail
 unset PSModulePath
-export HOME=/home/pwisorlowska
+source "$(dirname "${BASH_SOURCE[0]}")/local_env.sh"
 out=$1; profile=${2:-visual}
 source "$out/identity.env"
-integration=/home/pwisorlowska/.codex/skills/start-integration-test/scripts/start-integration-test.sh
 mkdir -p "$out/crash-dialogs"
 fixture_args=()
 if [[ -f $out/fixture.env ]]; then source "$out/fixture.env"; fixture_args=(--debug-fixture-manifest "$fixture_manifest" --debug-fixture-manifest-sha256 "$fixture_sha" --debug-fixture-inputs-root "$fixture_inputs"); fi

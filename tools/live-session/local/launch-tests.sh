@@ -9,6 +9,7 @@ printf '%s\n' "$@"
 [[ ! -v PSModulePath ]]
 CAPTURE
 chmod +x "$tmp/capture.sh"
+cp "$here/local_env.sh" "$tmp/local_env.sh"
 cat > "$tmp/identity.env" <<'IDENTITY'
 live_root=/test
 run_token=owned-run
@@ -24,7 +25,7 @@ fixture_sha=abc
 fixture_inputs=/fixtures
 FIXTURE
 for name in clients_up.sh client_relaunch.sh; do
-    sed "s|^integration=.*|integration=$tmp/capture.sh|" "$here/$name" > "$tmp/$name"
+    sed "/source .*local_env.sh/a integration=$tmp/capture.sh" "$here/$name" > "$tmp/$name"
     PSModulePath=wrong bash "$tmp/$name" "$tmp" > "$tmp/arguments"
     grep -Fxq -- '--defer-client-autoconnect' "$tmp/arguments"
     grep -Fxq -- 'owned-run' "$tmp/arguments"
