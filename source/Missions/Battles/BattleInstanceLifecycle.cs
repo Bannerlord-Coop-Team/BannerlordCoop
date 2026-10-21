@@ -132,6 +132,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
     {
         ReportFinalHealth();
         missionRegistry.EndBattle();
+        BattleSpawnGate.ResetCombatFeedback();
 
         if (session.HasInstance)
         {

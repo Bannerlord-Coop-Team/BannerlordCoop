@@ -651,6 +651,7 @@ internal class BattleMissionStartHandler : IHandler
             if (BattleSpawnConfig.Enabled)
             {
                 missionRegistry.BeginBattle(payload.MapEventId);
+                BattleSpawnGate.ResetCombatFeedback();
                 battleWindowOpened = true;
                 Logger.Information("[BattleSync] Opened coop battle window in OpenSiegeMission: mapEvent={MapEventId}", payload.MapEventId);
             }
@@ -812,6 +813,7 @@ internal class BattleMissionStartHandler : IHandler
             if (BattleSpawnConfig.Enabled)
             {
                 missionRegistry.BeginBattle(mapEventId);
+                BattleSpawnGate.ResetCombatFeedback();
                 battleWindowOpened = true;
                 Logger.Information("[BattleSync] Opened coop battle window in OpenAttackMission: mapEvent={MapEventId}", mapEventId);
             }
@@ -915,7 +917,10 @@ internal class BattleMissionStartHandler : IHandler
     // Closes the battle window this open attempt opened when no mission lifecycle took ownership of it.
     internal void CloseBattleWindowAfterFailedOpen(bool battleWindowOpened)
     {
-        if (battleWindowOpened) missionRegistry.EndBattle();
+        if (!battleWindowOpened) return;
+
+        missionRegistry.EndBattle();
+        BattleSpawnGate.ResetCombatFeedback();
     }
 
     internal static bool ShouldOpenBattleMission(bool isPlayerWounded, string localPartyId, string initiatingPartyId)

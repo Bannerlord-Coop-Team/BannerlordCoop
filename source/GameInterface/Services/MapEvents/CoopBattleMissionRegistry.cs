@@ -4,7 +4,7 @@ namespace GameInterface.Services.MapEvents;
 
 /// <summary>
 /// Tracks the coop battle windows open on this machine, so GameInterface patches can tell a coop battle apart from
-/// a vanilla or mission-less one. The battle window spans entry to leave; the mission window spans the controller.
+/// a vanilla or mission-less one. The battle window spans entry to leave; the mission window spans load to dispose.
 /// </summary>
 public interface ICoopBattleMissionRegistry
 {
@@ -25,7 +25,7 @@ public interface ICoopBattleMissionRegistry
 
     /// <summary>
     /// True from just before a coop battle mission is built (its initial wave spawns during the build) until the
-    /// battle instance is left. Opens earlier and closes later than <see cref="IsMissionActive"/>.
+    /// battle instance is left. Opens earlier than <see cref="IsMissionActive"/> and closes just before it, on leave.
     /// </summary>
     bool IsCoopBattleActive { get; }
 
@@ -122,9 +122,6 @@ public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
             activeMapEventId = mapEventId;
             ClearReserveTimeouts();
         }
-
-        // Kill-feed bookkeeping is still process-wide on BattleSpawnGate, so each battle window starts it clean.
-        BattleSpawnGate.ResetCombatFeedback();
     }
 
     public void EndBattle()
@@ -134,8 +131,6 @@ public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
             activeMapEventId = null;
             ClearReserveTimeouts();
         }
-
-        BattleSpawnGate.ResetCombatFeedback();
     }
 
     public void AcceptMissingReserveSide(BattleSideEnum side)

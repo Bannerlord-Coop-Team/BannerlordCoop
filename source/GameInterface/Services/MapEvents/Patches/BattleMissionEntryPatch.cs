@@ -56,6 +56,7 @@ internal class BattleMissionEntryPatch
         if (!objectManager.TryGetId(mapEvent, out var mapEventId)) return;
 
         missionRegistry.BeginBattle(mapEventId);
+        BattleSpawnGate.ResetCombatFeedback();
         Logger.Information("[BattleSync] Opened coop battle window before mission load: mapEvent={MapEventId}", mapEventId);
     }
 

@@ -145,6 +145,9 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
             var missionComponent = new Mock<ICoopMissionComponent>();
             missionComponent.SetupGet(component => component.AgentRegistry).Returns(agentRegistry.Object);
 
+            var missionRegistry = client.Resolve<ICoopBattleMissionRegistry>();
+            missionRegistry.BeginBattle(mapEventId);
+
             using var lifecycle = new BattleInstanceLifecycle(
                 client.Resolve<IBattleNetwork>(),
                 client.Resolve<INetwork>(),
@@ -154,10 +157,11 @@ public class BattleInstanceLifecycleTests : MissionTestEnvironment
                 worldItemRegistry: worldItemRegistry,
                 session: session,
                 missionContext: context,
-                missionRegistry: client.Resolve<ICoopBattleMissionRegistry>());
+                missionRegistry: missionRegistry);
 
             lifecycle.Leave(wasRetreat: false);
 
+            Assert.False(missionRegistry.IsCoopBattleActive);
             Assert.Empty(context.ControllersInMission);
             agentRegistry.Verify(registry => registry.Clear(), Times.Once);
             Assert.Equal(1, worldItemRegistry.ClearCalls);

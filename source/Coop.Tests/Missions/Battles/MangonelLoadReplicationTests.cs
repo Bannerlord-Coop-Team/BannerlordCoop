@@ -140,13 +140,13 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         bool oldKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
         bool oldEnabled = BattleSpawnConfig.Enabled;
         BattleSpawnConfig.Enabled = true;
-        var battleScope = new ActiveCoopBattleScope("mangonel-former-simulator");
         SiegeMissionAuthorityGate.IsLocalAuthority = false;
         SiegeMissionAuthorityGate.IsAuthorityKnown = authorityKnown;
         SiegeMissionAuthorityGate.SetClaimedMachines(localSimulator
             ? new HashSet<int> { replica.Machine.Id.Id } : new HashSet<int>(), new HashSet<int>());
         nativeBaseTicks = 0;
         nativePickupConsumes = 0;
+        var battleScope = new ActiveCoopBattleScope("mangonel-former-simulator");
         try
         {
             AccessTools.DeclaredMethod(typeof(Mangonel), "OnTick").Invoke(replica.Machine, new object[] { 0.1f });

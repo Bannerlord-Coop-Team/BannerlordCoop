@@ -264,11 +264,11 @@ public class SiegeMachineSimulationTests : IDisposable
         bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
         bool previousEnabled = BattleSpawnConfig.Enabled;
         BattleSpawnConfig.Enabled = true;
-        var battleScope = new ActiveCoopBattleScope("ram-authority-test");
         SiegeMissionAuthorityGate.IsAuthorityKnown = authorityKnown;
         SiegeMissionAuthorityGate.IsLocalAuthority = false;
         SiegeMissionAuthorityGate.SetClaimedMachines(
             localSimulator ? new HashSet<int> { ram.Id.Id } : new HashSet<int>(), new HashSet<int>());
+        var battleScope = new ActiveCoopBattleScope("ram-authority-test");
         try
         {
             Assert.False(GameNetwork.IsClientOrReplay);
@@ -329,10 +329,10 @@ public class SiegeMachineSimulationTests : IDisposable
         bool oldKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
         bool oldEnabled = BattleSpawnConfig.Enabled;
         BattleSpawnConfig.Enabled = true;
-        var battleScope = new ActiveCoopBattleScope("ram-arrival-test");
         SiegeMissionAuthorityGate.IsLocalAuthority = false;
         SiegeMissionAuthorityGate.IsAuthorityKnown = true;
         SiegeMissionAuthorityGate.ResetClaimedMachines();
+        var battleScope = new ActiveCoopBattleScope("ram-arrival-test");
         try
         {
             var broker = new TestMessageBroker();
