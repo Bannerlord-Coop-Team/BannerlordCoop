@@ -722,16 +722,11 @@ public class MerchantOutlawsTests : IDisposable
 
             var logic = new PartyScreenLogic();
             pickerLogic = logic;
-            logic.Initialize(new PartyScreenLogicInitializationData
-            {
-                LeftMemberRoster = issue.AlternativeSolutionSentTroops,
-                RightMemberRoster = party.MemberRoster,
-                LeftPrisonerRoster = TroopRoster.CreateDummyTroopRoster(),
-                RightPrisonerRoster = party.PrisonRoster,
-                RightOwnerParty = party.Party,
-                RightLeaderHero = Get<Hero>(ClientA, scenario.PlayerA.HeroId),
-                PartyPresentationDoneButtonDelegate = PartyScreenHelper.ManageTroopsAndPrisonersDoneHandler,
-            });
+            logic.Initialize(PartyScreenLogicInitializationData.CreateBasicInitDataWithMainParty(
+                issue.AlternativeSolutionSentTroops, TroopRoster.CreateDummyTroopRoster(),
+                PartyScreenLogic.TransferState.Transferable, PartyScreenLogic.TransferState.NotTransferable,
+                PartyScreenLogic.TransferState.Transferable, null, PartyScreenHelper.PartyScreenMode.QuestTroopManage,
+                partyPresentationDoneButtonDelegate: PartyScreenHelper.ManageTroopsAndPrisonersDoneHandler));
             logic._partyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
             if (upgradePicker)
             {
