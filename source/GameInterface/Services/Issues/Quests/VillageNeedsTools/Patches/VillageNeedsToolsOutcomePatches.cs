@@ -47,14 +47,14 @@ internal class VillageNeedsToolsOutcomePatches
     [HarmonyPrefix]
     private static bool PenaltyPrefix() => ModInformation.IsServer;
 
-    // These are compiled when patched, before the sync patches exist, so the hearth setter and AddPower
-    // inlined into them would skip syncing. Those calls are routed through the helpers below instead.
+    // These compile before the journal and sync patches exist, so inlined calls must go through helpers.
     [HarmonyPatch(typeof(Quest), nameof(Quest.FinishQuestSuccess1))]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> SyncedWritesTranspiler(IEnumerable<CodeInstruction> instructions)
     {
         var hearthSetter = AccessTools.PropertySetter(typeof(Village), nameof(Village.Hearth));
         var addPower = AccessTools.Method(typeof(Hero), nameof(Hero.AddPower));
+        var addLog = AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog));
         foreach (var instruction in instructions)
         {
             if (instruction.Calls(hearthSetter))
@@ -66,6 +66,11 @@ internal class VillageNeedsToolsOutcomePatches
             {
                 instruction.opcode = OpCodes.Call;
                 instruction.operand = AccessTools.Method(typeof(VillageNeedsToolsOutcomePatches), nameof(AddPower));
+            }
+            else if (instruction.Calls(addLog))
+            {
+                instruction.opcode = OpCodes.Call;
+                instruction.operand = AccessTools.Method(typeof(VillageNeedsToolsOutcomePatches), nameof(AddLog));
             }
             yield return instruction;
         }
@@ -82,6 +87,9 @@ internal class VillageNeedsToolsOutcomePatches
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void AddPower(Hero hero, float power) => hero.AddPower(power);
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static JournalLog AddLog(QuestBase quest, TextObject text, bool hideInformation) => quest.AddLog(text, hideInformation);
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
     [HarmonyPrefix]
