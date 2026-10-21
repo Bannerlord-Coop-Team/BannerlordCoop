@@ -206,8 +206,9 @@ public class QuestRequestOwnershipTests : IDisposable
         {
             scenario.ClientA.Call(() =>
             {
+                Assert.True(scenario.ClientA.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var merchant));
                 AccessTools.Field(typeof(Quest), nameof(Quest._counterOfferHero))
-                    .SetValue(clientQuest, GameObjectCreator.CreateInitializedObject<Hero>());
+                    .SetValue(clientQuest, merchant);
                 CampaignEventDispatcher.Instance.OnConversationEnded(new List<CharacterObject>
                 {
                     clientQuest._counterOfferHero.CharacterObject,
