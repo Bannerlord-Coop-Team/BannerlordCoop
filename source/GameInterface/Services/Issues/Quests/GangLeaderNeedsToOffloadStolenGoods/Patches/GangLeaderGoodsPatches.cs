@@ -17,14 +17,31 @@ internal class GangLeaderGoodsPatches
         if (ModInformation.IsServer) return;
         foreach (var line in __result.Lines)
         {
-            if (line.Text.GetID() != "21Y4tWE9") continue;
-            var original = line.ConsequenceDelegate;
+            var payment = line.Text.GetID() == "21Y4tWE9";
+            if (!payment && line.Text.GetID() != "M8j6J8aN") continue;
             line.ConsequenceDelegate = () =>
             {
-                if (ContainerProvider.TryResolve<IGangLeaderGoodsService>(out var service)) service.Purchase(__instance);
-                original();
+                if (!ContainerProvider.TryResolve<IGangLeaderGoodsService>(out var service)) return;
+                if (payment) service.Purchase(__instance);
+                else service.Fight(__instance);
             };
         }
+    }
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
+    [HarmonyPostfix]
+    private static void BattleStarted(MapEvent mapEvent) => Observe(mapEvent);
+
+    [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.OnBattleWon))]
+    [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
+    private static void BattleWon(MapEvent __instance) => Observe(__instance);
+
+    private static void Observe(MapEvent mapEvent)
+    {
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<IGangLeaderGoodsService>(out var service) &&
+            ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+            dispatcher.RunAsOwners<Quest>(quest => service.ObserveBattle(quest, mapEvent));
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventEnded))]

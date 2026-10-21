@@ -158,12 +158,17 @@ public class SmugglersTests : IDisposable
     private void StartPersuasionSession()
     {
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        var ownerPartyId = string.Empty;
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(ControllerA, out var player));
+            ownerPartyId = player.MobilePartyId;
+        });
         foreach (var instance in new[] { Server, ClientA })
         {
             instance.Call(() =>
             {
-                Assert.True(instance.Resolve<IPlayerManager>().TryGetPlayer(ControllerA, out var player));
-                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var ownerParty));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var smugglers));
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
                 using (new AllowedThread())
