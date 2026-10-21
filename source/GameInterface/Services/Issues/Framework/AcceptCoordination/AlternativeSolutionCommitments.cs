@@ -4,6 +4,7 @@ using Common.Network.Messages;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using LiteNetLib;
@@ -20,15 +21,17 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
     private readonly IObjectManager objects;
     private readonly ITroopRosterInterface rosters;
     private readonly IAlternativeSolutionTroopValidator troops;
+    private readonly IPlayerManager players;
     private readonly Dictionary<(string Hero, string Giver, string Issue), (NetPeer Peer, TroopRoster Troops)> selections = new();
 
     public AlternativeSolutionCommitments(IMessageBroker broker, IObjectManager objects,
-        ITroopRosterInterface rosters, IAlternativeSolutionTroopValidator troops)
+        ITroopRosterInterface rosters, IAlternativeSolutionTroopValidator troops, IPlayerManager players)
     {
         this.broker = broker;
         this.objects = objects;
         this.rosters = rosters;
         this.troops = troops;
+        this.players = players;
         broker.Subscribe<PartyDoneLogicApplied>(Handle_Applied);
         broker.Subscribe<PlayerDisconnected>(Handle_Disconnected);
     }
@@ -74,7 +77,8 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
     {
         var data = payload.What;
         if (ModInformation.IsClient || data.Requester == null || string.IsNullOrEmpty(data.IssueId)) return;
-        var key = (data.MainHeroId, data.IssueOwnerId, data.IssueId);
+        if (!players.TryGetPlayer(data.Requester, out var player)) return;
+        var key = (player.HeroId, data.IssueOwnerId, data.IssueId);
         if (!selections.TryGetValue(key, out var selection))
             selection = (data.Requester, TroopRoster.CreateDummyTroopRoster());
         foreach (var element in rosters.UnpackTroopRosterData(data.MemberDelta))

@@ -632,7 +632,7 @@ public class MerchantOutlawsTests : IDisposable
             foreach (var issueId in new[] { "pending_x", "accepted_y" })
                 broker.Publish(this, new GameInterface.Services.Party.Messages.PartyDoneLogicApplied(
                     ClientA.NetPeer, PartyScreenHelper.PartyScreenMode.QuestTroopManage, delta,
-                    scenario.PlayerA.HeroId, scenario.NotableId, issueId));
+                    "client_registry_alias", scenario.NotableId, issueId));
             Assert.Equal(10, Assert.Single(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "accepted_y", null)).Number);
             Assert.Equal(10, Assert.Single(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "pending_x", null)).Number);
             Assert.Empty(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "pending_x", null));

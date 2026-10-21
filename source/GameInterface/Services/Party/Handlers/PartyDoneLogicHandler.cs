@@ -125,6 +125,8 @@ internal class PartyDoneLogicHandler : IHandler
             if (issue != null && questTypes.TryGet(issue.GetType(), out var descriptor) &&
                 descriptor.AlternativeSolutionAcceptStrategy is ICommittedAlternativeSolutionAcceptStrategy &&
                 objectManager.TryGetIdWithLogging(issue.IssueOwner, out issueOwnerId)) issueId = issue.StringId;
+            logger.Information("Quest picker Done: hero={HeroId}, giver={GiverId}, issue={IssueId}, left stacks={Stacks}",
+                mainHeroId, issueOwnerId, issueId, leftMemberRosterData.Data?.Length ?? 0);
         }
 
         var message = new NetworkCompleteDoneLogic(
