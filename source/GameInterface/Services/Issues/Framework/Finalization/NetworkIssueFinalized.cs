@@ -15,22 +15,10 @@ public readonly struct NetworkIssueFinalized : IServerToClientCommand
     [ProtoMember(3)]
     public readonly IssueOutcome Outcome;
 
-    [ProtoMember(4)]
-    public readonly string ControllerId;
-
     public NetworkIssueFinalized(string issueOwnerId, string issueId, IssueOutcome outcome)
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
         Outcome = outcome;
-        ControllerId = null;
-    }
-
-    public NetworkIssueFinalized(string issueOwnerId, string issueId, IssueOutcome outcome, string controllerId)
-    {
-        IssueOwnerId = issueOwnerId;
-        IssueId = issueId;
-        Outcome = outcome;
-        ControllerId = controllerId;
     }
 }

@@ -62,7 +62,7 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
         return id ?? string.Empty;
     }
 
-    private readonly struct State : IEquatable<State>
+    private readonly struct State
     {
         private readonly string ownerId;
         private readonly string issueId;
@@ -72,7 +72,6 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
         private readonly bool saved;
         private readonly int warnings;
         private readonly int journalCount;
-        private readonly string[] journal;
 
         public State(string ownerId, string issueId, string controllerId, string caravanId, string banditId,
             bool saved, int warnings, int journalCount, string[] journal)
@@ -85,7 +84,6 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
             this.saved = saved;
             this.warnings = warnings;
             this.journalCount = journalCount;
-            this.journal = journal;
         }
 
         public bool Matches(string ownerId, string issueId, string controllerId, string caravanId, string banditId,
@@ -93,12 +91,5 @@ internal class CaravanAmbushStatePublisher : ICaravanAmbushStatePublisher
             this.controllerId == controllerId && this.caravanId == caravanId && this.banditId == banditId &&
             this.saved == saved && this.warnings == warnings && this.journalCount == journalCount;
 
-        public bool Equals(State other) => ownerId == other.ownerId && issueId == other.issueId &&
-            controllerId == other.controllerId && caravanId == other.caravanId && banditId == other.banditId &&
-            saved == other.saved && warnings == other.warnings && journalCount == other.journalCount && journal.SequenceEqual(other.journal);
-
-        public override bool Equals(object obj) => obj is State other && Equals(other);
-
-        public override int GetHashCode() => 0;
     }
 }

@@ -13,7 +13,6 @@ public interface IIssueOwnershipRegistry
 
     void Remove(string issueOwnerId, string issueId);
 
-    void Remove(string issueOwnerId, string issueId, string controllerId);
 
     IssueOwnershipData[] GetAll();
 }
