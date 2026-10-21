@@ -305,7 +305,7 @@ public class HeadmanNeedsGrainTests : IDisposable
         Server.Call(() =>
         {
             serverRewards = new HeadmanNeedsGrainTraitRewards(
-                NSubstitute.Substitute.For<Common.Network.INetwork>(), Server.ObjectManager);
+                new Moq.Mock<Common.Network.INetwork>().Object, Server.ObjectManager);
             var owner = Get<Hero>(Server, scenario.PlayerA.HeroId);
             serverRewards.Seed(owner, new Dictionary<string, int> { [DefaultTraits.Generosity.StringId] = 0 });
             using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
