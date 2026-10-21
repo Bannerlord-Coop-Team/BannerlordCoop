@@ -220,7 +220,7 @@ public class CoopBattleController : CoopMissionController
         coopMissionComponent.AgentVoiceHandler.WarmUp();
     }
 
-    // Tears down this battle and always closes the loaded-mission window it opened.
+    // Tears down this battle and always closes the loaded-mission window it opened and detaches its agent authority.
     public override void Dispose()
     {
         try
@@ -413,7 +413,6 @@ public class CoopBattleController : CoopMissionController
         bool hasHideoutAmbushMissionController)
         => !hasHideoutMissionController && !hasHideoutAmbushMissionController;
 
-    // Compare current authority with controller id
     public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)
     {
         base.OnAgentRemoved(affectedAgent, affectorAgent, agentState, killingBlow);
