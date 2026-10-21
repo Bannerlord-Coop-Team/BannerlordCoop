@@ -4,7 +4,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $receipts = @(Get-Content -LiteralPath $PreparationLog | ForEach-Object {
-    try { $value = $_ | ConvertFrom-Json; if ($value.serverData) { $value } } catch { }
+    try { $value = $_ | ConvertFrom-Json; if ($value.serverData) { $value } } catch { Write-Verbose ("Skipping non-receipt preparation output: " + $_.Exception.Message) }
 })
 if ($receipts.Count -ne 1) { throw 'Expected exactly one prepared server-data receipt.' }
 $data = [IO.Path]::GetFullPath([string]$receipts[0].serverData)
