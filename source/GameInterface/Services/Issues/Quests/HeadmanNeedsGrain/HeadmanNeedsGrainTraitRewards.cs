@@ -31,6 +31,7 @@ internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private Dictionary<Hero, Dictionary<string, int>> progress = new Dictionary<Hero, Dictionary<string, int>>();
+    private readonly Dictionary<Hero, Dictionary<string, int>> pendingRewards = new Dictionary<Hero, Dictionary<string, int>>();
     private Hero seededOwner;
 
     public HeadmanNeedsGrainTraitRewards(INetwork network, IObjectManager objectManager)
@@ -58,6 +59,12 @@ internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
 
         model.GetTraitLevelForTraitXp(owner, trait, xp + amount, out var level, out var remainingXp);
         values[trait.StringId] = remainingXp;
+        if (!pendingRewards.TryGetValue(owner, out var pending))
+        {
+            pending = new Dictionary<string, int>();
+            pendingRewards.Add(owner, pending);
+        }
+        pending[trait.StringId] = remainingXp;
         owner.SetTraitLevel(trait, level);
         network.SendAll(new NetworkHeadmanNeedsGrainTraitReward(ownerId, giverId, trait.StringId, amount, (int)note, level, remainingXp));
     }
@@ -82,11 +89,19 @@ internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
     {
         if (ModInformation.IsClient || values == null) return;
         var model = Campaign.Current.Models.CharacterDevelopmentModel;
-        var accepted = new Dictionary<string, int>();
+        var accepted = progress.TryGetValue(owner, out var current)
+            ? new Dictionary<string, int>(current) : new Dictionary<string, int>();
+        pendingRewards.TryGetValue(owner, out var pending);
         foreach (var value in values)
         {
             var trait = MBObjectManager.Instance.GetObject<TraitObject>(value.Key);
             if (!IsRewardTrait(trait)) continue;
+            // A seed sent after another reward can still contain this trait's old XP.
+            if (pending != null && pending.TryGetValue(value.Key, out var expectedXp))
+            {
+                if (value.Value != expectedXp) continue;
+                pending.Remove(value.Key);
+            }
             model.GetTraitLevelForTraitXp(owner, trait, value.Value, out var level, out var xp);
             accepted[value.Key] = xp;
             if (owner.GetTraitLevel(trait) != level) owner.SetTraitLevel(trait, level);

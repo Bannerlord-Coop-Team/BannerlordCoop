@@ -4,7 +4,6 @@ using System.IO;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Settlements;
-using Behavior = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior;
 using Issue = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue;
 
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain;
@@ -34,7 +33,6 @@ internal class HeadmanNeedsGrainCreationCaptureStrategy : ICreationCaptureStrate
             writer.Write(marketId ?? string.Empty);
             writer.Write(grainIssue._issueDifficultyMultiplier);
             writer.Write(grainIssue.IssueDueTime.NumTicks);
-            writer.Write(Campaign.Current.GetCampaignBehavior<Behavior>()._averageGrainPriceInCalradia);
             return stream.ToArray();
         }
     }
@@ -55,7 +53,6 @@ internal class HeadmanNeedsGrainCreationCaptureStrategy : ICreationCaptureStrate
 
             grainIssue._issueDifficultyMultiplier = reader.ReadSingle();
             grainIssue.IssueDueTime = new CampaignTime(reader.ReadInt64());
-            Campaign.Current.GetCampaignBehavior<Behavior>()._averageGrainPriceInCalradia = reader.ReadInt32();
         }
     }
 

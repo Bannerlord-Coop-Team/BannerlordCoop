@@ -4,11 +4,13 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.SaveSystem;
 
-namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
+namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain;
 
 public sealed class HeadmanNeedsGrainSaveableTypeDefiner : SaveableTypeDefiner
 {
-    public HeadmanNeedsGrainSaveableTypeDefiner() : base(44_195_000)
+    private const int SaveBaseId = 44_195_000;
+
+    public HeadmanNeedsGrainSaveableTypeDefiner() : base(SaveBaseId)
     {
     }
 

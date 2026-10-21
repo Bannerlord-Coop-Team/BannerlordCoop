@@ -363,6 +363,24 @@ public class HeadmanNeedsGrainTests : IDisposable
     private static bool SkipMapCharacterSwitch() => false;
 
     [Fact]
+    public void LateJoin_LoadsAverageGrainPriceWithoutAnIssueCreationPayload()
+    {
+        var records = new Dictionary<string, object>();
+        Server.Call(() =>
+        {
+            var behavior = Campaign.Current.GetCampaignBehavior<Behavior>();
+            behavior._averageGrainPriceInCalradia = 37;
+            behavior.SyncData(new TestDataStore(true, records));
+        });
+        ClientB.Call(() =>
+        {
+            var behavior = Campaign.Current.GetCampaignBehavior<Behavior>();
+            behavior._averageGrainPriceInCalradia = 0;
+            behavior.SyncData(new TestDataStore(false, records));
+            Assert.Equal(37, behavior._averageGrainPriceInCalradia);
+        });
+    }
+    [Fact]
     public void SaveData_PreservesTheAveragePriceAndTheServersChosenMarket()
     {
         Server.Call(() =>
