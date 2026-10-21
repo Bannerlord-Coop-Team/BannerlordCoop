@@ -506,6 +506,7 @@ public class VillageNeedsToolsTests : IDisposable
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var otherGoldBefore = 0;
         var expectedGold = 0;
+        var grainBefore = new Dictionary<EnvironmentInstance, int>();
 
         foreach (var instance in Instances)
         {
@@ -585,6 +586,8 @@ public class VillageNeedsToolsTests : IDisposable
 
                 Assert.True(issue.IsSolvingWithAlternative);
                 Assert.Equal(ServerPayment, issue._payment);
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
+                grainBefore[instance] = party.ItemRoster.GetItemNumber(DefaultItems.Grain);
             });
         }
 
@@ -634,7 +637,7 @@ public class VillageNeedsToolsTests : IDisposable
                 Assert.Null(notable.Issue);
                 Assert.Equal(700f, settlement.Village.Hearth);
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
-                Assert.Equal(exchange ? 12 : 0, party.ItemRoster.GetItemNumber(DefaultItems.Grain));
+                Assert.Equal(grainBefore[instance] + (exchange ? 12 : 0), party.ItemRoster.GetItemNumber(DefaultItems.Grain));
             });
         }
 
