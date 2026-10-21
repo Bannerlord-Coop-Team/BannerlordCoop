@@ -45,7 +45,7 @@ public readonly struct ModOptions
     [ProtoMember(12)]
     public readonly bool SmithingStaminaRecoveryOutsideSettlements { get; } = true;
     [ProtoMember(13)]
-    public readonly float SmithingStaminaRecoveryMultiplier { get; } = 0.1f;
+    public readonly float SmithingStaminaRecoveryMultiplier { get; } = 0.6f;
     [ProtoMember(14)]
     public readonly float MaximumLootersMultiplier { get; } = 1f;
     [ProtoMember(15)]
