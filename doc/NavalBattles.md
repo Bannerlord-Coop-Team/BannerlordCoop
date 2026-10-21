@@ -27,7 +27,8 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   applies, outside the physics step: a teleport to the extrapolated position and heading (`NavalShipsLogic.TeleportShip`,
   which carries the crew), along with any other agent standing on the copy, such as a local main agent that boarded it,
   then the owner's velocity and yaw rate.
-  Heave, pitch and roll come from this client's water. One rule decides a copy's mode at every sample and step: steered
+  Heave, pitch and roll come from this client's water, which can differ from the owner's (see "Copies float on local
+  water" in section 6). One rule decides a copy's mode at every sample and step: steered
   while its body simulates, its owner's frames written otherwise (warning `has no simulating body` once per copy;
   `bodyMode` in `inspect`). `NavalSteeredCopies.Track`/`Forget` are the only writers of `NavalForeignHulls`, the static
   copy set the patches read; spawning, releasing, replacing and removing a hull all go through them.
@@ -297,9 +298,16 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   be built (`AddPhysics(isStatic)` left no static body). Kinematic and static copies and `copy_body` were deleted.
 - **D2.** A failed AI fleet counts as a players' victory (the land precedent); an aborted battle would need a new
   result state.
-- **Water is not shared.** The water clock is native and can't be set from managed code, and `WaterQuality` and
-  `PhysicsTickRate` are per client. So the verdict is no-go on deterministic water. Option B has to treat each client's
-  sea as a disturbance. `water_probe` checks whether the clock happens to be shared.
+- **Copies float on local water (decided 2026-10-21, known difference).** Water height is a function of the engine's
+  process-wide `MBCommon.GetTotalMissionTime()` (the probe's `total`), which adds up every mission the client has run
+  (conversations, earlier battles) and has no managed setter. So clients with different mission histories see different
+  wave phases: about 1.5 m mean apart in R42's open-sea battle (`battle_terrain_opensea_southern`), about 0.001 m in
+  its coastal one. A copy keeps its local buoyancy: its planar position and yaw follow the owner, while its heave and roll
+  differ from the owner's by about the water mismatch (R42: 1-1.5 m heave and 5-6° roll mean, roll max 26°). Drift
+  criteria are planar plus yaw only; heave, pitch and roll are reported for information. `WaterQuality` and
+  `PhysicsTickRate` are per client too. `water_probe` logs both clocks; align two probes on `total`, not on `mt`. Rejected:
+  - follow the owner's heave, roll and pitch with buoyancy off: the copy would visibly hover over or sink into local waves;
+  - feed the owner's water plane into the copy's buoyancy: the copy would sit in visibly different water here.
 - **Jordan dependencies:**
   - M6 needs `CampaignShipsSync` to replicate a server `Ship.HitPoints` write and `DestroyShipAction`;
   - the campaign side of a mid-battle retreat (the party at sea, rafts) is his;
@@ -383,7 +391,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | `helm <rudder> <row> <sail> [seconds]` | client | Drives the own hull. |
 | `rope_list`, `rope_throw`, `rope_status` | client | Lists, throws and shows ropes. |
 | `copy_steer [key=value...]` | client | Shows or tunes the steered copies' knobs here (`gain window softzone clamp tau lead snap`), live. |
-| `water_probe start [grid=5] [spacing=40] [seconds=120] \| status \| stop` | client | Samples the water grid for the shared-clock test; each tick logs every hull's `x`, `y`, `yaw` (degrees, counter-clockwise from +x), `z`, `pitch`, `roll` and the water under it. |
+| `water_probe start [grid=5] [spacing=40] [seconds=120] \| status \| stop` | client | Samples the water grid for the shared-clock test; each tick logs every hull's `x`, `y`, `yaw` (degrees, counter-clockwise from +x), `z`, `pitch`, `roll` and the water under it. `start` is refused until deployment has finished. |
+| `board_copy [ship] \| status` | client | Teleports the main agent onto a copy's deck (the nearest copy, or the one whose ship id starts with `ship`) at vanilla's deck spot: the hull's player standing point, else the middle inner deck frame (`MissionShip.GetMiddleInnerSpawnGlobalFrame`). Reports the hull-frame `deckError` and `heightAboveSpot`; `status` reports the hull the main agent stands on. The copy's owner reports the puppet's `maxDeckError` in `inspect`. |
+| `immortal [on \| off]` | client | Sets the main agent's vanilla mortality state to `Immortal` (`on`) or `Mortal` (`off`), so blows, routed ones included, take no health; reports it without an argument. A ram's 2 m kill radius (`Agent.Die`) still kills it. |
 
 `coop.debug.map_event.start_naval` starts a naval battle directly. Everything above except `inspect` and `rope_status` is
 DEBUG only.
@@ -401,7 +411,11 @@ it isn't `EngageParty` on the first player. If there is still no map event after
 `EncounterModel.NeededMaximumNavalDistanceForEncounteringMobileParty`, the server calls
 `EncounterManager.StartPartyEncounter(fleet, player)`, which becomes the server-detected player conversation. Neither runs
 once the fleet is held in a player conversation (`ConversationPartyHold.IsInPlayerConversation`) or either party is in
-a map event, so the conversation's hold isn't overridden and no second encounter opens. While the
+a map event, so the conversation's hold isn't overridden and no second encounter opens. That conversation opens on the
+first player before the map event, and so before the scenario message, exists. So the server sends
+`NetworkNavalScenarioEngaging` with the engage order, and each listed client answers an `encounter_meeting` conversation
+that has stayed open 2 s, as `coop.debug.map_event.complete_encounter_meeting` does, until the scenario message arrives
+(R42 needed that command by hand on the engaged client). While the
 engage step waits, each distinct stack that resets the fleet's movement is logged once. `scenario_status` reports the
 re-issue count and whether the fallback ran.
 
@@ -428,6 +442,9 @@ Knobs (`NavalScenarioResolver.Usage`):
 - `ram=n` (0 to 4) fits `bow_ram_lvl1` on the first n ships without a ballista of every player and of the AI fleet
   (not the `encounter` or `blockade` enemy), swapping in an `empire_medium_ship` where a hull has no bow slot. `ramming`
   defaults to `ram=1`.
+
+A scenario client whose Ready press throws (R42 crash 2's first symptom) logs the exception, fails the `ready` step with
+`deployment half-finished` and runs no further steps in that battle.
 
 ### Validation procedure
 

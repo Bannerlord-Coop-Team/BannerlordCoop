@@ -93,8 +93,8 @@ internal readonly struct CopySteeringStep
 }
 
 /// <summary>
-/// Steers one copy toward its owner's latest sample extrapolated by the owner's velocity: target velocity = owner velocity
-/// + clamp(gain * soft-zoned error / window), blended in with time constant tau. Heave, pitch and roll stay with the local water.
+/// Steers a copy's planar position and yaw toward its owner's extrapolated sample: owner velocity plus a clamped, soft-zoned
+/// correction over tau. Heave, pitch and roll float on local water, whose waves can differ from the owner's (NavalBattles.md).
 /// </summary>
 internal sealed class CopySteering
 {
