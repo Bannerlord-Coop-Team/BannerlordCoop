@@ -55,6 +55,7 @@ public class QuestTraitXpTests : IDisposable
                     TraitLevelingHelper.OnIssueSolvedThroughQuest(owner, DefaultTraits.Honor, Reward);
                     TraitLevelingHelper.OnIssueSolvedThroughAlternativeSolution(owner, calculating);
                     TraitLevelingHelper.OnIssueSolvedThroughBetrayal(owner, calculating);
+                    TraitLevelingHelper.OnIssueFailed(owner, calculating);
                 }
             }
 
@@ -67,11 +68,38 @@ public class QuestTraitXpTests : IDisposable
     }
 
     [Fact]
+    public void QuestFailures_OnTheServerLeaveTheSharedTraitStoreAndTheOwnersLevelAlone()
+    {
+        Server.Call(() =>
+        {
+            var store = new PropertyOwner<PropertyObject>();
+            Campaign.Current.PlayerTraitDeveloper = store;
+
+            var owner = GameObjectCreator.CreateInitializedObject<Hero>();
+
+            using (new AllowedThread())
+            {
+                owner.SetTraitLevel(DefaultTraits.Honor, 1);
+            }
+
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+            {
+                TraitLevelingHelper.OnIssueFailed(owner, new[] { new Tuple<TraitObject, int>(DefaultTraits.Honor, -50) });
+            }
+
+            Assert.False(QuestTraitXpPatches.OnIssueFailedPrefix());
+            Assert.Equal(0, store.GetPropertyValue(DefaultTraits.Honor));
+            Assert.Equal(1, owner.GetTraitLevel(DefaultTraits.Honor));
+        });
+    }
+
+    [Fact]
     public void QuestRewards_AreSkipped()
     {
         Assert.False(QuestTraitXpPatches.OnIssueSolvedThroughQuestPrefix());
         Assert.False(QuestTraitXpPatches.OnIssueSolvedThroughQuestSingleTraitPrefix());
         Assert.False(QuestTraitXpPatches.OnIssueSolvedThroughAlternativeSolutionPrefix());
         Assert.False(QuestTraitXpPatches.OnIssueSolvedThroughBetrayalPrefix());
+        Assert.False(QuestTraitXpPatches.OnIssueFailedPrefix());
     }
 }

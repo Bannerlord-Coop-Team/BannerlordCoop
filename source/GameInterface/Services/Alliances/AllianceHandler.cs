@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Alliances.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -14,11 +15,13 @@ public class AllianceHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    public AllianceHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+    private readonly IPlayerManager playerManager;
+    public AllianceHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network, IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<AllianceStarted>(Handle_AllianceStarted);
         messageBroker.Subscribe<NetworkAllianceStarted>(Handle_NetworkAllianceStarted);
@@ -197,6 +200,7 @@ public class AllianceHandler : IHandler
         var obj = payload.What;
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(payload.Who, obj.PlayerId)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.CallingKingdomId, out var calling)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.CalledKingdomId, out var called)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.KingdomToCallToWarAgainstId, out var target)) return;

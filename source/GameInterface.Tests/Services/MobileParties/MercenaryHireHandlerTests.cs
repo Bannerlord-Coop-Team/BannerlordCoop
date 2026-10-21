@@ -4,6 +4,7 @@ using Common.Util;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Moq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -22,13 +23,15 @@ public class MercenaryHireHandlerTests
     private readonly Mock<IMessageBroker> messageBroker = new();
     private readonly Mock<IObjectManager> objectManager = new();
     private readonly Mock<INetwork> network = new();
+    private readonly Mock<IPlayerManager> playerManager = new();
     private readonly MercenaryHireHandler handler;
 
     private object? sentMessage;
 
     public MercenaryHireHandlerTests()
     {
-        handler = new MercenaryHireHandler(messageBroker.Object, objectManager.Object, network.Object);
+        playerManager.Setup(p => p.IsSenderControllingHero(It.IsAny<object>(), It.IsAny<string>())).Returns(true);
+        handler = new MercenaryHireHandler(messageBroker.Object, objectManager.Object, network.Object, playerManager.Object);
 
         network.Setup(n => n.SendAll(It.IsAny<IMessage>()))
             .Callback<IMessage>(message => sentMessage = message);

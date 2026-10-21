@@ -371,18 +371,11 @@ internal class HeirSelectionHandler : IHandler
 
     private void Handle_NetworkHeirSelectedForRetirement(MessagePayload<NetworkHeirSelectedForRetirement> obj)
     {
-        if (obj.Who is not NetPeer peer) return;
-
         var data = obj.What;
 
         GameThread.RunSafe(() =>
         {
-            if (!playerManager.TryGetPlayer(peer, out var player) || player.HeroId != data.OriginalHeroId)
-            {
-                Logger.Warning($"Ignoring heir selection for hero {data.OriginalHeroId} from peer {peer.Id} because that peer no longer controls the hero");
-                return;
-            }
-
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.OriginalHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.OriginalHeroId, out var originalHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.SelectedHeirId, out var selectedHeir)) return;
 
