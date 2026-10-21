@@ -5,6 +5,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/local_env.sh"
 out=$1
 platform_id=${2:-testclient2}
 source "$out/identity.env"
+[[ -f $out/runtime-profile.txt ]] || { echo 'Unknown recorded runtime profile' >&2; exit 2; }
 profile=$(cat "$out/runtime-profile.txt")
 [[ $profile == visual || $profile == functional ]] || { echo 'Unknown recorded runtime profile' >&2; exit 2; }
 fixture_args=()

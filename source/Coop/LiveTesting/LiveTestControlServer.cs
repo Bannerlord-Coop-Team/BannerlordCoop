@@ -768,6 +768,8 @@ namespace Coop.LiveTesting
                 catch { clientJoinState.CompleteStart(false); throw; }
                 clientJoinState.CompleteStart(started);
                 Logger.Information("[LiveTest] Deferred StartAsClient() returned {Started}", started);
+                if (!started)
+                    return Failure(request.Id, "client_start_refused", "The client session did not start; retry once startup is ready.", false);
                 return Success(request.Id, new
                 {
                     attempted = true,
