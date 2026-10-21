@@ -149,6 +149,36 @@ public class HeadmanNeedsGrainTests : IDisposable
     }
 
     [Fact]
+    public void TraitSeed_KeepsGenerosityUntilItsRewardIsAcknowledged()
+    {
+        Server.Call(() =>
+        {
+            var owner = Get<Hero>(Server, scenario.PlayerA.HeroId);
+            var rewards = Server.Resolve<IHeadmanNeedsGrainTraitRewards>();
+            var model = Campaign.Current.Models.CharacterDevelopmentModel;
+            var startingXp = model.GetTraitXpRequiredForTraitLevel(DefaultTraits.Generosity, 1) - 25;
+            rewards.Seed(owner, new Dictionary<string, int> { [DefaultTraits.Generosity.StringId] = startingXp });
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+            {
+                rewards.Apply(DefaultTraits.Mercy, 70, owner, ActionNotes.QuestSuccess);
+                rewards.Apply(DefaultTraits.Generosity, 50, owner, ActionNotes.QuestSuccess);
+            }
+            model.GetTraitLevelForTraitXp(owner, DefaultTraits.Generosity, startingXp + 50,
+                out var expectedLevel, out var expectedXp);
+            rewards.Seed(owner, new Dictionary<string, int>
+            {
+                [DefaultTraits.Mercy.StringId] = 70,
+                [DefaultTraits.Generosity.StringId] = startingXp,
+            });
+            Assert.Equal(expectedLevel, owner.GetTraitLevel(DefaultTraits.Generosity));
+            rewards.Seed(owner, new Dictionary<string, int> { [DefaultTraits.Generosity.StringId] = expectedXp });
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+                rewards.Apply(DefaultTraits.Generosity, 1, owner, ActionNotes.QuestSuccess);
+            var reward = Server.NetworkSentMessages.GetMessages<NetworkHeadmanNeedsGrainTraitReward>().Last();
+            Assert.Equal(expectedXp + 1, reward.RemainingXp);
+        });
+    }
+    [Fact]
     public void Delivery_PreservesTraitLevelThresholdCrossing()
     {
         var expectedLevel = 0;
