@@ -585,6 +585,28 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Fact]
+    public void CommittedSelectionsAreConsumedPerIssue()
+    {
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        Server.Call(() =>
+        {
+            var rosters = Server.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>();
+            var broker = Server.Resolve<IMessageBroker>();
+            var commitments = Server.Resolve<IAlternativeSolutionCommitments>();
+            var initial = TroopRoster.CreateDummyTroopRoster();
+            initial.AddToCounts(Get<CharacterObject>(Server, troopId), 10);
+            var delta = rosters.PackTroopRosterDelta(TroopRoster.CreateDummyTroopRoster(), initial);
+            foreach (var issueId in new[] { "pending_x", "accepted_y" })
+                broker.Publish(this, new GameInterface.Services.Party.Messages.PartyDoneLogicApplied(
+                    ClientA.NetPeer, PartyScreenHelper.PartyScreenMode.QuestTroopManage, delta,
+                    scenario.PlayerA.HeroId, scenario.NotableId, issueId));
+            Assert.Equal(10, Assert.Single(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "accepted_y", null)).Number);
+            Assert.Equal(10, Assert.Single(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "pending_x", null)).Number);
+            Assert.Empty(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "pending_x", null));
+        });
+    }
+
+    [Fact]
     public void FinalizingALoadedAlternativeRosterDoesNotGiveTheNonOwnerItsCompanion()
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
@@ -605,19 +627,21 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, false, false, false, false, false, false, false, false)]
-    [InlineData(true, false, false, false, false, false, false, false, false)]
-    [InlineData(false, true, false, false, false, false, false, false, false)]
-    [InlineData(false, true, true, false, false, false, false, false, false)]
-    [InlineData(false, true, false, true, false, false, false, false, false)]
-    [InlineData(false, true, false, true, true, false, false, false, false)]
-    [InlineData(false, true, true, true, true, false, false, false, false)]
-    [InlineData(false, true, false, true, true, true, false, false, false)]
-    [InlineData(false, true, false, true, true, false, true, false, false)]
-    [InlineData(false, true, false, true, true, false, false, true, false)]
-    [InlineData(false, true, false, false, false, false, false, false, true)]
-    [InlineData(false, true, false, true, true, false, false, false, true)]
-    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker, bool otherAccepts, bool otherDisconnects, bool acceptInFlight, bool otherAlternative, bool reopenPicker, bool rejectDone)
+    [InlineData(false, false, false, false, false, false, false, false, false, false)]
+    [InlineData(true, false, false, false, false, false, false, false, false, false)]
+    [InlineData(false, true, false, false, false, false, false, false, false, false)]
+    [InlineData(false, true, true, false, false, false, false, false, false, false)]
+    [InlineData(false, true, false, true, false, false, false, false, false, false)]
+    [InlineData(false, true, false, true, true, false, false, false, false, false)]
+    [InlineData(false, true, true, true, true, false, false, false, false, false)]
+    [InlineData(false, true, false, true, true, true, false, false, false, false)]
+    [InlineData(false, true, false, true, true, false, true, false, false, false)]
+    [InlineData(false, true, false, true, true, false, false, true, false, false)]
+    [InlineData(false, true, false, false, false, false, false, false, true, false)]
+    [InlineData(false, true, false, true, true, false, false, false, true, false)]
+    [InlineData(false, false, false, false, false, false, false, false, true, false)]
+    [InlineData(false, true, false, false, false, false, false, false, false, true)]
+    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker, bool otherAccepts, bool otherDisconnects, bool acceptInFlight, bool otherAlternative, bool reopenPicker, bool rejectDone, bool disconnectSelecting)
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
@@ -699,6 +723,21 @@ public class MerchantOutlawsTests : IDisposable
                 Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId))));
         }
         var expectedRegulars = rejectDone ? sent - 1 : sent + 5;
+        if (disconnectSelecting)
+        {
+            Server.Call(() =>
+            {
+                Server.Resolve<IPlayerManager>().ClearPeer(ClientA.NetPeer);
+                Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(ClientA.NetPeer, default(DisconnectInfo)));
+            });
+            Server.Call(() => Assert.Equal(expectedRegulars,
+                Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId))));
+            Server.Call(() => Server.Resolve<IMessageBroker>().Publish(this,
+                new PlayerDisconnected(ClientA.NetPeer, default(DisconnectInfo))));
+            Server.Call(() => Assert.Equal(expectedRegulars,
+                Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId))));
+            return;
+        }
 
         if (reopenPicker)
         {
@@ -775,7 +814,6 @@ public class MerchantOutlawsTests : IDisposable
                 transfer.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right,
                     PartyScreenLogic.TroopType.Member, Get<CharacterObject>(ClientB, troopId), sent, 0, -1);
                 using (new AllowedThread()) logic.TransferTroop(transfer, false);
-                if (rejectDone) ClientA.Resolve<TestNetworkRouter>().PauseLink(ClientA.NetPeer, Server.NetPeer);
                 Assert.True(logic.DoneLogic(false));
             }, TextHelpers);
             environment.FlushCoalescer();
@@ -859,6 +897,19 @@ public class MerchantOutlawsTests : IDisposable
             return;
         }
 
+        if (rejectDone)
+        {
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAcceptRejected>());
+            Server.Call(() => Assert.Equal(expectedRegulars,
+                Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId))));
+            ClientA.Call(() =>
+            {
+                Assert.Equal(1, Get<MobileParty>(ClientA, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<Hero>(ClientA, companionId).CharacterObject));
+                Assert.Equal(expectedRegulars, Get<MobileParty>(ClientA, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(ClientA, troopId)));
+            });
+            return;
+        }
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
         Issue ownerIssue = null!;

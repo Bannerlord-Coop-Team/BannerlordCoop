@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Services.Issues.Framework.Interface;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.GameDebug.Messages;
@@ -42,19 +43,21 @@ internal class PartyDoneLogicHandler : IHandler
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
+    private readonly IQuestTypeRegistry questTypes;
 
     public PartyDoneLogicHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         ITroopRosterInterface troopRosterInterface,
-        IVillageHostileActionInterface villageHostileActionInterface)
+        IVillageHostileActionInterface villageHostileActionInterface, IQuestTypeRegistry questTypes)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
         this.villageHostileActionInterface = villageHostileActionInterface;
+        this.questTypes = questTypes;
 
         messageBroker.Subscribe<PartyDoneLogicAttempted>(Handle_PartyDoneLogicAttempted);
         messageBroker.Subscribe<NetworkCompleteDoneLogic>(Handle_CompletePartyDoneLogic);
@@ -110,6 +113,17 @@ internal class PartyDoneLogicHandler : IHandler
                 objectManager);
         }
 
+        string issueOwnerId = null;
+        string issueId = null;
+        if (obj.What.PartyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage)
+        {
+            var issue = Campaign.Current.IssueManager.Issues.Values.FirstOrDefault(value =>
+                ReferenceEquals(value.AlternativeSolutionSentTroops, obj.What.LeftMemberRoster));
+            if (issue != null && questTypes.TryGet(issue.GetType(), out var descriptor) &&
+                descriptor.AlternativeSolutionAcceptStrategy is ICommittedAlternativeSolutionAcceptStrategy &&
+                objectManager.TryGetIdWithLogging(issue.IssueOwner, out issueOwnerId)) issueId = issue.StringId;
+        }
+
         var message = new NetworkCompleteDoneLogic(
             mainHeroId,
             FlattenedTroopSerializer.Serialize(obj.What.ReleasedPrisonersRoster, objectManager),
@@ -133,7 +147,7 @@ internal class PartyDoneLogicHandler : IHandler
             obj.What.ApplyReleasedAndTakenPrisonerActions,
             donationSettlementId,
             donatedPrisonersRoster,
-            obj.What.ForceTransferId
+            obj.What.ForceTransferId, issueOwnerId, issueId
         );
 
         network.SendAll(message);
@@ -295,7 +309,8 @@ internal class PartyDoneLogicHandler : IHandler
                     return;
                 }
             }
-            messageBroker.Publish(this, new PartyDoneLogicApplied(requester, message.PartyScreenMode, message.RightMemberRosterData));
+            messageBroker.Publish(this, new PartyDoneLogicApplied(requester, message.PartyScreenMode, message.RightMemberRosterData,
+                message.MainHeroId, message.IssueOwnerId, message.IssueId));
             PublishPlayerCaptivityReleaseEvents(releasedPlayerCaptivityEvents);
             ApplyRightOwnerPartyItemRoster(mainHero, message);
             if (message.ApplyReleasedAndTakenPrisonerActions)

@@ -37,6 +37,8 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
     private readonly IAlternativeSolutionTroopValidator troopValidator;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IIssueAcceptPreconditions acceptPreconditions;
+    private readonly IAlternativeSolutionCommitments commitments;
+    private readonly IQuestTypeRegistry questTypes;
 
     public AlternativeSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -47,7 +49,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         IPlayerManager playerManager,
         IAlternativeSolutionTroopValidator troopValidator,
         IControllerIdProvider controllerIdProvider,
-        IIssueAcceptPreconditions acceptPreconditions)
+        IIssueAcceptPreconditions acceptPreconditions, IAlternativeSolutionCommitments commitments, IQuestTypeRegistry questTypes)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -58,6 +60,8 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         this.troopValidator = troopValidator;
         this.controllerIdProvider = controllerIdProvider;
         this.acceptPreconditions = acceptPreconditions;
+        this.commitments = commitments;
+        this.questTypes = questTypes;
 
         messageBroker.Subscribe<AlternativeSolutionAcceptRequested>(Handle_AlternativeSolutionAcceptRequested);
         messageBroker.Subscribe<RequestAlternativeSolutionAccept>(Handle_RequestAlternativeSolutionAccept);
@@ -87,11 +91,13 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
             return;
         }
 
+        var requiresCommitment = questTypes.TryGet(issue.GetType(), out var descriptor) &&
+            descriptor.AlternativeSolutionAcceptStrategy is ICommittedAlternativeSolutionAcceptStrategy;
         network.SendAll(new RequestAlternativeSolutionAccept(
             issueOwnerId,
             issue.StringId,
             Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier(),
-            troopValidator.ToData(issue.AlternativeSolutionSentTroops)));
+            troopValidator.ToData(issue.AlternativeSolutionSentTroops), requiresCommitment));
     }
 
     private void Handle_RequestAlternativeSolutionAccept(MessagePayload<RequestAlternativeSolutionAccept> payload)
@@ -114,6 +120,11 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
     private void AcceptOnServer(NetPeer peer, Player player, RequestAlternativeSolutionAccept data)
     {
+        if (data.RequiresCommittedTroops)
+        {
+            data = new RequestAlternativeSolutionAccept(data.IssueOwnerId, data.IssueId, data.DifficultyMultiplier,
+                commitments.Consume(player.HeroId, data.IssueOwnerId, data.IssueId, data.SentTroops), true);
+        }
         if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var playerHero))
         {
             Reject(peer, data, playerHero);
