@@ -187,7 +187,7 @@ public class SiegeMachineStateReplicatorHostEpochTests : IDisposable
             joinerSession.Object,
             new Mock<INetworkAgentRegistry>().Object,
             new HostEpochPolicy(),
-            authority);
+            new SiegeMachineAuthorityRegistry());
 
         InvokeSetMachineAuthority(machineId, "remote-a");
         var authorityA = Assert.IsType<NetworkSiegeMachineAuthority>(Assert.Single(sentToAll));

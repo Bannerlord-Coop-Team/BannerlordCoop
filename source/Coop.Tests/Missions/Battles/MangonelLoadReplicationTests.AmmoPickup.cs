@@ -19,8 +19,8 @@ namespace Coop.Tests.Missions.Battles;
 
 public sealed partial class MangonelLoadReplicationTests
 {
-    private (SiegeMachineStateReplicator Sut, CoopAgentInfo Info, Mangonel Machine, Mock<IBattleNetwork> Network)
-        SupplyReplica(string own, Guid? pickerId = null, string agentOwner = "loader")
+    private (SiegeMachineStateReplicator Sut, CoopAgentInfo Info, Mangonel Machine, Mock<IBattleNetwork> Network,
+        SiegeMachineAuthorityRegistry Authority) SupplyReplica(string own, Guid? pickerId = null, string agentOwner = "loader")
     {
         var replica = Replica(own, pickerId, agentOwner);
         var session = Mock.Get(Field<IBattleSession>(replica.Sut, "session"));

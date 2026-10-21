@@ -27,15 +27,22 @@ internal sealed class SiegeAuthorityContainerScope : IDisposable
         containerUse = ContainerProvider.UseContainerThreadSafe(container);
     }
 
-    /// <summary>Restores the container the provider held before this scope.</summary>
+    /// <summary>Restores the container the provider held before this scope, unless another test replaced it since.</summary>
     public void Dispose()
     {
         containerUse.Dispose();
+        RestorePreviousContainer();
+        container.Dispose();
+    }
+
+    // Skips the restore when another test set its own container after the semaphore was released.
+    private void RestorePreviousContainer()
+    {
+        if (!ContainerProvider.TryGetContainer(out var current) || current != container) return;
+
         if (hadPreviousContainer)
             ContainerProvider.SetContainer(previousContainer);
         else
             ContainerProvider.Clear();
-
-        container.Dispose();
     }
 }
