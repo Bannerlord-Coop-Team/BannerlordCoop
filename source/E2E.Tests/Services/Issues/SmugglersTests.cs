@@ -1,5 +1,8 @@
 ﻿using Autofac;
 using Common.Network;
+using Common.Messaging;
+using GameInterface.Services.Issues.Framework.Conversation;
+using GameInterface.Services.MapEvents.Messages.Conversation;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -132,6 +135,46 @@ public class SmugglersTests : IDisposable
             Assert.Same(target, issue._targetSettlement);
             Assert.Same(origin, issue._originSettlement);
         });
+    }
+
+    [Fact]
+    public void LivePersuasionSession_AllowsExactlyOneServerSuccess()
+    {
+        StartPersuasionSession();
+        ClientA.Call(() => QuestOf(ClientA).SucceedQuest(null));
+        ClientA.Call(() => QuestOf(ClientA).SucceedQuest(null));
+        Assert.Equal(1, succeedQuest.CountFor(Server));
+    }
+
+    [Fact]
+    public void ConversationEnd_InvalidatesPersuasionSession()
+    {
+        StartPersuasionSession();
+        Server.SimulateMessage(ClientA.NetPeer, new NetworkConversationEnded());
+        ClientA.Call(() => QuestOf(ClientA).SucceedQuest(null));
+        Assert.Equal(0, succeedQuest.CountFor(Server));
+    }
+
+    private void StartPersuasionSession()
+    {
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        foreach (var instance in new[] { Server, ClientA })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.Resolve<IPlayerManager>().TryGetPlayer(ControllerA, out var player));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var ownerParty));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var smugglers));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                using (new AllowedThread())
+                {
+                    ownerParty.CurrentSettlement = settlement;
+                    smugglers.CurrentSettlement = settlement;
+                    QuestOf(instance)._smugglerParty = smugglers;
+                }
+            });
+        }
+        ClientA.Call(() => ClientA.Resolve<IPersuasionSessionService>().Start(QuestOf(ClientA), QuestOf(ClientA)._smugglerParty));
     }
 
     [Fact]
