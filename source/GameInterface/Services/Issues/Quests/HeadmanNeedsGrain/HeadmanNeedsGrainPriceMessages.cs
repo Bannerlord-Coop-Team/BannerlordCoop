@@ -3,6 +3,11 @@ using ProtoBuf;
 
 namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain;
 
+[ProtoContract(SkipConstructor = true)]
+public readonly struct RequestHeadmanGrainPrice : ICommand
+{
+}
+
 public readonly struct HeadmanGrainPriceCached : IEvent
 {
     public readonly int Price;

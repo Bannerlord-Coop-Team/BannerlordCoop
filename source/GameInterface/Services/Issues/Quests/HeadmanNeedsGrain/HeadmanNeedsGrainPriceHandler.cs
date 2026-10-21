@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Registry.Messages;
+using LiteNetLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -18,12 +20,31 @@ internal class HeadmanNeedsGrainPriceHandler : IHandler
 
         messageBroker.Subscribe<HeadmanGrainPriceCached>(Handle_HeadmanGrainPriceCached);
         messageBroker.Subscribe<NetworkHeadmanGrainPriceUpdated>(Handle_NetworkHeadmanGrainPriceUpdated);
+        messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
+        messageBroker.Subscribe<RequestHeadmanGrainPrice>(Handle_RequestHeadmanGrainPrice);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<HeadmanGrainPriceCached>(Handle_HeadmanGrainPriceCached);
         messageBroker.Unsubscribe<NetworkHeadmanGrainPriceUpdated>(Handle_NetworkHeadmanGrainPriceUpdated);
+        messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
+        messageBroker.Unsubscribe<RequestHeadmanGrainPrice>(Handle_RequestHeadmanGrainPrice);
+    }
+
+    private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> payload)
+    {
+        if (ModInformation.IsClient) network.SendAll(new RequestHeadmanGrainPrice());
+    }
+
+    private void Handle_RequestHeadmanGrainPrice(MessagePayload<RequestHeadmanGrainPrice> payload)
+    {
+        if (ModInformation.IsClient || !(payload.Who is NetPeer peer)) return;
+        GameThread.RunSafe(() =>
+        {
+            var behavior = Campaign.Current.GetCampaignBehavior<HeadmanNeedsGrainIssueBehavior>();
+            network.Send(peer, new NetworkHeadmanGrainPriceUpdated(behavior._averageGrainPriceInCalradia));
+        }, context: nameof(HeadmanNeedsGrainPriceHandler));
     }
 
     private void Handle_HeadmanGrainPriceCached(MessagePayload<HeadmanGrainPriceCached> payload)
