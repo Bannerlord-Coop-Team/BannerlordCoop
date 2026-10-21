@@ -755,9 +755,22 @@ public class MerchantOutlawsTests : IDisposable
             }
             Server.Call(() =>
             {
-                Server.Resolve<IPlayerManager>().ClearPeer(ClientB.NetPeer);
-                Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(ClientB.NetPeer, default(DisconnectInfo)));
-            });
+                if (otherAlternative)
+                {
+                    var owner = Get<Hero>(Server, scenario.PlayerB.HeroId);
+                    using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+                    {
+                        var issue = Get<Hero>(Server, scenario.NotableId).Issue;
+                        issue._failureChance = -1f;
+                        issue.CompleteIssueWithAlternativeSolution();
+                    }
+                }
+                else
+                {
+                    Server.Resolve<IPlayerManager>().ClearPeer(ClientB.NetPeer);
+                    Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(ClientB.NetPeer, default(DisconnectInfo)));
+                }
+            }, TextHelpers);
             environment.FlushCoalescer();
             if (acceptInFlight)
             {
