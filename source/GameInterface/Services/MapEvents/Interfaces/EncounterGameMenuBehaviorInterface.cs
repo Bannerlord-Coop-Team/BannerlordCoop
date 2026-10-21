@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using GameInterface.Services.Heroes.Patches;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
@@ -62,8 +63,10 @@ public class EncounterGameMenuBehaviorInterface : IEncounterGameMenuBehaviorInte
         // Receivers use main party which isn't available on the server.
         SkillLevelingManager.OnTacticsUsed(mainParty, numberOfTroopsSacrificed * 50f);
 
-        // TODO: Traits aren't synced yet
-        //TraitLevelingHelper.OnTroopsSacrificed();
+        using (new MainHeroSubstitutionScope(mainHero, mainParty))
+        {
+            TraitLevelingHelper.OnTroopsSacrificed();
+        }
 
         // TODO: Send message for CompanionGrievanceBehavior.OnPlayerDesertedBattle
 
