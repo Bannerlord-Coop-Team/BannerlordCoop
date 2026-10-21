@@ -295,6 +295,7 @@ internal class PartyDoneLogicHandler : IHandler
                     return;
                 }
             }
+            messageBroker.Publish(this, new PartyDoneLogicApplied(requester, message.PartyScreenMode, message.RightMemberRosterData));
             PublishPlayerCaptivityReleaseEvents(releasedPlayerCaptivityEvents);
             ApplyRightOwnerPartyItemRoster(mainHero, message);
             if (message.ApplyReleasedAndTakenPrisonerActions)

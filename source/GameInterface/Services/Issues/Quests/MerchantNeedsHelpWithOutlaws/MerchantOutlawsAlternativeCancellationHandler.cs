@@ -17,6 +17,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Services.TroopRosters.Interfaces;
 
 namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
 
@@ -76,10 +77,12 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
     private readonly HashSet<TroopRoster> acceptedSelections = new HashSet<TroopRoster>();
     private readonly Dictionary<TroopRoster, PartyScreenLogic> openPickers = new Dictionary<TroopRoster, PartyScreenLogic>();
     private readonly HashSet<TroopRoster> localSelections = new HashSet<TroopRoster>();
+    private readonly Dictionary<NetPeer, TroopRoster> serverSelections = new Dictionary<NetPeer, TroopRoster>();
+    private readonly ITroopRosterInterface rosterInterface;
 
     public MerchantOutlawsAlternativeCancellationHandler(IMessageBroker messageBroker, INetwork network,
         IObjectManager objectManager, IPlayerManager playerManager,
-        IAlternativeSolutionTroopValidator troops, IControllerIdProvider controllerIdProvider)
+        IAlternativeSolutionTroopValidator troops, IControllerIdProvider controllerIdProvider, ITroopRosterInterface rosterInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -87,6 +90,7 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
         this.playerManager = playerManager;
         this.troops = troops;
         this.controllerIdProvider = controllerIdProvider;
+        this.rosterInterface = rosterInterface;
         messageBroker.Subscribe<MerchantOutlawsAlternativeCancelled>(Handle_Local);
         messageBroker.Subscribe<PartyDoneLogicAttempted>(Handle_Done);
         messageBroker.Subscribe<MerchantOutlawsPickerOpened>(Handle_PickerOpened);
@@ -94,6 +98,8 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
         messageBroker.Subscribe<AlternativeSolutionAcceptRequested>(Handle_AcceptRequested);
         messageBroker.Subscribe<NetworkAlternativeSolutionAccepted>(Handle_Accepted);
         messageBroker.Subscribe<RequestMerchantOutlawsAlternativeCancellation>(Handle_Request);
+        messageBroker.Subscribe<PartyDoneLogicApplied>(Handle_Applied);
+        messageBroker.Subscribe<RequestAlternativeSolutionAccept>(Handle_ServerAccept);
     }
 
     public void Dispose()
@@ -105,6 +111,8 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
         messageBroker.Unsubscribe<AlternativeSolutionAcceptRequested>(Handle_AcceptRequested);
         messageBroker.Unsubscribe<NetworkAlternativeSolutionAccepted>(Handle_Accepted);
         messageBroker.Unsubscribe<RequestMerchantOutlawsAlternativeCancellation>(Handle_Request);
+        messageBroker.Unsubscribe<PartyDoneLogicApplied>(Handle_Applied);
+        messageBroker.Unsubscribe<RequestAlternativeSolutionAccept>(Handle_ServerAccept);
     }
 
     private void Handle_Local(MessagePayload<MerchantOutlawsAlternativeCancelled> payload)
@@ -117,7 +125,8 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
         var refundRoster = issue.AlternativeSolutionSentTroops;
         if (payload.What.Finalizing && openPickers.TryGetValue(issue.AlternativeSolutionSentTroops, out var picker))
         {
-            refundRoster = picker._initialData.LeftMemberRoster.CloneRosterData();
+            refundRoster = TroopRoster.CreateDummyTroopRoster();
+            refundRoster.Add(picker._initialData.LeftMemberRoster);
             using (new AllowedThread())
             {
                 if (committedSelections.Contains(issue.AlternativeSolutionSentTroops))
@@ -211,15 +220,36 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
     private void Handle_Request(MessagePayload<RequestMerchantOutlawsAlternativeCancellation> payload)
     {
         if (ModInformation.IsClient) return;
-        var data = payload.What;
         GameThread.RunSafe(() =>
         {
             if (!(payload.Who is NetPeer peer) || !playerManager.TryGetPlayer(peer, out var player) ||
                 !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero) ||
                 hero.PartyBelongedTo == null) return;
 
-            // The roster screen already committed troop removal; declining the follow-up must undo it on the server.
-            troops.ReturnTroopsToParty(hero.PartyBelongedTo, data.Troops);
+            if (!serverSelections.TryGetValue(peer, out var selection)) return;
+            serverSelections.Remove(peer);
+            troops.ReturnTroopsToParty(hero.PartyBelongedTo, troops.ToData(selection));
         }, context: nameof(MerchantOutlawsAlternativeCancellationHandler));
+    }
+
+    private void Handle_Applied(MessagePayload<PartyDoneLogicApplied> payload)
+    {
+        if (ModInformation.IsClient || payload.What.Requester == null ||
+            payload.What.Mode != Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage) return;
+        var peer = payload.What.Requester;
+        if (!serverSelections.TryGetValue(peer, out var selection))
+            serverSelections[peer] = selection = TroopRoster.CreateDummyTroopRoster();
+        foreach (var element in rosterInterface.UnpackTroopRosterData(payload.What.MemberDelta))
+        {
+            if (element.Character.IsHero) continue;
+            selection.AddToCounts(element.Character, -element.Number,
+                woundedCount: -element.WoundedNumber, xpChange: -element.Xp);
+        }
+    }
+
+    private void Handle_ServerAccept(MessagePayload<RequestAlternativeSolutionAccept> payload)
+    {
+        if (ModInformation.IsClient || !(payload.Who is NetPeer peer)) return;
+        GameThread.RunSafe(() => serverSelections.Remove(peer), context: nameof(MerchantOutlawsAlternativeCancellationHandler));
     }
 }

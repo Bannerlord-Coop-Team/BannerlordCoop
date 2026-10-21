@@ -605,17 +605,19 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, false, false, false, false, false, false, false)]
-    [InlineData(true, false, false, false, false, false, false, false)]
-    [InlineData(false, true, false, false, false, false, false, false)]
-    [InlineData(false, true, true, false, false, false, false, false)]
-    [InlineData(false, true, false, true, false, false, false, false)]
-    [InlineData(false, true, false, true, true, false, false, false)]
-    [InlineData(false, true, true, true, true, false, false, false)]
-    [InlineData(false, true, false, true, true, true, false, false)]
-    [InlineData(false, true, false, true, true, false, true, false)]
-    [InlineData(false, true, false, true, true, false, false, true)]
-    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker, bool otherAccepts, bool otherDisconnects, bool acceptInFlight, bool otherAlternative, bool reopenPicker)
+    [InlineData(false, false, false, false, false, false, false, false, false)]
+    [InlineData(true, false, false, false, false, false, false, false, false)]
+    [InlineData(false, true, false, false, false, false, false, false, false)]
+    [InlineData(false, true, true, false, false, false, false, false, false)]
+    [InlineData(false, true, false, true, false, false, false, false, false)]
+    [InlineData(false, true, false, true, true, false, false, false, false)]
+    [InlineData(false, true, true, true, true, false, false, false, false)]
+    [InlineData(false, true, false, true, true, true, false, false, false)]
+    [InlineData(false, true, false, true, true, false, true, false, false)]
+    [InlineData(false, true, false, true, true, false, false, true, false)]
+    [InlineData(false, true, false, false, false, false, false, false, true)]
+    [InlineData(false, true, false, true, true, false, false, false, true)]
+    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker, bool otherAccepts, bool otherDisconnects, bool acceptInFlight, bool otherAlternative, bool reopenPicker, bool rejectDone)
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
@@ -678,11 +680,25 @@ public class MerchantOutlawsTests : IDisposable
             }
             else if (!cancelPicker)
             {
+                if (rejectDone) ClientA.Resolve<TestNetworkRouter>().PauseLink(ClientA.NetPeer, Server.NetPeer);
                 Assert.True(logic.DoneLogic(false));
                 Assert.Equal(sent, issue.AlternativeSolutionSentTroops.GetTroopCount(troop));
             }
         }, TextHelpers);
         environment.FlushCoalescer();
+
+        if (rejectDone)
+        {
+            Server.Call(() => Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster
+                .AddToCounts(Get<CharacterObject>(Server, troopId), -6));
+            var delayed = ClientA.Resolve<TestNetworkRouter>();
+            delayed.ResumeLink(ClientA.NetPeer, Server.NetPeer);
+            delayed.DrainReady();
+            environment.FlushCoalescer();
+            Server.Call(() => Assert.Equal(sent - 1,
+                Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId))));
+        }
+        var expectedRegulars = rejectDone ? sent - 1 : sent + 5;
 
         if (reopenPicker)
         {
@@ -759,6 +775,7 @@ public class MerchantOutlawsTests : IDisposable
                 transfer.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right,
                     PartyScreenLogic.TroopType.Member, Get<CharacterObject>(ClientB, troopId), sent, 0, -1);
                 using (new AllowedThread()) logic.TransferTroop(transfer, false);
+                if (rejectDone) ClientA.Resolve<TestNetworkRouter>().PauseLink(ClientA.NetPeer, Server.NetPeer);
                 Assert.True(logic.DoneLogic(false));
             }, TextHelpers);
             environment.FlushCoalescer();
@@ -805,7 +822,7 @@ public class MerchantOutlawsTests : IDisposable
                 router.DrainReady();
                 environment.FlushCoalescer();
             }
-            Server.Call(() => Assert.Equal(sent + 5,
+            Server.Call(() => Assert.Equal(expectedRegulars,
                 Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId))));
             ClientA.Call(() =>
             {
@@ -815,7 +832,7 @@ public class MerchantOutlawsTests : IDisposable
                 }
                 Assert.Null(Get<Hero>(ClientA, scenario.NotableId).Issue);
                 Assert.Equal(1, Get<MobileParty>(ClientA, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<Hero>(ClientA, companionId).CharacterObject));
-                Assert.Equal(sent + 5, Get<MobileParty>(ClientA, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(ClientA, troopId)));
+                Assert.Equal(expectedRegulars, Get<MobileParty>(ClientA, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(ClientA, troopId)));
             });
             return;
         }
@@ -835,7 +852,7 @@ public class MerchantOutlawsTests : IDisposable
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
             Server.Call(() =>
             {
-                Assert.Equal(sent + 5, Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId)));
+                Assert.Equal(expectedRegulars, Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId)));
                 Assert.Equal(!otherAccepts, Get<Hero>(Server, scenario.NotableId).Issue.IsOngoingWithoutQuest);
             });
             if (otherAccepts) Assert.Equal(QuestScenario.ControllerB, scenario.OwnerOnServer());
