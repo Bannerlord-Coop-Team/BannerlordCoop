@@ -12,6 +12,8 @@ using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Linq;
+using GameInterface.Services.TroopRosters.Data;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
@@ -156,7 +158,10 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
 
         if (!troopsAreValid || !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
         {
-            Reject(peer, data, playerHero, troopsAreValid ? "issue already owned" : "committed troops do not satisfy the alternative solution");
+            var reason = troopsAreValid ? "issue already owned" : "committed troops do not satisfy the alternative solution";
+            var roster = string.Join(", ", (data.SentTroops ?? Array.Empty<TroopRosterElementData>())
+                .Select(element => $"{element.CharacterId}:{element.Number}/{element.WoundedNumber}/xp={element.Xp}"));
+            Reject(peer, data, playerHero, $"{reason}; hero={player.HeroId}; giver={data.IssueOwnerId}; roster=[{roster}]");
             return;
         }
 
