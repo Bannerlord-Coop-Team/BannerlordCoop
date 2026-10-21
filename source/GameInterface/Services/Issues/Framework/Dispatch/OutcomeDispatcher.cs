@@ -18,8 +18,7 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
 {
     private static readonly ILogger Logger = LogManager.GetLogger<OutcomeDispatcher>();
 
-    [ThreadStatic]
-    private static IssueBase lastObservedIssue;
+    private IssueBase lastObservedIssue;
 
     private readonly IMessageBroker messageBroker;
     private readonly IQuestTypeRegistry registry;
