@@ -4,6 +4,7 @@ using Common.Messaging;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using Issue = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssueQuest;
 
@@ -12,6 +13,14 @@ namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws.Patc
 [HarmonyPatch]
 internal class MerchantOutlawsAlternativeJournalPatches
 {
+    [HarmonyPatch(typeof(PartyScreenLogic), nameof(PartyScreenLogic.Initialize))]
+    [HarmonyPostfix]
+    private static void PickerOpenedPostfix(PartyScreenLogic __instance)
+    {
+        if (ModInformation.IsClient)
+            MessageBroker.Instance.Publish(__instance, new MerchantOutlawsPickerOpened(__instance));
+    }
+
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.OnAlternativeSolutionSolvedAndTroopsAreReturning))]
     [HarmonyPrefix]
     private static bool ReturningPrefix(IssueBase __instance)

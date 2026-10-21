@@ -681,6 +681,7 @@ public class MerchantOutlawsTests : IDisposable
             if (acceptInFlight)
             {
                 router.ResumeLink(ClientA.NetPeer, Server.NetPeer);
+                router.DrainReady();
                 environment.FlushCoalescer();
             }
             Server.Call(() => Assert.Equal(sent + 5,
