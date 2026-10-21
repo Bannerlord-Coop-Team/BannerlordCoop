@@ -14,6 +14,7 @@ public class SaveAsCommandTests
 {
     [Theory]
     [InlineData(true, "{\"UniqueGameId\":\"proof\",\"Players\":[]}", true)]
+    [InlineData(true, "\uFEFF{\"UniqueGameId\":\"proof\",\"Players\":[]}", true)]
     [InlineData(false, "{\"UniqueGameId\":\"proof\",\"Players\":[]}", false)]
     [InlineData(true, null, false)]
     [InlineData(true, "{\"UniqueGameId\":\"proof\",\"Players\":[", false)]

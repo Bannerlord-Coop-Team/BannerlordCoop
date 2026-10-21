@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Text.Json;
+using System.Text;
 using TaleWorlds.CampaignSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -81,7 +82,7 @@ namespace GameInterface.Services.Save.Commands
                     var sidecar = ReadFile(name + ".json");
                     if (campaign == null || campaign.Length == 0 || sidecar == null || sidecar.Length == 0)
                         return Failed("Save pair is incomplete; both .sav and .json are required.");
-                    using (var session = JsonDocument.Parse(sidecar))
+                    using (var session = JsonDocument.Parse(Encoding.UTF8.GetString(sidecar).TrimStart('\uFEFF')))
                     {
                         if (session.RootElement.ValueKind != JsonValueKind.Object ||
                             !session.RootElement.TryGetProperty("UniqueGameId", out var id) ||
