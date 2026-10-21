@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -116,12 +115,9 @@ internal class VillageNeedsToolsOutcomePatches
         {
             __state = null;
             if (ModInformation.IsClient || !(__instance is Quest quest) || !quest.IsOngoing ||
-                !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var owners)) return;
+                !ContainerProvider.TryResolve<IVillageNeedsToolsService>(out var service)) return;
 
-            var issue = IssueManager.GetIssueOfQuest(quest);
-            if (issue == null || !owners.TryResolveOwnerHero(issue, out var ownerHero)) return;
-
-            __state = new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo);
+            __state = service.OpenOwnerScope(quest);
         }
 
         [HarmonyFinalizer]

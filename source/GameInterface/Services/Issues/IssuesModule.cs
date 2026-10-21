@@ -6,6 +6,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
+using GameInterface.Services.Issues.Quests.VillageNeedsTools;
 using System;
 
 namespace GameInterface.Services.Issues;
@@ -31,6 +32,7 @@ internal class IssuesModule : Module
             .As<ITheConquestOfSettlementService>()
             .InstancePerLifetimeScope();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
+        builder.RegisterType<VillageNeedsToolsService>().As<IVillageNeedsToolsService>().InstancePerDependency();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)
             .Where(IsQuestPiece)
