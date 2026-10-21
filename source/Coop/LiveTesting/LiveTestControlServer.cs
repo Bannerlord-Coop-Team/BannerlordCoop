@@ -826,6 +826,8 @@ namespace Coop.LiveTesting
                 bool started = startAsClient();
                 clientJoinState.CompleteStart(started);
                 Logger.Information("[LiveTest] Reconnect StartAsClient() returned {Started}", started);
+                if (!started)
+                    return Failure(request.Id, "client_start_refused", "The client session did not start; retry once startup is ready.", false);
                 return Success(request.Id, new { attempted = true, started });
             }, true);
         }
