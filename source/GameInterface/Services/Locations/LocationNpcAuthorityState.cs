@@ -174,7 +174,7 @@ public class LocationNpcAuthorityState : ILocationNpcAuthorityState, IDisposable
     private sealed class ThreadFlagScope : IDisposable
     {
         private readonly bool previousValue;
-        private ThreadLocal<bool> flag;
+        private readonly ThreadLocal<bool> flag;
 
         /// <summary>Raises the flag on the current thread, remembering its previous value.</summary>
         public ThreadFlagScope(ThreadLocal<bool> flag)
@@ -184,14 +184,10 @@ public class LocationNpcAuthorityState : ILocationNpcAuthorityState, IDisposable
             flag.Value = true;
         }
 
-        /// <summary>Restores the flag's previous value; later calls do nothing.</summary>
+        /// <summary>Restores the flag's previous value.</summary>
         public void Dispose()
         {
-            ThreadLocal<bool> current = flag;
-            flag = null;
-            if (current == null) return;
-
-            current.Value = previousValue;
+            flag.Value = previousValue;
         }
     }
 }

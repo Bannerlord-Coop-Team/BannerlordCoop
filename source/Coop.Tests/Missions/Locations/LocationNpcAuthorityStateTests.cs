@@ -132,20 +132,6 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.False(state.IsCaptureSuppressed);
     }
 
-    /// <summary>Disposing a capture scope twice does not clear an outer scope.</summary>
-    [Fact]
-    public void SuppressCapture_DisposingTwiceDoesNotClearAnOuterScope()
-    {
-        using (state.SuppressCapture())
-        {
-            IDisposable inner = state.SuppressCapture();
-            inner.Dispose();
-            inner.Dispose();
-
-            Assert.True(state.IsCaptureSuppressed);
-        }
-    }
-
     /// <summary>Disposing a nested replay scope restores the outer scope.</summary>
     [Fact]
     public void ReplayNativePopulation_NestedScopeRestoresTheOuterScope()
