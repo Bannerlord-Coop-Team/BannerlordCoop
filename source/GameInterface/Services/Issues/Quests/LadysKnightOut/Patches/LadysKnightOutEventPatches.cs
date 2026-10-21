@@ -70,7 +70,7 @@ internal class LadysKnightOutWorldListenerPatches
 [HarmonyPatch]
 internal class LadysKnightOutNativeTournamentPatches
 {
-    // Native arena missions report callbacks here; co-op missions use server session snapshots instead.
+    // Only natively launched tournaments fire these callbacks; co-op sessions use server snapshots.
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnPlayerStartedTournamentMatch))]
     [HarmonyPrefix]
     private static bool PlayerStartedPrefix() => ModInformation.IsClient;

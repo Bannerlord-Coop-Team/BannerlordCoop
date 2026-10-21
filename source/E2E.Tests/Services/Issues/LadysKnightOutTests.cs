@@ -237,6 +237,7 @@ public class LadysKnightOutTests : IDisposable
         var quest = Accept(scenario.ClientA);
         var serverQuest = scenario.QuestOf(scenario.Server);
         var before = new Dictionary<string, (int Gold, float Renown, int Relation)>();
+        var heroIds = new Dictionary<string, string>();
         scenario.Server.Call(() =>
         {
             var giver = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId);
@@ -244,6 +245,7 @@ public class LadysKnightOutTests : IDisposable
             {
                 Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
                 var hero = scenario.Server.GetRegisteredObject<Hero>(player.HeroId);
+                heroIds[controllerId] = player.HeroId;
                 before[controllerId] = (hero.Gold, hero.Clan.Renown, giver.GetRelation(hero));
             }
         });
@@ -270,6 +272,17 @@ public class LadysKnightOutTests : IDisposable
                 CampaignEventDispatcher.Instance.OnPlayerEliminatedFromTournament(round, town);
         });
 
+        var nativeFinalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(scenario.NotableId, nativeFinalized.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, nativeFinalized.IssueId);
+        Assert.Equal(expected, nativeFinalized.Outcome);
+        scenario.Server.Call(() => Assert.True(serverQuest.IsFinalized));
+        scenario.ClientA.Call(() =>
+        {
+            Assert.True(quest.IsFinalized);
+            Assert.Equal(2, quest.JournalEntries.Count);
+        });
+
         scenario.ClientA.Call(() => scenario.ClientA.Resolve<INetwork>().SendAll(
             new RequestLadysKnightOutTournamentOutcome(scenario.NotableId, QuestScenario.IssueId,
                 (byte)(expected == IssueOutcome.QuestSuccess
@@ -287,8 +300,7 @@ public class LadysKnightOutTests : IDisposable
                 Assert.Null(giver.Issue);
                 foreach (var controllerId in new[] { QuestScenario.ControllerA, QuestScenario.ControllerB })
                 {
-                    Assert.True(instance.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
-                    var hero = instance.GetRegisteredObject<Hero>(player.HeroId);
+                    var hero = instance.GetRegisteredObject<Hero>(heroIds[controllerId]);
                     var owner = controllerId == QuestScenario.ControllerA;
                     var success = expected == IssueOutcome.QuestSuccess;
                     Assert.Equal(before[controllerId].Gold + (owner && success ? 750 : 0), hero.Gold);
