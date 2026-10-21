@@ -3,6 +3,7 @@ using Common.Network;
 using Common.Messaging;
 using GameInterface.Services.Issues.Framework.Conversation;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using GameInterface.Services.MapEvents;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -155,7 +156,16 @@ public class SmugglersTests : IDisposable
         Assert.Equal(0, succeedQuest.CountFor(Server));
     }
 
-    private void StartPersuasionSession()
+    [Fact]
+    public void OldConversationEnd_DoesNotInvalidateTheNewPersuasionSession()
+    {
+        StartPersuasionSession("conversation-B");
+        Server.SimulateMessage(ClientA.NetPeer, new NetworkConversationEnded("conversation-A"));
+        ClientA.Call(() => QuestOf(ClientA).SucceedQuest(null));
+        Assert.Equal(1, succeedQuest.CountFor(Server));
+    }
+
+    private void StartPersuasionSession(string? requestId = null)
     {
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var ownerPartyId = string.Empty;
@@ -178,6 +188,11 @@ public class SmugglersTests : IDisposable
                     QuestOf(instance)._smugglerParty = smugglers;
                 }
             });
+        }
+        if (requestId != null)
+        {
+            Server.Call(() => Assert.True(Server.Resolve<ConversationPartyTracker>().TryBeginEngagement(
+                ClientA.NetPeer, ownerPartyId, partyId, false, requestId: requestId)));
         }
         ClientA.Call(() => ClientA.Resolve<IPersuasionSessionService>().Start(QuestOf(ClientA), QuestOf(ClientA)._smugglerParty));
     }
