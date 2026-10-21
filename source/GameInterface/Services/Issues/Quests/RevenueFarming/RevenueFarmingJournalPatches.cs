@@ -1,5 +1,6 @@
 ﻿using Common;
 using HarmonyLib;
+using Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,11 +8,23 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade.GauntletUI;
 
 namespace GameInterface.Services.Issues.Quests.RevenueFarming;
 
 using Quest = RevenueFarmingIssueBehavior.RevenueFarmingIssueQuest;
+
+[HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithCancel))]
+internal class RevenueFarmingCancellationLogPatch
+{
+    private static void Prefix(QuestBase __instance, TextObject cancelLog)
+    {
+        // Vanilla's all-raided cancellation leaves QUEST_GIVER unbound.
+        if (__instance is Quest quest && cancelLog != null)
+            StringHelpers.SetCharacterProperties("QUEST_GIVER", quest.QuestGiver.CharacterObject, cancelLog);
+    }
+}
 
 [HarmonyPatch]
 internal class RevenueFarmingDetachedDialoguePatch
