@@ -202,7 +202,18 @@ public class QuestRequestOwnershipTests : IDisposable
         });
         Assert.Contains(scenario.ClientA.NetworkSentMessages.GetMessages<NetworkConversationEnded>(), message => message.RequestId == null);
 
-        if (ended) scenario.Server.SimulateMessage(scenario.ClientA.NetPeer, new NetworkConversationEnded());
+        if (ended)
+        {
+            scenario.ClientA.Call(() =>
+            {
+                clientQuest._counterOfferHero = GameObjectCreator.CreateInitializedObject<Hero>();
+                CampaignEventDispatcher.Instance.OnConversationEnded(new List<CharacterObject>
+                {
+                    clientQuest._counterOfferHero.CharacterObject,
+                });
+            });
+            Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestGangLeaderMerchantConversationEnded>());
+        }
 
         scenario.ClientA.Call(() =>
         {

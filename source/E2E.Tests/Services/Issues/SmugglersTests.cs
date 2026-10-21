@@ -151,7 +151,6 @@ public class SmugglersTests : IDisposable
     public void PersuasionSuccess_FinalizesOnceAndReplaysTheOwnersStartedQuest()
     {
         succeedQuest.Dispose();
-        successLogs.Dispose();
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var townId = TestEnvironment.CreateRegisteredObject<Town>();
         Quest ownerQuest = null!;

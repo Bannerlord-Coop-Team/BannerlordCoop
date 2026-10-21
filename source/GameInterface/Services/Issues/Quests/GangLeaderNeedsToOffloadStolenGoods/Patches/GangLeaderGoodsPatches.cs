@@ -1,5 +1,6 @@
 ﻿using Common;
 using HarmonyLib;
+using System.Collections.Generic;
 using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -12,6 +13,15 @@ namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsToOffloadStolenGoo
 [HarmonyPatch]
 internal class GangLeaderGoodsPatches
 {
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnConversationEnded))]
+    [HarmonyPrefix]
+    private static void ConversationEnded(IEnumerable<CharacterObject> characters)
+    {
+        // Encounter cleanup also runs on settlement exit, before the merchant dialog ends.
+        if (ModInformation.IsClient && ContainerProvider.TryResolve<IGangLeaderGoodsService>(out var service))
+            service.MerchantConversationEnded(characters);
+    }
+
     [HarmonyPatch(typeof(Quest), nameof(Quest.GetHideoutLeaderDialogFlow))]
     [HarmonyPostfix]
     private static void PurchaseConsequence(Quest __instance, DialogFlow __result)
