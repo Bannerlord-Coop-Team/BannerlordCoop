@@ -1,6 +1,7 @@
 ﻿using Common.Logging.Enrichers;
 using Serilog;
 using System;
+using System.IO;
 
 namespace Common.Logging;
 
@@ -16,12 +17,39 @@ public static class LogManager
             .Enrich.With(new StackTraceEnricher())
             .WriteTo.Sink(new OutputSinkManager());
 
+#if DEBUG
+        ConfigureDedicatedLiveTestLog(configuration, Environment.GetCommandLineArgs());
+#endif
+
         // CI keeps its test output without buffering events for an absent Seq server.
         if (Environment.GetEnvironmentVariable("COOP_DISABLE_SEQ") != "1")
             configuration.WriteTo.Seq("http://localhost:5341");
 
         return configuration.CreateLogger();
     });
+
+#if DEBUG
+    internal static void ConfigureDedicatedLiveTestLog(LoggerConfiguration configuration, string[] arguments)
+    {
+        if (Array.IndexOf(arguments, "/dedicatedcustomserver") < 0 ||
+            Array.IndexOf(arguments, "/cooptestrun") < 0)
+            return;
+
+        var logArgument = Array.IndexOf(arguments, "/cooptestlog");
+        if (logArgument < 0 || logArgument + 1 >= arguments.Length ||
+            !Path.IsPathRooted(arguments[logArgument + 1]))
+            return;
+
+        // The dedicated engine never loads CoopMod.SetupLogging; stdout may also be detached.
+        var path = Path.ChangeExtension(arguments[logArgument + 1], ".coop.log");
+        configuration.MinimumLevel.Debug().WriteTo.Sink(new SizeLimitedFileSink(
+            path,
+            "[{Timestamp:O} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}",
+            30L * 1024 * 1024,
+            1L * 1024 * 1024,
+            28L * 1024 * 1024));
+    }
+#endif
 
 	public static ILogger GetLogger<T>() => _logger.Value
 		.ForContext<T>();
