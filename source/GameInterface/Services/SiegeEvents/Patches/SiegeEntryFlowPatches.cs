@@ -16,6 +16,7 @@ using Serilog;
 using System;
 using System.Linq;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.BarterSystem.Barterables;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -142,7 +143,8 @@ internal class SiegeEntryFlowPatches
         if (ModInformation.IsServer || menuId != "join_siege_event") return true;
         if (!ContainerProvider.TryResolve<ISiegeJoinMenuDeferralTracker>(out var deferralTracker)) return true;
 
-        return !deferralTracker.TryDefer();
+        var campaign = Campaign.Current;
+        return !deferralTracker.TryDefer(campaign?.PlayerEncounter, campaign?.MainParty?.Party);
     }
 
     [HarmonyPatch(typeof(SiegeEventCampaignBehavior), nameof(SiegeEventCampaignBehavior.menu_siege_leave_on_consequence))]

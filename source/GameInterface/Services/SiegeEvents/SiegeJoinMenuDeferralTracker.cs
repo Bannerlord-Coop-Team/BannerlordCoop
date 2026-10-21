@@ -6,21 +6,6 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.SiegeEvents;
 
 /// <summary>
-/// What an involved-party snapshot should do about a deferred join_siege_event menu.
-/// </summary>
-public enum SiegeJoinMenuDeferralResult
-{
-    /// <summary>No deferred menu is ready for this map event, so the caller takes its normal path.</summary>
-    NotReady,
-
-    /// <summary>The deferred menu should open now.</summary>
-    Open,
-
-    /// <summary>The deferral was dropped because the player's encounter changed, so the caller does nothing.</summary>
-    DroppedForChangedEncounter,
-}
-
-/// <summary>
 /// Tracks the client's one pending siege assault or sally-out join whose join_siege_event menu waits for the server's involved-party snapshot.
 /// </summary>
 public interface ISiegeJoinMenuDeferralTracker : IGameAbstraction
@@ -29,10 +14,10 @@ public interface ISiegeJoinMenuDeferralTracker : IGameAbstraction
     void Arm(MapEvent mapEvent, PartyBase joiningParty);
 
     /// <summary>Returns true when the current join_siege_event activation should wait for the snapshot, otherwise drops the deferral if the main party already joined.</summary>
-    bool TryDefer();
+    bool TryDefer(PlayerEncounter currentEncounter, PartyBase mainParty);
 
     /// <summary>Decides what the snapshot for <paramref name="mapEvent"/> does with the deferred menu, consuming the deferral unless it is not ready.</summary>
-    SiegeJoinMenuDeferralResult Consume(MapEvent mapEvent);
+    SiegeJoinMenuDeferralResult Consume(MapEvent mapEvent, PlayerEncounter currentEncounter, PartyBase mainParty);
 
     /// <summary>Drops any pending deferral.</summary>
     void Clear();
@@ -58,26 +43,25 @@ internal sealed class SiegeJoinMenuDeferralTracker : ISiegeJoinMenuDeferralTrack
     }
 
     /// <summary>Defers the activation when it belongs to the main party's pending join that is not applied yet.</summary>
-    public bool TryDefer()
+    public bool TryDefer(PlayerEncounter currentEncounter, PartyBase mainParty)
     {
-        var encounter = PlayerEncounter.Current;
-        var mapEvent = encounter?._mapEvent;
+        var mapEvent = currentEncounter?._mapEvent;
         if (!ReferenceEquals(mapEvent, pendingMapEvent) ||
-            !ReferenceEquals(pendingJoiningParty, PartyBase.MainParty))
+            !ReferenceEquals(pendingJoiningParty, mainParty))
             return false;
 
-        if (ReferenceEquals(MobileParty.MainParty?.MapEvent, mapEvent))
+        if (ReferenceEquals(mainParty?.MapEvent, mapEvent))
         {
             Clear();
             return false;
         }
 
-        pendingEncounter = encounter;
+        pendingEncounter = currentEncounter;
         return true;
     }
 
     /// <summary>Consumes the deferral once the main party is in <paramref name="mapEvent"/> under the same encounter.</summary>
-    public SiegeJoinMenuDeferralResult Consume(MapEvent mapEvent)
+    public SiegeJoinMenuDeferralResult Consume(MapEvent mapEvent, PlayerEncounter currentEncounter, PartyBase mainParty)
     {
         if (!ReferenceEquals(pendingMapEvent, mapEvent))
             return SiegeJoinMenuDeferralResult.NotReady;
@@ -88,13 +72,13 @@ internal sealed class SiegeJoinMenuDeferralTracker : ISiegeJoinMenuDeferralTrack
             return SiegeJoinMenuDeferralResult.NotReady;
         }
 
-        if (!ReferenceEquals(PlayerEncounter.Current, pendingEncounter))
+        if (!ReferenceEquals(currentEncounter, pendingEncounter))
         {
             Clear();
             return SiegeJoinMenuDeferralResult.DroppedForChangedEncounter;
         }
 
-        if (!ReferenceEquals(MobileParty.MainParty?.MapEvent, mapEvent))
+        if (!ReferenceEquals(mainParty?.MapEvent, mapEvent))
             return SiegeJoinMenuDeferralResult.NotReady;
 
         Clear();
@@ -108,4 +92,19 @@ internal sealed class SiegeJoinMenuDeferralTracker : ISiegeJoinMenuDeferralTrack
         pendingEncounter = null;
         pendingMapEvent = null;
     }
+}
+
+/// <summary>
+/// What an involved-party snapshot should do about a deferred join_siege_event menu.
+/// </summary>
+public enum SiegeJoinMenuDeferralResult
+{
+    /// <summary>No deferred menu is ready for this map event, so the caller takes its normal path.</summary>
+    NotReady,
+
+    /// <summary>The deferred menu should open now.</summary>
+    Open,
+
+    /// <summary>The deferral was dropped because the player's encounter changed, so the caller does nothing.</summary>
+    DroppedForChangedEncounter,
 }
