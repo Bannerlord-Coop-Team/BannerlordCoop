@@ -5,12 +5,14 @@ using Common.Network.Messages;
 using Coop.Core.Server.Services.Instances;
 using Coop.Core.Server.Services.Instances.Handlers;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Environment.MockEngine;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using HarmonyLib;
+using Missions;
 using Missions.Battles;
 using Missions.Messages;
 using Moq;
@@ -24,6 +26,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -72,24 +75,34 @@ public class BattleResultReadyTests : MissionTestEnvironment
     // A throwing teardown step must not leave mission-less victories off the legacy state relay.
     public void ControllerTeardownThrows_StillClosesMissionWindow()
     {
+        using var fixture = new MissionEngineFixture();
         var host = Clients.First();
+        SetControllerId(host, "host");
         var broker = new Mock<IMessageBroker>();
         broker.Setup(b => b.Publish(It.IsAny<object>(), It.IsAny<BattleMissionEnded>()))
             .Throws(new InvalidOperationException("teardown failed"));
 
         host.Call(() =>
         {
+            var mock = fixture.CreateMission(host);
             var missionRegistry = host.Resolve<ICoopBattleMissionRegistry>();
+            var agentAuthority = host.Resolve<IBattleAgentAuthorityRegistry>();
             var controller = host.Container.Resolve<CoopBattleController>(
                 new TypedParameter(typeof(IMessageBroker), broker.Object));
             try
             {
                 controller.AfterStart();
                 Assert.True(missionRegistry.IsMissionActive);
+                var rider = mock.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
+                var puppetHorse = mock.SpawnMount(rider);
+                Assert.True(host.Resolve<INetworkAgentRegistry>().TryRegisterAgent("owner", Guid.NewGuid(), puppetHorse));
+                Assert.True(agentAuthority.IsMountRemotelyOwned(puppetHorse));
 
                 Assert.Throws<InvalidOperationException>(() => controller.Dispose());
 
                 Assert.False(missionRegistry.IsMissionActive);
+                // The throw skipped the agent registry teardown, so only the detach can silence the answer.
+                Assert.Null(agentAuthority.IsMountRemotelyOwned(puppetHorse));
             }
             finally
             {

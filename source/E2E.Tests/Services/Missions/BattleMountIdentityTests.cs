@@ -4,6 +4,8 @@ using Common.Messaging;
 using E2E.Tests.Environment.Extensions;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
+using E2E.Tests.Util;
+using GameInterface;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.TroopSupply;
@@ -125,9 +127,55 @@ public class BattleMountIdentityTests : MissionTestEnvironment
             Assert.True(agentAuthority.IsMountRemotelyOwned(puppetHorse));
             Assert.Null(agentAuthority.IsMountRemotelyOwned(looseHorse));
 
+            // BattleBlowInterceptPatch resolves through ContainerProvider, so it must reach the same answers.
+            Assert.True(ContainerProvider.TryResolve<IBattleAgentAuthorityRegistry>(out var patchAuthority));
+            Assert.True(patchAuthority.IsMountRemotelyOwned(puppetHorse));
+
             controller.Dispose();
 
             Assert.Null(agentAuthority.IsMountRemotelyOwned(puppetHorse));
+        });
+    }
+
+    // The live controller answers the hero health ownership question HeroExtensions asks until it is disposed.
+    [Fact]
+    public void HeroAuthority_AnswersForTheLiveBattle_AndClearsOnDispose()
+    {
+        using var fixture = new MissionEngineFixture();
+        var client = Clients.First();
+        SetControllerId(client, "attacker");
+
+        string puppetHeroId = null, absentHeroId = null;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetId(GameObjectCreator.CreateInitializedObject<Hero>(), out puppetHeroId));
+            Assert.True(Server.ObjectManager.TryGetId(GameObjectCreator.CreateInitializedObject<Hero>(), out absentHeroId));
+        });
+        FlushCoalescer();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(puppetHeroId, out var puppetHero));
+            Assert.True(client.ObjectManager.TryGetObject<Hero>(absentHeroId, out var absentHero));
+            var ownHero = ((CharacterObject)Game.Current.PlayerTroop).HeroObject;
+
+            var mock = fixture.CreateMission(client);
+            var controller = client.Resolve<CoopBattleController>();
+            var agentRegistry = client.Resolve<INetworkAgentRegistry>();
+            Assert.True(agentRegistry.TryRegisterAgent("attacker", Guid.NewGuid(),
+                mock.SpawnAgent(new AgentBuildData(ownHero.CharacterObject).Controller(AgentControllerType.AI))));
+            Assert.True(agentRegistry.TryRegisterAgent("owner", Guid.NewGuid(),
+                mock.SpawnAgent(new AgentBuildData(puppetHero.CharacterObject).Controller(AgentControllerType.None))));
+
+            // HeroExtensions resolves through ContainerProvider, the same path asserted here.
+            Assert.True(ContainerProvider.TryResolve<IBattleAgentAuthorityRegistry>(out var agentAuthority));
+            Assert.True(agentAuthority.IsHeroAgentLocallyOwned(ownHero));
+            Assert.False(agentAuthority.IsHeroAgentLocallyOwned(puppetHero));
+            Assert.Null(agentAuthority.IsHeroAgentLocallyOwned(absentHero));
+
+            controller.Dispose();
+
+            Assert.Null(agentAuthority.IsHeroAgentLocallyOwned(ownHero));
         });
     }
 

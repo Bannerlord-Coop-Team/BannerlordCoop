@@ -263,7 +263,7 @@ public class BattleInstanceLifecycle : IBattleInstanceLifecycle
                 var agent = info.Agent;
                 if (agent?.Origin is not CoopAgentOrigin origin) continue;
                 bool ownsHealth = info.CurrentAuthority == session.OwnControllerId;
-                // Seal puppet callbacks too, before registry teardown removes the authority probe.
+                // Seal puppet callbacks too, before registry teardown clears agent ownership.
                 origin.OnMissionEnded(agent.Health, ownsHealth);
                 if (!ownsHealth || !agent.IsActive() || !(agent.Health > 0f) || origin.MapEventPartyId == null) continue;
                 if (!healthByParty.TryGetValue(origin.MapEventPartyId, out var survivors))
