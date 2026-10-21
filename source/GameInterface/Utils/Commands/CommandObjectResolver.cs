@@ -36,6 +36,9 @@ public interface ICommandObjectResolver
 
     // The id to print for an object in command output: its registry id, falling back to StringId.
     string DisplayId(object obj);
+
+    // Whether a resolve error means the name matched several objects, as opposed to none.
+    bool IsAmbiguous(string error);
 }
 
 // Implements id-then-name command argument resolution; the matching core is game-free so it can be unit tested.
@@ -44,6 +47,8 @@ public class CommandObjectResolver : ICommandObjectResolver
     private static readonly ILogger Logger = LogManager.GetLogger<CommandObjectResolver>();
 
     private const int MaxListedCandidates = 25;
+
+    private const string AmbiguousPrefix = "Several ";
 
     private const string NoCampaignError = "No campaign is loaded.";
 
@@ -91,6 +96,8 @@ public class CommandObjectResolver : ICommandObjectResolver
         TryMatch(typeof(T).Name, query, () => candidates, LookupRegistry<T>, true, IdsOf<T>, nameOf, DisplayIdOf<T>, out value, out error);
 
     public string DisplayId(object obj) => obj == null ? "no id" : DisplayIdOf(obj);
+
+    public bool IsAmbiguous(string error) => error != null && error.StartsWith(AmbiguousPrefix, StringComparison.Ordinal);
 
     // Runs the shared core over the type's live game list; without a campaign only ids resolve.
     private bool ResolveGameObject<T>(
@@ -251,7 +258,7 @@ public class CommandObjectResolver : ICommandObjectResolver
         if (overflow > 0)
             listed += $", ... and {overflow} more";
 
-        return $"Several {Pluralize(typeName)} are named '{query}'; use an id. Candidates: {listed}";
+        return $"{AmbiguousPrefix}{Pluralize(typeName)} are named '{query}'; use an id. Candidates: {listed}";
     }
 
     // Plural of the friendly type name, e.g. Hero to Heroes and Mobile party to Mobile parties.

@@ -103,7 +103,7 @@ public sealed class ArmyRemovalFixtureStateCommand : ICoopCommand
         foreach (var id in ids)
         {
             var resolved = resolver.TryResolveMobileParty(id, out var party, out var resolveError);
-            if (!resolved && resolveError.StartsWith("Several ", StringComparison.Ordinal))
+            if (!resolved && resolver.IsAmbiguous(resolveError))
                 return new CoopCommandResult(false, resolveError, "command_failed");
             resolvedParties.Add(party);
         }

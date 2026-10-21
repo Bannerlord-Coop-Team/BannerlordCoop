@@ -387,7 +387,7 @@ public class LocationDebugCommand
                 .Select(locationCharacter => locationCharacter.Character);
             if (resolver.TryResolve(args[1], presentCharacters, candidate => candidate.Name?.ToString(), out var character, out error) == false)
             {
-                if (error.StartsWith("Several ", StringComparison.Ordinal)) return Failed(error);
+                if (resolver.IsAmbiguous(error)) return Failed(error);
                 return Failed($"'{args[1]}' is not a character in {resolver.DisplayId(location)}.");
             }
 
@@ -528,7 +528,7 @@ public class LocationDebugCommand
             var presentItems = location.SpecialItems ?? new List<ItemObject>();
             if (resolver.TryResolve(args[1], presentItems, candidate => candidate.Name?.ToString(), out var item, out error) == false)
             {
-                if (error.StartsWith("Several ", StringComparison.Ordinal)) return Failed(error);
+                if (resolver.IsAmbiguous(error)) return Failed(error);
                 return Failed($"'{args[1]}' is not a special item in {resolver.DisplayId(location)}.");
             }
 

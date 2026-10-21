@@ -94,7 +94,7 @@ internal class VillageDebugCommand
 
             StringBuilder sb = new();
 
-            sb.AppendFormat("ID: '{0}'\n", village.StringId);
+            sb.AppendFormat("ID: '{0}'\n", village.Settlement.StringId);
             sb.AppendFormat("Name: '{0}'\n", village.Name);
             sb.AppendFormat("Owner: '{0}'\n", village.Owner.Name);
             sb.AppendFormat("State: '{0}'\n", village.VillageState.ToString());

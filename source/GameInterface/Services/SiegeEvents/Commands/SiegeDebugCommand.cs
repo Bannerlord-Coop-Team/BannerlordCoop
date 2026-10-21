@@ -2498,7 +2498,7 @@ public class SiegeDebugCommand
                 if (!resolver.TryResolveHero(arg, out var hero, out var heroError))
                 {
                     // An ambiguous hero name is more useful than the party miss.
-                    return Failed(heroError.StartsWith("Several ", StringComparison.Ordinal) ? heroError : partyError);
+                    return Failed(resolver.IsAmbiguous(heroError) ? heroError : partyError);
                 }
 
                 party = hero.PartyBelongedTo;

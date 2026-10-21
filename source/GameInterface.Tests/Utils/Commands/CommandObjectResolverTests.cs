@@ -285,4 +285,18 @@ public class CommandObjectResolverTests
         Assert.True(resolver.TryResolveHero("lord_1_14", out var value, out _));
         Assert.Same(hero, value);
     }
+
+    [Fact]
+    public void IsAmbiguous_TrueOnlyForSeveralMatchesError()
+    {
+        var resolver = new CommandObjectResolver(new Mock<IObjectManager>().Object);
+        var candidates = new[] { new Fake("reg_a", "s_a", "Twin"), new Fake("reg_b", "s_b", "Twin") };
+
+        resolver.TryResolve("Twin", candidates, fake => fake.Name, out _, out var ambiguous);
+        resolver.TryResolve("Nobody", candidates, fake => fake.Name, out _, out var missing);
+
+        Assert.True(resolver.IsAmbiguous(ambiguous));
+        Assert.False(resolver.IsAmbiguous(missing));
+        Assert.False(resolver.IsAmbiguous(null));
+    }
 }

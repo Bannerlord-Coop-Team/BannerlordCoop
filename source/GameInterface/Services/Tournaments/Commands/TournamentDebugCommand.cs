@@ -593,7 +593,10 @@ public class TournamentDebugCommand
         out string error)
     {
         townId = null;
-        town = Settlement.Find(DanusticaSettlementId)?.Town;
+        // Read through the live campaign so a missing campaign is a clean failure instead of a Settlement.Find throw.
+        town = Campaign.Current?.CampaignObjectManager?.Settlements
+            .FirstOrDefault(settlement => settlement.StringId == DanusticaSettlementId)
+            ?.Town;
         if (town == null)
         {
             error = "Unable to resolve Danustica (town_ES1).";

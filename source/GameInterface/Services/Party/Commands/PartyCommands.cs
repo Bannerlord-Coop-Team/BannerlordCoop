@@ -64,7 +64,14 @@ internal class PartyCommands
             return false;
         }
 
-        return resolver.TryResolve<Hero>(nameOrId, Hero.AllAliveHeroes.Where(h => h.PartyBelongedTo != null), h => h.Name?.ToString(), out hero, out error);
+        if (resolver.TryResolve<Hero>(nameOrId, Hero.AllAliveHeroes.Where(h => h.PartyBelongedTo != null), h => h.Name?.ToString(), out hero, out error))
+            return true;
+
+        // A real hero outside every party gets the specific reason instead of a bare not-found.
+        if (!resolver.IsAmbiguous(error) && resolver.TryResolveHero(nameOrId, out var partyless, out _))
+            error = $"{partyless.Name} ({partyless.StringId}) has no party (a prisoner, notable, or wanderer?).";
+
+        return false;
     }
 
     /// <summary>

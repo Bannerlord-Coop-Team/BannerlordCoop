@@ -1001,7 +1001,9 @@ internal class SettlementCommands
         out string error)
     {
         error = null;
-        if (objectManager.TryGetObject<SettlementComponent>(query, out component))
+        // Untyped so a settlement id (town_ES1) misses here without logging a cast error, then resolves below.
+        component = objectManager.TryGetObject<object>(query, out var registered) ? registered as SettlementComponent : null;
+        if (component != null)
             return true;
 
         if (resolver.TryResolveSettlement(query, out var settlement, out error) == false)

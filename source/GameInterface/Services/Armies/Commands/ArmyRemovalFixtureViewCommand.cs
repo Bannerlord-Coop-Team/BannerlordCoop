@@ -60,7 +60,7 @@ public sealed class ArmyRemovalFixtureViewCommand : ICoopCommand
         if (args[0] == "show" && args.Count == 2)
         {
             var resolved = resolver.TryResolveMobileParty(args[1], out var party, out var resolveError);
-            if (!resolved && resolveError.StartsWith("Several ", StringComparison.Ordinal))
+            if (!resolved && resolver.IsAmbiguous(resolveError))
                 return new CoopCommandResult(false, resolveError, "command_failed");
             if (!resolved || party.LeaderHero == null)
                 return new CoopCommandResult(false, "The named lord party is missing.", "command_failed");

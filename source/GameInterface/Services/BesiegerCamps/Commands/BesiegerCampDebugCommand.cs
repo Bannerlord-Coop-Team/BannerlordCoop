@@ -178,7 +178,7 @@ public class BesiegerCampDebugCommand
             SiegeStrategy siegeStrategy = SiegeStrategy.All.FirstOrDefault(x => string.Equals(x.StringId, strategyId, StringComparison.OrdinalIgnoreCase));
             if (siegeStrategy == null && !resolver.TryResolve(strategyId, SiegeStrategy.All, s => s.Name?.ToString(), out siegeStrategy, out var error))
             {
-                if (error.StartsWith("Several ", StringComparison.Ordinal))
+                if (resolver.IsAmbiguous(error))
                     return Failed(error);
 
                 var possibleIds = string.Join(Environment.NewLine, SiegeStrategy.All.Select(x => x.StringId));

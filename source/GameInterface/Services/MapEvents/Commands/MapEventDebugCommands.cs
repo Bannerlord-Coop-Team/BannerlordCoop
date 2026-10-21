@@ -307,7 +307,7 @@ public class MapEventDebugCommands
             return true;
         }
 
-        if (resolveError != null && resolveError.StartsWith("Several ", StringComparison.Ordinal))
+        if (resolver.IsAmbiguous(resolveError))
         {
             error = resolveError;
             return false;
@@ -2774,7 +2774,7 @@ public class MapEventDebugCommands
                 return true;
             }
 
-            if (resolveError != null && resolveError.StartsWith("Several ", StringComparison.Ordinal))
+            if (resolver.IsAmbiguous(resolveError))
             {
                 error = resolveError;
                 return false;
