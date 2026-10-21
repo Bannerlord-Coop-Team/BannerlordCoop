@@ -133,4 +133,15 @@ internal class VillageNeedsToolsOutcomePatches
             MessageBroker.Instance.Publish(quest, new VillageNeedsToolsJournalAdded(quest, text.ToString()));
         }
     }
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnIssueUpdated))]
+    [HarmonyPostfix]
+    private static void AlternativeJournalPostfix(IssueBase issue, IssueBase.IssueUpdateDetails details)
+    {
+        if (ModInformation.IsServer && issue is Issue tools &&
+            (details == IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest || details == IssueBase.IssueUpdateDetails.SentTroopsFailedQuest))
+        {
+            MessageBroker.Instance.Publish(tools, new VillageNeedsToolsAlternativeEnding(tools, details));
+        }
+    }
 }
