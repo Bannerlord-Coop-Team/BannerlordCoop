@@ -398,11 +398,13 @@ public sealed class LesserNobleRevoltTests : IDisposable
     }
 
     [Fact]
-    public void DismissedQuest_ReleasesItsOwnersCaptureProtectionAndItsParty()
+    public void DismissedQuest_ReleasesItsOwnersCaptureProtectionItsPartyAndItsTrackers()
     {
         var server = testEnvironment.Server;
         var ownerId = testEnvironment.CreateRegisteredObject<Hero>();
         var revoltPartyId = testEnvironment.CreateRegisteredObject<MobileParty>();
+        var villageId = testEnvironment.CreateRegisteredObject<Settlement>();
+        var otherVillageId = testEnvironment.CreateRegisteredObject<Settlement>();
         AddIssueWithQuest(server, "issue_lesser_noble", revoltPartyId, constructed: true);
         var quest = QuestOf(server);
         using var destroyed = new MethodCallRecorder(AccessTools.Method(typeof(DestroyPartyAction), nameof(DestroyPartyAction.Apply)));
@@ -411,10 +413,23 @@ public sealed class LesserNobleRevoltTests : IDisposable
         {
             Assert.True(server.ObjectManager.TryGetObject<Hero>(ownerId, out var owner));
             Assert.True(server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(server.ObjectManager.TryGetObject<Settlement>(villageId, out var village));
+            Assert.True(server.ObjectManager.TryGetObject<Settlement>(otherVillageId, out var otherVillage));
+            var otherQuest = ObjectHelper.SkipConstructor<Quest>();
             using (new AllowedThread())
             {
                 quest._lesserNobleParty.IsActive = true;
+
+                // The server's mirror quest tracks its village like the constructor does, and the save keeps both stores.
+                Campaign.Current.VisualTrackerManager = new VisualTrackerManager();
+                quest.IsTrackEnabled = true;
+                quest.AddTrackedObject(village);
+                otherQuest.IsTrackEnabled = true;
+                otherQuest.AddTrackedObject(otherVillage);
             }
+
+            Assert.Contains(quest, Campaign.Current.QuestManager.TrackedObjects[village]);
+            Assert.True(Campaign.Current.VisualTrackerManager.CheckTracked(village));
 
             LesserNobleRevoltWorldEventPatches.RecordOwnerBattle(quest, owner, null);
             Assert.True(LesserNobleRevoltWorldEventPatches.IsProtectedHero(owner));
@@ -424,6 +439,10 @@ public sealed class LesserNobleRevoltTests : IDisposable
 
             Assert.Null(giver.Issue);
             Assert.False(LesserNobleRevoltWorldEventPatches.IsProtectedHero(owner));
+            Assert.DoesNotContain(Campaign.Current.QuestManager.TrackedObjects.Values, quests => quests.Contains(quest));
+            Assert.False(Campaign.Current.VisualTrackerManager.CheckTracked(village));
+            Assert.Contains(otherQuest, Campaign.Current.QuestManager.TrackedObjects[otherVillage]);
+            Assert.True(Campaign.Current.VisualTrackerManager.CheckTracked(otherVillage));
         });
 
         Assert.Equal(1, destroyed.CountFor(server));
