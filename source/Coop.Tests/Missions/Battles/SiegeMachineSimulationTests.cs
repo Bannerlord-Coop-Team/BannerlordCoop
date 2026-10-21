@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Tests.Utils;
 using Common.Util;
+using GameInterface;
 using Missions;
 using Moq;
 using GameInterface.Services.MapEvents;
@@ -305,6 +306,40 @@ public class SiegeMachineSimulationTests : IDisposable
 
             Assert.False((bool)ladderPrefix.Invoke(null, new object[] { ladder }));
             Assert.False((bool)gateToggle.Invoke(null, new object[] { gate }));
+        }
+        finally
+        {
+            BattleSpawnGate.EndBattle();
+            BattleSpawnConfig.Enabled = previousEnabled;
+        }
+    }
+
+    // Without a resolvable authority registry every reader falls back to vanilla: prefixes run it, client checks take the server path.
+    [Theory]
+    [InlineData(typeof(SiegeLadderAuthorityPatches), "StateSetterPrefix", typeof(SiegeLadder), true)]
+    [InlineData(typeof(SiegeMachineAuthorityPatches), "TickAuxPrefix", typeof(BatteringRam), true)]
+    [InlineData(typeof(SiegeMachineAuthorityPatches), "ShootPrefix", typeof(Ballista), true)]
+    [InlineData(typeof(SiegeMachineAuthorityPatches), "AllowGateToggle", typeof(CastleGate), true)]
+    [InlineData(typeof(SiegeMachineAuthorityPatches), "IsClientForMachine", typeof(BatteringRam), false)]
+    [InlineData(typeof(SiegeLadderAuthorityPatches), "IsClientForSiegeLadder", typeof(SiegeLadder), false)]
+    public void AuthorityReaders_RunVanillaWhenTheRegistryDoesNotResolve(
+        Type patchType, string methodName, Type machineType, bool vanillaResult)
+    {
+        var reader = patchType.GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic);
+        Assert.NotNull(reader);
+#pragma warning disable SYSLIB0050
+        var machine = FormatterServices.GetUninitializedObject(machineType);
+#pragma warning restore SYSLIB0050
+        var args = reader.GetParameters().Length == 1 ? new[] { machine } : new[] { machine, false };
+        bool previousEnabled = BattleSpawnConfig.Enabled;
+        BattleSpawnConfig.Enabled = true;
+        BattleSpawnGate.BeginBattle("authority-resolve-miss-test");
+        try
+        {
+            using (ContainerProvider.UseContainerThreadSafe(null))
+            {
+                Assert.Equal(vanillaResult, (bool)reader.Invoke(null, args));
+            }
         }
         finally
         {

@@ -6,15 +6,13 @@ using System;
 namespace Coop.Tests.Missions.Battles;
 
 /// <summary>
-/// Points <see cref="ContainerProvider"/> at a container holding one siege authority registry, so siege
-/// patches invoked by a test resolve it; the previous container is restored on dispose.
+/// Points <see cref="ContainerProvider"/> at a container holding one siege authority registry while holding the
+/// provider's lock, so siege patches invoked by a test resolve it; the provider is cleared on dispose.
 /// </summary>
 internal sealed class SiegeAuthorityContainerScope : IDisposable
 {
     private readonly IContainer container;
     private readonly IDisposable containerUse;
-    private readonly bool hadPreviousContainer;
-    private readonly ILifetimeScope previousContainer;
 
     /// <summary>Builds the container around the given registry and makes it the provider's container.</summary>
     public SiegeAuthorityContainerScope(ISiegeMachineAuthorityRegistry authority)
@@ -23,26 +21,14 @@ internal sealed class SiegeAuthorityContainerScope : IDisposable
         builder.RegisterInstance(authority).As<ISiegeMachineAuthorityRegistry>();
         container = builder.Build();
 
-        hadPreviousContainer = ContainerProvider.TryGetContainer(out previousContainer);
         containerUse = ContainerProvider.UseContainerThreadSafe(container);
     }
 
-    /// <summary>Restores the container the provider held before this scope, unless another test replaced it since.</summary>
+    /// <summary>Clears the provider before releasing its lock, so no writer can land between the clear and the release.</summary>
     public void Dispose()
     {
+        ContainerProvider.Clear();
         containerUse.Dispose();
-        RestorePreviousContainer();
         container.Dispose();
-    }
-
-    // Skips the restore when another test set its own container after the semaphore was released.
-    private void RestorePreviousContainer()
-    {
-        if (!ContainerProvider.TryGetContainer(out var current) || current != container) return;
-
-        if (hadPreviousContainer)
-            ContainerProvider.SetContainer(previousContainer);
-        else
-            ContainerProvider.Clear();
     }
 }
