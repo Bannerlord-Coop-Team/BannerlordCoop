@@ -135,6 +135,7 @@ internal class HeadmanNeedsGrainTraitRewards : IHeadmanNeedsGrainTraitRewards
             var trait = MBObjectManager.Instance.GetObject<TraitObject>(value.Key);
             if (IsRewardTrait(trait)) Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(trait, value.Value);
         }
+        if (ModInformation.IsClient && owner == Hero.MainHero) RequestSeed();
     }
 
     private static bool IsRewardTrait(TraitObject trait) =>

@@ -299,6 +299,54 @@ public class HeadmanNeedsGrainTests : IDisposable
     }
 
     [Fact]
+    public void RestoredReward_AcknowledgesPendingXpBeforeLaterLocalProgress()
+    {
+        IHeadmanNeedsGrainTraitRewards serverRewards = null!;
+        Server.Call(() =>
+        {
+            serverRewards = new HeadmanNeedsGrainTraitRewards(
+                NSubstitute.Substitute.For<Common.Network.INetwork>(), Server.ObjectManager);
+            var owner = Get<Hero>(Server, scenario.PlayerA.HeroId);
+            serverRewards.Seed(owner, new Dictionary<string, int> { [DefaultTraits.Generosity.StringId] = 0 });
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+                serverRewards.Apply(DefaultTraits.Generosity, 50, owner, ActionNotes.QuestSuccess);
+        });
+        var previousSeeds = ClientA.NetworkSentMessages.GetMessages<RequestHeadmanNeedsGrainTraitSeed>().Count();
+        ClientA.Call(() =>
+        {
+            var rewards = ClientA.Resolve<IHeadmanNeedsGrainTraitRewards>();
+            var owner = Get<Hero>(ClientA, scenario.PlayerA.HeroId);
+            var records = new Dictionary<string, object>
+            {
+                ["_coop_grain_trait_progress"] = new Dictionary<Hero, Dictionary<string, int>>
+                {
+                    [owner] = new() { [DefaultTraits.Generosity.StringId] = 50 },
+                },
+            };
+            rewards.SyncData(new TestDataStore(false, records));
+        });
+        var restoredSeeds = ClientA.NetworkSentMessages.GetMessages<RequestHeadmanNeedsGrainTraitSeed>().ToArray();
+        Assert.Equal(previousSeeds + 1, restoredSeeds.Length);
+        Server.Call(() => serverRewards.Seed(Get<Hero>(Server, scenario.PlayerA.HeroId), restoredSeeds.Last().Values));
+        ClientA.Call(() =>
+        {
+            Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Generosity, 75);
+            ClientA.Resolve<IHeadmanNeedsGrainTraitRewards>().RequestSeed();
+        });
+        var laterSeed = ClientA.NetworkSentMessages.GetMessages<RequestHeadmanNeedsGrainTraitSeed>().Last();
+        Server.Call(() =>
+        {
+            var owner = Get<Hero>(Server, scenario.PlayerA.HeroId);
+            serverRewards.Seed(owner, laterSeed.Values);
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+                serverRewards.Apply(DefaultTraits.Generosity, 25, owner, ActionNotes.QuestSuccess);
+            var records = new Dictionary<string, object>();
+            serverRewards.SyncData(new TestDataStore(true, records));
+            var progress = (Dictionary<Hero, Dictionary<string, int>>)records["_coop_grain_trait_progress"];
+            Assert.Equal(100, progress[owner][DefaultTraits.Generosity.StringId]);
+        });
+    }
+    [Fact]
     public void LoadedTraitProgress_IsRestoredAfterSwitchingFromTheSavedHeroToTheLocalPlayer()
     {
         textHarmony.Patch(AccessTools.Method(typeof(ChangePlayerCharacterAction), nameof(ChangePlayerCharacterAction.Apply)),
