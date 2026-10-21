@@ -57,6 +57,8 @@ public class VillageNeedsToolsTests : IDisposable
         AccessTools.PropertyGetter(typeof(Issue), nameof(Issue.AlternativeSolutionStartLog)),
         AccessTools.PropertyGetter(typeof(Issue), nameof(Issue.IssueAlternativeSolutionSuccessLog)),
         AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.SetCharacterProperties)),
+        // The patched alternative ending can inline SetCharacterProperties before this test disables it.
+        AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.GetCharacterProperties)),
     };
 
     private readonly string notableId;
