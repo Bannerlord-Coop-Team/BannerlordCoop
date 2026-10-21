@@ -662,7 +662,7 @@ internal class BattleFinalizeHandler : IHandler
             if (mobileParty == null)
                 continue;
 
-            mobileParty.Position = settlement.GatePosition;
+            mobileParty.Position = mobileParty.IsCurrentlyAtSea ? settlement.PortPosition : settlement.GatePosition;
             if (mobileParty.CurrentSettlement == settlement)
                 settlementInterface.PartyLeaveSettlement(mobileParty);
 
@@ -682,7 +682,7 @@ internal class BattleFinalizeHandler : IHandler
 
         using (new AllowedThread())
         {
-            mainParty.Position = settlement.GatePosition;
+            mainParty.Position = mainParty.IsCurrentlyAtSea ? settlement.PortPosition : settlement.GatePosition;
             if (mainParty.CurrentSettlement == settlement)
                 settlementInterface.PartyLeaveSettlement(mainParty);
 

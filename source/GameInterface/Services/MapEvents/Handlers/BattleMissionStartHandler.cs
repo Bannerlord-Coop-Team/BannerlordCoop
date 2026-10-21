@@ -15,6 +15,7 @@ using GameInterface.Services.MapEvents.TroopSupply;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using Helpers;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -217,6 +218,23 @@ internal class BattleMissionStartHandler : IHandler
                 {
                     mapEventLogger.DebugMapEvent(mapEvent, "Rejecting attack mission: an auto-resolve simulation is already underway for this event");
                     network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                    return;
+                }
+
+                // Naval village raids are single player for now so only the server claims the battle and nobody else is sent into it
+                operation = "claim naval raid mission";
+                if (MapEventHelper.IsNavalRaid(mapEvent))
+                {
+                    if (!isNewMissionClaim)
+                    {
+                        network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, false));
+                        return;
+                    }
+
+                    ApplyClientAttackHostileConsequences(mapEvent, attackerMobileParty.Party);
+                    network.Send(requester, new NetworkBattleStartReply(payload.What.RequestId, true));
+                    startAccepted = true;
+                    network.SendAll(new NetworkBattleModeSet(payload.What.MapEventId, (int)BattleStartMode.Mission));
                     return;
                 }
 
