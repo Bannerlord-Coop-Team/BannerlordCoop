@@ -1,0 +1,65 @@
+[
+  {
+    "file": "up20/TournamentFailure-offer-122300.png",
+    "caption": "A sees Sora offer the Lady quest in real dialogue.",
+    "sha256": "420166062cff5851d41c86a84403fcc472e9940eea85403e7c3ce0ce1b45f3a9",
+    "sourceHead": "b82865f7d967f328b6366ef44b2bfbb67b6261a3",
+    "visuallyInspected": true
+  },
+  {
+    "file": "up20/TournamentFailure-offer-105332.png",
+    "caption": "B remains at Danustica while A receives the offer.",
+    "sha256": "da02f15f8045d506e2ae0c293090d66fb7518ef3dcdfd0d0bd51eb7ca3fefe00",
+    "sourceHead": "b82865f7d967f328b6366ef44b2bfbb67b6261a3",
+    "visuallyInspected": true
+  },
+  {
+    "file": "up20/TournamentFailure-accept-choice-122300.png",
+    "caption": "A can accept Sora's challenge to reach round two.",
+    "sha256": "8d79c707dbf38fd4f79915cc5b285f8ed293f5668ca03e5596f51deca4286ccb",
+    "sourceHead": "b82865f7d967f328b6366ef44b2bfbb67b6261a3",
+    "visuallyInspected": true
+  },
+  {
+    "file": "up20/TournamentFailure-accepted-122300.png",
+    "caption": "Sora confirms A is her champion after acceptance.",
+    "sha256": "d609d0f3f23a48d82524a1cca973da852a6d885a2bd02869ce2ad00f38eb47f8",
+    "sourceHead": "b82865f7d967f328b6366ef44b2bfbb67b6261a3",
+    "visuallyInspected": true
+  },
+  {
+    "file": "up20/TournamentFailure-accepted-105332.png",
+    "caption": "B remains in town while A accepts the quest.",
+    "sha256": "d709e7ddb40b9a081af01a6c1ad842010d78861b79e79119ffa0659837cad7c5",
+    "sourceHead": "b82865f7d967f328b6366ef44b2bfbb67b6261a3",
+    "visuallyInspected": true
+  },
+  {
+    "file": "up20/TournamentFailure-actual-defeat-122300.png",
+    "caption": "TournamentFailure: A sees Quest Failed over the tournament bracket.",
+    "sha256": "6eea11920ae487b3ef354e2fafe15fc04510b7b0ec7e66b74bf66f60360f10ff",
+    "sourceHead": "b82865f7d967f328b6366ef44b2bfbb67b6261a3",
+    "visuallyInspected": true
+  },
+  {
+    "file": "up20/TournamentFailure-actual-defeat-105332.png",
+    "caption": "TournamentFailure: B remains in town while A is eliminated.",
+    "sha256": "ce07e152f3940d63d2a67a8e2d94d72675faeaab029f8ad2bef880603972e0f1",
+    "sourceHead": "b82865f7d967f328b6366ef44b2bfbb67b6261a3",
+    "visuallyInspected": true
+  },
+  {
+    "file": "up20/MainHeroAttackedLadysClansVillage-immediate-A-122300.png",
+    "caption": "Village crime: A sees the Lady quest log update after taking goods.",
+    "sha256": "55762a5086f7955e1fe4f02673a07db36eeb295793d7b94c97ccccbbb27067ae",
+    "sourceHead": "b82865f7d967f328b6366ef44b2bfbb67b6261a3",
+    "visuallyInspected": true
+  },
+  {
+    "file": "up20/MainHeroAttackedLadysClansVillage-immediate-B-105332.png",
+    "caption": "Village crime: B remains in town while A takes goods.",
+    "sha256": "b9aab17dd3d63afcd67142b2dd239c74783cc0f7aab19e9531970c8adbc3e29b",
+    "sourceHead": "b82865f7d967f328b6366ef44b2bfbb67b6261a3",
+    "visuallyInspected": true
+  }
+]
