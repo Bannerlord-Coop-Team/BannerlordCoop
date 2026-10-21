@@ -26,6 +26,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
@@ -470,9 +471,15 @@ public sealed class RevenueFarmingTests : IDisposable
     [Fact]
     public void RaidStopsCollectionAndAllVillagesRaidedCancelsOnlyThisQuest()
     {
+        foreach (var instance in Instances) instance.Call(() =>
+        {
+            using (new AllowedThread())
+                Object<Hero>(instance, scenario.NotableId).SetName(new TextObject("Derthert"), new TextObject("Derthert"));
+        });
         Accept();
         Collect();
         var quest = Quest(Client);
+        var serverQuest = Quest(Server);
         Server.Call(() => Quest(Server).OnVillageRaid(Quest(Server).RevenueVillages[0].Village));
         Client.Call(() =>
         {
@@ -481,7 +488,17 @@ public sealed class RevenueFarmingTests : IDisposable
             Assert.Equal(266, quest._totalRequestedDenars);
         });
         Server.Call(() => Quest(Server).OnVillageRaid(Quest(Server).RevenueVillages[1].Village));
+        environment.FlushCoalescer();
         Client.Call(() => Assert.True(quest.IsFinalized));
+        string ending = null!;
+        Server.Call(() =>
+        {
+            ending = serverQuest.JournalEntries.Last().LogText.ToString();
+            Assert.Contains("Derthert", ending);
+            Assert.Contains("has been raided and your agreement", ending);
+        });
+        Client.Call(() => Assert.Equal(ending, quest.JournalEntries.Last().LogText.ToString()));
+        Observer.Call(() => Assert.Empty(Campaign.Current.QuestManager.Quests.OfType<Quest>()));
         Assert.Empty(menus.MenusFor(Observer));
     }
 
