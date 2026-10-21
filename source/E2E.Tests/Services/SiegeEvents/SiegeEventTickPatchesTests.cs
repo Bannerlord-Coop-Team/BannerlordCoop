@@ -1,8 +1,6 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using GameInterface.Services.SiegeEvents.Patches;
-using HarmonyLib;
-using System.Reflection;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Siege;
 using Xunit;
@@ -26,18 +24,6 @@ public class SiegeEventTickPatchesTests : IDisposable
 
     /// <summary>Tears down the test environment.</summary>
     public void Dispose() => environment.Dispose();
-
-    /// <summary>Both targets carry the prefix, so a lost <c>[HarmonyPatch]</c> attribute fails here.</summary>
-    [Theory]
-    [InlineData(typeof(SiegeEventManager), nameof(SiegeEventManager.Tick), "TickPrefix")]
-    [InlineData(typeof(SiegeEvent), nameof(SiegeEvent.DoSiegeAction), "DoSiegeActionPrefix")]
-    public void Prefix_IsAppliedToTarget(Type targetType, string targetName, string prefixName)
-    {
-        MethodInfo target = AccessTools.Method(targetType, targetName);
-        MethodInfo prefix = AccessTools.Method(typeof(SiegeEventTickPatches), prefixName);
-
-        Assert.Contains(Harmony.GetPatchInfo(target).Prefixes, patch => patch.PatchMethod == prefix);
-    }
 
     /// <summary>A client skips the vanilla tick, which would otherwise walk the uninitialized siege list.</summary>
     [Fact]

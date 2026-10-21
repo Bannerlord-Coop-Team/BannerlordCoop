@@ -30,9 +30,9 @@ internal class SiegeEnginesContainerPatches
 
         if (ModInformation.IsClient)
         {
-            // DoSiegeAction is server-only and MapSiegeProductionPatches routes the popup, so this only catches the popup's
-            // missing-state fallback. A progress object made locally is an unregistered ghost, so the request
-            // carries the engine type and the server does its own reserve-lookup-or-create.
+            // No native client caller reaches this (DoSiegeAction is server-only, MapSiegeProductionPatches routes the popup);
+            // kept so a future caller routes instead of deploying a locally made, unregistered ghost. The request carries
+            // the engine type and the server does its own reserve-lookup-or-create.
             if (!TryDescribeContainer(__instance, out var siegeEvent, out var side))
             {
                 Logger.Error("Client tried to deploy a siege engine on a container outside its own siege");
