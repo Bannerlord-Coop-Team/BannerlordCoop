@@ -10,7 +10,7 @@ namespace Missions.Naval;
 /// </summary>
 public interface INavalScenarioReadyPress
 {
-    /// <summary>How many times the queued press actually ran.</summary>
+    /// <summary>How many times the queued press ran and returned.</summary>
     int Presses { get; }
 
     /// <summary>
@@ -51,8 +51,9 @@ public class NavalScenarioReadyPress : INavalScenarioReadyPress
             queued = false;
             if (!canPress()) return;
 
-            Presses++;
+            // A press that throws is no press: only one that returned counts.
             press();
+            Presses++;
         });
     }
 }

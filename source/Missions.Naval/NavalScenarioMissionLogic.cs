@@ -75,9 +75,10 @@ public class NavalScenarioMissionLogic : MissionLogic
         this.mapEventId = mapEventId;
     }
 
+    // Runs this client's pending scenario steps for the battle's current phase.
     public override void OnMissionTick(float dt)
     {
-        if (!TryAdoptScenario() || state.Current != config) return;
+        if (!TryAdoptScenario() || state.Current != config || state.Phase == NavalScenarioPhase.Ended) return;
 
         TickInBattleBookkeeping();
 
@@ -149,10 +150,22 @@ public class NavalScenarioMissionLogic : MissionLogic
         readyPress.Tick(dt, () => ReadyOrderOfBattle() != null, PressReady);
     }
 
+    // Presses the order of battle's Ready; a throw leaves vanilla's FinishDeployment half done, so the scenario stops there.
     private void PressReady()
     {
-        ReadyOrderOfBattle().ExecuteBeginMission();
-        Logger.Information("[NavalScenario] Pressed Ready ({Presses}) for {MapEventId}", readyPress.Presses, config.MapEventId);
+        int press = readyPress.Presses + 1;
+        try
+        {
+            ReadyOrderOfBattle().ExecuteBeginMission();
+        }
+        catch (Exception exception)
+        {
+            Logger.Error(exception, "[NavalScenario] Ready press {Press} threw for {MapEventId}", press, config.MapEventId);
+            Abort(NavalScenarioState.ReadyStep, $"Ready press {press} threw {exception.GetType().Name}: deployment half-finished");
+            return;
+        }
+
+        Logger.Information("[NavalScenario] Pressed Ready ({Presses}) for {MapEventId}", press, config.MapEventId);
     }
 
     // The order of battle when its Ready button would accept; ExecuteBeginMission refuses while the assignment is
@@ -401,6 +414,15 @@ public class NavalScenarioMissionLogic : MissionLogic
 
         loggedApproach = closest;
         Logger.Information("[NavalScenario] Ramming closest approach {Closest}", closest);
+    }
+
+    // Fails step and stops the scenario here: every other pending step fails and the mission tick runs no more steps.
+    private void Abort(string step, string detail)
+    {
+        Complete(step, false, detail);
+        state.Advance(NavalScenarioPhase.Ended);
+        foreach (var pending in state.Steps.Where(item => item.Status == NavalScenarioStepStatus.Pending).ToArray())
+            Complete(pending.Name, false, "the scenario stopped: " + detail);
     }
 
     private void End()

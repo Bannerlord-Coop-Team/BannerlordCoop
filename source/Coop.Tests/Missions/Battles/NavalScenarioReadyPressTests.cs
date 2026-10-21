@@ -80,6 +80,16 @@ public class NavalScenarioReadyPressTests
         Assert.Equal(2, readyPress.Presses);
     }
 
+    [Fact]
+    public void QueuedPress_ThatThrowsIsNotCounted()
+    {
+        readyPress.Tick(0.016f, () => canPress, () => throw new InvalidOperationException("half-finished deployment"));
+
+        Assert.Throws<InvalidOperationException>(RunQueued);
+
+        Assert.Equal(0, readyPress.Presses);
+    }
+
     private void Tick(float dt) => readyPress.Tick(dt, () => canPress, () => pressed++);
 
     private void RunQueued()
