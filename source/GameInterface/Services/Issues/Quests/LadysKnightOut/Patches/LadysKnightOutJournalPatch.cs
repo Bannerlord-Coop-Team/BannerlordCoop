@@ -35,7 +35,8 @@ internal class LadysKnightOutJournalPatch
 
     [HarmonyPatch(typeof(JournalLogsCampaignBehavior), nameof(JournalLogsCampaignBehavior.OnIssueUpdated))]
     [HarmonyPrefix]
-    private static bool HistoryPrefix(IssueBase issue) => !(issue is Issue) || issue.IsTriedToSolveBefore;
+    private static bool HistoryPrefix(IssueBase issue) => !(issue is Issue) ||
+        (ModInformation.IsClient && issue.IsTriedToSolveBefore);
 
     [HarmonyPatch(typeof(DefaultNotificationsCampaignBehavior), nameof(DefaultNotificationsCampaignBehavior.OnIssueUpdated))]
     [HarmonyPrefix]
