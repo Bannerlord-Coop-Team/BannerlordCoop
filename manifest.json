@@ -61,5 +61,86 @@
     "sha256": "b9aab17dd3d63afcd67142b2dd239c74783cc0f7aab19e9531970c8adbc3e29b",
     "sourceHead": "b82865f7d967f328b6366ef44b2bfbb67b6261a3",
     "visuallyInspected": true
+  },
+  {
+    "file": "up21/Offer-A-110052.png",
+    "caption": "Accept: A sees Sora's real offer before choosing the quest.",
+    "sourceHead": "b8fd953df1af1ce9763b3d1a923808b38c35abe9",
+    "sha256": "a54fb0a06ecef431efedba95f2df8d60b019fed30f8a13a66d2274526dcef727",
+    "visuallyInspected": true,
+    "processId": 110052,
+    "capturedFileModifiedUtc": "2026-10-21T05:14:59.368620+00:00"
+  },
+  {
+    "file": "up21/Accepted-A-110052.png",
+    "caption": "Accept: A sees Lady's Knight Out activated after real dialogue.",
+    "sourceHead": "b8fd953df1af1ce9763b3d1a923808b38c35abe9",
+    "sha256": "e4592af518e5406d616a2f25212702e18612e3c3e4030ef1d3451726fa957e7b",
+    "visuallyInspected": true,
+    "processId": 110052,
+    "capturedFileModifiedUtc": "2026-10-21T05:16:12.286614+00:00"
+  },
+  {
+    "file": "up21/Accepted-B-2368.png",
+    "caption": "Non-owner: B remains in Danustica while A accepts Sora's quest.",
+    "sourceHead": "b8fd953df1af1ce9763b3d1a923808b38c35abe9",
+    "sha256": "8cf2110f7eb2408ea53455c75a5e1b206d5005b2ed57ce3544967975e5c51c5b",
+    "visuallyInspected": true,
+    "processId": 2368,
+    "capturedFileModifiedUtc": "2026-10-21T05:16:14.327949+00:00"
+  },
+  {
+    "file": "up21/TournamentSuccess-result-A-110052.png",
+    "caption": "TournamentSuccess: A wins the real co-op bracket and receives 750 quest gold.",
+    "sourceHead": "b8fd953df1af1ce9763b3d1a923808b38c35abe9",
+    "sha256": "8103470adef4184e618a2295fa18d70b4ae4383da23bf6588ba469968a223e97",
+    "visuallyInspected": true,
+    "processId": 110052,
+    "capturedFileModifiedUtc": "2026-10-21T05:21:58.963850+00:00"
+  },
+  {
+    "file": "up21/TournamentSuccess-result-B-2368.png",
+    "caption": "TournamentSuccess: B stays in Danustica with no personal quest or reward.",
+    "sourceHead": "b8fd953df1af1ce9763b3d1a923808b38c35abe9",
+    "sha256": "6beb19388c0a9de022df7cbac5ce34da7d29b63bf5dee97b45258534fc7af0c3",
+    "visuallyInspected": true,
+    "processId": 2368,
+    "capturedFileModifiedUtc": "2026-10-21T05:22:00.455091+00:00"
+  },
+  {
+    "file": "up21/TournamentFailure-result-A-110052.png",
+    "caption": "TournamentFailure: A is down and the co-op match reports the team disqualified.",
+    "sourceHead": "b8fd953df1af1ce9763b3d1a923808b38c35abe9",
+    "sha256": "47e23342a147f3b6828e9990c956d93884baf9306a287cbb46ffa0906da86862",
+    "visuallyInspected": true,
+    "processId": 110052,
+    "capturedFileModifiedUtc": "2026-10-21T05:24:49.659422+00:00"
+  },
+  {
+    "file": "up21/TournamentFailure-result-B-2368.png",
+    "caption": "TournamentFailure: B remains in Danustica while A's quest fails.",
+    "sourceHead": "b8fd953df1af1ce9763b3d1a923808b38c35abe9",
+    "sha256": "744177168c57e1d70d2ed46611e62dec87366931f4d20b9a5002bdc853832507",
+    "visuallyInspected": true,
+    "processId": 2368,
+    "capturedFileModifiedUtc": "2026-10-21T05:24:51.153982+00:00"
+  },
+  {
+    "file": "up21/VillageCrime-result-A-110052.png",
+    "caption": "Village crime / Honor: A sees Lady's Knight Out updated after forcing goods.",
+    "sourceHead": "b8fd953df1af1ce9763b3d1a923808b38c35abe9",
+    "sha256": "fcc010ad9236f69920dce2a059cebe3bd1e97fdc8e11a8bae38e0d2ef7696708",
+    "visuallyInspected": true,
+    "processId": 110052,
+    "capturedFileModifiedUtc": "2026-10-21T05:27:51.604110+00:00"
+  },
+  {
+    "file": "up21/VillageCrime-result-B-2368.png",
+    "caption": "Village crime / Honor: B stays in town while only A receives the penalty.",
+    "sourceHead": "b8fd953df1af1ce9763b3d1a923808b38c35abe9",
+    "sha256": "c2668765eb075f24138c3a4384e1a078e2555eac987de75ce5e5774961de5b06",
+    "visuallyInspected": true,
+    "processId": 2368,
+    "capturedFileModifiedUtc": "2026-10-21T05:27:53.141082+00:00"
   }
 ]
