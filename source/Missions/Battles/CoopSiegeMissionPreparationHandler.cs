@@ -13,6 +13,9 @@ public class CoopSiegeMissionPreparationHandler : SiegeMissionPreparationHandler
     /// <summary>Seed derived from the server-assigned map-event id, identical on every client.</summary>
     private readonly uint _sceneSeed;
 
+    /// <summary>Exposes the scene seed so tests can pin that it is derived stably from the map-event id.</summary>
+    internal uint SceneSeed => _sceneSeed;
+
     /// <summary>Builds the vanilla walls-assault handler and derives the scene seed from the map event.</summary>
     public CoopSiegeMissionPreparationHandler(bool isSallyOut, float[] wallHitPointRatios, bool hasAnySiegeTower,
         string mapEventId)

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.Serialization;
+using GameInterface.Utils;
 using Missions.Battles;
 using TaleWorlds.Core;
 using Xunit;
@@ -14,10 +15,25 @@ public class GameCurrentCollection
 {
 }
 
-/// <summary>Covers the campaign RNG swap the siege preparation handler wraps around vanilla scene setup.</summary>
+/// <summary>Covers the shared scene seed and the campaign RNG swap the siege preparation handler wraps around
+/// vanilla scene setup.</summary>
 [Collection(nameof(GameCurrentCollection))]
 public class CoopSiegeMissionPreparationHandlerTests
 {
+    /// <summary>Every client builds its handler from the same map-event id, so each must derive the same
+    /// process-independent seed, otherwise clients pre-destroy different wall pieces.</summary>
+    [Fact]
+    public void SceneSeed_IsStableHashOfMapEventId_AcrossHandlerInstances()
+    {
+        const string mapEventId = "map-event-17";
+
+        var first = new CoopSiegeMissionPreparationHandler(false, new[] { 1f, 1f }, false, mapEventId);
+        var second = new CoopSiegeMissionPreparationHandler(true, new[] { 0.5f, 0.25f }, true, mapEventId);
+
+        Assert.Equal(StableHash.FromString(mapEventId), first.SceneSeed);
+        Assert.Equal(first.SceneSeed, second.SceneSeed);
+    }
+
     /// <summary>A failed scene setup must still hand the campaign its own RNG back, otherwise every client keeps
     /// drawing campaign randomness from the shared siege seed.</summary>
     [Fact]
