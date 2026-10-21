@@ -206,7 +206,8 @@ public class QuestRequestOwnershipTests : IDisposable
         {
             scenario.ClientA.Call(() =>
             {
-                clientQuest._counterOfferHero = GameObjectCreator.CreateInitializedObject<Hero>();
+                AccessTools.Field(typeof(Quest), nameof(Quest._counterOfferHero))
+                    .SetValue(clientQuest, GameObjectCreator.CreateInitializedObject<Hero>());
                 CampaignEventDispatcher.Instance.OnConversationEnded(new List<CharacterObject>
                 {
                     clientQuest._counterOfferHero.CharacterObject,
