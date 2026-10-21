@@ -7,9 +7,9 @@ namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsToOffloadStolenGoo
 
 internal class GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy : IFinalizationProofStrategy
 {
-    private readonly GangLeaderBranchEvidence evidence;
+    private readonly IGangLeaderGoodsService evidence;
 
-    public GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy(GangLeaderBranchEvidence evidence)
+    public GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy(IGangLeaderGoodsService evidence)
     {
         this.evidence = evidence;
     }
@@ -22,7 +22,7 @@ internal class GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy : IF
         }
 
         var issue = IssueManager.GetIssueOfQuest(gangLeaderQuest);
-        if (issue == null || !evidence.Consume(issue, proof) || !MatchesVanillaState(gangLeaderQuest, proof))
+        if (issue == null || !evidence.TryConsume(gangLeaderQuest, proof))
         {
             return true;
         }
@@ -47,26 +47,6 @@ internal class GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy : IF
             default:
                 return false;
         }
-    }
-
-    private static bool MatchesVanillaState(Quest quest, byte proof)
-    {
-        var branch = (GangLeaderNeedsToOffloadStolenGoodsBranch)proof;
-        if (branch == GangLeaderNeedsToOffloadStolenGoodsBranch.FailByLosingHideoutBattle)
-        {
-            return quest._isFightingForGoods;
-        }
-
-        var isSuccess = branch is GangLeaderNeedsToOffloadStolenGoodsBranch.SuccessByKeepingGoods or
-            GangLeaderNeedsToOffloadStolenGoodsBranch.SuccessByGivingGoodsBack;
-        if (quest._isPayingForGoods != isSuccess)
-        {
-            return false;
-        }
-
-        // Vanilla does not clear _playerHasTheGoods when the player gives the goods back,
-        // so that field cannot distinguish the keeping and giving branches.
-        return true;
     }
 
 }

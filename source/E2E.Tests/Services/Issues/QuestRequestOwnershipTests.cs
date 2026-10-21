@@ -9,6 +9,11 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using Xunit.Abstractions;
+using System.Runtime.CompilerServices;
+using E2E.Tests.Environment.Instance;
+using Quest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace E2E.Tests.Services.Issues;
 
@@ -18,7 +23,6 @@ public class QuestRequestOwnershipTests : IDisposable
 
     private readonly StubIssueQuestGenerator quests = new();
     private readonly StubIssuePreconditions preconditions = new(QuestScenario.IssueType);
-    private readonly MethodCallRecorder branches;
     private readonly MethodCallRecorder consequences;
     private readonly QuestScenario scenario;
 
@@ -28,17 +32,13 @@ public class QuestRequestOwnershipTests : IDisposable
     {
         TestEnvironment = new E2ETestEnvironment(output);
         scenario = new QuestScenario(TestEnvironment);
-        branches = new MethodCallRecorder(AccessTools.Method(
-            typeof(GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy),
-            nameof(GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy.TryRunBranch)));
-        consequences = new MethodCallRecorder(AccessTools.Method(
+        consequences = new MethodCallRecorder(Priority.Last, AccessTools.Method(
             typeof(TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest),
-            "SucceedQuestByPayingAndKeepingTheGoods"));
+            nameof(TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest.SucceedQuestByPayingAndKeepingTheGoods)));
     }
 
     public void Dispose()
     {
-        branches.Dispose();
         consequences.Dispose();
         TestEnvironment.Dispose();
         quests.Dispose();
@@ -117,21 +117,69 @@ public class QuestRequestOwnershipTests : IDisposable
     }
 
     [Fact]
-    public void ABranchRequestFromTheOwnerReachesTheServerProofStrategy()
+    public void ABranchRequestForARealQuestBeforeGoodsAcquisitionIsRejected()
     {
         scenario.Accept(scenario.ClientA);
-        var quest = scenario.QuestOf(scenario.ClientA);
+        var quest = AttachRealQuest(scenario.ClientA);
+        AttachRealQuest(scenario.Server);
 
         scenario.ClientA.Call(() =>
         {
-            scenario.ClientA.Resolve<GangLeaderBranchEvidence>().Record(quest, Branch);
             scenario.ClientA.Resolve<IMessageBroker>().Publish(this, new QuestBranchRequested(quest, Branch));
         });
 
         Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestBranch>());
-        Assert.Equal(1, branches.CountFor(scenario.Server));
         Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(0, consequences.CountFor(scenario.Server));
+    }
+
+    private Quest AttachRealQuest(EnvironmentInstance instance)
+    {
+        Quest quest = null!;
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+            quest = (Quest)RuntimeHelpers.GetUninitializedObject(typeof(Quest));
+            quest.QuestGiver = giver;
+            using (new AllowedThread()) giver.Issue.IssueQuest = quest;
+        });
+        return quest;
+    }
+
+    [Fact]
+    public void ServerValidatedPurchase_AllowsOneRealQuestBranchAndChargesOnce()
+    {
+        scenario.Accept(scenario.ClientA);
+        var clientQuest = AttachRealQuest(scenario.ClientA);
+        var serverQuest = AttachRealQuest(scenario.Server);
+        var hideoutId = TestEnvironment.CreateRegisteredObject<Settlement>();
+        scenario.Server.Call(() =>
+        {
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Settlement>(hideoutId, out var hideout));
+            AccessTools.Field(typeof(Quest), nameof(Quest._questHideout)).SetValue(serverQuest, hideout);
+            AccessTools.Field(typeof(Quest), nameof(Quest._stolenTradeGoodPrice)).SetValue(serverQuest, 100);
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var party));
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var hero));
+            using (new AllowedThread())
+            {
+                party.CurrentSettlement = hideout;
+                hero.ChangeHeroGold(1000 - hero.Gold);
+            }
+        });
+
+        scenario.ClientA.Call(() => scenario.ClientA.Resolve<IGangLeaderGoodsService>().Purchase(clientQuest));
+        scenario.ClientA.Call(() => scenario.ClientA.Resolve<IGangLeaderGoodsService>().Purchase(clientQuest));
+        scenario.Server.Call(() =>
+        {
+            Assert.True(serverQuest._isPayingForGoods);
+            Assert.True(serverQuest._playerHasTheGoods);
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var hero));
+            Assert.Equal(900, hero.Gold);
+        });
+
+        scenario.ClientA.Call(() => clientQuest.SucceedQuestByPayingAndKeepingTheGoods());
+        scenario.ClientA.Call(() => clientQuest.SucceedQuestByPayingAndKeepingTheGoods());
+        Assert.Equal(1, consequences.CountFor(scenario.Server));
     }
 
     [Fact]
@@ -143,7 +191,6 @@ public class QuestRequestOwnershipTests : IDisposable
         scenario.ClientA.Call(() =>
             scenario.ClientA.Resolve<IMessageBroker>().Publish(this, new QuestBranchRequested(quest, Branch)));
 
-        Assert.Equal(1, branches.CountFor(scenario.Server));
         Assert.Equal(0, consequences.CountFor(scenario.Server));
         Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
@@ -157,7 +204,6 @@ public class QuestRequestOwnershipTests : IDisposable
         scenario.ClientB.Call(() => scenario.ClientB.Resolve<IMessageBroker>().Publish(this, new QuestBranchRequested(foreignQuest, Branch)));
 
         Assert.Single(scenario.ClientB.NetworkSentMessages.GetMessages<RequestQuestBranch>());
-        Assert.Equal(0, branches.CountFor(scenario.Server));
         Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
     }

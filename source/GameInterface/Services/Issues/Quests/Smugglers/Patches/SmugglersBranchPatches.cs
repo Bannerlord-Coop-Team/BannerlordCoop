@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
 using Quest = TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior.SmugglersIssueQuest;
 
@@ -22,7 +23,7 @@ internal class SmugglersBranchPatches
         return false;
     }
 
-    [HarmonyPatch(typeof(Quest), nameof(Quest.GetPersuasionTask))]
+    [HarmonyPatch(typeof(Quest), nameof(Quest.persuasion_start_with_smugglers_on_consequence))]
     [HarmonyPostfix]
     private static void PersuasionStarted(Quest __instance)
     {
@@ -36,6 +37,22 @@ internal class SmugglersBranchPatches
     [HarmonyPrefix]
     private static bool SuccessByPersuasionPrefix(Quest __instance) =>
         BeforeBranch(__instance, SmugglersBranch.SuccessByPersuasion);
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.persuasion_complete_with_smugglers_on_consequence))]
+    [HarmonyPrefix]
+    private static bool CompletePersuasion(Quest __instance)
+    {
+        if (ModInformation.IsServer)
+        {
+            return true;
+        }
+
+        // Send success before conversation cleanup invalidates the session.
+        __instance.SucceedQuest(null);
+        PlayerEncounter.LeaveEncounter = true;
+        ConversationManager.EndPersuasion();
+        return false;
+    }
 
     private static bool BeforeBranch(Quest quest, SmugglersBranch branch)
     {

@@ -10,7 +10,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Players;
 using GameInterface.Services.MapEvents;
-using GameInterface.Services.Players.Messages;
+using GameInterface.Services.MapEvents.Messages.Conversation;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -32,7 +32,7 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
     private readonly ConversationPartyTracker partyTracker;
-    private readonly Dictionary<SessionKey, string> sessions = new();
+    private readonly Dictionary<SessionKey, (string Target, NetPeer Peer)> sessions = new();
 
     public PersuasionSessionService(
         IMessageBroker messageBroker,
@@ -50,17 +50,17 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
         this.partyTracker = partyTracker;
 
         messageBroker.Subscribe<PersuasionStarted>(HandleStarted);
-        messageBroker.Subscribe<NetworkIssueFinalized>(HandleFinalized);
+        messageBroker.Subscribe<NetworkConversationEnded>(HandleConversationEnded);
         messageBroker.Subscribe<IssueOutcomeObserved>(HandleOutcomeObserved);
-        messageBroker.Subscribe<NetworkPlayerRemoved>(HandlePlayerRemoved);
+        messageBroker.Subscribe<PlayerDisconnected>(HandlePlayerRemoved);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<PersuasionStarted>(HandleStarted);
-        messageBroker.Unsubscribe<NetworkIssueFinalized>(HandleFinalized);
+        messageBroker.Unsubscribe<NetworkConversationEnded>(HandleConversationEnded);
         messageBroker.Unsubscribe<IssueOutcomeObserved>(HandleOutcomeObserved);
-        messageBroker.Unsubscribe<NetworkPlayerRemoved>(HandlePlayerRemoved);
+        messageBroker.Unsubscribe<PlayerDisconnected>(HandlePlayerRemoved);
     }
 
     public void Start(QuestBase quest, object target)
@@ -78,7 +78,7 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
             return;
         }
 
-        network.SendAll(new PersuasionStarted(ownerId, issue.StringId, issue.StringId, targetId));
+        network.SendAll(new PersuasionStarted(ownerId, issue.StringId, quest.StringId, targetId));
     }
 
     public bool TryConsume(QuestBase quest, object target)
@@ -98,9 +98,9 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
             return false;
         }
 
-        var key = new SessionKey(ownerId, issue.StringId, issue.StringId, heroId);
+        var key = new SessionKey(ownerId, issue.StringId, quest.StringId, heroId);
         if (!sessions.TryGetValue(key, out var sessionTarget) ||
-            !objectManager.TryGetId(target, out var targetId) || sessionTarget != targetId ||
+            !objectManager.TryGetId(target, out var targetId) || sessionTarget.Target != targetId ||
             !sessions.Remove(key))
         {
             Logger.Warning("Rejected persuasion success for {issue}: no live session", issue.StringId);
@@ -127,7 +127,7 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
             MobileParty targetParty = null;
             if (!TryResolveIssue(data.IssueOwnerId, data.IssueId, out issue) ||
                 !issue.IsSolvingWithQuest ||
-                data.Generation != issue.StringId ||
+                issue.IssueQuest == null || !issue.IssueQuest.IsOngoing || data.Generation != issue.IssueQuest.StringId ||
                 !ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out owner) || owner != player.ControllerId ||
                 !objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out hero) ||
                 !objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out party) ||
@@ -145,38 +145,44 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
                 return;
             }
 
-            sessions.Add(key, data.TargetId);
+            sessions.Add(key, (data.TargetId, peer));
         }, context: nameof(PersuasionSessionService));
     }
 
-    private void HandleFinalized(MessagePayload<NetworkIssueFinalized> payload)
+    private void HandleConversationEnded(MessagePayload<NetworkConversationEnded> payload)
     {
-        var data = payload.What;
-        GameThread.RunSafe(() => ClearIssue(data.IssueOwnerId, data.IssueId), context: nameof(PersuasionSessionService));
+        if (payload.Who is NetPeer peer)
+        {
+            GameThread.RunSafe(() => ClearPeer(peer), context: nameof(PersuasionSessionService));
+        }
     }
 
-    private void HandlePlayerRemoved(MessagePayload<NetworkPlayerRemoved> payload)
+    private void HandlePlayerRemoved(MessagePayload<PlayerDisconnected> payload)
     {
-        var heroId = payload.What.HeroId;
-        GameThread.RunSafe(() => ClearHero(heroId), context: nameof(PersuasionSessionService));
+        var peer = payload.What.PlayerId;
+        GameThread.RunSafe(() => ClearPeer(peer), context: nameof(PersuasionSessionService));
     }
 
+    private void ClearPeer(NetPeer peer)
+    {
+        foreach (var key in new List<SessionKey>(sessions.Keys))
+        {
+            if (sessions[key].Peer == peer) sessions.Remove(key);
+        }
+    }
     private void HandleOutcomeObserved(MessagePayload<IssueOutcomeObserved> payload)
     {
-        if (!objectManager.TryGetId(payload.What.Issue.IssueOwner, out var ownerId)) return;
-        GameThread.RunSafe(() => ClearIssue(ownerId, payload.What.Issue.StringId), context: nameof(PersuasionSessionService));
+        var issue = payload.What.Issue;
+        GameThread.RunSafe(() =>
+        {
+            if (objectManager.TryGetId(issue.IssueOwner, out var ownerId)) ClearIssue(ownerId, issue.StringId);
+        }, context: nameof(PersuasionSessionService));
     }
 
     private void ClearIssue(string ownerId, string issueId)
     {
         foreach (var key in new List<SessionKey>(sessions.Keys))
             if (key.IssueOwnerId == ownerId && key.IssueId == issueId) sessions.Remove(key);
-    }
-
-    private void ClearHero(string heroId)
-    {
-        foreach (var key in new List<SessionKey>(sessions.Keys))
-            if (key.OwnerHeroId == heroId) sessions.Remove(key);
     }
 
     private bool TryGetTargetParty(string targetId, out MobileParty party)
@@ -232,6 +238,6 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
             Generation == other.Generation && OwnerHeroId == other.OwnerHeroId;
 
         public override bool Equals(object obj) => obj is SessionKey other && Equals(other);
-        public override int GetHashCode() => ((IssueOwnerId?.GetHashCode() ?? 0) * 397) ^ (IssueId?.GetHashCode() ?? 0) ^ (Generation?.GetHashCode() ?? 0) ^ (OwnerHeroId?.GetHashCode() ?? 0);
+        public override int GetHashCode() => ((((IssueOwnerId?.GetHashCode() ?? 0) * 397) ^ (IssueId?.GetHashCode() ?? 0)) * 397) ^ ((Generation?.GetHashCode() ?? 0) * 31) ^ (OwnerHeroId?.GetHashCode() ?? 0);
     }
 }
