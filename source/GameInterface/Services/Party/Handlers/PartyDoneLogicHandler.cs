@@ -302,7 +302,7 @@ internal class PartyDoneLogicHandler : IHandler
             if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
             {
                 if ((!string.IsNullOrEmpty(message.IssueId) &&
-                    !commitments.CanApply(message.MainHeroId, message.IssueOwnerId, message.IssueId, message.LeftMemberRosterData)) ||
+                    !commitments.CanApply(requester, message.IssueOwnerId, message.IssueId, message.LeftMemberRosterData)) ||
                     !troopRosterInterface.TryApplyTroopRosterDeltas(rosterDeltas))
                 {
                     logger.Warning(

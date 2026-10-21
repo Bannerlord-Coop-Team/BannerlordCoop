@@ -585,7 +585,7 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Fact]
-    public void CommittedSelectionsAllowReturningWoundedTroopsWithXp()
+    public void CommittedSelectionsAllowReturningWoundedTroopsWithXpUsingCanonicalPlayerIdentity()
     {
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
         Server.Call(() =>
@@ -599,17 +599,18 @@ public class MerchantOutlawsTests : IDisposable
             var selected = TroopRoster.CreateDummyTroopRoster();
             selected.AddToCounts(troop, 10, woundedCount: 2, xpChange: 100);
             var commit = rosters.PackTroopRosterDelta(selected, empty);
-            Assert.True(commitments.CanApply(scenario.PlayerA.HeroId, scenario.NotableId, "return_test", commit));
+            Assert.True(commitments.CanApply(ClientA.NetPeer, scenario.NotableId, "return_test", commit));
             broker.Publish(this, new GameInterface.Services.Party.Messages.PartyDoneLogicApplied(
                 ClientA.NetPeer, PartyScreenHelper.PartyScreenMode.QuestTroopManage, commit,
-                scenario.PlayerA.HeroId, scenario.NotableId, "return_test"));
+                "client_registry_alias", scenario.NotableId, "return_test"));
             var reduced = TroopRoster.CreateDummyTroopRoster();
             reduced.AddToCounts(troop, 8, woundedCount: 1, xpChange: 70);
             var returned = rosters.PackTroopRosterDelta(reduced, selected);
-            Assert.True(commitments.CanApply(scenario.PlayerA.HeroId, scenario.NotableId, "return_test", returned));
+            Assert.True(commitments.CanApply(ClientA.NetPeer, scenario.NotableId, "return_test", returned));
+            Assert.False(commitments.CanApply(ClientB.NetPeer, scenario.NotableId, "return_test", returned));
             broker.Publish(this, new GameInterface.Services.Party.Messages.PartyDoneLogicApplied(
                 ClientA.NetPeer, PartyScreenHelper.PartyScreenMode.QuestTroopManage, returned,
-                scenario.PlayerA.HeroId, scenario.NotableId, "return_test"));
+                "client_registry_alias", scenario.NotableId, "return_test"));
             var remaining = Assert.Single(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "return_test", null));
             Assert.Equal(8, remaining.Number);
             Assert.Equal(1, remaining.WoundedNumber);

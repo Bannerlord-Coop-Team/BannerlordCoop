@@ -42,9 +42,10 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
         broker.Unsubscribe<PlayerDisconnected>(Handle_Disconnected);
     }
 
-    public bool CanApply(string heroId, string issueOwnerId, string issueId, TroopRosterData delta)
+    public bool CanApply(NetPeer requester, string issueOwnerId, string issueId, TroopRosterData delta)
     {
-        selections.TryGetValue((heroId, issueOwnerId, issueId), out var selection);
+        if (requester == null || !players.TryGetPlayer(requester, out var player)) return false;
+        selections.TryGetValue((player.HeroId, issueOwnerId, issueId), out var selection);
         foreach (var element in rosters.UnpackTroopRosterData(delta))
         {
             if (element.Character.IsHero) continue;
