@@ -1222,10 +1222,11 @@ public partial class SiegeMachineStateReplicator : ISiegeMachineStateReplicator
         lastSentLadderAnimations.Remove(machineId);
     }
 
+    // Publishes the claim map to the registry, split into this client's claims and everyone else's.
     private void PushClaimsToRegistry()
     {
-        var locallyClaimed = new HashSet<int>();
-        var remotelyClaimed = new HashSet<int>();
+        var locallyClaimed = new List<int>();
+        var remotelyClaimed = new List<int>();
         foreach (var claim in claimedMachines)
         {
             if (claim.Value == session.OwnControllerId && !pendingStoneHandoffs.ContainsKey(claim.Key))

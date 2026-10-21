@@ -1,15 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 
 namespace GameInterface.Services.MapEvents;
 
-/// <summary>
-/// Per-client siege machine authority: whether this client is the mission host and which machines it
-/// simulates. The battle controller writes it on the game thread; the siege patches read it.
-/// </summary>
-/// <remarks>
-/// The mission host is the default authority for the shared siege scenery (engine placement and the
-/// machines themselves), and a client manning a machine can claim its simulation (see SiegeMachineStateReplicator).
-/// </remarks>
+/// <summary>Per-client siege authority: the mission-host flag (written by CoopBattleController) and per-machine
+/// claims and aims (written by SiegeMachineStateReplicator), read by the siege patches.</summary>
 public interface ISiegeMachineAuthorityRegistry
 {
     /// <summary>This client is the mission host. Read on the parallel tick threads (SiegeWeapon.TickAux).</summary>
@@ -23,8 +18,8 @@ public interface ISiegeMachineAuthorityRegistry
     /// everything except the machines claimed by a client interacting with them.</summary>
     bool IsMachineSimulatedLocally(int machineId);
 
-    /// <summary>[Game thread] Replaces the claim sets; the sets must not be mutated after this call.</summary>
-    void SetClaimedMachines(HashSet<int> locallyClaimed, HashSet<int> remotelyClaimed);
+    /// <summary>[Game thread] Replaces the machines claimed by this client and by other clients.</summary>
+    void SetClaimedMachines(IEnumerable<int> locallyClaimed, IEnumerable<int> remotelyClaimed);
 
     /// <summary>[Game thread] Drops every machine claim and received aim target.</summary>
     void ResetClaimedMachines();
@@ -78,16 +73,16 @@ public class SiegeMachineAuthorityRegistry : ISiegeMachineAuthorityRegistry
     }
 
     /// <inheritdoc/>
-    public void SetClaimedMachines(HashSet<int> locallyClaimed, HashSet<int> remotelyClaimed)
+    public void SetClaimedMachines(IEnumerable<int> locallyClaimed, IEnumerable<int> remotelyClaimed)
     {
-        locallyClaimedMachines = locallyClaimed;
-        remotelyClaimedMachines = remotelyClaimed;
+        locallyClaimedMachines = new HashSet<int>(locallyClaimed);
+        remotelyClaimedMachines = new HashSet<int>(remotelyClaimed);
     }
 
     /// <inheritdoc/>
     public void ResetClaimedMachines()
     {
-        SetClaimedMachines(new HashSet<int>(), new HashSet<int>());
+        SetClaimedMachines(Array.Empty<int>(), Array.Empty<int>());
         remoteAims.Clear();
     }
 
