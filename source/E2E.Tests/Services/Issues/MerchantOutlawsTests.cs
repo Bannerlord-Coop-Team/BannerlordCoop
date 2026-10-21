@@ -699,14 +699,45 @@ public class MerchantOutlawsTests : IDisposable
                     }
                 });
             }
+            Server.Call(() =>
+            {
+                var party = Get<MobileParty>(Server, scenario.PlayerB.MobilePartyId);
+                party.MemberRoster.AddToCounts(Get<Hero>(Server, otherCompanionId).CharacterObject, 1);
+                party.MemberRoster.AddToCounts(Get<CharacterObject>(Server, troopId), sent + 5);
+            });
+            environment.FlushCoalescer();
             ClientB.Call(() =>
             {
                 var issue = Get<Hero>(ClientB, scenario.NotableId).Issue;
+                var party = Get<MobileParty>(ClientB, scenario.PlayerB.MobilePartyId);
+                var companion = Get<Hero>(ClientB, otherCompanionId).CharacterObject;
                 using (new AllowedThread())
                 {
-                    issue.AlternativeSolutionSentTroops.AddToCounts(Get<Hero>(ClientB, otherCompanionId).CharacterObject, 1);
-                    issue.AlternativeSolutionSentTroops.AddToCounts(Get<CharacterObject>(ClientB, troopId), sent);
+                    party.MemberRoster.AddToCounts(companion, -1);
+                    issue.AlternativeSolutionSentTroops.AddToCounts(companion, 1);
                 }
+                var logic = new PartyScreenLogic();
+                logic.Initialize(new PartyScreenLogicInitializationData
+                {
+                    LeftMemberRoster = issue.AlternativeSolutionSentTroops,
+                    RightMemberRoster = party.MemberRoster,
+                    LeftPrisonerRoster = TroopRoster.CreateDummyTroopRoster(),
+                    RightPrisonerRoster = party.PrisonRoster,
+                    RightOwnerParty = party.Party,
+                    RightLeaderHero = Get<Hero>(ClientB, scenario.PlayerB.HeroId),
+                    PartyPresentationDoneButtonDelegate = PartyScreenHelper.ManageTroopsAndPrisonersDoneHandler,
+                });
+                logic._partyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+                var transfer = new PartyScreenLogic.PartyCommand();
+                transfer.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right,
+                    PartyScreenLogic.TroopType.Member, Get<CharacterObject>(ClientB, troopId), sent, 0, -1);
+                using (new AllowedThread()) logic.TransferTroop(transfer, false);
+                Assert.True(logic.DoneLogic(false));
+            }, TextHelpers);
+            environment.FlushCoalescer();
+            ClientB.Call(() =>
+            {
+                var issue = Get<Hero>(ClientB, scenario.NotableId).Issue;
                 issue.StartIssueWithAlternativeSolution();
             }, TextHelpers);
             Assert.Equal(QuestScenario.ControllerB, scenario.OwnerOnServer());
