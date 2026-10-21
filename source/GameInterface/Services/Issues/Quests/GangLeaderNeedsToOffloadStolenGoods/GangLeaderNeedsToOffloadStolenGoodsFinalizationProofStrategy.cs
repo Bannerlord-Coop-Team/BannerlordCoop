@@ -7,11 +7,11 @@ namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsToOffloadStolenGoo
 
 internal class GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy : IFinalizationProofStrategy
 {
-    private readonly IGangLeaderGoodsService evidence;
+    private readonly IGangLeaderGoodsService goods;
 
-    public GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy(IGangLeaderGoodsService evidence)
+    public GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy(IGangLeaderGoodsService goods)
     {
-        this.evidence = evidence;
+        this.goods = goods;
     }
 
     public bool TryRunBranch(QuestBase quest, byte proof)
@@ -22,7 +22,7 @@ internal class GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy : IF
         }
 
         var issue = IssueManager.GetIssueOfQuest(gangLeaderQuest);
-        if (issue == null || !evidence.TryConsume(gangLeaderQuest, proof))
+        if (issue == null || !goods.TryConsume(gangLeaderQuest, proof))
         {
             return true;
         }
@@ -40,9 +40,6 @@ internal class GangLeaderNeedsToOffloadStolenGoodsFinalizationProofStrategy : IF
                 return true;
             case GangLeaderNeedsToOffloadStolenGoodsBranch.BetrayalByGivingGoodsBack:
                 gangLeaderQuest.FailQuestByGivingBackTheGoods();
-                return true;
-            case GangLeaderNeedsToOffloadStolenGoodsBranch.FailByLosingHideoutBattle:
-                gangLeaderQuest.FailQuestByLosingHideoutBattle();
                 return true;
             default:
                 return false;

@@ -18,6 +18,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
 using GameInterface.Services.Entity;
 using SandBox.GauntletUI.Map;
+using GameInterface.Services.MapEvents.Messages.Conversation;
 
 namespace E2E.Tests.Services.Issues;
 
@@ -151,9 +152,10 @@ public class QuestRequestOwnershipTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ServerValidatedPurchase_AllowsOneRealQuestBranchAndChargesOnce(bool giveBack)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void ServerValidatedPurchase_AllowsOneRealQuestBranchAndChargesOnce(bool giveBack, bool ended)
     {
         scenario.Accept(scenario.ClientA);
         var clientQuest = AttachRealQuest(scenario.ClientA);
@@ -181,7 +183,13 @@ public class QuestRequestOwnershipTests : IDisposable
             Assert.True(serverQuest._playerHasTheGoods);
             Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var hero));
             Assert.Equal(900, hero.Gold);
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var party));
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Settlement>(hideoutId, out var hideout));
+            using (new MainHeroSubstitutionScope(hero, party))
+                scenario.Server.Resolve<IGangLeaderGoodsService>().LeaveHideout(serverQuest, party, hideout);
         });
+
+        if (ended) scenario.Server.SimulateMessage(scenario.ClientA.NetPeer, new NetworkConversationEnded());
 
         scenario.ClientA.Call(() =>
         {
@@ -193,7 +201,7 @@ public class QuestRequestOwnershipTests : IDisposable
             if (giveBack) clientQuest.SucceedQuestByPayingAndGivingTheGoodsBack();
             else clientQuest.SucceedQuestByPayingAndKeepingTheGoods();
         });
-        Assert.Equal(1, consequences.CountFor(scenario.Server));
+        Assert.Equal(ended ? 0 : 1, consequences.CountFor(scenario.Server));
     }
 
     [Theory]
@@ -235,6 +243,7 @@ public class QuestRequestOwnershipTests : IDisposable
                 if (!won) hero.PartyBelongedTo = null;
                 service.BattleEnded(serverQuest, battle);
                 service.BattleEnded(serverQuest, battle);
+                if (won) service.LeaveHideout(serverQuest, ownerParty, hideout);
             }
             Assert.Equal(won, serverQuest._playerHasTheGoods);
         }, new[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });

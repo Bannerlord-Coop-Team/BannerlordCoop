@@ -65,15 +65,10 @@ internal sealed class PersuasionSessionService : IPersuasionSessionService, IHan
 
     public void Start(QuestBase quest, object target)
     {
-        if (ModInformation.IsServer ||
-            !objectManager.TryGetIdWithLogging(target, out var targetId) ||
-            !objectManager.TryGetIdWithLogging(IssueManager.GetIssueOfQuest(quest)?.IssueOwner, out var ownerId))
-        {
-            return;
-        }
-
         var issue = IssueManager.GetIssueOfQuest(quest);
-        if (issue == null)
+        if (ModInformation.IsServer || issue == null ||
+            !objectManager.TryGetIdWithLogging(target, out var targetId) ||
+            !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var ownerId))
         {
             return;
         }

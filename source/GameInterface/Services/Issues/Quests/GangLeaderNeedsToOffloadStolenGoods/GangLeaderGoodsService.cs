@@ -3,6 +3,8 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Issues.Framework.Finalization;
 using Common.Network;
+using Common.Network.Messages;
+using GameInterface.Services.MapEvents.Messages.Conversation;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
@@ -17,6 +19,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Quest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest;
 
@@ -61,6 +64,7 @@ internal interface IGangLeaderGoodsService
     void Purchase(Quest quest);
     void Fight(Quest quest);
     void ObserveBattle(Quest quest, MapEvent mapEvent);
+    void LeaveHideout(Quest quest, MobileParty party, Settlement settlement);
     bool TryConsume(Quest quest, byte branch);
     void BattleEnded(Quest quest, MapEvent mapEvent);
 }
@@ -74,6 +78,7 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
     private readonly IPlayerManager players;
     private readonly IIssueOwnershipRegistry ownership;
     private readonly HashSet<Quest> consumed = new();
+    private readonly Dictionary<Quest, NetPeer> merchantConversations = new();
     private readonly Dictionary<MapEvent, Dictionary<Quest, BattleSideEnum>> participants = new();
 
     public GangLeaderGoodsService(IMessageBroker broker, INetwork network, IObjectManager objects,
@@ -86,12 +91,18 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
         this.ownership = ownership;
         broker.Subscribe<RequestGangLeaderGoodsPurchase>(HandlePurchase);
         broker.Subscribe<NetworkGangLeaderGoodsAcquired>(HandleAcquired);
+        broker.Subscribe<NetworkConversationEnded>(HandleConversationEnded);
+        broker.Subscribe<PlayerDisconnected>(HandleDisconnected);
+        broker.Subscribe<IssueOutcomeObserved>(HandleOutcome);
     }
 
     public void Dispose()
     {
         broker.Unsubscribe<RequestGangLeaderGoodsPurchase>(HandlePurchase);
         broker.Unsubscribe<NetworkGangLeaderGoodsAcquired>(HandleAcquired);
+        broker.Unsubscribe<NetworkConversationEnded>(HandleConversationEnded);
+        broker.Unsubscribe<PlayerDisconnected>(HandleDisconnected);
+        broker.Unsubscribe<IssueOutcomeObserved>(HandleOutcome);
     }
 
     public void Purchase(Quest quest) => Choose(quest, false);
@@ -154,6 +165,7 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
             quest._isFightingForGoods = data.Fight;
             quest._isPayingForGoods = !data.Fight;
             quest._playerHasTheGoods = !data.Fight;
+            if (data.Fight) quest.AddLog(quest.BeforeAttackHideoutQuestLogText);
         }, context: nameof(GangLeaderGoodsService));
     }
 
@@ -171,12 +183,53 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
             branch == GangLeaderNeedsToOffloadStolenGoodsBranch.SuccessByGivingGoodsBack;
         if (!success && branch != GangLeaderNeedsToOffloadStolenGoodsBranch.BetrayalByKeepingGoods &&
             branch != GangLeaderNeedsToOffloadStolenGoodsBranch.BetrayalByGivingGoodsBack) return false;
-        if (!quest._playerHasTheGoods || quest._isPayingForGoods != success || !consumed.Add(quest))
+        if (!quest._playerHasTheGoods || quest._isPayingForGoods != success ||
+            !merchantConversations.Remove(quest) || !consumed.Add(quest))
         {
             Logger.Warning("Rejected stolen goods branch {branch} for {quest}", branch, quest.StringId);
             return false;
         }
         return true;
+    }
+
+    public void LeaveHideout(Quest quest, MobileParty party, Settlement settlement)
+    {
+        if (ModInformation.IsClient || party != MobileParty.MainParty || settlement != quest._questHideout ||
+            !quest._playerHasTheGoods) return;
+        if (players.TryGetPlayer(Hero.MainHero, out var player) && players.TryGetPeer(player.ControllerId, out var peer))
+            merchantConversations[quest] = peer;
+    }
+
+    private void HandleConversationEnded(MessagePayload<NetworkConversationEnded> payload)
+    {
+        if (payload.Who is NetPeer peer) GameThread.RunSafe(() => ClearPeer(peer), context: nameof(GangLeaderGoodsService));
+    }
+
+    private void HandleDisconnected(MessagePayload<PlayerDisconnected> payload)
+    {
+        var peer = payload.What.PlayerId;
+        GameThread.RunSafe(() => ClearPeer(peer), context: nameof(GangLeaderGoodsService));
+    }
+
+    private void ClearPeer(NetPeer peer)
+    {
+        foreach (var quest in merchantConversations.Where(p => p.Value == peer).Select(p => p.Key).ToArray())
+            merchantConversations.Remove(quest);
+    }
+
+    private void HandleOutcome(MessagePayload<IssueOutcomeObserved> payload)
+    {
+        var owner = payload.What.Issue.IssueOwner;
+        GameThread.RunSafe(() =>
+        {
+            consumed.RemoveWhere(q => q.QuestGiver == owner);
+            foreach (var quest in merchantConversations.Keys.Where(q => q.QuestGiver == owner).ToArray()) merchantConversations.Remove(quest);
+            foreach (var battle in participants.Keys.ToArray())
+            {
+                foreach (var quest in participants[battle].Keys.Where(q => q.QuestGiver == owner).ToArray()) participants[battle].Remove(quest);
+                if (participants[battle].Count == 0) participants.Remove(battle);
+            }
+        }, context: nameof(GangLeaderGoodsService));
     }
 
     public void ObserveBattle(Quest quest, MapEvent mapEvent)

@@ -3,6 +3,8 @@ using HarmonyLib;
 using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using Quest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsToOffloadStolenGoods.Patches;
@@ -31,6 +33,15 @@ internal class GangLeaderGoodsPatches
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
     [HarmonyPostfix]
     private static void BattleStarted(MapEvent mapEvent) => Observe(mapEvent);
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementLeft))]
+    [HarmonyPostfix]
+    private static void LeftSettlement(MobileParty party, Settlement settlement)
+    {
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<IGangLeaderGoodsService>(out var service) &&
+            ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
+            dispatcher.RunAsOwners<Quest>(quest => service.LeaveHideout(quest, party, settlement));
+    }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.OnBattleWon))]
     [HarmonyPrefix]
