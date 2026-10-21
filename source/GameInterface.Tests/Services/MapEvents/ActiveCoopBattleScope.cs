@@ -6,8 +6,8 @@ using System;
 namespace GameInterface.Tests.Services.MapEvents;
 
 /// <summary>
-/// Installs a container whose coop battle registry has a battle window open, so patches invoked without an
-/// environment see a coop battle. Restores the previous container when disposed.
+/// Installs a container whose coop battle registry has a battle window open, plus the battle call-context trackers,
+/// so patches invoked without an environment see a coop battle. Restores the previous container when disposed.
 /// </summary>
 // Coop.Tests keeps its own copy, because E2E must not load Coop.Tests, whose module initializer starts a game-loop pump.
 public sealed class ActiveCoopBattleScope : IDisposable
@@ -21,6 +21,9 @@ public sealed class ActiveCoopBattleScope : IDisposable
     {
         var builder = new ContainerBuilder();
         builder.RegisterType<CoopBattleMissionRegistry>().As<ICoopBattleMissionRegistry>().SingleInstance();
+        builder.RegisterType<PuppetSpawnTracker>().As<IPuppetSpawnTracker>().SingleInstance();
+        builder.RegisterType<RoutedBlowTracker>().As<IRoutedBlowTracker>().SingleInstance();
+        builder.RegisterType<ReplicatedDeathTracker>().As<IReplicatedDeathTracker>().SingleInstance();
         container = builder.Build();
         Registry = container.Resolve<ICoopBattleMissionRegistry>();
 

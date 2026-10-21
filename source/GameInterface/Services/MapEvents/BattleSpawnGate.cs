@@ -2,15 +2,13 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
-using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents;
 
 /// <summary>
-/// Static bridge for the battle patches' remaining per-call state: puppet-spawn capture suppression, routed-blow
-/// and replicated-death context, and kill-feed bookkeeping. Whether a coop battle is active lives in
-/// <see cref="ICoopBattleMissionRegistry"/>, and agent ownership in <see cref="IBattleAgentAuthorityRegistry"/>.
+/// Static bridge for the battle patches' remaining kill-feed bookkeeping. Whether a coop battle is active lives in
+/// <see cref="ICoopBattleMissionRegistry"/>, and per-call spawn, blow and death context in the injected trackers.
 /// </summary>
 public static class BattleSpawnGate
 {
@@ -22,130 +20,10 @@ public static class BattleSpawnGate
     private static readonly List<RoutedPlayerHitNotification> RoutedPlayerHitNotifications = new List<RoutedPlayerHitNotification>();
 
     [System.ThreadStatic]
-    private static bool _suppressCapture;
-
-    [System.ThreadStatic]
-    private static Agent _replicatedDeathAgent;
-
-    [System.ThreadStatic]
-    private static Agent _replicatedDeathAffector;
-
-    [System.ThreadStatic]
-    private static KillingBlow _replicatedKillingBlow;
-
-    [System.ThreadStatic]
-    private static AgentState _replicatedDeathState;
-
-    [System.ThreadStatic]
     private static Agent _currentRoutedPlayerHitAgent;
 
     [System.ThreadStatic]
     private static int _currentRoutedPlayerHitDamage;
-
-    [System.ThreadStatic]
-    private static WeaponComponentData _routedAttackerWeapon;
-
-    [System.ThreadStatic]
-    private static string _routedBlowSourceControllerId;
-
-    /// <summary>
-    /// Set around a puppet spawn (<c>CoopBattleController.SpawnPuppet</c>) so the spawn-capture patch does NOT
-    /// re-capture and re-broadcast it — only locally owned native spawns should be captured. Thread-local: it
-    /// is set and read on the game thread within a single <c>Mission.SpawnAgent</c> call.
-    /// </summary>
-    public static bool SuppressCapture
-    {
-        get => _suppressCapture;
-        set => _suppressCapture = value;
-    }
-
-    /// <summary>Exposes the routed blow's weapon and originating peer during native damage and sound playback.</summary>
-    public static void RunWithRoutedBlow(
-        WeaponComponentData attackerWeapon, string sourceControllerId, Action applyBlow)
-    {
-        var previousWeapon = _routedAttackerWeapon;
-        string previousSource = _routedBlowSourceControllerId;
-        _routedAttackerWeapon = attackerWeapon;
-        _routedBlowSourceControllerId = sourceControllerId;
-        try
-        {
-            applyBlow();
-        }
-        finally
-        {
-            _routedAttackerWeapon = previousWeapon;
-            _routedBlowSourceControllerId = previousSource;
-        }
-    }
-
-    public static WeaponComponentData RoutedAttackerWeapon => _routedAttackerWeapon;
-    public static string RoutedBlowSourceControllerId => _routedBlowSourceControllerId;
-
-    /// <summary>Runs a replicated puppet death with the owner's kill-feed metadata available to UI patches.</summary>
-    public static void RunWithReplicatedDeath(
-        Agent affectedAgent,
-        Agent affectorAgent,
-        KillingBlow killingBlow,
-        AgentState agentState,
-        Action applyDeath)
-    {
-        var previousAgent = _replicatedDeathAgent;
-        var previousAffector = _replicatedDeathAffector;
-        var previousKillingBlow = _replicatedKillingBlow;
-        var previousAgentState = _replicatedDeathState;
-
-        _replicatedDeathAgent = affectedAgent;
-        _replicatedDeathAffector = affectorAgent;
-        _replicatedKillingBlow = killingBlow;
-        _replicatedDeathState = agentState;
-        try
-        {
-            applyDeath();
-        }
-        finally
-        {
-            _replicatedDeathAgent = previousAgent;
-            _replicatedDeathAffector = previousAffector;
-            _replicatedKillingBlow = previousKillingBlow;
-            _replicatedDeathState = previousAgentState;
-        }
-    }
-
-    public static bool IsReplicatedDeath(Agent affectedAgent)
-    {
-        return ReferenceEquals(_replicatedDeathAgent, affectedAgent);
-    }
-
-    public static bool TryGetReplicatedDeath(
-        Agent affectedAgent,
-        out Agent affectorAgent,
-        out KillingBlow killingBlow)
-    {
-        if (!IsReplicatedDeath(affectedAgent))
-        {
-            affectorAgent = null;
-            killingBlow = default;
-            return false;
-        }
-
-        affectorAgent = _replicatedDeathAffector;
-        killingBlow = _replicatedKillingBlow;
-        return true;
-    }
-
-    public static bool TryGetReplicatedDeathState(
-        Agent affectedAgent,
-        out AgentState agentState)
-    {
-        if (!IsReplicatedDeath(affectedAgent))
-        {
-            agentState = AgentState.None;
-            return false;
-        }
-
-        agentState = _replicatedDeathState;
-        return true;
-    }
 
     public static void EnqueueCombatLogContext(Agent routedPlayerHitAgent, int damage)
     {
@@ -276,7 +154,6 @@ public static class BattleSpawnGate
         }
 
         EndCombatLog();
-        _routedAttackerWeapon = null;
     }
 
     private static void RemoveExpiredRoutedPlayerHitNotifications()

@@ -24,7 +24,8 @@ internal class ReplicatedDeathKillFeedPatch
         ref KillingBlow killingBlow)
     {
         if (!BattleSpawnConfig.Enabled) return;
-        if (!BattleSpawnGate.TryGetReplicatedDeath(affectedAgent, out var replicatedAffector, out var replicatedKillingBlow)) return;
+        if (!ContainerProvider.TryResolve<IReplicatedDeathTracker>(out var replicatedDeathTracker)
+            || !replicatedDeathTracker.TryGetReplicatedDeath(affectedAgent, out var replicatedAffector, out var replicatedKillingBlow)) return;
         if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
             || !missionRegistry.IsCoopBattleActive) return;
 

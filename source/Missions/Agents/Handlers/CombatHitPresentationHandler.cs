@@ -35,17 +35,20 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly ICoopBattleMissionRegistry missionRegistry;
+    private readonly IRoutedBlowTracker routedBlowTracker;
 
     public CombatHitPresentationHandler(
         INetworkAgentRegistry agentRegistry,
         IBattleNetwork network,
         IMessageBroker messageBroker,
-        ICoopBattleMissionRegistry missionRegistry)
+        ICoopBattleMissionRegistry missionRegistry,
+        IRoutedBlowTracker routedBlowTracker)
     {
         this.agentRegistry = agentRegistry;
         this.network = network;
         this.messageBroker = messageBroker;
         this.missionRegistry = missionRegistry;
+        this.routedBlowTracker = routedBlowTracker;
 
         messageBroker.Subscribe<MeleeHitPresentation>(Handle_LocalPresentation);
         messageBroker.Subscribe<NetworkMeleeHitPresentation>(Handle_NetworkPresentation);
@@ -69,7 +72,7 @@ public class CombatHitPresentationHandler : ICombatHitPresentationHandler
             return;
         }
 
-        string excludedController = BattleSpawnGate.RoutedBlowSourceControllerId;
+        string excludedController = routedBlowTracker.SourceControllerId;
         if (excludedController == null &&
             TryResolveIdentity(sound.AlreadyPlayedBy, out Guid attackerId, out _) &&
             agentRegistry.TryGetAgentInfo(attackerId, out CoopAgentInfo attackerInfo))

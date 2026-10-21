@@ -168,7 +168,7 @@ public class AgentHitSoundTests : MissionTestEnvironment
                 call => call.Mission == missions[2].Shell && call.AttackerIndex == -1 && call.VictimIndex == -1);
             Assert.True(AgentMirror.TryGet(victims[0], out var victimMirror));
             Assert.Equal(99f, victimMirror.Health);
-            Assert.Null(BattleSpawnGate.RoutedBlowSourceControllerId);
+            Assert.Null(clients[1].Resolve<IRoutedBlowTracker>().SourceControllerId);
         }
         finally
         {
@@ -225,7 +225,7 @@ public class AgentHitSoundTests : MissionTestEnvironment
             Assert.True(registry.TryRegisterAgent("victim-owner", Guid.NewGuid(), victim));
             var network = new Moq.Mock<IBattleNetwork>();
             using var handler = new CombatHitPresentationHandler(registry, network.Object, client.Resolve<IMessageBroker>(),
-                client.Resolve<ICoopBattleMissionRegistry>());
+                client.Resolve<ICoopBattleMissionRegistry>(), client.Resolve<IRoutedBlowTracker>());
 
             client.Resolve<IMessageBroker>().Publish(this,
                 new AgentHitSound(victim, attacker, null, 123, new Vec3(1f, 2f, 3f), 0.5f));

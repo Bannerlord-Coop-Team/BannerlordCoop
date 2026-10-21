@@ -119,7 +119,10 @@ public class CoopBattleController : CoopMissionController
         IMissionWeaponDataMapper missionWeaponDataMapper,
         ISiegeGateHitApplier siegeGateHitApplier,
         ICoopBattleMissionRegistry missionRegistry,
-        IBattleAgentAuthorityRegistry agentAuthorityRegistry)
+        IBattleAgentAuthorityRegistry agentAuthorityRegistry,
+        IPuppetSpawnTracker puppetSpawnTracker,
+        IRoutedBlowTracker routedBlowTracker,
+        IReplicatedDeathTracker replicatedDeathTracker)
         : base(
             network,
             messageBroker,
@@ -146,14 +149,15 @@ public class CoopBattleController : CoopMissionController
             missionContext,
             missionRegistry);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, coopMissionComponent, session,
-            casualties, missionRegistry);
+            casualties, missionRegistry, replicatedDeathTracker);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties, lifecycle);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         puppetDeathApplier = new PuppetDeathApplier(
             messageBroker,
             coopMissionComponent,
             casualties,
-            puppetMountStateRepairer);
+            puppetMountStateRepairer,
+            replicatedDeathTracker);
         damageRouter = new BattleDamageRouter(
             network,
             messageBroker,
@@ -162,7 +166,8 @@ public class CoopBattleController : CoopMissionController
             guardedHitWindow,
             agentNativeMountState,
             puppetMountStateRepairer,
-            battleDamageDataMapper);
+            battleDamageDataMapper,
+            routedBlowTracker);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         OwnedAgentReplicator ownedAgentReplicator = null;
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder, lifecycle,
@@ -190,6 +195,7 @@ public class CoopBattleController : CoopMissionController
             formationAssigner,
             agentBudget,
             missionWeaponDataMapper,
+            puppetSpawnTracker,
             puppetRoutApplier,
             spawnBatchCodec,
             authorityMigrator);

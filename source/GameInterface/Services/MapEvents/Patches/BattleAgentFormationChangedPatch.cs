@@ -17,7 +17,9 @@ internal class BattleAgentFormationChangedPatch
     [HarmonyPostfix]
     private static void Postfix(Agent __instance, Formation __state)
     {
-        if (!BattleSpawnConfig.Enabled || BattleSpawnGate.SuppressCapture || __state == __instance.Formation) return;
+        if (!BattleSpawnConfig.Enabled || __state == __instance.Formation) return;
+        if (!ContainerProvider.TryResolve<IPuppetSpawnTracker>(out var puppetSpawnTracker)
+            || puppetSpawnTracker.IsSpawningPuppet) return;
         if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
             || !missionRegistry.IsCoopBattleActive) return;
 

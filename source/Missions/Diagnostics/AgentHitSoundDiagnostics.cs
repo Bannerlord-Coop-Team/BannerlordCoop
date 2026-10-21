@@ -73,6 +73,7 @@ internal static class AgentHitSoundDiagnostics
             return;
 
         Agent attacker = blow.OwnerId < 0 ? null : mission.FindAgentWithIndex(blow.OwnerId);
+        ContainerProvider.TryResolve<IRoutedBlowTracker>(out var routedBlowTracker);
         Add(new
         {
             kind = "registerBlow",
@@ -80,7 +81,7 @@ internal static class AgentHitSoundDiagnostics
             attackerId = AgentId(registry, attacker),
             victimIndex = victim.Index,
             attackerIndex = blow.OwnerId,
-            sourceControllerId = BattleSpawnGate.RoutedBlowSourceControllerId,
+            sourceControllerId = routedBlowTracker?.SourceControllerId,
             damage = blow.InflictedDamage,
             blockedWithShield = collisionData.AttackBlockedWithShield,
             missile = blow.IsMissile,

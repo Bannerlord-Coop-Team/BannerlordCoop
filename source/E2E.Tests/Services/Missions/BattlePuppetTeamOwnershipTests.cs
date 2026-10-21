@@ -106,7 +106,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                     deployment.Object,
                     Mock.Of<IAgentFormationAssigner>(),
                     new BattleAgentBudget(),
-                    client.Resolve<IMissionWeaponDataMapper>());
+                    client.Resolve<IMissionWeaponDataMapper>(),
+                    client.Resolve<IPuppetSpawnTracker>());
             });
 
             GameThread.Instance.MarkGameThread();
@@ -282,7 +283,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                 deployment.Object,
                 Mock.Of<IAgentFormationAssigner>(),
                 new BattleAgentBudget(),
-                client.Resolve<IMissionWeaponDataMapper>());
+                client.Resolve<IMissionWeaponDataMapper>(),
+                client.Resolve<IPuppetSpawnTracker>());
 
             var equipment = new Equipment();
             var missionEquipment = new MissionEquipmentData(new());
@@ -360,7 +362,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                     deployment.Object,
                     Mock.Of<IAgentFormationAssigner>(),
                     new BattleAgentBudget(),
-                    client.Resolve<IMissionWeaponDataMapper>());
+                    client.Resolve<IMissionWeaponDataMapper>(),
+                    client.Resolve<IPuppetSpawnTracker>());
 
                 var record = new BattleAgentSpawnData(
                     agentId, characterId, default, BattleSideEnum.Attacker, 100f,
@@ -425,6 +428,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                 Mock.Of<IAgentFormationAssigner>(),
                 new BattleAgentBudget(),
                 client.Resolve<IMissionWeaponDataMapper>(),
+                client.Resolve<IPuppetSpawnTracker>(),
                 applier);
 
             var record = new BattleAgentSpawnData(

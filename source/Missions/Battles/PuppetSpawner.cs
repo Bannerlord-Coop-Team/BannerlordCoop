@@ -52,6 +52,7 @@ public class PuppetSpawner : IPuppetSpawner
     private readonly IAgentFormationAssigner formationAssigner;
     private readonly IBattleAgentBudget agentBudget;
     private readonly IMissionWeaponDataMapper missionWeaponDataMapper;
+    private readonly IPuppetSpawnTracker puppetSpawnTracker;
     private readonly IBattleAgentSpawnBatchCodec spawnBatchCodec;
     private readonly IPuppetRoutApplier puppetRoutApplier;
     private readonly IBattleAuthorityMigrator authorityMigrator;
@@ -83,6 +84,7 @@ public class PuppetSpawner : IPuppetSpawner
         IAgentFormationAssigner formationAssigner,
         IBattleAgentBudget agentBudget,
         IMissionWeaponDataMapper missionWeaponDataMapper,
+        IPuppetSpawnTracker puppetSpawnTracker,
         IPuppetRoutApplier puppetRoutApplier = null,
         IBattleAgentSpawnBatchCodec spawnBatchCodec = null,
         IBattleAuthorityMigrator authorityMigrator = null)
@@ -97,6 +99,7 @@ public class PuppetSpawner : IPuppetSpawner
         this.formationAssigner = formationAssigner;
         this.agentBudget = agentBudget;
         this.missionWeaponDataMapper = missionWeaponDataMapper;
+        this.puppetSpawnTracker = puppetSpawnTracker;
         this.spawnBatchCodec = spawnBatchCodec ?? new BattleAgentSpawnBatchCodec();
         this.puppetRoutApplier = puppetRoutApplier;
         this.authorityMigrator = authorityMigrator;
@@ -458,17 +461,10 @@ public class PuppetSpawner : IPuppetSpawner
         // Suppress capture for the duration of this spawn: a puppet is another owner's troop replicated to us,
         // not ours, so BattleAgentSpawnedPatch must not re-capture and re-broadcast it.
         Agent agent;
-        BattleSpawnGate.SuppressCapture = true;
-        try
+        using (puppetSpawnTracker.BeginPuppetSpawn())
+        using (new TransientEquipmentSyncScope())
         {
-            using (new TransientEquipmentSyncScope())
-            {
-                agent = Mission.Current.SpawnAgent(buildData);
-            }
-        }
-        finally
-        {
-            BattleSpawnGate.SuppressCapture = false;
+            agent = Mission.Current.SpawnAgent(buildData);
         }
         agent.FadeIn();
         if (data.Health > 0) agent.Health = data.Health;

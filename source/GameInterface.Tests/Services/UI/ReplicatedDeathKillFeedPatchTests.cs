@@ -1,5 +1,6 @@
 ﻿using System;
 using Common.Util;
+using GameInterface;
 using GameInterface.Services.MapEvents;
 using GameInterface.Tests.Services.MapEvents;
 using GameInterface.Services.UI.Patches;
@@ -33,8 +34,9 @@ public class ReplicatedDeathKillFeedPatchTests : IDisposable
             VictimBodyPart = BoneBodyPartType.Head,
         };
         var expectedKillingBlow = new KillingBlow(blow, Vec3.Zero, Vec3.Zero, 123, 0);
+        Assert.True(ContainerProvider.TryResolve<IReplicatedDeathTracker>(out var replicatedDeathTracker));
 
-        BattleSpawnGate.RunWithReplicatedDeath(affectedAgent, affectorAgent, expectedKillingBlow, AgentState.Killed, () =>
+        using (replicatedDeathTracker.BeginReplicatedDeath(affectedAgent, affectorAgent, expectedKillingBlow, AgentState.Killed))
         {
             Agent actualAffector = null!;
             KillingBlow actualKillingBlow = default;
@@ -50,9 +52,9 @@ public class ReplicatedDeathKillFeedPatchTests : IDisposable
             ReplicatedDeathKillFeedPatch.Prefix(otherAgent, ref actualAffector, ref actualKillingBlow);
             Assert.Null(actualAffector);
             Assert.False(actualKillingBlow.IsValid);
-        });
+        }
 
-        Assert.False(BattleSpawnGate.TryGetReplicatedDeath(affectedAgent, out _, out _));
+        Assert.False(replicatedDeathTracker.TryGetReplicatedDeath(affectedAgent, out _, out _));
     }
 
     [Fact]

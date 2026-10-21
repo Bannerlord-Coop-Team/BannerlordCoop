@@ -151,6 +151,9 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<CoopBattleMissionRegistry>().As<ICoopBattleMissionRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<BattleAgentAuthorityRegistry>().As<IBattleAgentAuthorityRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<PuppetSpawnTracker>().As<IPuppetSpawnTracker>().InstancePerLifetimeScope();
+        builder.RegisterType<RoutedBlowTracker>().As<IRoutedBlowTracker>().InstancePerLifetimeScope();
+        builder.RegisterType<ReplicatedDeathTracker>().As<IReplicatedDeathTracker>().InstancePerLifetimeScope();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<LocationConversationAgentGuard>().As<ILocationConversationAgentGuard>().InstancePerDependency();
         builder.RegisterType<BattleAgentBudget>().As<IBattleAgentBudget>().InstancePerDependency();

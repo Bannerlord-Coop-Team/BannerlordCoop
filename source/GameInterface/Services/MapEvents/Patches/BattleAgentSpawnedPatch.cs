@@ -27,7 +27,8 @@ internal class BattleAgentSpawnedPatch
         if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
             || !missionRegistry.IsCoopBattleActive) return;
         // A puppet being spawned from another owner's broadcast is NOT our troop — don't re-capture it.
-        if (BattleSpawnGate.SuppressCapture) return;
+        if (!ContainerProvider.TryResolve<IPuppetSpawnTracker>(out var puppetSpawnTracker)
+            || puppetSpawnTracker.IsSpawningPuppet) return;
         if (__result == null) return;
 
         if (__result.Origin is CoopAgentOrigin origin && origin.InitialHealth is float health &&

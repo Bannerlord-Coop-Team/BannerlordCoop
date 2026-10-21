@@ -35,6 +35,7 @@ public class PuppetDeathApplier : IPuppetDeathApplier
     private readonly ICoopMissionComponent coopMissionComponent;
     private readonly ICasualtyAttributionMap casualties;
     private readonly IPuppetMountStateRepairer puppetMountStateRepairer;
+    private readonly IReplicatedDeathTracker replicatedDeathTracker;
     private readonly Dictionary<Guid, NetworkBattleAgentDied> pendingDeaths =
         new Dictionary<Guid, NetworkBattleAgentDied>();
     private readonly HashSet<Guid> completedDeaths = new HashSet<Guid>();
@@ -43,12 +44,14 @@ public class PuppetDeathApplier : IPuppetDeathApplier
         IMessageBroker messageBroker,
         ICoopMissionComponent coopMissionComponent,
         ICasualtyAttributionMap casualties,
-        IPuppetMountStateRepairer puppetMountStateRepairer)
+        IPuppetMountStateRepairer puppetMountStateRepairer,
+        IReplicatedDeathTracker replicatedDeathTracker)
     {
         this.messageBroker = messageBroker;
         this.coopMissionComponent = coopMissionComponent;
         this.casualties = casualties;
         this.puppetMountStateRepairer = puppetMountStateRepairer;
+        this.replicatedDeathTracker = replicatedDeathTracker;
 
         messageBroker.Subscribe<NetworkBattleAgentDied>(Handle_NetworkBattleAgentDied);
     }
@@ -166,18 +169,11 @@ public class PuppetDeathApplier : IPuppetDeathApplier
             appliedDamage = blow.InflictedDamage;
             var agentState = death.Wounded ? AgentState.Unconscious : AgentState.Killed;
 
-            BattleSpawnGate.RunWithReplicatedDeath(
-                agent,
-                affectorAgent,
-                killingBlow,
-                agentState,
-                () =>
-                {
-                    using (new AllowedThread())
-                    {
-                        agent.RegisterBlow(blow, default);
-                    }
-                });
+            using (replicatedDeathTracker.BeginReplicatedDeath(agent, affectorAgent, killingBlow, agentState))
+            using (new AllowedThread())
+            {
+                agent.RegisterBlow(blow, default);
+            }
 
             healthAfter = agent.Health;
             activeAfter = agent.IsActive();

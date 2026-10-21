@@ -48,7 +48,7 @@ public class BattleFormationSyncTests : MissionTestEnvironment
             using var spawner = new PuppetSpawner(broker, peer.ObjectManager, peer.Resolve<IPlayerManager>(),
                 peer.Resolve<ICoopMissionComponent>(), session, new CasualtyAttributionMap(),
                 Mock.Of<IBattleDeploymentCoordinator>(), new AgentFormationAssigner(), new BattleAgentBudget(),
-                peer.Resolve<IMissionWeaponDataMapper>());
+                peer.Resolve<IMissionWeaponDataMapper>(), peer.Resolve<IPuppetSpawnTracker>());
             var id = Guid.NewGuid();
             var agent = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
                 .Controller(AgentControllerType.None).Team(mission.DefenderTeam.Shell));
@@ -85,7 +85,7 @@ public class BattleFormationSyncTests : MissionTestEnvironment
                 peer.Resolve<ICoopMissionComponent>(), session, new CasualtyAttributionMap(),
                 Mock.Of<IBattleDeploymentCoordinator>(), new AgentFormationAssigner(),
                 Mock.Of<IBattleAgentBudget>(value => value.SlotsForEquipment(It.IsAny<Equipment>()) == 1),
-                peer.Resolve<IMissionWeaponDataMapper>());
+                peer.Resolve<IMissionWeaponDataMapper>(), peer.Resolve<IPuppetSpawnTracker>());
             var id = Guid.NewGuid();
             var record = new BattleAgentSpawnData(id, "troop", default, BattleSideEnum.Defender,
                 100f, "owner", null, 0, new Equipment(), default, null, formationIndex: 0);
@@ -166,7 +166,7 @@ public class BattleFormationSyncTests : MissionTestEnvironment
             using var spawner = new PuppetSpawner(broker, peer.ObjectManager, peer.Resolve<IPlayerManager>(),
                 peer.Resolve<ICoopMissionComponent>(), session, new CasualtyAttributionMap(),
                 Mock.Of<IBattleDeploymentCoordinator>(), new AgentFormationAssigner(), new BattleAgentBudget(),
-                peer.Resolve<IMissionWeaponDataMapper>());
+                peer.Resolve<IMissionWeaponDataMapper>(), peer.Resolve<IPuppetSpawnTracker>());
             var id = Guid.NewGuid();
             var agent = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
                 .Controller(AgentControllerType.None).Team(mission.DefenderTeam.Shell));
@@ -212,7 +212,7 @@ public class BattleFormationSyncTests : MissionTestEnvironment
             using var spawner = new PuppetSpawner(broker, peer.ObjectManager, peer.Resolve<IPlayerManager>(),
                 peer.Resolve<ICoopMissionComponent>(), session, new CasualtyAttributionMap(),
                 Mock.Of<IBattleDeploymentCoordinator>(), new AgentFormationAssigner(), new BattleAgentBudget(),
-                peer.Resolve<IMissionWeaponDataMapper>());
+                peer.Resolve<IMissionWeaponDataMapper>(), peer.Resolve<IPuppetSpawnTracker>());
             var id = Guid.NewGuid();
             var agent = mission.SpawnAgent(new AgentBuildData(Game.Current.PlayerTroop)
                 .Controller(AgentControllerType.None).Team(mission.DefenderTeam.Shell));
@@ -257,7 +257,7 @@ public class BattleFormationSyncTests : MissionTestEnvironment
             using var spawner = new PuppetSpawner(broker, peer.ObjectManager, peer.Resolve<IPlayerManager>(),
                 peer.Resolve<ICoopMissionComponent>(), session, new CasualtyAttributionMap(),
                 Mock.Of<IBattleDeploymentCoordinator>(), new AgentFormationAssigner(), budget.Object,
-                peer.Resolve<IMissionWeaponDataMapper>());
+                peer.Resolve<IMissionWeaponDataMapper>(), peer.Resolve<IPuppetSpawnTracker>());
             var pending = (IDictionary)AccessTools.Field(typeof(PuppetSpawner), "pendingFormations").GetValue(spawner);
             var spawns = (List<BattleAgentSpawnData>)AccessTools.Field(typeof(PuppetSpawner), "pendingPuppets").GetValue(spawner);
 

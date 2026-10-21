@@ -2,6 +2,7 @@
 using System.Linq;
 using Common.Messaging;
 using E2E.Tests.Environment.MockEngine;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
 using Missions;
 using Missions.Agents;
@@ -220,7 +221,8 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
             var casualties = new CasualtyAttributionMap();
             var mountRepairer = new Mock<IPuppetMountStateRepairer>();
             using var applier = new PuppetDeathApplier(
-                broker, peer.Resolve<ICoopMissionComponent>(), casualties, mountRepairer.Object);
+                broker, peer.Resolve<ICoopMissionComponent>(), casualties, mountRepairer.Object,
+                peer.Resolve<IReplicatedDeathTracker>());
             var victimId = Guid.NewGuid();
             var victim = mock.SpawnAgent(
                 new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
@@ -288,7 +290,7 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
             var broker = peer.Resolve<IMessageBroker>();
             using var applier = new PuppetDeathApplier(
                 broker, peer.Resolve<ICoopMissionComponent>(), new CasualtyAttributionMap(),
-                peer.Resolve<IPuppetMountStateRepairer>());
+                peer.Resolve<IPuppetMountStateRepairer>(), peer.Resolve<IReplicatedDeathTracker>());
             var victimId = Guid.NewGuid();
             var victim = mock.SpawnAgent(
                 new AgentBuildData(Game.Current.PlayerTroop).Controller(AgentControllerType.None));
@@ -328,7 +330,8 @@ public class BattleDeathMirrorTests : MissionTestEnvironment
                 broker,
                 peer.Resolve<ICoopMissionComponent>(),
                 new CasualtyAttributionMap(),
-                peer.Resolve<IPuppetMountStateRepairer>());
+                peer.Resolve<IPuppetMountStateRepairer>(),
+                peer.Resolve<IReplicatedDeathTracker>());
 
             broker.Publish(this,
                 new NetworkBattleAgentDied(

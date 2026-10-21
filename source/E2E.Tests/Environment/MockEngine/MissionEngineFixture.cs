@@ -753,9 +753,11 @@ public sealed class MissionEngineFixture : IDisposable
         {
             victim.Health = 0f;
             victim.IsActive = false;
-            if (BattleSpawnGate.TryGetReplicatedDeathState(__instance, out var agentState))
+            ContainerProvider.TryResolve<IReplicatedDeathTracker>(out var replicatedDeathTracker);
+            if (replicatedDeathTracker != null && replicatedDeathTracker.TryGetReplicatedDeathState(__instance, out var agentState))
                 victim.WasKilled = agentState == AgentState.Killed;
-            if (BattleSpawnGate.TryGetReplicatedDeath(__instance, out _, out var killingBlow) && killingBlow.IsValid)
+            if (replicatedDeathTracker != null
+                && replicatedDeathTracker.TryGetReplicatedDeath(__instance, out _, out var killingBlow) && killingBlow.IsValid)
                 victim.DeathAction = killingBlow.DeathAction;
             if (victim.MountAgent != null && AgentMirror.TryGet(victim.MountAgent, out var horse) && horse.RiderAgent == __instance)
                 horse.RiderAgent = null;
