@@ -25,6 +25,7 @@ using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.TournamentGames;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -873,6 +874,47 @@ public class LadysKnightOutTests : IDisposable
             Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
             Assert.Equal(expectedInfluence, scenario.Server.GetRegisteredObject<Hero>(player.HeroId).Clan.Influence);
         });
+    }
+
+    [Fact]
+    public void CompletedLordSolutionDoesNotLeakThroughTheLateJoinSaveHistory()
+    {
+        PrepareLordSolution();
+        var issues = new Dictionary<EnvironmentInstance, IssueBase>();
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                issues[instance] = instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+                new JournalLogsCampaignBehavior().RegisterEvents();
+            });
+
+        scenario.ClientA.Call(() => issues[scenario.ClientA].StartIssueWithLordSolution());
+        scenario.Server.Call(() => Assert.True(issues[scenario.Server].IsTriedToSolveBefore));
+        scenario.ClientA.Call(() => issues[scenario.ClientA].CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+
+        Assert.Equal(IssueOutcome.QuestSuccess,
+            Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        scenario.ClientA.Call(() =>
+        {
+            var ownerHistory = Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(issues[scenario.ClientA]) && entry.IsEnded());
+            Assert.Single(ownerHistory);
+        });
+
+        LogEntry[] saveHistory = null!;
+        scenario.Server.Call(() => saveHistory = Campaign.Current.LogEntryHistory.GameActionLogs.ToArray());
+        scenario.ClientB.Call(() =>
+        {
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsEnded()));
+            // A late join loads the server's saved LogEntryHistory before the quest page reads its ended entries.
+            Campaign.Current.LogEntryHistory._logs.Clear();
+            Campaign.Current.LogEntryHistory._logs.AddRange(saveHistory);
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsEnded()));
+            Assert.Null(scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
+        });
+        scenario.Server.Call(() => Assert.DoesNotContain(
+            Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsEnded()),
+            entry => entry.IsRelatedTo(issues[scenario.Server])));
     }
 
     [Fact]
