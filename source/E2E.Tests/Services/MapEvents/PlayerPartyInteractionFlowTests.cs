@@ -43,6 +43,7 @@ using HarmonyLib;
 using Helpers;
 using LiteNetLib;
 using Missions.Messages;
+using Moq;
 using System.Reflection;
 using System.Xml;
 using TaleWorlds.CampaignSystem;
@@ -55,6 +56,8 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Map;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
@@ -3098,6 +3101,35 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     [Fact]
     public void PortBreakOut_ServerAppliesTroopLossesSoClientAndServerTotalsMatch()
     {
+        var (client, playerMobilePartyId, troops) = RequestPortBreakOut(hasPort: true, hasShips: true, anchoredHere: true);
+
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakOutResult>()).Approved);
+        AssertRegularTroops(playerMobilePartyId, troops - 30);
+        client.Call(() =>
+        {
+            var behavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
+            Assert.Equal(30, behavior._breakInOutCasualties.TotalManCount);
+            Assert.True(behavior._isBreakingOutFromPort);
+        });
+    }
+
+    [Theory]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    public void PortBreakOut_WithoutAPortShipsOrTheFleetAnchoredHere_IsTurnedDownWithoutLosses(
+        bool hasPort, bool hasShips, bool anchoredHere)
+    {
+        var (_, playerMobilePartyId, troops) = RequestPortBreakOut(hasPort, hasShips, anchoredHere);
+
+        Assert.False(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakOutResult>()).Approved);
+        AssertRegularTroops(playerMobilePartyId, troops);
+    }
+
+    // The client always asks for the port, so only the server's own port, ship and fleet state decides.
+    private (EnvironmentInstance client, string playerMobilePartyId, int troops) RequestPortBreakOut(
+        bool hasPort, bool hasShips, bool anchoredHere)
+    {
         var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
         var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
         var siege = CreateSyncedSiege();
@@ -3113,22 +3145,54 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
                     party._currentSettlement = settlement;
             });
         }
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(siege.SettlementId, out var settlement));
+            UseNavalMap();
+            settlement.PortPosition = new CampaignVec2(new Vec2(10f, 10f), isOnLand: false);
+            settlement.HasPort = hasPort;
+            party.Party._ships.Clear();
+            if (hasShips) party.Party._ships.Add(ObjectHelper.SkipConstructor<Ship>());
+            var anchorPosition = new CampaignVec2(new Vec2(anchoredHere ? 10f : 60f, 10f), isOnLand: false)
+            {
+                _faceCache = new PathFaceRecord(1, 0, 0),
+                _isPositionCacheValid = true,
+            };
+            party.Anchor = new AnchorPoint(party) { Position = anchorPosition };
+            Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(30);
+        });
         var troops = AddRegularTroops(playerMobilePartyId, 200);
-        Server.Call(() => Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(30));
+        Server.NetworkSentMessages.Clear();
 
         client.Call(() =>
         {
             Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>()._isBreakingOutFromPort = true;
             InvokeMenuConsequence("break_out_menu_accept_on_consequence");
         }, MapEventDisabledMethods);
+        return (client, playerMobilePartyId, troops);
+    }
 
-        AssertRegularTroops(playerMobilePartyId, troops - 30);
-        client.Call(() =>
-        {
-            var behavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
-            Assert.Equal(30, behavior._breakInOutCasualties.TotalManCount);
-            Assert.True(behavior._isBreakingOutFromPort);
-        });
+    // Call inside Server.Call. Gives the headless campaign a sea face and the town encounter distance AnchorPoint.IsAtSettlement reads.
+    private void UseNavalMap()
+    {
+        var map = new Mock<IMapScene>();
+        map.Setup(scene => scene.GetFaceTerrainType(It.IsAny<PathFaceRecord>())).Returns(TerrainType.Water);
+        Campaign.Current._mapSceneWrapper = map.Object;
+        var models = Campaign.Current.Models.GetGameModels().ToList();
+        models.Add(new DefaultEncounterModel());
+        models.Add(new NavalPartyNavigationModel());
+        var gameModels = new GameModels(models);
+        Server.GameInstance.Game._gameModelManagers[typeof(GameModels)] = gameModels;
+        Campaign.Current._gameModels = gameModels;
+    }
+
+    private sealed class NavalPartyNavigationModel : DefaultPartyNavigationModel
+    {
+        public override bool IsTerrainTypeValidForNavigationType(TerrainType terrainType, MobileParty.NavigationType navigationType) =>
+            navigationType == MobileParty.NavigationType.Naval
+                ? terrainType == TerrainType.Water
+                : base.IsTerrainTypeValidForNavigationType(terrainType, navigationType);
     }
 
     private sealed class FixedTroopSacrificeModel : DefaultTroopSacrificeModel

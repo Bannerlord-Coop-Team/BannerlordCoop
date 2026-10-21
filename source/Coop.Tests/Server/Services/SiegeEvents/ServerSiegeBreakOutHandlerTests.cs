@@ -60,6 +60,7 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
         objects.Setup(manager => manager.TryGetHandleWithLogging(roster, out rosterId)).Returns(true);
         int armyLosses = -1;
         action.Setup(service => service.ApplySacrifice(party, It.IsAny<int>(), out armyLosses)).Returns(TroopRoster.CreateDummyTroopRoster());
+        action.Setup(service => service.CanBreakOutFromPort(party, settlement)).Returns(true);
         handler = new ServerSiegeBreakOutHandler(broker, network, objects.Object, players.Object, action.Object);
     }
 
@@ -194,6 +195,18 @@ public class ServerSiegeBreakOutHandlerTests : IDisposable
         Assert.Equal(7, party.MemberRoster.TotalRegulars);
         action.Verify(service => service.GetRequiredCasualties(party, false), Times.Never);
         action.Verify(service => service.ProtectAfterLeave(It.IsAny<MobileParty>(), It.IsAny<Settlement>()), Times.Never);
+    }
+
+    [Fact]
+    public void PortRequestWithoutVanillaPortPrerequisites_IsTurnedDownWithoutSacrifice()
+    {
+        action.Setup(service => service.CanBreakOutFromPort(party, settlement)).Returns(false);
+
+        Send("port", isFromPort: true);
+
+        Assert.False(Assert.Single(Results()).Approved);
+        action.Verify(service => service.GetRequiredCasualties(It.IsAny<MobileParty>(), It.IsAny<bool>()), Times.Never);
+        action.Verify(service => service.ApplySacrifice(It.IsAny<MobileParty>(), It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Never);
     }
 
     [Fact]

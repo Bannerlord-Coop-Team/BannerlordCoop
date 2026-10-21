@@ -68,7 +68,9 @@ internal class ServerSiegeBreakOutHandler : IHandler
                 objectManager.TryGetObjectWithLogging<Settlement>(request.SettlementId, out var settlement) &&
                 objectManager.TryGetObjectWithLogging<SiegeEvent>(request.SiegeId, out var siege) &&
                 party.IsActive && party.CurrentSettlement == settlement && settlement.SiegeEvent == siege &&
-                party.BesiegerCamp == null && party.MapEvent == null && settlement.Party?.MapEvent == null)
+                party.BesiegerCamp == null && party.MapEvent == null && settlement.Party?.MapEvent == null &&
+                // The client flag alone never opens the port; vanilla needs a port, ships and the fleet anchored there.
+                (!request.IsFromPort || breakOut.CanBreakOutFromPort(party, settlement)))
             {
                 if (receipts.TryGetValue(party, out var receipt) && receipt.Siege == siege)
                 {

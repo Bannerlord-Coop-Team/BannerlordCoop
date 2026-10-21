@@ -19,6 +19,7 @@ public interface ISiegeBreakOut
 {
     int GetRequiredCasualties(MobileParty party, bool isFromPort);
     int GetBreakInCasualties(MobileParty party, SiegeEvent siege);
+    bool CanBreakOutFromPort(MobileParty party, Settlement settlement);
     bool CanJoinDefenders(MobileParty party, Settlement settlement, bool alreadyEntered);
     TroopRoster ApplySacrifice(MobileParty party, int losses, out int armyCasualties);
     void ShowDebrief(TroopRoster casualties, int armyCasualties, bool isFromPort);
@@ -36,6 +37,10 @@ public class SiegeBreakOut : ISiegeBreakOut
     public int GetBreakInCasualties(MobileParty party, SiegeEvent siege) => Math.Max(0,
         Campaign.Current.Models.TroopSacrificeModel.GetLostTroopCountForBreakingInBesiegedSettlement(
             party, siege).RoundedResultNumber);
+
+    // Same as vanilla menu_defender_siege_break_out_from_port_on_condition: a port, own ships, and the fleet anchored at this settlement.
+    public bool CanBreakOutFromPort(MobileParty party, Settlement settlement) =>
+        settlement.HasPort && party.Ships.Any() && party.Anchor != null && party.Anchor.IsAtSettlement(settlement);
 
     public bool CanJoinDefenders(MobileParty party, Settlement settlement, bool alreadyEntered)
     {
