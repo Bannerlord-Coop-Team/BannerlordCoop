@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using Serilog;
 using System.Linq;
@@ -131,6 +133,15 @@ public class PlayerEncounterInterface : IPlayerEncounterInterface
         // the encounter itself, otherwise the stale assault menu stays up with only Leave
         if (siegeEventInterface?.TryRouteArmyMemberToAftermath(playerEncounter._mapEvent) == true)
             return;
+
+        var mapEvent = playerEncounter._mapEvent;
+        if (ModInformation.IsClient && mapEvent.IsRaidHostileAction() &&
+            mapEvent.HasWinner && !mapEvent.IsFinalized)
+        {
+            // Completed resistance results still need the server to end the raid and return us to the village.
+            MessageBroker.Instance.Publish(playerEncounter, new MapEventFinalizeAttempted(mapEvent));
+            return;
+        }
 
         PlayerEncounter.Finish(true);
     }
