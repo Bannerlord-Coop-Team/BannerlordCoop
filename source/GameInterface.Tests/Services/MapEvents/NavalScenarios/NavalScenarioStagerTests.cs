@@ -1,5 +1,8 @@
 ﻿#if DEBUG
+using Common.Network;
 using GameInterface.Services.MapEvents.NavalScenarios;
+using GameInterface.Services.Missions;
+using Moq;
 using System;
 using Xunit;
 
@@ -88,6 +91,46 @@ public class NavalScenarioStagerTests
     {
         Assert.Null(Pick(new[] { Lord("town", Excluded, 1f), Lord("player", Excluded, 2f) }, allowThirdFaction: true));
         Assert.Null(Pick(Array.Empty<TestLord>(), allowThirdFaction: true));
+    }
+
+    // R43: boarding was staged while both clients were still in the finished ramming mission, and neither entered it.
+    [Fact]
+    public void TryStage_WhileAListedPlayerIsStillInAMission_RefusesBeforeTouchingTheCampaign()
+    {
+        var network = new Mock<INetwork>(MockBehavior.Strict);
+        var stager = Stager(network.Object, "testclient2");
+        var config = new NavalScenarioConfig { Preset = "boarding", ControllerIds = new[] { "testclient1", "testclient2" } };
+
+        Assert.False(stager.TryStage(config, out var output));
+
+        Assert.Contains("testclient2", output);
+        Assert.DoesNotContain("testclient1", output);
+        Assert.Contains("coop.debug.map_event.leave_battle", output);
+    }
+
+    // Another player's mission doesn't block staging for the listed ones.
+    [Fact]
+    public void PlayersStillInBattle_IsNullWhenNoListedPlayerIsInAMission()
+    {
+        Assert.Null(Stager(null, "someone_else").PlayersStillInBattle(new[] { "testclient1", "testclient2" }));
+    }
+
+    // A client container builds the stager without mission membership, which only the server registers.
+    [Fact]
+    public void PlayersStillInBattle_WithoutMissionMembership_RefusesNothing()
+    {
+        var stager = new NavalScenarioStager(null, null, null, null, null);
+
+        Assert.Null(stager.PlayersStillInBattle(new[] { "testclient1" }));
+    }
+
+    // A stager whose mission membership holds only the given controllers; the campaign services stay null.
+    private static NavalScenarioStager Stager(INetwork? network, params string[] inMission)
+    {
+        var membership = new Mock<IMissionMembershipRegistry>();
+        membership.Setup(registry => registry.IsControllerInMission(It.IsAny<string>()))
+            .Returns<string>(controllerId => Array.IndexOf(inMission, controllerId) >= 0);
+        return new NavalScenarioStager(null, network, null, null, null, membership.Object);
     }
 
     private const NavalScenarioStager.BlockadeLordStanding Excluded = NavalScenarioStager.BlockadeLordStanding.Excluded;
