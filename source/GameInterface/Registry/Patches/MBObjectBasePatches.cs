@@ -3,6 +3,7 @@ using HarmonyLib;
 using Common;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.ObjectSystem;
