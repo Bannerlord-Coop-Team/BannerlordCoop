@@ -82,7 +82,7 @@ internal sealed class ArtisanProductsTroopReturns : IArtisanProductsTroopReturns
             if (entry?.Character == null || string.IsNullOrEmpty(entry.ControllerId)) continue;
             if (!pending.TryGetValue(entry.ControllerId, out var roster))
             { roster = TroopRoster.CreateDummyTroopRoster(); pending.Add(entry.ControllerId, roster); }
-            roster.AddToCounts(entry.Character, entry.Number, entry.WoundedNumber, entry.Xp, false);
+            roster.AddToCounts(entry.Character, entry.Number, false, entry.WoundedNumber, entry.Xp);
         }
         savedPending = null;
     }
