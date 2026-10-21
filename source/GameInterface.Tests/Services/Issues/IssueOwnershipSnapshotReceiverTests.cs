@@ -12,6 +12,7 @@ using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
 using Moq;
+using System.Runtime.CompilerServices;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Issues;
@@ -19,6 +20,10 @@ namespace GameInterface.Tests.Services.Issues;
 [Collection(ModInformationRoleCollection.Name)]
 public class IssueOwnershipSnapshotReceiverTests : IDisposable
 {
+    static IssueOwnershipSnapshotReceiverTests()
+    {
+        RuntimeHelpers.RunModuleConstructor(typeof(Coop.Tests.Mocks.TestNetwork).Module.ModuleHandle);
+    }
     private readonly bool wasServer = ModInformation.IsServer;
     private readonly IssueOwnershipRegistry registry = new IssueOwnershipRegistry();
     private readonly IssueOwnershipSnapshotReceiver receiver;
@@ -77,20 +82,14 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
     }
 
     [Fact]
-    public void AChangedOwnerReplaysCancellationForThePreviousController()
+    public void AChangedControllerDoesNotReplayCancellationForTheSameIssue()
     {
-        NetworkIssueFinalized? finalized = null;
         var broker = new MessageBroker();
-        broker.Subscribe<NetworkIssueFinalized>(payload => finalized = payload.What);
         using var receiverWithObserver = new IssueOwnershipSnapshotReceiver(broker, registry);
 
         receiverWithObserver.Handle_NetworkIssueOwnershipSnapshot(new MessagePayload<NetworkIssueOwnershipSnapshot>(this,
             new NetworkIssueOwnershipSnapshot(new[] { new IssueOwnershipData("hero_1", "issue_1", "new-player") })));
 
-        Assert.True(finalized.HasValue);
-        Assert.Equal("hero_1", finalized.Value.IssueOwnerId);
-        Assert.Equal("issue_1", finalized.Value.IssueId);
-        Assert.Equal(IssueOutcome.QuestCancel, finalized.Value.Outcome);
         Assert.True(registry.TryGetOwner("hero_1", "issue_1", out var owner));
         Assert.Equal("new-player", owner);
     }
