@@ -892,6 +892,7 @@ public class VillageHostileActionTests : MapEventTestBase
     [InlineData("finalize")]
     [InlineData("finish")]
     [InlineData("stale-reply")]
+    [InlineData("request")]
     public void RaidFinalization_ClientActionsWaitForServer(string action)
     {
         var owner = Clients.First();
@@ -963,6 +964,10 @@ public class VillageHostileActionTests : MapEventTestBase
             {
                 owner.SimulateMessage(Server.NetPeer, new NetworkMapEventFinalized());
             }
+            else if (action == "request")
+            {
+                PlayerEncounter.Finish(true);
+            }
             else
             {
                 using (new AllowedThread())
@@ -979,7 +984,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.Same(encounter, PlayerEncounter.Current);
             Assert.Equal(raidPosition, party.Position);
             Assert.Equal("raiding_village", Campaign.Current.MapStateData.GameMenuId);
-        }, disabledMethods);
+        }, action == "request" ? disabledMethods.Concat(WithoutNetworkDelivery()).Distinct().ToList() : disabledMethods);
 
         foreach (var instance in Clients.Append(Server))
         {
@@ -993,7 +998,11 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.Equal(0, completed[instance]);
             });
         }
-        Assert.Empty(owner.NetworkSentMessages.GetMessages<NetworkMapEventFinalizeAttempted>());
+        var requests = owner.NetworkSentMessages.GetMessages<NetworkMapEventFinalizeAttempted>();
+        if (action == "request")
+            Assert.Equal(mapEventId, requests.Single().MapEventId);
+        else
+            Assert.Empty(requests);
 
         Server.Call(() =>
         {
@@ -1016,6 +1025,7 @@ public class VillageHostileActionTests : MapEventTestBase
                 Assert.Equal(BattleSideEnum.Attacker, events[instance].WinningSide);
                 Assert.True(events[instance].IsFinalized);
                 Assert.Equal(Village.VillageStates.Looted, settlement.Village.VillageState);
+                Assert.Equal(instance == Server ? 1 : 0, completed[instance]);
                 CampaignEvents.RaidCompletedEvent.ClearListeners(this);
             });
         }

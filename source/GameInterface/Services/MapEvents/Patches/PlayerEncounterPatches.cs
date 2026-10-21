@@ -328,7 +328,16 @@ internal class PlayerEncounterPatches
 
         // Server teardown detaches the party before closing its encounter; receive callbacks must wait for it.
         var mapEvent = MobileParty.MainParty?.MapEvent;
-        return !mapEvent.IsRaidHostileAction() || mapEvent.IsFinalized;
+        if (!mapEvent.IsRaidHostileAction() || mapEvent.IsFinalized)
+            return true;
+
+        if (CallOriginalPolicy.IsOriginalAllowed())
+            Logger.Debug("Ignored received raid encounter finish for {MapEventId}. {StackTrace}",
+                mapEvent.StringId, System.Environment.StackTrace);
+        else
+            MessageBroker.Instance.Publish(mapEvent, new MapEventFinalizeAttempted(mapEvent));
+
+        return false;
     }
 
     // When an open-map encounter finishes on a client (e.g. you close a conversation with a lord party), the
