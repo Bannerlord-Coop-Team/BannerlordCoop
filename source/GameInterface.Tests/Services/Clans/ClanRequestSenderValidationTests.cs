@@ -5,6 +5,9 @@ using Coop.Tests.Mocks;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Handlers;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.Heroes.Handlers;
+using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.RomanceFlow;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Moq;
@@ -79,6 +82,22 @@ public class ClanRequestSenderValidationTests
         fixture.LeaveRules.Verify(rules => rules.TryApply(It.IsAny<Hero>(), It.IsAny<bool>()), Times.Never);
     }
 
+    [Theory]
+    [InlineData("different-hero")]
+    [InlineData(null)]
+    public void DivorceRequest_InvalidSender_DoesNotApplyDivorce(string? registeredHeroId)
+    {
+        using var fixture = new HandlerFixture(registeredHeroId);
+
+        fixture.MessageBroker.Publish(fixture.Peer, new RequestPlayerDivorce(ActorId, MemberId));
+        FlushGameThread();
+
+        bool separated = false;
+        string reason = null!;
+        fixture.DivorceRules.Verify(rules => rules.TryApply(
+            fixture.Actor, fixture.Member, out separated, out reason), Times.Never);
+    }
+
     private static void FlushGameThread() => GameThread.Run(() => { }, blocking: true);
 
     private sealed class HandlerFixture : System.IDisposable
@@ -86,11 +105,13 @@ public class ClanRequestSenderValidationTests
         private readonly bool wasServer;
         private readonly ClanFinanceHandler financeHandler;
         private readonly ClanMembershipHandler membershipHandler;
+        private readonly PlayerDivorceHandler divorceHandler;
 
         public MessageBroker MessageBroker { get; } = new();
         public TestNetwork Network { get; } = new();
         public Mock<IClanFinance> ClanFinance { get; } = new();
         public Mock<IClanLeaveRules> LeaveRules { get; } = new();
+        public Mock<IPlayerDivorceRules> DivorceRules { get; } = new();
         public Hero Actor { get; } = ObjectHelper.SkipConstructor<Hero>();
         public Hero Member { get; } = ObjectHelper.SkipConstructor<Hero>();
         public Clan Clan { get; } = ObjectHelper.SkipConstructor<Clan>();
@@ -118,10 +139,13 @@ public class ClanRequestSenderValidationTests
                 MessageBroker, objectManager.Object, Network, ClanFinance.Object, playerManager.Object);
             membershipHandler = new ClanMembershipHandler(
                 MessageBroker, objectManager.Object, Network, LeaveRules.Object, playerManager.Object);
+            divorceHandler = new PlayerDivorceHandler(
+                MessageBroker, Network, objectManager.Object, playerManager.Object, DivorceRules.Object);
         }
 
         public void Dispose()
         {
+            divorceHandler.Dispose();
             membershipHandler.Dispose();
             financeHandler.Dispose();
             Network.Dispose();

@@ -39,6 +39,14 @@
     <string id="str_coop_clan_join_too_many_workshops" text="{=str_coop_clan_join_too_many_workshops}Joining would exceed this clan's workshop limit. Sell workshops before joining." />
     <string id="str_coop_clan_join_too_many_parties" text="{=str_coop_clan_join_too_many_parties}Joining would exceed this clan's party limit. Disband clan parties and wait for disbanding to finish before joining." />
     <string id="str_coop_clan_leave" text="{=str_coop_clan_leave}Leave Clan" />
+    <string id="str_coop_divorce" text="{=str_coop_divorce}Divorce" />
+    <string id="str_coop_divorce_title" text="{=str_coop_divorce_title}Divorce {HERO}?" />
+    <string id="str_coop_divorce_description" text="{=str_coop_divorce_description}Are you sure you want to end your marriage to {HERO}?" />
+    <string id="str_coop_divorce_shared_clan" text="{=str_coop_divorce_shared_clan}The spouse who is not clan leader will return to their original clan under the normal departure rules, keeping their character, party and personal gold. Shared settlements, companions, renown and influence stay with the current clan. Eligible family members follow the departing spouse." />
+    <string id="str_coop_divorce_keep_clans" text="{=str_coop_divorce_keep_clans}Both heroes will keep their current clan membership." />
+    <string id="str_coop_divorce_completed" text="{=str_coop_divorce_completed}{FIRST} and {SECOND} are now divorced." />
+    <string id="str_coop_divorce_unavailable" text="{=str_coop_divorce_unavailable}Divorce could not be completed. The selected hero must still be your living spouse." />
+    <string id="str_coop_divorce_clan_unchanged" text="{=str_coop_divorce_clan_unchanged}Clan separation could not complete under the normal departure rules; clan membership is unchanged." />
     <string id="str_coop_clan_manage_player" text="{=str_coop_clan_manage_player}Manage Player" />
     <string id="str_coop_clan_manage_player_title" text="{=str_coop_clan_manage_player_title}Manage {HERO}" />
     <string id="str_coop_clan_manage_player_description" text="{=str_coop_clan_manage_player_description}Choose an action for this player. Hover over an option for details." />

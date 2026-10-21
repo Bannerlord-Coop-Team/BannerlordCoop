@@ -13,6 +13,8 @@ using GameInterface.Services.CampaignService.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.HeirSelection.Interfaces;
 using GameInterface.Services.Heroes.Commands;
+using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.RomanceFlow;
 using GameInterface.Services.Heroes.HeirSelection.Messages;
 using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
@@ -627,9 +629,11 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void DivorcePlayerSpouses_RestoresIndependentClanAndPreservesParties(bool leaderFirst)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void DivorcePlayerSpouses_RestoresIndependentClanAndPreservesParties(bool leaderFirst, bool fromClient)
     {
         Join();
         int memberTroops = 0;
@@ -645,17 +649,33 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
         });
         Flush();
 
-        Server.Call(() =>
+        if (fromClient)
         {
-            var args = new CoopCommandArgsFactory().FromValues(new[]
+            var client = leaderFirst ? leaderClient : memberClient;
+            client.Call(() =>
             {
-                leaderFirst ? leader.HeroId : member.HeroId,
-                leaderFirst ? member.HeroId : leader.HeroId,
+                var hero = Get<Hero>(client, leaderFirst ? leader.HeroId : member.HeroId);
+                var spouse = Get<Hero>(client, leaderFirst ? member.HeroId : leader.HeroId);
+                var confirmation = client.Resolve<IPlayerDivorceConfirmation>();
+                Assert.True(confirmation.CanDivorce(hero, spouse));
+                confirmation.CreateInquiry(hero, spouse).AffirmativeAction();
             });
-            var result = new RomanceDebugCommand.RomanceDivorceCoopCommand().ProcessCommand(args);
-            Assert.True(result.Succeeded, result.Output);
-            Assert.DoesNotContain("could not complete", result.Output);
-        });
+            Assert.Single(client.NetworkSentMessages.GetMessages<RequestPlayerDivorce>());
+        }
+        else
+        {
+            Server.Call(() =>
+            {
+                var args = new CoopCommandArgsFactory().FromValues(new[]
+                {
+                    leaderFirst ? leader.HeroId : member.HeroId,
+                    leaderFirst ? member.HeroId : leader.HeroId,
+                });
+                var result = new RomanceDebugCommand.RomanceDivorceCoopCommand().ProcessCommand(args);
+                Assert.True(result.Succeeded, result.Output);
+                Assert.DoesNotContain("could not complete", result.Output);
+            });
+        }
         Flush();
 
         foreach (var instance in Clients.Prepend(Server))
@@ -690,8 +710,10 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
         }
     }
 
-    [Fact]
-    public void DivorceNpcSpouse_EndsMarriageWithoutChangingPlayerClan()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DivorceNpcSpouse_EndsMarriageWithoutChangingPlayerClan(bool fromClient)
     {
         var spouseId = TestEnvironment.CreateRegisteredObject<Hero>();
         Server.Call(() =>
@@ -700,11 +722,24 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
             var spouse = Get<Hero>(Server, spouseId);
             playerHero.Spouse = spouse;
             ChangeRomanticStateAction.Apply(playerHero, spouse, Romance.RomanceLevelEnum.Marriage);
-
-            var result = new RomanceDebugCommand.RomanceDivorceCoopCommand().ProcessCommand(
-                new CoopCommandArgsFactory().FromValues(new[] { leader.HeroId, spouseId }));
-            Assert.True(result.Succeeded, result.Output);
         });
+        Flush();
+
+        if (fromClient)
+        {
+            leaderClient.Call(() => leaderClient.Resolve<IPlayerDivorceConfirmation>()
+                .CreateInquiry(Get<Hero>(leaderClient, leader.HeroId), Get<Hero>(leaderClient, spouseId))
+                .AffirmativeAction());
+        }
+        else
+        {
+            Server.Call(() =>
+            {
+                var result = new RomanceDebugCommand.RomanceDivorceCoopCommand().ProcessCommand(
+                    new CoopCommandArgsFactory().FromValues(new[] { leader.HeroId, spouseId }));
+                Assert.True(result.Succeeded, result.Output);
+            });
+        }
         Flush();
 
         foreach (var instance in Clients.Prepend(Server))
@@ -718,6 +753,40 @@ public class CoopClanFlowTests : MapEventTestBase, IDisposable
                 Assert.Equal(Romance.RomanceLevelEnum.Ended, Romance.GetRomanticLevel(playerHero, spouse));
                 Assert.Same(Get<Clan>(instance, leader.ClanId), playerHero.Clan);
                 Assert.Same(Get<MobileParty>(instance, leader.MobilePartyId), playerHero.PartyBelongedTo);
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DivorceRequest_WrongPlayerOrSpouse_DoesNotChangeTheMarriage(bool wrongPlayer)
+    {
+        Join();
+        var unrelatedId = TestEnvironment.CreateRegisteredObject<Hero>();
+        Server.Call(() =>
+        {
+            var first = Get<Hero>(Server, leader.HeroId);
+            var second = Get<Hero>(Server, member.HeroId);
+            first.Spouse = second;
+            ChangeRomanticStateAction.Apply(first, second, Romance.RomanceLevelEnum.Marriage);
+        });
+        Flush();
+
+        Send(wrongPlayer ? leaderClient : memberClient,
+            new RequestPlayerDivorce(member.HeroId, wrongPlayer ? leader.HeroId : unrelatedId));
+        Flush();
+
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                var first = Get<Hero>(instance, leader.HeroId);
+                var second = Get<Hero>(instance, member.HeroId);
+                Assert.Same(second, first.Spouse);
+                Assert.Same(first, second.Spouse);
+                Assert.Same(first.Clan, second.Clan);
+                Assert.Equal(Romance.RomanceLevelEnum.Marriage, Romance.GetRomanticLevel(first, second));
             });
         }
     }

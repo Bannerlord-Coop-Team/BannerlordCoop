@@ -331,17 +331,10 @@ internal class RomanceDebugCommand
                     return Failed(error);
                 if (!ContainerProvider.TryResolve<IPlayerDivorceRules>(out var divorceRules))
                     return Failed("Could not resolve player divorce rules.");
-                if (!divorceRules.CanDivorce(playerHero, targetHero, out error))
+                if (!divorceRules.TryApply(playerHero, targetHero, out var clansSeparated, out error))
                     return Failed(error);
 
-                playerHero.Spouse = null;
-                ChangeRomanticStateAction.Apply(playerHero, targetHero, Romance.RomanceLevelEnum.Ended);
-
-                if (playerHero.Spouse != null || targetHero.Spouse != null ||
-                    Romance.GetRomanticLevel(playerHero, targetHero) != Romance.RomanceLevelEnum.Ended)
-                    return Failed($"Divorce between {playerHero.Name} and {targetHero.Name} did not complete.");
-
-                if (!divorceRules.TrySeparateClans(playerHero, targetHero))
+                if (!clansSeparated)
                     return Succeeded($"Divorced {playerHero.Name} and {targetHero.Name}. " +
                         "Clan separation could not complete under the normal departure rules; clan membership is unchanged.");
 

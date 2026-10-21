@@ -92,6 +92,7 @@ public class ClanPrefabEditor : IClanPrefabEditor
 
     public void AddMembershipActions(XmlNode root)
     {
+        AddDivorceAction(root);
         var fragment = root.OwnerDocument.CreateDocumentFragment();
         XmlNode previous;
         if (root.Attributes?["Id"]?.Value == "ClanScreenWidget" &&
@@ -133,6 +134,30 @@ public class ClanPrefabEditor : IClanPrefabEditor
             whitespace.ParentNode.RemoveChild(whitespace);
 
         previous.ParentNode.InsertAfter(fragment, previous);
+    }
+
+    private void AddDivorceAction(XmlNode root)
+    {
+        if (root.Attributes?["Id"]?.Value != "ClanMembersWidget" ||
+            root.SelectSingleNode(".//*[@Id='DivorceButton']") != null) return;
+        var anchor = root.SelectSingleNode(".//*[@Id='LastSeenLocationParent']");
+        if (anchor == null) return;
+
+        var fragment = root.OwnerDocument.CreateDocumentFragment();
+        fragment.InnerXml = @"
+            <NavigationScopeTargeter ScopeID='ClanDivorceScope' ScopeParent='..\DivorceButton' ScopeMovements='Horizontal' />
+            <ButtonWidget Id='DivorceButton' DataSource='{..}' IsVisible='@CanDivorce'
+                WidthSizePolicy='Fixed' HeightSizePolicy='Fixed' SuggestedWidth='250' SuggestedHeight='50'
+                HorizontalAlignment='Center' MarginTop='6' Brush='Popup.Delete.Button' Command.Click='ExecuteDivorce'
+                DoNotPassEventsToChildren='true' GamepadNavigationIndex='0'>
+                <Children>
+                    <TextWidget WidthSizePolicy='StretchToParent' HeightSizePolicy='StretchToParent'
+                        Brush='Popup.Button.Text' Text='@DivorceText' />
+                </Children>
+            </ButtonWidget>";
+        foreach (XmlNode whitespace in fragment.SelectNodes(".//text()[normalize-space(.)='']"))
+            whitespace.ParentNode.RemoveChild(whitespace);
+        anchor.ParentNode.InsertAfter(fragment, anchor);
     }
 
     public void ApplyIncomePermissions(XmlNode root)

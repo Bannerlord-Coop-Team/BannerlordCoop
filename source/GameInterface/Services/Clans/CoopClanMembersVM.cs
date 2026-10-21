@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Extensions;
+using GameInterface.Services.Heroes.RomanceFlow;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,6 +18,13 @@ public class CoopClanMembersVM : ClanMembersVM
     private readonly IClanMemberGrouping grouping;
     private readonly IClanLeaveRules leaveRules;
     private readonly IMessageBroker messageBroker;
+    private readonly IPlayerDivorceConfirmation divorceConfirmation;
+
+    [DataSourceProperty]
+    public bool CanDivorce => divorceConfirmation?.CanDivorce(Hero.MainHero, CurrentSelectedMember?.GetHero()) == true;
+
+    [DataSourceProperty]
+    public string DivorceText => GameTexts.FindText("str_coop_divorce").ToString();
 
     [DataSourceProperty]
     public bool CanLeaveClan => leaveRules?.CanLeave(Hero.MainHero) == true;
@@ -51,12 +59,13 @@ public class CoopClanMembersVM : ClanMembersVM
     public string OtherFamiliesText => GetGroupText("str_coop_clan_other_families", OtherFamilies.Count);
 
     public CoopClanMembersVM(Action onRefresh, Action<Hero> showHeroOnMap, IClanMemberGrouping grouping,
-        IClanLeaveRules leaveRules, IMessageBroker messageBroker)
+        IClanLeaveRules leaveRules, IMessageBroker messageBroker, IPlayerDivorceConfirmation divorceConfirmation)
         : base(onRefresh, showHeroOnMap)
     {
         this.grouping = grouping;
         this.leaveRules = leaveRules;
         this.messageBroker = messageBroker;
+        this.divorceConfirmation = divorceConfirmation;
         SortController._listsToControl.Insert(0, Players);
         SortController._listsToControl.Insert(2, OtherFamilies);
         RegroupMembers();
@@ -66,6 +75,12 @@ public class CoopClanMembersVM : ClanMembersVM
     {
         if (CanLeaveClan)
             messageBroker.Publish(this, new ClanMemberLeaveRequested(Hero.MainHero, Hero.MainHero));
+    }
+
+    public void ExecuteDivorce()
+    {
+        if (CanDivorce)
+            InformationManager.ShowInquiry(divorceConfirmation.CreateInquiry(Hero.MainHero, CurrentSelectedMember.GetHero()));
     }
 
     public void ExecuteManagePlayer()
@@ -95,6 +110,8 @@ public class CoopClanMembersVM : ClanMembersVM
 
     public void RefreshPlayerActions()
     {
+        OnPropertyChanged(nameof(CanDivorce));
+        OnPropertyChanged(nameof(DivorceText));
         OnPropertyChanged(nameof(CanLeaveClan));
         OnPropertyChanged(nameof(CanManagePlayer));
         OnPropertyChanged(nameof(LeaveClanText));

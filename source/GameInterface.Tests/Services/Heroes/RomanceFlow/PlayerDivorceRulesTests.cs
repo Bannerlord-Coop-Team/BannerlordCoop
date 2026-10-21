@@ -1,4 +1,5 @@
-﻿using Common.Util;
+﻿using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.RomanceFlow;
 using GameInterface.Services.Players;
@@ -57,6 +58,8 @@ public class PlayerDivorceRulesTests
         var secondSpouse = second?.Spouse;
 
         Assert.False(Rules().CanDivorce(first, second, out var reason));
+        Assert.False(Rules().TryApply(first, second, out var separated, out _));
+        Assert.False(separated);
         Assert.NotEmpty(reason);
         Assert.Same(firstSpouse, first?.Spouse);
         Assert.Same(secondSpouse, second?.Spouse);
@@ -129,7 +132,7 @@ public class PlayerDivorceRulesTests
         leave.VerifyNoOtherCalls();
     }
 
-    private PlayerDivorceRules Rules() => new(players.Object, leave.Object);
+    private PlayerDivorceRules Rules() => new(players.Object, leave.Object, Mock.Of<IMessageBroker>());
 
     private static Hero CreateHero()
     {
