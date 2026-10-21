@@ -20,6 +20,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using SandBox.GauntletUI.Map;
 using GameInterface.Services.MapEvents.Messages.Conversation;
+using Coop.Core.Client.Services.MobileParties.Messages;
 
 namespace E2E.Tests.Services.Issues;
 
@@ -189,6 +190,17 @@ public class QuestRequestOwnershipTests : IDisposable
             using (new MainHeroSubstitutionScope(hero, party))
                 scenario.Server.Resolve<IGangLeaderGoodsService>().LeaveHideout(serverQuest, party, hideout);
         });
+
+        // The accepted exit finishes the outgoing encounter after the merchant was authorized.
+        scenario.ClientA.Call(() =>
+        {
+            Assert.True(scenario.ClientA.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var party));
+            Assert.True(scenario.ClientA.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var hero));
+            using (new MainHeroSubstitutionScope(hero, party))
+                scenario.ClientA.Resolve<IMessageBroker>().Publish(this,
+                    new NetworkSettlementEncounterLeaveResult(0, SettlementEncounterLeaveOutcome.Applied));
+        });
+        Assert.Contains(scenario.ClientA.NetworkSentMessages.GetMessages<NetworkConversationEnded>(), message => message.RequestId == null);
 
         if (ended) scenario.Server.SimulateMessage(scenario.ClientA.NetPeer, new NetworkConversationEnded());
 
