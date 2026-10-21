@@ -9,6 +9,7 @@ using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Quests.RevenueFarming;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -421,6 +422,40 @@ public sealed class RevenueFarmingTests : IDisposable
             Assert.Equal(ending == "betray" ? 3600 : 3068, Object<Hero>(Server, owner.HeroId).Gold);
             Assert.Equal(2000, Object<Hero>(Server, other.HeroId).Gold);
         });
+    }
+
+    [Theory]
+    [InlineData(false, "client")]
+    [InlineData(true, "client")]
+    [InlineData(false, "server")]
+    [InlineData(true, "server")]
+    [InlineData(false, "request")]
+    [InlineData(true, "request")]
+    public void GenericSuccessDoesNotBypassPayment(bool allCollected, string source)
+    {
+        Accept();
+        if (allCollected) CompleteCollections();
+        var serverQuest = Quest(Server);
+        var ownerQuest = Quest(Client);
+        var gold = 0;
+        Server.Call(() => gold = Object<Hero>(Server, owner.HeroId).Gold);
+
+        if (source == "client") Client.Call(() => ownerQuest.CompleteQuestWithSuccess());
+        else if (source == "server") Server.Call(() => serverQuest.CompleteQuestWithSuccess());
+        else Client.Call(() => Client.Resolve<IMessageBroker>().Publish(this,
+            new QuestOutcomeRequested(ownerQuest, IssueOutcome.QuestSuccess)));
+
+        environment.FlushCoalescer();
+        foreach (var instance in new[] { Server, Client }) instance.Call(() =>
+        {
+            var quest = instance == Server ? serverQuest : ownerQuest;
+            Assert.True(quest.IsOngoing);
+            Assert.Same(quest, Quest(instance));
+            Assert.DoesNotContain(quest.JournalEntries, log => log.LogText.ToString() == quest.QuestSuccessLog.ToString());
+            Assert.Equal(gold, Object<Hero>(instance, owner.HeroId).Gold);
+        });
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
     [Fact]

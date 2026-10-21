@@ -5,7 +5,7 @@ using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Quests.RevenueFarming;
 
-public enum RevenueFarmingAction
+public enum RevenueFarmingAction : byte
 {
     Collect,
     Leave,

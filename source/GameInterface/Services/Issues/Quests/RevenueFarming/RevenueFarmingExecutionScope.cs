@@ -17,13 +17,15 @@ internal sealed class RevenueFarmingExecutionScope : IDisposable
     private readonly string initialFingerprint = null;
 
     internal RevenueFarmingSession Session { get; }
+    internal RevenueFarmingAction? Action { get; }
     internal string Menu { get; set; }
     internal bool FinishEncounter { get; set; }
 
-    internal RevenueFarmingExecutionScope(RevenueFarmingSession session, bool publish = true)
+    internal RevenueFarmingExecutionScope(RevenueFarmingSession session, bool publish = true, RevenueFarmingAction? action = null)
     {
         if (session == null) throw new ArgumentNullException(nameof(session));
         Session = session;
+        Action = action;
         previous = Current;
         this.publish = publish && previous == null && ModInformation.IsServer;
         if (ModInformation.IsServer)

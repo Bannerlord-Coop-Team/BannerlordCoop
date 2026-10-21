@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Players;
 using HarmonyLib;
 using Helpers;
@@ -307,6 +308,21 @@ internal class RevenueFarmingSettlementPatch
         if (ModInformation.IsClient || session == null) return true;
         __result = session.PlayerHero.PartyBelongedTo?.CurrentSettlement;
         return false;
+    }
+}
+
+[HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess))]
+internal class RevenueFarmingSuccessGuardPatch
+{
+    [HarmonyPriority(Priority.VeryHigh)]
+    private static bool Prefix(QuestBase __instance)
+    {
+        if (__instance is not Quest) return true;
+        if (ModInformation.IsClient) return QuestEndingReplay.IsActive;
+        // Generic success skips the vanilla branch that pays the giver or steward.
+        return RevenueFarmingExecutionScope.Current?.Session.Quest == __instance &&
+            RevenueFarmingExecutionScope.Current.Action is RevenueFarmingAction.PayGiver or
+                RevenueFarmingAction.PayDemand or RevenueFarmingAction.PaySteward;
     }
 }
 

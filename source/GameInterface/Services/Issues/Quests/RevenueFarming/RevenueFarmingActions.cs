@@ -55,7 +55,7 @@ internal sealed class RevenueFarmingActions : IRevenueFarmingActions
         if (!hero.IsAlive) return false;
         if (request.Action != RevenueFarmingAction.PayDemand && request.Action != RevenueFarmingAction.BetrayDemand &&
             (hero.IsPrisoner || hero.PartyBelongedTo == null || hero.PartyBelongedTo != session.PlayerParty)) return false;
-        using (new RevenueFarmingExecutionScope(session))
+        using (new RevenueFarmingExecutionScope(session, action: request.Action))
         {
             var behavior = Campaign.Current.GetCampaignBehavior<RevenueFarmingIssueBehavior>();
             var args = new MenuCallbackArgs((MenuContext)null, null);
