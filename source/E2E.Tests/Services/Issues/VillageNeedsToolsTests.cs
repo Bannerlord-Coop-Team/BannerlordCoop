@@ -539,7 +539,7 @@ public class VillageNeedsToolsTests : IDisposable
             otherGoldBefore = otherHero.Gold;
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
             var issue = (Issue)notable.Issue;
-            expectedGold = 10000 - issue.CostOfToolsForAlternativeSolution + issue._payment + issue.RewardGold;
+            expectedGold = 10000 - issue.CostOfToolsForAlternativeSolution + (exchange ? 0 : issue._payment) + issue.RewardGold;
         });
         TestEnvironment.FlushCoalescer();
 
@@ -633,6 +633,8 @@ public class VillageNeedsToolsTests : IDisposable
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
                 Assert.Null(notable.Issue);
                 Assert.Equal(700f, settlement.Village.Hearth);
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
+                Assert.Equal(exchange ? 12 : 0, party.ItemRoster.GetItemNumber(DefaultItems.Grain));
             });
         }
 
