@@ -1,7 +1,9 @@
-﻿using HarmonyLib;
+﻿using Common.Logging;
+using HarmonyLib;
 using NavalDLC.View.Map.Managers;
 using NavalDLC.View.Map.Visuals;
 using SandBox.View;
+using Serilog;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.Naval.PartyVisuals.Patches;
@@ -12,6 +14,8 @@ namespace Coop.Naval.PartyVisuals.Patches;
 [HarmonyPatch(typeof(MobileParty))]
 internal class NavalRaftExitVisualPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<NavalRaftExitVisualPatches>();
+
     // Vanilla only leaves a raft at landfall, where the naval visual stops ticking. Leaving it at sea with ships (the naval
     // scenario stager) ticked the raft entity as a ship, and TickFoamDecals hit foam decal slots only AddShipVisual creates.
     [HarmonyPatch(nameof(MobileParty.IsInRaftState), MethodType.Setter)]
@@ -24,6 +28,7 @@ internal class NavalRaftExitVisualPatches
 
         // ResetPartyIcon plus a dirty mark, so the next refresh runs AddShipVisual (or nothing while the fleet is gone)
         visual.ClearVisualMemory();
+        Logger.Debug("[NavalRaft] Cleared the stale raft visual of {Party} after it left raft state", __instance.StringId);
     }
 
     /// <summary>Whether <paramref name="visual"/> still shows the raft of a party that has left raft state.</summary>
