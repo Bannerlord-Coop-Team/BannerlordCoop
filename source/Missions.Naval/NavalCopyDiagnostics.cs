@@ -38,6 +38,18 @@ internal sealed class RollingWindow
 
     public float Max => samples.Count == 0 ? 0f : samples.Max(sample => sample.Value);
 
+    public float Sum => samples.Sum(sample => sample.Value);
+
+    /// <summary>The nearest-rank percentile (0 to 100) of the window's values, so one GC pause doesn't stand for the window.</summary>
+    public float Percentile(float percent)
+    {
+        if (samples.Count == 0) return 0f;
+
+        var sorted = samples.Select(sample => sample.Value).OrderBy(value => value).ToList();
+        int rank = (int)Math.Ceiling(percent * sorted.Count / 100.0);
+        return sorted[Math.Max(0, Math.Min(sorted.Count - 1, rank - 1))];
+    }
+
     /// <summary>How often the sign flips between samples; samples within <paramref name="epsilon"/> of zero keep the last sign.</summary>
     public int SignChanges(float epsilon)
     {
@@ -70,14 +82,17 @@ internal sealed class CopyDiagnostics
 
     public RollingWindow Correction { get; } = new RollingWindow();
 
-    /// <summary>The position error to the target along the heading, whose sign changes over the window count as oscillations.</summary>
+    /// <summary>The along-heading position error to the target, low-passed over tau; its sign changes over the window count as oscillations.</summary>
     public RollingWindow ErrorAlongHeading { get; } = new RollingWindow();
+
+    /// <summary>How far the target moved at each sample arrival; owner frame-time jitter times speed shows here.</summary>
+    public RollingWindow TargetJump { get; } = new RollingWindow();
 
     /// <summary>Records one steering step's velocity change and along-heading error.</summary>
     public void RecordStep(float time, CopySteeringStep step)
     {
         Correction.Add(time, step.DeltaVelocity.Length);
-        ErrorAlongHeading.Add(time, step.ErrorAlongHeading);
+        ErrorAlongHeading.Add(time, step.SmoothedErrorAlongHeading);
     }
 
     /// <summary>The drift, heading, heave and correction windows with the steering's counters.</summary>
@@ -86,6 +101,7 @@ internal sealed class CopyDiagnostics
         drift = new { samples = Distance.Count, meanM = Round(Distance.Mean), maxM = Round(Distance.Max) },
         heading = new { meanDeg = Round(HeadingDegrees.Mean), maxDeg = Round(HeadingDegrees.Max) },
         heave = new { meanM = Round(Heave.Mean), maxM = Round(Heave.Max) },
+        targetJump = new { samples = TargetJump.Count, meanM = Round(TargetJump.Mean), maxM = Round(TargetJump.Max) },
         correction = new
         {
             samples = Correction.Count,

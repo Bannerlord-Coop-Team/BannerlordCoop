@@ -373,6 +373,19 @@ public class NavalShipEngine : INavalShipEngine
         return PlankSourceHull(agent);
     }
 
+    // The box vanilla reads the hull outline from (MissionShip's XY plane vertices), in the hull's local frame.
+    public bool TryGetFootprint(MissionObject hull, out Vec2 min, out Vec2 max)
+    {
+        min = max = Vec2.Zero;
+        var physics = (hull as MissionShip)?.Physics;
+        if (physics == null) return false;
+
+        var box = physics.PhysicsBoundingBoxWithoutChildren;
+        min = box.min.AsVec2;
+        max = box.max.AsVec2;
+        return max.x > min.x && max.y > min.y;
+    }
+
     // A connected plank belongs to no hull; its rope's source hull is the reference frame.
     private static MissionShip PlankSourceHull(Agent agent)
     {

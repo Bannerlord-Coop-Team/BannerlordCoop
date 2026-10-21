@@ -170,6 +170,13 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
 
     public MissionObject GetSupportHull(Agent agent) => null!;
 
+    // Fake hulls have no physics box, so no deck pose is refused for its distance.
+    public bool TryGetFootprint(MissionObject hull, out Vec2 min, out Vec2 max)
+    {
+        min = max = Vec2.Zero;
+        return false;
+    }
+
     public bool TryDescribeStation(UsableMissionObject point, out MissionObject hull, out string stationKey, out int pointIndex)
     {
         foreach (var fake in hulls)

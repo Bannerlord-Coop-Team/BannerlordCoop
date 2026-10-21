@@ -56,6 +56,15 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   thread.
 - A hit on a hull that another client simulates is routed to that owner, which applies it once through the vanilla damage
   method (`BattleShipDamageRouter`).
+- An on-foot agent on a registered hull sends its pose hull-local (`NavalDeckPoses`). Vanilla's on-ship check has no
+  distance (`MissionShip.GetIsAgentOnShip`) and `SteppedShip` latches through the jump-off cooldown, so a pose more than
+  15 m outside the hull's physics box (`NavalShipEngine.TryGetFootprint`, `PhysicsBoundingBoxWithoutChildren`) goes as a
+  world pose instead (R43: a corsair 470 m off its deck ship). A deck puppet out of walking reach teleports at most once
+  per owner update and walks the rest (R43: 2034 teleports of one puppet).
+- Only an agent's owner drowns it. Vanilla's 5 s breath check (`AgentNavalComponent.CheckAgentDrown`) queues a 10 damage
+  self-blow (`Mission.MissionTickAction.RegisterDrownBlow`). `NavalPuppetDrowningPatch` skips it on a puppet, and
+  `BattleBlowInterceptPatch` never routes a puppet's self-blow, so a non-owner's pose under water can't drown the real
+  agent a second time (R43: 10 routed self-hits killed a pirate).
 - Every stream is ordered by `AuthorityStamp` (host epoch, then revision) and drops traffic from a controller that is not
   in the mission.
 
@@ -382,9 +391,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 
 | Command | Side | What it does |
 |---|---|---|
-| `scenario <preset> [knobs] [ids]` | server | Stages a preset and starts the battle. |
+| `scenario <preset> [knobs] [ids]` | server | Stages a preset and starts the battle. Refuses while a listed player is still in a battle mission (leave it and finish the post-battle screens first), and heals each listed player's hero to full. |
 | `scenario_status` | client | Preset steps, knobs and `battle.hulls[]` with owner, AI flag, weapon and ram. |
-| `inspect` | client | Session, host epoch, hull streams, damage, weapons, decks, stations, AI fleet, end tally, agents, ships; DEBUG adds `copyProbe`: steering knobs, drift (against the owner's estimated current pose, the latest sample moved on by its age without the lead) and correction per copy, `oscillations10s`/`oscillationsTotal` (sign changes of the along-heading position error to the target, outside a 0.1 m deadband), steering cost, contact counters, `rams[]` (`hasRam` per hull) and the ram counters (`ramTicksGatedOnCopies`, `ramPuppetsSpared`). |
+| `inspect` | client | Session, host epoch, hull streams, damage, weapons, decks, stations, AI fleet, end tally, agents, ships; DEBUG adds `copyProbe`: steering knobs, drift (against the owner's estimated current pose, the latest sample moved on by its age without the lead) and correction per copy, `oscillations10s`/`oscillationsTotal` (sign changes of the along-heading position error to the target, low-passed over the steering's `tau`, outside a 0.1 m deadband; the raw error flips at each sample arrival as the target jumps by the owner's frame-time jitter times its speed, R43), `targetJump` (how far the target moved at each sample arrival), steering cost (`steerMeanMs`, `steerP99Ms`, `steerMaxMs`) with `gcCollections10s` per generation, contact counters, the deck puppets' `maxDeckError` (the largest hull-frame puppet-to-target error, skipping a teleport's or a new deck placement's sample, counted in `deckSamplesSkipped`), `rams[]` (`hasRam` per hull) and the ram counters (`ramTicksGatedOnCopies`, `ramPuppetsSpared`). |
 | `win`, `lose` | battle host | Ends the battle as a victory or defeat for the host's side; peers follow. |
 | `damage <ship> <amount>`, `sink <ship>` | client | Hits a hull as a ship weapon would; another owner's hull takes it through its owner. |
 | `reswap <ship>` | battle host | Replaces an AI hull without a migration. |
@@ -455,10 +464,14 @@ A scenario client whose Ready press throws (R42 crash 2's first symptom) logs th
 3. On the server, run the scenario under test, for example `coop.debug.naval.scenario vs_pirates hulls=3 weapons=1`.
    Check every gate with `inspect`, `scenario_status` and the `[NavalSync]` log lines on each client.
 4. After each battle, exit in the order the gate asks, then move on.
-   - Heal the heroes between scenarios (`coop.debug.hero.set_hitpoints <heroId> 100`, e.g.
-     `coop.debug.hero.set_hitpoints Hero_Player 100`). A wounded hero gets its party removed from the next battle by
-     `BattleMissionStartHandler.RemoveWoundedNonInitiatorParties`, which turns a 2-player scenario into a 1-player one
-     (R41a-2 E attempts 1 and 2).
+   - Leave each battle (`coop.debug.map_event.leave_battle` on each client) and finish the post-battle screens before the
+     next scenario; `scenario` refuses while a listed player is still in a mission (R43 staged into a live mission and
+     the client never entered the new map event). The server can't see the post-battle screens, so wait for them.
+   - `scenario` heals the listed heroes when it stages: a heal sent while a client is still in the old mission is
+     overwritten at its exit (`CoopAgentOrigin.OnMissionEnded`, R43: 51/100). A wounded hero gets its party removed
+     from the next battle by `BattleMissionStartHandler.RemoveWoundedNonInitiatorParties`, which turns a 2-player
+     scenario into a 1-player one (R41a-2 E attempts 1 and 2). `coop.debug.hero.set_hitpoints Hero_Player 100` still
+     heals one by hand.
    - To test a kept host's re-entry refusal, use `coop.debug.map_event.start_attack_mission` on that client. The kept host
      has no `PlayerEncounter` after leaving (menu `naval_encounter_disengaged`), so `enter_current_battle` only answers
      "No active encounter" (R41a-2 K).

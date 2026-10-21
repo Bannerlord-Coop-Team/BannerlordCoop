@@ -3,6 +3,7 @@ using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Missions;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
@@ -55,19 +56,30 @@ public class NavalScenarioStager : INavalScenarioStager
     private readonly INavalScenarioState state;
     private readonly INavalEngageResetTracer resetTracer;
     private readonly IPlayerRaftFleetInterface raftFleets;
+    // Only the server registers mission membership; a client container resolves this command without it.
+    private readonly IMissionMembershipRegistry missionMembership;
 
     public NavalScenarioStager(IObjectManager objectManager, INetwork network, INavalScenarioState state,
-        INavalEngageResetTracer resetTracer, IPlayerRaftFleetInterface raftFleets)
+        INavalEngageResetTracer resetTracer, IPlayerRaftFleetInterface raftFleets,
+        IMissionMembershipRegistry missionMembership = null)
     {
         this.objectManager = objectManager;
         this.network = network;
         this.state = state;
         this.resetTracer = resetTracer;
         this.raftFleets = raftFleets;
+        this.missionMembership = missionMembership;
     }
 
     public bool TryStage(NavalScenarioConfig config, out string output)
     {
+        output = PlayersStillInBattle(config.ControllerIds);
+        if (output != null)
+        {
+            Logger.Warning("[NavalScenario] {Output}", output);
+            return false;
+        }
+
         var players = new MobileParty[config.ControllerIds.Length];
         for (int i = 0; i < players.Length; i++)
         {
@@ -91,6 +103,7 @@ public class NavalScenarioStager : INavalScenarioStager
             TopUpShips(party.Party, config.ShipsPerPlayer, hull);
             TopUpTroops(party, config.TroopTemplatesPerPlayer);
         }
+        HealHeroes(players, log);
         log.Append(" players=").Append(string.Join(",", config.ControllerIds.Zip(players,
             (id, party) => $"{id}(ships={party.Ships.Count},troops={party.MemberRoster.TotalManCount})")));
         if (config.ArmedShipsPerParty > 0)
@@ -132,6 +145,35 @@ public class NavalScenarioStager : INavalScenarioStager
         output = log.Append(" mapEvent=").Append(config.MapEventId).ToString();
         Logger.Information("[NavalScenario] {Output}", output);
         return true;
+    }
+
+    /// <summary>The refusal while a listed player is still in a battle mission, else null: its client would take the new
+    /// map event on top of the old encounter, never enter it, and throw in the encounter menu on leaving (R43).</summary>
+    internal string PlayersStillInBattle(IEnumerable<string> controllerIds)
+    {
+        if (missionMembership == null) return null;
+
+        var inMission = controllerIds.Where(missionMembership.IsControllerInMission).ToList();
+        if (inMission.Count == 0) return null;
+
+        return $"Not staged: {string.Join(",", inMission)} still in a battle mission. Leave it " +
+            "(coop.debug.map_event.leave_battle) and finish the post-battle screens, then stage again.";
+    }
+
+    // Heals each player's hero, whose last mission exit may have reported it wounded (R43: 51/100), so its party isn't left out
+    // of the battle as wounded; the synced HitPoints carry it to every client.
+    private static void HealHeroes(MobileParty[] players, StringBuilder log)
+    {
+        var healed = new List<string>();
+        foreach (var hero in players.Select(party => party.LeaderHero))
+        {
+            if (hero == null || hero.HitPoints >= hero.MaxHitPoints) continue;
+
+            healed.Add($"{hero.StringId}({hero.HitPoints}->{hero.MaxHitPoints})");
+            hero.HitPoints = hero.MaxHitPoints;
+        }
+
+        if (healed.Count > 0) log.Append(" healed=").Append(string.Join(",", healed));
     }
 
     // A failed encounter or blockade stays visible in scenario_status with the reason.

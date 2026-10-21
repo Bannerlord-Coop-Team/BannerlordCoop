@@ -20,6 +20,32 @@ public class NavalCopyDiagnosticsTests
         Assert.Equal(3f, window.Max);
     }
 
+    // R43: one 3.4 ms spike stood for the whole window's steer cost; the p99 of 100 frames skips the single worst one.
+    [Fact]
+    public void RollingWindow_Percentile_IsTheNearestRankValue()
+    {
+        var window = new RollingWindow();
+        for (int frame = 1; frame <= 99; frame++) window.Add(frame * 0.01f, 0.03f);
+        window.Add(1f, 3.4f);
+
+        Assert.Equal(0.03f, window.Percentile(99f));
+        Assert.Equal(3.4f, window.Percentile(100f));
+        Assert.Equal(3.4f, window.Max);
+        Assert.Equal(0f, new RollingWindow().Percentile(99f));
+    }
+
+    // The probe sums per-frame GC collection deltas over the window.
+    [Fact]
+    public void RollingWindow_Sum_AddsTheWindowsValues()
+    {
+        var window = new RollingWindow();
+        window.Add(0f, 1f);
+        window.Add(1f, 0f);
+        window.Add(2f, 2f);
+
+        Assert.Equal(3f, window.Sum);
+    }
+
     [Fact]
     public void RollingWindow_IgnoresNonFiniteValues()
     {
