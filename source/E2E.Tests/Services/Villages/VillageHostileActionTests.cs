@@ -909,6 +909,7 @@ public class VillageHostileActionTests : MapEventTestBase
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
             party.MemberRoster.AddToCounts(hero.CharacterObject, 1);
+            hero.PartyBelongedTo = party;
             settlement.SettlementHitPoints = 1f;
             var mapEvent = CreateHostileActionMapEvent(party.Party, settlement.Party, VillageHostileAction.Raid);
             Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
@@ -934,7 +935,12 @@ public class VillageHostileActionTests : MapEventTestBase
         owner.Call(() =>
         {
             Assert.True(owner.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
-            using (new AllowedThread()) Campaign.Current.MainParty = party;
+            Assert.True(owner.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = party;
+                settlement.SetSettlementComponent(settlement.Village);
+            }
             var mapEvent = events[owner];
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
             encounter._mapEvent = mapEvent;
