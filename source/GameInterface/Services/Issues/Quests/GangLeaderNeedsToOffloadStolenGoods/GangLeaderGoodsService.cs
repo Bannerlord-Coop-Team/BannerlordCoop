@@ -50,13 +50,15 @@ public readonly struct NetworkGangLeaderGoodsAcquired : IEvent
     [ProtoMember(2)] public readonly string IssueId;
     [ProtoMember(3)] public readonly string QuestId;
     [ProtoMember(4)] public readonly bool Fight;
+    [ProtoMember(5)] public readonly bool BattleWon;
 
-    public NetworkGangLeaderGoodsAcquired(string issueOwnerId, string issueId, string questId, bool fight)
+    public NetworkGangLeaderGoodsAcquired(string issueOwnerId, string issueId, string questId, bool fight, bool battleWon = false)
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
         QuestId = questId;
         Fight = fight;
+        BattleWon = battleWon;
     }
 }
 
@@ -166,8 +168,8 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
                 quest.StringId != data.QuestId) return;
             quest._isFightingForGoods = data.Fight;
             quest._isPayingForGoods = !data.Fight;
-            quest._playerHasTheGoods = !data.Fight;
-            if (data.Fight) quest.AddLog(quest.BeforeAttackHideoutQuestLogText);
+            quest._playerHasTheGoods = !data.Fight || data.BattleWon;
+            if (data.Fight && !data.BattleWon) quest.AddLog(quest.BeforeAttackHideoutQuestLogText);
         }, context: nameof(GangLeaderGoodsService));
     }
 
@@ -184,7 +186,11 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
         var success = branch == GangLeaderNeedsToOffloadStolenGoodsBranch.SuccessByKeepingGoods ||
             branch == GangLeaderNeedsToOffloadStolenGoodsBranch.SuccessByGivingGoodsBack;
         if (!success && branch != GangLeaderNeedsToOffloadStolenGoodsBranch.BetrayalByKeepingGoods &&
-            branch != GangLeaderNeedsToOffloadStolenGoodsBranch.BetrayalByGivingGoodsBack) return false;
+            branch != GangLeaderNeedsToOffloadStolenGoodsBranch.BetrayalByGivingGoodsBack)
+        {
+            Logger.Warning("Rejected unknown stolen goods branch {branch} for {quest}", proof, quest.StringId);
+            return false;
+        }
         if (!quest._playerHasTheGoods || quest._isPayingForGoods != success ||
             !merchantConversations.Remove(quest) || !consumed.Add(quest))
         {
@@ -282,6 +288,10 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
         {
             quest._isFightingForGoods = true;
             quest._playerHasTheGoods = true;
+            var issue = IssueManager.GetIssueOfQuest(quest);
+            if (issue != null && objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) &&
+                players.TryGetPlayer(Hero.MainHero, out var player) && players.TryGetPeer(player.ControllerId, out var peer))
+                network.Send(peer, new NetworkGangLeaderGoodsAcquired(ownerId, issue.StringId, quest.StringId, true, true));
         }
     }
 }

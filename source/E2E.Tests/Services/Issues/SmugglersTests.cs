@@ -203,7 +203,17 @@ public class SmugglersTests : IDisposable
         Assert.Equal(1, succeedQuest.CountFor(Server));
     }
 
-    private void StartPersuasionSession(string? requestId = null)
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void MapPersuasion_RequiresAnEngagementWithTheTarget(bool engaged)
+    {
+        StartPersuasionSession(engaged ? "map-persuasion" : null, onMap: true);
+        ClientA.Call(() => QuestOf(ClientA).SucceedQuest(null));
+        Assert.Equal(engaged ? 1 : 0, succeedQuest.CountFor(Server));
+    }
+
+    private void StartPersuasionSession(string? requestId = null, bool onMap = false)
     {
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var ownerPartyId = string.Empty;
@@ -221,16 +231,23 @@ public class SmugglersTests : IDisposable
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
                 using (new AllowedThread())
                 {
-                    ownerParty.CurrentSettlement = settlement;
-                    smugglers.CurrentSettlement = settlement;
+                    ownerParty.CurrentSettlement = onMap ? null : settlement;
+                    smugglers.CurrentSettlement = onMap ? null : settlement;
                     QuestOf(instance)._smugglerParty = smugglers;
                 }
             });
         }
         if (requestId != null)
         {
-            Server.Call(() => Assert.True(Server.Resolve<ConversationPartyTracker>().TryBeginEngagement(
-                ClientA.NetPeer, ownerPartyId, partyId, false, requestId: requestId)));
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(partyId, out var target));
+                Assert.True(Server.ObjectManager.TryGetId(ownerParty.Party, out var ownerBaseId));
+                Assert.True(Server.ObjectManager.TryGetId(target.Party, out var targetBaseId));
+                Assert.True(Server.Resolve<ConversationPartyTracker>().TryBeginEngagement(
+                    ClientA.NetPeer, ownerBaseId, targetBaseId, false, requestId: requestId));
+            });
         }
         ClientA.Call(() => ClientA.Resolve<IPersuasionSessionService>().Start(QuestOf(ClientA), QuestOf(ClientA)._smugglerParty));
     }
