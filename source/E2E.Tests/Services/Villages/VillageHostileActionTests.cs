@@ -921,6 +921,12 @@ public class VillageHostileActionTests : MapEventTestBase
             instance.Call(() =>
             {
                 Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<Village>(target.VillageId, out var village));
+                if (instance != Server)
+                {
+                    using (new AllowedThread()) settlement.SetSettlementComponent(village);
+                }
                 Assert.Empty(Campaign.Current.QuestManager.Quests);
                 events.Add(instance, mapEvent);
                 completed.Add(instance, 0);
@@ -940,7 +946,6 @@ public class VillageHostileActionTests : MapEventTestBase
             using (new AllowedThread())
             {
                 Campaign.Current.MainParty = party;
-                settlement.SetSettlementComponent(settlement.Village);
                 settlement.GatePosition = new CampaignVec2(new Vec2(42f, 24f), true);
                 party.Position = new CampaignVec2(new Vec2(40f, 24f), true);
             }
