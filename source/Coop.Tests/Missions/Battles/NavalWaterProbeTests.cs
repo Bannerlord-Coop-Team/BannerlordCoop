@@ -132,5 +132,12 @@ public class NavalWaterProbeTests
     {
         Assert.Equal(degrees, NavalWaterProbeLogic.YawDegrees(new Vec3(x, y, z)), 3);
     }
+
+    [Fact]
+    public void StartRefusal_RefusesStartUntilDeploymentHasFinished()
+    {
+        Assert.NotNull(NavalWaterProbeCoopCommand.StartRefusal(deploymentFinished: false));
+        Assert.Null(NavalWaterProbeCoopCommand.StartRefusal(deploymentFinished: true));
+    }
 }
 #endif

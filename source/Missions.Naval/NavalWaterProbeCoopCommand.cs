@@ -33,9 +33,11 @@ public sealed class NavalWaterProbeCoopCommand : ICoopCommand
         new ExpectedArgs("knob_3", "grid=n, spacing=m or seconds=s.", false),
     };
 
+    // Starts, stops or reports this client's water probe in the running naval battle.
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        var probe = Mission.Current?.GetMissionBehavior<NavalWaterProbeLogic>();
+        var mission = Mission.Current;
+        var probe = mission?.GetMissionBehavior<NavalWaterProbeLogic>();
         if (probe == null || !CoopNavalMissionScope.IsActive) return Failed("No active coop naval battle mission.");
 
         var values = args?.ToArray() ?? Array.Empty<string>();
@@ -44,7 +46,8 @@ public sealed class NavalWaterProbeCoopCommand : ICoopCommand
         switch (values[0].Trim().ToLowerInvariant())
         {
             case "start":
-                var error = NavalWaterProbeSettings.TryParse(values.Skip(1), out var settings) ?? probe.Start(settings);
+                var error = StartRefusal(mission.IsDeploymentFinished)
+                    ?? NavalWaterProbeSettings.TryParse(values.Skip(1), out var settings) ?? probe.Start(settings);
                 return error != null ? Failed(error) : Status("started", probe);
             case "stop":
                 if (values.Length > 1) return Failed(NavalWaterProbeSettings.Usage);
@@ -58,9 +61,18 @@ public sealed class NavalWaterProbeCoopCommand : ICoopCommand
         }
     }
 
+    /// <summary>
+    /// Why start must wait, or null: R42's crash 2 hit a client that took a probe start while its battle still deployed.
+    /// </summary>
+    internal static string StartRefusal(bool deploymentFinished) => deploymentFinished
+        ? null
+        : "The battle is still loading or deploying; start the water probe once deployment has finished (after Ready).";
+
+    // The probe's state as a NAVAL_WATER_PROBE_STATUS line.
     private static CoopCommandResult Status(string action, NavalWaterProbeLogic probe) =>
         new CoopCommandResult(true, "NAVAL_WATER_PROBE_STATUS " + JsonConvert.SerializeObject(new { action, probe = probe.Status() }));
 
+    // A failed command result with output.
     private static CoopCommandResult Failed(string output) => new CoopCommandResult(false, output, "command_failed");
 }
 #endif
