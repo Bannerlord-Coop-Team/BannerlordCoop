@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Load;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Issues;
