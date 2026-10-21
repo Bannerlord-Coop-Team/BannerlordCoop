@@ -40,6 +40,7 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.UI.Notifications.Messages;
 using GameInterface.Services.Villages.Interfaces;
+using GameInterface.Utils.Commands;
 using HarmonyLib;
 using SandBox.Conversation.MissionLogics;
 using SandBox.ViewModelCollection.Map.Tracker;
@@ -118,7 +119,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             var previousHero = ResolvedMainHeroContext.ResolvedMainHero;
             var previousParty = Campaign.Current.MainParty;
             var args = new CoopCommandArgsFactory();
-            var war = new KingdomDebugCommand.KingdomDeclareWarCoopCommand();
+            var war = new KingdomDebugCommand.KingdomDeclareWarCoopCommand(new CommandObjectResolver(Server.ObjectManager));
             Assert.False(war.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId })).Succeeded);
             Assert.False(war.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId, "hostility", "none" })).Succeeded);
             Assert.False(kingdom.IsAtWarWith(enemyKingdom));
@@ -146,7 +147,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 Assert.Same(previousHero, ResolvedMainHeroContext.ResolvedMainHero);
                 Assert.Same(previousParty, Campaign.Current.MainParty);
 
-                var peace = new KingdomDebugCommand.KingdomMakePeaceCoopCommand();
+                var peace = new KingdomDebugCommand.KingdomMakePeaceCoopCommand(new CommandObjectResolver(Server.ObjectManager));
                 Assert.False(peace.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId })).Succeeded);
                 Assert.True(kingdom.IsAtWarWith(enemyKingdom));
                 result = peace.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId, ControllerId }));
@@ -245,7 +246,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
             var previousHero = ResolvedMainHeroContext.ResolvedMainHero;
             var previousParty = Campaign.Current.MainParty;
-            var command = new ClanDebugCommands.ClanLeaveKingdomCoopCommand();
+            var command = new ClanDebugCommands.ClanLeaveKingdomCoopCommand(
+                new GameInterface.Utils.Commands.CommandObjectResolver(Server.ObjectManager));
             var args = new CoopCommandArgsFactory();
             var missingActor = command.ProcessCommand(args.FromValues(new[] { player.ClanId, "rebellion" }));
             Assert.False(missingActor.Succeeded);
@@ -402,7 +404,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             output = ExecuteCommand(
-                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                new KingdomDebugCommand.KingdomCreateCoopCommand(new CommandObjectResolver(Server.ObjectManager)),
                 player.HeroId,
                 KingdomName);
         });
@@ -440,7 +442,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.Call(() =>
         {
             output = ExecuteCommand(
-                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                new KingdomDebugCommand.KingdomCreateCoopCommand(new CommandObjectResolver(client.ObjectManager)),
                 player.HeroId,
                 KingdomName);
         });
@@ -472,7 +474,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             output = ExecuteCommand(
-                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                new KingdomDebugCommand.KingdomCreateCoopCommand(new CommandObjectResolver(Server.ObjectManager)),
                 followerId,
                 KingdomName);
         });
@@ -495,7 +497,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             string result = ExecuteCommand(
-                new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(),
+                new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(new CommandObjectResolver(Server.ObjectManager)),
                 ControllerId,
                 kingdomId);
 
@@ -540,7 +542,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.Call(() =>
         {
-            var joinResult = ExecuteCommand(new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(), ControllerId, kingdomId);
+            var joinResult = ExecuteCommand(new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(new CommandObjectResolver(Server.ObjectManager)), ControllerId, kingdomId);
 
             Assert.Contains("Forced player", joinResult);
         });
@@ -548,7 +550,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.NetworkSentMessages.Clear();
         Server.Call(() =>
         {
-            var restoreResult = ExecuteCommand(new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(), ControllerId, "none");
+            var restoreResult = ExecuteCommand(new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(new CommandObjectResolver(Server.ObjectManager)), ControllerId, "none");
 
             Assert.Contains("Restored player", restoreResult);
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
@@ -894,7 +896,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             string result = ExecuteCommand(
-                new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(),
+                new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(new CommandObjectResolver(Server.ObjectManager)),
                 ControllerId,
                 newKingdomId);
 
@@ -3422,7 +3424,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client2.Call(() =>
         {
             output = ExecuteCommand(
-                new KingdomDebugCommand.KingdomDecisionsCoopCommand(),
+                new KingdomDebugCommand.KingdomDecisionsCoopCommand(new CommandObjectResolver(client2.ObjectManager)),
                 kingdomId);
         });
 

@@ -163,8 +163,15 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id", "The optional registered clan id.", false),
+            new ExpectedArgs("clan_id", "The optional clan name or id; quote names with spaces.", false),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanWageStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -173,8 +180,8 @@ namespace GameInterface.Services.GameDebug.Commands
                 if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
 
                 Clan clan = Clan.PlayerClan;
-                if (args.Count == 1 && !objectManager.TryGetObject(args[0], out clan))
-                    return Failed($"Unable to find clan with id: {args[0]}");
+                if (args.Count == 1 && !resolver.TryResolveClan(args[0], out clan, out var error))
+                    return Failed(error);
                 if (clan == null) return Failed("The target clan is unavailable.");
 
                 var parties = new List<(string Type, MobileParty Party)>();
@@ -275,9 +282,16 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party_id", "The registered mobile party id."),
+            new ExpectedArgs("party_id", "The mobile party name or id; quote names with spaces."),
             new ExpectedArgs("count", "A message count from 1 through 500."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanRefreshBurstCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -285,17 +299,19 @@ namespace GameInterface.Services.GameDebug.Commands
                 if (!int.TryParse(args[1], out var count) || count < 1 || count > 500)
                     return Failed($"Refresh count must be an integer from 1 through 500: {args[1]}.");
                 if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-                if (!objectManager.TryGetObject(args[0], out MobileParty _))
-                    return Failed($"Party with id {args[0]} not found.");
+                if (!resolver.TryResolveMobileParty(args[0], out var party, out var error))
+                    return Failed(error);
+                if (!objectManager.TryGetId(party, out string partyId))
+                    return Failed($"Party {party.Name} has no registered id.");
                 if (!ContainerProvider.TryResolve<INetwork>(out var network))
                     return Failed("Unable to resolve Network.");
 
                 for (int i = 0; i < count; i++)
                 {
-                    network.SendAll(new NetworkRefreshAfterRoleAssignment(args[0]));
+                    network.SendAll(new NetworkRefreshAfterRoleAssignment(partyId));
                 }
 
-                return Succeeded($"REFRESH_BURST_SENT party={args[0]} count={count}");
+                return Succeeded($"REFRESH_BURST_SENT party={partyId} count={count}");
         }
     }
 
@@ -311,10 +327,17 @@ namespace GameInterface.Services.GameDebug.Commands
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
-                new ExpectedArgs("clan_id", "The registered player clan id."),
+                new ExpectedArgs("clan_id", "The player clan name or id; quote names with spaces."),
                 new ExpectedArgs("count", "The number of heirs to create, from 1 through 10."),
-                new ExpectedArgs("parent", "Optional player hero id or exact name; defaults to the clan leader.", false),
+                new ExpectedArgs("parent", "Optional player hero name or id; quote names with spaces. Defaults to the clan leader.", false),
             };
+
+            private readonly ICommandObjectResolver resolver;
+
+            public ClanAddHeirsCoopCommand(ICommandObjectResolver resolver)
+            {
+                this.resolver = resolver;
+            }
 
             public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
             {
@@ -326,8 +349,8 @@ namespace GameInterface.Services.GameDebug.Commands
 
                 if (!TryGetObjectManager(out var objectManager))
                     return Failed($"Unable to resolve {nameof(IObjectManager)}");
-                if (!objectManager.TryGetObjectWithLogging(args[0], out Clan playerClan))
-                    return Failed($"Unable to resolve clan {args[0]}");
+                if (!resolver.TryResolveClan(args[0], out Clan playerClan, out error))
+                    return Failed(error);
 
                 if (!playerClan.IsPlayerClan())
                     return Failed("Targeted clan is not a player clan. Only add new heirs to player clans.");
@@ -335,9 +358,9 @@ namespace GameInterface.Services.GameDebug.Commands
                 Hero playerHero = playerClan.Leader;
                 if (args.Count == 3)
                 {
-                    if (!objectManager.TryGetObject(args[2], out playerHero))
-                        playerHero = playerClan.Heroes.FirstOrDefault(hero => hero.IsPlayerHero() && hero.Name.ToString() == args[2]);
-                    if (playerHero == null || !playerHero.IsPlayerHero() || playerHero.Clan != playerClan)
+                    if (!resolver.TryResolveHero(args[2], out playerHero, out error))
+                        return Failed(error);
+                    if (!playerHero.IsPlayerHero() || playerHero.Clan != playerClan)
                         return Failed("The parent must be a player in the selected clan.");
                 }
 
@@ -392,9 +415,12 @@ namespace GameInterface.Services.GameDebug.Commands
                         $"relation=child eligible={eligible} points={(eligible ? selectionPoints : 0)}");
                 }
 
+                string clanId = objectManager.TryGetId(playerClan, out string registeredClanId)
+                    ? registeredClanId
+                    : playerClan.StringId;
                 output.Insert(
                     0,
-                    $"ADD_HEIRS clan={args[0]} player={playerHero.StringId} " +
+                    $"ADD_HEIRS clan={clanId} player={playerHero.StringId} " +
                     $"created={createdHeroes.Count} eligible={eligibleCount}\n");
                 return Succeeded(output.ToString());
             }
@@ -450,13 +476,19 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id", "The registered clan id."),
+            new ExpectedArgs("clan_id", "The clan name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanFieldDumpCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-                if (!TryGetObjectManager(out IObjectManager objectManager)) return Failed("Unable to resolve ObjectManager");
-                if (!objectManager.TryGetObject(args[0], out Clan clan)) return Failed($"Unable to find clan with id: {args[0]}");
+                if (!resolver.TryResolveClan(args[0], out Clan clan, out var error)) return Failed(error);
 
                 var stringBuilder = new StringBuilder();
                 foreach (var field in typeof(Clan).GetFields(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance))
@@ -484,17 +516,23 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id", "The registered clan id."),
+            new ExpectedArgs("clan_id", "The clan name or id; quote names with spaces."),
             new ExpectedArgs("amount", "The numeric influence amount."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanAddInfluenceCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
                 if (ModInformation.IsClient)
                     return Failed("Command is only available to run on the server");
 
-                if (!TryGetObjectManager(out IObjectManager objectManager)) return Failed("Unable to resolve ObjectManager");
-                if (!objectManager.TryGetObject(args[0], out Clan clan)) return Failed($"Unable to find clan with id: {args[0]}");
+                if (!resolver.TryResolveClan(args[0], out Clan clan, out var error)) return Failed(error);
                 if (!float.TryParse(args[1], out float amount)) return Failed($"'{args[1]}' is not a valid number");
 
                 ChangeClanInfluenceAction.Apply(clan, amount);
@@ -514,31 +552,30 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id", "The registered clan id."),
-            new ExpectedArgs("hero_id", "The registered new leader hero id."),
+            new ExpectedArgs("clan_id", "The clan name or id; quote names with spaces."),
+            new ExpectedArgs("hero_id", "The new leader hero name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanChangeLeaderCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
                 if (ModInformation.IsClient)
                     return Failed("Command is only available to run on the server");
 
-                if (!TryGetObjectManager(out IObjectManager objectManager))
+                if (!resolver.TryResolveClan(args[0], out Clan clan, out var error))
                 {
-                    return Failed("Unable to resolve ObjectManager");
+                    return Failed(error);
                 }
 
-                string clanId = args[0];
-                string heroId = args[1];
-
-                if (!objectManager.TryGetObject(clanId, out Clan clan))
+                if (!resolver.TryResolveHero(args[1], out Hero newLeader, out error))
                 {
-                    return Failed($"Argument1: Clan not found by ID: {clanId}");
-                }
-
-                if (!objectManager.TryGetObject(heroId, out Hero newLeader))
-                {
-                    return Failed($"Argument2: Kingdom not found by ID: {heroId}");
+                    return Failed(error);
                 }
 
                 ChangeClanLeaderAction.ApplyWithSelectedNewLeader(clan, newLeader);
@@ -559,11 +596,18 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id", "The registered clan id."),
-            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("clan_id", "The clan name or id; quote names with spaces."),
+            new ExpectedArgs("kingdom_id", "The kingdom name or id; quote names with spaces."),
             new ExpectedArgs("join", "normal, defection or mercenary."),
             new ExpectedArgs("actor_controller_id", "The registered acting player for native diplomacy callbacks."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanChangeKingdomCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -575,17 +619,14 @@ namespace GameInterface.Services.GameDebug.Commands
                     return Failed("Unable to resolve ObjectManager");
                 }
 
-                string clanId = args[0];
-                string kingdomId = args[1];
-
-                if (!objectManager.TryGetObject(clanId, out Clan clan))
+                if (!resolver.TryResolveClan(args[0], out Clan clan, out var error))
                 {
-                    return Failed($"Argument1: Clan not found by ID: {clanId}");
+                    return Failed(error);
                 }
 
-                if (!objectManager.TryGetObject(kingdomId, out Kingdom newKingdom))
+                if (!resolver.TryResolveKingdom(args[1], out Kingdom newKingdom, out error))
                 {
-                    return Failed($"Argument2: Kingdom not found by ID: {kingdomId}");
+                    return Failed(error);
                 }
 
                 if (args.Count < 4 ||
@@ -632,24 +673,24 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id", "The registered clan id."),
+            new ExpectedArgs("clan_id", "The clan name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanDestroyCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
                 if (ModInformation.IsClient)
                     return Failed("Command is only available to run on the server");
 
-                if (!TryGetObjectManager(out IObjectManager objectManager))
+                if (!resolver.TryResolveClan(args[0], out Clan clan, out var error))
                 {
-                    return Failed("Unable to resolve ObjectManager");
-                }
-
-                string clanId = args[0];
-
-                if (!objectManager.TryGetObject(clanId, out Clan clan))
-                {
-                    return Failed($"Argument1: Clan not found by ID: {clanId}");
+                    return Failed(error);
                 }
 
                 DestroyClanAction.Apply(clan);
@@ -670,31 +711,30 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id", "The registered clan id."),
-            new ExpectedArgs("hero_id", "The registered companion hero id."),
+            new ExpectedArgs("clan_id", "The clan name or id; quote names with spaces."),
+            new ExpectedArgs("hero_id", "The companion hero name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanAddCompanionCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
                 if (ModInformation.IsClient)
                     return Failed("Command is only available to run on the server");
 
-                if (!TryGetObjectManager(out IObjectManager objectManager))
+                if (!resolver.TryResolveClan(args[0], out Clan clan, out var error))
                 {
-                    return Failed("Unable to resolve ObjectManager");
+                    return Failed(error);
                 }
 
-                string clanId = args[0];
-                string heroId = args[1];
-
-                if (!objectManager.TryGetObject(clanId, out Clan clan))
+                if (!resolver.TryResolveHero(args[1], out Hero companion, out error))
                 {
-                    return Failed($"Argument1: Clan not found by ID: {clanId}");
-                }
-
-                if (!objectManager.TryGetObject(heroId, out Hero companion))
-                {
-                    return Failed($"Argument2: Hero not found by ID: {heroId}");
+                    return Failed(error);
                 }
 
                 AddCompanionAction.Apply(clan, companion);
@@ -715,24 +755,24 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered companion hero id."),
+            new ExpectedArgs("hero_id", "The companion hero name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanRemoveCompanionCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
                 if (ModInformation.IsClient)
                     return Failed("Command is only available to run on the server");
 
-                if (!TryGetObjectManager(out IObjectManager objectManager))
+                if (!resolver.TryResolveHero(args[0], out Hero companion, out var error))
                 {
-                    return Failed("Unable to resolve ObjectManager");
-                }
-
-                string heroId = args[0];
-
-                if (!objectManager.TryGetObject(heroId, out Hero companion))
-                {
-                    return Failed($"Argument1: Hero not found by ID: {heroId}");
+                    return Failed(error);
                 }
 
                 if (companion.Clan == null) return Failed("Wanderer/companion is not in a clan.");
@@ -756,26 +796,27 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id", "The registered clan id."),
+            new ExpectedArgs("clan_id", "The clan name or id; quote names with spaces."),
             new ExpectedArgs("renown", "The integer renown amount."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanAddRenownCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
                 if (ModInformation.IsClient)
                     return Failed("Command is only available to run on the server");
 
-                if (!TryGetObjectManager(out IObjectManager objectManager))
-                {
-                    return Failed("Unable to resolve ObjectManager");
-                }
-
-                string clanId = args[0];
                 string renownStr = args[1];
 
-                if (!objectManager.TryGetObject(clanId, out Clan clan))
+                if (!resolver.TryResolveClan(args[0], out Clan clan, out var error))
                 {
-                    return Failed($"Argument1: Clan not found by ID: {clanId}");
+                    return Failed(error);
                 }
 
                 if (!int.TryParse(renownStr, out int renown))
@@ -806,31 +847,25 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id_or_name", "The optional clan id or display name. Quote multi-word names.", false),
+            new ExpectedArgs("clan_id_or_name", "The optional clan name or id. Quote multi-word names.", false),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanEconomyCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-                if (!TryGetObjectManager(out IObjectManager objectManager))
-                {
-                    return Failed("Unable to resolve ObjectManager");
-                }
-
                 Clan clan;
                 if (args.Count >= 1)
                 {
                     // Quote a multi-word display name so it arrives as one command argument.
-                    string query = args[0];
-
-                    if (!objectManager.TryGetObject(query, out clan))
+                    if (!resolver.TryResolveClan(args[0], out clan, out var error))
                     {
-                        clan = Campaign.Current?.CampaignObjectManager?.Clans
-                            ?.FirstOrDefault(c => string.Equals(c.Name?.ToString(), query, System.StringComparison.OrdinalIgnoreCase));
-                    }
-
-                    if (clan == null)
-                    {
-                        return Failed($"Clan not found by id or name: '{query}'");
+                        return Failed(error);
                     }
                 }
                 else
@@ -881,23 +916,27 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id", "The registered clan id."),
-            new ExpectedArgs("kingdom_id", "The registered kingdom id."),
+            new ExpectedArgs("clan_id", "The clan name or id; quote names with spaces."),
+            new ExpectedArgs("kingdom_id", "The kingdom name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanJoinKingdomCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
                 if (ModInformation.IsClient)
                     return Failed("Command is only available to run on the server");
 
-                if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-                    return Failed($"Unable to get {nameof(IObjectManager)}");
+                if (!resolver.TryResolveClan(args[0], out var clan, out var error))
+                    return Failed(error);
 
-                if (objectManager.TryGetObject<Clan>(args[0], out var clan) == false)
-                    return Failed($"Unable to get Clan with {args[0]}");
-
-                if (objectManager.TryGetObject<Kingdom>(args[1], out var kingdom) == false)
-                    return Failed($"Unable to get Kingdom with {args[1]}");
+                if (!resolver.TryResolveKingdom(args[1], out var kingdom, out error))
+                    return Failed(error);
 
                 ChangeKingdomAction.ApplyByJoinToKingdom(clan, kingdom);
 
@@ -919,10 +958,17 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id", "The registered clan id."),
+            new ExpectedArgs("clan_id", "The clan name or id; quote names with spaces."),
             new ExpectedArgs("leave", "normal or rebellion."),
             new ExpectedArgs("actor_controller_id", "The registered acting player for native diplomacy callbacks."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanLeaveKingdomCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -932,8 +978,8 @@ namespace GameInterface.Services.GameDebug.Commands
                 if (!TryGetObjectManager(out IObjectManager objectManager))
                     return Failed("Unable to resolve ObjectManager");
 
-                if (!objectManager.TryGetObject<Clan>(args[0], out var clan))
-                    return Failed($"Unable to get Clan with {args[0]}");
+                if (!resolver.TryResolveClan(args[0], out var clan, out var error))
+                    return Failed(error);
 
                 if (clan.Kingdom == null)
                     return Failed($"{clan.Name} does not belong to a kingdom");
@@ -989,16 +1035,20 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id", "The registered clan id."),
+            new ExpectedArgs("clan_id", "The clan name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanMembershipCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-                if (!TryGetObjectManager(out IObjectManager objectManager))
-                    return Failed("Unable to resolve ObjectManager");
-
-                if (!objectManager.TryGetObject<Clan>(args[0], out var clan))
-                    return Failed($"Unable to get Clan with {args[0]}");
+                if (!resolver.TryResolveClan(args[0], out var clan, out var error))
+                    return Failed(error);
 
                 var sb = new StringBuilder();
                 sb.AppendLine($"ClanId={clan.StringId}");
@@ -1025,20 +1075,24 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id", "The registered clan id."),
+            new ExpectedArgs("clan_id", "The clan name or id; quote names with spaces."),
             new ExpectedArgs("amount", "The numeric influence amount."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanGiveInfluenceCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
                 if (ModInformation.IsClient)
                     return Failed("Command is only available to run on the server");
 
-                if (!TryGetObjectManager(out IObjectManager objectManager))
-                    return Failed("Unable to resolve ObjectManager");
-
-                if (!objectManager.TryGetObject<Clan>(args[0], out var clan))
-                    return Failed($"Unable to get Clan with {args[0]}");
+                if (!resolver.TryResolveClan(args[0], out var clan, out var error))
+                    return Failed(error);
 
                 if (!float.TryParse(args[1], out float amount))
                     return Failed($"Unable to parse {args[1]} as float");
@@ -1062,19 +1116,23 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id", "The registered clan id."),
+            new ExpectedArgs("clan_id", "The clan name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanInfoCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-                if (!TryGetObjectManager(out IObjectManager objectManager))
-                    return Failed("Unable to resolve ObjectManager");
-
-                if (!objectManager.TryGetObject<Clan>(args[0], out var clan))
-                    return Failed($"Unable to get Clan with {args[0]}");
+                if (!resolver.TryResolveClan(args[0], out var clan, out var error))
+                    return Failed(error);
 
                 var sb = new StringBuilder();
-                sb.AppendLine($"Name: {clan.Name}");
+                sb.AppendLine($"Name:{clan.Name}");
                 sb.AppendLine($"StringId: {clan.StringId}");
                 sb.AppendLine($"Leader: {clan.Leader?.Name.ToString() ?? "none"}");
                 sb.AppendLine($"Kingdom: {clan.Kingdom?.Name.ToString() ?? "none"}");
@@ -1099,16 +1157,20 @@ namespace GameInterface.Services.GameDebug.Commands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("clan_id", "The registered clan id."),
+            new ExpectedArgs("clan_id", "The clan name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ClanDailyGoldChangeCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-                if (!TryGetObjectManager(out IObjectManager objectManager))
-                    return Failed("Unable to resolve ObjectManager");
-
-                if (!objectManager.TryGetObject<Clan>(args[0], out var clan))
-                    return Failed($"Unable to get Clan with {args[0]}");
+                if (!resolver.TryResolveClan(args[0], out var clan, out var error))
+                    return Failed(error);
 
                 var goldChange = Campaign.Current.Models.ClanFinanceModel.CalculateClanGoldChange(clan, true, false, true);
 

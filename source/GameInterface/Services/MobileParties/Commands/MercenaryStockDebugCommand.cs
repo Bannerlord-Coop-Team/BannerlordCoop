@@ -33,6 +33,10 @@ internal class MercenaryStockDebugCommand
 
     public sealed class RefreshMercenaryStocksCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public RefreshMercenaryStocksCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "refresh_mercenary_stocks";
@@ -43,7 +47,7 @@ internal class MercenaryStockDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townName", "The exact town name; quote values containing spaces."),
+            new ExpectedArgs("townName", "Town name or id, or ALL for every town; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -66,7 +70,7 @@ internal class MercenaryStockDebugCommand
             var towns = allTowns ? GetTowns().ToList() : new List<Town>();
             if (!allTowns)
             {
-                if (!TryGetTownByName(townName, out var town, out string error)) return Failed(error);
+                if (!TryGetMercenaryTown(resolver, townName, out var town, out string error)) return Failed(error);
 
                 towns.Add(town);
             }
@@ -91,6 +95,10 @@ internal class MercenaryStockDebugCommand
 
     public sealed class RequestMercenaryStockCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public RequestMercenaryStockCoopCommand(ICommandObjectResolver resolver) => this.resolver = resolver;
+
         public string Prefix => "coop.debug.town";
 
         public string Name => "request_mercenary_stock";
@@ -101,7 +109,7 @@ internal class MercenaryStockDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townName", "The exact town name; quote values containing spaces."),
+            new ExpectedArgs("townName", "Town name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -110,7 +118,7 @@ internal class MercenaryStockDebugCommand
 
             string townName = args[0];
             if (!CommandHelpers.TryGetObjectManager(out var objectManager, out string error)) return Failed(error);
-            if (!TryGetTownByName(townName, out var town, out error)) return Failed(error);
+            if (!TryGetMercenaryTown(resolver, townName, out var town, out error)) return Failed(error);
 
             if (!objectManager.TryGetIdWithLogging(town, out var resolvedTownId))
             {
@@ -149,61 +157,17 @@ internal class MercenaryStockDebugCommand
             .Select(settlement => settlement.Town);
     }
 
-    private static bool TryGetTownByName(string townName, out Town town, out string error)
+    // Resolves a town by name or id and rejects castles, which have no mercenary stock.
+    private static bool TryGetMercenaryTown(ICommandObjectResolver resolver, string townQuery, out Town town, out string error)
     {
+        if (!resolver.TryResolveTown(townQuery, out town, out error)) return false;
+
+        var settlement = town.Settlement;
+        if (settlement.IsTown) return true;
+
+        error = $"{settlement.Name} is a {GetSettlementType(settlement)}, not a town. Mercenary stock only exists for towns.";
         town = null;
-        error = null;
-
-        if (string.IsNullOrWhiteSpace(townName))
-        {
-            error = "Town name cannot be empty.";
-            return false;
-        }
-
-        var campaign = Campaign.Current;
-        if (campaign == null)
-        {
-            error = "Unable to find current campaign.";
-            return false;
-        }
-
-        var matchingSettlements = campaign.CampaignObjectManager.Settlements
-            .Where(settlement => SettlementNameMatches(settlement, townName))
-            .ToList();
-
-        if (matchingSettlements.Count == 0)
-        {
-            error = $"No settlement found with name '{townName}'.";
-            return false;
-        }
-
-        if (matchingSettlements.Count > 1)
-        {
-            error = $"Multiple settlements found with name '{townName}'. Use the exact town name.";
-            return false;
-        }
-
-        var settlement = matchingSettlements[0];
-        if (!settlement.IsTown)
-        {
-            error = $"{settlement.Name} is a {GetSettlementType(settlement)}, not a town. Mercenary stock only exists for towns.";
-            return false;
-        }
-
-        if (settlement.Town == null)
-        {
-            error = $"{settlement.Name} is marked as a town but has no {nameof(Town)} component.";
-            return false;
-        }
-
-        town = settlement.Town;
-        return true;
-    }
-
-    private static bool SettlementNameMatches(Settlement settlement, string townName)
-    {
-        return string.Equals(settlement.Name?.ToString(), townName, StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(settlement.Town?.Name?.ToString(), townName, StringComparison.OrdinalIgnoreCase);
+        return false;
     }
 
     private static string GetSettlementType(Settlement settlement)

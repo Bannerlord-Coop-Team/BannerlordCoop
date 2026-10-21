@@ -1,7 +1,7 @@
 ﻿using Common.Commands;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using System;
 using TaleWorlds.CampaignSystem;
 
@@ -9,12 +9,12 @@ namespace GameInterface.Services.Issues.Framework.Commands;
 
 public sealed class IssuesCompleteCoopCommand : ICoopCommand
 {
-    private readonly IObjectManager objectManager;
+    private readonly ICommandObjectResolver resolver;
     private readonly IIssueOwnerResolver ownerResolver;
 
-    public IssuesCompleteCoopCommand(IObjectManager objectManager, IIssueOwnerResolver ownerResolver)
+    public IssuesCompleteCoopCommand(ICommandObjectResolver resolver, IIssueOwnerResolver ownerResolver)
     {
-        this.objectManager = objectManager;
+        this.resolver = resolver;
         this.ownerResolver = ownerResolver;
     }
 
@@ -28,15 +28,15 @@ public sealed class IssuesCompleteCoopCommand : ICoopCommand
 
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
-        new ExpectedArgs("hero_id", "The registered id of the hero that offers the issue."),
+        new ExpectedArgs("hero_id", "Name or id of the hero that offers the issue; quote names with spaces."),
         new ExpectedArgs("outcome", "success, fail, betrayal, cancel or timeout. Success is the default.", isRequired: false),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        if (!objectManager.TryGetObject<Hero>(args[0], out var hero))
+        if (!resolver.TryResolveHero(args[0], out var hero, out var error))
         {
-            return Failed($"Hero with id '{args[0]}' not found");
+            return Failed(error);
         }
 
         var issue = hero.Issue;

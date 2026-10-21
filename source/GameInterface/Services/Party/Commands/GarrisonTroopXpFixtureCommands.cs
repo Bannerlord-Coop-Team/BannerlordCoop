@@ -5,6 +5,7 @@ using Common.Messaging;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Utils.Commands;
 using Helpers;
 using Newtonsoft.Json;
 using SandBox.GauntletUI;
@@ -19,6 +20,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Party.Commands;
@@ -268,20 +270,23 @@ internal static class GarrisonTroopXpFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("player_party_id", "The player party id.", true),
-            new ExpectedArgs("garrison_party_id", "The garrison party id.", true),
-            new ExpectedArgs("character_id", "The character id.", true),
+            new ExpectedArgs("player_party_id", "Player mobile party name or id; quote names with spaces.", true),
+            new ExpectedArgs("garrison_party_id", "Garrison mobile party name or id; quote names with spaces.", true),
+            new ExpectedArgs("character_id", "Troop character name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public GarrisonXpFixtureStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out MobileParty playerParty))
-                return Failed($"Player party '{args[0]}' was not found.");
-            if (!objectManager.TryGetObject(args[1], out MobileParty garrison))
-                return Failed($"Garrison party '{args[1]}' was not found.");
-            if (!objectManager.TryGetObject(args[2], out CharacterObject character))
-                return Failed($"Character '{args[2]}' was not found.");
+            if (!resolver.TryResolveMobileParty(args[0], out var playerParty, out var error)) return Failed(error);
+            if (!resolver.TryResolveMobileParty(args[1], out var garrison, out error)) return Failed(error);
+            if (!resolver.TryResolveCharacterObject(args[2], out var character, out error)) return Failed(error);
 
             var settlement = Settlement.Find(SettlementId);
             var garrisonState = ReadRosterState(garrison.MemberRoster, character);
@@ -290,11 +295,11 @@ internal static class GarrisonTroopXpFixtureCommands
             return Succeeded(JsonResult(new
             {
                 role = ModInformation.IsServer ? "server" : "client",
-                playerPartyId = args[0],
-                garrisonPartyId = args[1],
+                playerPartyId = IdOf(playerParty),
+                garrisonPartyId = IdOf(garrison),
                 settlementId = SettlementId,
                 settlementName = settlement?.Name.ToString(),
-                characterId = args[2],
+                characterId = IdOf(character),
                 characterName = character.Name.ToString(),
                 playerOwnsSettlement = settlement?.OwnerClan != null &&
                     ReferenceEquals(settlement.OwnerClan, playerParty.ActualClan),
@@ -327,15 +332,20 @@ internal static class GarrisonTroopXpFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("garrison_party_id", "The garrison party id.", true),
+            new ExpectedArgs("garrison_party_id", "Garrison mobile party name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public OpenGarrisonXpFixtureCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out MobileParty garrison))
-                return Failed($"Garrison party '{args[0]}' was not found.");
+            if (!resolver.TryResolveMobileParty(args[0], out var garrison, out var error)) return Failed(error);
             var settlement = Settlement.Find(SettlementId);
             if (settlement == null || garrison != settlement.Town?.GarrisonParty)
                 return Failed("The target is not Danustica's garrison.");
@@ -361,21 +371,25 @@ internal static class GarrisonTroopXpFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("garrison_party_id", "The garrison party id.", true),
-            new ExpectedArgs("character_id", "The character id.", true),
+            new ExpectedArgs("garrison_party_id", "Garrison mobile party name or id; quote names with spaces.", true),
+            new ExpectedArgs("character_id", "Troop character name or id; quote names with spaces.", true),
             new ExpectedArgs("expected_state", "The expected screen state.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public GarrisonXpFixtureScreenStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
             if ((args[2] != "baseline" && args[2] != "staged" && args[2] != "committed"))
                 return Failed("Invalid command argument value.");
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out MobileParty garrison))
-                return Failed($"Garrison party '{args[0]}' was not found.");
-            if (!objectManager.TryGetObject(args[1], out CharacterObject character))
-                return Failed($"Character '{args[1]}' was not found.");
+            if (!resolver.TryResolveMobileParty(args[0], out var garrison, out var error)) return Failed(error);
+            if (!resolver.TryResolveCharacterObject(args[1], out var character, out error)) return Failed(error);
             if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
                 partyState.PartyScreenLogic?.LeftOwnerParty?.MobileParty != garrison)
                 return Failed("Danustica's Manage Garrison screen is not active.");
@@ -438,25 +452,29 @@ internal static class GarrisonTroopXpFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("garrison_party_id", "The garrison party id.", true),
-            new ExpectedArgs("character_id", "The character id.", true),
+            new ExpectedArgs("garrison_party_id", "Garrison mobile party name or id; quote names with spaces.", true),
+            new ExpectedArgs("character_id", "Troop character name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public StageGarrisonXpWithdrawalCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out MobileParty garrison))
-                return Failed($"Garrison party '{args[0]}' was not found.");
-            if (!objectManager.TryGetObject(args[1], out CharacterObject character))
-                return Failed($"Character '{args[1]}' was not found.");
+            if (!resolver.TryResolveMobileParty(args[0], out var garrison, out var error)) return Failed(error);
+            if (!resolver.TryResolveCharacterObject(args[1], out var character, out error)) return Failed(error);
             if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState) ||
                 partyState.PartyScreenLogic?.LeftOwnerParty?.MobileParty != garrison)
                 return Failed("Danustica's Manage Garrison screen is not active.");
 
             var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
             var row = partyVm?.OtherPartyTroops.FirstOrDefault(vm => vm.Character == character);
-            if (row == null) return Failed($"Character '{args[1]}' is not rendered in Danustica's garrison.");
+            if (row == null) return Failed($"Character '{IdOf(character)}' is not rendered in Danustica's garrison.");
 
             partyVm.OnTransferTroop(row, -1, FixtureTroopCount, row.Side);
             partyVm.ExecuteRemoveZeroCounts();
@@ -800,6 +818,10 @@ internal static class GarrisonTroopXpFixtureCommands
         objectManager = null;
         return ContainerProvider.TryResolve(out objectManager);
     }
+
+    // The registry id of a resolved object for echoing in command output, falling back to its StringId.
+    private static string IdOf(MBObjectBase obj) =>
+        TryGetObjectManager(out var objectManager) && objectManager.TryGetId(obj, out var id) ? id : obj.StringId;
 
     private static string JsonResult(object value) =>
         "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(value);

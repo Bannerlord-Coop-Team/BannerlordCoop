@@ -1,9 +1,8 @@
 ﻿using Common.Commands;
-using Autofac;
 using Common;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Actions.Patches;
-using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
@@ -22,14 +21,6 @@ namespace GameInterface.Services.Workshops.Commands
         private static CoopCommandResult Failed(string output) =>
             new CoopCommandResult(false, output, "command_failed");
 
-        private static bool TryGetObjectManager(out IObjectManager objectManager)
-        {
-            objectManager = null;
-            if (ContainerProvider.TryGetContainer(out var container) == false) return false;
-
-            return container.TryResolve(out objectManager);
-        }
-
         public static Workshop GetWorkshopBySettlementAndType(Settlement settlement, WorkshopType workshopType)
         {
             foreach (var workshop in settlement.Town.Workshops)
@@ -42,14 +33,15 @@ namespace GameInterface.Services.Workshops.Commands
             return null;
         }
 
-        internal static Hero ResolveHero(string heroId, IObjectManager objectManager)
+        // Resolves a workshop type by its id first, then by a unique display name.
+        internal static bool TryResolveWorkshopType(ICommandObjectResolver resolver, string query, out WorkshopType type, out string error)
         {
-            if (objectManager.TryGetObject<Hero>(heroId, out var registeredHero))
-            {
-                return registeredHero;
-            }
+            error = null;
+            type = string.IsNullOrWhiteSpace(query) ? null : WorkshopType.Find(query);
+            if (type != null)
+                return true;
 
-            return Hero.FindFirst(hero => hero.StringId == heroId || hero.Name?.ToString() == heroId);
+            return resolver.TryResolve(query, WorkshopType.All, w => w.Name?.ToString(), out type, out error);
         }
 
         internal static void ApplyOwnerChange(Workshop workshop, Hero newOwner)
@@ -64,6 +56,13 @@ namespace GameInterface.Services.Workshops.Commands
 
         public sealed class SetWorkshopCustomNameCoopCommand : ICoopCommand
         {
+            private readonly ICommandObjectResolver resolver;
+
+            public SetWorkshopCustomNameCoopCommand(ICommandObjectResolver resolver)
+            {
+                this.resolver = resolver;
+            }
+
             public string Prefix => "coop.debug.workshop";
 
             public string Name => "set_workshop_custom_name";
@@ -74,8 +73,8 @@ namespace GameInterface.Services.Workshops.Commands
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
-                new ExpectedArgs("settlementId", "The settlement id."),
-                new ExpectedArgs("workshopType", "The workshop type."),
+                new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
+                new ExpectedArgs("workshopType", "Workshop type name or id; quote names with spaces."),
                 new ExpectedArgs("newCustomName", "The exact new custom name; quote values containing spaces."),
             };
 
@@ -86,17 +85,11 @@ namespace GameInterface.Services.Workshops.Commands
                 string workshopType = args[1];
                 string newCustomName = args[2];
 
-                Settlement settlement = Settlement.Find(settlementId);
-                if (settlement == null)
-                {
-                    return Failed($"Settlement with id: '{settlementId}' not found");
-                }
+                if (!resolver.TryResolveSettlement(settlementId, out Settlement settlement, out string error))
+                    return Failed(error);
 
-                WorkshopType type = WorkshopType.Find(workshopType); // Ensure this method or logic to find WorkshopType exists
-                if (type == null)
-                {
-                    return Failed($"Workshop type: '{workshopType}' not found");
-                }
+                if (!TryResolveWorkshopType(resolver, workshopType, out WorkshopType type, out error))
+                    return Failed(error);
 
                 Workshop workshop = GetWorkshopBySettlementAndType(settlement, type);
                 if (workshop == null)
@@ -114,6 +107,13 @@ namespace GameInterface.Services.Workshops.Commands
 
         public sealed class SetWorkshopOwnerCoopCommand : ICoopCommand
         {
+            private readonly ICommandObjectResolver resolver;
+
+            public SetWorkshopOwnerCoopCommand(ICommandObjectResolver resolver)
+            {
+                this.resolver = resolver;
+            }
+
             public string Prefix => "coop.debug.workshop";
 
             public string Name => "set_workshop_owner";
@@ -124,32 +124,26 @@ namespace GameInterface.Services.Workshops.Commands
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
-                new ExpectedArgs("settlementId", "The settlement id."),
-                new ExpectedArgs("workshopType", "The workshop type."),
-                new ExpectedArgs("newOwnerId", "The new owner id."),
+                new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
+                new ExpectedArgs("workshopType", "Workshop type name or id; quote names with spaces."),
+                new ExpectedArgs("newOwnerId", "New owner hero name or id; quote names with spaces."),
             };
 
             public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
             {
-                // Expect three arguments: settlement id, workshop type, and new owner (hero ID or name)
+                // Expect three arguments: settlement (id or name), workshop type (id or name), and new owner (hero ID or name)
 
                 string settlementId = args[0];
                 string workshopType = args[1];
                 string newOwnerId = args[2];
 
                 // Find the settlement
-                Settlement settlement = Settlement.Find(settlementId);
-                if (settlement == null)
-                {
-                    return Failed($"Settlement with id: '{settlementId}' not found");
-                }
+                if (!resolver.TryResolveSettlement(settlementId, out Settlement settlement, out string error))
+                    return Failed(error);
 
                 // Find the workshop type (ensure the workshop type is valid)
-                WorkshopType type = WorkshopType.Find(workshopType); // Ensure this method exists in your codebase or mod
-                if (type == null)
-                {
-                    return Failed($"Workshop type: '{workshopType}' not found");
-                }
+                if (!TryResolveWorkshopType(resolver, workshopType, out WorkshopType type, out error))
+                    return Failed(error);
 
                 // Find the workshop by settlement and type
                 Workshop workshop = GetWorkshopBySettlementAndType(settlement, type);
@@ -159,16 +153,8 @@ namespace GameInterface.Services.Workshops.Commands
                 }
 
                 // Find the new owner (Hero) by ID or name
-                if (!TryGetObjectManager(out var objectManager))
-                {
-                    return Failed("Unable to resolve ObjectManager");
-                }
-
-                Hero newOwner = ResolveHero(newOwnerId, objectManager);
-                if (newOwner == null)
-                {
-                    return Failed($"Hero with ID or Name: '{newOwnerId}' not found (use the registry id from coop.debug.alley.my_hero_id on the owning client)");
-                }
+                if (!resolver.TryResolveHero(newOwnerId, out Hero newOwner, out error))
+                    return Failed(error);
 
                 // Use the same action path as normal workshop purchases so ownership-dependent
                 // campaign behavior and client warehouse data are updated too.
@@ -184,6 +170,13 @@ namespace GameInterface.Services.Workshops.Commands
         /// </summary>
         public sealed class OwnersInSettlementCommandCoopCommand : ICoopCommand
         {
+            private readonly ICommandObjectResolver resolver;
+
+            public OwnersInSettlementCommandCoopCommand(ICommandObjectResolver resolver)
+            {
+                this.resolver = resolver;
+            }
+
             public string Prefix => "coop.debug.workshop";
 
             public string Name => "owners_in_settlement";
@@ -194,18 +187,15 @@ namespace GameInterface.Services.Workshops.Commands
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
-                new ExpectedArgs("settlementId", "The settlement id."),
+                new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
             };
 
             public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
             {
 
                 StringBuilder stringBuilder = new StringBuilder();
-                Settlement settlement = Settlement.Find(strings[0]);
-                if (settlement == null)
-                {
-                    return Failed($"Settlement with id: '{strings[0]}' not found");
-                }
+                if (!resolver.TryResolveSettlement(strings[0], out Settlement settlement, out string error))
+                    return Failed(error);
 
                 stringBuilder.AppendLine($"{settlement.Name}");
                 foreach (var workshop in settlement.Town.Workshops)
@@ -228,6 +218,13 @@ namespace GameInterface.Services.Workshops.Commands
         /// </summary>
         public sealed class HeroOwnedWorkshopsCommandCoopCommand : ICoopCommand
         {
+            private readonly ICommandObjectResolver resolver;
+
+            public HeroOwnedWorkshopsCommandCoopCommand(ICommandObjectResolver resolver)
+            {
+                this.resolver = resolver;
+            }
+
             public string Prefix => "coop.debug.workshop";
 
             public string Name => "hero_owned_workshops";
@@ -238,18 +235,15 @@ namespace GameInterface.Services.Workshops.Commands
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
-                new ExpectedArgs("heroId", "The hero id."),
+                new ExpectedArgs("heroId", "Hero name or id; quote names with spaces."),
             };
 
             public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
             {
 
                 StringBuilder stringBuilder = new StringBuilder();
-                Hero hero = Hero.Find(strings[0]);
-                if (hero == null)
-                {
-                    return Failed($"Hero with id: '{strings[0]}' not found");
-                }
+                if (!resolver.TryResolveHero(strings[0], out Hero hero, out string error))
+                    return Failed(error);
 
                 stringBuilder.AppendLine($"{hero.Name}");
                 foreach (var workshop in hero.OwnedWorkshops)
@@ -337,6 +331,13 @@ namespace GameInterface.Services.Workshops.Commands
         /// </summary>
         public sealed class ViewWorkshopInfoCommandCoopCommand : ICoopCommand
         {
+            private readonly ICommandObjectResolver resolver;
+
+            public ViewWorkshopInfoCommandCoopCommand(ICommandObjectResolver resolver)
+            {
+                this.resolver = resolver;
+            }
+
             public string Prefix => "coop.debug.workshop";
 
             public string Name => "workshop_info";
@@ -347,18 +348,15 @@ namespace GameInterface.Services.Workshops.Commands
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
-                new ExpectedArgs("settlementId", "The settlement id."),
+                new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
             };
 
             public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
             {
 
                 StringBuilder stringBuilder = new StringBuilder();
-                Settlement settlement = Settlement.Find(strings[0]);
-                if (settlement == null)
-                {
-                    return Failed($"Settlement with id: '{strings[0]}' not found");
-                }
+                if (!resolver.TryResolveSettlement(strings[0], out Settlement settlement, out string error))
+                    return Failed(error);
 
                 stringBuilder.AppendLine($"{settlement.Name}");
                 foreach (var workshop in settlement.Town.Workshops)

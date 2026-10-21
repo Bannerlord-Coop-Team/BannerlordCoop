@@ -16,6 +16,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Utils.Commands;
 using HarmonyLib;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -44,6 +45,14 @@ internal static class SiegeDefenseArmyFixtureCommands
     /// <summary>Reports the current fixture identities.</summary>
     public sealed class FixtureStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns the settlement name or id argument into a settlement.
+        public FixtureStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
         public string Name => "defense_army_fixture_state";
         public string Description => "Inspect the siege defense fixture and current party identities.";
@@ -51,19 +60,27 @@ internal static class SiegeDefenseArmyFixtureCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controllerId", "The connected player controller id."),
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (args.Count != 2) return Failed("Expected 2 arguments");
-            return FixtureStateCommand(args);
+            return FixtureStateCommand(resolver, args);
         }
     }
 
     /// <summary>Captures the clean fixture participants.</summary>
     public sealed class CaptureFixtureCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns the settlement name or id argument into a settlement.
+        public CaptureFixtureCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
         public string Name => "capture_defense_army_fixture";
         public string Description => "Capture four clean parties for the paused siege defense fixture.";
@@ -71,14 +88,14 @@ internal static class SiegeDefenseArmyFixtureCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controllerId", "The connected player controller id."),
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("This command can only be used by the server");
             if (args.Count != 2) return Failed("Expected 2 arguments");
-            return CaptureFixture(args);
+            return CaptureFixture(resolver, args);
         }
     }
 
@@ -105,6 +122,14 @@ internal static class SiegeDefenseArmyFixtureCommands
     /// <summary>Checks the requested fixture state and recovery proof.</summary>
     public sealed class DefenseArmyStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        // Takes the resolver that turns the settlement name or id argument into a settlement.
+        public DefenseArmyStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.siege";
         public string Name => "defense_army_state";
         public string Description => "Assert baseline, joined, unstuck, or restored against captured identities.";
@@ -112,7 +137,7 @@ internal static class SiegeDefenseArmyFixtureCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controllerId", "The connected player controller id."),
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("state", "baseline, joined, unstuck, or restored."),
             new ExpectedArgs("expectedState", "Staged JSON; clients checking unstuck require the successful server unstuck JSON."),
         };
@@ -120,7 +145,7 @@ internal static class SiegeDefenseArmyFixtureCommands
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (args.Count != 4) return Failed("Expected 4 arguments");
-            return DefenseArmyState(args);
+            return DefenseArmyState(resolver, args);
         }
     }
 
@@ -164,18 +189,18 @@ internal static class SiegeDefenseArmyFixtureCommands
         }
     }
 
-    private static CoopCommandResult FixtureStateCommand(ICoopCommandArgs args)
+    private static CoopCommandResult FixtureStateCommand(ICommandObjectResolver resolver, ICoopCommandArgs args)
     {
-        if (!TryResolveContext(args[0], args[1], out var player, out var settlement, out var manager, out var error))
+        if (!TryResolveContext(resolver, args[0], args[1], out var player, out var settlement, out var manager, out var error))
             return Failed(error);
         var expected = fixture?.Campaign == Campaign.Current && fixture.ControllerId == args[0] && fixture.Settlement == settlement
             ? fixture.StagedExpectation ?? fixture.CapturedExpectation : null;
         return FormatState("Siege defense army fixture state", player, settlement, manager, expected);
     }
 
-    private static CoopCommandResult CaptureFixture(ICoopCommandArgs args)
+    private static CoopCommandResult CaptureFixture(ICommandObjectResolver resolver, ICoopCommandArgs args)
     {
-        if (!TryResolveContext(args[0], args[1], out var player, out var settlement, out var manager, out var error))
+        if (!TryResolveContext(resolver, args[0], args[1], out var player, out var settlement, out var manager, out var error))
             return Failed(error);
         if (!TryRequirePause(out error)) return Failed(error);
         if (fixture != null && fixture.Campaign == Campaign.Current && !fixture.Verified)
@@ -312,8 +337,8 @@ internal static class SiegeDefenseArmyFixtureCommands
     private static bool TryPreflightStage(out IObjectManager manager, out Kingdom kingdom, out string error)
     {
         kingdom = null;
-        if (!TryResolveContext(fixture.ControllerId, fixture.Settlement.StringId,
-            out var player, out var settlement, out manager, out error)) return false;
+        var settlement = fixture.Settlement;
+        if (!TryResolvePlayerContext(fixture.ControllerId, out var player, out manager, out error)) return false;
         if (player != fixture.Player.Party || settlement != fixture.Settlement
             || GetId(manager, settlement) != fixture.SettlementId)
         {
@@ -351,12 +376,14 @@ internal static class SiegeDefenseArmyFixtureCommands
         return true;
     }
 
-    private static CoopCommandResult DefenseArmyState(ICoopCommandArgs args)
+    private static CoopCommandResult DefenseArmyState(ICommandObjectResolver resolver, ICoopCommandArgs args)
     {
-        if (!TryReadExpectation(args[3], args[0], args[1], true, out var expected, out var error))
+        if (!resolver.TryResolveSettlement(args[1], out var settlement, out var error))
+            return Failed(error);
+        if (!TryReadExpectation(args[3], args[0], settlement.StringId, true, out var expected, out error))
             return Failed(error);
         if (ModInformation.IsServer && !TryValidateToken(args[3], out error)) return Failed(error);
-        if (!TryResolveContext(args[0], args[1], out var player, out var settlement, out var manager, out error))
+        if (!TryResolvePlayerContext(args[0], out var player, out var manager, out error))
             return Failed(error);
         if (recoveryObserver != null && !recoveryObserver.Matches(Campaign.Current, expected))
             recoveryObserver.Dispose();
@@ -484,11 +511,20 @@ internal static class SiegeDefenseArmyFixtureCommands
         }
     }
 
-    private static bool TryResolveContext(string controllerId, string settlementId, out MobileParty playerParty,
-        out Settlement settlement, out IObjectManager manager, out string error)
+    // Resolves the connected player's party, then the settlement from a name or id argument.
+    private static bool TryResolveContext(ICommandObjectResolver resolver, string controllerId, string settlementQuery,
+        out MobileParty playerParty, out Settlement settlement, out IObjectManager manager, out string error)
+    {
+        settlement = null;
+        if (!TryResolvePlayerContext(controllerId, out playerParty, out manager, out error)) return false;
+        return resolver.TryResolveSettlement(settlementQuery, out settlement, out error);
+    }
+
+    // Resolves the object manager and the connected player's party for a controller id.
+    private static bool TryResolvePlayerContext(string controllerId, out MobileParty playerParty,
+        out IObjectManager manager, out string error)
     {
         playerParty = null;
-        settlement = null;
         error = null;
         if (!ContainerProvider.TryResolve<IObjectManager>(out manager)
             || !ContainerProvider.TryResolve<IPlayerManager>(out var players) || Campaign.Current == null)
@@ -500,11 +536,6 @@ internal static class SiegeDefenseArmyFixtureCommands
             || !manager.TryGetObject<MobileParty>(player.MobilePartyId, out playerParty))
         {
             error = $"Unable to resolve connected player {controllerId}";
-            return false;
-        }
-        if (!manager.TryGetObject<Settlement>(settlementId, out settlement))
-        {
-            error = $"Settlement with id {settlementId} not found";
             return false;
         }
         return true;

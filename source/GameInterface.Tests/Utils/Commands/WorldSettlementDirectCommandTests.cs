@@ -150,7 +150,8 @@ public class WorldSettlementDirectCommandTests
 
         Assert.False(result.Succeeded);
         Assert.Equal("command_failed", result.ErrorCode);
-        Assert.Contains("was not of type Settlement", result.Output);
+        Assert.Contains("No Settlement found with id", result.Output);
+        Assert.Contains("'registered-object'", result.Output);
     }
 
     [Fact]
@@ -216,13 +217,13 @@ public class WorldSettlementDirectCommandTests
     [Theory]
     [InlineData("coop.debug.workshop.set_workshop_custom_name")]
     [InlineData("coop.debug.workshop.set_workshop_owner")]
-    public void WorkshopCommands_RequireSettlementStringId(string fullName)
+    public void WorkshopCommands_AcceptSettlementNameOrId(string fullName)
     {
         ICoopCommand command = CreateCommand(fullName);
         IExpectedArgs settlementArgument = command.ExpectedArgs[0];
 
         Assert.Equal("settlementId", settlementArgument.Name);
-        Assert.Equal("The settlement id.", settlementArgument.Description);
+        Assert.Equal("Settlement name or id; quote names with spaces.", settlementArgument.Description);
     }
 
     private static CoopCommandResult RunWithObjectManager(
@@ -259,22 +260,8 @@ public class WorldSettlementDirectCommandTests
 
     private static ICoopCommand[] CreateCommands()
     {
-#if DEBUG
-        var fixture = new Mock<IRaidLootWarningFixture>().Object;
-#endif
         return GetCommandTypes()
-            .Select(type => (ICoopCommand)Activator.CreateInstance(
-                type,
-                type.GetConstructor(new[] { typeof(IObjectManager) }) != null
-                    ? new object[] { new ObjectManager(Serilog.Core.Logger.None) }
-                    :
-#if DEBUG
-                type.GetConstructor(new[] { typeof(IRaidLootWarningFixture) }) != null
-                    ? new object[] { fixture }
-                    : Array.Empty<object>()))
-#else
-                Array.Empty<object>()))
-#endif
+            .Select(CommandTestFactory.Create<ICoopCommand>)
             .ToArray();
     }
 

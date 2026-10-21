@@ -6,7 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
-using TaleWorlds.CampaignSystem;
+using GameInterface.Utils.Commands;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -24,8 +24,16 @@ namespace GameInterface.Services.ItemRosters.Commands
         private static CoopCommandResult Failed(string output) =>
             new CoopCommandResult(false, output, "command_failed");
 
+        // Adds one random item to a settlement's roster.
         public sealed class ItemRostersAddRandomItemCoopCommand : ICoopCommand
         {
+            private readonly ICommandObjectResolver resolver;
+
+            public ItemRostersAddRandomItemCoopCommand(ICommandObjectResolver resolver)
+            {
+                this.resolver = resolver;
+            }
+
             public string Prefix => "coop.debug.item_rosters";
 
             public string Name => "add_random_item";
@@ -36,16 +44,12 @@ namespace GameInterface.Services.ItemRosters.Commands
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
-                new ExpectedArgs("settlement_id", "The settlement StringId.", isRequired: true),
+                new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces.", isRequired: true),
             };
 
             public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
             {
-
-                var settlementId = args[0];
-                var settlement = MBObjectManager.Instance.GetObject<Settlement>(settlementId);
-
-                if (settlement == null) return Failed($"Unable to find settlement with id: {settlementId}");
+                if (!resolver.TryResolveSettlement(args[0], out var settlement, out var error)) return Failed(error);
 
                 Random random = new();
 
@@ -59,8 +63,16 @@ namespace GameInterface.Services.ItemRosters.Commands
             }
         }
 
+        // Adds the same random item to a settlement's roster many times in one tick.
         public sealed class ItemRostersAddItemBurstCoopCommand : ICoopCommand
         {
+            private readonly ICommandObjectResolver resolver;
+
+            public ItemRostersAddItemBurstCoopCommand(ICommandObjectResolver resolver)
+            {
+                this.resolver = resolver;
+            }
+
             public string Prefix => "coop.debug.item_rosters";
 
             public string Name => "add_item_burst";
@@ -71,7 +83,7 @@ namespace GameInterface.Services.ItemRosters.Commands
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
-                new ExpectedArgs("settlement_id", "The settlement StringId.", isRequired: true),
+                new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces.", isRequired: true),
                 new ExpectedArgs("count", "The positive number of items to add.", isRequired: true),
             };
 
@@ -82,11 +94,7 @@ namespace GameInterface.Services.ItemRosters.Commands
                     return Failed("Run this on the server; it is authoritative and replicates to clients.");
                 }
 
-
-                var settlementId = args[0];
-                var settlement = MBObjectManager.Instance.GetObject<Settlement>(settlementId);
-
-                if (settlement == null) return Failed($"Unable to find settlement with id: {settlementId}");
+                if (!resolver.TryResolveSettlement(args[0], out var settlement, out var error)) return Failed(error);
 
                 if (!int.TryParse(args[1], out var count) || count < 1)
                 {
@@ -112,8 +120,16 @@ namespace GameInterface.Services.ItemRosters.Commands
             }
         }
 
+        // Reports the item count, hash and food of a settlement's or party's roster.
         public sealed class ItemRostersInfoCoopCommand : ICoopCommand
         {
+            private readonly ICommandObjectResolver resolver;
+
+            public ItemRostersInfoCoopCommand(ICommandObjectResolver resolver)
+            {
+                this.resolver = resolver;
+            }
+
             public string Prefix => "coop.debug.item_rosters";
 
             public string Name => "info";
@@ -124,18 +140,12 @@ namespace GameInterface.Services.ItemRosters.Commands
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
-                new ExpectedArgs("party_or_settlement_id", "The party or settlement StringId.", isRequired: true),
+                new ExpectedArgs("party_or_settlement_id", "Party or settlement name or id; quote names with spaces.", isRequired: true),
             };
 
             public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
             {
-
-                var roster = FindItemRoster(args[0], out string owner);
-
-                if (roster == null)
-                {
-                    return Failed(string.Format("ID: '{0}' not found", args[0]));
-                }
+                if (!TryFindItemRoster(resolver, args[0], out var roster, out var owner, out var error)) return Failed(error);
 
                 return Succeeded(string.Format("ItemRoster info for '{0}':\n  Items: {1}\n  Count: {2}\n  SHA1: {3:X}\n  Food: {4}\n",
                     owner, roster.Count, roster.Sum((i) => { return i.Amount; }), ItemRosterHash(roster),
@@ -143,8 +153,16 @@ namespace GameInterface.Services.ItemRosters.Commands
             }
         }
 
+        // Writes a settlement's or party's roster contents to a text file.
         public sealed class ItemRostersExportCoopCommand : ICoopCommand
         {
+            private readonly ICommandObjectResolver resolver;
+
+            public ItemRostersExportCoopCommand(ICommandObjectResolver resolver)
+            {
+                this.resolver = resolver;
+            }
+
             public string Prefix => "coop.debug.item_rosters";
 
             public string Name => "export";
@@ -155,45 +173,60 @@ namespace GameInterface.Services.ItemRosters.Commands
 
             public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
             {
-                new ExpectedArgs("party_or_settlement_id", "The party or settlement StringId.", isRequired: true),
+                new ExpectedArgs("party_or_settlement_id", "Party or settlement name or id; quote names with spaces.", isRequired: true),
             };
 
             public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
             {
+                if (!TryFindItemRoster(resolver, args[0], out var roster, out var owner, out var error)) return Failed(error);
 
-                var roster = FindItemRoster(args[0], out string owner);
-
-                if (roster == null)
-                {
-                    return Failed(string.Format("ID: '{0}' not found", args[0]));
-                }
-
-                var name = "!" + (ModInformation.IsServer ? "server-itemroster-export-" : "client-itemroster-export-") + $"{owner}.txt";
+                var name = "!" + (ModInformation.IsServer ? "server-itemroster-export-" : "client-itemroster-export-") + $"{SanitizeFileName(owner)}.txt";
                 File.WriteAllText(name, ItemRosterContent(roster));
 
                 return Succeeded($"Exported '{owner}' into '{name}'.\n Check bannerlord bin directory.");
             }
         }
 
-        private static ItemRoster FindItemRoster(string id, out string name)
+        // Resolves a settlement or mobile party by name or id and returns its roster, failing when neither or both match.
+        private static bool TryFindItemRoster(ICommandObjectResolver resolver, string query, out ItemRoster roster, out string name, out string error)
         {
-            if (MBObjectManager.Instance.ContainsObject<Settlement>(id))
-            {
-                var obj = MBObjectManager.Instance.GetObject<Settlement>(id);
-
-                name = obj.Town.Name.ToString();
-                return obj.ItemRoster;
-            }
-
-            MobileParty party = Campaign.Current.CampaignObjectManager.Find<MobileParty>(id);
-            if (party != null)
-            {
-                name = party.Owner.Name.ToString();
-                return party.ItemRoster;
-            }
-
+            roster = null;
             name = null;
-            return null;
+
+            var isSettlement = resolver.TryResolveSettlement(query, out var settlement, out var settlementError);
+            var isParty = resolver.TryResolveMobileParty(query, out var party, out var partyError);
+
+            if (isSettlement && isParty)
+            {
+                error = $"'{query}' matches both a settlement and a party; use an id. Settlement: {settlement.Name} ({settlement.StringId}), party: {party.Name} ({party.StringId})";
+                return false;
+            }
+
+            if (isSettlement)
+            {
+                roster = settlement.ItemRoster;
+                name = settlement.Name.ToString();
+                error = null;
+                return true;
+            }
+
+            if (isParty)
+            {
+                roster = party.ItemRoster;
+                name = party.Name.ToString();
+                error = null;
+                return true;
+            }
+
+            error = $"{settlementError} {partyError}";
+            return false;
+        }
+
+        // Replaces characters that are invalid in file names, since owner names come from user-facing text.
+        private static string SanitizeFileName(string name)
+        {
+            var invalid = Path.GetInvalidFileNameChars();
+            return new string(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
         }
 
         private static string ItemRosterContent(ItemRoster roster)

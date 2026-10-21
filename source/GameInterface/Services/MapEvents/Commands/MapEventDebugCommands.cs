@@ -289,6 +289,18 @@ public class MapEventDebugCommands
                partyBaseId == id;
     }
 
+    // Builds a party matcher that compares against the party the query resolves to (name or id), else by raw StringId, MobileParty or PartyBase registry id.
+    private static Func<MobileParty, bool> CreatePartyMatcher(
+        ICommandObjectResolver resolver,
+        IObjectManager objectManager,
+        string query)
+    {
+        if (string.IsNullOrEmpty(query)) return _ => false;
+        if (resolver.TryResolveMobileParty(query, out var resolved, out _)) return party => party == resolved;
+
+        return party => MatchesPartyId(objectManager, party, query);
+    }
+
     public sealed class StartPlayerFieldBattleCoopCommand : ICoopCommand
     {
         public string Prefix => "coop.debug.map_event";
@@ -301,9 +313,16 @@ public class MapEventDebugCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("attacker_mobile_party_id", "The attacker mobile party id.", true),
-            new ExpectedArgs("defender_mobile_party_id", "The defender mobile party id.", true),
+            new ExpectedArgs("attacker_mobile_party_id", "The attacker mobile party name or id; quote names with spaces.", true),
+            new ExpectedArgs("defender_mobile_party_id", "The defender mobile party name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public StartPlayerFieldBattleCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -316,16 +335,10 @@ public class MapEventDebugCommands
             if (!TryGetObjectManager(out var objectManager))
                 return Failed("Unable to resolve ObjectManager.");
 
-            var attackerError = string.Empty;
-            if ((!objectManager.TryGetObject(args[0], out MobileParty attacker) &&
-                 !CommandHelpers.TryGetMobileParty(args[0], out attacker, out attackerError)) ||
-                attacker?.Party == null)
+            if (!resolver.TryResolveMobileParty(args[0], out var attacker, out var attackerError) || attacker.Party == null)
                 return Failed("Unable to resolve attacker party: " + attackerError);
 
-            var defenderError = string.Empty;
-            if ((!objectManager.TryGetObject(args[1], out MobileParty defender) &&
-                 !CommandHelpers.TryGetMobileParty(args[1], out defender, out defenderError)) ||
-                defender?.Party == null)
+            if (!resolver.TryResolveMobileParty(args[1], out var defender, out var defenderError) || defender.Party == null)
                 return Failed("Unable to resolve defender party: " + defenderError);
 
             if (attacker == defender)
@@ -397,8 +410,8 @@ public class MapEventDebugCommands
 
             return Succeeded("Player field-battle fixture started.\n" +
                 $"MapEventId: {mapEventId}\n" +
-                $"AttackerPartyId: {args[0]}\n" +
-                $"DefenderPartyId: {args[1]}\n" +
+                $"AttackerPartyId: {attackerMobilePartyId}\n" +
+                $"DefenderPartyId: {defenderMobilePartyId}\n" +
                 $"OriginalWarState: {fixture.WasAtWar}");
         }
     }
@@ -455,8 +468,15 @@ public class MapEventDebugCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("defender_mobile_party_id", "The defender mobile party id.", true),
+            new ExpectedArgs("defender_mobile_party_id", "The defender mobile party name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public RequestPlayerFieldBattleCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -470,10 +490,7 @@ public class MapEventDebugCommands
             if (!TryGetObjectManager(out var objectManager))
                 return Failed("Unable to resolve ObjectManager.");
 
-            var defenderError = string.Empty;
-            if ((!objectManager.TryGetObject(args[0], out MobileParty defender) &&
-                 !CommandHelpers.TryGetMobileParty(args[0], out defender, out defenderError)) ||
-                defender?.Party == null)
+            if (!resolver.TryResolveMobileParty(args[0], out var defender, out var defenderError) || defender.Party == null)
                 return Failed("Unable to resolve defender party: " + defenderError);
 
             if (defender == attacker || !defender.IsActive || defender.MapEvent != null)
@@ -738,8 +755,15 @@ public class MapEventDebugCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
-            new ExpectedArgs("excluded_party_id", "The excluded party id.", false),
+            new ExpectedArgs("excluded_party_id", "The excluded party name or id; quote names with spaces.", false),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public StartNearestBanditAttackCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -782,12 +806,12 @@ public class MapEventDebugCommands
                 LeaveSettlementAction.ApplyForParty(playerParty);
             }
 
-            var excludedPartyId = args.Count == 2 ? args[1] : null;
+            var isExcluded = CreatePartyMatcher(resolver, objectManager, args.Count == 2 ? args[1] : null);
             var playerPosition = playerParty.Position.ToVec2();
             var banditParty = MobileParty.All
                 .Where(p => p.IsActive && p.IsBandit && p != playerParty
                             && p.MapEvent == null && p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0
-                            && !MatchesPartyId(objectManager, p, excludedPartyId))
+                            && !isExcluded(p))
                 .OrderBy(p => p.Position.ToVec2().DistanceSquared(playerPosition))
                 .FirstOrDefault();
 
@@ -829,8 +853,15 @@ public class MapEventDebugCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
-            new ExpectedArgs("excluded_party_id", "The excluded party id.", false),
+            new ExpectedArgs("excluded_party_id", "The excluded party name or id; quote names with spaces.", false),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public EngageNearestBanditCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -845,13 +876,13 @@ public class MapEventDebugCommands
                               "run coop.debug.map_event.leave_settlement first.");
 
             // A held or AI-disabled party would never move, so it is skipped.
-            var excludedPartyId = args.Count == 2 ? args[1] : null;
+            var isExcluded = CreatePartyMatcher(resolver, objectManager, args.Count == 2 ? args[1] : null);
             var playerPosition = playerParty.Position.ToVec2();
             var banditParty = MobileParty.All
                 .Where(p => p.IsActive && p.IsBandit && p != playerParty
                             && p.MapEvent == null && p.CurrentSettlement == null && p.MemberRoster.TotalManCount > 0
                             && p.Ai?.IsDisabled == false
-                            && !MatchesPartyId(objectManager, p, excludedPartyId))
+                            && !isExcluded(p))
                 .OrderBy(p => p.Position.ToVec2().DistanceSquared(playerPosition))
                 .FirstOrDefault();
 
@@ -897,8 +928,15 @@ public class MapEventDebugCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
-            new ExpectedArgs("bandit_party_id", "The bandit party id.", true),
+            new ExpectedArgs("bandit_party_id", "The bandit party name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public BanditAttackFixturePrepareCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -911,9 +949,7 @@ public class MapEventDebugCommands
             if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
                 return Failed(error);
 
-            if ((!objectManager.TryGetObject(args[1], out MobileParty banditParty) &&
-                 !CommandHelpers.TryGetMobileParty(args[1], out banditParty, out error)) ||
-                banditParty?.Party == null)
+            if (!resolver.TryResolveMobileParty(args[1], out var banditParty, out error) || banditParty.Party == null)
             {
                 return Failed($"Unable to resolve bandit party {args[1]}: {error}");
             }
@@ -1036,8 +1072,15 @@ public class MapEventDebugCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
-            new ExpectedArgs("bandit_party_id", "The bandit party id.", true),
+            new ExpectedArgs("bandit_party_id", "The bandit party name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public BanditAttackFixtureStartCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -1049,7 +1092,7 @@ public class MapEventDebugCommands
 
             var fixture = banditAttackFixture;
             if (fixture == null || fixture.ControllerId != args[0] ||
-                !MatchesPartyId(objectManager, fixture.BanditParty, args[1]))
+                !CreatePartyMatcher(resolver, objectManager, args[1])(fixture.BanditParty))
             {
                 return Failed($"Prepare the bandit attack fixture for {args[0]} and {args[1]} first.");
             }
@@ -1119,8 +1162,15 @@ public class MapEventDebugCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
-            new ExpectedArgs("bandit_party_id", "The bandit party id.", true),
+            new ExpectedArgs("bandit_party_id", "The bandit party name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public BanditAttackFixtureStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -1135,9 +1185,7 @@ public class MapEventDebugCommands
                 return Failed(error);
             }
 
-            if ((!objectManager.TryGetObject(args[1], out MobileParty banditParty) &&
-                 !CommandHelpers.TryGetMobileParty(args[1], out banditParty, out error)) ||
-                banditParty == null)
+            if (!resolver.TryResolveMobileParty(args[1], out var banditParty, out error))
             {
                 return Failed($"Unable to resolve bandit party {args[1]}: {error}");
             }
@@ -2666,8 +2714,15 @@ public class MapEventDebugCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party_base_id", "The party base id.", true),
+            new ExpectedArgs("party_base_id", "The party base id, or a mobile party name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ConversationHoldStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -2676,8 +2731,21 @@ public class MapEventDebugCommands
                 return Failed("Run this command on the server.");
             }
 
-            var held = ConversationPartyTracker.Instance?.TryGetEngagement(args[0], out _) == true;
-            return Succeeded($"Conversation hold for PartyBase id {args[0]}: {(held ? "held" : "released")}.");
+            var partyBaseId = ResolvePartyBaseId(args[0]);
+            var held = ConversationPartyTracker.Instance?.TryGetEngagement(partyBaseId, out _) == true;
+            return Succeeded($"Conversation hold for PartyBase id {partyBaseId}: {(held ? "held" : "released")}.");
+        }
+
+        // Maps a mobile party name or id to its PartyBase registry id, passing the raw query through when it is already a PartyBase id.
+        private string ResolvePartyBaseId(string query)
+        {
+            if (!resolver.TryResolveMobileParty(query, out var party, out _) || party.Party == null)
+                return query;
+
+            if (!TryGetObjectManager(out var objectManager))
+                return query;
+
+            return objectManager.TryGetId(party.Party, out string partyBaseId) ? partyBaseId : query;
         }
     }
 
@@ -2694,8 +2762,15 @@ public class MapEventDebugCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The connected player's controller id.", true),
-            new ExpectedArgs("hero_id", "The AI lord's registered hero id.", true),
+            new ExpectedArgs("hero_id", "The AI lord's hero name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public HoldAiConversationCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -2703,9 +2778,10 @@ public class MapEventDebugCommands
             if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
                 return Failed(error);
             if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
-                !playerManager.TryGetPeer(args[0], out var peer) ||
-                !objectManager.TryGetObject(args[1], out Hero aiHero))
+                !playerManager.TryGetPeer(args[0], out var peer))
                 return Failed("The connected player peer or AI lord is unavailable.");
+            if (!resolver.TryResolveHero(args[1], out var aiHero, out error))
+                return Failed(error);
 
             var aiParty = aiHero.PartyBelongedTo;
             if (playerParty?.Party == null || !playerParty.IsActive || playerParty.MapEvent != null ||
@@ -3473,8 +3549,15 @@ public class MapEventDebugCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
-            new ExpectedArgs("party_string_id", "The party string id.", true),
+            new ExpectedArgs("party_string_id", "The party name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public PeacePursuitStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -3483,10 +3566,9 @@ public class MapEventDebugCommands
                 return Failed(error);
             }
 
-            var neutralParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[1]);
-            if (neutralParty == null)
+            if (!resolver.TryResolveMobileParty(args[1], out var neutralParty, out error))
             {
-                return Failed($"Party {args[1]} was not found.");
+                return Failed(error);
             }
 
             return Succeeded(FormatPeacePursuitState("Peace pursuit state", objectManager, neutralParty, playerParty));
@@ -3510,8 +3592,15 @@ public class MapEventDebugCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("controller_id", "The controller id.", true),
-            new ExpectedArgs("party_string_id", "The party string id.", true),
+            new ExpectedArgs("party_string_id", "The party name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public TestPeaceStopsPursuitCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -3525,10 +3614,9 @@ public class MapEventDebugCommands
                 return Failed(error);
             }
 
-            var neutralParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[1]);
-            if (neutralParty == null)
+            if (!resolver.TryResolveMobileParty(args[1], out var neutralParty, out error))
             {
-                return Failed($"Party {args[1]} was not found.");
+                return Failed(error);
             }
 
             if (!IsPeacePursuitFixture(neutralParty, playerParty))

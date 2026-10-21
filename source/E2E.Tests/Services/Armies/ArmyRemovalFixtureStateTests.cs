@@ -2,6 +2,7 @@
 using Common.Commands;
 using E2E.Tests.Environment;
 using GameInterface.Services.Armies.Commands;
+using GameInterface.Utils.Commands;
 using Newtonsoft.Json.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -34,7 +35,7 @@ public class ArmyRemovalFixtureStateTests : IDisposable
         {
             instance.Call(() =>
             {
-                var command = new ArmyRemovalFixtureStateCommand(instance.ObjectManager);
+                var command = new ArmyRemovalFixtureStateCommand(instance.ObjectManager, new CommandObjectResolver(instance.ObjectManager));
                 var args = new CoopCommandArgsFactory().FromValues(new[] { armyId, leaderId, memberId });
                 var result = command.ProcessCommand(args);
                 Assert.True(result.Succeeded);
@@ -50,7 +51,7 @@ public class ArmyRemovalFixtureStateTests : IDisposable
         {
             instance.Call(() =>
             {
-                var result = new ArmyRemovalFixtureStateCommand(instance.ObjectManager).ProcessCommand(
+                var result = new ArmyRemovalFixtureStateCommand(instance.ObjectManager, new CommandObjectResolver(instance.ObjectManager)).ProcessCommand(
                     new CoopCommandArgsFactory().FromValues(new[] { armyId, leaderId, memberId }));
                 Assert.True(result.Succeeded);
                 var state = JObject.Parse(result.Output.Substring("LIVE_TEST_JSON=".Length));

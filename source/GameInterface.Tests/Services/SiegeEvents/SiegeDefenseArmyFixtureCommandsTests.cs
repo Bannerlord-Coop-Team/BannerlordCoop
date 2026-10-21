@@ -5,12 +5,15 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.SiegeEvents.Commands;
+using GameInterface.Utils.Commands;
+using Moq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Serilog;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
 
 namespace GameInterface.Tests.Services.SiegeEvents;
@@ -301,18 +304,31 @@ public class SiegeDefenseArmyFixtureCommandsTests
         Assert.False(SiegeDefenseArmyFixtureCommands.IsCleanParty(ObjectHelper.SkipConstructor<MobileParty>()));
     }
 
+    // Builds a resolver that answers every settlement query with a settlement carrying the given StringId.
+    private static ICommandObjectResolver ResolverFor(string settlementId)
+    {
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        settlement.StringId = settlementId;
+        string error = string.Empty;
+        var resolver = new Mock<ICommandObjectResolver>();
+        resolver.Setup(r => r.TryResolveSettlement(It.IsAny<string>(), out settlement, out error)).Returns(true);
+        return resolver.Object;
+    }
+
     [Fact]
     public void DirectCommands_RegisterSixUniqueCommandsAndNoClientMutationShortcuts()
     {
         var commands = typeof(SiegeDefenseArmyFixtureCommands).GetNestedTypes()
             .Where(t => typeof(ICoopCommand).IsAssignableFrom(t))
-            .Select(t => (ICoopCommand)Activator.CreateInstance(t)).ToArray();
+            .Select(t => (ICoopCommand)Activator.CreateInstance(t, t.GetConstructor(new[] { typeof(ICommandObjectResolver) }) != null
+                ? new object[] { ResolverFor("town_ES1") }
+                : Array.Empty<object>())).ToArray();
         var registry = new CoopCommandRegistry(commands, new LoggerConfiguration().CreateLogger());
         Assert.Equal(6, registry.Commands.Count);
         Assert.Equal(4, commands.Count(c => c.Side == CoopCommandSide.Server));
         Assert.Equal(2, commands.Count(c => c.Side == CoopCommandSide.Both));
         Assert.DoesNotContain(commands, c => c.Name == "open_defender_encounter" || c.Name == "invoke_defender_join");
-        var command = new SiegeDefenseArmyFixtureCommands.DefenseArmyStateCoopCommand();
+        var command = new SiegeDefenseArmyFixtureCommands.DefenseArmyStateCoopCommand(ResolverFor("town_ES1"));
         var args = new CoopCommandArgsFactory().FromValues(new[] { "controller", "town_ES1", "joined" });
         var result = registry.ProcessCommand($"{command.Prefix}.{command.Name}", args);
         Assert.False(result.Succeeded);
@@ -341,7 +357,7 @@ public class SiegeDefenseArmyFixtureCommandsTests
     [Fact]
     public void StateCommand_MissingCapture_IsExplicitFailureBeforeCampaignAccess()
     {
-        var result = new SiegeDefenseArmyFixtureCommands.DefenseArmyStateCoopCommand()
+        var result = new SiegeDefenseArmyFixtureCommands.DefenseArmyStateCoopCommand(ResolverFor("town_ES1"))
             .ProcessCommand(new CoopCommandArgsFactory().FromValues(new[] { "controller", "town_ES1", "joined", "{}" }));
         Assert.False(result.Succeeded);
         Assert.Equal("command_failed", result.ErrorCode);

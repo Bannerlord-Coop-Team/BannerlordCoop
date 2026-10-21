@@ -38,6 +38,13 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
     public sealed class PlayerCaptivityObserveAiLordPairCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityObserveAiLordPairCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "observe_ai_lord_pair";
@@ -48,8 +55,8 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("prisoner_hero_id", "The registered prisoner hero id.", isRequired: true),
-            new ExpectedArgs("captor_hero_id", "The registered captor hero id.", isRequired: true),
+            new ExpectedArgs("prisoner_hero_id", "Prisoner hero name or id; quote names with spaces.", isRequired: true),
+            new ExpectedArgs("captor_hero_id", "Captor hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -57,11 +64,9 @@ internal static class AiLordPeaceReleaseFixtureCommands
             string error;
             var context = new CommandContext("observe_ai_lord_pair", "Argument must not be empty.", new List<string>(args));
 
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            if (!resolver.TryResolveHero(args[0], out var prisoner, out error))
                 return Failed("Failed to observe AI lords: " + error);
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var prisoner, out error))
-                return Failed("Failed to observe AI lords: " + error);
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[1], out var captorHero, out error))
+            if (!resolver.TryResolveHero(args[1], out var captorHero, out error))
                 return Failed("Failed to observe AI lords: " + error);
 
             var heroParty = prisoner.PartyBelongedTo;
@@ -95,6 +100,13 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
     public sealed class PlayerCaptivityFocusHeroPartyCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityFocusHeroPartyCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "focus_hero_party";
@@ -105,7 +117,7 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered hero id.", isRequired: true),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -113,9 +125,7 @@ internal static class AiLordPeaceReleaseFixtureCommands
             string error;
             var context = new CommandContext("focus_hero_party", "Argument must not be empty.", new List<string>(args));
 
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
-                return Failed("Failed to focus hero party: " + error);
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var hero, out error))
+            if (!resolver.TryResolveHero(args[0], out var hero, out error))
                 return Failed("Failed to focus hero party: " + error);
 
             var party = hero.PartyBelongedTo ?? hero.PartyBelongedToAsPrisoner?.MobileParty;
@@ -129,6 +139,13 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
     public sealed class PlayerCaptivitySnapshotAiLordDiplomacyFixtureCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivitySnapshotAiLordDiplomacyFixtureCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "snapshot_ai_lord_diplomacy_fixture";
@@ -139,8 +156,8 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("prisoner_hero_id", "The registered prisoner hero id.", isRequired: true),
-            new ExpectedArgs("captor_hero_id", "The registered captor hero id.", isRequired: true),
+            new ExpectedArgs("prisoner_hero_id", "Prisoner hero name or id; quote names with spaces.", isRequired: true),
+            new ExpectedArgs("captor_hero_id", "Captor hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -150,7 +167,7 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
             if (!ModInformation.IsClient) return Failed("snapshot_ai_lord_diplomacy_fixture must be run on a client.");
             if (clientDiplomaticSnapshot != null) return Failed("A client AI-lord diplomatic fixture is already active.");
-            if (!TryGetHeroFactions(args, out var prisonerFaction, out var captorFaction, out error))
+            if (!TryGetHeroFactions(resolver, args, out var prisonerFaction, out var captorFaction, out error))
                 return Failed("Failed to snapshot AI-lord diplomacy: " + error);
 
             clientDiplomaticSnapshot = StanceLinkSnapshot.Capture(prisonerFaction, captorFaction);
@@ -191,6 +208,13 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
     public sealed class PlayerCaptivityCaptureAiLordFixtureCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityCaptureAiLordFixtureCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "capture_ai_lord_fixture";
@@ -201,8 +225,8 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("prisoner_hero_id", "The registered prisoner hero id.", isRequired: true),
-            new ExpectedArgs("captor_hero_id", "The registered captor hero id.", isRequired: true),
+            new ExpectedArgs("prisoner_hero_id", "Prisoner hero name or id; quote names with spaces.", isRequired: true),
+            new ExpectedArgs("captor_hero_id", "Captor hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -211,11 +235,9 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
             if (!context.RequireServer(out var error)) return Failed(error);
             if (fixture != null) return Failed("An AI-lord captivity fixture is already active.");
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
+            if (!resolver.TryResolveHero(args[0], out var prisoner, out error))
                 return Failed("Failed to create AI-lord fixture: " + error);
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var prisoner, out error))
-                return Failed("Failed to create AI-lord fixture: " + error);
-            if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[1], out var captorHero, out error))
+            if (!resolver.TryResolveHero(args[1], out var captorHero, out error))
                 return Failed("Failed to create AI-lord fixture: " + error);
 
             if (prisoner.IsPrisoner)
@@ -327,6 +349,13 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
     public sealed class PlayerCaptivityFocusPartyCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public PlayerCaptivityFocusPartyCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.player_captivity";
 
         public string Name => "focus_party";
@@ -337,7 +366,7 @@ internal static class AiLordPeaceReleaseFixtureCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("mobile_party_id", "The registered mobile party id.", isRequired: true),
+            new ExpectedArgs("mobile_party_id", "Mobile party name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -345,10 +374,7 @@ internal static class AiLordPeaceReleaseFixtureCommands
             string error;
             var context = new CommandContext("focus_party", "Argument must not be empty.", new List<string>(args));
 
-            if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error))
-                return Failed("Failed to focus party: " + error);
-            if (!objectManager.TryGetObject(args[0], out MobileParty party) &&
-                !CommandHelpers.TryGetMobileParty(args[0], out party, out error))
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out error))
                 return Failed("Failed to focus party: " + error);
 
             party.Party.SetAsCameraFollowParty();
@@ -522,7 +548,9 @@ internal static class AiLordPeaceReleaseFixtureCommands
         return StanceLinkSnapshot.GetFingerprint(faction1, faction2);
     }
 
+    // Resolves the prisoner and captor heroes by name or id and returns their distinct map factions.
     private static bool TryGetHeroFactions(
+        ICommandObjectResolver resolver,
         IReadOnlyList<string> args,
         out IFaction prisonerFaction,
         out IFaction captorFaction,
@@ -530,9 +558,8 @@ internal static class AiLordPeaceReleaseFixtureCommands
     {
         prisonerFaction = null;
         captorFaction = null;
-        if (!CommandHelpers.TryGetObjectManager(out var objectManager, out error)) return false;
-        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[0], out var prisoner, out error)) return false;
-        if (!CommandHelpers.TryGetManagedObject<Hero>(objectManager, args[1], out var captor, out error)) return false;
+        if (!resolver.TryResolveHero(args[0], out var prisoner, out error)) return false;
+        if (!resolver.TryResolveHero(args[1], out var captor, out error)) return false;
 
         prisonerFaction = prisoner.MapFaction;
         captorFaction = captor.MapFaction;

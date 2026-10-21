@@ -5,6 +5,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
+using GameInterface.Utils.Commands;
 using Newtonsoft.Json;
 using System;
 using System.Linq;
@@ -18,11 +19,13 @@ public sealed class ArmyRemovalFixtureSetupCommand : ICoopCommand
 {
     private readonly IObjectManager objectManager;
     private readonly ITimeControlInterface timeControl;
+    private readonly ICommandObjectResolver resolver;
 
-    public ArmyRemovalFixtureSetupCommand(IObjectManager objectManager, ITimeControlInterface timeControl)
+    public ArmyRemovalFixtureSetupCommand(IObjectManager objectManager, ITimeControlInterface timeControl, ICommandObjectResolver resolver)
     {
         this.objectManager = objectManager;
         this.timeControl = timeControl;
+        this.resolver = resolver;
     }
 
     public string Prefix => "coop.debug.army";
@@ -31,14 +34,16 @@ public sealed class ArmyRemovalFixtureSetupCommand : ICoopCommand
     public CoopCommandSide Side => CoopCommandSide.Server;
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
-        new ExpectedArgs("settlementId", "A registered settlement, such as town_ES1 (Danustica)."),
+        new ExpectedArgs("settlementId", "Settlement name or id, such as town_ES1 or Danustica; quote names with spaces."),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
         if (ModInformation.IsClient || args.Count != 1 || timeControl.GetTimeControl() != TimeControlEnum.Pause)
-            return new CoopCommandResult(false, "Run on the paused server with one settlement id.", "command_failed");
-        if (!objectManager.TryGetObject<Settlement>(args[0], out var settlement) || settlement.MapFaction is not Kingdom kingdom)
+            return new CoopCommandResult(false, "Run on the paused server with one settlement name or id.", "command_failed");
+        if (!resolver.TryResolveSettlement(args[0], out var settlement, out var error))
+            return new CoopCommandResult(false, error, "command_failed");
+        if (settlement.MapFaction is not Kingdom kingdom)
             return new CoopCommandResult(false, "The settlement must resolve to a kingdom.", "command_failed");
         var parties = MobileParty.AllLordParties.Where(p => p.IsActive && p.MapFaction == kingdom
             && p.LeaderHero != null && !p.IsPlayerParty() && p.Army == null && p.AttachedTo == null
@@ -68,8 +73,13 @@ public sealed class ArmyRemovalFixtureSetupCommand : ICoopCommand
 public sealed class ArmyRemovalFixtureStateCommand : ICoopCommand
 {
     private readonly IObjectManager objectManager;
+    private readonly ICommandObjectResolver resolver;
 
-    public ArmyRemovalFixtureStateCommand(IObjectManager objectManager) => this.objectManager = objectManager;
+    public ArmyRemovalFixtureStateCommand(IObjectManager objectManager, ICommandObjectResolver resolver)
+    {
+        this.objectManager = objectManager;
+        this.resolver = resolver;
+    }
 
     public string Prefix => "coop.debug.army";
     public string Name => "removal_fixture_state";
@@ -78,8 +88,8 @@ public sealed class ArmyRemovalFixtureStateCommand : ICoopCommand
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
         new ExpectedArgs("armyId", "The original registered army id, also after destruction."),
-        new ExpectedArgs("leaderId", "The registered leader party id."),
-        new ExpectedArgs("memberId", "The registered member party id."),
+        new ExpectedArgs("leaderId", "Leader party name or id; quote names with spaces."),
+        new ExpectedArgs("memberId", "Member party name or id; quote names with spaces."),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -90,10 +100,13 @@ public sealed class ArmyRemovalFixtureStateCommand : ICoopCommand
         var ids = new[] { args[1], args[2] };
         var parties = ids.Select(id =>
         {
-            objectManager.TryGetObject<MobileParty>(id, out var party);
+            resolver.TryResolveMobileParty(id, out var party, out _);
+            // Echo the canonical registry id when the argument was a name, the raw argument when nothing resolved.
+            if (party == null || !objectManager.TryGetId(party, out var canonicalId))
+                canonicalId = id;
             return new
             {
-                partyId = id, exists = party != null, partyStringId = party?.StringId,
+                partyId = canonicalId, exists = party != null, partyStringId = party?.StringId,
                 armyId = GetId(party?.Army), attachedToId = GetId(party?.AttachedTo),
                 attachedPartyIds = party?.AttachedParties.Select(p => GetId(p)).ToArray() ?? Array.Empty<string>(),
             };

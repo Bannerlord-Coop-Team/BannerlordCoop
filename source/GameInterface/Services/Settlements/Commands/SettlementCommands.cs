@@ -1,9 +1,9 @@
 ﻿using Common.Commands;
-using Autofac;
 using Common;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -56,8 +56,16 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("castleId", "The castle id.", isRequired: false),
+            new ExpectedArgs("castleId", "Castle name or id; quote names with spaces.", isRequired: false),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public EnterRandomCastleCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
@@ -65,11 +73,9 @@ internal class SettlementCommands
                 return Failed("Run this command on a client.");
 
             var castles = Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsCastle).ToArray();
-            var castle = strings.Count == 0
-                ? castles[new Random().Next(castles.Length)]
-                : castles.FirstOrDefault(settlement => settlement.StringId == strings[0]);
-            if (castle == null)
-                return Failed($"Castle '{strings[0]}' was not found.");
+            var castle = strings.Count == 0 ? castles[new Random().Next(castles.Length)] : null;
+            if (castle == null && resolver.TryResolve<Settlement>(strings[0], castles, s => s.Name?.ToString(), out castle, out var castleError) == false)
+                return Failed(castleError);
 
             EncounterManager.StartSettlementEncounter(MobileParty.MainParty, castle);
 
@@ -91,18 +97,25 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("castleId", "The castle id."),
+            new ExpectedArgs("castleId", "Castle name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public TeleportMainPartyToCastleCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
             if (ModInformation.IsServer)
                 return Failed("Run this command on a client.");
 
-            var castle = Campaign.Current.CampaignObjectManager.Settlements
-                .FirstOrDefault(settlement => settlement.IsCastle && settlement.StringId == strings[0]);
-            if (castle == null)
-                return Failed($"Castle '{strings[0]}' was not found.");
+            var castles = Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsCastle).ToArray();
+            if (resolver.TryResolve<Settlement>(strings[0], castles, s => s.Name?.ToString(), out var castle, out var castleError) == false)
+                return Failed(castleError);
 
             var mainParty = MobileParty.MainParty;
             if (mainParty == null)
@@ -217,22 +230,22 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public GetTownNameCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
 
-            string settlementId = strings.Single();
-
-            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get town name");
-
-            var objectManager = container.Resolve<IObjectManager>();
-
-            if (objectManager.Contains(settlementId) == false) return Failed($"{settlementId} does not exist");
-
-            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-                return Failed($"{settlementId} was in object manager but was not of type Settlement");
+            if (resolver.TryResolveSettlement(strings.Single(), out var settlement, out var settlementError) == false)
+                return Failed(settlementError);
 
             return Succeeded($"Settlement Name: {settlement.Name}");
 
@@ -257,23 +270,27 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("value", "The value."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public SetEnemiesSpottedCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
-
-            var objectManager = container.Resolve<IObjectManager>();
-
             string settlementId = args[0];
 
-            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-                return Failed($"Settlement: {settlementId} was not found.");
+            if (resolver.TryResolveSettlement(settlementId, out var settlement, out var settlementError) == false)
+                return Failed(settlementError);
 
 
             if (float.TryParse(args[1], out var num) == false)
@@ -283,7 +300,7 @@ internal class SettlementCommands
 
             settlement.NearbyLandThreatIntensity = num;
 
-            return Succeeded($"Successfully set the Settlement ({settlementId}) NumberOfEnemiesSpottedAround to '{args[1]}'");
+            return Succeeded($"Successfully set the Settlement ({settlement.StringId}) NumberOfEnemiesSpottedAround to '{args[1]}'");
 
         }
     }
@@ -307,30 +324,34 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("value", "The value."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public SetAlliesSpottedCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
-
-            var objectManager = container.Resolve<IObjectManager>();
-
             string settlementId = args[0];
 
-            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-                return Failed($"Settlement: {settlementId} was not found.");
+            if (resolver.TryResolveSettlement(settlementId, out var settlement, out var settlementError) == false)
+                return Failed(settlementError);
 
             if (float.TryParse(args[1], out var num) == false)
                 return Failed($"Error setting the value: {args[1]} to a float.");
 
             settlement.NearbyLandAllyIntensity = num;
 
-            return Succeeded($"Successfully set the Settlement ({settlementId}) NumberOfAlliesSpottedAround to '{args[1]}'");
+            return Succeeded($"Successfully set the Settlement ({settlement.StringId}) NumberOfAlliesSpottedAround to '{args[1]}'");
 
         }
     }
@@ -354,30 +375,34 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("value", "The value."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public SetBribePaidCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
-
-            var objectManager = container.Resolve<IObjectManager>();
-
             string settlementId = args[0];
 
-            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-                return Failed($"Settlement: {settlementId} was not found.");
+            if (resolver.TryResolveSettlement(settlementId, out var settlement, out var settlementError) == false)
+                return Failed(settlementError);
 
             if (int.TryParse(args[1], out var num) == false)
                 return Failed($"Error setting the value: {args[1]} to a int.");
 
             settlement.BribePaid = num;
 
-            return Succeeded($"Successfully set the Settlement ({settlementId}) BribePaid to '{args[1]}'");
+            return Succeeded($"Successfully set the Settlement ({settlement.StringId}) BribePaid to '{args[1]}'");
 
         }
     }
@@ -401,30 +426,34 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("value", "The value."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public SetHitPointsCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
-
-            var objectManager = container.Resolve<IObjectManager>();
-
             string settlementId = args[0];
 
-            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-                return Failed($"Settlement: {settlementId} was not found.");
+            if (resolver.TryResolveSettlement(settlementId, out var settlement, out var settlementError) == false)
+                return Failed(settlementError);
 
             if (float.TryParse(args[1], out var num) == false)
                 return Failed($"Error setting the value: {args[1]} to a float.");
 
             settlement.SettlementHitPoints = num;
 
-            return Succeeded($"Successfully set the Settlement ({settlementId}) SettlementHitPoints to '{args[1]}'");
+            return Succeeded($"Successfully set the Settlement ({settlement.StringId}) SettlementHitPoints to '{args[1]}'");
 
         }
     }
@@ -448,34 +477,38 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
-            new ExpectedArgs("lastAttackerPartyId", "The last attacker party id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
+            new ExpectedArgs("lastAttackerPartyId", "Last attacker party name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public SetLastAttackerPartyCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
-
-            var objectManager = container.Resolve<IObjectManager>();
-
             string settlementId = args[0];
             string mobilePartyId = args[1];
 
-            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-                return Failed($"Settlement: {settlementId} was not found.");
+            if (resolver.TryResolveSettlement(settlementId, out var settlement, out var settlementError) == false)
+                return Failed(settlementError);
 
 
-            if (objectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty) == false)
-                return Failed($"Settlement: {mobilePartyId} was not found.");
+            if (resolver.TryResolveMobileParty(mobilePartyId, out var mobileParty, out var partyError) == false)
+                return Failed(partyError);
 
 
             settlement.LastAttackerParty = mobileParty;
 
 
-            return Succeeded($"Successfully set the Settlement ({settlementId}) MobileParty to '{mobileParty.StringId}'");
+            return Succeeded($"Successfully set the Settlement ({settlement.StringId}) MobileParty to '{mobileParty.StringId}'");
 
         }
     }
@@ -528,24 +561,28 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("siegeState", "The siege state."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public SetSiegeStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
-
-            var objectManager = container.Resolve<IObjectManager>();
-
             string settlementId = args[0];
             string siegeState = args[1];
 
-            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-                return Failed($"Settlement: {settlementId} was not found.");
+            if (resolver.TryResolveSettlement(settlementId, out var settlement, out var settlementError) == false)
+                return Failed(settlementError);
 
             if (Enum.TryParse<SiegeState>(siegeState, true, out var state) == false)
                 return Failed($"{siegeState} was not a valid enum in {nameof(SiegeState)}");
@@ -554,7 +591,7 @@ internal class SettlementCommands
             settlement.CurrentSiegeState = state;
 
 
-            return Succeeded($"Successfully set the Settlement ({settlementId}) SiegeState to '{siegeState}'");
+            return Succeeded($"Successfully set the Settlement ({settlement.StringId}) SiegeState to '{siegeState}'");
 
         }
     }
@@ -579,24 +616,28 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("militia", "The militia."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public SetMiltiiaCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
-
-            var objectManager = container.Resolve<IObjectManager>();
-
             string settlementId = args[0];
             string militiaFloat = args[1];
 
-            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-                return Failed($"Settlement: {settlementId} was not found.");
+            if (resolver.TryResolveSettlement(settlementId, out var settlement, out var settlementError) == false)
+                return Failed(settlementError);
 
 
             if (float.TryParse(militiaFloat, out var militia) == false)
@@ -605,7 +646,7 @@ internal class SettlementCommands
             settlement.Militia = militia;
 
 
-            return Succeeded($"Successfully set the Settlement ({settlementId}) Militia to '{militia}'");
+            return Succeeded($"Successfully set the Settlement ({settlement.StringId}) Militia to '{militia}'");
 
         }
     }
@@ -629,24 +670,28 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
             new ExpectedArgs("payLimit", "The pay limit."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public SetGarrisonWageLimitCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
-
-            var objectManager = container.Resolve<IObjectManager>();
-
             string settlementId = args[0];
             string garrisonInt = args[1];
 
-            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-                return Failed($"Settlement: {settlementId} was not found.");
+            if (resolver.TryResolveSettlement(settlementId, out var settlement, out var settlementError) == false)
+                return Failed(settlementError);
 
 
             if (int.TryParse(garrisonInt, out var wageLimit) == false)
@@ -655,7 +700,7 @@ internal class SettlementCommands
             settlement.SetGarrisonWagePaymentLimit(wageLimit);
 
 
-            return Succeeded($"Successfully set the Settlement ({settlementId}) GarrisonWagePaymentLimit to '{wageLimit}'");
+            return Succeeded($"Successfully set the Settlement ({settlement.StringId}) GarrisonWagePaymentLimit to '{wageLimit}'");
 
         }
     }
@@ -679,28 +724,32 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public CollectCacheNotablesCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
-
-            var objectManager = container.Resolve<IObjectManager>();
-
             string settlementId = args[0];
 
-            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-                return Failed($"Settlement: {settlementId} was not found.");
+            if (resolver.TryResolveSettlement(settlementId, out var settlement, out var settlementError) == false)
+                return Failed(settlementError);
 
 
             settlement.CollectNotablesToCache();
 
 
-            return Succeeded($"Successfully called settlement.CollectNotablesToCache() for {settlementId}.");
+            return Succeeded($"Successfully called settlement.CollectNotablesToCache() for {settlement.StringId}.");
 
         }
     }
@@ -727,21 +776,25 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementId", "The settlement id."),
+            new ExpectedArgs("settlementId", "Settlement name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public InfoCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
 
 
-            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get Settlement");
-
-            var objectManager = container.Resolve<IObjectManager>();
-
             string settlementId = args.Single();
 
-            if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
-                return Failed($"Settlement: {settlementId} was not found.");
+            if (resolver.TryResolveSettlement(settlementId, out var settlement, out var settlementError) == false)
+                return Failed(settlementError);
 
             StringBuilder sb = new();
 
@@ -787,38 +840,42 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementComponentId", "The settlement component id."),
-            new ExpectedArgs("mobilePartyId", "The mobile party id."),
+            new ExpectedArgs("settlementComponentId", "Settlement component id, or the name or id of its settlement; quote names with spaces."),
+            new ExpectedArgs("mobilePartyId", "Settlement or mobile party name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
+
+        // Injects the resolver and registry used to look up the settlement component argument.
+        public SetOwnerCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get SettlementComponent");
-            var objectManager = container.Resolve<IObjectManager>();
-            string settlementComponentId = args[0];
             string partyBaseId = args[1];
-            PartyBase partyBase;
-            if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
-                return Failed($"SettlementComponent: {settlementComponentId} was not found.");
-            if (objectManager.TryGetObject<Settlement>(partyBaseId, out var settlement))
-            {
-                partyBase = settlement.Party;
-            }
-            else if (objectManager.TryGetObject<MobileParty>(partyBaseId, out var mobileParty))
-            {
-                partyBase = mobileParty.Party;
-            }
-            else
-            {
-                return Failed($"PartyBase: {partyBaseId} was not found.");
-            }
+            if (TryResolveSettlementComponent(objectManager, resolver, args[0], out var settlementComponent, out var componentError) == false)
+                return Failed(componentError);
+
+            var foundSettlement = resolver.TryResolveSettlement(partyBaseId, out var settlement, out var settlementError);
+            var foundParty = resolver.TryResolveMobileParty(partyBaseId, out var mobileParty, out var partyError);
+            if (foundSettlement && foundParty)
+                return Failed($"'{partyBaseId}' matches both Settlement {settlement.Name} ({settlement.StringId}) and MobileParty {mobileParty.Name} ({mobileParty.StringId}); use an id.");
+            if (foundSettlement == false && foundParty == false)
+                return Failed($"PartyBase '{partyBaseId}' was not found. {settlementError} {partyError}");
+
+            var partyBase = foundSettlement ? settlement.Party : mobileParty.Party;
+            var ownerId = foundSettlement ? settlement.StringId : mobileParty.StringId;
 
             settlementComponent.Owner = partyBase;
 
-            return Succeeded($"Successfully set the SettlementComponent ({settlementComponentId}) Owner to '{args[1]}'");
+            return Succeeded($"Successfully set the SettlementComponent ({IdOf(objectManager, settlementComponent, args[0])}) Owner to '{ownerId}'");
 
         }
     }
@@ -843,28 +900,33 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementNameOrId", "The exact settlement name or id; quote names containing spaces."),
-            new ExpectedArgs("capturerHeroId", "The capturer hero id.", isRequired: false),
+            new ExpectedArgs("settlementNameOrId", "Settlement name or id; quote names with spaces."),
+            new ExpectedArgs("capturerHeroId", "Capturer hero name or id; quote names with spaces.", isRequired: false),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public CaptureBySiegeCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-            var settlement = Campaign.Current.CampaignObjectManager.Settlements
-                .FirstOrDefault(s => s.StringId == args[0] || s.Name?.ToString() == args[0]);
-            if (settlement == null)
-                return Failed($"Settlement '{args[0]}' not found");
+            if (resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError) == false)
+                return Failed(settlementError);
             if (!settlement.IsFortification)
                 return Failed($"'{args[0]}' is not a town or castle");
 
             Hero capturer;
             if (args.Count >= 2)
             {
-                capturer = Campaign.Current.CampaignObjectManager.Find<Hero>(args[1]);
-                if (capturer == null)
-                    return Failed($"Hero '{args[1]}' not found");
+                if (resolver.TryResolveHero(args[1], out capturer, out var heroError) == false)
+                    return Failed(heroError);
             }
             else
             {
@@ -908,21 +970,54 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementNameOrId", "The exact settlement name or id; quote names containing spaces."),
+            new ExpectedArgs("settlementNameOrId", "Settlement name or id; quote names with spaces."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public OwnerStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
 
-            var settlement = Campaign.Current.CampaignObjectManager.Settlements
-                .FirstOrDefault(s => s.StringId == args[0] || s.Name?.ToString() == args[0]);
-            if (settlement == null)
-                return Failed($"Settlement '{args[0]}' not found");
+            if (resolver.TryResolveSettlement(args[0], out var settlement, out var settlementError) == false)
+                return Failed(settlementError);
 
             return Succeeded(FormatOwnerState(settlement));
 
         }
     }
+
+    // Resolves a component by registry id first, else through the settlement named or identified by the query.
+    private static bool TryResolveSettlementComponent(
+        IObjectManager objectManager,
+        ICommandObjectResolver resolver,
+        string query,
+        out SettlementComponent component,
+        out string error)
+    {
+        error = null;
+        if (objectManager.TryGetObject<SettlementComponent>(query, out component))
+            return true;
+
+        if (resolver.TryResolveSettlement(query, out var settlement, out error) == false)
+            return false;
+
+        component = settlement.SettlementComponent;
+        if (component != null)
+            return true;
+
+        error = $"Settlement {settlement.Name} ({settlement.StringId}) has no settlement component.";
+        return false;
+    }
+
+    // The registry id of an object, falling back to the supplied text when it is not registered.
+    private static string IdOf(IObjectManager objectManager, object obj, string fallback) =>
+        objectManager.TryGetId(obj, out var id) ? id : fallback;
 
     private static string FormatOwnerState(Settlement settlement)
     {
@@ -960,28 +1055,35 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementComponentId", "The settlement component id."),
+            new ExpectedArgs("settlementComponentId", "Settlement component id, or the name or id of its settlement; quote names with spaces."),
             new ExpectedArgs("gold", "The gold."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
+
+        // Injects the resolver and registry used to look up the settlement component argument.
+        public SetGoldCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get SettlementComponent");
-            var objectManager = container.Resolve<IObjectManager>();
-            string settlementComponentId = args[0];
             if (int.TryParse(args[1], out int gold) == false)
             {
                 return Failed("Unable to parse gold amount");
             }
-            if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
-                return Failed($"SettlementComponent: {settlementComponentId} was not found.");
+            if (TryResolveSettlementComponent(objectManager, resolver, args[0], out var settlementComponent, out var componentError) == false)
+                return Failed(componentError);
 
             settlementComponent.Gold = gold;
 
-            return Succeeded($"Successfully set the SettlementComponent ({settlementComponentId}) Gold to '{args[1]}'");
+            return Succeeded($"Successfully set the SettlementComponent ({IdOf(objectManager, settlementComponent, args[0])}) Gold to '{args[1]}'");
 
         }
     }
@@ -1005,36 +1107,43 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementComponentId", "The settlement component id."),
+            new ExpectedArgs("settlementComponentId", "Settlement component id, or the name or id of its settlement; quote names with spaces."),
             new ExpectedArgs("value", "The value."),
         };
+
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
+
+        // Injects the resolver and registry used to look up the settlement component argument.
+        public SetIsOwnerUnassignedCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-            if (ContainerProvider.TryGetContainer(out var container) == false) return Failed("Unable to get SettlementComponent");
-            var objectManager = container.Resolve<IObjectManager>();
-            string settlementComponentId = args[0];
             if (bool.TryParse(args[1], out bool value) == false)
             {
                 return Failed("Unable to parse IsOwnerUnassigned");
             }
-            if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
-                return Failed($"SettlementComponent: {settlementComponentId} was not found.");
+            if (TryResolveSettlementComponent(objectManager, resolver, args[0], out var settlementComponent, out var componentError) == false)
+                return Failed(componentError);
 
 
             settlementComponent.IsOwnerUnassigned = value;
 
 
-            return Succeeded($"Successfully set the SettlementComponent ({settlementComponentId}) IsOwnerUnassigned to '{args[1]}'");
+            return Succeeded($"Successfully set the SettlementComponent ({IdOf(objectManager, settlementComponent, args[0])}) IsOwnerUnassigned to '{args[1]}'");
 
         }
     }
 
     /// <summary>
-    /// Set OwnerClan of a settlement from Hero Id
+    /// Set OwnerClan of a settlement from a hero name or id
     /// </summary>
     public sealed class SetOwnerClanCoopCommand : ICoopCommand
     {
@@ -1048,10 +1157,18 @@ internal class SettlementCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("settlementNameOrId", "The exact settlement name or id; quote names containing spaces."),
-            new ExpectedArgs("heroId", "The hero id."),
+            new ExpectedArgs("settlementNameOrId", "Settlement name or id; quote names with spaces."),
+            new ExpectedArgs("heroId", "Hero name or id; quote names with spaces."),
             new ExpectedArgs("transfer", "gift (default) or barter.", false),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        // Injects the resolver that turns command arguments into game objects.
+        public SetOwnerClanCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
@@ -1060,27 +1177,16 @@ internal class SettlementCommands
             if (transfer != "gift" && transfer != "barter")
                 return Failed("Transfer must be gift or barter.");
 
-            StringBuilder stringBuilder = new StringBuilder();
-            foreach (var settlement in Settlement.All)
-            {
-                if (settlement.Name.ToString() == strings[0] || settlement.StringId == strings[0])
-                {
-                    var hero = Campaign.Current.CampaignObjectManager.Find<Hero>(strings[1]);
+            if (resolver.TryResolveSettlement(strings[0], out var settlement, out var settlementError) == false)
+                return Failed(settlementError);
 
-                    if (hero == null) return Failed($"Unable to find hero by id: {strings[1]}");
+            if (resolver.TryResolveHero(strings[1], out var hero, out var heroError) == false)
+                return Failed(heroError);
 
-                    if (transfer == "barter") ChangeOwnerOfSettlementAction.ApplyByBarter(hero, settlement);
-                    else ChangeOwnerOfSettlementAction.ApplyByGift(settlement, hero);
-                    stringBuilder.AppendLine($"{settlement.Name} ({settlement.StringId}) transferred to {hero.Name} ({hero.StringId}).");
-                }
-            }
+            if (transfer == "barter") ChangeOwnerOfSettlementAction.ApplyByBarter(hero, settlement);
+            else ChangeOwnerOfSettlementAction.ApplyByGift(settlement, hero);
 
-            string result = stringBuilder.ToString();
-            if (result.Length > 0)
-            {
-                return Succeeded(result);
-            }
-            return Failed("Settlement or hero not found.");
+            return Succeeded($"{settlement.Name} ({settlement.StringId}) transferred to {hero.Name} ({hero.StringId})." + Environment.NewLine);
 
         }
     }

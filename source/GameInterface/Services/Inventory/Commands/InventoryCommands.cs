@@ -3,6 +3,7 @@ using Autofac;
 using Common;
 using Common.Logging;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using Serilog;
 using System.Collections.Generic;
 using System.Text;
@@ -38,6 +39,14 @@ internal class InventoryCommands
     /// </summary>
     public sealed class InventoryItemIdsCoopCommand : ICoopCommand
     {
+        // Resolves hero arguments by name or id.
+        private readonly ICommandObjectResolver resolver;
+
+        public InventoryItemIdsCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.inventory";
 
         public string Name => "item_ids";
@@ -48,31 +57,22 @@ internal class InventoryCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
+            new ExpectedArgs("hero_name", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
 
+            if (!resolver.TryResolveHero(strings[0], out var hero, out var error)) return Failed(error);
+
             StringBuilder stringBuilder = new StringBuilder();
-            foreach (var hero in Hero.AllAliveHeroes)
+            stringBuilder.AppendLine(hero.Name.ToString());
+            foreach (var rosterElement in hero.PartyBelongedTo.ItemRoster)
             {
-                if (hero.Name.ToString() == strings[0])
-                {
-                    stringBuilder.AppendLine(hero.Name.ToString());
-                    foreach (var rosterElement in hero.PartyBelongedTo.ItemRoster)
-                    {
-                        stringBuilder.AppendLine(rosterElement.EquipmentElement.Item.StringId + ": " + rosterElement._amount);
-                    }
-                }
+                stringBuilder.AppendLine(rosterElement.EquipmentElement.Item.StringId + ": " + rosterElement._amount);
             }
 
-            string result = stringBuilder.ToString();
-            if (result.Length > 0)
-            {
-                return Succeeded(result);
-            }
-            return Failed("Hero not found.");
+            return Succeeded(stringBuilder.ToString());
         }
     }
 
@@ -81,6 +81,14 @@ internal class InventoryCommands
     /// </summary>
     public sealed class InventoryItemValuesCoopCommand : ICoopCommand
     {
+        // Resolves hero arguments by name or id.
+        private readonly ICommandObjectResolver resolver;
+
+        public InventoryItemValuesCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.inventory";
 
         public string Name => "item_values";
@@ -91,31 +99,22 @@ internal class InventoryCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
+            new ExpectedArgs("hero_name", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
 
+            if (!resolver.TryResolveHero(strings[0], out var hero, out var error)) return Failed(error);
+
             StringBuilder stringBuilder = new StringBuilder();
-            foreach (var hero in Hero.AllAliveHeroes)
+            stringBuilder.AppendLine(hero.Name.ToString());
+            foreach (var rosterElement in hero.PartyBelongedTo.ItemRoster)
             {
-                if (hero.Name.ToString() == strings[0])
-                {
-                    stringBuilder.AppendLine(hero.Name.ToString());
-                    foreach (var rosterElement in hero.PartyBelongedTo.ItemRoster)
-                    {
-                        stringBuilder.AppendLine(rosterElement.EquipmentElement.Item.StringId + ": " + rosterElement.EquipmentElement.Item.Value + "(" + rosterElement.EquipmentElement.ItemValue + ")");
-                    }
-                }
+                stringBuilder.AppendLine(rosterElement.EquipmentElement.Item.StringId + ": " + rosterElement.EquipmentElement.Item.Value + "(" + rosterElement.EquipmentElement.ItemValue + ")");
             }
 
-            string result = stringBuilder.ToString();
-            if (result.Length > 0)
-            {
-                return Succeeded(result);
-            }
-            return Failed("Hero not found.");
+            return Succeeded(stringBuilder.ToString());
         }
     }
 
@@ -124,6 +123,14 @@ internal class InventoryCommands
     /// </summary>
     public sealed class InventoryHeroEquipmentCoopCommand : ICoopCommand
     {
+        // Resolves hero arguments by name or id.
+        private readonly ICommandObjectResolver resolver;
+
+        public InventoryHeroEquipmentCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.inventory";
 
         public string Name => "hero_equipment";
@@ -134,36 +141,27 @@ internal class InventoryCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
+            new ExpectedArgs("hero_name", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
         {
 
+            if (!resolver.TryResolveHero(strings[0], out var hero, out var error)) return Failed(error);
+
             StringBuilder stringBuilder = new StringBuilder();
-            foreach (var hero in Hero.AllAliveHeroes)
-            {
-                if (hero.Name.ToString() == strings[0])
-                {
-                    stringBuilder.AppendLine(hero.Name.ToString());
+            stringBuilder.AppendLine(hero.Name.ToString());
 
-                    stringBuilder.AppendLine("BattleEquipment");
-                    foreach (var equipmentElement in hero.BattleEquipment._itemSlots) stringBuilder.AppendLine(equipmentElement.Item?.StringId ?? "[EMPTY]");
+            stringBuilder.AppendLine("BattleEquipment");
+            foreach (var equipmentElement in hero.BattleEquipment._itemSlots) stringBuilder.AppendLine(equipmentElement.Item?.StringId ?? "[EMPTY]");
 
-                    stringBuilder.AppendLine("CivilianEquipment");
-                    foreach (var equipmentElement in hero.CivilianEquipment._itemSlots) stringBuilder.AppendLine(equipmentElement.Item?.StringId ?? "[EMPTY]");
+            stringBuilder.AppendLine("CivilianEquipment");
+            foreach (var equipmentElement in hero.CivilianEquipment._itemSlots) stringBuilder.AppendLine(equipmentElement.Item?.StringId ?? "[EMPTY]");
 
-                    stringBuilder.AppendLine("StealthEquipment");
-                    foreach (var equipmentElement in hero.StealthEquipment._itemSlots) stringBuilder.AppendLine(equipmentElement.Item?.StringId ?? "[EMPTY]");
-                }
-            }
+            stringBuilder.AppendLine("StealthEquipment");
+            foreach (var equipmentElement in hero.StealthEquipment._itemSlots) stringBuilder.AppendLine(equipmentElement.Item?.StringId ?? "[EMPTY]");
 
-            string result = stringBuilder.ToString();
-            if (result.Length > 0)
-            {
-                return Succeeded(result);
-            }
-            return Failed("Hero not found.");
+            return Succeeded(stringBuilder.ToString());
         }
     }
 
@@ -172,6 +170,14 @@ internal class InventoryCommands
     /// </summary>
     public sealed class InventoryGiveAnimalsCoopCommand : ICoopCommand
     {
+        // Resolves hero arguments by name or id.
+        private readonly ICommandObjectResolver resolver;
+
+        public InventoryGiveAnimalsCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.inventory";
 
         public string Name => "give_animals";
@@ -182,7 +188,7 @@ internal class InventoryCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
+            new ExpectedArgs("hero_name", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -194,42 +200,33 @@ internal class InventoryCommands
                 return Failed("Unable to resolve ObjectManager.");
             }
 
+            if (!resolver.TryResolveHero(strings[0], out var hero, out var error)) return Failed(error);
+
             StringBuilder stringBuilder = new StringBuilder();
-            foreach (var hero in Hero.AllAliveHeroes)
+            var itemsToAdd = new Dictionary<string, int>()
             {
-                if (hero.Name.ToString() == strings[0])
+                { "sheep", 5 },
+                { "cow", 5 },
+                { "hog", 5 },
+                { "goose", 5 },
+                { "chicken", 5 }
+            };
+
+            foreach (var itemId in itemsToAdd.Keys)
+            {
+                if (!objectManager.TryGetObject(itemId, out ItemObject itemObject))
                 {
-                    var itemsToAdd = new Dictionary<string, int>()
-                    {
-                        { "sheep", 5 },
-                        { "cow", 5 },
-                        { "hog", 5 },
-                        { "goose", 5 },
-                        { "chicken", 5 }
-                    };
-
-                    foreach (var itemId in itemsToAdd.Keys)
-                    {
-                        if (!objectManager.TryGetObject(itemId, out ItemObject itemObject))
-                        {
-                            stringBuilder.AppendLine("Failed to retrieve object for ItemObject id: " + itemId);
-                        }
-                        else
-                        {
-                            hero.PartyBelongedTo.ItemRoster.AddToCounts(itemObject, itemsToAdd[itemId]);
-                        }
-                    }
-
-                    stringBuilder.AppendLine(strings[0] + " was given animals.");
+                    stringBuilder.AppendLine("Failed to retrieve object for ItemObject id: " + itemId);
+                }
+                else
+                {
+                    hero.PartyBelongedTo.ItemRoster.AddToCounts(itemObject, itemsToAdd[itemId]);
                 }
             }
 
-            string result = stringBuilder.ToString();
-            if (result.Length > 0)
-            {
-                return Succeeded(result);
-            }
-            return Failed("Hero not found.");
+            stringBuilder.AppendLine(strings[0] + " was given animals.");
+
+            return Succeeded(stringBuilder.ToString());
         }
     }
 
@@ -238,6 +235,14 @@ internal class InventoryCommands
     /// </summary>
     public sealed class InventoryGiveWarhorsesCoopCommand : ICoopCommand
     {
+        // Resolves hero arguments by name or id.
+        private readonly ICommandObjectResolver resolver;
+
+        public InventoryGiveWarhorsesCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.inventory";
 
         public string Name => "give_warhorses";
@@ -248,7 +253,7 @@ internal class InventoryCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name", "The exact hero display name.", isRequired: true),
+            new ExpectedArgs("hero_name", "Hero name or id; quote names with spaces.", isRequired: true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs strings)
@@ -257,39 +262,30 @@ internal class InventoryCommands
 
             if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager.");
 
+            if (!resolver.TryResolveHero(strings[0], out var hero, out var error)) return Failed(error);
+
             StringBuilder stringBuilder = new StringBuilder();
-            foreach (var hero in Hero.AllAliveHeroes)
+            var itemsToAdd = new Dictionary<string, int>()
             {
-                if (hero.Name.ToString() == strings[0])
+                { "t2_empire_horse", 3 },
+                { "t2_khuzait_horse", 2 }
+            };
+
+            foreach (var itemId in itemsToAdd.Keys)
+            {
+                if (!objectManager.TryGetObject(itemId, out ItemObject itemObject))
                 {
-                    var itemsToAdd = new Dictionary<string, int>()
-                    {
-                        { "t2_empire_horse", 3 },
-                        { "t2_khuzait_horse", 2 }
-                    };
-
-                    foreach (var itemId in itemsToAdd.Keys)
-                    {
-                        if (!objectManager.TryGetObject(itemId, out ItemObject itemObject))
-                        {
-                            stringBuilder.AppendLine("Failed to retrieve object for ItemObject id: " + itemId);
-                        }
-                        else
-                        {
-                            hero.PartyBelongedTo.ItemRoster.AddToCounts(itemObject, itemsToAdd[itemId]);
-                        }
-                    }
-
-                    stringBuilder.AppendLine(strings[0] + " was given war horses.");
+                    stringBuilder.AppendLine("Failed to retrieve object for ItemObject id: " + itemId);
+                }
+                else
+                {
+                    hero.PartyBelongedTo.ItemRoster.AddToCounts(itemObject, itemsToAdd[itemId]);
                 }
             }
 
-            string result = stringBuilder.ToString();
-            if (result.Length > 0)
-            {
-                return Succeeded(result);
-            }
-            return Failed("Hero not found.");
+            stringBuilder.AppendLine(strings[0] + " was given war horses.");
+
+            return Succeeded(stringBuilder.ToString());
         }
     }
 }

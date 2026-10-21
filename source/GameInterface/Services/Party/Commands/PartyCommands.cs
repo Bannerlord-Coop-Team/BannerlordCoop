@@ -10,6 +10,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Patches;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Utils.Commands;
 using SandBox.GauntletUI;
 using Serilog;
 using System.Collections.Generic;
@@ -50,30 +51,28 @@ internal class PartyCommands
     }
 
     /// <summary>
-    /// All alive heroes whose full name matches and that have a party (the console splits arguments on spaces,
-    /// so the caller joins them back). The bulk cheats act on every match, not just the first, so a co-op test
-    /// save with several identically-named heroes - e.g. multiple "RandomPlayer" parties - is set up on all of
-    /// them at once. Heroes with no party (a prisoner, notable, or wanderer) are skipped so a cheat never
-    /// dereferences a null PartyBelongedTo.
+    /// Resolves one alive hero by name or id and requires that it has a party, so a cheat never dereferences a
+    /// null PartyBelongedTo. A name shared by several heroes (multiple "RandomPlayer" parties) reports the
+    /// candidate ids from the resolver so the caller can rerun with the hero id printed by `who_am_i`.
     /// </summary>
-    private static List<Hero> FindHeroesWithParty(string name)
-        => Hero.AllAliveHeroes.Where(h => h != null && h.Name?.ToString() == name && h.PartyBelongedTo != null).ToList();
-
-    /// <summary>
-    /// Finds a single alive hero with a party, for the cheats that target one party (the companion-preserve
-    /// pair - putting one hero into several prisons at once would be invalid state). Accepts a hero StringId
-    /// (unique, printed by `whoami`) so you can target one specific party when several heroes share a name
-    /// (multiple "RandomPlayer" parties), or falls back to a full-name match. Reports cleanly on a miss.
-    /// </summary>
-    private static bool TryGetHeroWithParty(string nameOrId, out Hero hero, out string error)
+    private static bool TryResolveHeroWithParty(ICommandObjectResolver resolver, string nameOrId, out Hero hero, out string error)
     {
-        hero = Hero.AllAliveHeroes.FirstOrDefault(h => h.StringId == nameOrId)
-            ?? Hero.AllAliveHeroes.FirstOrDefault(h => h.Name.ToString() == nameOrId && h.PartyBelongedTo != null);
-        if (hero == null) { error = "No hero \"" + nameOrId + "\" (by id or name) with a party found."; return false; }
-        if (hero.PartyBelongedTo == null) { error = hero.Name + " (" + hero.StringId + ") has no party (a prisoner, notable, or wanderer?)."; return false; }
-        error = null;
+        if (!resolver.TryResolveHero(nameOrId, out hero, out error)) return false;
+
+        if (hero.PartyBelongedTo == null)
+        {
+            error = hero.Name + " (" + hero.StringId + ") has no party (a prisoner, notable, or wanderer?).";
+            return false;
+        }
+
         return true;
     }
+
+    /// <summary>
+    /// The registry id of a resolved object for echoing in command output, falling back to its StringId.
+    /// </summary>
+    private static string IdOf(MBObjectBase obj) =>
+        TryGetObjectManager(out var objectManager) && objectManager.TryGetId(obj, out var id) ? id : obj.StringId;
 
     /// <summary>
     /// Prints this instance's controlled hero and its ids. Run on a CLIENT to learn your own hero's StringId,
@@ -120,19 +119,22 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party_id", "The party id.", true),
+            new ExpectedArgs("party_id", "Mobile party name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public PositionCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out MobileParty party))
-                return Failed($"Party with id {args[0]} not found");
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
 
             CampaignVec2 position = party.Position;
-            var partyId = objectManager.TryGetId(party, out string resolvedPartyId)
-                ? resolvedPartyId
-                : args[0];
+            var partyId = IdOf(party);
             return Succeeded($"id={partyId}|party={party.StringId}|" +
                 $"x={position.X.ToString("R", CultureInfo.InvariantCulture)}|" +
                 $"y={position.Y.ToString("R", CultureInfo.InvariantCulture)}|" +
@@ -201,30 +203,60 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-        new ExpectedArgs("party_id", "The registered mobile-party id."),
+        new ExpectedArgs("party_id", "Mobile party name or id; quote names with spaces."),
         new ExpectedArgs("x", "The campaign-map x coordinate."),
         new ExpectedArgs("y", "The campaign-map y coordinate."),
         new ExpectedArgs("is_on_land", "Whether the restored position is on land."),
         };
 
+        private readonly ICommandObjectResolver resolver;
+
+        public RestorePositionCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            return RestorePartyPosition(args);
+            if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
+            if (!TryParsePosition(args, out var positionX, out var positionY, out var isOnLand))
+                return Failed("Invalid command argument value.");
+
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
+
+            return MovePartyToPosition(party, positionX, positionY, isOnLand);
         }
     }
 
+    // Registry-id entry point for other debug commands that already hold a party id (the siege fixtures).
     internal static CoopCommandResult RestorePartyPosition(IReadOnlyList<string> args)
     {
         if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
-        if (!float.TryParse(args[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var positionX) ||
-            !float.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var positionY) ||
-            !bool.TryParse(args[3], out var isOnLand))
+        if (!TryParsePosition(args, out var positionX, out var positionY, out var isOnLand))
             return Failed("Invalid command argument value.");
 
         if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
         if (!objectManager.TryGetObject(args[0], out MobileParty party))
             return Failed($"Party with id {args[0]} not found");
 
+        return MovePartyToPosition(party, positionX, positionY, isOnLand);
+    }
+
+    // Parses the x, y and is_on_land arguments at indexes 1 to 3 of a restore_position argument list.
+    private static bool TryParsePosition(IReadOnlyList<string> args, out float positionX, out float positionY, out bool isOnLand)
+    {
+        positionX = 0f;
+        positionY = 0f;
+        isOnLand = false;
+
+        return float.TryParse(args[1], NumberStyles.Float, CultureInfo.InvariantCulture, out positionX) &&
+            float.TryParse(args[2], NumberStyles.Float, CultureInfo.InvariantCulture, out positionY) &&
+            bool.TryParse(args[3], out isOnLand);
+    }
+
+    // Moves a party to an exact map position in Hold mode and announces the forced position change.
+    private static CoopCommandResult MovePartyToPosition(MobileParty party, float positionX, float positionY, bool isOnLand)
+    {
         party.Position = new CampaignVec2(new TaleWorlds.Library.Vec2(positionX, positionY), isOnLand);
         party.SetMoveModeHold();
         party.ResetNavigationToHold();
@@ -251,29 +283,31 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party_id", "The party id.", true),
-            new ExpectedArgs("settlement_id", "The settlement id.", true),
+            new ExpectedArgs("party_id", "Mobile party name or id; quote names with spaces.", true),
+            new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces.", true),
             new ExpectedArgs("instant", "Set to true to teleport instantly instead of travelling.", isRequired: false),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public MoveToSettlementCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!ModInformation.IsServer)
                 return Failed("Command can only be run on the server.");
 
-
-            if (!TryGetObjectManager(out var objectManager))
-                return Failed("Unable to resolve ObjectManager.");
-
-            if (!objectManager.TryGetObject(args[0], out MobileParty party))
-                return Failed($"Party with id {args[0]} not found");
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error))
+                return Failed(error);
 
             if (!party.IsPlayerParty())
                 return Failed($"Party {party.StringId} is not a player party.");
 
-            var settlement = Settlement.Find(args[1]);
-            if (settlement == null)
-                return Failed($"Settlement with id {args[1]} not found");
+            if (!resolver.TryResolveSettlement(args[1], out var settlement, out error))
+                return Failed(error);
 
             if (!party.IsActive)
                 return Failed($"Party {party.StringId} is not active.");
@@ -350,38 +384,29 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name_or_id", "The hero name or id.", true),
+            new ExpectedArgs("hero_name_or_id", "Hero name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public CharacterIdsCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             var nameOrId = string.Join(" ", args);
-            var mainHero = Hero.MainHero;
-            var heroById = mainHero != null &&
-                           mainHero.StringId == nameOrId &&
-                           mainHero.PartyBelongedTo != null
-                ? mainHero
-                : Hero.AllAliveHeroes.FirstOrDefault(
-                    hero => hero != null && hero.StringId == nameOrId && hero.PartyBelongedTo != null);
-            var heroes = heroById == null
-                ? FindHeroesWithParty(nameOrId)
-                : new List<Hero> { heroById };
-            if (heroes.Count == 0)
-                return Failed("No hero named or identified by \"" + nameOrId + "\" with a party found.");
+            if (!TryResolveHeroWithParty(resolver, nameOrId, out var hero, out var error)) return Failed(error);
 
+            var party = hero.PartyBelongedTo;
             StringBuilder stringBuilder = new StringBuilder();
-            foreach (var hero in heroes)
-            {
-                var party = hero.PartyBelongedTo;
-                if (party == null) continue;
+            stringBuilder.AppendLine("##" + (hero.Name?.ToString() ?? "<unnamed>") + "  (hero id: " + hero.StringId + ")");
+            stringBuilder.AppendLine("Member roster:");
+            AppendRoster(stringBuilder, party.MemberRoster);
 
-                stringBuilder.AppendLine("##" + (hero.Name?.ToString() ?? "<unnamed>") + "  (hero id: " + hero.StringId + ")");
-                stringBuilder.AppendLine("Member roster:");
-                AppendRoster(stringBuilder, party.MemberRoster);
-
-                stringBuilder.AppendLine("Prisoner roster:");
-                AppendRoster(stringBuilder, party.PrisonRoster);
-            }
+            stringBuilder.AppendLine("Prisoner roster:");
+            AppendRoster(stringBuilder, party.PrisonRoster);
 
             return Succeeded(stringBuilder.ToString());
         }
@@ -418,10 +443,17 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party_id", "The party id.", true),
-            new ExpectedArgs("character_id", "The character id.", true),
+            new ExpectedArgs("party_id", "Mobile party name or id; quote names with spaces.", true),
+            new ExpectedArgs("character_id", "Troop character name or id; quote names with spaces.", true),
             new ExpectedArgs("wounded_count", "The wounded count.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public SetTroopWoundedCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -430,23 +462,20 @@ internal class PartyCommands
             if (!int.TryParse(args[2], out var woundedCount))
                 return Failed("Please enter an integer for wounded count.");
 
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out MobileParty party))
-                return Failed($"Party with id {args[0]} not found.");
-            if (!objectManager.TryGetObject(args[1], out CharacterObject character))
-                return Failed($"Character with id {args[1]} not found.");
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
+            if (!resolver.TryResolveCharacterObject(args[1], out var character, out error)) return Failed(error);
 
             var roster = party.MemberRoster;
             var index = roster.FindIndexOfTroop(character);
             if (index < 0)
-                return Failed($"{args[1]} is not in {party.Name}'s member roster.");
+                return Failed($"{IdOf(character)} is not in {party.Name}'s member roster.");
 
             var element = roster.GetElementCopyAtIndex(index);
             if (woundedCount < 0 || woundedCount > element.Number)
                 return Failed($"Wounded count must be between 0 and {element.Number}.");
 
             roster.SetElementWoundedNumber(index, woundedCount);
-            return Succeeded($"Set {args[1]} oldWounded={element.WoundedNumber} newWounded={woundedCount}.");
+            return Succeeded($"Set {IdOf(character)} oldWounded={element.WoundedNumber} newWounded={woundedCount}.");
         }
     }
 
@@ -465,13 +494,20 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party_id", "The party id.", true),
-            new ExpectedArgs("character_id", "The character id.", true),
+            new ExpectedArgs("party_id", "Mobile party name or id; quote names with spaces.", true),
+            new ExpectedArgs("character_id", "Troop character name or id; quote names with spaces.", true),
             new ExpectedArgs("exists", "The exists.", true),
             new ExpectedArgs("number", "The number.", true),
             new ExpectedArgs("wounded_count", "The wounded count.", true),
             new ExpectedArgs("xp", "The xp.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public SetTroopStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
@@ -484,11 +520,8 @@ internal class PartyCommands
                 out var xp);
             if (validationError != null) return Failed(validationError);
 
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out MobileParty party))
-                return Failed($"Party with id {args[0]} not found.");
-            if (!objectManager.TryGetObject(args[1], out CharacterObject character))
-                return Failed($"Character with id {args[1]} not found.");
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
+            if (!resolver.TryResolveCharacterObject(args[1], out var character, out error)) return Failed(error);
             if (character.IsHero) return Failed("Hero roster elements are not supported by this command.");
 
             var roster = party.MemberRoster;
@@ -516,7 +549,7 @@ internal class PartyCommands
                 roster.InitializeCachedData();
             }
 
-            return Succeeded($"TROOP_STATE_SET party={args[0]} character={args[1]} " +
+            return Succeeded($"TROOP_STATE_SET party={IdOf(party)} character={IdOf(character)} " +
                    $"oldExists={oldExists} oldNumber={oldNumber} oldWounded={oldWounded} oldXp={oldXp} " +
                    $"newExists={shouldExist} newNumber={number} newWounded={woundedCount} newXp={xp}");
         }
@@ -563,15 +596,20 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("character_id", "The character id.", true),
+            new ExpectedArgs("character_id", "Troop character name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public SelectPartyScreenTroopCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsServer) return Failed("Command can only be run on a client.");
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out CharacterObject character))
-                return Failed($"Character with id {args[0]} not found.");
+            if (!resolver.TryResolveCharacterObject(args[0], out var character, out var error)) return Failed(error);
             if (!(Game.Current?.GameStateManager?.ActiveState is PartyState))
                 return Failed("No active party screen.");
 
@@ -579,10 +617,10 @@ internal class PartyCommands
             if (partyVm == null) return Failed("No active Party screen view model.");
 
             var row = partyVm.MainPartyTroops.FirstOrDefault(vm => vm.Character == character);
-            if (row == null) return Failed($"{args[0]} is not in the right member roster.");
+            if (row == null) return Failed($"{IdOf(character)} is not in the right member roster.");
 
             if (!row.IsSelected) partyVm.ExecuteSelectCharacterTuple(row);
-            return Succeeded($"PARTY_SCREEN_TROOP_SELECTED character={args[0]} selected={row.IsSelected} " +
+            return Succeeded($"PARTY_SCREEN_TROOP_SELECTED character={IdOf(character)} selected={row.IsSelected} " +
                    $"upgradeTargets={row.Upgrades.Count} ready={row.NumOfReadyToUpgradeTroops} " +
                    $"upgradeable={row.NumOfUpgradeableTroops}");
         }
@@ -603,16 +641,21 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("character_id", "The character id.", true),
+            new ExpectedArgs("character_id", "Troop character name or id; quote names with spaces.", true),
             new ExpectedArgs("upgrade_target_index", "The upgrade target index.", false),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public UpgradePartyScreenTroopCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsServer) return Failed("Command can only be run on a client.");
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out CharacterObject character))
-                return Failed($"Character with id {args[0]} not found.");
+            if (!resolver.TryResolveCharacterObject(args[0], out var character, out var error)) return Failed(error);
             if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState))
                 return Failed("No active party screen.");
 
@@ -620,12 +663,12 @@ internal class PartyCommands
             if (args.Count == 2 && (!int.TryParse(args[1], out upgradeTarget) || upgradeTarget < 0))
                 return Failed("Upgrade target index must be a non-negative integer.");
             if (upgradeTarget >= character.UpgradeTargets.Length)
-                return Succeeded($"{args[0]} has {character.UpgradeTargets.Length} upgrade targets.");
+                return Succeeded($"{IdOf(character)} has {character.UpgradeTargets.Length} upgrade targets.");
 
             var logic = partyState.PartyScreenLogic;
             int rosterIndex = logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right]
                 .FindIndexOfTroop(character);
-            if (rosterIndex < 0) return Failed($"{args[0]} is not in the right member roster.");
+            if (rosterIndex < 0) return Failed($"{IdOf(character)} is not in the right member roster.");
 
             var troop = logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right]
                 .GetElementCopyAtIndex(rosterIndex);
@@ -642,10 +685,10 @@ internal class PartyCommands
                 upgradeTarget,
                 insertionIndex);
             if (!logic.ValidateCommand(command))
-                return Failed($"PARTY_SCREEN_UPGRADE_REJECTED character={args[0]} target={upgradeTarget}");
+                return Failed($"PARTY_SCREEN_UPGRADE_REJECTED character={IdOf(character)} target={upgradeTarget}");
 
             logic.AddCommand(command);
-            return Succeeded($"PARTY_SCREEN_UPGRADE_STAGED character={args[0]} " +
+            return Succeeded($"PARTY_SCREEN_UPGRADE_STAGED character={IdOf(character)} " +
                 $"target={character.UpgradeTargets[upgradeTarget].StringId} pending={logic.IsThereAnyChanges()}");
         }
     }
@@ -665,15 +708,20 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("character_id", "The character id.", true),
+            new ExpectedArgs("character_id", "Troop character name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public StagePartyScreenTransferCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsServer) return Failed("Command can only be run on a client.");
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out CharacterObject character))
-                return Failed($"Character with id {args[0]} not found.");
+            if (!resolver.TryResolveCharacterObject(args[0], out var character, out var error)) return Failed(error);
             if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState))
                 return Failed("No active party screen.");
 
@@ -682,7 +730,7 @@ internal class PartyCommands
             if (partyVm == null) return Failed("No active Party screen view model.");
 
             var row = partyVm.MainPartyTroops.FirstOrDefault(vm => vm.Character == character);
-            if (row == null) return Failed($"{args[0]} is not in the right member roster.");
+            if (row == null) return Failed($"{IdOf(character)} is not in the right member roster.");
 
             partyVm.OnTransferTroop(row, -1, 1, row.Side);
             partyVm.ExecuteRemoveZeroCounts();
@@ -705,15 +753,20 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("character_id", "The character id.", true),
+            new ExpectedArgs("character_id", "Troop character name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public PartyScreenTroopStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsServer) return Failed("Command can only be run on a client.");
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out CharacterObject character))
-                return Failed($"Character with id {args[0]} not found.");
+            if (!resolver.TryResolveCharacterObject(args[0], out var character, out var error)) return Failed(error);
             if (!(Game.Current?.GameStateManager?.ActiveState is PartyState partyState))
                 return Failed("No active party screen.");
 
@@ -726,7 +779,7 @@ internal class PartyCommands
                 ? (number: -1, wounded: -1, xp: -1)
                 : (number: row.Troop.Number, wounded: row.Troop.WoundedNumber, xp: row.Troop.Xp);
 
-            return Succeeded($"PARTY_SCREEN_TROOP_STATE character={args[0]} " +
+            return Succeeded($"PARTY_SCREEN_TROOP_STATE character={IdOf(character)} " +
                    $"visibleNumber={visible.number} visibleWounded={visible.wounded} visibleXp={visible.xp} " +
                    $"baselineNumber={baseline.number} baselineWounded={baseline.wounded} baselineXp={baseline.xp} " +
                    $"vmNumber={rendered.number} vmWounded={rendered.wounded} vmXp={rendered.xp} " +
@@ -762,32 +815,32 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name", "The hero name.", true),
+            new ExpectedArgs("hero_name", "Hero name or id; quote names with spaces.", true),
             new ExpectedArgs("xp_amount", "The xp amount.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public AddTroopXpCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
 
-
-            // The xp amount is the last token; the rest is the (possibly multi-word) hero name.
             if (!int.TryParse(args[1], out int xpGain)) return Failed("Please enter an integer for xp amount");
 
-            var name = args[0];
-            var heroes = FindHeroesWithParty(name);
-            if (heroes.Count == 0) return Failed("No hero named \"" + name + "\" with a party found.");
+            if (!TryResolveHeroWithParty(resolver, args[0], out var hero, out var error)) return Failed(error);
 
-            foreach (var hero in heroes)
+            var memberRoster = hero.PartyBelongedTo.MemberRoster;
+            foreach (var troop in memberRoster.data)
             {
-                var memberRoster = hero.PartyBelongedTo.MemberRoster;
-                foreach (var troop in memberRoster.data)
-                {
-                    memberRoster.AddXpToTroop(troop.Character, xpGain);
-                }
+                memberRoster.AddXpToTroop(troop.Character, xpGain);
             }
 
-            return Succeeded("Gave xp to the troops of " + heroes.Count + " party/parties named \"" + name + "\".");
+            return Succeeded("Gave xp to the troops of " + hero.Name + "'s party.");
         }
     }
 
@@ -806,19 +859,23 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name", "The hero name.", true),
+            new ExpectedArgs("hero_name", "Hero name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public AddTroopsCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
 
-
             if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager.");
 
-            var name = string.Join(" ", args);
-            var heroes = FindHeroesWithParty(name);
-            if (heroes.Count == 0) return Failed("No hero named \"" + name + "\" with a party found.");
+            if (!TryResolveHeroWithParty(resolver, string.Join(" ", args), out var hero, out var error)) return Failed(error);
 
             var troopsToAdd = new Dictionary<string, int>()
             {
@@ -829,23 +886,20 @@ internal class PartyCommands
             };
 
             StringBuilder stringBuilder = new StringBuilder();
-            foreach (var hero in heroes)
+            var memberRoster = hero.PartyBelongedTo.MemberRoster;
+            foreach (var troopId in troopsToAdd.Keys)
             {
-                var memberRoster = hero.PartyBelongedTo.MemberRoster;
-                foreach (var troopId in troopsToAdd.Keys)
+                if (!objectManager.TryGetObject(troopId, out CharacterObject characterObject))
                 {
-                    if (!objectManager.TryGetObject(troopId, out CharacterObject characterObject))
-                    {
-                        stringBuilder.AppendLine("Failed to retrieve object for CharacterObject id: " + troopId);
-                    }
-                    else
-                    {
-                        memberRoster.AddToCounts(characterObject, troopsToAdd[troopId]);
-                    }
+                    stringBuilder.AppendLine("Failed to retrieve object for CharacterObject id: " + troopId);
                 }
-
-                stringBuilder.AppendLine(hero.Name.ToString() + " was given troops.");
+                else
+                {
+                    memberRoster.AddToCounts(characterObject, troopsToAdd[troopId]);
+                }
             }
+
+            stringBuilder.AppendLine(hero.Name.ToString() + " was given troops.");
 
             return Succeeded(stringBuilder.ToString());
         }
@@ -869,14 +923,20 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party_id", "The party id.", true),
+            new ExpectedArgs("party_id", "Mobile party name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public SiegeBuffCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
-            if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out MobileParty party)) return Failed($"Party with id {args[0]} not found");
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
 
             var troop = party.MapFaction?.Culture?.EliteBasicTroop ?? party.MapFaction?.Culture?.BasicTroop;
             if (troop == null) return Failed($"Could not resolve a troop for {party.Name}'s culture");
@@ -918,16 +978,22 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party_id", "The party id.", true),
-            new ExpectedArgs("settlement_id", "The settlement id.", true),
+            new ExpectedArgs("party_id", "Mobile party name or id; quote names with spaces.", true),
+            new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public DeclareWarCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
-            if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager.");
-            if (!objectManager.TryGetObject(args[0], out MobileParty party)) return Failed($"Party with id {args[0]} not found");
-            if (!objectManager.TryGetObject(args[1], out Settlement settlement)) return Failed($"Settlement with id {args[1]} not found");
+            if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
+            if (!resolver.TryResolveSettlement(args[1], out var settlement, out error)) return Failed(error);
 
             var attacker = party.MapFaction;
             var defender = settlement.MapFaction;
@@ -955,19 +1021,23 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name", "The hero name.", true),
+            new ExpectedArgs("hero_name", "Hero name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public AddPrisonersCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
 
-
             if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager.");
 
-            var name = string.Join(" ", args);
-            var heroes = FindHeroesWithParty(name);
-            if (heroes.Count == 0) return Failed("No hero named \"" + name + "\" with a party found.");
+            if (!TryResolveHeroWithParty(resolver, string.Join(" ", args), out var hero, out var error)) return Failed(error);
 
             var troopsToAdd = new Dictionary<string, int>()
             {
@@ -978,23 +1048,20 @@ internal class PartyCommands
             };
 
             StringBuilder stringBuilder = new StringBuilder();
-            foreach (var hero in heroes)
+            var prisonerRoster = hero.PartyBelongedTo.PrisonRoster;
+            foreach (var troopId in troopsToAdd.Keys)
             {
-                var prisonerRoster = hero.PartyBelongedTo.PrisonRoster;
-                foreach (var troopId in troopsToAdd.Keys)
+                if (!objectManager.TryGetObject(troopId, out CharacterObject characterObject))
                 {
-                    if (!objectManager.TryGetObject(troopId, out CharacterObject characterObject))
-                    {
-                        stringBuilder.AppendLine("Failed to retrieve object for CharacterObject id: " + troopId);
-                    }
-                    else
-                    {
-                        prisonerRoster.AddToCounts(characterObject, troopsToAdd[troopId]);
-                    }
+                    stringBuilder.AppendLine("Failed to retrieve object for CharacterObject id: " + troopId);
                 }
-
-                stringBuilder.AppendLine(hero.Name.ToString() + " was given prisoners.");
+                else
+                {
+                    prisonerRoster.AddToCounts(characterObject, troopsToAdd[troopId]);
+                }
             }
+
+            stringBuilder.AppendLine(hero.Name.ToString() + " was given prisoners.");
 
             return Succeeded(stringBuilder.ToString());
         }
@@ -1015,33 +1082,34 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name", "The hero name.", true),
+            new ExpectedArgs("hero_name", "Hero name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public RemovePrisonersCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
 
-
-            var name = string.Join(" ", args);
-            var heroes = FindHeroesWithParty(name);
-            if (heroes.Count == 0) return Failed("No hero named \"" + name + "\" with a party found.");
+            if (!TryResolveHeroWithParty(resolver, string.Join(" ", args), out var hero, out var error)) return Failed(error);
 
             StringBuilder stringBuilder = new StringBuilder();
-            foreach (var hero in heroes)
+            var prisonerRoster = hero.PartyBelongedTo.PrisonRoster;
+
+            // Walk from the end so removing the current element leaves the lower indices valid. Each
+            // subtract-to-zero with removeDepleted runs with patches live, so it replicates to clients.
+            for (int i = prisonerRoster.Count - 1; i >= 0; i--)
             {
-                var prisonerRoster = hero.PartyBelongedTo.PrisonRoster;
-
-                // Walk from the end so removing the current element leaves the lower indices valid. Each
-                // subtract-to-zero with removeDepleted runs with patches live, so it replicates to clients.
-                for (int i = prisonerRoster.Count - 1; i >= 0; i--)
-                {
-                    var element = prisonerRoster.GetElementCopyAtIndex(i);
-                    prisonerRoster.AddToCounts(element.Character, -element.Number, false, -element.WoundedNumber, 0, true);
-                }
-
-                stringBuilder.AppendLine(hero.Name.ToString() + " had their prisoners removed.");
+                var element = prisonerRoster.GetElementCopyAtIndex(i);
+                prisonerRoster.AddToCounts(element.Character, -element.Number, false, -element.WoundedNumber, 0, true);
             }
+
+            stringBuilder.AppendLine(hero.Name.ToString() + " had their prisoners removed.");
 
             return Succeeded(stringBuilder.ToString());
         }
@@ -1063,25 +1131,28 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("captor_hero", "The captor hero.", true),
-            new ExpectedArgs("prisoner_hero", "The prisoner hero.", true),
+            new ExpectedArgs("captor_hero", "Captor hero name or id; quote names with spaces.", true),
+            new ExpectedArgs("prisoner_hero", "Prisoner hero name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public ImprisonCompanionCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
 
-
-            // The console splits arguments on spaces, so the captor is the first token and the prisoner name is
-            // the rest joined back together. Companions always have a multi-word name (e.g. "Chandion the Bull"),
-            // which would otherwise arrive as several tokens and never match. (The captor must be a single-token
-            // name for this split to work, which the player's own hero typically is.) One captor only: a hero can
+            // The captor is the first token and the prisoner is the rest joined back together, so an unquoted
+            // multi-word companion name (e.g. Chandion the Bull) still resolves. One captor only: a hero can
             // only be a prisoner in one place, so imprisoning the companion in several prisons would be invalid.
-            if (!TryGetHeroWithParty(args[0], out var captor, out var error)) return Failed(error);
+            if (!TryResolveHeroWithParty(resolver, args[0], out var captor, out var error)) return Failed(error);
 
             var prisonerName = string.Join(" ", args.Skip(1));
-            var prisoner = Hero.AllAliveHeroes.FirstOrDefault(h => h.Name.ToString() == prisonerName);
-            if (prisoner == null) return Failed("Prisoner hero \"" + prisonerName + "\" not found.");
+            if (!resolver.TryResolveHero(prisonerName, out var prisoner, out error)) return Failed(error);
 
             // The preserve only fires for a player companion, so a non-companion would be removed by both the
             // fixed and the old code and prove nothing. Require a companion so the test actually exercises it.
@@ -1114,18 +1185,24 @@ internal class PartyCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_name_or_id", "The hero name or id.", true),
+            new ExpectedArgs("hero_name_or_id", "Hero name or id; quote names with spaces.", true),
         };
+
+        private readonly ICommandObjectResolver resolver;
+
+        public SnapshotPrisonCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
 
-
             if (TryGetObjectManager(out var objectManager) == false) return Failed("Unable to resolve ObjectManager.");
 
             // One party only, to pair with imprison_companion (which targets one prison).
-            if (!TryGetHeroWithParty(string.Join(" ", args), out var hero, out var error)) return Failed(error);
+            if (!TryResolveHeroWithParty(resolver, string.Join(" ", args), out var hero, out var error)) return Failed(error);
 
             var prisonRoster = hero.PartyBelongedTo.PrisonRoster;
             if (ContainerProvider.TryGetContainer(out var container) == false ||

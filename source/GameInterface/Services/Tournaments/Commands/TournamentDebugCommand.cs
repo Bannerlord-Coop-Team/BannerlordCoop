@@ -6,6 +6,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.Messages;
 using GameInterface.Services.Tournaments.UI;
+using GameInterface.Utils.Commands;
 using SandBox.Tournaments.MissionLogics;
 using System;
 using System.Collections.Generic;
@@ -40,6 +41,13 @@ public class TournamentDebugCommand
 
     public sealed class AddTournamentToTownCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public AddTournamentToTownCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.tournaments";
 
         public string Name => "add_tournament_to_town";
@@ -50,7 +58,7 @@ public class TournamentDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("townNameOrId", "The exact town name or id; quote names containing spaces."),
+            new ExpectedArgs("townNameOrId", "Town name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -62,8 +70,11 @@ public class TournamentDebugCommand
             if (Campaign.Current?.TournamentManager is not TournamentManager tournamentManager)
                 return Failed("No campaign is currently loaded");
 
-            if (!TryResolveTown(args[0], out var town))
-                return Failed($"Town '{args[0]}' not found");
+            if (!resolver.TryResolveTown(args[0], out var town, out var error))
+                return Failed(error);
+
+            if (!town.Settlement.IsTown)
+                return Failed($"{town.Name} is not a town");
 
             if (tournamentManager.GetTournamentGame(town) != null)
                 return Failed($"{town.Name} already has an active tournament");
@@ -595,7 +606,6 @@ public class TournamentDebugCommand
         error = null;
         return true;
     }
-#endif
 
     private static bool TryResolveTown(string townIdentifier, out Town town)
     {
@@ -608,4 +618,5 @@ public class TournamentDebugCommand
             ?.Town;
         return town != null;
     }
+#endif
 }
