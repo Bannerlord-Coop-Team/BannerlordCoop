@@ -127,7 +127,7 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (!objects.TryGetObject<Hero>(data.IssueOwnerId, out var giver) ||
+            if (!objects.TryGetObjectWithLogging<Hero>(data.IssueOwnerId, out var giver) ||
                 giver.Issue == null || giver.Issue.StringId != data.IssueId || !giver.Issue.IsSolvingWithQuest ||
                 !(giver.Issue.IssueQuest is Quest quest) || !quest.IsOngoing || quest.StringId != data.QuestId ||
                 !ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out var owner) || owner != player.ControllerId ||
@@ -163,7 +163,7 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (!objects.TryGetObject<Hero>(data.IssueOwnerId, out var giver) || giver.Issue == null ||
+            if (!objects.TryGetObjectWithLogging<Hero>(data.IssueOwnerId, out var giver) || giver.Issue == null ||
                 giver.Issue.StringId != data.IssueId || !(giver.Issue.IssueQuest is Quest quest) ||
                 quest.StringId != data.QuestId) return;
             quest._isFightingForGoods = data.Fight;
@@ -226,7 +226,7 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (objects.TryGetObject<Hero>(data.IssueOwnerId, out var giver) &&
+            if (objects.TryGetObjectWithLogging<Hero>(data.IssueOwnerId, out var giver) &&
                 giver.Issue != null && giver.Issue.StringId == data.IssueId &&
                 giver.Issue.IssueQuest is Quest quest && quest.StringId == data.QuestId &&
                 merchantConversations.TryGetValue(quest, out var ownerPeer) && ownerPeer == peer)
