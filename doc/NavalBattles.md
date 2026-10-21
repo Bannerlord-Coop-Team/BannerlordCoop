@@ -17,11 +17,16 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 - Every other owner's hull is a copy on this client: spawned from the record with its dynamic body, no controller, and
   driven only by its owner's streams (D3 option B). It replays the owner's helm input, and `NavalSteeredCopies`
   (`Missions.Naval`) steers it every fixed physics step toward the owner's latest sample extrapolated by the owner's
-  velocity and yaw rate: target velocity = owner velocity + clamped, soft-zoned correction, blended in with a time
-  constant. Steering reads the body's physics pose (`GetBodyWorldTransform`), as vanilla's fixed-tick code does. A large
-  error or a jump between samples queues a snap that the next mission tick applies, outside the physics step: a teleport
-  to the extrapolated position and heading (`NavalShipsLogic.TeleportShip`, which carries the crew), along with any other
-  agent standing on the copy, such as a local main agent that boarded it, then the owner's velocity and yaw rate.
+  velocity and yaw rate for the sample's age on this clock (at most 0.3 s): target velocity = owner velocity + clamped,
+  soft-zoned correction, blended in with a time constant. The default lead past the age is 0: the age already covers
+  the time since the sample arrived, transit on a LAN is about 0, and R42 measured the old 0.1 s lead as pure overshoot
+  (copies ran speed x 0.1 s ahead of their owners). No clean one-way transit time exists on the client (samples ride the
+  reliable channel, direct or relayed through the server, whose owner-to-server hop this client can't see), so
+  `copy_steer lead=` stays the tuning knob. Steering reads the body's physics pose (`GetBodyWorldTransform`), as
+  vanilla's fixed-tick code does. A large error or a jump between samples queues a snap that the next mission tick
+  applies, outside the physics step: a teleport to the extrapolated position and heading (`NavalShipsLogic.TeleportShip`,
+  which carries the crew), along with any other agent standing on the copy, such as a local main agent that boarded it,
+  then the owner's velocity and yaw rate.
   Heave, pitch and roll come from this client's water. One rule decides a copy's mode at every sample and step: steered
   while its body simulates, its owner's frames written otherwise (warning `has no simulating body` once per copy;
   `bodyMode` in `inspect`). `NavalSteeredCopies.Track`/`Forget` are the only writers of `NavalForeignHulls`, the static
@@ -370,7 +375,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 |---|---|---|
 | `scenario <preset> [knobs] [ids]` | server | Stages a preset and starts the battle. |
 | `scenario_status` | client | Preset steps, knobs and `battle.hulls[]` with owner, AI flag, weapon and ram. |
-| `inspect` | client | Session, host epoch, hull streams, damage, weapons, decks, stations, AI fleet, end tally, agents, ships; DEBUG adds `copyProbe`: steering knobs, drift and correction per copy, steering cost, contact counters, `rams[]` (`hasRam` per hull) and the ram counters (`ramTicksGatedOnCopies`, `ramPuppetsSpared`). |
+| `inspect` | client | Session, host epoch, hull streams, damage, weapons, decks, stations, AI fleet, end tally, agents, ships; DEBUG adds `copyProbe`: steering knobs, drift (against the owner's estimated current pose, the latest sample moved on by its age without the lead) and correction per copy, `oscillations10s`/`oscillationsTotal` (sign changes of the along-heading position error to the target, outside a 0.1 m deadband), steering cost, contact counters, `rams[]` (`hasRam` per hull) and the ram counters (`ramTicksGatedOnCopies`, `ramPuppetsSpared`). |
 | `win`, `lose` | battle host | Ends the battle as a victory or defeat for the host's side; peers follow. |
 | `damage <ship> <amount>`, `sink <ship>` | client | Hits a hull as a ship weapon would; another owner's hull takes it through its owner. |
 | `reswap <ship>` | battle host | Replaces an AI hull without a migration. |

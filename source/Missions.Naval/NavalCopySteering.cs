@@ -24,8 +24,11 @@ public sealed class CopySteeringKnobs
     /// <summary>Time constant in seconds over which the body's velocity is blended to the target velocity.</summary>
     public float TauSeconds { get; private set; } = 0.2f;
 
-    /// <summary>Seconds the target is extrapolated past the sample's age, covering the owner-to-here delay.</summary>
-    public float LeadSeconds { get; private set; } = 0.1f;
+    /// <summary>
+    /// Seconds the target is extrapolated past the sample's age, for a transit delay the age misses; 0 because on a LAN it is
+    /// about 0 and any lead puts the copy that far ahead of its owner.
+    /// </summary>
+    public float LeadSeconds { get; private set; }
 
     /// <summary>Planar error or sample jump in metres beyond which the copy is teleported to the owner's frame.</summary>
     public float SnapMetres { get; private set; } = 25f;
@@ -65,13 +68,13 @@ public sealed class CopySteeringKnobs
 /// <summary>One correction step for a steered copy: the velocity change to apply, or a snap to the owner's frame.</summary>
 internal readonly struct CopySteeringStep
 {
-    public CopySteeringStep(bool snap, MatrixFrame snapFrame, Vec2 deltaVelocity, float deltaYawRate, float alongHeading)
+    public CopySteeringStep(bool snap, MatrixFrame snapFrame, Vec2 deltaVelocity, float deltaYawRate, float errorAlongHeading)
     {
         Snap = snap;
         SnapFrame = snapFrame;
         DeltaVelocity = deltaVelocity;
         DeltaYawRate = deltaYawRate;
-        AlongHeading = alongHeading;
+        ErrorAlongHeading = errorAlongHeading;
     }
 
     /// <summary>Teleport to <see cref="SnapFrame"/> and take the owner's velocity instead of steering.</summary>
@@ -85,8 +88,8 @@ internal readonly struct CopySteeringStep
     /// <summary>Yaw rate change in rad/s.</summary>
     public float DeltaYawRate { get; }
 
-    /// <summary>The velocity change along the copy's heading, whose sign changes count as oscillations.</summary>
-    public float AlongHeading { get; }
+    /// <summary>The position error to the target along the copy's heading in metres, whose sign changes count as oscillations.</summary>
+    public float ErrorAlongHeading { get; }
 }
 
 /// <summary>
@@ -102,8 +105,8 @@ internal sealed class CopySteering
     internal const float YawSoftStartDegrees = 1f;
     internal const float YawSoftEndDegrees = 3f;
     internal const float YawClampDegreesPerSecond = 10f;
-    // A correction along the heading smaller than this (m/s) has no sign, so noise does not count as oscillation.
-    internal const float OscillationEpsilon = 0.01f;
+    // A position error along the heading smaller than this (m) has no sign, so a copy sitting on its target does not oscillate.
+    internal const float OscillationDeadbandMetres = 0.1f;
     internal const float DegToRad = (float)(Math.PI / 180.0);
 
     private readonly CopySteeringKnobs knobs;
@@ -123,6 +126,9 @@ internal sealed class CopySteering
     /// <summary>The owner's latest sample frame as received, not extrapolated.</summary>
     public MatrixFrame SampleFrame => sampleFrame;
 
+    /// <summary>Where the owner is estimated to be right now: the sample moved on by its velocity for its age, without the lead.</summary>
+    internal (Vec2 Position, float Yaw) OwnerEstimate => Extrapolate(MaxExtrapolationSeconds, 0f);
+
     /// <summary>Physics time stepped since the latest sample arrived.</summary>
     public float SecondsSinceSample { get; private set; }
 
@@ -136,7 +142,8 @@ internal sealed class CopySteering
     /// <summary>Takes the owner's latest sample; a jump past the snap distance from where the last one led snaps the copy.</summary>
     public void ObserveOwner(MatrixFrame frame, Vec2 velocity, float yawRate)
     {
-        if (HasTarget && (frame.origin.AsVec2 - Extrapolate(StaleSeconds).Position).Length > knobs.SnapMetres) pendingSnap = true;
+        var led = Extrapolate(StaleSeconds, knobs.LeadSeconds).Position;
+        if (HasTarget && (frame.origin.AsVec2 - led).Length > knobs.SnapMetres) pendingSnap = true;
 
         sampleFrame = frame;
         sampleVelocity = velocity;
@@ -146,7 +153,7 @@ internal sealed class CopySteering
     }
 
     /// <summary>The planar position and yaw the copy steers toward right now.</summary>
-    internal (Vec2 Position, float Yaw) Target => Extrapolate(MaxExtrapolationSeconds);
+    internal (Vec2 Position, float Yaw) Target => Extrapolate(MaxExtrapolationSeconds, knobs.LeadSeconds);
 
     /// <summary>The correction for one physics step of <paramref name="dt"/> seconds from the copy's current state.</summary>
     public CopySteeringStep Compute(float dt, Vec3 origin, float yaw, Vec2 velocity, float yawRate)
@@ -171,15 +178,15 @@ internal sealed class CopySteering
         float yawCorrection = Clamp(yawError * yawGain, -yawClamp, yawClamp);
         float deltaYawRate = ((stale ? 0f : sampleYawRate) + yawCorrection - yawRate) * blend;
 
-        float along = (deltaVelocity.x * (float)Math.Cos(yaw)) + (deltaVelocity.y * (float)Math.Sin(yaw));
+        float along = (error.x * (float)Math.Cos(yaw)) + (error.y * (float)Math.Sin(yaw));
         CountOscillation(along);
         return new CopySteeringStep(false, default, deltaVelocity, deltaYawRate, along);
     }
 
     // The sample moved on by its velocity for its age, capped at maxAge, plus the lead.
-    private (Vec2 Position, float Yaw) Extrapolate(float maxAge)
+    private (Vec2 Position, float Yaw) Extrapolate(float maxAge, float lead)
     {
-        float ahead = Math.Min(SecondsSinceSample, maxAge) + knobs.LeadSeconds;
+        float ahead = Math.Min(SecondsSinceSample, maxAge) + lead;
         return (sampleFrame.origin.AsVec2 + (sampleVelocity * ahead), YawOf(sampleFrame.rotation.f) + (sampleYawRate * ahead));
     }
 
@@ -229,10 +236,10 @@ internal sealed class CopySteering
     private static Vec3 TurnAboutZ(Vec3 vector, float sin, float cos) =>
         new Vec3((vector.x * cos) - (vector.y * sin), (vector.x * sin) + (vector.y * cos), vector.z);
 
-    // A sign change of the correction along the heading; corrections inside the epsilon keep the last sign.
+    // A sign change of the along-heading position error, the copy crossing its target; errors in the deadband keep the last sign.
     private void CountOscillation(float along)
     {
-        if (Math.Abs(along) < OscillationEpsilon) return;
+        if (Math.Abs(along) < OscillationDeadbandMetres) return;
 
         int sign = along > 0f ? 1 : -1;
         if (lastSign != 0 && sign != lastSign) Oscillations++;

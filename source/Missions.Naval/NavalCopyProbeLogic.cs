@@ -11,7 +11,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Naval;
 
 /// <summary>
-/// [Game thread] DEBUG: measures each copy's drift from its owner's latest sample, the closest approach of every hull pair,
+/// [Game thread] DEBUG: measures each copy's drift from its owner's estimated pose, the closest approach of every hull pair,
 /// the frame cost and the steering cost.
 /// </summary>
 public class NavalCopyProbeLogic : MissionLogic
@@ -48,7 +48,7 @@ public class NavalCopyProbeLogic : MissionLogic
         fixedTicks++;
     }
 
-    // Against the owner's latest raw sample, which a steered copy is pushed toward and a written one is set to.
+    // Against where the owner is now, its latest sample moved on by its age without the lead; heave against the sample's height.
     private void MeasureDrift(float time)
     {
         foreach (var entry in steeredCopies.Copies)
@@ -58,12 +58,12 @@ public class NavalCopyProbeLogic : MissionLogic
             if (!steering.HasTarget || ship.IsRemoved || !ship.GameEntity.IsValid) continue;
 
             var frame = ship.GlobalFrame;
-            var target = steering.SampleFrame;
+            var owner = steering.OwnerEstimate;
             var diagnostics = entry.Value.Diagnostics;
-            diagnostics.Distance.Add(time, (frame.origin.AsVec2 - target.origin.AsVec2).Length);
-            diagnostics.HeadingDegrees.Add(time, Math.Abs(CopySteering.WrapAngle(
-                CopySteering.YawOf(target.rotation.f) - CopySteering.YawOf(frame.rotation.f))) / CopySteering.DegToRad);
-            diagnostics.Heave.Add(time, Math.Abs(frame.origin.z - target.origin.z));
+            diagnostics.Distance.Add(time, (frame.origin.AsVec2 - owner.Position).Length);
+            diagnostics.HeadingDegrees.Add(time, Math.Abs(CopySteering.WrapAngle(owner.Yaw - CopySteering.YawOf(frame.rotation.f)))
+                / CopySteering.DegToRad);
+            diagnostics.Heave.Add(time, Math.Abs(frame.origin.z - steering.SampleFrame.origin.z));
         }
     }
 

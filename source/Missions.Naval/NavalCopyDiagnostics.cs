@@ -58,7 +58,7 @@ internal sealed class RollingWindow
     public void Clear() => samples.Clear();
 }
 
-/// <summary>DEBUG: how far one copy sits from its owner's latest sample, and how hard its steering pushes, over the last 10 s.</summary>
+/// <summary>DEBUG: how far one copy sits from its owner's estimated pose, and how hard its steering pushes, over the last 10 s.</summary>
 internal sealed class CopyDiagnostics
 {
     public RollingWindow Distance { get; } = new RollingWindow();
@@ -70,14 +70,14 @@ internal sealed class CopyDiagnostics
 
     public RollingWindow Correction { get; } = new RollingWindow();
 
-    /// <summary>The correction along the heading, whose sign changes over the window count as oscillations.</summary>
-    public RollingWindow CorrectionAlongHeading { get; } = new RollingWindow();
+    /// <summary>The position error to the target along the heading, whose sign changes over the window count as oscillations.</summary>
+    public RollingWindow ErrorAlongHeading { get; } = new RollingWindow();
 
-    /// <summary>Records one steering step's velocity change.</summary>
+    /// <summary>Records one steering step's velocity change and along-heading error.</summary>
     public void RecordStep(float time, CopySteeringStep step)
     {
         Correction.Add(time, step.DeltaVelocity.Length);
-        CorrectionAlongHeading.Add(time, step.AlongHeading);
+        ErrorAlongHeading.Add(time, step.ErrorAlongHeading);
     }
 
     /// <summary>The drift, heading, heave and correction windows with the steering's counters.</summary>
@@ -91,7 +91,7 @@ internal sealed class CopyDiagnostics
             samples = Correction.Count,
             meanMps = Round(Correction.Mean),
             maxMps = Round(Correction.Max),
-            oscillations10s = CorrectionAlongHeading.SignChanges(CopySteering.OscillationEpsilon),
+            oscillations10s = ErrorAlongHeading.SignChanges(CopySteering.OscillationDeadbandMetres),
             oscillationsTotal = steering?.Oscillations,
             snaps = steering?.Snaps,
             sampleAgeS = steering == null ? (float?)null : Round(steering.SecondsSinceSample),
