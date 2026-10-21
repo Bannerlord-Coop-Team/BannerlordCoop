@@ -289,7 +289,7 @@ internal sealed class GangLeaderGoodsService : IGangLeaderGoodsService, IHandler
             quest._isFightingForGoods = true;
             quest._playerHasTheGoods = true;
             var issue = IssueManager.GetIssueOfQuest(quest);
-            if (issue != null && objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) &&
+            if (!quest._isPayingForGoods && issue != null && objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) &&
                 players.TryGetPlayer(Hero.MainHero, out var player) && players.TryGetPeer(player.ControllerId, out var peer))
                 network.Send(peer, new NetworkGangLeaderGoodsAcquired(ownerId, issue.StringId, quest.StringId, true, true));
         }
