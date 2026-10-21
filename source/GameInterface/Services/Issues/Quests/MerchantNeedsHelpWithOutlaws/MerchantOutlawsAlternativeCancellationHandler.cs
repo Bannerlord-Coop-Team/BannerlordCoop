@@ -23,14 +23,10 @@ public readonly struct MerchantOutlawsAlternativeCancelled : IEvent
 [ProtoContract(SkipConstructor = true)]
 public readonly struct RequestMerchantOutlawsAlternativeCancellation : ICommand
 {
-    [ProtoMember(1)] public string GiverId { get; }
-    [ProtoMember(2)] public string IssueId { get; }
     [ProtoMember(3)] public TroopRosterElementData[] Troops { get; }
 
-    public RequestMerchantOutlawsAlternativeCancellation(string giverId, string issueId, TroopRosterElementData[] troops)
+    public RequestMerchantOutlawsAlternativeCancellation(TroopRosterElementData[] troops)
     {
-        GiverId = giverId;
-        IssueId = issueId;
         Troops = troops;
     }
 }
@@ -66,9 +62,7 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
     {
         if (ModInformation.IsServer) return;
         var issue = payload.What.Issue;
-        if (!objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
-
-        network.SendAll(new RequestMerchantOutlawsAlternativeCancellation(giverId, issue.StringId,
+        network.SendAll(new RequestMerchantOutlawsAlternativeCancellation(
             troops.ToData(issue.AlternativeSolutionSentTroops)));
         using (new AllowedThread()) troops.ReturnToMainParty(issue);
     }

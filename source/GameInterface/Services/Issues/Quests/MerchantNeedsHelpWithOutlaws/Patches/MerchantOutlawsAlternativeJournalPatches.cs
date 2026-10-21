@@ -1,5 +1,6 @@
 ﻿using Common;
 using HarmonyLib;
+using Common.Messaging;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -34,6 +35,13 @@ internal class MerchantOutlawsAlternativeJournalPatches
     [HarmonyPrefix]
     private static void FinalizedPrefix(IssueBase __instance)
     {
+        if (ModInformation.IsClient && __instance is Issue && !__instance.IsSolvingWithAlternative &&
+            __instance.AlternativeSolutionSentTroops.TotalManCount > 0)
+        {
+            // A different solver can finish while this client's committed picker selection is pending.
+            MessageBroker.Instance.Publish(__instance, new MerchantOutlawsAlternativeCancelled(__instance));
+        }
+
         // Framework dismissal ends the issue directly, without finalizing its unstarted server quest.
         if (ModInformation.IsServer && __instance is Issue && __instance.IssueQuest is Quest quest && quest.IsOngoing)
         {

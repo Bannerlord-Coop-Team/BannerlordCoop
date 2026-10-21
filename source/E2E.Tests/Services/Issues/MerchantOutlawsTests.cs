@@ -585,12 +585,13 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, false, false, false)]
-    [InlineData(true, false, false, false)]
-    [InlineData(false, true, false, false)]
-    [InlineData(false, true, true, false)]
-    [InlineData(false, true, false, true)]
-    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker, bool otherAccepts)
+    [InlineData(false, false, false, false, false)]
+    [InlineData(true, false, false, false, false)]
+    [InlineData(false, true, false, false, false)]
+    [InlineData(false, true, true, false, false)]
+    [InlineData(false, true, false, true, false)]
+    [InlineData(false, true, false, true, true)]
+    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker, bool otherAccepts, bool otherDisconnects)
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
@@ -658,6 +659,24 @@ public class MerchantOutlawsTests : IDisposable
         environment.FlushCoalescer();
 
         if (otherAccepts) scenario.Accept(ClientB);
+
+        if (otherDisconnects)
+        {
+            Server.Call(() =>
+            {
+                Server.Resolve<IPlayerManager>().ClearPeer(ClientB.NetPeer);
+                Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(ClientB.NetPeer, default(DisconnectInfo)));
+            });
+            environment.FlushCoalescer();
+            Server.Call(() => Assert.Equal(sent + 5,
+                Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId))));
+            ClientA.Call(() =>
+            {
+                Assert.Null(Get<Hero>(ClientA, scenario.NotableId).Issue);
+                Assert.Equal(1, Get<MobileParty>(ClientA, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<Hero>(ClientA, companionId).CharacterObject));
+            });
+            return;
+        }
 
         ClientA.Call(() =>
         {
