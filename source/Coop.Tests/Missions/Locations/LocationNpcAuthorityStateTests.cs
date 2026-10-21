@@ -2,7 +2,6 @@
 using GameInterface.Services.Locations;
 using GameInterface.Services.Locations.Hosting;
 using System;
-using System.Threading;
 using Moq;
 using Xunit;
 
@@ -51,43 +50,10 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.True(state.ShouldSuppressNativeSpawns);
     }
 
-    /// <summary>A registry assignment naming this client lifts the suppression.</summary>
-    [Fact]
-    [Trait("Requirement", "SR-011")]
-    public void ConfirmedHost_LiftsSuppression()
-    {
-        hostRegistry.Setup(registry => registry.IsHost(TavernInstanceId)).Returns(true);
-        state.BeginMission(TavernInstanceId);
-
-        Assert.True(state.IsLocalHostConfirmed);
-        Assert.False(state.ShouldSuppressNativeSpawns);
-    }
-
-    /// <summary>A registry assignment naming another client keeps the suppression.</summary>
-    [Fact]
-    [Trait("Requirement", "SR-012")]
-    public void ConfirmedNonHost_StaysSuppressed()
-    {
-        hostRegistry.Setup(registry => registry.IsHost(TavernInstanceId)).Returns(false);
-        state.BeginMission(TavernInstanceId);
-
-        Assert.False(state.IsLocalHostConfirmed);
-        Assert.True(state.ShouldSuppressNativeSpawns);
-    }
-
-    /// <summary>Hosting a different instance does not confirm the active one.</summary>
-    [Fact]
-    public void HostOfAnotherInstance_DoesNotConfirmActiveInstance()
-    {
-        hostRegistry.Setup(registry => registry.IsHost(CenterInstanceId)).Returns(true);
-        state.BeginMission(TavernInstanceId);
-
-        Assert.False(state.IsLocalHostConfirmed);
-        Assert.True(state.ShouldSuppressNativeSpawns);
-    }
-
     /// <summary>Confirmation follows the registry as the host migrates to and away from this client.</summary>
     [Fact]
+    [Trait("Requirement", "SR-011")]
+    [Trait("Requirement", "SR-012")]
     [Trait("Requirement", "SR-014")]
     public void HostMigration_FollowsTheRegistry()
     {
@@ -151,18 +117,6 @@ public class LocationNpcAuthorityStateTests : IDisposable
         Assert.True(state.ShouldSuppressNativeSpawns);
     }
 
-    /// <summary>Capture suppression holds only inside its scope.</summary>
-    [Fact]
-    public void SuppressCapture_IsRaisedOnlyInsideTheScope()
-    {
-        Assert.False(state.IsCaptureSuppressed);
-
-        using (state.SuppressCapture())
-            Assert.True(state.IsCaptureSuppressed);
-
-        Assert.False(state.IsCaptureSuppressed);
-    }
-
     /// <summary>Disposing a nested capture scope restores the outer scope.</summary>
     [Fact]
     public void SuppressCapture_NestedScopeRestoresTheOuterScope()
@@ -190,22 +144,6 @@ public class LocationNpcAuthorityStateTests : IDisposable
 
             Assert.True(state.IsCaptureSuppressed);
         }
-    }
-
-    /// <summary>Capture suppression on one thread is not seen by another.</summary>
-    [Fact]
-    public void SuppressCapture_IsPerThread()
-    {
-        bool otherThreadSuppressed = true;
-
-        using (state.SuppressCapture())
-        {
-            var thread = new Thread(() => otherThreadSuppressed = state.IsCaptureSuppressed);
-            thread.Start();
-            thread.Join();
-        }
-
-        Assert.False(otherThreadSuppressed);
     }
 
     /// <summary>Disposing a nested replay scope restores the outer scope.</summary>

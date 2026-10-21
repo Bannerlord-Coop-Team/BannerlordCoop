@@ -53,10 +53,10 @@ internal class LocationNativeSpawnSuppressionPatches
     internal static bool ShouldAllowEnteringLocationSpawn(bool isOwnedCompanion, bool suppressNativeSpawns)
         => isOwnedCompanion || !suppressNativeSpawns;
 
+    /// <summary>Runs vanilla simulation unless the authority state says to skip this player-party agent.</summary>
     [HarmonyPatch(nameof(MissionAgentHandler.SimulateAgent))]
     [HarmonyPrefix]
     [HarmonyPriority(Priority.High)]
-    /// <summary>Runs vanilla simulation unless the authority state says to skip this player-party agent.</summary>
     internal static bool SkipPlayerPartySimulation(Agent agent)
     {
         if (!ContainerProvider.TryResolve<ILocationNpcAuthorityState>(out var authorityState)) return true;
