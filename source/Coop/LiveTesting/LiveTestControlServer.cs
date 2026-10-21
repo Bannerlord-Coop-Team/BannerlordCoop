@@ -60,7 +60,7 @@ namespace Coop.LiveTesting
         private readonly string endpointDirectory;
         private readonly string endpointRegistrationPath;
         private int shutdownScheduled;
-        private int deferredClientJoinAttempted;
+        private readonly LiveTestClientJoinState clientJoinState = new LiveTestClientJoinState();
         private bool trackedRenderingEnabled = true;
         private bool renderStateTrackable = true;
         private int renderToggleCount;
@@ -729,7 +729,9 @@ namespace Coop.LiveTesting
 
             return ExecuteOnGameThread(request, () =>
             {
-                if (Volatile.Read(ref deferredClientJoinAttempted) != 0)
+                bool sessionActive = ContainerProvider.TryResolve<ILogic>(out _);
+                clientJoinState.Refresh(GameStateManager.Current?.ActiveState is InitialState, Campaign.Current != null, sessionActive);
+                if (clientJoinState.Attempted)
                 {
                     return Failure(
                         request.Id,
@@ -747,7 +749,10 @@ namespace Coop.LiveTesting
                         false);
                 }
 
-                if (Interlocked.Exchange(ref deferredClientJoinAttempted, 1) != 0)
+                if (sessionActive)
+                    return Failure(request.Id, "client_session_active", "The previous client session is still tearing down.", false);
+
+                if (!clientJoinState.TryBegin())
                 {
                     return Failure(
                         request.Id,
@@ -757,6 +762,7 @@ namespace Coop.LiveTesting
                 }
 
                 bool started = startAsClient();
+                clientJoinState.CompleteStart(started);
                 Logger.Information("[LiveTest] Deferred StartAsClient() returned {Started}", started);
                 return Success(request.Id, new
                 {
@@ -785,7 +791,6 @@ namespace Coop.LiveTesting
                 }
 
                 clientLogic.Disconnect();
-                Interlocked.Exchange(ref deferredClientJoinAttempted, 0);
                 return Success(request.Id, new { scheduled = true, readyForJoin = false });
             }, true);
         }
@@ -813,7 +818,7 @@ namespace Coop.LiveTesting
                 }
 
                 bool started = startAsClient();
-                Interlocked.Exchange(ref deferredClientJoinAttempted, started ? 1 : 0);
+                clientJoinState.CompleteStart(started);
                 Logger.Information("[LiveTest] Reconnect StartAsClient() returned {Started}", started);
                 return Success(request.Id, new { attempted = true, started });
             }, true);
@@ -954,10 +959,9 @@ namespace Coop.LiveTesting
                 registeredControllerIds,
                 connectedControllerIds,
                 deferredClientJoinEnabled,
-                readyForClientJoin = !isServer && deferredClientJoinEnabled &&
-                    Volatile.Read(ref deferredClientJoinAttempted) == 0 &&
-                    GameStateManager.Current?.ActiveState is InitialState && !campaignLoaded,
-                deferredClientJoinAttempted = Volatile.Read(ref deferredClientJoinAttempted) != 0,
+                readyForClientJoin = !isServer && deferredClientJoinEnabled && clientJoinState.Refresh(
+                    GameStateManager.Current?.ActiveState is InitialState, campaignLoaded, ContainerProvider.TryResolve<ILogic>(out _)),
+                deferredClientJoinAttempted = clientJoinState.Attempted,
                 readyForCampaignTests,
                 readyForMissionTests = readyForCampaignTests && missionActive,
             });
