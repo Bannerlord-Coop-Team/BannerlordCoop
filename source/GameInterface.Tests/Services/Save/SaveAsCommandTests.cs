@@ -5,6 +5,7 @@ using GameInterface.Services.Save.Commands;
 using Moq;
 using System;
 using System.IO;
+using System.Text;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Save;
@@ -12,10 +13,14 @@ namespace GameInterface.Tests.Services.Save;
 public class SaveAsCommandTests
 {
     [Theory]
-    [InlineData(true, true, true)]
-    [InlineData(false, true, false)]
-    [InlineData(true, false, false)]
-    public void ReportsSuccessOnlyForCompletedPair(bool nativeSuccess, bool sidecarWritten, bool expected)
+    [InlineData(true, "{\"UniqueGameId\":\"proof\",\"Players\":[]}", true)]
+    [InlineData(false, "{\"UniqueGameId\":\"proof\",\"Players\":[]}", false)]
+    [InlineData(true, null, false)]
+    [InlineData(true, "{\"UniqueGameId\":\"proof\",\"Players\":[", false)]
+    [InlineData(true, "null", false)]
+    [InlineData(true, "{\"UniqueGameId\":\"other\",\"Players\":[]}", false)]
+    [InlineData(true, "{\"UniqueGameId\":\"proof\"}", false)]
+    public void ReportsSuccessOnlyForCompletedPair(bool nativeSuccess, string sidecar, bool expected)
     {
         bool previous = ModInformation.IsServer;
         ModInformation.IsServer = true;
@@ -25,7 +30,8 @@ public class SaveAsCommandTests
             var saves = new Mock<ISaveInterface>();
             saves.SetupGet(x => x.CanQueueSave).Returns(true);
             saves.Setup(x => x.ReadSaveFile(It.IsAny<string>())).Returns((string name) =>
-                written && (name.EndsWith(".sav") || sidecarWritten) ? new byte[] { 1 } : null);
+                !written ? null : name.EndsWith(".sav") ? new byte[] { 1 } :
+                sidecar == null ? null : Encoding.UTF8.GetBytes(sidecar));
             saves.Setup(x => x.SaveCurrentGameToFile("proof")).Returns(() =>
             {
                 written = true;
