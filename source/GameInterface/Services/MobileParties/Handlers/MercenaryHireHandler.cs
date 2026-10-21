@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.UI.Notifications.Messages;
 using LiteNetLib;
 using Serilog;
@@ -29,15 +30,18 @@ internal class MercenaryHireHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
 
     public MercenaryHireHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
-        INetwork network)
+        INetwork network,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<MercenariesHired>(Handle_MercenariesHired);
         messageBroker.Subscribe<HireMercenaries>(Handle_HireMercenaries);
@@ -82,6 +86,7 @@ internal class MercenaryHireHandler : IHandler
 
     private void ApplyHireMercenaries(HireMercenaries data, NetPeer peer)
     {
+        if (!playerManager.IsSenderControllingHero(peer, data.MainHeroId)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var mainHero)) return;
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(data.MainPartyId, out var mainParty)) return;
         if (!objectManager.TryGetObjectWithLogging<Town>(data.TownId, out var town)) return;
