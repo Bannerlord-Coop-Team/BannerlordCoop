@@ -12,7 +12,19 @@ if [[ $prev != - ]]; then bash "$here/local_down.sh" "$prev" >/dev/null 2>&1 || 
 bash "$here/bench_lock.sh" acquire "$issue" "$out" || exit $?
 # A failed cycle tears down whatever it started (local_down.sh also releases the lock), so no game runs unlocked;
 # a successful run keeps the lock until local_down.sh.
-trap 'rc=$?; if [[ $rc -ne 0 ]]; then if [[ -f "$out/identity.env" ]]; then bash "$here/local_down.sh" "$out" >/dev/null 2>&1 || true; fi; bash "$here/bench_lock.sh" release "$issue" >/dev/null; fi' EXIT
+cleanup_failed_cycle() {
+  local rc=$?
+  [[ $rc -ne 0 ]] || return 0
+  if [[ -f "$out/identity.env" ]]; then
+    if ! bash "$here/local_down.sh" "$out"; then
+      echo 'Cleanup failed; bench lock retained. Confirm verifiedAbsent=true before releasing it.' >&2
+    fi
+  else
+    bash "$here/bench_lock.sh" release "$issue"
+  fi
+  return "$rc"
+}
+trap cleanup_failed_cycle EXIT
 bash "$here/make_fixture.sh" "$root" "$out"
 steps="build prepare record start readiness"
 [[ $rot == rotate ]] && steps="rotate $steps"
