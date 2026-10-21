@@ -695,6 +695,11 @@ public class LadysKnightOutTests : IDisposable
                 Campaign.Current.ConversationManager.IsConversationInProgress = true;
                 ownerIssue = scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
                 using (new IssueDifficultyOverride(0.1f)) ownerIssue.StartIssueWithLordSolution();
+            });
+            Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+            scenario.ClientA.Call(() =>
+            {
+                Assert.True(ownerIssue.IsSolvingWithLordSolution);
                 Campaign.Current.ConversationManager.IsConversationInProgress = false;
                 var states = Game.Current.GameStateManager;
                 states._gameStates.Add(states.CreateState<MapState>());

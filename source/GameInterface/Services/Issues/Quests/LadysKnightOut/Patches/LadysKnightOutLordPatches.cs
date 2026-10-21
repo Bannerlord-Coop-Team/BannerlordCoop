@@ -26,8 +26,7 @@ internal class LadysKnightOutLordPatches
     [HarmonyPrefix]
     private static bool CompletePrefix(IssueBase __instance)
     {
-        if (!(__instance is Issue) || ModInformation.IsServer) return true;
-        // Settlement replay can open the menu, but the server must still run its consequence.
+        if (!(__instance is Issue) || ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
         MessageBroker.Instance.Publish(__instance, new LadysKnightOutLordTriggered(__instance, true));
         return false;
     }
