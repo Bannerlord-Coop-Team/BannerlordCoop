@@ -228,5 +228,4 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
             troops.ReturnTroopsToParty(hero.PartyBelongedTo, selection);
         }, context: nameof(MerchantOutlawsAlternativeCancellationHandler));
     }
-
 }
