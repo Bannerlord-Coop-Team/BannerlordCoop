@@ -233,11 +233,25 @@ public class QuestRequestOwnershipTests : IDisposable
     [InlineData(true, false)]
     [InlineData(true, true)]
     [InlineData(false, false)]
-    public void ServerBattleResult_AuthorizesGoodsOrFailsOnce(bool won, bool giveBack)
+    [InlineData(true, false, true)]
+    public void ServerBattleResult_AuthorizesGoodsOrFailsOnce(bool won, bool giveBack, bool paid = false)
     {
         scenario.Accept(scenario.ClientA);
         var clientQuest = AttachRealQuest(scenario.ClientA);
         var serverQuest = AttachRealQuest(scenario.Server);
+        if (paid)
+        {
+            scenario.ClientA.Call(() =>
+            {
+                clientQuest._isPayingForGoods = true;
+                clientQuest._playerHasTheGoods = true;
+            });
+            scenario.Server.Call(() =>
+            {
+                serverQuest._isPayingForGoods = true;
+                serverQuest._playerHasTheGoods = true;
+            });
+        }
         using var failures = new MethodCallRecorder(Priority.Last,
             AccessTools.Method(typeof(Quest), nameof(Quest.FailQuestByKeepingTheGoods)),
             AccessTools.Method(typeof(Quest), nameof(Quest.FailQuestByGivingBackTheGoods)),
@@ -278,21 +292,24 @@ public class QuestRequestOwnershipTests : IDisposable
             scenario.ClientA.Call(() =>
             {
                 Assert.True(clientQuest._playerHasTheGoods);
-                Assert.False(clientQuest._isPayingForGoods);
-                Assert.True(clientQuest._isFightingForGoods);
+                Assert.Equal(paid, clientQuest._isPayingForGoods);
+                if (!paid) Assert.True(clientQuest._isFightingForGoods);
             });
             scenario.ClientA.Call(() =>
             {
-                if (giveBack) clientQuest.FailQuestByGivingBackTheGoods();
+                if (paid) clientQuest.SucceedQuestByPayingAndKeepingTheGoods();
+                else if (giveBack) clientQuest.FailQuestByGivingBackTheGoods();
                 else clientQuest.FailQuestByKeepingTheGoods();
             });
             scenario.ClientA.Call(() =>
             {
-                if (giveBack) clientQuest.FailQuestByGivingBackTheGoods();
+                if (paid) clientQuest.SucceedQuestByPayingAndKeepingTheGoods();
+                else if (giveBack) clientQuest.FailQuestByGivingBackTheGoods();
                 else clientQuest.FailQuestByKeepingTheGoods();
             });
         }
-        Assert.Equal(1, failures.CountFor(scenario.Server));
+        Assert.Equal(paid ? 0 : 1, failures.CountFor(scenario.Server));
+        if (paid) Assert.Equal(1, consequences.CountFor(scenario.Server));
     }
 
     [Fact]
