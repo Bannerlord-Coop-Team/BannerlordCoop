@@ -139,10 +139,12 @@ internal class HeroConversationDebugCommand
     public sealed class HeroConversationSetHasMetCoopCommand : ICoopCommand
     {
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public HeroConversationSetHasMetCoopCommand(ICommandObjectResolver resolver)
+        public HeroConversationSetHasMetCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public string Prefix => "coop.debug.hero_conversation";
@@ -164,8 +166,6 @@ internal class HeroConversationDebugCommand
             if (!bool.TryParse(args[1], out var hasMet))
                 return Failed($"Unable to parse {args[1]} as a boolean.");
             if (!resolver.TryResolveHero(args[0], out var hero, out var error)) return Failed(error);
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-                return Failed($"Unable to get {nameof(IObjectManager)}");
             if (!objectManager.TryGetId(hero, out var heroId))
                 return Failed($"Hero '{hero.Name}' is not registered with the object manager.");
 
@@ -183,10 +183,12 @@ internal class HeroConversationDebugCommand
     public sealed class HeroConversationMeetingStateCoopCommand : ICoopCommand
     {
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public HeroConversationMeetingStateCoopCommand(ICommandObjectResolver resolver)
+        public HeroConversationMeetingStateCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public string Prefix => "coop.debug.hero_conversation";
@@ -211,8 +213,6 @@ internal class HeroConversationDebugCommand
 
             if (!resolver.TryResolveHero(args[0], out var playerHero, out var error)) return Failed(error);
             if (!resolver.TryResolveHero(args[1], out var metHero, out error)) return Failed(error);
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-                return Failed($"Unable to get {nameof(IObjectManager)}");
             if (!objectManager.TryGetId(playerHero, out var playerHeroId))
                 return Failed($"Hero '{playerHero.Name}' is not registered with the object manager.");
             if (!objectManager.TryGetId(metHero, out var metHeroId))

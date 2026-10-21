@@ -296,7 +296,7 @@ public class BesiegerCampDebugCommand
 
             besiegerCamp._besiegerParties.Add(mobileParty);
 
-            var partyId = objectManager.TryGetId(mobileParty, out var registryId) ? registryId : mobileParty.StringId;
+            var partyId = resolver.DisplayId(mobileParty);
             return Succeeded($"MobileParty {partyId} added to BesiegerCamp {besiegerCampId}");
 
         }
@@ -351,7 +351,7 @@ public class BesiegerCampDebugCommand
                 return Failed(error);
             }
 
-            var partyId = objectManager.TryGetId(mobileParty, out var registryId) ? registryId : mobileParty.StringId;
+            var partyId = resolver.DisplayId(mobileParty);
 
             if (!besiegerCamp._besiegerParties.Remove(mobileParty))
             {

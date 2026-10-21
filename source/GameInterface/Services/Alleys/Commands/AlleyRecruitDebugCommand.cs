@@ -110,7 +110,7 @@ public class AlleyRecruitDebugCommand
                     managementData.LastRecruitTimeTicks));
                 network.SendAll(new NetworkAlleyUnderAttack(alleyId, null, default, showNotification: false));
 
-                return Succeeded($"ALLEY_RECRUIT_FIXTURE_STARTED settlement={args[0]} alley={args[1]} " +
+                return Succeeded($"ALLEY_RECRUIT_FIXTURE_STARTED settlement={alley.Settlement.StringId} alley={args[1]} " +
                        $"owner={owner.StringId} party={owner.PartyBelongedTo.StringId} " +
                        $"originalOwner={fixture.OriginalOwner?.StringId ?? "none"} " +
                        $"originalRosterEntries={fixture.MemberRoster.Length}");
@@ -170,17 +170,14 @@ public class AlleyRecruitDebugCommand
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-                return Failed("Unable to resolve IObjectManager.");
             if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
                 return Failed(heroError);
             if (hero.PartyBelongedTo == null) return Failed($"Hero '{args[0]}' has no party.");
-            objectManager.TryGetId(hero, out var registryId);
 
             var roster = hero.PartyBelongedTo.MemberRoster;
             var result = new StringBuilder();
             result.AppendLine(
-                $"ALLEY_RECRUIT_ROSTER hero={hero.StringId} registry={registryId ?? args[0]} " +
+                $"ALLEY_RECRUIT_ROSTER hero={hero.StringId} registry={resolver.DisplayId(hero)} " +
                 $"party={hero.PartyBelongedTo.StringId} total={roster.TotalManCount}");
             for (var index = 0; index < roster.Count; index++)
             {

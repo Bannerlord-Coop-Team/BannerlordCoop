@@ -1,7 +1,7 @@
 ﻿using Common.Commands;
+using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.MobileParties.Commands;
-using GameInterface.Utils.Commands;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
@@ -113,6 +113,10 @@ public class MobilePartyDisorganizationTests : SyncTestBase
             });
     }
 
+    // Resolves a registered debug command from the instance container so tests do not depend on its constructor shape.
+    private static T ResolveCommand<T>(EnvironmentInstance instance) where T : ICoopCommand =>
+        instance.Resolve<IEnumerable<ICoopCommand>>().OfType<T>().Single();
+
     [Fact]
     public void DebugCommands_UseAuthoritativeActionAndObserveWithoutChangingCache()
     {
@@ -121,7 +125,7 @@ public class MobilePartyDisorganizationTests : SyncTestBase
         var args = new CoopCommandArgsFactory();
         Server.Call(() =>
         {
-            var set = new MobilePartyDebugCommand.SetDisorganizedCoopCommand(Server.ObjectManager, new CommandObjectResolver(Server.ObjectManager));
+            var set = ResolveCommand<MobilePartyDebugCommand.SetDisorganizedCoopCommand>(Server);
             Assert.False(set.ProcessCommand(args.FromValues(new[] { partyId, "invalid" })).Succeeded);
             Assert.False(set.ProcessCommand(args.FromValues(new[] { "missing-party", "true" })).Succeeded);
             Assert.True(set.ProcessCommand(args.FromValues(new[] { partyId, "true" })).Succeeded);
@@ -134,7 +138,7 @@ public class MobilePartyDisorganizationTests : SyncTestBase
                 Assert.True(party.IsDisorganized);
                 var version = party.VersionNo;
                 var cachedVersion = party._partyPureSpeedLastCheckVersion;
-                var inspect = new MobilePartyDebugCommand.DisorganizationCacheCoopCommand(client.ObjectManager, new CommandObjectResolver(client.ObjectManager));
+                var inspect = ResolveCommand<MobilePartyDebugCommand.DisorganizationCacheCoopCommand>(client);
                 var result = inspect.ProcessCommand(args.FromValues(new[] { partyId, "false" }));
                 Assert.True(result.Succeeded);
                 Assert.Contains("IsDisorganized=True", result.Output);
@@ -144,7 +148,7 @@ public class MobilePartyDisorganizationTests : SyncTestBase
                 Assert.Equal(cachedVersion, party._partyPureSpeedLastCheckVersion);
                 Assert.False(inspect.ProcessCommand(args.FromValues(new[] { "missing-party", "false" })).Succeeded);
                 Assert.False(inspect.ProcessCommand(args.FromValues(new[] { partyId, "invalid" })).Succeeded);
-                var set = new MobilePartyDebugCommand.SetDisorganizedCoopCommand(client.ObjectManager, new CommandObjectResolver(client.ObjectManager));
+                var set = ResolveCommand<MobilePartyDebugCommand.SetDisorganizedCoopCommand>(client);
                 Assert.False(set.ProcessCommand(args.FromValues(new[] { partyId, "false" })).Succeeded);
                 Assert.True(party.IsDisorganized);
                 Assert.Equal(version, party.VersionNo);

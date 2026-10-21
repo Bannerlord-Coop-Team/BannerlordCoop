@@ -295,11 +295,11 @@ internal static class GarrisonTroopXpFixtureCommands
             return Succeeded(JsonResult(new
             {
                 role = ModInformation.IsServer ? "server" : "client",
-                playerPartyId = IdOf(playerParty),
-                garrisonPartyId = IdOf(garrison),
+                playerPartyId = resolver.DisplayId(playerParty),
+                garrisonPartyId = resolver.DisplayId(garrison),
                 settlementId = SettlementId,
                 settlementName = settlement?.Name.ToString(),
-                characterId = IdOf(character),
+                characterId = resolver.DisplayId(character),
                 characterName = character.Name.ToString(),
                 playerOwnsSettlement = settlement?.OwnerClan != null &&
                     ReferenceEquals(settlement.OwnerClan, playerParty.ActualClan),
@@ -474,7 +474,7 @@ internal static class GarrisonTroopXpFixtureCommands
 
             var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
             var row = partyVm?.OtherPartyTroops.FirstOrDefault(vm => vm.Character == character);
-            if (row == null) return Failed($"Character '{IdOf(character)}' is not rendered in Danustica's garrison.");
+            if (row == null) return Failed($"Character '{resolver.DisplayId(character)}' is not rendered in Danustica's garrison.");
 
             partyVm.OnTransferTroop(row, -1, FixtureTroopCount, row.Side);
             partyVm.ExecuteRemoveZeroCounts();
@@ -812,16 +812,6 @@ internal static class GarrisonTroopXpFixtureCommands
         }
         return true;
     }
-
-    private static bool TryGetObjectManager(out IObjectManager objectManager)
-    {
-        objectManager = null;
-        return ContainerProvider.TryResolve(out objectManager);
-    }
-
-    // The registry id of a resolved object for echoing in command output, falling back to its StringId.
-    private static string IdOf(MBObjectBase obj) =>
-        TryGetObjectManager(out var objectManager) && objectManager.TryGetId(obj, out var id) ? id : obj.StringId;
 
     private static string JsonResult(object value) =>
         "LIVE_TEST_JSON=" + JsonConvert.SerializeObject(value);

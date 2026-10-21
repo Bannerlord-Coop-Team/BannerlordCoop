@@ -31,12 +31,10 @@ internal class MobilePartyDebugCommand
 
     public sealed class SetDisorganizedCoopCommand : ICoopCommand
     {
-        private readonly IObjectManager objectManager;
         private readonly ICommandObjectResolver resolver;
 
-        public SetDisorganizedCoopCommand(IObjectManager objectManager, ICommandObjectResolver resolver)
+        public SetDisorganizedCoopCommand(ICommandObjectResolver resolver)
         {
-            this.objectManager = objectManager;
             this.resolver = resolver;
         }
 
@@ -59,19 +57,17 @@ internal class MobilePartyDebugCommand
                 return Failed(error);
 
             party.SetDisorganized(value);
-            var partyId = objectManager.TryGetId(party, out var registeredId) ? registeredId : party.StringId;
+            var partyId = resolver.DisplayId(party);
             return Succeeded($"PartyId={partyId} IsDisorganized={party.IsDisorganized}");
         }
     }
 
     public sealed class DisorganizationCacheCoopCommand : ICoopCommand
     {
-        private readonly IObjectManager objectManager;
         private readonly ICommandObjectResolver resolver;
 
-        public DisorganizationCacheCoopCommand(IObjectManager objectManager, ICommandObjectResolver resolver)
+        public DisorganizationCacheCoopCommand(ICommandObjectResolver resolver)
         {
-            this.objectManager = objectManager;
             this.resolver = resolver;
         }
 
@@ -92,7 +88,7 @@ internal class MobilePartyDebugCommand
             if (!resolver.TryResolveMobileParty(args[0], out var party, out var error))
                 return Failed(error);
 
-            var partyId = objectManager.TryGetId(party, out var registeredId) ? registeredId : party.StringId;
+            var partyId = resolver.DisplayId(party);
             int beforeVersion = party.VersionNo;
             int beforeDerivedVersion = party.GetVersionNoForBaseSpeedCalculation();
             int beforeCacheVersion = party._partyPureSpeedLastCheckVersion;

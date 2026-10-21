@@ -289,16 +289,32 @@ public class MapEventDebugCommands
                partyBaseId == id;
     }
 
-    // Builds a party matcher that compares against the party the query resolves to (name or id), else by raw StringId, MobileParty or PartyBase registry id.
-    private static Func<MobileParty, bool> CreatePartyMatcher(
+    // Builds a party matcher for the resolved name or id, falling back to raw StringId or registry id when nothing is found; an ambiguous name fails with the resolver error.
+    private static bool TryCreatePartyMatcher(
         ICommandObjectResolver resolver,
         IObjectManager objectManager,
-        string query)
+        string query,
+        out Func<MobileParty, bool> matcher,
+        out string error)
     {
-        if (string.IsNullOrEmpty(query)) return _ => false;
-        if (resolver.TryResolveMobileParty(query, out var resolved, out _)) return party => party == resolved;
+        error = null;
+        matcher = _ => false;
+        if (string.IsNullOrEmpty(query)) return true;
 
-        return party => MatchesPartyId(objectManager, party, query);
+        if (resolver.TryResolveMobileParty(query, out var resolved, out var resolveError))
+        {
+            matcher = party => party == resolved;
+            return true;
+        }
+
+        if (resolveError != null && resolveError.StartsWith("Several ", StringComparison.Ordinal))
+        {
+            error = resolveError;
+            return false;
+        }
+
+        matcher = party => MatchesPartyId(objectManager, party, query);
+        return true;
     }
 
     public sealed class StartPlayerFieldBattleCoopCommand : ICoopCommand
@@ -777,6 +793,9 @@ public class MapEventDebugCommands
                 return Failed(error);
             }
 
+            if (!TryCreatePartyMatcher(resolver, objectManager, args.Count == 2 ? args[1] : null, out var isExcluded, out error))
+                return Failed(error);
+
             const int maximumFixtureTroops = 8;
             var remainingFixtureTroops = maximumFixtureTroops;
             var removedTroops = 0;
@@ -806,7 +825,6 @@ public class MapEventDebugCommands
                 LeaveSettlementAction.ApplyForParty(playerParty);
             }
 
-            var isExcluded = CreatePartyMatcher(resolver, objectManager, args.Count == 2 ? args[1] : null);
             var playerPosition = playerParty.Position.ToVec2();
             var banditParty = MobileParty.All
                 .Where(p => p.IsActive && p.IsBandit && p != playerParty
@@ -876,7 +894,8 @@ public class MapEventDebugCommands
                               "run coop.debug.map_event.leave_settlement first.");
 
             // A held or AI-disabled party would never move, so it is skipped.
-            var isExcluded = CreatePartyMatcher(resolver, objectManager, args.Count == 2 ? args[1] : null);
+            if (!TryCreatePartyMatcher(resolver, objectManager, args.Count == 2 ? args[1] : null, out var isExcluded, out error))
+                return Failed(error);
             var playerPosition = playerParty.Position.ToVec2();
             var banditParty = MobileParty.All
                 .Where(p => p.IsActive && p.IsBandit && p != playerParty
@@ -1090,9 +1109,11 @@ public class MapEventDebugCommands
             if (!TryGetObjectManager(out var objectManager))
                 return Failed("Unable to resolve ObjectManager");
 
+            if (!TryCreatePartyMatcher(resolver, objectManager, args[1], out var isBanditParty, out var matcherError))
+                return Failed(matcherError);
+
             var fixture = banditAttackFixture;
-            if (fixture == null || fixture.ControllerId != args[0] ||
-                !CreatePartyMatcher(resolver, objectManager, args[1])(fixture.BanditParty))
+            if (fixture == null || fixture.ControllerId != args[0] || !isBanditParty(fixture.BanditParty))
             {
                 return Failed($"Prepare the bandit attack fixture for {args[0]} and {args[1]} first.");
             }
@@ -2718,10 +2739,12 @@ public class MapEventDebugCommands
         };
 
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public ConversationHoldStateCoopCommand(ICommandObjectResolver resolver)
+        public ConversationHoldStateCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -2731,21 +2754,33 @@ public class MapEventDebugCommands
                 return Failed("Run this command on the server.");
             }
 
-            var partyBaseId = ResolvePartyBaseId(args[0]);
+            if (!TryResolvePartyBaseId(args[0], out var partyBaseId, out var error))
+                return Failed(error);
+
             var held = ConversationPartyTracker.Instance?.TryGetEngagement(partyBaseId, out _) == true;
             return Succeeded($"Conversation hold for PartyBase id {partyBaseId}: {(held ? "held" : "released")}.");
         }
 
-        // Maps a mobile party name or id to its PartyBase registry id, passing the raw query through when it is already a PartyBase id.
-        private string ResolvePartyBaseId(string query)
+        // Maps a mobile party name or id to its PartyBase registry id, passing the raw query through when nothing resolves (it may already be a PartyBase id); an ambiguous name returns the resolver error.
+        private bool TryResolvePartyBaseId(string query, out string partyBaseId, out string error)
         {
-            if (!resolver.TryResolveMobileParty(query, out var party, out _) || party.Party == null)
-                return query;
+            partyBaseId = query;
+            error = null;
+            if (resolver.TryResolveMobileParty(query, out var party, out var resolveError))
+            {
+                if (party.Party != null && objectManager.TryGetId(party.Party, out var registryId))
+                    partyBaseId = registryId;
 
-            if (!TryGetObjectManager(out var objectManager))
-                return query;
+                return true;
+            }
 
-            return objectManager.TryGetId(party.Party, out string partyBaseId) ? partyBaseId : query;
+            if (resolveError != null && resolveError.StartsWith("Several ", StringComparison.Ordinal))
+            {
+                error = resolveError;
+                return false;
+            }
+
+            return true;
         }
     }
 

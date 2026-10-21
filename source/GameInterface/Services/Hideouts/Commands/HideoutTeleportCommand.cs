@@ -3,7 +3,6 @@ using Common.Commands;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.Commands;
 using System;
 using System.Linq;
@@ -20,18 +19,15 @@ public sealed class HideoutTeleportCommand : IHideoutTeleportCommand
 {
     private readonly IMessageBroker messageBroker;
     private readonly IMobilePartyBehaviorSnapshot behaviorSnapshot;
-    private readonly IObjectManager objectManager;
     private readonly ICommandObjectResolver resolver;
 
     public HideoutTeleportCommand(IMessageBroker messageBroker, IMobilePartyBehaviorSnapshot behaviorSnapshot,
-        IObjectManager objectManager, ICommandObjectResolver resolver)
+        ICommandObjectResolver resolver)
     {
         if (messageBroker == null) throw new ArgumentNullException(nameof(messageBroker));
         if (behaviorSnapshot == null) throw new ArgumentNullException(nameof(behaviorSnapshot));
-        if (objectManager == null) throw new ArgumentNullException(nameof(objectManager));
         this.messageBroker = messageBroker;
         this.behaviorSnapshot = behaviorSnapshot;
-        this.objectManager = objectManager;
         this.resolver = resolver;
     }
 
@@ -54,7 +50,7 @@ public sealed class HideoutTeleportCommand : IHideoutTeleportCommand
 
         if (!resolver.TryResolveMobileParty(args[0], out var party, out var error))
             return new CoopCommandResult(false, error, "party_not_found");
-        var partyId = objectManager.TryGetId(party, out var registeredId) ? registeredId : party.StringId;
+        var partyId = resolver.DisplayId(party);
         if (!party.IsActive)
             return new CoopCommandResult(false, $"Party '{partyId}' is not active.", "party_unavailable");
         if (party.CurrentSettlement != null || party.MapEvent != null || party.SiegeEvent != null || party.Army != null)

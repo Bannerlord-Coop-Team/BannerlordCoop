@@ -262,9 +262,9 @@ internal static class TroopXpTransferFixtureCommands
 
             return Succeeded(JsonResult(new
             {
-                playerPartyId = IdOf(playerParty),
-                clanPartyId = clanPartyResolved ? IdOf(clanParty) : args[1],
-                characterId = IdOf(character),
+                playerPartyId = resolver.DisplayId(playerParty),
+                clanPartyId = clanPartyResolved ? resolver.DisplayId(clanParty) : args[1],
+                characterId = resolver.DisplayId(character),
                 clanPartyResolved,
                 clanPartyActive = clanPartyResolved && clanParty.IsActive,
                 sameClan = clanPartyResolved && clanParty.ActualClan != null &&
@@ -352,7 +352,7 @@ internal static class TroopXpTransferFixtureCommands
             var logic = partyState.PartyScreenLogic;
             var partyVm = (ScreenManager.TopScreen as GauntletPartyScreen)?._dataSource;
             var row = partyVm?.OtherPartyTroops.FirstOrDefault(vm => vm.Character == character);
-            if (row == null) return Failed($"Character '{IdOf(character)}' is not rendered in the clan party's member roster.");
+            if (row == null) return Failed($"Character '{resolver.DisplayId(character)}' is not rendered in the clan party's member roster.");
 
             partyVm.OnTransferTroop(row, -1, FixtureTroopCount, row.Side);
             partyVm.ExecuteRemoveZeroCounts();
@@ -705,10 +705,6 @@ internal static class TroopXpTransferFixtureCommands
 
         return true;
     }
-
-    // The registry id of a resolved object for echoing in command output, falling back to its StringId.
-    private static string IdOf(MBObjectBase obj) =>
-        TryGetObjectManager(out var objectManager) && objectManager.TryGetId(obj, out var id) ? id : obj.StringId;
 
     private static bool TryGetObjectManager(out IObjectManager objectManager)
     {

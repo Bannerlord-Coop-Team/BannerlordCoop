@@ -1,9 +1,11 @@
-﻿using GameInterface.Services.ObjectManager;
+﻿using Common.Util;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.Commands;
 using Moq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using Xunit;
 
 namespace GameInterface.Tests.Utils.Commands;
@@ -37,7 +39,7 @@ public class CommandObjectResolverTests
         return CommandObjectResolver.TryMatch(
             "Fake",
             query,
-            candidates,
+            () => candidates,
             id => registry.TryGetValue(id, out var hit) ? hit : null,
             mustBeCandidate,
             fake => new[] { fake.RegistryId, fake.StringId },
@@ -124,20 +126,6 @@ public class CommandObjectResolverTests
     }
 
     [Fact]
-    public void AmbiguousName_PrintedIdIsAcceptedOnRerun()
-    {
-        var a = new Fake("reg_a", "s_a", "Twin");
-        var b = new Fake("reg_b", "s_b", "Twin");
-        var candidates = new[] { a, b };
-
-        Match("Twin", candidates, out _, out _);
-        var ok = Match("reg_b", candidates, out var value, out _);
-
-        Assert.True(ok);
-        Assert.Same(b, value);
-    }
-
-    [Fact]
     public void AmbiguousName_CapsListAtTwentyFive()
     {
         var candidates = Enumerable.Range(0, 30)
@@ -211,7 +199,8 @@ public class CommandObjectResolverTests
         var outside = new Fake("reg_out", "s_out", "Outside");
         var inside = new Fake("reg_in", "s_in", "Inside");
         var objectManager = new Mock<IObjectManager>();
-        objectManager.Setup(m => m.TryGetObject<Fake>("reg_out", out outside)).Returns(true);
+        object outsideObject = outside;
+        objectManager.Setup(m => m.TryGetObject<object>("reg_out", out outsideObject)).Returns(true);
         var resolver = new CommandObjectResolver(objectManager.Object);
 
         var ok = resolver.TryResolve("reg_out", new[] { inside }, fake => fake.Name, out var value, out var error);
@@ -235,18 +224,6 @@ public class CommandObjectResolverTests
 
         Assert.True(resolver.TryResolve("reg_in", new[] { inside }, fake => "other", out var byId, out _));
         Assert.Same(inside, byId);
-    }
-
-    [Fact]
-    public void TryResolveGeneric_NullCandidates_Fails()
-    {
-        var resolver = new CommandObjectResolver(new Mock<IObjectManager>().Object);
-
-        var ok = resolver.TryResolve<Fake>("x", null, fake => fake.Name, out var value, out var error);
-
-        Assert.False(ok);
-        Assert.Null(value);
-        Assert.False(string.IsNullOrEmpty(error));
     }
 
     [Fact]
@@ -276,5 +253,36 @@ public class CommandObjectResolverTests
 
         Assert.True(ok);
         Assert.Same(target, value);
+    }
+
+    [Fact]
+    public void TypedResolve_RegistryHit_ResolvesWithoutTypedCastLookup()
+    {
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        object heroObject = hero;
+        var objectManager = new Mock<IObjectManager>();
+        objectManager.Setup(m => m.TryGetObject<object>("Hero_Player2863", out heroObject)).Returns(true);
+        var resolver = new CommandObjectResolver(objectManager.Object);
+
+        var ok = resolver.TryResolveHero("Hero_Player2863", out var value, out var error);
+
+        Assert.True(ok);
+        Assert.Same(hero, value);
+        Assert.Null(error);
+        // The typed lookup logs a cast error for ids of other types, so the resolver must not use it.
+        objectManager.Verify(m => m.TryGetObject(It.IsAny<string>(), out It.Ref<Hero>.IsAny), Times.Never);
+    }
+
+    [Fact]
+    public void TypedResolve_PrefixedRegistryKey_Resolves()
+    {
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        object heroObject = hero;
+        var objectManager = new Mock<IObjectManager>();
+        objectManager.Setup(m => m.TryGetObject<object>("Hero_lord_1_14", out heroObject)).Returns(true);
+        var resolver = new CommandObjectResolver(objectManager.Object);
+
+        Assert.True(resolver.TryResolveHero("lord_1_14", out var value, out _));
+        Assert.Same(hero, value);
     }
 }

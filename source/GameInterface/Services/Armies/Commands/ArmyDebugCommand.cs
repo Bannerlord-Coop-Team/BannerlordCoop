@@ -189,18 +189,13 @@ public class ArmyDebugCommand
                 return Failed("Command is only available to run on the server");
             }
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-            {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
-            }
-
             if (resolver.TryResolveArmy(args[0], out var army, out var error) == false)
             {
                 return Failed(error);
             }
 
             // Read before the disband unregisters the army.
-            objectManager.TryGetId(army, out var armyId);
+            var armyId = resolver.DisplayId(army);
 
             var disbandArmyReason = args[1];
             if (Enum.TryParse(disbandArmyReason, true, out ArmyDispersionReason reason) == false)
@@ -310,11 +305,6 @@ public class ArmyDebugCommand
         {
             var stringBuilder = new StringBuilder();
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-            {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
-            }
-
             if (resolver.TryResolveMobileParty(args[1], out var mobileParty, out var error) == false)
             {
                 return Failed(error);
@@ -325,7 +315,7 @@ public class ArmyDebugCommand
                 return Failed(error);
             }
 
-            objectManager.TryGetId(army, out var armyId);
+            var armyId = resolver.DisplayId(army);
 
             mobileParty.Army = army;
 
@@ -368,11 +358,6 @@ public class ArmyDebugCommand
         {
             var stringBuilder = new StringBuilder();
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-            {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
-            }
-
             if (resolver.TryResolveMobileParty(args[1], out var mobileParty, out var error) == false)
             {
                 return Failed(error);
@@ -383,7 +368,7 @@ public class ArmyDebugCommand
                 return Failed(error);
             }
 
-            objectManager.TryGetId(army, out var armyId);
+            var armyId = resolver.DisplayId(army);
 
             mobileParty.Army = null;
 
@@ -415,11 +400,10 @@ public class ArmyDebugCommand
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsClient) return Failed("Command is only available on the server");
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var manager)) return Failed("Unable to get ObjectManager");
             if (!resolver.TryResolveArmy(args[0], out var army, out var error)) return Failed(error);
 
-            manager.TryGetId(army, out var armyId);
-            var objectiveId = args.Count > 2 ? args[2] : "none";
+            var armyId = resolver.DisplayId(army);
+            var objectiveId = "none";
 
             if (args[1] == "None")
                 army.FinishArmyObjective();
@@ -427,13 +411,13 @@ public class ArmyDebugCommand
             {
                 if (!resolver.TryResolveSettlement(args[2], out var settlement, out error)) return Failed(error);
                 army.AiBehaviorObject = settlement;
-                manager.TryGetId(settlement, out objectiveId);
+                objectiveId = resolver.DisplayId(settlement);
             }
             else if (args[1] == "MobileParty")
             {
                 if (!resolver.TryResolveMobileParty(args[2], out var party, out error)) return Failed(error);
                 army.AiBehaviorObject = party;
-                manager.TryGetId(party, out objectiveId);
+                objectiveId = resolver.DisplayId(party);
             }
             else return Failed("Objective type must be Settlement, MobileParty, or None");
 
@@ -472,15 +456,11 @@ public class ArmyDebugCommand
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             var sb = new StringBuilder();
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-            {
-                return Failed($"Unable to get {nameof(IObjectManager)}");
-            }
             if (resolver.TryResolveArmy(args[0], out var army, out var error) == false)
             {
                 return Failed(error);
             }
-            objectManager.TryGetId(army, out var armyId);
+            var armyId = resolver.DisplayId(army);
             sb.AppendLine($"AttachedParties count: {army?.LeaderParty.AttachedParties?.Count}");
             sb.AppendLine($"{army._parties.Count}");
             sb.AppendLine($"LeaderHero: {army?.LeaderParty?.LeaderHero?.Name}");
@@ -488,9 +468,7 @@ public class ArmyDebugCommand
             sb.AppendLine($"Armyowner {army.ArmyOwner.Name}");
             sb.AppendLine($"leaderparty owner {army?.LeaderParty.Owner.Name}");
             sb.AppendLine($"armycohesion: {army?.Cohesion}");
-            string objectiveId = null;
-            if (army.AiBehaviorObject != null && !objectManager.TryGetId(army.AiBehaviorObject, out objectiveId))
-                return Failed("Army objective is not registered");
+            var objectiveId = army.AiBehaviorObject != null ? resolver.DisplayId(army.AiBehaviorObject) : null;
             sb.AppendLine($"ArmyId: {armyId}");
             sb.AppendLine($"ObjectiveType: {army.AiBehaviorObject?.GetType().Name ?? "None"}");
             sb.AppendLine($"ObjectiveId: {objectiveId ?? "none"}");

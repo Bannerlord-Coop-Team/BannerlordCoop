@@ -236,7 +236,7 @@ public class LocationDebugCommand
 
             var stringBuilder = new StringBuilder();
 
-            foreach (var locationCharacter in location.GetCharacterList() ?? Enumerable.Empty<LocationCharacter>())
+            foreach (var locationCharacter in location.GetCharacterList())
             {
                 stringBuilder.AppendLine($"'{locationCharacter.Character?.StringId}' Hero: {locationCharacter.Character?.IsHero} Tag: '{locationCharacter.SpecialTargetTag}'");
             }
@@ -382,7 +382,7 @@ public class LocationDebugCommand
 
 
             if (TryResolveLocation(resolver, args[0], out var location, out var error) == false) return Failed(error);
-            var presentCharacters = (location.GetCharacterList() ?? Enumerable.Empty<LocationCharacter>())
+            var presentCharacters = location.GetCharacterList()
                 .Select(locationCharacter => locationCharacter.Character);
             if (resolver.TryResolve(args[1], presentCharacters, candidate => candidate.Name?.ToString(), out var character, out error) == false) return Failed(error);
 

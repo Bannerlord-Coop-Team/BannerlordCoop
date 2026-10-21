@@ -36,11 +36,6 @@ namespace GameInterface.Services.Workshops.Commands
         // Resolves a workshop type by its id first, then by a unique display name.
         internal static bool TryResolveWorkshopType(ICommandObjectResolver resolver, string query, out WorkshopType type, out string error)
         {
-            error = null;
-            type = string.IsNullOrWhiteSpace(query) ? null : WorkshopType.Find(query);
-            if (type != null)
-                return true;
-
             return resolver.TryResolve(query, WorkshopType.All, w => w.Name?.ToString(), out type, out error);
         }
 

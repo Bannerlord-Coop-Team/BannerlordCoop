@@ -355,7 +355,7 @@ public class SiegeDefenseArmyFixtureCommandsTests
     }
 
     [Fact]
-    public void StateCommand_MissingCapture_IsExplicitFailureBeforeCampaignAccess()
+    public void StateCommand_MissingCapture_IsExplicitFailureAfterSettlementResolves()
     {
         var result = new SiegeDefenseArmyFixtureCommands.DefenseArmyStateCoopCommand(ResolverFor("town_ES1"))
             .ProcessCommand(new CoopCommandArgsFactory().FromValues(new[] { "controller", "town_ES1", "joined", "{}" }));

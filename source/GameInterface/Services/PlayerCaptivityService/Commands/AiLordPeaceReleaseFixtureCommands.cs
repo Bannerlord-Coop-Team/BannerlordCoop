@@ -5,7 +5,6 @@ using Common.Messaging;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Utils.Commands;
 using System;

@@ -165,17 +165,8 @@ internal class MercenaryStockDebugCommand
         var settlement = town.Settlement;
         if (settlement.IsTown) return true;
 
-        error = $"{settlement.Name} is a {GetSettlementType(settlement)}, not a town. Mercenary stock only exists for towns.";
+        error = $"{settlement.Name} is a castle, not a town. Mercenary stock only exists for towns.";
         town = null;
         return false;
-    }
-
-    private static string GetSettlementType(Settlement settlement)
-    {
-        if (settlement.IsCastle) return "castle";
-        if (settlement.IsVillage) return "village";
-        if (settlement.IsTown) return "town";
-
-        return "settlement";
     }
 }

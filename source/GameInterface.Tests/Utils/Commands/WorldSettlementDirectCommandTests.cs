@@ -3,10 +3,6 @@ using Common;
 using Common.Commands;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
-#if DEBUG
-using GameInterface.Services.Villages.Commands;
-using Moq;
-#endif
 using Serilog;
 using System;
 using System.Collections;
@@ -139,7 +135,7 @@ public class WorldSettlementDirectCommandTests
     }
 
     [Fact]
-    public void GetTownName_RegisteredNonSettlement_IsExplicitFailure()
+    public void GetTownName_IdRegisteredAsAnotherType_IsReportedAsNotFound()
     {
         var objectManager = new ObjectManager(Serilog.Core.Logger.None);
         Assert.True(objectManager.AddExisting("registered-object", new object()));

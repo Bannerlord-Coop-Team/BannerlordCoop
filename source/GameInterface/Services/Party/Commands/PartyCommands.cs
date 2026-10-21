@@ -51,28 +51,21 @@ internal class PartyCommands
     }
 
     /// <summary>
-    /// Resolves one alive hero by name or id and requires that it has a party, so a cheat never dereferences a
-    /// null PartyBelongedTo. A name shared by several heroes (multiple "RandomPlayer" parties) reports the
-    /// candidate ids from the resolver so the caller can rerun with the hero id printed by `who_am_i`.
+    /// Resolves one alive hero by name or id among heroes that have a party, so a cheat never dereferences a
+    /// null PartyBelongedTo and a partyless notable sharing a name is not ambiguous. A name shared by several
+    /// party heroes reports the candidate ids so the caller can rerun with the id printed by `who_am_i`.
     /// </summary>
     private static bool TryResolveHeroWithParty(ICommandObjectResolver resolver, string nameOrId, out Hero hero, out string error)
     {
-        if (!resolver.TryResolveHero(nameOrId, out hero, out error)) return false;
-
-        if (hero.PartyBelongedTo == null)
+        hero = null;
+        if (Campaign.Current == null)
         {
-            error = hero.Name + " (" + hero.StringId + ") has no party (a prisoner, notable, or wanderer?).";
+            error = "No campaign is loaded.";
             return false;
         }
 
-        return true;
+        return resolver.TryResolve<Hero>(nameOrId, Hero.AllAliveHeroes.Where(h => h.PartyBelongedTo != null), h => h.Name?.ToString(), out hero, out error);
     }
-
-    /// <summary>
-    /// The registry id of a resolved object for echoing in command output, falling back to its StringId.
-    /// </summary>
-    private static string IdOf(MBObjectBase obj) =>
-        TryGetObjectManager(out var objectManager) && objectManager.TryGetId(obj, out var id) ? id : obj.StringId;
 
     /// <summary>
     /// Prints this instance's controlled hero and its ids. Run on a CLIENT to learn your own hero's StringId,
@@ -134,7 +127,7 @@ internal class PartyCommands
             if (!resolver.TryResolveMobileParty(args[0], out var party, out var error)) return Failed(error);
 
             CampaignVec2 position = party.Position;
-            var partyId = IdOf(party);
+            var partyId = resolver.DisplayId(party);
             return Succeeded($"id={partyId}|party={party.StringId}|" +
                 $"x={position.X.ToString("R", CultureInfo.InvariantCulture)}|" +
                 $"y={position.Y.ToString("R", CultureInfo.InvariantCulture)}|" +
@@ -468,14 +461,14 @@ internal class PartyCommands
             var roster = party.MemberRoster;
             var index = roster.FindIndexOfTroop(character);
             if (index < 0)
-                return Failed($"{IdOf(character)} is not in {party.Name}'s member roster.");
+                return Failed($"{resolver.DisplayId(character)} is not in {party.Name}'s member roster.");
 
             var element = roster.GetElementCopyAtIndex(index);
             if (woundedCount < 0 || woundedCount > element.Number)
                 return Failed($"Wounded count must be between 0 and {element.Number}.");
 
             roster.SetElementWoundedNumber(index, woundedCount);
-            return Succeeded($"Set {IdOf(character)} oldWounded={element.WoundedNumber} newWounded={woundedCount}.");
+            return Succeeded($"Set {resolver.DisplayId(character)} oldWounded={element.WoundedNumber} newWounded={woundedCount}.");
         }
     }
 
@@ -549,7 +542,7 @@ internal class PartyCommands
                 roster.InitializeCachedData();
             }
 
-            return Succeeded($"TROOP_STATE_SET party={IdOf(party)} character={IdOf(character)} " +
+            return Succeeded($"TROOP_STATE_SET party={resolver.DisplayId(party)} character={resolver.DisplayId(character)} " +
                    $"oldExists={oldExists} oldNumber={oldNumber} oldWounded={oldWounded} oldXp={oldXp} " +
                    $"newExists={shouldExist} newNumber={number} newWounded={woundedCount} newXp={xp}");
         }
@@ -617,10 +610,10 @@ internal class PartyCommands
             if (partyVm == null) return Failed("No active Party screen view model.");
 
             var row = partyVm.MainPartyTroops.FirstOrDefault(vm => vm.Character == character);
-            if (row == null) return Failed($"{IdOf(character)} is not in the right member roster.");
+            if (row == null) return Failed($"{resolver.DisplayId(character)} is not in the right member roster.");
 
             if (!row.IsSelected) partyVm.ExecuteSelectCharacterTuple(row);
-            return Succeeded($"PARTY_SCREEN_TROOP_SELECTED character={IdOf(character)} selected={row.IsSelected} " +
+            return Succeeded($"PARTY_SCREEN_TROOP_SELECTED character={resolver.DisplayId(character)} selected={row.IsSelected} " +
                    $"upgradeTargets={row.Upgrades.Count} ready={row.NumOfReadyToUpgradeTroops} " +
                    $"upgradeable={row.NumOfUpgradeableTroops}");
         }
@@ -663,12 +656,12 @@ internal class PartyCommands
             if (args.Count == 2 && (!int.TryParse(args[1], out upgradeTarget) || upgradeTarget < 0))
                 return Failed("Upgrade target index must be a non-negative integer.");
             if (upgradeTarget >= character.UpgradeTargets.Length)
-                return Succeeded($"{IdOf(character)} has {character.UpgradeTargets.Length} upgrade targets.");
+                return Succeeded($"{resolver.DisplayId(character)} has {character.UpgradeTargets.Length} upgrade targets.");
 
             var logic = partyState.PartyScreenLogic;
             int rosterIndex = logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right]
                 .FindIndexOfTroop(character);
-            if (rosterIndex < 0) return Failed($"{IdOf(character)} is not in the right member roster.");
+            if (rosterIndex < 0) return Failed($"{resolver.DisplayId(character)} is not in the right member roster.");
 
             var troop = logic.MemberRosters[(int)PartyScreenLogic.PartyRosterSide.Right]
                 .GetElementCopyAtIndex(rosterIndex);
@@ -685,10 +678,10 @@ internal class PartyCommands
                 upgradeTarget,
                 insertionIndex);
             if (!logic.ValidateCommand(command))
-                return Failed($"PARTY_SCREEN_UPGRADE_REJECTED character={IdOf(character)} target={upgradeTarget}");
+                return Failed($"PARTY_SCREEN_UPGRADE_REJECTED character={resolver.DisplayId(character)} target={upgradeTarget}");
 
             logic.AddCommand(command);
-            return Succeeded($"PARTY_SCREEN_UPGRADE_STAGED character={IdOf(character)} " +
+            return Succeeded($"PARTY_SCREEN_UPGRADE_STAGED character={resolver.DisplayId(character)} " +
                 $"target={character.UpgradeTargets[upgradeTarget].StringId} pending={logic.IsThereAnyChanges()}");
         }
     }
@@ -730,7 +723,7 @@ internal class PartyCommands
             if (partyVm == null) return Failed("No active Party screen view model.");
 
             var row = partyVm.MainPartyTroops.FirstOrDefault(vm => vm.Character == character);
-            if (row == null) return Failed($"{IdOf(character)} is not in the right member roster.");
+            if (row == null) return Failed($"{resolver.DisplayId(character)} is not in the right member roster.");
 
             partyVm.OnTransferTroop(row, -1, 1, row.Side);
             partyVm.ExecuteRemoveZeroCounts();
@@ -779,7 +772,7 @@ internal class PartyCommands
                 ? (number: -1, wounded: -1, xp: -1)
                 : (number: row.Troop.Number, wounded: row.Troop.WoundedNumber, xp: row.Troop.Xp);
 
-            return Succeeded($"PARTY_SCREEN_TROOP_STATE character={IdOf(character)} " +
+            return Succeeded($"PARTY_SCREEN_TROOP_STATE character={resolver.DisplayId(character)} " +
                    $"visibleNumber={visible.number} visibleWounded={visible.wounded} visibleXp={visible.xp} " +
                    $"baselineNumber={baseline.number} baselineWounded={baseline.wounded} baselineXp={baseline.xp} " +
                    $"vmNumber={rendered.number} vmWounded={rendered.wounded} vmXp={rendered.xp} " +

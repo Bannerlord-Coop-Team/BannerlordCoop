@@ -505,10 +505,12 @@ public class HeroDebugCommand
     public sealed class HeroKillPlayerCoopCommand : ICoopCommand
     {
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public HeroKillPlayerCoopCommand(ICommandObjectResolver resolver)
+        public HeroKillPlayerCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public string Prefix => "coop.debug.hero";
@@ -529,17 +531,19 @@ public class HeroDebugCommand
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.kill_player")) return Failed(error);
-            return KillRegisteredHero(resolver, args, requirePlayer: true);
+            return KillRegisteredHero(resolver, objectManager, args, requirePlayer: true);
         }
     }
 
     public sealed class HeroKillNpcCoopCommand : ICoopCommand
     {
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public HeroKillNpcCoopCommand(ICommandObjectResolver resolver)
+        public HeroKillNpcCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public string Prefix => "coop.debug.hero";
@@ -557,12 +561,12 @@ public class HeroDebugCommand
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!CommandHelpers.IsServerOnlyCommand(out var error, "coop.debug.hero.kill_npc")) return Failed(error);
-            return KillRegisteredHero(resolver, args, requirePlayer: false);
+            return KillRegisteredHero(resolver, objectManager, args, requirePlayer: false);
         }
     }
 
     // Resolves the target (and optional killer) hero by name or id, then applies the native death action.
-    private static CoopCommandResult KillRegisteredHero(ICommandObjectResolver resolver, ICoopCommandArgs args, bool requirePlayer)
+    private static CoopCommandResult KillRegisteredHero(ICommandObjectResolver resolver, IObjectManager objectManager, ICoopCommandArgs args, bool requirePlayer)
     {
         if (!resolver.TryResolveHero(args[0], out var hero, out var heroError))
             return Failed(heroError);
@@ -595,7 +599,6 @@ public class HeroDebugCommand
         Hero actor = null;
         MobileParty party = null;
         if (!requirePlayer && (!ContainerProvider.TryResolve<IPlayerManager>(out var players) ||
-            !ContainerProvider.TryResolve<IObjectManager>(out var objectManager) ||
             !players.TryGetPlayer(args[2], out var player) ||
             !objectManager.TryGetObject(player.HeroId, out actor) ||
             !objectManager.TryGetObject(player.MobilePartyId, out party)))

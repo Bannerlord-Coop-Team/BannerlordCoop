@@ -62,16 +62,11 @@ internal class CompanionsCommands
     /// Resolves a hero argument by name or id and returns its registry id for message comparisons and fixture output.
     /// </summary>
     private static bool TryResolveHeroWithId(
-        ICommandObjectResolver resolver, string query, out Hero hero, out string heroId, out string error)
+        ICommandObjectResolver resolver, IObjectManager objectManager, string query,
+        out Hero hero, out string heroId, out string error)
     {
         heroId = null;
         if (!resolver.TryResolveHero(query, out hero, out error)) return false;
-
-        if (!TryGetObjectManager(out var objectManager))
-        {
-            error = "Unable to resolve ObjectManager.";
-            return false;
-        }
 
         if (!objectManager.TryGetIdWithLogging(hero, out heroId))
         {
@@ -83,21 +78,16 @@ internal class CompanionsCommands
     }
 
     /// <summary>
-    /// Resolves a mobile party argument by name or id and returns its registry id for fixture output.
+    /// Resolves a mobile party argument by name or id and returns the id to print in fixture output.
     /// </summary>
     private static bool TryResolvePartyWithId(
-        ICommandObjectResolver resolver, IObjectManager objectManager, string query,
+        ICommandObjectResolver resolver, string query,
         out MobileParty party, out string partyId, out string error)
     {
         partyId = null;
         if (!resolver.TryResolveMobileParty(query, out party, out error)) return false;
 
-        if (!objectManager.TryGetIdWithLogging(party, out partyId))
-        {
-            error = $"Party '{query}' has no registered id.";
-            return false;
-        }
-
+        partyId = resolver.DisplayId(party);
         return true;
     }
 
@@ -404,7 +394,7 @@ internal class CompanionsCommands
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!TryResolvePartyWithId(resolver, objectManager, args[0], out var party, out var partyId, out var error))
+            if (!TryResolvePartyWithId(resolver, args[0], out var party, out var partyId, out var error))
                 return Failed(error);
             var companion = FindRoleFixtureCompanion();
             if (companion == null) return Failed("The companion-role fixture hero was not found.");
@@ -415,7 +405,7 @@ internal class CompanionsCommands
                 scoutId = resolvedScoutId;
             string roles = string.Join(",", party.GetHeroPartyRoles(companion));
 
-            return Succeeded($"ROLE_FIXTURE_STATE party={partyId}companion={companion.StringId} " +
+            return Succeeded($"ROLE_FIXTURE_STATE party={partyId} companion={companion.StringId} " +
                 $"roster={party.MemberRoster.GetTroopCount(companion.CharacterObject)} " +
                 $"scout={scoutId} assigned={scout == companion} roles={roles}");
         }
@@ -446,7 +436,7 @@ internal class CompanionsCommands
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager.");
-            if (!TryResolvePartyWithId(resolver, objectManager, args[0], out var party, out var partyId, out var error))
+            if (!TryResolvePartyWithId(resolver, args[0], out var party, out var partyId, out var error))
                 return Failed(error);
 
             var scout = party.GetRoleHolder(PartyRole.Scout);
@@ -454,7 +444,7 @@ internal class CompanionsCommands
             if (scout != null && objectManager.TryGetIdWithLogging(scout, out var resolvedScoutId))
                 scoutId = resolvedScoutId;
 
-            return Succeeded($"SCOUT_ROLE_STATE party={partyId}scout={scoutId}");
+            return Succeeded($"SCOUT_ROLE_STATE party={partyId} scout={scoutId}");
         }
     }
 
@@ -632,16 +622,18 @@ internal class CompanionsCommands
         };
 
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public CompanionDismissalFixtureTriggerConsequenceCoopCommand(ICommandObjectResolver resolver)
+        public CompanionDismissalFixtureTriggerConsequenceCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
-            if (!TryResolveHeroWithId(resolver, args[0], out var dismissed, out var dismissedHeroId, out var error))
+            if (!TryResolveHeroWithId(resolver, objectManager, args[0], out var dismissed, out var dismissedHeroId, out var error))
                 return Failed(error);
             if (PlayerEncounter.Current != null) return Failed("A player encounter is already active.");
             if (Campaign.Current.ConversationManager.IsConversationInProgress)
@@ -690,7 +682,7 @@ internal class CompanionsCommands
                 // map conversation too, while leaving its encounter held until the correlated acknowledgement.
                 Campaign.Current.ConversationManager.EndConversation();
 
-                return Succeeded($"DISMISSAL_CONSEQUENCE_TRIGGERED hero={dismissedHeroId}" +
+                return Succeeded($"DISMISSAL_CONSEQUENCE_TRIGGERED hero={dismissedHeroId} " +
                     $"encounterActive={lastDismissalEncounterObservation.EncounterActiveAtTrigger} " +
                     $"conversationHeroMatched={lastDismissalEncounterObservation.ConversationHeroMatched} " +
                     $"leaveBefore={lastDismissalEncounterObservation.LeaveBeforeConsequence} " +
@@ -724,16 +716,18 @@ internal class CompanionsCommands
         };
 
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public CompanionDismissalFixtureCompletionCoopCommand(ICommandObjectResolver resolver)
+        public CompanionDismissalFixtureCompletionCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
-            if (!TryResolveHeroWithId(resolver, args[0], out _, out var dismissedHeroId, out var error))
+            if (!TryResolveHeroWithId(resolver, objectManager, args[0], out _, out var dismissedHeroId, out var error))
                 return Failed(error);
             if (lastDismissalCompletion == null ||
                 lastDismissalCompletion.Value.OneToOneConversationHeroId != dismissedHeroId)
@@ -768,16 +762,18 @@ internal class CompanionsCommands
         };
 
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public CompanionDismissalFixtureReleaseEncounterCoopCommand(ICommandObjectResolver resolver)
+        public CompanionDismissalFixtureReleaseEncounterCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
-            if (!TryResolveHeroWithId(resolver, args[0], out _, out var dismissedHeroId, out var error))
+            if (!TryResolveHeroWithId(resolver, objectManager, args[0], out _, out var dismissedHeroId, out var error))
                 return Failed(error);
             if (lastDismissalCompletion == null ||
                 lastDismissalCompletion.Value.OneToOneConversationHeroId != dismissedHeroId)
@@ -787,7 +783,7 @@ internal class CompanionsCommands
 
             bool wasActive = PlayerEncounter.Current != null;
             Campaign.Current.PlayerEncounter = null;
-            return Succeeded($"DISMISSAL_ENCOUNTER_RELEASED hero={dismissedHeroId}wasActive={wasActive} leaveAcknowledged=True");
+            return Succeeded($"DISMISSAL_ENCOUNTER_RELEASED hero={dismissedHeroId} wasActive={wasActive} leaveAcknowledged=True");
         }
     }
 
@@ -816,14 +812,14 @@ internal class CompanionsCommands
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (!ModInformation.IsClient) return Failed("Command can only be run on a client.");
-            if (!TryResolveHeroWithId(resolver, args[0], out var replacement, out var replacementHeroId, out var error))
+            if (!resolver.TryResolveHero(args[0], out var replacement, out var error))
                 return Failed(error);
             if (Hero.MainHero?.Clan == null || MobileParty.MainParty == null)
                 return Failed("The local player hero, clan, or main party is unavailable.");
 
             MessageBroker.Instance.Publish(null,
                 new CompanionHired(Hero.MainHero, replacement, 0, Hero.MainHero.Clan, MobileParty.MainParty));
-            return Succeeded($"REPLACEMENT_REQUESTED hero={replacementHeroId}");
+            return Succeeded($"REPLACEMENT_REQUESTED hero={resolver.DisplayId(replacement)}");
         }
     }
 

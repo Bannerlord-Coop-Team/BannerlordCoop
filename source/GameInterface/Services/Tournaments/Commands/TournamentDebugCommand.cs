@@ -585,13 +585,15 @@ public class TournamentDebugCommand
         return true;
     }
 
+    // Looks up Danustica's town and its registered id; fails if either is missing.
     private static bool TryResolveDanusticaContext(
         out Town town,
         out string townId,
         out string error)
     {
         townId = null;
-        if (!TryResolveTown(DanusticaSettlementId, out town))
+        town = Settlement.Find(DanusticaSettlementId)?.Town;
+        if (town == null)
         {
             error = "Unable to resolve Danustica (town_ES1).";
             return false;
@@ -605,18 +607,6 @@ public class TournamentDebugCommand
 
         error = null;
         return true;
-    }
-
-    private static bool TryResolveTown(string townIdentifier, out Town town)
-    {
-        town = Campaign.Current?.CampaignObjectManager?.Settlements
-            .Where(settlement => settlement.IsTown)
-            .FirstOrDefault(settlement =>
-                string.Equals(settlement.StringId, townIdentifier, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(settlement.Town?.StringId, townIdentifier, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(settlement.Name?.ToString(), townIdentifier, StringComparison.OrdinalIgnoreCase))
-            ?.Town;
-        return town != null;
     }
 #endif
 }

@@ -342,10 +342,12 @@ public class KingdomDebugCommand
     public sealed class KingdomPolicyTimeoutStageCoopCommand : ICoopCommand
     {
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public KingdomPolicyTimeoutStageCoopCommand(ICommandObjectResolver resolver)
+        public KingdomPolicyTimeoutStageCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public string Prefix => "coop.debug.kingdom";
@@ -370,7 +372,6 @@ public class KingdomDebugCommand
             if (!bool.TryParse(args[3], out bool policyWasActive))
                 return Failed($"Unable to parse {args[3]} as a boolean.");
             if (pendingPolicyTimeoutFixture != null) return Failed("A policy-timeout fixture lifecycle is already active.");
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager");
             if (!resolver.TryResolveKingdom(args[0], out Kingdom kingdom, out string error)) return Failed(error);
             if (!resolver.TryResolveClan(args[1], out Clan proposerClan, out error)) return Failed(error);
             if (!TryResolvePolicy(resolver, args[2], out PolicyObject policy, out error)) return Failed(error);
@@ -447,10 +448,12 @@ public class KingdomDebugCommand
     public sealed class KingdomPolicyTimeoutRestoreCoopCommand : ICoopCommand
     {
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public KingdomPolicyTimeoutRestoreCoopCommand(ICommandObjectResolver resolver)
+        public KingdomPolicyTimeoutRestoreCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public string Prefix => "coop.debug.kingdom";
@@ -474,7 +477,6 @@ public class KingdomDebugCommand
             if (ModInformation.IsClient) return Failed("Command can only be run on the server.");
             if (!bool.TryParse(args[3], out bool policyWasActive))
                 return Failed($"Unable to parse {args[3]} as a boolean.");
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager");
             if (!resolver.TryResolveKingdom(args[0], out Kingdom kingdom, out string error)) return Failed(error);
             if (!resolver.TryResolveClan(args[1], out Clan proposerClan, out error)) return Failed(error);
             if (!TryResolvePolicy(resolver, args[2], out PolicyObject policy, out error)) return Failed(error);
@@ -515,10 +517,12 @@ public class KingdomDebugCommand
     public sealed class KingdomPolicyTimeoutVerifyCoopCommand : ICoopCommand
     {
         private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
 
-        public KingdomPolicyTimeoutVerifyCoopCommand(ICommandObjectResolver resolver)
+        public KingdomPolicyTimeoutVerifyCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
         {
             this.resolver = resolver;
+            this.objectManager = objectManager;
         }
 
         public string Prefix => "coop.debug.kingdom";
@@ -542,7 +546,6 @@ public class KingdomDebugCommand
             if (!bool.TryParse(args[2], out bool policyWasActive))
                 return Failed($"Unable to parse {args[2]} as a boolean.");
             if (pendingPolicyTimeoutFixture != null) return Failed("The policy-timeout fixture lifecycle is still active.");
-            if (!TryGetObjectManager(out var objectManager)) return Failed("Unable to resolve ObjectManager");
             if (!resolver.TryResolveKingdom(args[0], out Kingdom kingdom, out string error)) return Failed(error);
             if (!TryResolvePolicy(resolver, args[1], out PolicyObject policy, out error)) return Failed(error);
             if (!objectManager.TryGetIdWithLogging(kingdom, out string kingdomId) ||
@@ -1540,7 +1543,7 @@ public class KingdomDebugCommand
                 return Failed(resolveMessage);
 
             ApplyCollectionChange(kingdom, collectionType, CollectionOperation.Add, value);
-            return Succeeded($"{CollectionOperation.Add} {DescribeId(objectManager, value, args[2])} in {args[0]} for kingdom {DescribeId(objectManager, kingdom, args[1])}.");
+            return Succeeded($"{CollectionOperation.Add} {resolver.DisplayId(value)} in {args[0]} for kingdom {resolver.DisplayId(kingdom)}.");
         }
     }
 
@@ -1622,7 +1625,7 @@ public class KingdomDebugCommand
                 return Failed(resolveMessage);
 
             ApplyCollectionChange(kingdom, collectionType, CollectionOperation.Remove, value);
-            return Succeeded($"{CollectionOperation.Remove} {DescribeId(objectManager, value, args[2])} in {args[0]} for kingdom {DescribeId(objectManager, kingdom, args[1])}.");
+            return Succeeded($"{CollectionOperation.Remove} {resolver.DisplayId(value)} in {args[0]} for kingdom {resolver.DisplayId(kingdom)}.");
         }
     }
 
@@ -1950,15 +1953,13 @@ public class KingdomDebugCommand
         IReadOnlyList<string> args,
         CollectionOperation operation)
     {
-        if (!TryGetObjectManager(out var objectManager))
-            return Failed("Unable to resolve ObjectManager");
         if (!resolver.TryResolveKingdom(args[1], out Kingdom kingdom, out string error))
             return Failed(error);
         if (!TryResolvePolicy(resolver, args[2], out PolicyObject policy, out error))
             return Failed(error);
 
-        string policyId = DescribeId(objectManager, policy, args[2]);
-        string kingdomId = DescribeId(objectManager, kingdom, args[1]);
+        string policyId = resolver.DisplayId(policy);
+        string kingdomId = resolver.DisplayId(kingdom);
         if (operation == CollectionOperation.Add)
         {
             kingdom.AddPolicy(policy);
@@ -1972,10 +1973,6 @@ public class KingdomDebugCommand
     // Resolves a policy by registry id, StringId or unique display name against PolicyObject.All.
     private static bool TryResolvePolicy(ICommandObjectResolver resolver, string query, out PolicyObject policy, out string error) =>
         resolver.TryResolve(query, PolicyObject.All, candidate => candidate.Name?.ToString(), out policy, out error);
-
-    // The registry id of a resolved object for echoing in output, falling back to the typed argument.
-    private static string DescribeId(IObjectManager objectManager, object value, string fallback) =>
-        objectManager.TryGetId(value, out var id) ? id : fallback;
 
     private static bool TryParseCollectionTarget(
         string value,

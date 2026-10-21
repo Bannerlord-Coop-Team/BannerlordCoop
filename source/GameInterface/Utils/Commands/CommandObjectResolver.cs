@@ -1,4 +1,6 @@
-﻿using GameInterface.Services.ObjectManager;
+﻿using Common.Logging;
+using GameInterface.Services.ObjectManager;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,11 +33,16 @@ public interface ICommandObjectResolver
 
     // Resolves against a caller-supplied candidate list (a siege camp's parties, a settlement's locations, PolicyObject.All).
     bool TryResolve<T>(string query, IEnumerable<T> candidates, Func<T, string> nameOf, out T value, out string error) where T : class;
+
+    // The id to print for an object in command output: its registry id, falling back to StringId.
+    string DisplayId(object obj);
 }
 
 // Implements id-then-name command argument resolution; the matching core is game-free so it can be unit tested.
 public class CommandObjectResolver : ICommandObjectResolver
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<CommandObjectResolver>();
+
     private const int MaxListedCandidates = 25;
 
     private const string NoCampaignError = "No campaign is loaded.";
@@ -80,21 +87,12 @@ public class CommandObjectResolver : ICommandObjectResolver
     public bool TryResolveItemObject(string query, out ItemObject item, out string error) =>
         ResolveGameObject("Item", query, () => MBObjectManager.Instance.GetObjectTypeList<ItemObject>(), i => i.Name, out item, out error);
 
-    public bool TryResolve<T>(string query, IEnumerable<T> candidates, Func<T, string> nameOf, out T value, out string error) where T : class
-    {
-        value = null;
-        error = null;
+    public bool TryResolve<T>(string query, IEnumerable<T> candidates, Func<T, string> nameOf, out T value, out string error) where T : class =>
+        TryMatch(typeof(T).Name, query, () => candidates, LookupRegistry<T>, true, IdsOf<T>, nameOf, DisplayIdOf<T>, out value, out error);
 
-        if (candidates == null)
-        {
-            error = $"No {typeof(T).Name} candidates were supplied.";
-            return false;
-        }
+    public string DisplayId(object obj) => obj == null ? "no id" : DisplayIdOf(obj);
 
-        return TryMatch(typeof(T).Name, query, candidates, LookupRegistry<T>, true, IdsOf<T>, nameOf, DisplayIdOf<T>, out value, out error);
-    }
-
-    // Guards the empty query, then runs the shared core over the type's live game list; without a campaign only ids resolve.
+    // Runs the shared core over the type's live game list; without a campaign only ids resolve.
     private bool ResolveGameObject<T>(
         string typeName,
         string query,
@@ -104,35 +102,28 @@ public class CommandObjectResolver : ICommandObjectResolver
         out string error,
         Func<T, Settlement> settlementOf = null) where T : class
     {
-        value = null;
-        error = null;
-
-        if (string.IsNullOrWhiteSpace(query))
-        {
-            error = EmptyQueryError(typeName);
-            return false;
-        }
-
         Func<T, IEnumerable<string>> idsOf = IdsOf<T>;
         if (settlementOf != null)
             idsOf = candidate => IdsOfWithSettlement(candidate, settlementOf(candidate));
 
         bool hasCampaign = Campaign.Current != null;
-        var liveCandidates = hasCampaign ? candidates() : Enumerable.Empty<T>();
+        Func<IEnumerable<T>> liveCandidates = hasCampaign ? candidates : Enumerable.Empty<T>;
         if (TryMatch(typeName, query, liveCandidates, LookupRegistry<T>, false, idsOf, candidate => nameOf(candidate)?.ToString(), DisplayIdOf<T>, out value, out error))
             return true;
 
-        if (!hasCampaign)
+        if (!hasCampaign && !string.IsNullOrWhiteSpace(query))
             error = $"No {typeName} found with id '{query}'. {NoCampaignError} Names can only be matched in a campaign.";
 
         return false;
     }
 
-    // Looks the query up as a registry id, returning null on a miss without logging.
+    // Looks the query up as a registry id (bare or with the "{Type}_" prefix); untyped so an id of another type misses without logging a cast error.
     private T LookupRegistry<T>(string id) where T : class
     {
-        objectManager.TryGetObject<T>(id, out var found);
-        return found;
+        if (objectManager.TryGetObject<object>($"{typeof(T).Name}_{id}", out var prefixed) && prefixed is T typed)
+            return typed;
+
+        return objectManager.TryGetObject<object>(id, out var found) ? found as T : null;
     }
 
     // The ids a candidate answers to: its registry id and, for MBObjectBase types, its StringId.
@@ -166,7 +157,7 @@ public class CommandObjectResolver : ICommandObjectResolver
     internal static bool TryMatch<T>(
         string typeName,
         string query,
-        IEnumerable<T> candidates,
+        Func<IEnumerable<T>> candidates,
         Func<string, T> registryLookup,
         bool registryHitMustBeCandidate,
         Func<T, IEnumerable<string>> idsOf,
@@ -185,10 +176,17 @@ public class CommandObjectResolver : ICommandObjectResolver
         }
 
         var trimmedQuery = query.Trim();
-        var candidateList = candidates.Where(candidate => candidate != null).Distinct().ToList();
 
-        var registryHit = registryLookup(query) ?? registryLookup(trimmedQuery);
-        if (registryHit != null && (!registryHitMustBeCandidate || candidateList.Contains(registryHit)))
+        // Ids resolve before the candidate list is built, so an id lookup never enumerates or names live objects.
+        var registryHit = registryLookup(trimmedQuery);
+        if (registryHit != null && !registryHitMustBeCandidate)
+        {
+            value = registryHit;
+            return true;
+        }
+
+        var candidateList = candidates().Where(candidate => candidate != null).Distinct().ToList();
+        if (registryHit != null && candidateList.Contains(registryHit))
         {
             value = registryHit;
             return true;
@@ -215,15 +213,17 @@ public class CommandObjectResolver : ICommandObjectResolver
         return false;
     }
 
-    // Reads a candidate's name, treating a throwing getter as no name; some live objects (e.g. half-built parties) can't render one.
+    // Reads a candidate's name, skipping (and logging) one whose getter throws so one broken object can't fail every name lookup.
     private static string SafeName<T>(Func<T, string> nameOf, T candidate)
     {
         try
         {
             return nameOf(candidate);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            // Lord parties whose leader hero is only partly built (e.g. E2E harness objects) throw from Name via Hero.EncyclopediaLink.
+            Logger.Debug(ex, "Skipped {Type} candidate with an unreadable name during command name lookup", typeof(T).Name);
             return null;
         }
     }

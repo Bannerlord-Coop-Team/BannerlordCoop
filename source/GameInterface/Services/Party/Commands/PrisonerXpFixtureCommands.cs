@@ -20,12 +20,6 @@ internal static class PrisonerXpFixtureCommands
         new CoopCommandResult(false, output, "command_failed");
 
     /// <summary>
-    /// The registry id of a resolved object for echoing in command output, falling back to its StringId.
-    /// </summary>
-    private static string IdOf(MBObjectBase obj) =>
-        CommandHelpers.TryGetObjectManager(out var objectManager, out _) && objectManager.TryGetId(obj, out var id) ? id : obj.StringId;
-
-    /// <summary>
     /// Sets one prison-roster stack's xp through SetElementXp, so vanilla clamps it and the change replicates.
     /// </summary>
     public sealed class SetPrisonerXpCoopCommand : ICoopCommand
@@ -64,11 +58,11 @@ internal static class PrisonerXpFixtureCommands
 
             var roster = party.PrisonRoster;
             int index = roster.FindIndexOfTroop(character);
-            if (index < 0) return Failed($"{IdOf(character)} is not in {IdOf(party)}'s prison roster.");
+            if (index < 0) return Failed($"{resolver.DisplayId(character)} is not in {resolver.DisplayId(party)}'s prison roster.");
 
             int oldXp = roster.GetElementXp(index);
             roster.SetElementXp(index, xp);
-            return Succeeded($"PRISONER_XP_SET party={IdOf(party)} character={IdOf(character)} " +
+            return Succeeded($"PRISONER_XP_SET party={resolver.DisplayId(party)} character={resolver.DisplayId(character)} " +
                 $"number={roster.GetElementNumber(index)} oldXp={oldXp} requestedXp={xp} " +
                 $"newXp={roster.GetElementXp(index)}");
         }

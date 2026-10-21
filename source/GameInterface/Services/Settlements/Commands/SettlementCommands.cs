@@ -875,7 +875,7 @@ internal class SettlementCommands
 
             settlementComponent.Owner = partyBase;
 
-            return Succeeded($"Successfully set the SettlementComponent ({IdOf(objectManager, settlementComponent, args[0])}) Owner to '{ownerId}'");
+            return Succeeded($"Successfully set the SettlementComponent ({resolver.DisplayId(settlementComponent)}) Owner to '{ownerId}'");
 
         }
     }
@@ -1015,10 +1015,6 @@ internal class SettlementCommands
         return false;
     }
 
-    // The registry id of an object, falling back to the supplied text when it is not registered.
-    private static string IdOf(IObjectManager objectManager, object obj, string fallback) =>
-        objectManager.TryGetId(obj, out var id) ? id : fallback;
-
     private static string FormatOwnerState(Settlement settlement)
     {
         var role = ModInformation.IsServer ? "SERVER" : "CLIENT";
@@ -1083,7 +1079,7 @@ internal class SettlementCommands
 
             settlementComponent.Gold = gold;
 
-            return Succeeded($"Successfully set the SettlementComponent ({IdOf(objectManager, settlementComponent, args[0])}) Gold to '{args[1]}'");
+            return Succeeded($"Successfully set the SettlementComponent ({resolver.DisplayId(settlementComponent)}) Gold to '{args[1]}'");
 
         }
     }
@@ -1137,7 +1133,7 @@ internal class SettlementCommands
             settlementComponent.IsOwnerUnassigned = value;
 
 
-            return Succeeded($"Successfully set the SettlementComponent ({IdOf(objectManager, settlementComponent, args[0])}) IsOwnerUnassigned to '{args[1]}'");
+            return Succeeded($"Successfully set the SettlementComponent ({resolver.DisplayId(settlementComponent)}) IsOwnerUnassigned to '{args[1]}'");
 
         }
     }

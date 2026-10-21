@@ -25,10 +25,12 @@ public sealed class StanceLinkHandleDebugCommand : ICoopCommand
     private static int receivedMessages;
 
     private readonly ICommandObjectResolver resolver;
+    private readonly IObjectManager manager;
 
-    public StanceLinkHandleDebugCommand(ICommandObjectResolver resolver)
+    public StanceLinkHandleDebugCommand(ICommandObjectResolver resolver, IObjectManager manager)
     {
         this.resolver = resolver;
+        this.manager = manager;
     }
 
     public string Prefix => "coop.debug.stance_link";
@@ -51,8 +53,6 @@ public sealed class StanceLinkHandleDebugCommand : ICoopCommand
         if (action == "send" && ModInformation.IsClient) return Failed("send requires the server.");
         if (action != "send" && action != "state" && ModInformation.IsServer)
             return Failed("Setup and conflict checks require a client.");
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var manager))
-            return Failed("ObjectManager is required.");
         if (!resolver.TryResolveKingdom(args[1], out var faction1, out var error1))
             return Failed(error1);
         if (!resolver.TryResolveKingdom(args[2], out var faction2, out var error2))
