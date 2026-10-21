@@ -140,7 +140,7 @@ public class PartyScreenTransferXpGainTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(hero, out var heroId));
             Assert.True(Server.ObjectManager.TryGetId(troop, out var troopId));
             Assert.True(Server.ObjectManager.TryGetId(target, out var targetId));
-            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(ControllerId, null, rightId, null, null)));
+            Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(ControllerId, heroId, rightId, null, null)));
             fixture = new TransferFixture(rightId, leftId, heroId, troopId, targetId);
         });
         TestEnvironment.ConnectRegisteredPlayer(Client, ControllerId);

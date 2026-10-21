@@ -1,4 +1,4 @@
-# Quest and issue framework
+﻿# Quest and issue framework
 
 Scope: everything under `source/GameInterface/Services/Issues/`. The repo root `AGENTS.md` applies too.
 `README.md` here is the short player-facing summary and the debug commands. This file owns the rules.
@@ -47,10 +47,10 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    replay (a war, an army's removal), and `OutcomeDispatcher.BeforeQuestOutcome` drops that ending unless
    `Replay` is running (`Framework/Finalization/QuestEndingReplay.cs`). A listener outside `AllowedThread`, like a
    clan's kingdom change, still sends its ending to the server as a request.
-9. Endings the server sees (a war, a kingdom change, a capture) are decided on the server.
+9. Endings the server sees (a war, a kingdom change, a capture, an army dispersal) are decided on the server.
    `Framework/Dispatch/QuestWorldEventRelayPatches.cs` postfixes `CampaignEventDispatcher.OnWarDeclared`,
-   `OnClanChangedKingdom` and `OnHeroPrisonerTaken`, and `Framework/Dispatch/QuestEventRelay.cs` runs the
-   listener with that exact name and parameter types on every running registered quest, as its owner through
+   `OnClanChangedKingdom`, `OnHeroPrisonerTaken` and `OnArmyDispersed`, and `Framework/Dispatch/QuestEventRelay.cs`
+   runs the listener with that exact name and parameter types on every running registered quest, as its owner through
    `IOutcomeDispatcher.RunAsOwners`. A listener under another name is skipped without a log. These two files pass
    listener names as strings because `Framework/` cannot name quest types.
 10. `Replay` cancels the owner's running quest after an issue-only ending (`IssueStayAliveFailed`,

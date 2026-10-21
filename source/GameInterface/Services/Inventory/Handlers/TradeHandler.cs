@@ -15,6 +15,7 @@ using Helpers;
 using LiteNetLib;
 using Serilog;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -144,7 +145,6 @@ internal class TradeHandler : IHandler
 
             var boughtItems = ResolveTradeItems(message.BoughtItems);
             var soldItems = ResolveTradeItems(message.SoldItems);
-            ResolveCharacterEquipmentsData(message.CharacterIdEquipmentsData, out var characterEquipmentsData);
 
             if (ModInformation.IsServer && !message.IsTrading)
             {
@@ -167,13 +167,22 @@ internal class TradeHandler : IHandler
             var fromItemRosterData = message.FromItemRosterData;
             var toItemRosterData = message.ToItemRosterData;
             var totalAmount = message.TotalAmount;
+            var merchantGold = message.MerchantGold;
 
             // Undo any purchases that are no longer present in the roster
-            // When looting, taken items are treated as bought items. Don't need to manage changed rosters in these cases
+            // When looting, taken items are treated as bought items
             if (fromRoster != null)
             {
-                totalAmount = ReconcilePurchases(fromRoster, ref fromItemRosterData, ref toItemRosterData, boughtItems, totalAmount);
+                var heroEquipments = GetHeroTradeEquipments(message.CharacterIdEquipmentsData);
+                totalAmount = ReconcilePurchases(fromRoster, toItemRosterData, heroEquipments, boughtItems, totalAmount, out var keptItems);
+
+                // Merchants are shared, the client's snapshot misses what other players traded since it was taken
+                if (message.IsTrading) fromItemRosterData = ApplyTradeToLiveStock(fromRoster, keptItems, soldItems);
             }
+
+            if (message.IsTrading) merchantGold = GetLiveMerchantGold(currentSettlementComponent, currentMobileParty, merchantGold);
+
+            ResolveCharacterEquipmentsData(message.CharacterIdEquipmentsData, out var characterEquipmentsData);
 
             // Update rosters with new data
             if (toRoster != null) inventoryLogicInterface.UpdateRosterWithData(toRoster, toItemRosterData);
@@ -195,7 +204,7 @@ internal class TradeHandler : IHandler
                 message.CanGainXpFromDiscarding,
                 hero,
                 totalAmount,
-                message.MerchantGold,
+                merchantGold,
                 currentMobileParty,
                 currentSettlementComponent,
                 boughtItems,
@@ -310,62 +319,148 @@ internal class TradeHandler : IHandler
     }
 
     /// <summary>
-    /// Takes any purchased quantity the merchant can no longer supply out of the party roster data and refunds
-    /// the prorated cost. Only what the party data still holds can be taken back, so the refund follows the
-    /// quantity actually removed.
-    /// The merchant roster data is the client's view, which misses what other players bought since, and the
-    /// caller rebuilds the live roster from it. Each bought item's merchant stock is therefore set from the live
-    /// roster: what the server holds minus what this trade keeps. Vanilla logs a buy and a sell of the same
-    /// item against each other, so a bought item has no sale to add back.
+    /// Takes any purchased quantity the merchant can no longer supply back out of the party roster data, then the
+    /// slots that gained it this trade, and refunds the prorated cost of what was taken back. Outputs each purchase's kept quantity.
     /// </summary>
     internal static int ReconcilePurchases(
         ItemRoster merchantRoster,
-        ref ItemRosterElement[] merchantRosterData,
-        ref ItemRosterElement[] partyRosterData,
+        ItemRosterElement[] partyRosterData,
+        IEnumerable<HeroTradeEquipment> heroEquipments,
         List<(ItemRosterElement, int)> boughtItems,
-        int totalAmount)
+        int totalAmount,
+        out List<ItemRosterElement> keptItems)
     {
+        keptItems = new List<ItemRosterElement>();
+
         foreach (var boughtItem in boughtItems)
         {
             var element = boughtItem.Item1.EquipmentElement;
             int amount = boughtItem.Item1.Amount;
             int elementIndex = merchantRoster.FindIndexOfElement(element);
             int available = elementIndex >= 0 ? merchantRoster.GetElementNumber(elementIndex) : 0;
-            int kept = amount;
+            int shortfall = System.Math.Max(amount - available, 0);
 
-            if (amount > available)
+            int removed = TakeFromRosterData(partyRosterData, element, shortfall);
+            removed += TakeFromEquipment(heroEquipments, element, shortfall - removed);
+
+            if (removed < shortfall)
             {
-                // Items missing from the party data (equipped during the trade) cannot be taken back
-                int partyIndex = partyRosterData?.FindIndex(rosterElement => rosterElement.EquipmentElement.Equals(boughtItem.Item1)) ?? -1;
-                int removed = partyIndex >= 0 ? System.Math.Min(amount - available, System.Math.Max(partyRosterData[partyIndex].Amount, 0)) : 0;
-                if (removed > 0)
-                {
-                    partyRosterData[partyIndex].Amount -= removed;
-                    totalAmount -= (boughtItem.Item2 * removed) / amount;
-                    kept -= removed;
-                }
+                logger.Warning("Trade kept {Missing} {Item} the merchant could not supply because they could not be taken back",
+                    shortfall - removed, element.Item?.StringId);
             }
 
-            SetRosterDataAmount(ref merchantRosterData, element, System.Math.Max(available - kept, 0));
+            if (removed > 0) totalAmount -= (boughtItem.Item2 * removed) / amount;
+
+            var kept = boughtItem.Item1;
+            kept.Amount = amount - removed;
+            keptItems.Add(kept);
         }
 
         return totalAmount;
     }
 
-    private static void SetRosterDataAmount(ref ItemRosterElement[] rosterData, EquipmentElement element, int amount)
+    /// <summary>
+    /// Builds the merchant stock from the live roster with this trade's kept purchases removed and its sales added,
+    /// so trades other players made since the client's snapshot are kept.
+    /// </summary>
+    internal static ItemRosterElement[] ApplyTradeToLiveStock(
+        ItemRoster merchantRoster,
+        IEnumerable<ItemRosterElement> keptItems,
+        IEnumerable<(ItemRosterElement, int)> soldItems)
     {
-        if (rosterData == null) return;
+        var stock = merchantRoster.Where(rosterElement => rosterElement.Amount > 0).ToList();
 
-        int index = rosterData.FindIndex(rosterElement => rosterElement.EquipmentElement.IsEqualTo(element));
-        if (index >= 0)
+        foreach (var kept in keptItems) AddToStock(stock, kept.EquipmentElement, -kept.Amount);
+        foreach (var (sold, _) in soldItems) AddToStock(stock, sold.EquipmentElement, sold.Amount);
+
+        return stock.Where(rosterElement => rosterElement.Amount > 0).ToArray();
+    }
+
+    // Changes the amount of an element in the stock list without going below zero
+    private static void AddToStock(List<ItemRosterElement> stock, EquipmentElement element, int amount)
+    {
+        int index = stock.FindIndex(rosterElement => rosterElement.EquipmentElement.IsEqualTo(element));
+        if (index < 0)
         {
-            rosterData[index].Amount = amount;
+            if (amount > 0) stock.Add(new ItemRosterElement(element, amount));
+            return;
         }
-        else if (amount > 0)
+
+        var updated = stock[index];
+        updated.Amount = System.Math.Max(updated.Amount + amount, 0);
+        stock[index] = updated;
+    }
+
+    // Removes up to amount of the element from the roster data and returns how many were removed
+    private static int TakeFromRosterData(ItemRosterElement[] rosterData, EquipmentElement element, int amount)
+    {
+        if (rosterData == null || amount <= 0) return 0;
+
+        int index = System.Array.FindIndex(rosterData, rosterElement => rosterElement.EquipmentElement.IsEqualTo(element));
+        if (index < 0) return 0;
+
+        int removed = System.Math.Min(amount, System.Math.Max(rosterData[index].Amount, 0));
+        rosterData[index].Amount -= removed;
+        return removed;
+    }
+
+    // Empties up to amount of equipment slots that gained the element during this trade and returns how many were emptied
+    private static int TakeFromEquipment(IEnumerable<HeroTradeEquipment> heroEquipments, EquipmentElement element, int amount)
+    {
+        if (heroEquipments == null || amount <= 0) return 0;
+
+        int removed = 0;
+        foreach (var heroEquipment in heroEquipments)
         {
-            System.Array.Resize(ref rosterData, rosterData.Length + 1);
-            rosterData[rosterData.Length - 1] = new ItemRosterElement(element, amount);
+            removed += heroEquipment.TakeGained(element, amount - removed);
         }
+
+        return removed;
+    }
+
+    // Pairs each hero's traded equipment with the server's live equipment, which this trade has not been applied to yet
+    private List<HeroTradeEquipment> GetHeroTradeEquipments(Dictionary<string, EquipmentData[]> characterIdEquipmentsData)
+    {
+        var heroEquipments = new List<HeroTradeEquipment>();
+        if (characterIdEquipmentsData == null) return heroEquipments;
+
+        foreach (var characterIdEquipment in characterIdEquipmentsData)
+        {
+            if (characterIdEquipment.Value == null) continue;
+            if (!objectManager.TryGetObjectWithLogging<Hero>(characterIdEquipment.Key, out var hero)) continue;
+
+            var tradedSets = new List<EquipmentElement[]>();
+            var preTradeSets = new List<EquipmentElement[]>();
+            foreach (var equipmentData in characterIdEquipment.Value)
+            {
+                var liveEquipment = GetLiveEquipment(hero.CharacterObject, equipmentData.EquipmentType);
+                if (equipmentData.ItemSlots == null || liveEquipment == null) continue;
+
+                tradedSets.Add(equipmentData.ItemSlots);
+                preTradeSets.Add(liveEquipment._itemSlots);
+            }
+
+            heroEquipments.Add(new HeroTradeEquipment(tradedSets.ToArray(), preTradeSets.ToArray()));
+        }
+
+        return heroEquipments;
+    }
+
+    // Picks the hero's equipment set of the given type, the same sets UpdateEquipmentWithData writes
+    private static Equipment GetLiveEquipment(CharacterObject character, Equipment.EquipmentType equipmentType)
+    {
+        if (equipmentType == Equipment.EquipmentType.Battle) return character.FirstBattleEquipment;
+        if (equipmentType == Equipment.EquipmentType.Civilian) return character.FirstCivilianEquipment;
+        if (equipmentType == Equipment.EquipmentType.Stealth) return character.FirstStealthEquipment;
+        return null;
+    }
+
+    // Reads the merchant's current gold the same way the vanilla merchant and caravan inventory listeners do
+    private static int GetLiveMerchantGold(SettlementComponent settlementComponent, MobileParty mobileParty, int fallback)
+    {
+        if (settlementComponent != null) return settlementComponent.Gold;
+        if (mobileParty != null) return mobileParty.PartyTradeGold;
+        return fallback;
     }
 
     private (ItemRosterElementData, int)[] ResolveTradeItemIds(
