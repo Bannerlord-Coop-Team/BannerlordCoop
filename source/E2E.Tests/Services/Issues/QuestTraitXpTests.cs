@@ -54,6 +54,7 @@ public class QuestTraitXpTests : IDisposable
                     TraitLevelingHelper.OnIssueSolvedThroughQuest(owner, DefaultTraits.Honor, Reward);
                     TraitLevelingHelper.OnIssueSolvedThroughAlternativeSolution(owner, calculating);
                     TraitLevelingHelper.OnIssueSolvedThroughBetrayal(owner, calculating);
+                    TraitLevelingHelper.OnIssueFailed(owner, calculating);
                 }
             }
 
