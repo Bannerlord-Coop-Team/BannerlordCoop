@@ -5,6 +5,7 @@ using Common.Network;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -21,17 +22,20 @@ internal class PatrolInteractionsHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
     private readonly ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface;
 
     public PatrolInteractionsHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
+        IPlayerManager playerManager,
         ISessionInteractionsPlayerDataInterface sessionInteractionsPlayerDataInterface)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
         this.sessionInteractionsPlayerDataInterface = sessionInteractionsPlayerDataInterface;
 
         messageBroker.Subscribe<AddPatrolPartyInteraction>(Handle_AddPatrolPartyInteraction);
@@ -73,6 +77,8 @@ internal class PatrolInteractionsHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.MainHeroId)) return;
+
             // Validate ids before adding to CoopSession
             if (!objectManager.TryGetObjectWithLogging<Hero>(data.MainHeroId, out var _)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(data.PartyHomeSettlementId, out var _)) return;

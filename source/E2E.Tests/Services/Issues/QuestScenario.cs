@@ -21,7 +21,7 @@ internal sealed class QuestScenario
     public static readonly Type IssueType = typeof(AllowedIssue);
 
     private readonly E2ETestEnvironment testEnvironment;
-    private readonly Func<Hero, IssueBase> issueFactory;
+    private readonly Func<EnvironmentInstance, Hero, IssueBase> issueFactory;
     private readonly Action<EnvironmentInstance, Hero>? configureGiver;
 
     public string NotableId { get; }
@@ -32,11 +32,11 @@ internal sealed class QuestScenario
     public EnvironmentInstance ClientA => testEnvironment.Clients.First();
     public EnvironmentInstance ClientB => testEnvironment.Clients.Last();
 
-    public QuestScenario(E2ETestEnvironment testEnvironment, Func<Hero, IssueBase>? issueFactory = null,
+    public QuestScenario(E2ETestEnvironment testEnvironment, Func<EnvironmentInstance, Hero, IssueBase>? issueFactory = null,
         Action<EnvironmentInstance, Hero>? configureGiver = null)
     {
         this.testEnvironment = testEnvironment;
-        this.issueFactory = issueFactory ?? (hero => new AllowedIssue(hero, null));
+        this.issueFactory = issueFactory ?? ((instance, hero) => new AllowedIssue(hero, null));
         this.configureGiver = configureGiver;
 
         NotableId = testEnvironment.CreateRegisteredObject<Hero>();
@@ -50,6 +50,16 @@ internal sealed class QuestScenario
         }
     }
 
+    public string OwnerHeroId => PlayerA.HeroId;
+    public string OwnerPartyId => PlayerA.PartyId;
+    public string OtherHeroId => PlayerB.HeroId;
+    public string OtherPartyId => PlayerB.PartyId;
+
+    public QuestScenario(E2ETestEnvironment testEnvironment, Func<Hero, IssueBase> issueFactory,
+        Action<EnvironmentInstance, Hero>? configureGiver = null)
+        : this(testEnvironment, (instance, hero) => issueFactory(hero), configureGiver)
+    {
+    }
     public void Accept(EnvironmentInstance client)
     {
         client.Call(() =>
@@ -123,7 +133,7 @@ internal sealed class QuestScenario
             using (new AllowedThread())
             {
                 configureGiver?.Invoke(instance, notable);
-                var issue = issueFactory(notable);
+                var issue = issueFactory(instance, notable);
                 issue.StringId = IssueId;
                 issue._issueState = IssueBase.IssueState.Ongoing;
 

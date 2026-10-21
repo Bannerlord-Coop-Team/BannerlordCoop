@@ -2,6 +2,8 @@
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -59,6 +61,10 @@ public class PartyDoneLogicInfluenceSyncTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(party, out partyId));
             Assert.True(Server.ObjectManager.TryGetId(hero, out heroId));
             Assert.True(Server.ObjectManager.TryGetId(hero.Clan, out clanId));
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("RequestingControllerId", heroId, string.Empty, string.Empty, string.Empty)));
+            playerManager.SetPeer("RequestingControllerId", Clients.First().NetPeer);
         });
 
         // Act: a client finishes the party screen with a pending influence gain and nothing else changed. This
