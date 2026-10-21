@@ -39,7 +39,7 @@ Network-receive handlers run on the single `Poller` thread, but the object an id
 
 The main solution is `source/Coop.sln`. Game-facing code lives in `source/Coop`, shared networking/serialization in `source/Common`, sync/domain logic in `source/Coop.Core`, and Bannerlord API adapters in `source/GameInterface`. Tests sit beside the code in `source/*.Tests`, `source/Coop.IntegrationTests`, and `source/E2E.Tests`. Deploy templates are in `deploy`, UI prefabs in `UIMovies`, docs in `doc`, and workshop/media assets in `Workshop` and `Images`.
 
-### Area-Specific Instructions (Read Before Editing)
+### Area-Specific Instructions
 
 Some folders have their own `AGENTS.md` with rules that apply only there and add to this file. Before you work in one of these folders, read its `AGENTS.md` in full.
 
@@ -136,7 +136,7 @@ Tests use xUnit. Add unit tests for logic that does not require Bannerlord to ru
 
 A new Coop.Core server handler that depends on a GameInterface service needs a `RegisterMock<T>` in `Coop.Tests/TestComponentBase.cs`, otherwise every server-container test in `Coop.Tests` fails to build its container.
 
-An empty array of structs in a message arrives as `null`, because protobuf-net writes nothing for it (an empty `byte[]` field arrives non-null), so guard it with `?? Array.Empty<T>()`. `MessageBroker.Publish` catches and logs a subscriber's exception, so an in-process test can pass over a throwing handler: call the handler directly, or assert something it does after its riskiest line.
+An empty array of structs in a message arrives as `null`, because protobuf-net writes nothing for it (an empty `byte[]` field arrives non-null), so guard it with `?? Array.Empty<T>()`. `MessageBroker.Publish` catches and logs a subscriber's exception, so an in-process test can pass over a throwing handler: call the handler directly, or assert something it does after its riskiest line. Count sends and events with `Assert.Single`, not `Assert.Contains`, so a duplicate fails the test.
 
 When a change needs runtime verification, **prefer adding a debug cheat over hand-staging the scenario.** Co-op state is usually impractical to set up by hand (winning a specific battle to take a prisoner, an AI governor change), so add or extend a `coop.debug.*` console command that triggers the exact authoritative action — e.g. `coop.debug.town.set_governor` driving `ChangeGovernorAction`, or `coop.debug.town.imprison_hero` driving `TakePrisonerAction` — and drive the test from the console instead of describing fiddly in-game steps. **Run state-changing cheats on the server only:** the host is authoritative and replicates to clients, so a cheat must originate there (it also lets server-side events fire on the host); use a client purely for read-only inspection (e.g. `coop.debug.location.list_characters`) to confirm what it received.
 
@@ -171,6 +171,7 @@ Every PR must retain an exact `## Bot Changelog Entry` heading. For War Sails up
   - Review/Fix Loop (suggested)
   - Review and report
   - Skip
+- **Offer to update the quest learnings before a quest PR leaves draft.** When the PR touches `source/GameInterface/Services/Issues/`, also ask whether to add what its review and fix commits taught to [`QuestLearnings.md`](source/GameInterface/Services/Issues/QuestLearnings.md), following its update steps.
 - **Don't take maintainer actions unasked.** No merging, approving, closing or reopening PRs/issues, requesting reviewers, or force-pushing a branch someone else is reviewing, unless explicitly told to.
 
 ### Unowned AI Contributions Are Not Accepted

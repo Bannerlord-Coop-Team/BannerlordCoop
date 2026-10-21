@@ -37,6 +37,15 @@ Use the existing framework for each of these instead of building a parallel one:
 - Register the type in the owning Autofac module (or confirm it's already registered) so consumers resolve it from the container instead of constructing it.
 - Write new shared logic as a **transient DI class** (an interface plus an `InstancePerDependency` registration, constructor-injected), not a `static` helper, because transient dependencies are much easier to fake in tests. `AgentFormationAssigner` started as a static class and was asked in review to become an injected transient. Existing static helpers like `AgentAiWaker` predate this and can stay.
 - The battle sub-services `PuppetSpawner`, `ReinforcementFielder`, and `BattleAuthorityMigrator` are `new`ed in `CoopBattleController`. For a helper they share, register it in `MissionModule` and inject it into `CoopBattleController`, which hands it to the services it constructs.
+- A class that subscribes to a message implements `IDisposable` and unsubscribes in `Dispose`.
+- Static collections in patches outlive the session. Keep that state in a DI'd service, or clear it when the campaign ends.
+- Use the result of `ContainerProvider.TryResolve(out var x)` instead of ignoring it and null-checking `x` afterwards.
+
+## Harmony
+
+- A class applied through `PatchAllUncategorized` needs a `[HarmonyPatch]` attribute, even an empty one, otherwise it's never applied.
+- Harmony calls methods named `Prepare`, `Cleanup`, `TargetMethod` and `TargetMethods` on a patch class at patch time, with null arguments. Don't give helpers those names, because a throw there stops all patching.
+- Give each patched method one owner. A `TargetMethods` that yields every method of a type also picks up methods another class patches, so that patch runs twice. Exclude them.
 
 ## Validation
 
