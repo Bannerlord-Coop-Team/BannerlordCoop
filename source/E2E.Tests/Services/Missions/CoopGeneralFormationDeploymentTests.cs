@@ -3,7 +3,7 @@ using Common.Util;
 using Moq;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Patches;
-using Coop.Tests.Missions.Battles;
+using GameInterface.Tests.Services.MapEvents;
 using HarmonyLib;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;

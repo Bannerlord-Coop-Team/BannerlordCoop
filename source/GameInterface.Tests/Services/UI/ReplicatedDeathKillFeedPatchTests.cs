@@ -1,7 +1,6 @@
 ﻿using System;
 using Common.Util;
 using GameInterface.Services.MapEvents;
-using Coop.Tests.Missions.Battles;
 using GameInterface.Tests.Services.MapEvents;
 using GameInterface.Services.UI.Patches;
 using TaleWorlds.Core;

@@ -1,5 +1,4 @@
-﻿using Coop.Tests.Missions.Battles;
-using Xunit;
+﻿using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
 

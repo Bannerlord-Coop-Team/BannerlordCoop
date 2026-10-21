@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using Common.Util;
-using Coop.Tests.Missions.Battles;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Patches;
 using HarmonyLib;

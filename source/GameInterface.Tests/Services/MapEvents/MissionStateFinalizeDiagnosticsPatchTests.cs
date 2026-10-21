@@ -1,5 +1,4 @@
 ﻿using GameInterface.Services.MapEvents.Patches;
-using Coop.Tests.Missions.Battles;
 using GameInterface.Services.MapEvents;
 using Common.Logging;
 using System;
