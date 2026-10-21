@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.SiegeEvents.Patches;
@@ -29,6 +30,17 @@ internal class SiegeBreakOutPatches
     {
         if (ModInformation.IsServer) return true;
         MessageBroker.Instance.Publish(null, new BreakInAttempted(MobileParty.MainParty, PlayerEncounter.EncounterSettlement));
+        return false;
+    }
+
+    // Reject waits while the server may already be paying the troops. It stays clickable so a timed out wait never strands the player.
+    [HarmonyPatch(typeof(EncounterGameMenuBehavior), "break_in_menu_reject_on_consequence")]
+    [HarmonyPrefix]
+    private static bool BreakInRejectPrefix()
+    {
+        if (ModInformation.IsServer || !SiegeBreakOut.IsBreakInPending) return true;
+        InformationManager.DisplayMessage(new InformationMessage(
+            new TextObject("{=coop_break_in_pending}Waiting for the server to answer your break in.").ToString()));
         return false;
     }
 

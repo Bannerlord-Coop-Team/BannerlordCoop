@@ -57,6 +57,7 @@ internal class ClientSiegeBreakInHandler : IHandler
     {
         if (pending != null && pending.IsCurrent())
         {
+            breakOut.SetBreakInPending(true);
             network.SendAll(pending.Request);
             return;
         }
@@ -78,6 +79,7 @@ internal class ClientSiegeBreakInHandler : IHandler
             Encounter = PlayerEncounter.Current,
             MenuId = Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId,
         };
+        breakOut.SetBreakInPending(true);
         network.SendAll(pending.Request);
     }
 
@@ -89,6 +91,7 @@ internal class ClientSiegeBreakInHandler : IHandler
             if (pending == null || pending.Request.RequestId != result.RequestId) return;
             var attempt = pending;
             pending = null;
+            breakOut.SetBreakInPending(false);
             if (!attempt.IsCurrent()) return;
             if (!result.Approved)
             {
@@ -111,5 +114,6 @@ internal class ClientSiegeBreakInHandler : IHandler
         messageBroker.Unsubscribe<BreakInAttempted>(HandleAttempt);
         messageBroker.Unsubscribe<NetworkBreakInResult>(HandleResult);
         pending = null;
+        breakOut.SetBreakInPending(false);
     }
 }

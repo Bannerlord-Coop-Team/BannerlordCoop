@@ -1,6 +1,7 @@
 ﻿using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.SiegeEvents.Patches;
 using System;
+using System.Diagnostics;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -20,6 +21,7 @@ public interface ISiegeBreakOut
     int GetRequiredCasualties(MobileParty party, bool isFromPort);
     int GetBreakInCasualties(MobileParty party, SiegeEvent siege);
     bool CanBreakOutFromPort(MobileParty party, Settlement settlement);
+    void SetBreakInPending(bool pending);
     bool CanJoinDefenders(MobileParty party, Settlement settlement, bool alreadyEntered);
     TroopRoster ApplySacrifice(MobileParty party, int losses, out int armyCasualties);
     void ShowDebrief(TroopRoster casualties, int armyCasualties, bool isFromPort);
@@ -41,6 +43,12 @@ public class SiegeBreakOut : ISiegeBreakOut
     // Same as vanilla menu_defender_siege_break_out_from_port_on_condition: a port, own ships, and the fleet anchored at this settlement.
     public bool CanBreakOutFromPort(MobileParty party, Settlement settlement) =>
         settlement.HasPort && party.Ships.Any() && party.Anchor != null && party.Anchor.IsAtSettlement(settlement);
+
+    // The server may already be paying the troops, so Reject stays locked until it answers or the wait runs out.
+    private static long breakInPendingSince;
+    public void SetBreakInPending(bool pending) => breakInPendingSince = pending ? Stopwatch.GetTimestamp() : 0;
+    internal static bool IsBreakInPending =>
+        breakInPendingSince != 0 && Stopwatch.GetTimestamp() - breakInPendingSince < Stopwatch.Frequency * 10;
 
     public bool CanJoinDefenders(MobileParty party, Settlement settlement, bool alreadyEntered)
     {

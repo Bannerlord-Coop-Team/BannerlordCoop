@@ -36,6 +36,7 @@ using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.Villages.Interfaces;
@@ -55,6 +56,7 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors.BarterBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Naval;
@@ -3027,6 +3029,49 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void BreakIn_RejectWhileTheServerAnswerIsPending_StaysInTheMenuSoThePaidLossesAreNotLost()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+        PrepareClientSiegeEncounter(
+            client,
+            playerPartyId,
+            siege.SettlementId,
+            enterSettlement: false);
+        var troops = AddRegularTroops(playerMobilePartyId, 200);
+        Server.Call(() => Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(40));
+        OpenBreakInMenu(client);
+
+        // The server pays the troops but its answer has not reached the player yet.
+        using (new ReliableMessageDeliveryBlocker<NetworkBreakInResult>())
+            client.Call(() => InvokeMenuConsequence("break_in_menu_accept_on_consequence"), MapEventDisabledMethods);
+        AssertRegularTroops(playerMobilePartyId, troops - 40);
+
+        client.Call(() =>
+        {
+            InvokeMenuConsequence("break_in_menu_reject_on_consequence");
+            Assert.Equal("break_in_menu", Campaign.Current.CurrentMenuContext?.GameMenu?.StringId);
+        }, MapEventDisabledMethods);
+
+        // Accepting again resends the same request and the server reuses the paid losses.
+        client.Call(() => InvokeMenuConsequence("break_in_menu_accept_on_consequence"), MapEventDisabledMethods);
+
+        AssertRegularTroops(playerMobilePartyId, troops - 40);
+        client.Call(() =>
+        {
+            Assert.Equal("break_in_debrief_menu", Campaign.Current.CurrentMenuContext?.GameMenu?.StringId);
+            Assert.Equal(40, Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>()._breakInOutCasualties.TotalManCount);
+            Assert.False(SiegeBreakOut.IsBreakInPending);
+        });
+    }
+
+    [Fact]
     public void BreakIn_AcceptedAgainAfterTheMenuChanged_LosesTroopsOnce()
     {
         var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
@@ -3213,6 +3258,24 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         var method = AccessTools.Method(typeof(EncounterGameMenuBehavior), methodName);
         Assert.NotNull(method);
         method.Invoke(Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>(), new object?[] { null });
+    }
+
+    // Opens a real break in menu, so leaving it through Reject changes the menu the pending request belongs to.
+    private static void OpenBreakInMenu(EnvironmentInstance client)
+    {
+        client.Call(() =>
+        {
+            var starter = new CampaignGameStarter(Campaign.Current.GameMenuManager, Campaign.Current.ConversationManager);
+            foreach (var menuId in new[] { "break_in_menu", "break_in_debrief_menu", "join_siege_event" })
+                if (Campaign.Current.GameMenuManager.GetGameMenu(menuId) == null)
+                    starter.AddGameMenu(menuId, "{=!}" + menuId, null);
+            var context = Game.Current.ObjectManager.CreateObject<MenuContext>();
+            var mapState = Game.Current.GameStateManager.CreateState<MapState>();
+            mapState._menuContext = context;
+            Game.Current.GameStateManager._gameStates.Add(mapState);
+            context.SwitchToMenu("break_in_menu");
+            Assert.Equal("break_in_menu", Campaign.Current.CurrentMenuContext?.GameMenu?.StringId);
+        });
     }
 
     // Call inside Server.Call. Pays the break in troops, which the server needs before the party may enter.
