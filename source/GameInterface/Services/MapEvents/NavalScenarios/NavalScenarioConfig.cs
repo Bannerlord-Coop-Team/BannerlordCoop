@@ -140,4 +140,20 @@ internal readonly struct NetworkNavalScenarioStarted : ICommand
         Rejoining = rejoining;
     }
 }
+
+/// <summary>
+/// DEBUG, server to clients: the encounter preset ordered its fleet to engage, so a listed player answers the encounter
+/// conversation that comes before the map event, as the player would.
+/// </summary>
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkNavalScenarioEngaging : ICommand
+{
+    [ProtoMember(1)]
+    public readonly NavalScenarioConfig Config;
+
+    public NetworkNavalScenarioEngaging(NavalScenarioConfig config)
+    {
+        Config = config;
+    }
+}
 #endif

@@ -115,12 +115,14 @@ public class NavalScenarioStager : INavalScenarioStager
         state.Start(config, localControllerId: null, isServer: true);
         if (config.Blockade) state.Complete(NavalScenarioState.BlockadeStep, true, log.ToString());
 
-        // The encounter's map event comes from the campaign AI later; the clients hear of the scenario once it exists.
+        // The encounter's map event comes from the campaign AI later; the clients hear of the scenario once it exists, and
+        // until then only answer the encounter conversation that comes first.
         if (engagingEnemy != null)
         {
             output = log.Append(" mapEvent=pending(engage)").ToString();
             Logger.Information("[NavalScenario] {Output}", output);
             resetTracer.Watch(engagingEnemy);
+            network.SendAll(new NetworkNavalScenarioEngaging(config));
             WatchEngage(new EngageWait(config, engagingEnemy, players, DateTime.UtcNow));
             return true;
         }

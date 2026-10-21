@@ -4,6 +4,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -17,8 +18,8 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.MapEvents.NavalScenarios;
 
 /// <summary>
-/// DEBUG, client: takes the server's naval scenario and, for the attacked player, a late joiner and a player that reconnected,
-/// enters its battle through the same mission-start request the encounter menu's Attack! option sends.
+/// DEBUG, client: takes the server's naval scenario and enters its battle through the encounter menu's Attack! request; for
+/// the encounter preset it first answers the encounter conversation, as the player would.
 /// </summary>
 internal class NavalScenarioClientHandler : IHandler
 {
@@ -31,24 +32,84 @@ internal class NavalScenarioClientHandler : IHandler
     private readonly INavalScenarioState state;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IObjectManager objectManager;
+    private readonly IPlayerEncounterInterface playerEncounterInterface;
 
     public NavalScenarioClientHandler(
         IMessageBroker messageBroker,
         INavalScenarioState state,
         IControllerIdProvider controllerIdProvider,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        IPlayerEncounterInterface playerEncounterInterface)
     {
         this.messageBroker = messageBroker;
         this.state = state;
         this.controllerIdProvider = controllerIdProvider;
         this.objectManager = objectManager;
+        this.playerEncounterInterface = playerEncounterInterface;
 
         messageBroker.Subscribe<NetworkNavalScenarioStarted>(Handle_NetworkNavalScenarioStarted);
+        messageBroker.Subscribe<NetworkNavalScenarioEngaging>(Handle_NetworkNavalScenarioEngaging);
     }
 
+    // Drops this handler's subscriptions.
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkNavalScenarioStarted>(Handle_NetworkNavalScenarioStarted);
+        messageBroker.Unsubscribe<NetworkNavalScenarioEngaging>(Handle_NetworkNavalScenarioEngaging);
+    }
+
+    // The encounter conversation opens before the map event (and with it the scenario message) exists, so a listed player
+    // watches for it from the engage order on (R42: client2 sat in it until a manual complete_encounter_meeting).
+    private void Handle_NetworkNavalScenarioEngaging(MessagePayload<NetworkNavalScenarioEngaging> payload)
+    {
+        if (ModInformation.IsServer) return;
+
+        var config = payload.What.Config;
+        if (config == null) return;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!config.ControllerIds.Contains(controllerIdProvider.ControllerId)) return;
+
+            Logger.Information("[NavalScenario] {Preset} {ScenarioId}: answering the encounter conversation when it opens",
+                config.Preset, config.ScenarioId);
+            var wait = new NavalEncounterMeetingWait(config, DateTime.UtcNow.AddSeconds(NavalScenarioStager.EngageWaitSeconds));
+            PollEncounterMeeting(wait);
+        }, context: nameof(Handle_NetworkNavalScenarioEngaging));
+    }
+
+    // Answers each encounter conversation once it settled, until the scenario's map event reached this client or the wait ends.
+    private void PollEncounterMeeting(NavalEncounterMeetingWait wait)
+    {
+        var config = wait.Config;
+        if (state.Current?.ScenarioId == config.ScenarioId) return;
+        if (DateTime.UtcNow >= wait.Deadline)
+        {
+            Logger.Warning("[NavalScenario] {ScenarioId}: stopped watching for the encounter conversation after {Seconds:0} s " +
+                "({Answers} answered) with no scenario battle", config.ScenarioId, NavalScenarioStager.EngageWaitSeconds, wait.Answers);
+            return;
+        }
+
+        if (wait.ShouldAnswer(DateTime.UtcNow, playerEncounterInterface.IsEncounterMeetingConversationOpen()))
+            AnswerEncounterMeeting(wait);
+
+        Task.Delay(PollMilliseconds).ContinueWith(_ =>
+            GameThread.RunSafe(() => PollEncounterMeeting(wait), context: nameof(PollEncounterMeeting)));
+    }
+
+    // Ends the open encounter conversation as complete_encounter_meeting does, so vanilla goes on to the battle.
+    private void AnswerEncounterMeeting(NavalEncounterMeetingWait wait)
+    {
+        if (!playerEncounterInterface.TryCompleteEncounterMeeting(out var failure))
+        {
+            Logger.Warning("[NavalScenario] {ScenarioId}: could not answer the encounter conversation: {Failure}",
+                wait.Config.ScenarioId, failure);
+            return;
+        }
+
+        wait.Answered();
+        Logger.Information("[NavalScenario] {ScenarioId}: answered the encounter conversation ({Answers})",
+            wait.Config.ScenarioId, wait.Answers);
     }
 
     private void Handle_NetworkNavalScenarioStarted(MessagePayload<NetworkNavalScenarioStarted> payload)
@@ -126,6 +187,50 @@ internal class NavalScenarioClientHandler : IHandler
         {
             return null;
         }
+    }
+}
+
+/// <summary>
+/// DEBUG, client: one encounter preset's wait for its encounter conversation, which is answered once it stayed open
+/// <see cref="SettleTime"/>, so the conversation mission has finished opening.
+/// </summary>
+internal sealed class NavalEncounterMeetingWait
+{
+    internal static readonly TimeSpan SettleTime = TimeSpan.FromSeconds(2);
+
+    private DateTime? openSince;
+
+    public NavalEncounterMeetingWait(NavalScenarioConfig config, DateTime deadline)
+    {
+        Config = config;
+        Deadline = deadline;
+    }
+
+    public NavalScenarioConfig Config { get; }
+
+    public DateTime Deadline { get; }
+
+    /// <summary>How many conversations this wait answered.</summary>
+    public int Answers { get; private set; }
+
+    /// <summary>Whether to answer now: the conversation has been open <see cref="SettleTime"/>; closing it restarts the clock.</summary>
+    public bool ShouldAnswer(DateTime now, bool conversationOpen)
+    {
+        if (!conversationOpen)
+        {
+            openSince = null;
+            return false;
+        }
+
+        if (openSince == null) openSince = now;
+        return now - openSince.Value >= SettleTime;
+    }
+
+    /// <summary>Counts an answered conversation; a later one settles again before it is answered.</summary>
+    public void Answered()
+    {
+        Answers++;
+        openSince = null;
     }
 }
 #endif

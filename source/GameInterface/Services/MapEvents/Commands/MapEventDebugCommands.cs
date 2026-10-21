@@ -14,6 +14,7 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Initialization;
+using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -4143,14 +4144,12 @@ public class MapEventDebugCommands
             if (ModInformation.IsServer)
                 return Failed("Run this command on a client at the encounter meeting.");
 
-            if (Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId != "encounter_meeting")
-                return Failed("The encounter meeting is not active.");
+            if (!ContainerProvider.TryResolve<IPlayerEncounterInterface>(out var playerEncounterInterface))
+                return Failed("Player encounter interface is unavailable.");
 
-            var conversationManager = Campaign.Current.ConversationManager;
-            if (!conversationManager.IsConversationInProgress)
-                return Failed("The encounter conversation is not active.");
+            if (!playerEncounterInterface.TryCompleteEncounterMeeting(out var failure))
+                return Failed(failure);
 
-            conversationManager.EndConversation();
             return Succeeded("Encounter meeting completed.");
         }
     }
