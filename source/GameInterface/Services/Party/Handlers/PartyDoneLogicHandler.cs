@@ -300,7 +300,7 @@ internal class PartyDoneLogicHandler : IHandler
             if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
             {
                 if ((!string.IsNullOrEmpty(message.IssueId) &&
-                    !commitments.CanApply(message.MainHeroId, message.IssueOwnerId, message.IssueId, message.RightMemberRosterData)) ||
+                    !commitments.CanApply(message.MainHeroId, message.IssueOwnerId, message.IssueId, message.LeftMemberRosterData)) ||
                     !troopRosterInterface.TryApplyTroopRosterDeltas(rosterDeltas))
                 {
                     logger.Warning(
@@ -314,7 +314,7 @@ internal class PartyDoneLogicHandler : IHandler
                     return;
                 }
             }
-            messageBroker.Publish(this, new PartyDoneLogicApplied(requester, message.PartyScreenMode, message.RightMemberRosterData,
+            messageBroker.Publish(this, new PartyDoneLogicApplied(requester, message.PartyScreenMode, message.LeftMemberRosterData,
                 message.MainHeroId, message.IssueOwnerId, message.IssueId));
             PublishPlayerCaptivityReleaseEvents(releasedPlayerCaptivityEvents);
             ApplyRightOwnerPartyItemRoster(mainHero, message);

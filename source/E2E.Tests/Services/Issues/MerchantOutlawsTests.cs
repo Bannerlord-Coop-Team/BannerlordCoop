@@ -585,6 +585,39 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Fact]
+    public void CommittedSelectionsAllowReturningWoundedTroopsWithXp()
+    {
+        var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        Server.Call(() =>
+        {
+            var troop = Get<CharacterObject>(Server, troopId);
+            troop.UpgradeTargets = Array.Empty<CharacterObject>();
+            var rosters = Server.Resolve<GameInterface.Services.TroopRosters.Interfaces.ITroopRosterInterface>();
+            var broker = Server.Resolve<IMessageBroker>();
+            var commitments = Server.Resolve<IAlternativeSolutionCommitments>();
+            var empty = TroopRoster.CreateDummyTroopRoster();
+            var selected = TroopRoster.CreateDummyTroopRoster();
+            selected.AddToCounts(troop, 10, woundedCount: 2, xpChange: 100);
+            var commit = rosters.PackTroopRosterDelta(selected, empty);
+            Assert.True(commitments.CanApply(scenario.PlayerA.HeroId, scenario.NotableId, "return_test", commit));
+            broker.Publish(this, new GameInterface.Services.Party.Messages.PartyDoneLogicApplied(
+                ClientA.NetPeer, PartyScreenHelper.PartyScreenMode.QuestTroopManage, commit,
+                scenario.PlayerA.HeroId, scenario.NotableId, "return_test"));
+            var reduced = TroopRoster.CreateDummyTroopRoster();
+            reduced.AddToCounts(troop, 8, woundedCount: 1, xpChange: 70);
+            var returned = rosters.PackTroopRosterDelta(reduced, selected);
+            Assert.True(commitments.CanApply(scenario.PlayerA.HeroId, scenario.NotableId, "return_test", returned));
+            broker.Publish(this, new GameInterface.Services.Party.Messages.PartyDoneLogicApplied(
+                ClientA.NetPeer, PartyScreenHelper.PartyScreenMode.QuestTroopManage, returned,
+                scenario.PlayerA.HeroId, scenario.NotableId, "return_test"));
+            var remaining = Assert.Single(commitments.Consume(scenario.PlayerA.HeroId, scenario.NotableId, "return_test", null));
+            Assert.Equal(8, remaining.Number);
+            Assert.Equal(1, remaining.WoundedNumber);
+            Assert.Equal(70, remaining.Xp);
+        });
+    }
+
+    [Fact]
     public void CommittedSelectionsAreConsumedPerIssue()
     {
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
@@ -595,7 +628,7 @@ public class MerchantOutlawsTests : IDisposable
             var commitments = Server.Resolve<IAlternativeSolutionCommitments>();
             var initial = TroopRoster.CreateDummyTroopRoster();
             initial.AddToCounts(Get<CharacterObject>(Server, troopId), 10);
-            var delta = rosters.PackTroopRosterDelta(TroopRoster.CreateDummyTroopRoster(), initial);
+            var delta = rosters.PackTroopRosterDelta(initial, TroopRoster.CreateDummyTroopRoster());
             foreach (var issueId in new[] { "pending_x", "accepted_y" })
                 broker.Publish(this, new GameInterface.Services.Party.Messages.PartyDoneLogicApplied(
                     ClientA.NetPeer, PartyScreenHelper.PartyScreenMode.QuestTroopManage, delta,
@@ -627,25 +660,28 @@ public class MerchantOutlawsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, false, false, false, false, false, false, false, false, false)]
-    [InlineData(true, false, false, false, false, false, false, false, false, false)]
-    [InlineData(false, true, false, false, false, false, false, false, false, false)]
-    [InlineData(false, true, true, false, false, false, false, false, false, false)]
-    [InlineData(false, true, false, true, false, false, false, false, false, false)]
-    [InlineData(false, true, false, true, true, false, false, false, false, false)]
-    [InlineData(false, true, true, true, true, false, false, false, false, false)]
-    [InlineData(false, true, false, true, true, true, false, false, false, false)]
-    [InlineData(false, true, false, true, true, false, true, false, false, false)]
-    [InlineData(false, true, false, true, true, false, false, true, false, false)]
-    [InlineData(false, true, false, false, false, false, false, false, true, false)]
-    [InlineData(false, true, false, true, true, false, false, false, true, false)]
-    [InlineData(false, false, false, false, false, false, false, false, true, false)]
-    [InlineData(false, true, false, false, false, false, false, false, false, true)]
-    [InlineData(false, true, false, false, false, false, false, true, true, false)]
-    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker, bool otherAccepts, bool otherDisconnects, bool acceptInFlight, bool otherAlternative, bool reopenPicker, bool rejectDone, bool disconnectSelecting)
+    [InlineData(false, false, false, false, false, false, false, false, false, false, false)]
+    [InlineData(true, false, false, false, false, false, false, false, false, false, false)]
+    [InlineData(false, true, false, false, false, false, false, false, false, false, false)]
+    [InlineData(false, true, true, false, false, false, false, false, false, false, false)]
+    [InlineData(false, true, false, true, false, false, false, false, false, false, false)]
+    [InlineData(false, true, false, true, true, false, false, false, false, false, false)]
+    [InlineData(false, true, true, true, true, false, false, false, false, false, false)]
+    [InlineData(false, true, false, true, true, true, false, false, false, false, false)]
+    [InlineData(false, true, false, true, true, false, true, false, false, false, false)]
+    [InlineData(false, true, false, true, true, false, false, true, false, false, false)]
+    [InlineData(false, true, false, false, false, false, false, false, true, false, false)]
+    [InlineData(false, true, false, true, true, false, false, false, true, false, false)]
+    [InlineData(false, false, false, false, false, false, false, false, true, false, false)]
+    [InlineData(false, true, false, false, false, false, false, false, false, true, false)]
+    [InlineData(false, true, false, false, false, false, false, true, true, false, false)]
+    [InlineData(false, true, false, false, false, false, false, false, false, false, true)]
+    [InlineData(false, false, false, false, false, false, false, false, false, false, true)]
+    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker, bool otherAccepts, bool otherDisconnects, bool acceptInFlight, bool otherAlternative, bool reopenPicker, bool rejectDone, bool disconnectSelecting, bool upgradePicker)
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
+        var unupgradedId = upgradePicker ? environment.CreateRegisteredObject<CharacterObject>() : null;
         var sent = 0;
         PartyScreenLogic pickerLogic = null!;
         foreach (var instance in Instances)
@@ -667,7 +703,8 @@ public class MerchantOutlawsTests : IDisposable
             var party = Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId);
             sent = Get<Hero>(Server, scenario.NotableId).Issue.GetTotalAlternativeSolutionNeededMenCount();
             party.MemberRoster.AddToCounts(Get<Hero>(Server, companionId).CharacterObject, 1);
-            party.MemberRoster.AddToCounts(Get<CharacterObject>(Server, troopId), sent + 5);
+            party.MemberRoster.AddToCounts(Get<CharacterObject>(Server, troopId), upgradePicker ? 5 : sent + 5);
+            if (upgradePicker) party.MemberRoster.AddToCounts(Get<CharacterObject>(Server, unupgradedId!), sent + 1);
         });
         environment.FlushCoalescer();
 
@@ -696,6 +733,15 @@ public class MerchantOutlawsTests : IDisposable
                 PartyPresentationDoneButtonDelegate = PartyScreenHelper.ManageTroopsAndPrisonersDoneHandler,
             });
             logic._partyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+            if (upgradePicker)
+            {
+                // Stage the roster effects of upgrading in the open picker, keeping its original snapshots.
+                using (new AllowedThread())
+                {
+                    party.MemberRoster.AddToCounts(Get<CharacterObject>(ClientA, unupgradedId!), -(sent + 1));
+                    party.MemberRoster.AddToCounts(troop, sent + 1);
+                }
+            }
             var transfer = new PartyScreenLogic.PartyCommand();
             transfer.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right, PartyScreenLogic.TroopType.Member, troop, sent, 0, -1);
             using (new AllowedThread()) logic.TransferTroop(transfer, false);
@@ -723,7 +769,7 @@ public class MerchantOutlawsTests : IDisposable
             Server.Call(() => Assert.Equal(sent - 1,
                 Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId))));
         }
-        var expectedRegulars = rejectDone ? sent - 1 : sent + 5;
+        var expectedRegulars = rejectDone ? sent - 1 : sent + (upgradePicker ? 6 : 5);
         if (disconnectSelecting)
         {
             Server.Call(() =>
@@ -977,7 +1023,7 @@ public class MerchantOutlawsTests : IDisposable
         {
             Assert.Equal(100 + (fails ? 0 : 550), Get<Hero>(Server, scenario.PlayerA.HeroId).Gold);
             Assert.Equal(100, Get<Hero>(Server, scenario.PlayerB.HeroId).Gold);
-            Assert.Equal(sent + 4, Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId)));
+            Assert.Equal(sent + (upgradePicker ? 5 : 4), Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId)));
             Assert.Equal(fails ? 490f : 505f, Get<Town>(Server, townId).Prosperity);
             Assert.Equal(1, Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<Hero>(Server, companionId).CharacterObject));
         });

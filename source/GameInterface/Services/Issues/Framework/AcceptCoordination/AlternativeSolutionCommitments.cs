@@ -48,8 +48,8 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
             var available = selection.Troops == null ? default : selection.Troops.GetTroopRoster()
                 .FirstOrDefault(value => value.Character == element.Character);
             if (available.Character == null) available = new TroopRosterElement(element.Character);
-            if (element.Number > available.Number || element.WoundedNumber > available.WoundedNumber ||
-                element.Xp > available.Xp) return false;
+            if (-element.Number > available.Number || -element.WoundedNumber > available.WoundedNumber ||
+                -element.Xp > available.Xp) return false;
         }
         return true;
     }
@@ -80,8 +80,8 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
         foreach (var element in rosters.UnpackTroopRosterData(data.MemberDelta))
         {
             if (element.Character.IsHero) continue;
-            selection.Troops.AddToCounts(element.Character, -element.Number,
-                woundedCount: -element.WoundedNumber, xpChange: -element.Xp);
+            selection.Troops.AddToCounts(element.Character, element.Number,
+                woundedCount: element.WoundedNumber, xpChange: element.Xp);
         }
         selections[key] = selection;
     }
