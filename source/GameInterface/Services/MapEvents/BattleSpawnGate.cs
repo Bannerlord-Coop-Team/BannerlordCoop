@@ -278,7 +278,8 @@ public static class BattleSpawnGate
         notificationToRemove?.Invoke();
     }
 
-    /// <summary>Drops kill-feed bookkeeping left from an earlier battle; runs when a coop battle window opens or closes.</summary>
+    /// <summary>Drops kill-feed bookkeeping left from an earlier battle. Every <see cref="ICoopBattleMissionRegistry.BeginBattle"/>
+    /// and <see cref="ICoopBattleMissionRegistry.EndBattle"/> call must be paired with it, otherwise the next kill feed shows stale entries.</summary>
     public static void ResetCombatFeedback()
     {
         lock (Gate)

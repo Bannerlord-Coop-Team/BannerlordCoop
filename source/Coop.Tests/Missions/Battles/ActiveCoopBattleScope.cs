@@ -7,13 +7,12 @@ namespace Coop.Tests.Missions.Battles;
 
 /// <summary>
 /// Installs a container whose coop battle registry has a battle window open, so patches invoked without an
-/// environment see a coop battle. Holds the container slot until disposed, then restores the previous one.
+/// environment see a coop battle. Restores the previous container when disposed.
 /// </summary>
 // GameInterface.Tests holds the copy E2E uses, because Coop.Tests cannot reference it.
 internal sealed class ActiveCoopBattleScope : IDisposable
 {
     private readonly IContainer container;
-    private readonly IDisposable containerUse;
     private readonly ILifetimeScope previousContainer;
     private readonly bool hadPreviousContainer;
 
@@ -26,7 +25,7 @@ internal sealed class ActiveCoopBattleScope : IDisposable
         Registry = container.Resolve<ICoopBattleMissionRegistry>();
 
         hadPreviousContainer = ContainerProvider.TryGetContainer(out previousContainer);
-        containerUse = ContainerProvider.UseContainerThreadSafe(container);
+        ContainerProvider.SetContainer(container);
         Registry.BeginBattle(mapEventId);
     }
 
@@ -37,7 +36,6 @@ internal sealed class ActiveCoopBattleScope : IDisposable
     public void Dispose()
     {
         Registry.EndBattle();
-        containerUse.Dispose();
         if (hadPreviousContainer) ContainerProvider.SetContainer(previousContainer);
         else ContainerProvider.Clear();
         container.Dispose();

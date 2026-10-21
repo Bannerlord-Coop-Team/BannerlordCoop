@@ -32,12 +32,16 @@ public interface ICoopBattleMissionRegistry
     /// <summary>The map-event id of the open battle window, or null when no coop battle is active.</summary>
     string ActiveMapEventId { get; }
 
-    /// <summary>Opens the battle window for <paramref name="mapEventId"/> and clears any reserve timeouts.</summary>
+    /// <summary>
+    /// Opens the battle window for <paramref name="mapEventId"/> and clears any reserve timeouts. Callers also reset the
+    /// kill feed with <see cref="BattleSpawnGate.ResetCombatFeedback"/>, which still lives on the static class.
+    /// </summary>
     void BeginBattle(string mapEventId);
 
     /// <summary>
     /// Closes the battle window and clears any reserve timeouts. Not keyed like <see cref="EndMission"/>, because its
-    /// only callers (leaving the battle, or a failed open) both mean no coop battle should stay active.
+    /// only callers (leaving the battle, or a failed open) both mean no coop battle should stay active. Callers also
+    /// reset the kill feed with <see cref="BattleSpawnGate.ResetCombatFeedback"/>.
     /// </summary>
     void EndBattle();
 
