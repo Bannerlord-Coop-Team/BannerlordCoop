@@ -641,6 +641,7 @@ public class MerchantOutlawsTests : IDisposable
     [InlineData(false, true, false, true, true, false, false, false, true, false)]
     [InlineData(false, false, false, false, false, false, false, false, true, false)]
     [InlineData(false, true, false, false, false, false, false, false, false, true)]
+    [InlineData(false, true, false, false, false, false, false, true, true, false)]
     public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker, bool otherAccepts, bool otherDisconnects, bool acceptInFlight, bool otherAlternative, bool reopenPicker, bool rejectDone, bool disconnectSelecting)
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
@@ -741,6 +742,23 @@ public class MerchantOutlawsTests : IDisposable
 
         if (reopenPicker)
         {
+            string? replacementId = null;
+            if (rejectDone)
+            {
+                replacementId = environment.CreateRegisteredObject<CharacterObject>();
+                foreach (var instance in Instances)
+                    instance.Call(() =>
+                    {
+                        using (new AllowedThread())
+                        {
+                            Get<CharacterObject>(instance, replacementId).Level = 20;
+                            Get<CharacterObject>(instance, replacementId).UpgradeTargets = Array.Empty<CharacterObject>();
+                        }
+                    });
+                Server.Call(() => Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId).MemberRoster
+                    .AddToCounts(Get<CharacterObject>(Server, replacementId), 1));
+                environment.FlushCoalescer();
+            }
             ClientA.Call(() =>
             {
                 var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
@@ -758,11 +776,31 @@ public class MerchantOutlawsTests : IDisposable
                 });
                 pickerLogic._partyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
                 var transfer = new PartyScreenLogic.PartyCommand();
+                if (rejectDone)
+                {
+                    transfer.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Left,
+                        PartyScreenLogic.TroopType.Member, Get<CharacterObject>(ClientA, troopId), 1, 0, -1);
+                    using (new AllowedThread()) pickerLogic.TransferTroop(transfer, false);
+                    transfer.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right,
+                        PartyScreenLogic.TroopType.Member, Get<CharacterObject>(ClientA, replacementId!), 1, 0, -1);
+                    using (new AllowedThread()) pickerLogic.TransferTroop(transfer, false);
+                    Assert.True(pickerLogic.DoneLogic(false));
+                    return;
+                }
                 transfer.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right,
                     PartyScreenLogic.TroopType.Member, Get<CharacterObject>(ClientA, troopId), 1, 0, -1);
                 using (new AllowedThread()) pickerLogic.TransferTroop(transfer, false);
                 Assert.Equal(sent + 1, issue.AlternativeSolutionSentTroops.GetTroopCount(Get<CharacterObject>(ClientA, troopId)));
             }, TextHelpers);
+            if (rejectDone)
+            {
+                Server.Call(() =>
+                {
+                    var party = Get<MobileParty>(Server, scenario.PlayerA.MobilePartyId);
+                    Assert.Equal(expectedRegulars, party.MemberRoster.GetTroopCount(Get<CharacterObject>(Server, troopId)));
+                    Assert.Equal(1, party.MemberRoster.GetTroopCount(Get<CharacterObject>(Server, replacementId!)));
+                });
+            }
         }
 
         if (otherAlternative)

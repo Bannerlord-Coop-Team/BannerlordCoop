@@ -39,6 +39,20 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
         broker.Unsubscribe<PlayerDisconnected>(Handle_Disconnected);
     }
 
+    public bool CanApply(string heroId, string issueOwnerId, string issueId, TroopRosterData delta)
+    {
+        selections.TryGetValue((heroId, issueOwnerId, issueId), out var selection);
+        foreach (var element in rosters.UnpackTroopRosterData(delta))
+        {
+            if (element.Character.IsHero) continue;
+            var available = selection.Troops == null ? default : selection.Troops.GetTroopRoster()
+                .FirstOrDefault(value => value.Character == element.Character);
+            if (element.Number > available.Number || element.WoundedNumber > available.WoundedNumber ||
+                element.Xp > available.Xp) return false;
+        }
+        return true;
+    }
+
     public TroopRosterElementData[] Consume(string heroId, string issueOwnerId, string issueId, TroopRosterElementData[] requested)
     {
         var key = (heroId, issueOwnerId, issueId);

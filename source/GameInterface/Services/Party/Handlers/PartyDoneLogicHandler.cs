@@ -44,13 +44,15 @@ internal class PartyDoneLogicHandler : IHandler
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
     private readonly IQuestTypeRegistry questTypes;
+    private readonly IAlternativeSolutionCommitments commitments;
 
     public PartyDoneLogicHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         ITroopRosterInterface troopRosterInterface,
-        IVillageHostileActionInterface villageHostileActionInterface, IQuestTypeRegistry questTypes)
+        IVillageHostileActionInterface villageHostileActionInterface, IQuestTypeRegistry questTypes,
+        IAlternativeSolutionCommitments commitments)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -58,6 +60,7 @@ internal class PartyDoneLogicHandler : IHandler
         this.troopRosterInterface = troopRosterInterface;
         this.villageHostileActionInterface = villageHostileActionInterface;
         this.questTypes = questTypes;
+        this.commitments = commitments;
 
         messageBroker.Subscribe<PartyDoneLogicAttempted>(Handle_PartyDoneLogicAttempted);
         messageBroker.Subscribe<NetworkCompleteDoneLogic>(Handle_CompletePartyDoneLogic);
@@ -296,7 +299,9 @@ internal class PartyDoneLogicHandler : IHandler
             // Only apply deltas if not ransoming. SellPrisonersAction already changes troop rosters
             if (message.PartyScreenMode != Helpers.PartyScreenHelper.PartyScreenMode.Ransom)
             {
-                if (!troopRosterInterface.TryApplyTroopRosterDeltas(rosterDeltas))
+                if ((!string.IsNullOrEmpty(message.IssueId) &&
+                    !commitments.CanApply(message.MainHeroId, message.IssueOwnerId, message.IssueId, message.RightMemberRosterData)) ||
+                    !troopRosterInterface.TryApplyTroopRosterDeltas(rosterDeltas))
                 {
                     logger.Warning(
                         "Rejected party changes for {MainHeroId}: {Reason}",

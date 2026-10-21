@@ -49,7 +49,8 @@ public class PlayerCaptivityReleasePositionTests
             network.Object,
             troopRosterInterface.Object,
             villageHostileActionInterface.Object,
-            new Mock<IQuestTypeRegistry>().Object);
+            new Mock<IQuestTypeRegistry>().Object,
+            new Mock<IAlternativeSolutionCommitments>().Object);
     }
 
     [Fact]
