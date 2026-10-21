@@ -68,13 +68,15 @@ public sealed class CopySteeringKnobs
 /// <summary>One correction step for a steered copy: the velocity change to apply, or a snap to the owner's frame.</summary>
 internal readonly struct CopySteeringStep
 {
-    public CopySteeringStep(bool snap, MatrixFrame snapFrame, Vec2 deltaVelocity, float deltaYawRate, float errorAlongHeading)
+    public CopySteeringStep(bool snap, MatrixFrame snapFrame, Vec2 deltaVelocity, float deltaYawRate, float errorAlongHeading,
+        float smoothedErrorAlongHeading = 0f)
     {
         Snap = snap;
         SnapFrame = snapFrame;
         DeltaVelocity = deltaVelocity;
         DeltaYawRate = deltaYawRate;
         ErrorAlongHeading = errorAlongHeading;
+        SmoothedErrorAlongHeading = smoothedErrorAlongHeading;
     }
 
     /// <summary>Teleport to <see cref="SnapFrame"/> and take the owner's velocity instead of steering.</summary>
@@ -88,8 +90,12 @@ internal readonly struct CopySteeringStep
     /// <summary>Yaw rate change in rad/s.</summary>
     public float DeltaYawRate { get; }
 
-    /// <summary>The position error to the target along the copy's heading in metres, whose sign changes count as oscillations.</summary>
+    /// <summary>The position error to the target along the copy's heading in metres.</summary>
     public float ErrorAlongHeading { get; }
+
+    /// <summary><see cref="ErrorAlongHeading"/> low-passed over tau, whose sign changes count as oscillations; the raw error flips
+    /// at each sample arrival as the target jumps by the owner's frame-time jitter times its speed (R43).</summary>
+    public float SmoothedErrorAlongHeading { get; }
 }
 
 /// <summary>
@@ -115,6 +121,8 @@ internal sealed class CopySteering
     private float sampleYawRate;
     private bool pendingSnap;
     private int lastSign;
+    private float smoothedAlong;
+    private bool hasSmoothedAlong;
 
     public CopySteering(CopySteeringKnobs knobs)
     {
@@ -144,13 +152,19 @@ internal sealed class CopySteering
     {
         var led = Extrapolate(StaleSeconds, knobs.LeadSeconds).Position;
         if (HasTarget && (frame.origin.AsVec2 - led).Length > knobs.SnapMetres) pendingSnap = true;
+        var targetBefore = Target.Position;
+        bool hadTarget = HasTarget;
 
         sampleFrame = frame;
         sampleVelocity = velocity;
         sampleYawRate = yawRate;
         SecondsSinceSample = 0f;
         HasTarget = true;
+        LastTargetJumpMetres = hadTarget ? (Target.Position - targetBefore).Length : 0f;
     }
+
+    /// <summary>How far the steered-toward target moved when the latest sample arrived (diagnostics).</summary>
+    public float LastTargetJumpMetres { get; private set; }
 
     /// <summary>The planar position and yaw the copy steers toward right now.</summary>
     internal (Vec2 Position, float Yaw) Target => Extrapolate(MaxExtrapolationSeconds, knobs.LeadSeconds);
@@ -179,8 +193,9 @@ internal sealed class CopySteering
         float deltaYawRate = ((stale ? 0f : sampleYawRate) + yawCorrection - yawRate) * blend;
 
         float along = (error.x * (float)Math.Cos(yaw)) + (error.y * (float)Math.Sin(yaw));
-        CountOscillation(along);
-        return new CopySteeringStep(false, default, deltaVelocity, deltaYawRate, along);
+        float smoothed = SmoothAlong(along, dt);
+        CountOscillation(smoothed);
+        return new CopySteeringStep(false, default, deltaVelocity, deltaYawRate, along, smoothed);
     }
 
     // The sample moved on by its velocity for its age, capped at maxAge, plus the lead.
@@ -196,6 +211,7 @@ internal sealed class CopySteering
         pendingSnap = false;
         Snaps++;
         lastSign = 0;
+        hasSmoothedAlong = false;
         return new CopySteeringStep(true, FrameAt(target), Vec2.Zero, 0f, 0f);
     }
 
@@ -236,7 +252,15 @@ internal sealed class CopySteering
     private static Vec3 TurnAboutZ(Vec3 vector, float sin, float cos) =>
         new Vec3((vector.x * cos) - (vector.y * sin), (vector.x * sin) + (vector.y * cos), vector.z);
 
-    // A sign change of the along-heading position error, the copy crossing its target; errors in the deadband keep the last sign.
+    // The along-heading error low-passed with the steering's own tau, starting from the first error after a reset.
+    private float SmoothAlong(float along, float dt)
+    {
+        smoothedAlong = hasSmoothedAlong ? smoothedAlong + ((along - smoothedAlong) * Math.Min(1f, dt / knobs.TauSeconds)) : along;
+        hasSmoothedAlong = true;
+        return smoothedAlong;
+    }
+
+    // A sign change of the smoothed along-heading error, the copy crossing its target; errors in the deadband keep the last sign.
     private void CountOscillation(float along)
     {
         if (Math.Abs(along) < OscillationDeadbandMetres) return;

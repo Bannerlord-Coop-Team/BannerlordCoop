@@ -21,6 +21,10 @@ public class NavalCopyProbeLogic : MissionLogic
     private readonly Dictionary<MissionShip, HullOutline> outlines = new Dictionary<MissionShip, HullOutline>();
     private readonly RollingWindow frameMilliseconds = new RollingWindow();
     private readonly RollingWindow steerMilliseconds = new RollingWindow();
+    // Garbage collections per frame by generation, to tell a GC pause from steering in the steer cost's tail.
+    private readonly RollingWindow[] gcCollections = { new RollingWindow(), new RollingWindow(), new RollingWindow() };
+    private readonly int[] lastCollectionCounts = new int[3];
+    private bool collectionCountsTaken;
     private long fixedTicks;
 
     public NavalCopyProbeLogic(INetworkShipRegistry registry, INavalSteeredCopies steeredCopies)
@@ -38,6 +42,7 @@ public class NavalCopyProbeLogic : MissionLogic
         float time = Mission.CurrentTime;
         frameMilliseconds.Add(time, dt * 1000f);
         steerMilliseconds.Add(time, steeredCopies.LastTickMilliseconds);
+        MeasureCollections(time);
         MeasureDrift(time);
         MeasureApproaches(time);
     }
@@ -46,6 +51,19 @@ public class NavalCopyProbeLogic : MissionLogic
     {
         base.OnFixedMissionTick(fixedDt);
         fixedTicks++;
+    }
+
+    // Adds each generation's collections since the last frame; the first frame only takes the counts.
+    private void MeasureCollections(float time)
+    {
+        for (int generation = 0; generation < gcCollections.Length; generation++)
+        {
+            int count = GC.CollectionCount(generation);
+            if (collectionCountsTaken) gcCollections[generation].Add(time, count - lastCollectionCounts[generation]);
+            lastCollectionCounts[generation] = count;
+        }
+
+        collectionCountsTaken = true;
     }
 
     // Against where the owner is now, its latest sample moved on by its age without the lead; heave against the sample's height.
@@ -157,7 +175,14 @@ public class NavalCopyProbeLogic : MissionLogic
                 meanMs = CopyDiagnostics.Round(frameMilliseconds.Mean),
                 maxMs = CopyDiagnostics.Round(frameMilliseconds.Max),
                 steerMeanMs = CopyDiagnostics.Round(steerMilliseconds.Mean),
+                steerP99Ms = CopyDiagnostics.Round(steerMilliseconds.Percentile(99f)),
                 steerMaxMs = CopyDiagnostics.Round(steerMilliseconds.Max),
+                gcCollections10s = new
+                {
+                    gen0 = (int)gcCollections[0].Sum,
+                    gen1 = (int)gcCollections[1].Sum,
+                    gen2 = (int)gcCollections[2].Sum,
+                },
                 simulatedHulls = hulls?.Count(NavalSteeredCopies.IsSimulating),
                 steeredCopies = steeredCopies.Copies.Keys.Count(NavalSteeredCopies.IsSimulating),
                 hulls = hulls?.Count,

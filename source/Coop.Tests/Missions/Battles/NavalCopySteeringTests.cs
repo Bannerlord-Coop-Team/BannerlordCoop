@@ -224,14 +224,121 @@ public class NavalCopySteeringTests
     {
         var steering = Observed(Knobs("lead=0"), 0f, Vec2.Zero);
 
-        steering.Compute(Dt, new Vec3(-1f, 0f, 0f), 0f, Vec2.Zero, 0f);
-        steering.Compute(Dt, new Vec3(1f, 0f, 0f), 0f, Vec2.Zero, 0f);
-        steering.Compute(Dt, new Vec3(-1f, 0f, 0f), 0f, Vec2.Zero, 0f);
+        // Each position is held for a second, well past the smoothing's tau.
+        HoldCopyAt(steering, new Vec3(-1f, 0f, 0f));
+        HoldCopyAt(steering, new Vec3(1f, 0f, 0f));
+        HoldCopyAt(steering, new Vec3(-1f, 0f, 0f));
         // A sideways error has no component along the heading, so it keeps the last sign.
-        steering.Compute(Dt, new Vec3(0f, -1f, 0f), 0f, Vec2.Zero, 0f);
-        steering.Compute(Dt, new Vec3(-1f, 0f, 0f), 0f, Vec2.Zero, 0f);
+        HoldCopyAt(steering, new Vec3(0f, -1f, 0f));
+        HoldCopyAt(steering, new Vec3(-1f, 0f, 0f));
 
         Assert.Equal(2, steering.Oscillations);
+    }
+
+    // Steps the steering for one second with the copy held at a fixed position.
+    private static void HoldCopyAt(CopySteering steering, Vec3 origin)
+    {
+        for (int tick = 0; tick < 60; tick++) steering.Compute(Dt, origin, 0f, Vec2.Zero, 0f);
+    }
+
+    // R43 S1: the target jumps at each sample arrival by the arrival jitter times the speed; a hull moving smoothly with the
+    // owner never crosses its target, so the raw error's flips are no oscillation.
+    [Fact]
+    public void Compute_JitteredArrivalAt10MpsOnASmoothHullCountsNoOscillation()
+    {
+        var run = RunJitteredArrival(ringingMetres: 0f);
+
+        Assert.True(run.RawFlips > 10, $"{run.RawFlips} raw flips; the model no longer reproduces the R43 artifact");
+        Assert.Equal(0, run.Oscillations);
+    }
+
+    // A copy really swinging 0.5 m about its target every 2 s under the same jitter still counts its crossings.
+    [Fact]
+    public void Compute_JitteredArrivalAt10MpsStillCountsRealRinging()
+    {
+        var run = RunJitteredArrival(ringingMetres: 0.5f);
+
+        Assert.InRange(run.Oscillations, 15, 21);
+    }
+
+    // An owner at 10 m/s sending every 50 ms on its own frames, arriving 0 to 20 ms late on 60 Hz copy frames, and a copy
+    // that follows the owner smoothly at the target's mean offset, plus an optional sine ringing of the given amplitude.
+    private static (int RawFlips, long Oscillations) RunJitteredArrival(float ringingMetres)
+    {
+        const float speed = 10f;
+        float meanOffset = MeanTargetOffset(speed);
+        var steering = new CopySteering(Knobs("lead=0"));
+        var sends = JitteredSends(new Random(43));
+        int next = 0;
+        int rawFlips = 0;
+        int lastRawSign = 0;
+        for (int tick = 0; tick < 20 * 60; tick++)
+        {
+            float time = tick * Dt;
+            while (next < sends.Count && sends[next].ArrivesAt <= time)
+            {
+                steering.ObserveOwner(Frame(speed * sends[next].SentAt, 0f, 0f), new Vec2(speed, 0f), 0f);
+                next++;
+            }
+
+            if (next == 0) continue;
+            float ringing = ringingMetres * (float)Math.Sin(Math.PI * time);
+            var step = steering.Compute(Dt, new Vec3((speed * time) + meanOffset + ringing, 0f, 0f), 0f, new Vec2(speed, 0f), 0f);
+            if (Math.Abs(step.ErrorAlongHeading) < CopySteering.OscillationDeadbandMetres) continue;
+
+            int sign = Math.Sign(step.ErrorAlongHeading);
+            if (lastRawSign != 0 && sign != lastRawSign) rawFlips++;
+            lastRawSign = sign;
+        }
+
+        return (rawFlips, steering.Oscillations);
+    }
+
+    // The along-heading error a copy exactly on the owner sees on average, so the modelled copy sits on the target's mean.
+    private static float MeanTargetOffset(float speed)
+    {
+        var steering = new CopySteering(Knobs("lead=0"));
+        var sends = JitteredSends(new Random(43));
+        int next = 0;
+        float sum = 0f;
+        int samples = 0;
+        for (int tick = 0; tick < 20 * 60; tick++)
+        {
+            float time = tick * Dt;
+            while (next < sends.Count && sends[next].ArrivesAt <= time)
+            {
+                steering.ObserveOwner(Frame(speed * sends[next].SentAt, 0f, 0f), new Vec2(speed, 0f), 0f);
+                next++;
+            }
+
+            if (next == 0) continue;
+            sum += steering.Compute(Dt, new Vec3(speed * time, 0f, 0f), 0f, new Vec2(speed, 0f), 0f).ErrorAlongHeading;
+            samples++;
+        }
+
+        return sum / samples;
+    }
+
+    // The owner's sends: every 50 ms on owner frames of 12 to 22 ms, each arriving 0 to 20 ms after it was sent.
+    private static System.Collections.Generic.List<(float SentAt, float ArrivesAt)> JitteredSends(Random random)
+    {
+        var sends = new System.Collections.Generic.List<(float, float)>();
+        float ownerTime = 0f;
+        float accumulated = 0f;
+        float lastArrival = 0f;
+        while (ownerTime < 21f)
+        {
+            float frame = 0.012f + ((float)random.NextDouble() * 0.01f);
+            ownerTime += frame;
+            accumulated += frame;
+            if (accumulated < 0.05f) continue;
+
+            accumulated = Math.Min(accumulated - 0.05f, 0.05f);
+            lastArrival = Math.Max(lastArrival, ownerTime + ((float)random.NextDouble() * 0.02f));
+            sends.Add((ownerTime, lastArrival));
+        }
+
+        return sends;
     }
 
     // R41b F4: an owner sampled at 20 Hz with jittered arrival, followed straight and through a constant-rate turn.

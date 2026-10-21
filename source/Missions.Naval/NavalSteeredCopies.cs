@@ -103,6 +103,9 @@ public class NavalSteeredCopies : INavalSteeredCopies
         if (!copies.TryGetValue(ship, out var copy) || ship.IsRemoved || !ship.GameEntity.IsValid) return;
 
         copy.Steering.ObserveOwner(frame, motion.Velocity, motion.YawRate);
+#if DEBUG
+        copy.Diagnostics.TargetJump.Add(Mission.Current?.CurrentTime ?? 0f, copy.Steering.LastTargetJumpMetres);
+#endif
         if (IsSimulating(ship)) return;
 
         WarnWritten(ship, copy);
