@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Util;
+using Common.Network;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
@@ -219,7 +220,7 @@ public class LadysKnightOutTests : IDisposable
     }
 
     [Fact]
-    public void AClientCannotClaimATournamentWinWithoutAServerResult()
+    public void AClientCannotInvokeTheSuccessBranchWithoutATournamentResult()
     {
         var quest = Accept(scenario.ClientA);
         scenario.ClientA.Call(() => quest.PlayerReachedTournamentRoundGoal());
@@ -227,23 +228,80 @@ public class LadysKnightOutTests : IDisposable
         scenario.ClientA.Call(() => Assert.True(quest.IsOngoing));
     }
 
-    [Fact]
-    public void OwnerTournamentFinishedEventRequestsOneServerSuccess()
+    [Theory]
+    [InlineData(true, 0, IssueOutcome.QuestSuccess)]
+    [InlineData(false, 0, IssueOutcome.QuestFail)]
+    [InlineData(false, 1, IssueOutcome.QuestSuccess)]
+    public void NativeOwnerTournamentResultFinalizesOnlyItsQuestOnce(bool champion, int round, IssueOutcome expected)
     {
         var quest = Accept(scenario.ClientA);
+        var serverQuest = scenario.QuestOf(scenario.Server);
+        var before = new Dictionary<string, (int Gold, float Renown, int Relation)>();
+        scenario.Server.Call(() =>
+        {
+            var giver = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId);
+            foreach (var controllerId in new[] { QuestScenario.ControllerA, QuestScenario.ControllerB })
+            {
+                Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
+                var hero = scenario.Server.GetRegisteredObject<Hero>(player.HeroId);
+                before[controllerId] = (hero.Gold, hero.Clan.Renown, giver.GetRelation(hero));
+            }
+        });
+        scenario.ClientB.Call(() => scenario.ClientB.Resolve<INetwork>().SendAll(
+            new RequestLadysKnightOutTournamentOutcome(scenario.NotableId, QuestScenario.IssueId,
+                (byte)LadysKnightOutBranch.TournamentSuccess)));
+        scenario.ClientA.Call(() => scenario.ClientA.Resolve<INetwork>().SendAll(
+            new RequestLadysKnightOutTournamentOutcome(scenario.NotableId, "previous-offer",
+                (byte)LadysKnightOutBranch.TournamentSuccess)));
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        scenario.ClientA.Call(() => Assert.True(quest.IsOngoing));
+
         scenario.ClientA.Call(() =>
         {
             var town = quest.QuestGiver.CurrentSettlement.Town;
             CampaignEventDispatcher.Instance.OnPlayerStartedTournamentMatch(town);
-            CampaignEventDispatcher.Instance.OnTournamentFinished(
-                CharacterObject.PlayerCharacter,
-                new MBReadOnlyList<CharacterObject>(new[] { CharacterObject.PlayerCharacter }),
-                town,
-                null);
+            if (champion)
+                CampaignEventDispatcher.Instance.OnTournamentFinished(
+                    CharacterObject.PlayerCharacter,
+                    new MBReadOnlyList<CharacterObject>(new[] { CharacterObject.PlayerCharacter }),
+                    town,
+                    null);
+            else
+                CampaignEventDispatcher.Instance.OnPlayerEliminatedFromTournament(round, town);
         });
 
+        scenario.ClientA.Call(() => scenario.ClientA.Resolve<INetwork>().SendAll(
+            new RequestLadysKnightOutTournamentOutcome(scenario.NotableId, QuestScenario.IssueId,
+                (byte)(expected == IssueOutcome.QuestSuccess
+                    ? LadysKnightOutBranch.TournamentSuccess : LadysKnightOutBranch.TournamentFailure))));
         var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
+        Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
+        Assert.Equal(expected, finalized.Outcome);
+        scenario.Server.Call(() => Assert.True(serverQuest.IsFinalized));
+        environment.FlushCoalescer();
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                var giver = instance.GetRegisteredObject<Hero>(scenario.NotableId);
+                Assert.Null(giver.Issue);
+                foreach (var controllerId in new[] { QuestScenario.ControllerA, QuestScenario.ControllerB })
+                {
+                    Assert.True(instance.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
+                    var hero = instance.GetRegisteredObject<Hero>(player.HeroId);
+                    var owner = controllerId == QuestScenario.ControllerA;
+                    var success = expected == IssueOutcome.QuestSuccess;
+                    Assert.Equal(before[controllerId].Gold + (owner && success ? 750 : 0), hero.Gold);
+                    Assert.Equal(before[controllerId].Renown + (owner && success ? 1 : 0), hero.Clan.Renown);
+                    Assert.Equal(before[controllerId].Relation + (owner ? (success ? 5 : -5) : 0), giver.GetRelation(hero));
+                }
+            });
+        scenario.ClientA.Call(() =>
+        {
+            Assert.True(quest.IsFinalized);
+            Assert.Equal(2, quest.JournalEntries.Count);
+            Assert.Contains(expected == IssueOutcome.QuestSuccess ? "750" : "failed to reach", quest.JournalEntries.Last().LogText.ToString());
+        });
     }
 
     [Theory]

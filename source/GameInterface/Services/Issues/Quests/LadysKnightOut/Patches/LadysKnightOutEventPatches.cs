@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
@@ -70,6 +70,7 @@ internal class LadysKnightOutWorldListenerPatches
 [HarmonyPatch]
 internal class LadysKnightOutNativeTournamentPatches
 {
+    // Native arena missions report callbacks here; co-op missions use server session snapshots instead.
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnPlayerStartedTournamentMatch))]
     [HarmonyPrefix]
     private static bool PlayerStartedPrefix() => ModInformation.IsClient;
@@ -101,7 +102,6 @@ internal class LadysKnightOutNativeTournamentPatches
 
     private static void Publish(Quest quest, LadysKnightOutBranch branch)
     {
-        if (ContainerProvider.TryResolve<IMessageBroker>(out var broker))
-            broker.Publish(quest, new LadysKnightOutTournamentTriggered(quest, (byte)branch));
+        MessageBroker.Instance.Publish(quest, new LadysKnightOutTournamentTriggered(quest, (byte)branch));
     }
 }
