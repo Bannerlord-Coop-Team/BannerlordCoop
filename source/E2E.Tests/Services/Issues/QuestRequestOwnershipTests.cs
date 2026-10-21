@@ -17,6 +17,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Patches;
 using SandBox.GauntletUI.Map;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 
