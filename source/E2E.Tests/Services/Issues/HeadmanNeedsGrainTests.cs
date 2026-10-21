@@ -408,6 +408,53 @@ public class HeadmanNeedsGrainTests : IDisposable
         }, Texts);
     }
 
+    private static Hero companionPickerGiver;
+    private static Hero companionPickerSelection;
+    private static bool PickerGiverPrefix(ref Hero __result)
+    {
+        if (companionPickerGiver == null) return true;
+        __result = companionPickerGiver;
+        return false;
+    }
+    private static bool PickerSelectionPrefix(ref object __result)
+    {
+        if (companionPickerSelection == null) return true;
+        __result = companionPickerSelection;
+        return false;
+    }
+
+    [Fact]
+    public void CompanionPicker_StagesSelectionWithoutRemovingTheManagedPartyHero()
+    {
+        var companionId = environment.CreateRegisteredObject<Hero>();
+        textHarmony.Patch(AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.OneToOneConversationHero)),
+            prefix: new HarmonyMethod(typeof(HeadmanNeedsGrainTests), nameof(PickerGiverPrefix)));
+        textHarmony.Patch(AccessTools.PropertyGetter(typeof(TaleWorlds.CampaignSystem.Conversation.ConversationSentence),
+                nameof(TaleWorlds.CampaignSystem.Conversation.ConversationSentence.SelectedRepeatObject)),
+            prefix: new HarmonyMethod(typeof(HeadmanNeedsGrainTests), nameof(PickerSelectionPrefix)));
+        textHarmony.Patch(AccessTools.Method(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroGetsBusy)),
+            prefix: new HarmonyMethod(typeof(HeadmanNeedsGrainTests), nameof(SkipMapCharacterSwitch)));
+        ClientA.Call(() =>
+        {
+            var companion = Get<Hero>(ClientA, companionId);
+            var party = MobileParty.MainParty;
+            using (new AllowedThread()) party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+            companionPickerGiver = Get<Hero>(ClientA, scenario.NotableId);
+            companionPickerSelection = companion;
+            try
+            {
+                IssuesCampaignBehavior.issue_offer_player_accept_alternative_3_consequence();
+                Assert.Equal(1, party.MemberRoster.GetTroopCount(companion.CharacterObject));
+                Assert.Same(party, companion.PartyBelongedTo);
+                Assert.Equal(1, IssueHere(ClientA).AlternativeSolutionSentTroops.GetTroopCount(companion.CharacterObject));
+            }
+            finally
+            {
+                companionPickerGiver = null;
+                companionPickerSelection = null;
+            }
+        });
+    }
     private static bool SkipMapCharacterSwitch() => false;
 
     [Fact]
