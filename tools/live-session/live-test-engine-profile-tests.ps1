@@ -54,10 +54,19 @@ try {
         -Condition ($appliedText -match '(?m)^resolution_scale = 100\.0000\r?$') `
         -Message 'The functional profile changed an unrelated setting.'
 
+    $appliedText = $appliedText.Replace("`r`n", "`n") + "safely_exited = 1`n"
+    [IO.File]::WriteAllText($configPath, $appliedText)
     $borrowed = Enter-LiveTestEngineProfile -Profile functional -RunToken engine-profile-test -EvidenceDirectory (Join-Path $testRoot 'borrower') -EngineConfigPath $configPath -LockTimeoutSeconds 0
     Assert-True -Condition ([bool]$borrowed.Borrowed) -Message 'Same run did not reuse its applied profile.'
     Exit-LiveTestEngineProfile -Lease $borrowed
     Assert-True -Condition ([IO.File]::ReadAllText($configPath) -ceq $appliedText) -Message 'Borrower restored the owner profile.'
+
+    [IO.File]::WriteAllText($configPath, $appliedText.Replace('max_framerate = 15', 'max_framerate = 60'))
+    $changedProfileRejected = $false
+    try { $null = Enter-LiveTestEngineProfile -Profile functional -RunToken engine-profile-test -EvidenceDirectory $evidencePath -EngineConfigPath $configPath -LockTimeoutSeconds 0 }
+    catch { $changedProfileRejected = $_.Exception.Message -like '*engine-profile lease*' }
+    Assert-True -Condition $changedProfileRejected -Message 'Same-run borrow accepted changed profile settings.'
+    [IO.File]::WriteAllText($configPath, $appliedText)
 
     $contentionFailed = $false
     try {

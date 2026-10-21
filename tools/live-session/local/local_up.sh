@@ -58,7 +58,11 @@ for s in $steps; do case $s in
   start) if [[ -n "$server_save" ]]; then
             step select-save "$hidden" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -File "$(wslpath -w "$(dirname "$0")/select_server_save.ps1")" -PreparationLog "$(wslpath -w "$out/dedicated-prepare.stdout.log")" -SaveName "$server_save"
           fi
-          step dedicated-start "${prepare[@]}" --start ;;
+          step dedicated-start "${prepare[@]}" --start
+          if [[ -n "$server_save" ]] && grep -Eq 'startedPid=[0-9]+ reused=true' "$out/dedicated-start.stdout.log"; then
+            echo 'Named-save startup reused an existing server; stop the run and restart through cycle.sh.' >&2
+            exit 1
+          fi ;;
   readiness) step dedicated-readiness timeout 660s "$hidden" "$powershell" -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass \
             -File "$(wslpath -w "$skill/verify_local_dedicated_server_readiness.ps1")" \
             -DedicatedServerRoot "$(wslpath -w "$dedicated_root")" -InputsRoot "$(wslpath -w "$inputs")" \

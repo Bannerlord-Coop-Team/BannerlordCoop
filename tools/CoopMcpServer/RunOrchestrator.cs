@@ -282,14 +282,14 @@ public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGu
                 var report = preflight.Check(settings.Profiles[run.Profile], 0);
                 if (!report.Allowed || report.Bridge.Mvid != run.Preflight.Bridge.Mvid)
                     return LocalFailure(target, report.Allowed ? "bridge_build_changed" : report.Code,
-                        report.Allowed ? "Coop.dll changed since launch; no join was sent." : report.Message);
+                        report.Allowed ? "Coop.dll changed since launch; no session request was sent." : report.Message);
                 var mismatch = await CheckLoadedBridgeAsync(target, report.Bridge.Mvid, cancellationToken);
                 if (mismatch != null) return mismatch;
                 var server = FindInstance(run, "server");
                 await server.Gate.WaitAsync(cancellationToken);
                 try
                 {
-                    if (!Alive(server)) return LocalFailure(server, "server_exited", "The owned server exited; no join was sent.");
+                    if (!Alive(server)) return LocalFailure(server, "server_exited", "The owned server exited; no session request was sent.");
                     mismatch = await CheckLoadedBridgeAsync(server, report.Bridge.Mvid, cancellationToken);
                     if (mismatch != null) return mismatch;
                 }
@@ -472,7 +472,7 @@ public sealed partial class RunOrchestrator : IRunOrchestrator, IDeploymentRunGu
             mvid.ValueKind != JsonValueKind.String || !mvid.TryGetGuid(out var actual) || actual != expected ||
             !value.TryGetProperty("protocolVersion", out var version) || version.ValueKind != JsonValueKind.Number ||
             !version.TryGetInt32(out int protocol) || protocol != LiveTestProtocol.Version)
-            return LocalFailure(target, "bridge_build_mismatch", "Loaded bridge does not match preflight. No join was sent.");
+            return LocalFailure(target, "bridge_build_mismatch", "Loaded bridge does not match preflight. No session request was sent.");
         return null;
     }
 

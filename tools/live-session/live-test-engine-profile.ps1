@@ -221,11 +221,19 @@ function Enter-LiveTestEngineProfile {
         catch [IO.IOException] {
             if (Test-Path -LiteralPath $recoveryPath -PathType Leaf) {
                 $owner = Get-Content -LiteralPath $recoveryPath -Raw | ConvertFrom-Json
-                $currentHash = Get-LiveTestBytesSha256 -Bytes ([IO.File]::ReadAllBytes($EngineConfigPath))
+                $currentText = [IO.File]::ReadAllText($EngineConfigPath)
+                $profileMatches = $true
+                foreach ($entry in (Get-LiveTestEngineProfileSettings -Profile $Profile).GetEnumerator()) {
+                    $pattern = '(?m)^' + [Regex]::Escape([string]$entry.Key) + '[ \t]*=[ \t]*([^\r\n]*)'
+                    $values = [Regex]::Matches($currentText, $pattern)
+                    if ($values.Count -ne 1 -or $values[0].Groups[1].Value.Trim() -cne [string]$entry.Value) {
+                        $profileMatches = $false
+                    }
+                }
                 if ([string]$owner.runToken -ceq $RunToken -and
                     [string]$owner.profile -ceq $Profile -and
                     [string]$owner.engineConfigPath -ieq $EngineConfigPath -and
-                    [string]$owner.appliedSha256 -ceq $currentHash) {
+                    $profileMatches) {
                     return [pscustomobject]@{
                         Borrowed = $true
                         LockStream = $null
