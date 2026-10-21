@@ -584,16 +584,37 @@ public class MerchantOutlawsTests : IDisposable
         Assert.True(Quest(ClientA).IsOngoing);
     }
 
+    [Fact]
+    public void FinalizingALoadedAlternativeRosterDoesNotGiveTheNonOwnerItsCompanion()
+    {
+        var companionId = environment.CreateRegisteredObject<Hero>();
+        ClientB.Call(() =>
+        {
+            var issue = Get<Hero>(ClientB, scenario.NotableId).Issue;
+            var companion = Get<Hero>(ClientB, companionId).CharacterObject;
+            var party = Get<MobileParty>(ClientB, scenario.PlayerB.MobilePartyId);
+            using (new AllowedThread())
+            {
+                issue.AlternativeSolutionSentTroops.AddToCounts(companion, 1);
+                issue._issueState = IssueBase.IssueState.SolvingWithAlternativeSolution;
+                issue.IssueFinalized();
+            }
+            Assert.Equal(0, party.MemberRoster.GetTroopCount(companion));
+            Assert.Equal(0, issue.AlternativeSolutionSentTroops.TotalManCount);
+        }, TextHelpers);
+    }
+
     [Theory]
-    [InlineData(false, false, false, false, false, false)]
-    [InlineData(true, false, false, false, false, false)]
-    [InlineData(false, true, false, false, false, false)]
-    [InlineData(false, true, true, false, false, false)]
-    [InlineData(false, true, false, true, false, false)]
-    [InlineData(false, true, false, true, true, false)]
-    [InlineData(false, true, true, true, true, false)]
-    [InlineData(false, true, false, true, true, true)]
-    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker, bool otherAccepts, bool otherDisconnects, bool acceptInFlight)
+    [InlineData(false, false, false, false, false, false, false)]
+    [InlineData(true, false, false, false, false, false, false)]
+    [InlineData(false, true, false, false, false, false, false)]
+    [InlineData(false, true, true, false, false, false, false)]
+    [InlineData(false, true, false, true, false, false, false)]
+    [InlineData(false, true, false, true, true, false, false)]
+    [InlineData(false, true, true, true, true, false, false)]
+    [InlineData(false, true, false, true, true, true, false)]
+    [InlineData(false, true, false, true, true, false, true)]
+    public void CompanionSolutionReturnsTroopsAndKeepsItsResultWithTheOwner(bool fails, bool cancel, bool cancelPicker, bool otherAccepts, bool otherDisconnects, bool acceptInFlight, bool otherAlternative)
     {
         var companionId = environment.CreateRegisteredObject<Hero>();
         var troopId = environment.CreateRegisteredObject<CharacterObject>();
@@ -662,7 +683,36 @@ public class MerchantOutlawsTests : IDisposable
         }, TextHelpers);
         environment.FlushCoalescer();
 
-        if (otherAccepts) scenario.Accept(ClientB);
+        if (otherAlternative)
+        {
+            var otherCompanionId = environment.CreateRegisteredObject<Hero>();
+            foreach (var instance in Instances)
+            {
+                instance.Call(() =>
+                {
+                    using (new AllowedThread())
+                    {
+                        var hero = Get<Hero>(instance, otherCompanionId);
+                        hero.HitPoints = 100;
+                        hero.SetSkillValue(DefaultSkills.Tactics, 150);
+                        hero._partyBelongedTo = Get<MobileParty>(instance, scenario.PlayerB.MobilePartyId);
+                    }
+                });
+            }
+            ClientB.Call(() =>
+            {
+                var issue = Get<Hero>(ClientB, scenario.NotableId).Issue;
+                using (new AllowedThread())
+                {
+                    issue.AlternativeSolutionSentTroops.AddToCounts(Get<Hero>(ClientB, otherCompanionId).CharacterObject, 1);
+                    issue.AlternativeSolutionSentTroops.AddToCounts(Get<CharacterObject>(ClientB, troopId), sent);
+                }
+                issue.StartIssueWithAlternativeSolution();
+            }, TextHelpers);
+            Assert.Equal(QuestScenario.ControllerB, scenario.OwnerOnServer());
+            ClientA.Call(() => Assert.True(Get<Hero>(ClientA, scenario.NotableId).Issue.IsSolvingWithAlternative));
+        }
+        else if (otherAccepts) scenario.Accept(ClientB);
 
         if (otherDisconnects)
         {

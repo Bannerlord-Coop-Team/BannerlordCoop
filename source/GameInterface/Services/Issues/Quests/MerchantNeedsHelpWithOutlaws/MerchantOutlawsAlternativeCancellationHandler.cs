@@ -20,6 +20,16 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
 
+public readonly struct MerchantOutlawsAlternativeSelected : IEvent
+{
+    public IssueBase Issue { get; }
+
+    public MerchantOutlawsAlternativeSelected(IssueBase issue)
+    {
+        Issue = issue;
+    }
+}
+
 public readonly struct MerchantOutlawsPickerOpened : IEvent
 {
     public PartyScreenLogic Logic { get; }
@@ -65,6 +75,7 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
     private readonly HashSet<IssueBase> pendingAccepts = new HashSet<IssueBase>();
     private readonly HashSet<TroopRoster> acceptedSelections = new HashSet<TroopRoster>();
     private readonly Dictionary<TroopRoster, PartyScreenLogic> openPickers = new Dictionary<TroopRoster, PartyScreenLogic>();
+    private readonly HashSet<TroopRoster> localSelections = new HashSet<TroopRoster>();
 
     public MerchantOutlawsAlternativeCancellationHandler(IMessageBroker messageBroker, INetwork network,
         IObjectManager objectManager, IPlayerManager playerManager,
@@ -79,6 +90,7 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
         messageBroker.Subscribe<MerchantOutlawsAlternativeCancelled>(Handle_Local);
         messageBroker.Subscribe<PartyDoneLogicAttempted>(Handle_Done);
         messageBroker.Subscribe<MerchantOutlawsPickerOpened>(Handle_PickerOpened);
+        messageBroker.Subscribe<MerchantOutlawsAlternativeSelected>(Handle_Selected);
         messageBroker.Subscribe<AlternativeSolutionAcceptRequested>(Handle_AcceptRequested);
         messageBroker.Subscribe<NetworkAlternativeSolutionAccepted>(Handle_Accepted);
         messageBroker.Subscribe<RequestMerchantOutlawsAlternativeCancellation>(Handle_Request);
@@ -89,6 +101,7 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
         messageBroker.Unsubscribe<MerchantOutlawsAlternativeCancelled>(Handle_Local);
         messageBroker.Unsubscribe<PartyDoneLogicAttempted>(Handle_Done);
         messageBroker.Unsubscribe<MerchantOutlawsPickerOpened>(Handle_PickerOpened);
+        messageBroker.Unsubscribe<MerchantOutlawsAlternativeSelected>(Handle_Selected);
         messageBroker.Unsubscribe<AlternativeSolutionAcceptRequested>(Handle_AcceptRequested);
         messageBroker.Unsubscribe<NetworkAlternativeSolutionAccepted>(Handle_Accepted);
         messageBroker.Unsubscribe<RequestMerchantOutlawsAlternativeCancellation>(Handle_Request);
@@ -98,6 +111,8 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
     {
         if (ModInformation.IsServer) return;
         var issue = payload.What.Issue;
+        if (payload.What.Finalizing && !localSelections.Remove(issue.AlternativeSolutionSentTroops)) return;
+        localSelections.Remove(issue.AlternativeSolutionSentTroops);
         if (payload.What.Finalizing && acceptedSelections.Remove(issue.AlternativeSolutionSentTroops)) return;
         if (payload.What.Finalizing && openPickers.TryGetValue(issue.AlternativeSolutionSentTroops, out var picker))
         {
@@ -128,7 +143,11 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
         openPickers.Remove(roster);
         if (Campaign.Current.IssueManager.Issues.Values.Any(issue =>
             issue is MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssue &&
-            ReferenceEquals(issue.AlternativeSolutionSentTroops, roster))) committedSelections.Add(roster);
+            ReferenceEquals(issue.AlternativeSolutionSentTroops, roster)))
+        {
+            localSelections.Add(roster);
+            committedSelections.Add(roster);
+        }
     }
 
     private void Handle_PickerOpened(MessagePayload<MerchantOutlawsPickerOpened> payload)
@@ -138,13 +157,23 @@ internal class MerchantOutlawsAlternativeCancellationHandler : IHandler
         var roster = logic.MemberRosters[0];
         if (Campaign.Current.IssueManager.Issues.Values.Any(issue =>
             issue is MerchantNeedsHelpWithOutlawsIssueQuestBehavior.MerchantNeedsHelpWithOutlawsIssue &&
-            ReferenceEquals(issue.AlternativeSolutionSentTroops, roster))) openPickers[roster] = logic;
+            ReferenceEquals(issue.AlternativeSolutionSentTroops, roster)))
+        {
+            localSelections.Add(roster);
+            openPickers[roster] = logic;
+        }
+    }
+
+    private void Handle_Selected(MessagePayload<MerchantOutlawsAlternativeSelected> payload)
+    {
+        if (ModInformation.IsClient) localSelections.Add(payload.What.Issue.AlternativeSolutionSentTroops);
     }
 
     private void Handle_AcceptRequested(MessagePayload<AlternativeSolutionAcceptRequested> payload)
     {
         if (ModInformation.IsServer) return;
         // Acceptance now owns the refund through the framework's rejection path.
+        localSelections.Add(payload.What.Issue.AlternativeSolutionSentTroops);
         committedSelections.Remove(payload.What.Issue.AlternativeSolutionSentTroops);
         pendingAccepts.Add(payload.What.Issue);
     }
