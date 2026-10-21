@@ -96,6 +96,7 @@ public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
         }
     }
 
+    /// <inheritdoc/>
     public bool IsCoopBattleActive
     {
         get
@@ -107,6 +108,7 @@ public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
         }
     }
 
+    /// <inheritdoc/>
     public string ActiveMapEventId
     {
         get
@@ -118,6 +120,7 @@ public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
         }
     }
 
+    /// <inheritdoc/>
     public void BeginBattle(string mapEventId)
     {
         lock (sync)
@@ -127,6 +130,7 @@ public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
         }
     }
 
+    /// <inheritdoc/>
     public void EndBattle()
     {
         lock (sync)
@@ -136,16 +140,19 @@ public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
         }
     }
 
+    /// <inheritdoc/>
     public void AcceptMissingReserveSide(BattleSideEnum side)
     {
         SetReserveTimedOut(side, timedOut: true);
     }
 
+    /// <inheritdoc/>
     public void RestoreReserveSide(BattleSideEnum side)
     {
         SetReserveTimedOut(side, timedOut: false);
     }
 
+    /// <inheritdoc/>
     public bool IsMissingReserveSideAccepted(BattleSideEnum side)
     {
         lock (sync)
