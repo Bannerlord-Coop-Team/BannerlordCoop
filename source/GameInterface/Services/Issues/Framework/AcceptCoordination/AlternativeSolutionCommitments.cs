@@ -47,6 +47,7 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
             if (element.Character.IsHero) continue;
             var available = selection.Troops == null ? default : selection.Troops.GetTroopRoster()
                 .FirstOrDefault(value => value.Character == element.Character);
+            if (available.Character == null) available = new TroopRosterElement(element.Character);
             if (element.Number > available.Number || element.WoundedNumber > available.WoundedNumber ||
                 element.Xp > available.Xp) return false;
         }
