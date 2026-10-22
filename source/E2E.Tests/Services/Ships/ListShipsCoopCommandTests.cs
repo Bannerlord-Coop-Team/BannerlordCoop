@@ -44,7 +44,7 @@ public class ListShipsCoopCommandTests : SyncTestBase
         var result = ListShips(Clients.First(), "MobileParty_missing");
 
         Assert.False(result.Succeeded);
-        Assert.Equal("No player, MobileParty or PartyBase has id MobileParty_missing.", result.Output);
+        Assert.Equal("No player, MobileParty, PartyBase or party/hero name matches MobileParty_missing.", result.Output);
     }
 
     private static CoopCommandResult ListShips(EnvironmentInstance instance, string id)
