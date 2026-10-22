@@ -33,6 +33,7 @@ internal class ServerSiegeAftermathHandler : IHandler
         this.siegeEventInterface = siegeEventInterface;
         messageBroker.Subscribe<NetworkRequestSiegeAftermath>(HandleRequest);
         messageBroker.Subscribe<SiegeAftermathApplied>(HandleApplied);
+        messageBroker.Subscribe<SiegeAftermathDiscarded>(HandleDiscarded);
         messageBroker.Subscribe<SiegeAftermathChoicePrompted>(HandlePrompted);
         messageBroker.Subscribe<PlayerCampaignEntered>(HandlePlayerCampaignEntered);
     }
@@ -44,9 +45,11 @@ internal class ServerSiegeAftermathHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.LeaderParty, out var leaderPartyId)) return;
+        // The clan only feeds the consequence text and the client keeps its own snapshot on a null id, so still prompt.
+        objectManager.TryGetId(obj.PreviousOwnerClan, out var previousOwnerClanId);
 
         // Broadcast; each client checks locally whether it is the leader.
-        network.SendAll(new NetworkPromptSiegeAftermathChoice(settlementId, leaderPartyId));
+        network.SendAll(new NetworkPromptSiegeAftermathChoice(settlementId, leaderPartyId, previousOwnerClanId));
     }
 
     // Runs on the game thread already — published from the ApplyAftermath postfix; only resolves an id and broadcasts, so no GameThread.RunSafe.
@@ -57,6 +60,15 @@ internal class ServerSiegeAftermathHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
 
         network.SendAll(new NetworkSiegeAftermathApplied(settlementId, obj.AftermathType));
+    }
+
+    // Runs on the game thread already, published from the server's pending-aftermath discard; tells the leader's
+    // client to stop holding a choice that will never be applied.
+    private void HandleDiscarded(MessagePayload<SiegeAftermathDiscarded> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.Settlement, out var settlementId)) return;
+
+        network.SendAll(new NetworkSiegeAftermathDiscarded(settlementId));
     }
 
     private void HandleRequest(MessagePayload<NetworkRequestSiegeAftermath> payload)
@@ -88,10 +100,11 @@ internal class ServerSiegeAftermathHandler : IHandler
         {
             if (!objectManager.TryGetIdWithLogging(prompt.Settlement, out var settlementId)) continue;
             if (!objectManager.TryGetIdWithLogging(prompt.LeaderParty, out var leaderPartyId)) continue;
+            objectManager.TryGetId(prompt.PreviousOwnerClan, out var previousOwnerClanId);
 
             // Send every valid prompt to the entering peer. The client-side leader check makes this
             // a no-op for other players and lets a reconnected leader resume the saved choice.
-            network.Send(peer, new NetworkPromptSiegeAftermathChoice(settlementId, leaderPartyId));
+            network.Send(peer, new NetworkPromptSiegeAftermathChoice(settlementId, leaderPartyId, previousOwnerClanId));
         }
     }
 
@@ -99,6 +112,7 @@ internal class ServerSiegeAftermathHandler : IHandler
     {
         messageBroker.Unsubscribe<NetworkRequestSiegeAftermath>(HandleRequest);
         messageBroker.Unsubscribe<SiegeAftermathApplied>(HandleApplied);
+        messageBroker.Unsubscribe<SiegeAftermathDiscarded>(HandleDiscarded);
         messageBroker.Unsubscribe<SiegeAftermathChoicePrompted>(HandlePrompted);
         messageBroker.Unsubscribe<PlayerCampaignEntered>(HandlePlayerCampaignEntered);
     }
