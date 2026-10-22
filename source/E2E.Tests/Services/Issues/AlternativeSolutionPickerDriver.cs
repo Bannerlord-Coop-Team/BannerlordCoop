@@ -1,6 +1,6 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment.Instance;
-using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using Helpers;
 using TaleWorlds.CampaignSystem;

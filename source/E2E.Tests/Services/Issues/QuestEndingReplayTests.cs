@@ -84,7 +84,7 @@ public class QuestEndingReplayTests : IDisposable
             Assert.True(quest.IsFinalized);
             Assert.Equal(owner && inQuestManager, quest.GameplayFinalized);
             Assert.DoesNotContain(quest, Campaign.Current.QuestManager.Quests);
-            CampaignEventDispatcher.Instance.OnHourlyTick();
+            CampaignEventDispatcher.Instance.HourlyTick();
             Assert.Equal(0, quest.HourlyCalls);
         });
     }
@@ -103,7 +103,7 @@ public class QuestEndingReplayTests : IDisposable
             HourlyCalls++;
         }
 
-        protected override void OnFinalize()
+        public override void OnFinalize()
         {
             GameplayFinalized = true;
         }
