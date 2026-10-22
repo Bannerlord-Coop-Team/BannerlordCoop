@@ -4,6 +4,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using System;
 using TaleWorlds.Core;
 using TaleWorlds.CampaignSystem.Party;
@@ -37,6 +38,7 @@ internal class CaravanAmbushStateHandler : IHandler
         broker.Subscribe<NetworkCaravanAmbushState>(Handle);
         broker.Subscribe<NetworkCaravanAmbushConversation>(Conversation);
         broker.Subscribe<BanditPartyRecruitedByPlayer>(Recruited);
+        broker.Subscribe<CampaignTick>(Tick);
     }
 
     public void Dispose()
@@ -44,6 +46,7 @@ internal class CaravanAmbushStateHandler : IHandler
         broker.Unsubscribe<NetworkCaravanAmbushState>(Handle);
         broker.Unsubscribe<NetworkCaravanAmbushConversation>(Conversation);
         broker.Unsubscribe<BanditPartyRecruitedByPlayer>(Recruited);
+        broker.Unsubscribe<CampaignTick>(Tick);
         ClearPendingConversation();
     }
 
@@ -52,11 +55,15 @@ internal class CaravanAmbushStateHandler : IHandler
         if (ModInformation.IsServer || payload.What.ControllerId != controller.ControllerId) return;
         GameThread.RunSafe(() =>
         {
-            if (pendingConversation == null)
-                CampaignEvents.TickEvent.AddNonSerializedListener(this, _ => TryOpenConversation());
             pendingConversation = payload.What;
             TryOpenConversation();
         }, context: nameof(CaravanAmbushStateHandler));
+    }
+
+    private void Tick(MessagePayload<CampaignTick> payload)
+    {
+        // Vanilla TickEvent stops while paused, including after battle loot closes.
+        if (ModInformation.IsClient && pendingConversation.HasValue) TryOpenConversation();
     }
 
     private void TryOpenConversation()
@@ -93,7 +100,6 @@ internal class CaravanAmbushStateHandler : IHandler
     private void ClearPendingConversation()
     {
         pendingConversation = null;
-        if (Campaign.Current != null) CampaignEvents.TickEvent.ClearListeners(this);
     }
 
     private void Recruited(MessagePayload<BanditPartyRecruitedByPlayer> payload)

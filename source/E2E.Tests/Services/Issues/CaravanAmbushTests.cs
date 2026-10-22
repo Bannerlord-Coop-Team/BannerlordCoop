@@ -12,6 +12,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.CaravanAmbush;
 using GameInterface.Services.Bandits.Messages;
 using GameInterface.Services.Players;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -324,7 +325,7 @@ public class CaravanAmbushTests : IDisposable
     }
 
     [Fact]
-    public void SavedCaravanConversationWaitsForMissionAndLootScreensAndOpensOnce()
+    public void SavedCaravanConversationWaitsForPausedCampaignAndOpensOnce()
     {
         using var conversations = new MethodCallRecorder(AccessTools.Method(typeof(ConversationManager), nameof(ConversationManager.OpenMapConversation)));
         Owner.Call(() =>
@@ -339,19 +340,23 @@ public class CaravanAmbushTests : IDisposable
         Assert.Equal(0, conversations.CountFor(Owner));
         Owner.Call(() =>
         {
-            CampaignEvents.Instance.Tick(0f);
+            Campaign.Current._dt = 0f;
+            Owner.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
             Assert.Equal(0, conversations.CountFor(Owner));
             var states = Game.Current.GameStateManager;
             states._gameStates.Clear();
             var map = states.CreateState<MapState>();
             states._gameStates.Add(map);
             map._menuContext = Game.Current.ObjectManager.CreateObject<MenuContext>();
-            CampaignEvents.Instance.Tick(0f);
+            Campaign.Current._dt = 0f;
+            Owner.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
             Assert.Equal(0, conversations.CountFor(Owner));
             map._menuContext = null;
-            CampaignEvents.Instance.Tick(0f);
+            Campaign.Current._dt = 0f;
+            Owner.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
             Assert.Equal(1, conversations.CountFor(Owner));
-            CampaignEvents.Instance.Tick(0f);
+            Campaign.Current._dt = 0f;
+            Owner.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
             Assert.Equal(1, conversations.CountFor(Owner));
         });
         Assert.Equal(0, conversations.CountFor(Other));
@@ -369,7 +374,8 @@ public class CaravanAmbushTests : IDisposable
         Owner.Call(() =>
         {
             Game.Current.GameStateManager._gameStates.Add(Game.Current.GameStateManager.CreateState<MapState>());
-            CampaignEvents.Instance.Tick(0f);
+            Campaign.Current._dt = 0f;
+            Owner.Resolve<IMessageBroker>().Publish(this, new CampaignTick());
         });
         Assert.Equal(0, conversations.CountFor(Owner));
     }
