@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.GameDebug.Messages;
 using Missions.Messages;
 using Missions.Services.Network;
@@ -40,6 +41,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
     internal const float HeldConfirmLifetimeSeconds = 30f;
 
     private readonly IBattleNetwork network;
+    private readonly INetwork relayNetwork;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
     private readonly ICoopMissionComponent missionComponent;
@@ -60,10 +62,11 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
     private string lastDrop;
     private bool disposed;
 
-    public BattleShipCaptureReplicator(IBattleNetwork network, IMessageBroker messageBroker, BattleContext context,
-        INavalShipEngine engine, IBattleShipReplicator ships, INavalHullAuthority hullAuthority)
+    public BattleShipCaptureReplicator(IBattleNetwork network, INetwork relayNetwork, IMessageBroker messageBroker,
+        BattleContext context, INavalShipEngine engine, IBattleShipReplicator ships, INavalHullAuthority hullAuthority)
     {
         this.network = network;
+        this.relayNetwork = relayNetwork;
         this.messageBroker = messageBroker;
         session = context.Session;
         missionComponent = context.MissionComponent;
@@ -367,6 +370,16 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         if (session.IsOwn(previousAuthority) && !prize.IsNpcParty && !session.IsOwn(captor))
             Logger.Warning("[NavalSync] This client's hull {ShipId} was captured by {Captor}; its formation has no hull of its own left",
                 prize.ShipId, captor);
+        if (session.IsOwn(captor)) ReportCaptureToServer(prize);
+    }
+
+    // On the relay channel this client's fates use, so the server knows the captor before the prize's first fate from it.
+    private void ReportCaptureToServer(NetworkShipInfo prize)
+    {
+        var campaignShipId = engine.CampaignShipIdOf(prize.Hull);
+        if (string.IsNullOrEmpty(campaignShipId) || !session.HasInstance) return;
+
+        relayNetwork.SendAll(new NetworkBattleShipCaptured(session.InstanceId, campaignShipId));
     }
 
     // Counts and logs a confirm this client won't apply.

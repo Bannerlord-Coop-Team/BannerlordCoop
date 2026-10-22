@@ -83,8 +83,8 @@ public class NavalBattleServices : INavalBattleServices
             shipEngine, context.Deployment, context.MissionContext);
         ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
             hullAuthority, conditions, StationUseReplicator);
-        ShipCaptureReplicator = new BattleShipCaptureReplicator(network, messageBroker, context, shipEngine, ShipReplicator,
-            hullAuthority);
+        ShipCaptureReplicator = new BattleShipCaptureReplicator(network, relayNetwork, messageBroker, context, shipEngine,
+            ShipReplicator, hullAuthority);
         DeckPoses =new NavalDeckPoses(context.MissionComponent, shipEngine, StationUseReplicator);
         MigrationReserveFielder = new NavalMigrationReserveFielder(context.Session, context.ReinforcementFielder,
             context.MissionComponent.ShipRegistry, shipEngine, ShipReplicator);

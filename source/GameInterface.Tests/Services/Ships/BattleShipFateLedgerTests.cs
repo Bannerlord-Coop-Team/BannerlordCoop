@@ -66,6 +66,56 @@ public class BattleShipFateLedgerTests
         Assert.Equal(50f, fate.MitigatedDamage);
     }
 
+    // Capture 2.5: the captor numbers the prize's fates from its own count, so its first fate replaces the host's held one
+    // whatever their stamps, and later captor fates order among themselves.
+    [Fact]
+    public void RecordCapture_LetsTheCaptorsFirstFateSupersedeTheHeldOne()
+    {
+        var ledger = new BattleShipFateLedger();
+        ledger.Record(Battle, Fate("Ship_1", 800f), hostEpoch: 2, revision: 9);
+
+        ledger.RecordCapture(Battle, "Ship_1", "captor");
+        ledger.Record(Battle, Fate("Ship_1", 600f), hostEpoch: 1, revision: 1);
+        ledger.Record(Battle, Fate("Ship_1", 650f), hostEpoch: 1, revision: 0);
+
+        Assert.Equal("captor", ledger.CaptorOf(Battle, "Ship_1"));
+        Assert.Equal(600f, Assert.Single(ledger.Take(Battle, _ => true)).HitPoints);
+    }
+
+    // A sunk ship stays sunk across a capture record (a sinking hull can't be captured anyway).
+    [Fact]
+    public void RecordCapture_KeepsAHeldSinkFinal()
+    {
+        var ledger = new BattleShipFateLedger();
+        ledger.Record(Battle, Fate("Ship_1", 0f, sunk: true), hostEpoch: 1, revision: 1);
+
+        ledger.RecordCapture(Battle, "Ship_1", "captor");
+        ledger.Record(Battle, Fate("Ship_1", 500f), hostEpoch: 1, revision: 1);
+
+        Assert.True(Assert.Single(ledger.Take(Battle, _ => true)).Sunk);
+    }
+
+    // Capture 2.5 (M6 D5 widened): the captor's departure applies the ships it captured; an owner taking its ship back clears
+    // the record, and the battle's finalize forgets them all.
+    [Fact]
+    public void CapturedBy_ListsTheCaptorsShips_UntilRetakenOrForgotten()
+    {
+        var ledger = new BattleShipFateLedger();
+        ledger.RecordCapture(Battle, "Ship_1", "captor");
+        ledger.RecordCapture(Battle, "Ship_2", "captor");
+        ledger.RecordCapture(Battle, "Ship_3", "rival");
+        ledger.RecordCapture("MapEvent_2", "Ship_4", "captor");
+
+        ledger.RecordCapture(Battle, "Ship_2", null);
+
+        Assert.Equal(new[] { "Ship_1" }, ledger.CapturedBy(Battle, "captor"));
+        Assert.Null(ledger.CaptorOf(Battle, "Ship_2"));
+        ledger.ForgetCaptures(Battle);
+        Assert.Empty(ledger.CapturedBy(Battle, "captor"));
+        Assert.Null(ledger.CaptorOf(Battle, "Ship_3"));
+        Assert.Equal("captor", ledger.CaptorOf("MapEvent_2", "Ship_4"));
+    }
+
     [Fact]
     public void Take_FindsNothingForAnUnknownBattle()
     {

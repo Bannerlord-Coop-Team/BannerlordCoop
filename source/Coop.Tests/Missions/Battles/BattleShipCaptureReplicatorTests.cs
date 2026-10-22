@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.ObjectManager;
 using Missions;
@@ -211,6 +212,28 @@ public class BattleShipCaptureReplicatorTests
         Assert.Equal(BattleSideEnum.Attacker, ownHull.OrphanedSide);
     }
 
+    // 2.3 step 5: only the captor tells the server, on the relay its fates use, so the server takes the prize's fates from it.
+    [Fact]
+    public void Confirm_OnlyTheCaptorReportsTheCaptureToTheServer()
+    {
+        var captorSide = new Harness();
+        var prize = captorSide.Register(Host, BattleSideEnum.Defender, npc: true);
+        var ownHull = captorSide.Register(Own, BattleSideEnum.Attacker);
+        captorSide.Engine.Setup(e => e.CampaignShipIdOf(prize.Hull)).Returns("Ship_7");
+        var observerSide = new Harness();
+        var observed = observerSide.Register(Host, BattleSideEnum.Defender, npc: true);
+        var captorCopy = observerSide.Register(Captor, BattleSideEnum.Attacker);
+        observerSide.Engine.Setup(e => e.CampaignShipIdOf(observed.Hull)).Returns("Ship_7");
+
+        captorSide.Captures.AcceptConfirm(new NetworkShipCaptured(prize.ShipId, Own, ownHull.ShipId, Host, 1));
+        observerSide.Captures.AcceptConfirm(new NetworkShipCaptured(observed.ShipId, Captor, captorCopy.ShipId, Host, 1));
+
+        captorSide.Relay.Verify(r => r.SendAll(It.Is<IMessage>(m => m is NetworkBattleShipCaptured
+            && ((NetworkBattleShipCaptured)m).CampaignShipId == "Ship_7" && ((NetworkBattleShipCaptured)m).InstanceId == "MapEvent_1")),
+            Times.Once);
+        observerSide.Relay.Verify(r => r.SendAll(It.IsAny<IMessage>()), Times.Never);
+    }
+
     // 2.3 step 1: a client that never simulated the prize can't confirm its capture.
     [Fact]
     public void Confirm_FromAClientThatNeverSimulatedThePrize_IsDropped()
@@ -356,6 +379,7 @@ public class BattleShipCaptureReplicatorTests
     private sealed class Harness
     {
         public Mock<IBattleNetwork> Network { get; } = new Mock<IBattleNetwork>();
+        public Mock<INetwork> Relay { get; } = new Mock<INetwork>();
         public Mock<INavalShipEngine> Engine { get; } = new Mock<INavalShipEngine>();
         public MessageBroker Broker { get; } = new MessageBroker();
         public NetworkShipRegistry Registry { get; } = new NetworkShipRegistry();
@@ -406,7 +430,7 @@ public class BattleShipCaptureReplicatorTests
                 Mock.Of<IObjectManager>(), HullAuthority,
                 new BattleShipConditionStream(Network.Object, session.Object, Engine.Object, epochs, members.Object),
                 Mock.Of<IAgentStationUseReplicator>());
-            Captures = new BattleShipCaptureReplicator(Network.Object, Broker, context, Engine.Object, Ships, HullAuthority);
+            Captures = new BattleShipCaptureReplicator(Network.Object, Relay.Object, Broker, context, Engine.Object, Ships, HullAuthority);
             Broker.Subscribe<SendInformationMessage>(Handle_Told);
         }
 

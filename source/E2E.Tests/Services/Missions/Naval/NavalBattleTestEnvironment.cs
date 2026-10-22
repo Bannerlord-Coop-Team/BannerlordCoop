@@ -594,6 +594,18 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             Broker.Publish(this, new AgentStationUseChanged(agent, point, inUse));
         });
 
+        /// <summary>
+        /// The capture patch's event: this client's main agent, crew of its hull <paramref name="ownHull"/>, held the helm of
+        /// <paramref name="prize"/> for vanilla's capture time.
+        /// </summary>
+        public void ElapseCaptureTimer(Guid prize, Guid ownHull)
+        {
+            var main = RegisterAgent(Guid.NewGuid(), Id);
+            var prizeHull = Ship(prize).Hull;
+            Engine.PlaceAgent(main, prizeHull, Ship(ownHull).Hull);
+            Call(() => Broker.Publish(this, new ShipCaptureTimerElapsed(prizeHull, main)));
+        }
+
         /// <summary>The ship damage patch's event for a hit this client decided on its local hull.</summary>
         public void Hit(Guid shipId, float damage) => Call(() =>
         {

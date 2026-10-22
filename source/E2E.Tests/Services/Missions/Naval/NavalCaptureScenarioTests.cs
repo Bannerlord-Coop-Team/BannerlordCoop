@@ -25,7 +25,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         var lateSampleFromH = h.SentSamples(prize).Last();
         h.Hull(prize).IsVacant = true;
 
-        TimerElapses(c, prize, captorHull);
+        c.ElapseCaptureTimer(prize, captorHull);
 
         foreach (var peer in new[] { h, c, o })
         {
@@ -72,7 +72,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         var prize = pirates[0];
         h.Hull(prize).IsVacant = true;
 
-        TimerElapses(h, prize, hostHull);
+        h.ElapseCaptureTimer(prize, hostHull);
 
         foreach (var peer in new[] { h, c, o })
         {
@@ -113,7 +113,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         battle.TickAll(2);
         b.Hull(hullB).IsVacant = true;
 
-        TimerElapses(a, hullB, hullA);
+        a.ElapseCaptureTimer(hullB, hullA);
 
         foreach (var peer in new[] { a, b, o })
         {
@@ -135,7 +135,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
         var prize = pirates[0];
 
-        TimerElapses(c, prize, captorHull);
+        c.ElapseCaptureTimer(prize, captorHull);
 
         Assert.Equal("not_vacant", Assert.Single(h.Network.NetworkSentMessages.GetMessages<NetworkShipCaptureRejected>()).Reason);
         Assert.Null(PendingAge(c, prize));
@@ -159,8 +159,8 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         // Both requests are in flight before either captor hears of the other.
         c.Network.RouteMessages = false;
         o.Network.RouteMessages = false;
-        TimerElapses(c, prize, captorHull);
-        TimerElapses(o, prize, observerHull);
+        c.ElapseCaptureTimer(prize, captorHull);
+        o.ElapseCaptureTimer(prize, observerHull);
         c.Network.RouteMessages = true;
         o.Network.RouteMessages = true;
         var requestOfC = c.Network.NetworkSentMessages.GetMessages<NetworkShipCaptureRequest>().Single();
@@ -186,7 +186,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
     {
         using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
         h.Hull(pirates[0]).IsVacant = true;
-        TimerElapses(c, pirates[0], captorHull);
+        c.ElapseCaptureTimer(pirates[0], captorHull);
 
         battle.MigrateHost(h, "O");
         battle.TickAll(4);
@@ -210,7 +210,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         var prize = pirates[0];
         h.Hull(prize).IsVacant = true;
         h.Network.RouteMessages = false;
-        TimerElapses(c, prize, captorHull);
+        c.ElapseCaptureTimer(prize, captorHull);
         var confirm = h.Network.NetworkSentMessages.GetMessages<NetworkShipCaptured>().Single();
 
         battle.MigrateHost(h, "O");
@@ -238,7 +238,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
     {
         using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
         c.Network.RouteMessages = false;
-        TimerElapses(c, pirates[0], captorHull);
+        c.ElapseCaptureTimer(pirates[0], captorHull);
         c.Network.RouteMessages = true;
 
         battle.MigrateHost(h, "O");
@@ -258,7 +258,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
         var prize = pirates[0];
         h.Hull(prize).IsVacant = true;
-        TimerElapses(c, prize, captorHull);
+        c.ElapseCaptureTimer(prize, captorHull);
         var crewOnOrphan = StandCrewOnOrphan(new[] { h, o }, prize, captorHull);
 
         battle.Disconnect(c);
@@ -281,7 +281,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
         var prize = pirates[0];
         h.Hull(prize).IsVacant = true;
-        TimerElapses(c, prize, captorHull);
+        c.ElapseCaptureTimer(prize, captorHull);
         var crewOnOrphan = StandCrewOnOrphan(new[] { h, o }, prize, captorHull);
 
         c.Call(() =>
@@ -313,7 +313,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
             lateJoiner: "O");
         var prize = pirates[0];
         h.Hull(prize).IsVacant = true;
-        TimerElapses(c, prize, captorHull);
+        c.ElapseCaptureTimer(prize, captorHull);
 
         var joiner = battle.Join("O");
         joiner.Commit();
@@ -347,7 +347,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         Assert.False(joiner.Has(prize));
 
         h.Hull(prize).IsVacant = true;
-        TimerElapses(c, prize, captorHull);
+        c.ElapseCaptureTimer(prize, captorHull);
         joiner.Engine.IsDeploymentMode = false;
         battle.TickAll(2);
 
@@ -367,8 +367,8 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         h.Hull(pirates[0]).IsVacant = true;
         h.Hull(pirates[1]).IsVacant = true;
 
-        TimerElapses(c, pirates[0], captorHull);
-        TimerElapses(h, pirates[1], hostHull);
+        c.ElapseCaptureTimer(pirates[0], captorHull);
+        h.ElapseCaptureTimer(pirates[1], hostHull);
 
         var enemy = EndTally(h, BattleSideEnum.Defender, liveHumans: 0);
         var players = EndTally(h, BattleSideEnum.Attacker, liveHumans: 3);
@@ -399,16 +399,6 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         battle.CommitAll();
         battle.TickAll(2);
         return battle;
-    }
-
-    // The captor's main agent, crew of its own hull, held the prize's helm for vanilla's capture time on the captor's client.
-    private static void TimerElapses(NavalPeer captor, Guid prize, Guid captorHull)
-    {
-        var main = captor.RegisterAgent(Guid.NewGuid(), captor.Id);
-        var prizeHull = captor.Ship(prize).Hull;
-        var ownHull = captor.Ship(captorHull).Hull;
-        captor.Engine.PlaceAgent(main, prizeHull, ownHull);
-        captor.Call(() => captor.Broker.Publish(captor, new ShipCaptureTimerElapsed(prizeHull, main)));
     }
 
     // A puppet of the captor's crew, crewing the prize, standing on the orphan's deck on each observer.

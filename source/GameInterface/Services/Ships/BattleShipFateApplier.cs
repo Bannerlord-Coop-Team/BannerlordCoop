@@ -4,6 +4,7 @@ using GameInterface.Services.Ships.Data;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -20,8 +21,11 @@ namespace GameInterface.Services.Ships;
 /// </summary>
 public interface IBattleShipFateApplier
 {
-    /// <summary>Applies the held fates of the ships <paramref name="party"/> owns, as its player departs the battle.</summary>
-    void ApplyParty(MapEvent mapEvent, PartyBase party);
+    /// <summary>
+    /// Applies the held fates of the ships <paramref name="party"/> owns and of the <paramref name="capturedShipIds"/> its player
+    /// captured in the mission, as that player departs the battle with them.
+    /// </summary>
+    void ApplyParty(MapEvent mapEvent, PartyBase party, IReadOnlyCollection<string> capturedShipIds);
 
     /// <summary>Applies every held fate of the battle.</summary>
     void ApplyAll(MapEvent mapEvent);
@@ -47,13 +51,14 @@ public class BattleShipFateApplier : IBattleShipFateApplier
         this.objectManager = objectManager;
     }
 
-    public void ApplyParty(MapEvent mapEvent, PartyBase party) => Apply(mapEvent, ship => ship.Owner == party);
+    public void ApplyParty(MapEvent mapEvent, PartyBase party, IReadOnlyCollection<string> capturedShipIds) =>
+        Apply(mapEvent, (shipId, ship) => ship.Owner == party || capturedShipIds.Contains(shipId));
 
-    public void ApplyAll(MapEvent mapEvent) => Apply(mapEvent, ship => true);
+    public void ApplyAll(MapEvent mapEvent) => Apply(mapEvent, (shipId, ship) => true);
 
     // Resolves each held ship once. A fate whose ship is already gone (destroyed by a finalize, a loot discard) or ownerless is
     // taken and dropped, so the ledger never keeps it; vanilla's destroy and every HP write expect an owned ship.
-    private void Apply(MapEvent mapEvent, Func<Ship, bool> selects)
+    private void Apply(MapEvent mapEvent, Func<string, Ship, bool> selects)
     {
         if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId) || !ledger.HasFates(mapEventId)) return;
 
@@ -61,7 +66,7 @@ public class BattleShipFateApplier : IBattleShipFateApplier
         var fates = ledger.Take(mapEventId, fate =>
         {
             if (!objectManager.TryGetObject<Ship>(fate.CampaignShipId, out var ship) || ship.Owner == null) return true;
-            if (!selects(ship)) return false;
+            if (!selects(fate.CampaignShipId, ship)) return false;
 
             ships[fate.CampaignShipId] = ship;
             return true;

@@ -230,6 +230,64 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(0f, grant.FinalDamage);
     }
 
+    // Capture 2.5: once B captured an AI hull the server takes that ship's fates from B alone, so the old host's late fate is
+    // refused and the commit hands the loot the captor's battle HP.
+    [Fact]
+    public void CapturedAiHull_ItsCaptorsFateAppliesAtTheCommit_AndTheOldHostsLateFateIsDropped()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out var b, out var concluded);
+        var shipId = GiveShip(AddAiParty(battle));
+        var prize = CaptureAiHull(battle, a, b, shipId);
+        b.Hull(prize).HitPoints = 450f;
+        b.Tick(BattleShipFateReporterInterval);
+        SendFates(a, battle, hostEpoch: 1, revision: 99, new BattleShipFate(shipId, 900f, 450f, false));
+
+        float? hpAtLoot = null;
+        Action<MessagePayload<CommitMapEventResults>> onCommit = _ => hpAtLoot = Server.GetRegisteredObject<Ship>(shipId).HitPoints;
+        Server.Resolve<IMessageBroker>().Subscribe(onCommit);
+        ResolveOnHost(a, BattleState.AttackerVictory);
+        GC.KeepAlive(onCommit);
+
+        Assert.Equal(1, concluded());
+        Assert.Equal(450f, hpAtLoot!.Value, 2);
+    }
+
+    // Capture 2.6 (M6 D5 widened): the prize leaves with its captor, so the captor's departure writes the prize's battle HP
+    // to the AI party's ship on every machine before the battle concludes.
+    [Fact]
+    public void CapturedAiHull_TheCaptorsDepartureWritesItsBattleCondition_ToEveryMachine()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out var b, out var concluded);
+        var shipId = GiveShip(AddAiParty(battle));
+        var prize = CaptureAiHull(battle, a, b, shipId);
+        b.Hull(prize).HitPoints = 520f;
+        b.Hull(prize).SailHitPoints = 130f;
+
+        b.Tick(BattleShipFateReporterInterval);
+        LeaveMission(battle, b);
+
+        Assert.Equal(0, concluded());
+        AssertShipEverywhere(shipId, ship =>
+        {
+            Assert.Equal(520f, ship.HitPoints, 2);
+            Assert.Equal(130f, ship.SailHitPoints, 2);
+        });
+    }
+
+    // The host A fields the AI party's hull for the ship; B captures it with its own hull, which the host confirms.
+    private static Guid CaptureAiHull(NavalBattle battle, NavalPeer host, NavalPeer captor, string shipId)
+    {
+        var prize = battle.FieldAiHull(host, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f), formationIndex: 0, campaignShipId: shipId);
+        var captorHull = battle.FieldPlayerHull(captor, new Vec3(0f, 0f, 0f), formationIndex: 0);
+        battle.CommitAll();
+        battle.TickAll();
+        host.Hull(prize).IsVacant = true;
+
+        captor.ElapseCaptureTimer(prize, captorHull);
+        Assert.Equal(captor.Id, captor.Ship(prize).CaptorControllerId);
+        return prize;
+    }
+
     private const float BattleShipFateReporterInterval = 2f;
 
     // A registered ship at full condition, given to the party through the vanilla production ownership path on the server.
