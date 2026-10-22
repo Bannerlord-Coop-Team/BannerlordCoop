@@ -21,11 +21,8 @@ public interface IRoutedPlayerHitNotificationTracker
     /// <summary>Mirrors one vanilla combat-log entry, with its routed victim or null when it is not a routed player hit.</summary>
     void EnqueueCombatLogContext(Agent routedPlayerHitAgent, int damage);
 
-    /// <summary>Dequeues the mirror of the combat log vanilla is about to publish and exposes it on the calling thread.</summary>
-    void BeginCombatLog();
-
-    /// <summary>Clears the routed hit exposed on the calling thread by <see cref="BeginCombatLog"/>.</summary>
-    void EndCombatLog();
+    /// <summary>Dequeues the mirror of the combat log vanilla is about to publish and exposes it on the calling thread until disposed.</summary>
+    IDisposable BeginCombatLog();
 
     /// <summary>Gets the routed victim and damage of the combat log being published on the calling thread.</summary>
     bool TryGetCurrentRoutedPlayerHit(out Agent affectedAgent, out int damage);
@@ -79,18 +76,15 @@ public class RoutedPlayerHitNotificationTracker : IRoutedPlayerHitNotificationTr
     }
 
     /// <inheritdoc/>
-    public void BeginCombatLog()
+    public IDisposable BeginCombatLog()
     {
+        CombatLogContext next;
         lock (sync)
         {
-            currentRoutedPlayerHit.Value = combatLogContexts.Count == 0 ? null : combatLogContexts.Dequeue();
+            next = combatLogContexts.Count == 0 ? null : combatLogContexts.Dequeue();
         }
-    }
 
-    /// <inheritdoc/>
-    public void EndCombatLog()
-    {
-        currentRoutedPlayerHit.Value = null;
+        return new ThreadLocalValueScope<CombatLogContext>(currentRoutedPlayerHit, next);
     }
 
     /// <inheritdoc/>
@@ -142,8 +136,6 @@ public class RoutedPlayerHitNotificationTracker : IRoutedPlayerHitNotificationTr
             combatLogContexts.Clear();
             routedPlayerHitNotifications.Clear();
         }
-
-        EndCombatLog();
     }
 
     // Removes and returns the newest notification of the given kind for this victim and damage. Caller holds sync.

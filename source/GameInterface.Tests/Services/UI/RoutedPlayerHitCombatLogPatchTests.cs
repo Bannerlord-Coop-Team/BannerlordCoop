@@ -59,11 +59,11 @@ public class RoutedPlayerHitCombatLogPatchTests
         tracker.EnqueueCombatLogContext(affectedAgent, 50);
 
         RoutedPlayerHitCombatLogContextPatch.Prefix(out var state);
-        Assert.Same(tracker, state);
+        Assert.NotNull(state);
         Assert.True(tracker.TryGetCurrentRoutedPlayerHit(out var actualAgent, out int damage));
         Assert.Same(affectedAgent, actualAgent);
         Assert.Equal(50, damage);
-        RoutedPlayerHitCombatLogContextPatch.Postfix(state);
+        RoutedPlayerHitCombatLogContextPatch.Finalizer(state);
 
         Assert.False(tracker.TryGetCurrentRoutedPlayerHit(out _, out _));
     }

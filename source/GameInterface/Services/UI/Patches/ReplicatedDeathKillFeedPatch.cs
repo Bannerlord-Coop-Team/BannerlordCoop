@@ -116,17 +116,15 @@ internal class RoutedPlayerHitCombatLogContextPatch
 {
     // Exposes the mirror of the combat log vanilla is about to publish.
     [HarmonyPrefix]
-    internal static void Prefix(out IRoutedPlayerHitNotificationTracker __state)
+    internal static void Prefix(out IDisposable __state)
     {
-        if (!ContainerProvider.TryResolve(out __state)) return;
+        __state = null;
+        if (!ContainerProvider.TryResolve<IRoutedPlayerHitNotificationTracker>(out var notificationTracker)) return;
 
-        __state.BeginCombatLog();
+        __state = notificationTracker.BeginCombatLog();
     }
 
-    // Clears the exposed routed hit once vanilla has published the log.
-    [HarmonyPostfix]
-    internal static void Postfix(IRoutedPlayerHitNotificationTracker __state)
-    {
-        __state?.EndCombatLog();
-    }
+    // Clears the exposed routed hit once vanilla has published the log, even when a subscriber throws.
+    [HarmonyFinalizer]
+    internal static void Finalizer(IDisposable __state) => __state?.Dispose();
 }

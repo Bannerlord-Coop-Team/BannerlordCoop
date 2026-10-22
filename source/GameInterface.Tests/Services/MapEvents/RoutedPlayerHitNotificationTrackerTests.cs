@@ -53,15 +53,17 @@ public class RoutedPlayerHitNotificationTrackerTests
         tracker.EnqueueCombatLogContext(null!, 50);
         tracker.EnqueueCombatLogContext(affectedAgent, 50);
 
-        tracker.BeginCombatLog();
-        Assert.False(tracker.TryGetCurrentRoutedPlayerHit(out _, out _));
-        tracker.EndCombatLog();
+        using (tracker.BeginCombatLog())
+        {
+            Assert.False(tracker.TryGetCurrentRoutedPlayerHit(out _, out _));
+        }
 
-        tracker.BeginCombatLog();
-        Assert.True(tracker.TryGetCurrentRoutedPlayerHit(out var actualAgent, out int damage));
-        Assert.Same(affectedAgent, actualAgent);
-        Assert.Equal(50, damage);
-        tracker.EndCombatLog();
+        using (tracker.BeginCombatLog())
+        {
+            Assert.True(tracker.TryGetCurrentRoutedPlayerHit(out var actualAgent, out int damage));
+            Assert.Same(affectedAgent, actualAgent);
+            Assert.Equal(50, damage);
+        }
 
         Assert.False(tracker.TryGetCurrentRoutedPlayerHit(out _, out _));
     }
@@ -74,18 +76,19 @@ public class RoutedPlayerHitNotificationTrackerTests
         var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
         tracker.EnqueueCombatLogContext(affectedAgent, 50);
 
-        tracker.BeginCombatLog();
-        bool visibleOnOtherThread = true;
-        var otherThread = new Thread(() => visibleOnOtherThread = tracker.TryGetCurrentRoutedPlayerHit(out _, out _));
-        otherThread.Start();
-        otherThread.Join();
+        using (tracker.BeginCombatLog())
+        {
+            bool visibleOnOtherThread = true;
+            var otherThread = new Thread(() => visibleOnOtherThread = tracker.TryGetCurrentRoutedPlayerHit(out _, out _));
+            otherThread.Start();
+            otherThread.Join();
 
-        Assert.True(tracker.TryGetCurrentRoutedPlayerHit(out _, out _));
-        Assert.False(visibleOnOtherThread);
-        tracker.EndCombatLog();
+            Assert.True(tracker.TryGetCurrentRoutedPlayerHit(out _, out _));
+            Assert.False(visibleOnOtherThread);
+        }
     }
 
-    // Reset must drop queued combat logs, pending notifications and the exposed routed hit from an earlier battle.
+    // Reset must drop queued combat logs and pending notifications from an earlier battle.
     [Fact]
     public void Reset_DropsEarlierBattleBookkeeping()
     {
@@ -93,15 +96,15 @@ public class RoutedPlayerHitNotificationTrackerTests
         var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
         bool notificationRemoved = false;
         tracker.EnqueueCombatLogContext(affectedAgent, 50);
-        tracker.EnqueueCombatLogContext(affectedAgent, 50);
-        tracker.BeginCombatLog();
         tracker.TrackRoutedPlayerHitNotification(affectedAgent, 50, () => notificationRemoved = true);
 
         tracker.Reset();
 
-        Assert.False(tracker.TryGetCurrentRoutedPlayerHit(out _, out _));
-        tracker.BeginCombatLog();
-        Assert.False(tracker.TryGetCurrentRoutedPlayerHit(out _, out _));
+        using (tracker.BeginCombatLog())
+        {
+            Assert.False(tracker.TryGetCurrentRoutedPlayerHit(out _, out _));
+        }
+
         tracker.RemoveRoutedPlayerHitNotification(affectedAgent, 50);
         Assert.False(notificationRemoved);
     }

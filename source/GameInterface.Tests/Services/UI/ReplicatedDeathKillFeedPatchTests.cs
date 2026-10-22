@@ -62,10 +62,12 @@ public class ReplicatedDeathKillFeedPatchTests
         var killFeed = new SPPersonalKillNotificationVM();
         tracker.EnqueueCombatLogContext(affectedAgent, 50);
 
-        tracker.BeginCombatLog();
-        killFeed.OnPersonalMessage("routed victim");
-        RoutedPlayerHitNotificationPatch.Postfix(killFeed, 50, isMountDamage: false);
-        tracker.EndCombatLog();
+        using (tracker.BeginCombatLog())
+        {
+            killFeed.OnPersonalMessage("routed victim");
+            RoutedPlayerHitNotificationPatch.Postfix(killFeed, 50, isMountDamage: false);
+        }
+
         Assert.Single(killFeed.NotificationList);
 
         tracker.RemoveRoutedPlayerHitNotification(affectedAgent, 50);
