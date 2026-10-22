@@ -9,6 +9,7 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MapEvents.Extensions;
@@ -347,6 +348,87 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             Assert.Equal(client.GetHandle<MobileParty>(context.PartyId), request.PartyId);
             Assert.Equal(client.GetHandle<Settlement>(context.SettlementId), request.SettlementId);
         }
+    }
+
+    [Fact]
+    public void BesiegedTownEncounter_RepeatedArrival_RequestsOnce()
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+        foreach (var instance in Clients.Append(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(context.PartyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<Town>(context.TownId, out var town));
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(context.DefenderClanId, out var defenderClan));
+                using (new AllowedThread())
+                {
+                    settlement.SetSettlementComponent(town);
+                    town.OwnerClan = defenderClan;
+                    CreatePresentedSiege(party, settlement);
+                }
+            }, SiegeCreationDisabledMethods);
+        }
+        ClearMessages();
+
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+            Assert.True(settlement.IsUnderSiege);
+            Campaign.Current.PlayerEncounter = null;
+
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+        }, SiegeCreationDisabledMethods);
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(context.SettlementId, out var settlement));
+            var encounter = PlayerEncounter.Current;
+            Assert.NotNull(encounter);
+            Assert.Same(settlement, PlayerEncounter.EncounterSettlement);
+            Assert.Null(MobileParty.MainParty.CurrentSettlement);
+
+            // Client time keeps running under the menu, so the map tick arrives here again.
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+
+            Assert.Same(encounter, PlayerEncounter.Current);
+        }, SiegeCreationDisabledMethods);
+
+        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SettlementArrival_WithoutEncounterAtThatSettlement_StillRequestsEntry(bool otherSettlementEncounter)
+    {
+        var client = Clients.First();
+        var context = CreateEntryContext(client);
+
+        client.Call(() =>
+        {
+            var settlement = PrepareClientMenuContext(client, context);
+            client.Resolve<IControllerIdProvider>().SetControllerId("PlayerOne");
+            PlayerEncounter? encounter = null;
+            if (otherSettlementEncounter)
+            {
+                encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+                encounter.EncounterSettlementAux = GameObjectCreator.CreateInitializedObject<Settlement>();
+            }
+            Campaign.Current.PlayerEncounter = encounter;
+
+            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+        }, WithoutNetworkDelivery());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+        Assert.Equal(client.GetHandle<Settlement>(context.SettlementId), request.SettlementId);
     }
 
     [Fact]
