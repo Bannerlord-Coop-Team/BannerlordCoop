@@ -8,8 +8,7 @@ namespace GameInterface.Services.MapEvents.TroopSupply;
 /// Bridges the network handler (which receives a side's reserve from the server) to the
 /// <see cref="CoopTroopSupplier"/>s the injection patch installs into the mission. A reserve message can
 /// arrive before or after the mission (and thus the supplier) is built, so a reserve that arrives early is
-/// buffered (latest wins) and applied when the matching supplier registers. Static because the injection
-/// patch can't resolve DI services.
+/// buffered (latest wins) and applied when the matching supplier registers.
 /// </summary>
 public static class CoopTroopSupplierRegistry
 {

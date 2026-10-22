@@ -59,7 +59,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
                 controller.Session.TryBegin(mapEventId);
                 // The LOCAL client is the host; the retreater "A" is a NON-host member.
                 remaining.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("B", new[] { "A" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, remaining);
 
                 // PVP sides: we fight as Defender; A's puppets replicated onto the opposing Attacker team.
                 mock.PlayerTeam = mock.DefenderTeam;
@@ -87,7 +87,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(remaining);
         }
     }
 
@@ -112,7 +112,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
 
                 controller.Session.TryBegin(mapEventId);
                 remaining.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("B", new[] { "A" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, remaining);
                 mock.PlayerTeam = mock.DefenderTeam;
 
                 Assert.True(remaining.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var disconnectedParty));
@@ -161,7 +161,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(remaining);
         }
     }
 
@@ -189,7 +189,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
 
                 controller.Session.TryBegin(mapEventId);
                 successor.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("A", new[] { "B" }, epoch: 1));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, successor);
                 mock.PlayerTeam = mock.DefenderTeam;
 
                 Assert.True(successor.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var disconnectedParty));
@@ -256,7 +256,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(successor);
         }
     }
 
@@ -286,7 +286,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
 
                 controller.Session.TryBegin(mapEventId);
                 remaining.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("B", new[] { "A" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, remaining);
 
                 mock.PlayerTeam = mock.DefenderTeam;
 
@@ -317,7 +317,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(remaining);
         }
     }
 
@@ -347,7 +347,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
 
                 controller.Session.TryBegin(mapEventId);
                 remaining.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("B", new[] { "A" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, remaining);
 
                 mock.PlayerTeam = mock.DefenderTeam;
 
@@ -385,7 +385,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(remaining);
         }
     }
 
@@ -418,7 +418,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
 
                 controller.Session.TryBegin(mapEventId);
                 remaining.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("B", new[] { "A" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, remaining);
 
                 mock.PlayerTeam = mock.DefenderTeam;
 
@@ -457,7 +457,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(remaining);
         }
     }
 
@@ -488,7 +488,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
 
                 controller.Session.TryBegin(mapEventId);
                 successor.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("A", new[] { "B" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, successor);
 
                 // PVP sides: the local client fights as Defender; the host A's agents are all Attackers.
                 mock.PlayerTeam = mock.DefenderTeam;
@@ -527,7 +527,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(successor);
         }
     }
 
@@ -551,7 +551,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
 
                 controller.Session.TryBegin(mapEventId);
                 successor.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("A", new[] { "B" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, successor);
                 mock.PlayerTeam = mock.DefenderTeam;
 
                 Assert.True(successor.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var hostParty));
@@ -585,7 +585,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(successor);
         }
     }
 
@@ -646,7 +646,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
 
                 controller.Session.TryBegin(mapEventId);
                 hosts.Set(mapEventId, new BattleHostAssignment("A", new[] { "B", "C" }));
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, finalSuccessor);
                 mock.PlayerTeam = mock.DefenderTeam;
 
                 broker.Publish(this, new NetworkMissionPeerEntered("A", mapEventId));
@@ -676,7 +676,7 @@ public class BattleNonHostRetreatDespawnTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(finalSuccessor);
         }
     }
 }

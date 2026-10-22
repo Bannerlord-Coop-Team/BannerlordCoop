@@ -53,3 +53,13 @@ internal sealed class MissionCurrentScope : IDisposable
 
     public void Dispose() => CurrentField.SetValue(null, null);
 }
+
+/// <summary>
+/// Runs the Mission.Current tests apart from every parallel test, because they swap process-wide state:
+/// <c>Mission.Current</c>, and through <see cref="ActiveCoopBattleScope"/> the ContainerProvider container.
+/// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public class MissionCurrentCollection
+{
+    public const string Name = "Mission.Current";
+}

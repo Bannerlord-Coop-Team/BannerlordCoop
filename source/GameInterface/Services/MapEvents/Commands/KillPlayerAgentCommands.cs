@@ -21,6 +21,14 @@ internal class KillPlayerAgentCommands
 
     public sealed class KmsCoopCommand : ICoopCommand
     {
+        private readonly ICoopBattleMissionRegistry missionRegistry;
+
+        // Takes the registry whose battle window decides whether a forced death is allowed.
+        public KmsCoopCommand(ICoopBattleMissionRegistry missionRegistry)
+        {
+            this.missionRegistry = missionRegistry;
+        }
+
         public string Prefix => "coop.debug.map_event";
 
         public string Name => "kms";
@@ -51,7 +59,7 @@ internal class KillPlayerAgentCommands
             if (!agent.IsActive())
                 return Failed("Failed to kill player agent: main agent is not active (already dead or removed).");
 
-            if (forceDeath && (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive))
+            if (forceDeath && (!BattleSpawnConfig.Enabled || !missionRegistry.IsCoopBattleActive))
                 return Failed("Failed to force-kill player agent: no active co-op battle.");
 
             try

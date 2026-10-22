@@ -227,7 +227,8 @@ internal class MapEventPatches
         // accepted joiner. The local set still runs so this mission winds down; the server applies the result
         // only after the completion barrier publishes the authoritative state change.
         if ((value == BattleState.AttackerVictory || value == BattleState.DefenderVictory)
-            && BattleConclusionGate.IsInCoopBattleMission)
+            && ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            && missionRegistry.IsMissionActive)
         {
             return true;
         }

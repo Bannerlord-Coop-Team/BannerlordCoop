@@ -16,7 +16,6 @@ using Missions.Services.Network;
 using SandBox.Missions.MissionLogics.Hideout;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -81,7 +80,12 @@ public class CoopBattleController : CoopMissionController
 #endif
     private readonly ISiegeWeaponFireReplicator siegeWeaponFire;
     private readonly IBattleHostRegistry hostRegistryRef;
+    private readonly ICoopBattleMissionRegistry missionRegistry;
     private readonly IMissionContext debugMissionContext;
+
+    // The window id this controller opened in AfterStart, so Dispose closes exactly that one and never a newer
+    // mission's. Kept apart from Session.InstanceId, which can still change after AfterStart.
+    private string beganMissionId;
     private NetworkBattleResultSnapshot? pendingResultSnapshot;
     private int lastResultSnapshotEpochReported;
 
@@ -90,8 +94,8 @@ public class CoopBattleController : CoopMissionController
     private readonly ISupplyProgressReporter supplyReporter;
     private readonly BattleTeamDiagnostics diagnostics = new BattleTeamDiagnostics();
 
-    // Answer BattleSpawnGate.HeroAgentAuthorityProbe for paths in GameInterface (e.g. HeroExtensions.IsHealthControlledByThisInstance)
-    private readonly Func<Hero, bool?> heroAgentAuthorityProbe;
+    private readonly IBattleAgentAuthorityRegistry agentAuthorityRegistry;
+    private readonly IBattleAgentAuthority agentAuthority;
 
     public CoopBattleController(
         IBattleNetwork network,
@@ -113,7 +117,12 @@ public class CoopBattleController : CoopMissionController
         IBattleAgentSpawnBatchCodec spawnBatchCodec,
         IBattleDamageDataMapper battleDamageDataMapper,
         IMissionWeaponDataMapper missionWeaponDataMapper,
-        ISiegeGateHitApplier siegeGateHitApplier)
+        ISiegeGateHitApplier siegeGateHitApplier,
+        ICoopBattleMissionRegistry missionRegistry,
+        IBattleAgentAuthorityRegistry agentAuthorityRegistry,
+        IPuppetSpawnTracker puppetSpawnTracker,
+        IRoutedBlowTracker routedBlowTracker,
+        IReplicatedDeathTracker replicatedDeathTracker)
         : base(
             network,
             messageBroker,
@@ -137,15 +146,18 @@ public class CoopBattleController : CoopMissionController
             coopMissionComponent,
             worldItemRegistry,
             session,
-            missionContext);
-        deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, coopMissionComponent, session, casualties);
+            missionContext,
+            missionRegistry);
+        deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, coopMissionComponent, session,
+            casualties, missionRegistry, replicatedDeathTracker);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties, lifecycle);
         puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
         puppetDeathApplier = new PuppetDeathApplier(
             messageBroker,
             coopMissionComponent,
             casualties,
-            puppetMountStateRepairer);
+            puppetMountStateRepairer,
+            replicatedDeathTracker);
         damageRouter = new BattleDamageRouter(
             network,
             messageBroker,
@@ -154,7 +166,8 @@ public class CoopBattleController : CoopMissionController
             guardedHitWindow,
             agentNativeMountState,
             puppetMountStateRepairer,
-            battleDamageDataMapper);
+            battleDamageDataMapper,
+            routedBlowTracker);
         reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
         OwnedAgentReplicator ownedAgentReplicator = null;
         authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder, lifecycle,
@@ -182,6 +195,7 @@ public class CoopBattleController : CoopMissionController
             formationAssigner,
             agentBudget,
             missionWeaponDataMapper,
+            puppetSpawnTracker,
             puppetRoutApplier,
             spawnBatchCodec,
             authorityMigrator);
@@ -195,6 +209,7 @@ public class CoopBattleController : CoopMissionController
         supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
         hostRegistryRef = hostRegistry;
+        this.missionRegistry = missionRegistry;
         Session = session;
         Deployment = deployment;
         ResultCommitter = new BattleResultCommitter(network, relayNetwork, session);
@@ -202,14 +217,34 @@ public class CoopBattleController : CoopMissionController
         messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
         messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
 
-        heroAgentAuthorityProbe = ProbeHeroAgentAuthority;
-        BattleSpawnGate.HeroAgentAuthorityProbe = heroAgentAuthorityProbe;
+        // Answers GameInterface ownership questions (mount blow routing, hero health) for this battle's lifetime.
+        this.agentAuthorityRegistry = agentAuthorityRegistry;
+        agentAuthority = new BattleAgentAuthority(coopMissionComponent.AgentRegistry, session);
+        agentAuthorityRegistry.Attach(agentAuthority);
 
         // Decode order clips during battle setup so the first issued order does not hitch.
         coopMissionComponent.AgentVoiceHandler.WarmUp();
     }
 
+    // Tears down this battle and always closes the loaded-mission window it opened and detaches its agent authority.
     public override void Dispose()
+    {
+        try
+        {
+            DisposeBattleServices();
+        }
+        finally
+        {
+            // Closed even when a teardown step throws, otherwise mission-less victories stay off the legacy relay.
+            missionRegistry.EndMission(beganMissionId);
+            agentAuthorityRegistry.Detach(agentAuthority);
+        }
+
+        base.Dispose();
+    }
+
+    // Tears down the battle sub-services and resets the siege authority flags this controller owns.
+    private void DisposeBattleServices()
     {
         messageBroker.Publish(this, new BattleMissionEnded(Session.InstanceId));
         lifecycle.Dispose();
@@ -230,17 +265,11 @@ public class CoopBattleController : CoopMissionController
         messageBroker.Unsubscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
         messageBroker.Unsubscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
 
-        if (BattleSpawnGate.HeroAgentAuthorityProbe == heroAgentAuthorityProbe)
-            BattleSpawnGate.HeroAgentAuthorityProbe = null;
-
         // OnMissionTick sets these each frame; reset them here (their owner) so a stale authority
         // never bleeds into the next siege before the first tick refreshes it.
         SiegeMissionAuthorityGate.IsLocalAuthority = false;
         SiegeMissionAuthorityGate.IsAuthorityKnown = false;
         SiegeMissionAuthorityGate.ResetClaimedMachines();
-        BattleConclusionGate.IsInCoopBattleMission = false;
-
-        base.Dispose();
     }
 
     // MISSION-READY (BR-010): the native MissionState.FinishMissionLoading fans Mission.AfterStart() out to
@@ -252,7 +281,8 @@ public class CoopBattleController : CoopMissionController
     {
         base.AfterStart();
 
-        BattleConclusionGate.IsInCoopBattleMission = true;
+        beganMissionId = Session.InstanceId;
+        missionRegistry.BeginMission(beganMissionId);
 
         // BR-025: the deployment time limit begins when this player becomes mission-ready — right here.
         Deployment.OnMissionReady();
@@ -282,9 +312,6 @@ public class CoopBattleController : CoopMissionController
             SiegeMissionAuthorityGate.IsLocalAuthority = Session.IsLocalHost;
             SiegeMissionAuthorityGate.IsAuthorityKnown = hostRegistryRef.TryGet(Session.InstanceId, out _);
         }
-
-        // Route coop mission victories through the server's result-ready completion barrier.
-        BattleConclusionGate.IsInCoopBattleMission = true;
 
         // Register the buffered puppet batch before the one-shot end-condition gate so it can observe both
         // sides as fielded even when a queued terminal event removes every agent on one side this tick.
@@ -366,8 +393,8 @@ public class CoopBattleController : CoopMissionController
             Deployment.IsActivated,
             attackerFielded,
             defenderFielded,
-            BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Attacker),
-            BattleSpawnGate.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
+            missionRegistry.IsMissingReserveSideAccepted(BattleSideEnum.Attacker),
+            missionRegistry.IsMissingReserveSideAccepted(BattleSideEnum.Defender));
     }
 
     /// <summary>
@@ -391,15 +418,6 @@ public class CoopBattleController : CoopMissionController
         bool hasHideoutMissionController,
         bool hasHideoutAmbushMissionController)
         => !hasHideoutMissionController && !hasHideoutAmbushMissionController;
-
-    // Compare current authority with controller id
-    private bool? ProbeHeroAgentAuthority(Hero hero)
-    {
-        if (!coopMissionComponent.AgentRegistry.TryGetHeroAgentInfo(hero, out var info))
-            return null;
-
-        return info.CurrentAuthority == Session.OwnControllerId;
-    }
 
     public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow killingBlow)
     {

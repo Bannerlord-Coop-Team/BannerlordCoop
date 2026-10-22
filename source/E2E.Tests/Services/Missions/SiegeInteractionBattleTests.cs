@@ -383,7 +383,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(battle.DefenderPlayerPartyId, out var mainParty));
             var previousMainParty = Campaign.Current.MainParty;
             var previousEncounter = Campaign.Current.PlayerEncounter;
-            bool previousConclusionGate = BattleConclusionGate.IsInCoopBattleMission;
+            var missionRegistry = client.Resolve<ICoopBattleMissionRegistry>();
 
             try
             {
@@ -391,7 +391,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 PlayerEncounter.Start();
                 PlayerEncounter.Current._mapEvent = mapEvent;
                 PlayerEncounter.Current.SetIsSallyOutAmbush(true);
-                BattleConclusionGate.IsInCoopBattleMission = true;
+                missionRegistry.BeginMission(battle.MapEventId);
 
                 new SiegeAmbushCampaignBehavior().OnMissionEnded(Mock.Of<IMission>());
 
@@ -401,7 +401,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             }
             finally
             {
-                BattleConclusionGate.IsInCoopBattleMission = previousConclusionGate;
+                missionRegistry.EndMission(battle.MapEventId);
                 Campaign.Current.MainParty = previousMainParty;
                 Campaign.Current.PlayerEncounter = previousEncounter;
             }
@@ -476,6 +476,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             Assert.Equal(isSiegeAmbush, snapshot.IsSallyOut);
 
             using var broker = new MessageBroker();
+            var missionRegistry = client.Resolve<ICoopBattleMissionRegistry>();
             using var handler = new BattleMissionStartHandler(
                 broker,
                 client.ObjectManager,
@@ -483,7 +484,8 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
                 client.Resolve<IBattleMissionInitializerResolver>(),
-                null!);
+                null!,
+                missionRegistry);
 
             try
             {
@@ -513,7 +515,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 Campaign.Current.Models.MilitaryPowerModel = previousMilitaryPowerModel;
                 mapEvent.MapEventSettlement = previousSettlement;
                 ContainerProvider.SetContainer(client.Container);
-                BattleSpawnGate.EndBattle();
+                missionRegistry.EndBattle();
             }
         }, disabledMethods);
     }
@@ -746,6 +748,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
             PlayerEncounter.Start();
             PlayerEncounter.Current._mapEvent = mainParty.MapEvent;
             using var broker = new MessageBroker();
+            var missionRegistry = client.Resolve<ICoopBattleMissionRegistry>();
             using var handler = new BattleMissionStartHandler(
                 broker,
                 client.ObjectManager,
@@ -753,7 +756,8 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 client.Resolve<INetwork>(),
                 client.Resolve<IMapEventLogger>(),
                 resolver,
-                null!);
+                null!,
+                missionRegistry);
 
             try
             {
@@ -773,7 +777,7 @@ public class SiegeInteractionBattleTests : MissionTestEnvironment
                 Campaign.Current.MainParty = previousMainParty;
                 Campaign.Current.PlayerEncounter = null;
                 ContainerProvider.SetContainer(client.Container);
-                BattleSpawnGate.EndBattle();
+                missionRegistry.EndBattle();
             }
         });
     }

@@ -36,14 +36,14 @@ internal class BattleMissionEntryPatch
     // exactly once per mission. ConditionalWeakTable lets the mission be GC'd freely.
     private static readonly ConditionalWeakTable<Mission, object> AttachedMissions = new();
 
-    // Engage the spawn gate BEFORE OpenBattleMission builds the mission, because the deployment controller
-    // spawns the initial wave during mission setup (inside OpenBattleMission) — earlier than the postfix.
-    // The gate holds no host/ownership state: which client fields a party is decided server-side by the
+    // Open the coop battle window BEFORE OpenBattleMission builds the mission, because the deployment controller
+    // spawns the initial wave during mission setup (inside OpenBattleMission), earlier than the postfix.
+    // The window holds no host/ownership state: which client fields a party is decided server-side by the
     // troop reserve assignment (BattleTroopReserveBuilder), and the host is elected when the first client
     // reports mission-ready (BattleHostHandler). BeginBattle only marks the coop battle active for the
     // spawn/battle patches.
     [HarmonyPrefix]
-    private static void Prefix()
+    internal static void Prefix()
     {
         if (ModInformation.IsServer) return;
         if (!BattleSpawnConfig.Enabled) return;
@@ -52,10 +52,11 @@ internal class BattleMissionEntryPatch
         if (mapEvent == null) return;
 
         if (!ContainerProvider.TryResolve(out IObjectManager objectManager)) return;
+        if (!ContainerProvider.TryResolve(out ICoopBattleMissionRegistry missionRegistry)) return;
         if (!objectManager.TryGetId(mapEvent, out var mapEventId)) return;
 
-        BattleSpawnGate.BeginBattle(mapEventId);
-        Logger.Information("[BattleSync] Engaged spawn gate before mission load: mapEvent={MapEventId}", mapEventId);
+        missionRegistry.BeginBattle(mapEventId);
+        Logger.Information("[BattleSync] Opened coop battle window before mission load: mapEvent={MapEventId}", mapEventId);
     }
 
     [HarmonyPostfix]

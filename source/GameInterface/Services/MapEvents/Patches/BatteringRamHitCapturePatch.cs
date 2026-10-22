@@ -16,7 +16,9 @@ internal static class BatteringRamHitCapturePatch
 {
     private static void Postfix(BatteringRam __instance, int powerStage, float progress)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+        if (!BattleSpawnConfig.Enabled) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return;
         if (!SiegeMissionAuthorityGate.IsMachineSimulatedLocally(__instance.Id.Id)) return;
 
         MessageBroker.Instance.Publish(__instance, new RamHitStarted(__instance, powerStage, progress));

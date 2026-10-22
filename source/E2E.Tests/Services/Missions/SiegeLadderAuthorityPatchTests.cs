@@ -13,7 +13,7 @@ public class SiegeLadderAuthorityPatchTests
     [Fact]
     public void SiegeLadderAuthorityPatches_HookVanillaStateMethods()
     {
-        var patchType = typeof(BattleSpawnGate).Assembly
+        var patchType = typeof(CoopBattleMissionRegistry).Assembly
             .GetType("GameInterface.Services.MapEvents.Patches.SiegeLadderAuthorityPatches");
         Assert.NotNull(patchType);
 
@@ -41,7 +41,7 @@ public class SiegeLadderAuthorityPatchTests
     [Fact]
     public void SiegeMachineAuthorityPatches_HookRamAndStoneTicks_AndAllowRepeatedPatching()
     {
-        var patchType = typeof(BattleSpawnGate).Assembly
+        var patchType = typeof(CoopBattleMissionRegistry).Assembly
             .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
         Assert.NotNull(patchType);
         var harmony = new Harmony("e2e.siegemachine.authority");

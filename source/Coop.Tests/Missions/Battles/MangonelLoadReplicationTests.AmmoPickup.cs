@@ -199,7 +199,7 @@ public sealed partial class MangonelLoadReplicationTests
                 new object[] { payload });
         MessageBroker.Instance.Subscribe(receive);
         BattleSpawnConfig.Enabled = true;
-        BattleSpawnGate.BeginBattle("finite-mangonel-pickup");
+        var battleScope = new ActiveCoopBattleScope("finite-mangonel-pickup");
         try
         {
             AccessTools.DeclaredMethod(typeof(Mangonel), "OnTick").Invoke(picker.Machine, new object[] { 0.1f });
@@ -212,7 +212,7 @@ public sealed partial class MangonelLoadReplicationTests
         {
             repeatedHarmony.UnpatchAll(repeatedHarmony.Id);
             MessageBroker.Instance.Unsubscribe(receive);
-            BattleSpawnGate.EndBattle();
+            battleScope.Dispose();
             BattleSpawnConfig.Enabled = oldEnabled;
         }
     }

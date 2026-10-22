@@ -22,7 +22,7 @@ namespace E2E.Tests.Services.MapEvents;
 /// deduped per event instance (<c>BattleFinalizeHandler.TryMarkFinalized</c>, keyed by a
 /// <see cref="System.Runtime.CompilerServices.ConditionalWeakTable{TKey, TValue}"/>), so a repeated finalize of
 /// one battle is ignored and never reaches into a different, concurrent battle. The mission-active gate half
-/// lives in <c>BattleSpawnGateTests.EndBattle_ClearsActiveBattle_Idempotently</c>.
+/// lives in <c>CoopBattleMissionRegistryTests.EndBattle_ClearsActiveBattle_Idempotently</c>.
 /// </summary>
 public class IdempotentCleanupTests : MapEventTestBase
 {

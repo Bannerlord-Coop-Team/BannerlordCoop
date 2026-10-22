@@ -654,6 +654,14 @@ internal static class BattleDebugCommands
 
     public sealed class ReplicationFixtureCoopCommand : ICoopCommand
     {
+        private readonly ICoopBattleMissionRegistry missionRegistry;
+
+        // Takes the registry whose battle window must be open before the fixture runs.
+        public ReplicationFixtureCoopCommand(ICoopBattleMissionRegistry missionRegistry)
+        {
+            this.missionRegistry = missionRegistry;
+        }
+
         public string Prefix => "coop.debug.battle";
 
         public string Name => "replication_fixture";
@@ -674,7 +682,7 @@ internal static class BattleDebugCommands
             CoopBattleController controller = mission?.GetMissionBehavior<CoopBattleController>();
             if (mission == null || controller == null)
                 return Failed("BATTLE_REPLICATION_FIXTURE no active coop battle");
-            if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive)
+            if (!BattleSpawnConfig.Enabled || !missionRegistry.IsCoopBattleActive)
                 return Failed("BATTLE_REPLICATION_FIXTURE coop spawn capture is not active");
             if (!controller.Deployment.IsActivated || !controller.Deployment.IsCommitted)
                 return Failed("BATTLE_REPLICATION_FIXTURE finish local deployment first");

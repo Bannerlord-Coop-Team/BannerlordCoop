@@ -15,7 +15,9 @@ internal class BattleSurgeryRewardPatch
     internal static bool Prefix(MobileParty party, bool surgerySuccess, int troopTier)
     {
         if (CallOriginalPolicy.IsOriginalAllowed() || ModInformation.IsServer) return true;
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
+        if (!BattleSpawnConfig.Enabled) return true;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return true;
 
         // Vanilla has already checked surgery use and the active surgeon; only the server may award XP.
         if (party?.MapEvent != null)

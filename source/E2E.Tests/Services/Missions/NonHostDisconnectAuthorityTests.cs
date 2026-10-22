@@ -79,8 +79,7 @@ public class NonHostDisconnectAuthorityTests : MissionTestEnvironment
         }
         finally
         {
-            foreach (var state in new[] { a, b, c })
-                state.Instance.Call(BattleSpawnGate.EndBattle);
+            EndCoopBattle(a.Instance, b.Instance, c.Instance);
         }
     }
 
@@ -98,7 +97,7 @@ public class NonHostDisconnectAuthorityTests : MissionTestEnvironment
             MockMission mission = CreateConnectedMission(engine, instance, mapEventId);
             var controller = instance.Resolve<CoopBattleController>();
             controller.Session.TryBegin(mapEventId);
-            BattleSpawnGate.BeginBattle(mapEventId);
+            BeginCoopBattle(mapEventId, instance);
             instance.Resolve<IBattleHostRegistry>().Set(
                 mapEventId, new BattleHostAssignment("A", new[] { "B", "C" }, 1));
             Assert.True(instance.ObjectManager.TryGetObject(partyId, out MobileParty party));

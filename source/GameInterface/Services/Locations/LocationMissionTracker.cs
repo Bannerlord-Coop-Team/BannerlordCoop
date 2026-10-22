@@ -5,9 +5,8 @@ namespace GameInterface.Services.Locations;
 
 /// <summary>
 /// Tracks which missions are coop LOCATION missions — the ones <see cref="Patches.PlayerLocationEntryPatches"/>
-/// attached the P2P location behaviors to (tavern/indoor, town centre, castle courtyard, village). Static
-/// because Harmony patches (e.g. <see cref="Patches.LocationPvpBlockPatch"/>) cannot resolve DI services;
-/// keyed weakly on the <see cref="Mission"/> itself so entries die with their mission and no end-of-mission
+/// attached the P2P location behaviors to (tavern/indoor, town centre, castle courtyard, village). Keyed
+/// weakly on the <see cref="Mission"/> itself so entries die with their mission and no end-of-mission
 /// cleanup hook is needed.
 /// </summary>
 public static class LocationMissionTracker

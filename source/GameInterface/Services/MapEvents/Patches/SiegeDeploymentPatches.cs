@@ -22,7 +22,7 @@ internal class SiegeDeploymentPatches
     [HarmonyPrefix]
     private static bool DeployAllOfPlayerPrefix()
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
+        if (!BattleSpawnConfig.Enabled || !IsCoopBattleActive()) return true;
 
         return SiegeMissionAuthorityGate.IsLocalAuthority;
     }
@@ -31,7 +31,7 @@ internal class SiegeDeploymentPatches
     [HarmonyPrefix]
     private static bool DeployAllOfAiPrefix()
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
+        if (!BattleSpawnConfig.Enabled || !IsCoopBattleActive()) return true;
 
         return SiegeMissionAuthorityGate.IsLocalAuthority;
     }
@@ -43,7 +43,7 @@ internal class SiegeDeploymentPatches
     [HarmonyPrefix]
     private static bool RemoveDeploymentPointsPrefix()
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return true;
+        if (!BattleSpawnConfig.Enabled || !IsCoopBattleActive()) return true;
         if (SiegeMissionAuthorityGate.SuppressCapture) return true;
 
         return SiegeMissionAuthorityGate.IsLocalAuthority;
@@ -55,7 +55,7 @@ internal class SiegeDeploymentPatches
     [HarmonyPostfix]
     private static void GetMaxDeployableCountPostfix(ref int __result)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+        if (!BattleSpawnConfig.Enabled || !IsCoopBattleActive()) return;
 
         if (!SiegeMissionAuthorityGate.IsLocalAuthority)
         {
@@ -69,7 +69,7 @@ internal class SiegeDeploymentPatches
     [HarmonyPostfix]
     private static void GetDeployableCountPostfix(ref int __result)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+        if (!BattleSpawnConfig.Enabled || !IsCoopBattleActive()) return;
 
         if (!SiegeMissionAuthorityGate.IsLocalAuthority)
         {
@@ -88,7 +88,7 @@ internal class SiegeDeploymentPatches
 
     private static void PublishPlacement(DeploymentPoint point)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+        if (!BattleSpawnConfig.Enabled || !IsCoopBattleActive()) return;
         if (SiegeMissionAuthorityGate.SuppressCapture) return;
         if (!SiegeMissionAuthorityGate.IsLocalAuthority) return;
 
@@ -98,4 +98,9 @@ internal class SiegeDeploymentPatches
 
         MessageBroker.Instance.Publish(point, new SiegeEnginePlacementChanged(point, weaponTypeName));
     }
+
+    // Reads this client's coop battle window; no container means a vanilla battle.
+    private static bool IsCoopBattleActive()
+        => ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+           && missionRegistry.IsCoopBattleActive;
 }

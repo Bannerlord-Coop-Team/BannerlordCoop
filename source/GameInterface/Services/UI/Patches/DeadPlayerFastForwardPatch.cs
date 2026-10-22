@@ -14,7 +14,10 @@ internal static class DeadPlayerFastForwardPatch
     [HarmonyPrefix]
     private static bool PreventCoopBattleFastForward(SPScoreboardVM __instance)
     {
-        if (!BattleSpawnGate.IsCoopBattleActive || __instance.IsSimulation)
+        if (__instance.IsSimulation)
+            return true;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive)
             return true;
 
         __instance.IsFastForwarding = false;

@@ -16,7 +16,9 @@ internal static class CastleGateHitCapturePatch
 {
     private static void Postfix(CastleGate __instance, ScriptComponentBehavior attackerScriptComponentBehavior, int inflictedDamage)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+        if (!BattleSpawnConfig.Enabled) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return;
         if (!(attackerScriptComponentBehavior is BatteringRam ram)) return;
         if (!SiegeMissionAuthorityGate.IsMachineSimulatedLocally(ram.Id.Id)) return;
 

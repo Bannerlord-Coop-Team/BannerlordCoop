@@ -22,7 +22,9 @@ internal class BattleSpawnDiagnosticPatch
     [HarmonyFinalizer]
     private static void Finalizer(Exception __exception, MissionBattleSideSpawnContext __instance, int number, bool isReinforcement, int __result)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
+        if (!BattleSpawnConfig.Enabled) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return;
 
         if (__exception != null)
             Logger.Error(__exception, "[BattleDiag] SpawnTroops(isPlayerSide={Player}, number={Num}, reinforcement={Reinf}) THREW",

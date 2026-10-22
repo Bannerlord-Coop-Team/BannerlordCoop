@@ -15,8 +15,10 @@ internal class ReplicatedDeathAgentStatePatch
     internal static bool Prefix(Agent agent, ref AgentState __result)
     {
         if (!BattleSpawnConfig.Enabled) return true;
-        if (!BattleSpawnGate.IsCoopBattleActive) return true;
-        if (!BattleSpawnGate.TryGetReplicatedDeathState(agent, out var agentState)) return true;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return true;
+        if (!ContainerProvider.TryResolve<IReplicatedDeathTracker>(out var replicatedDeathTracker)
+            || !replicatedDeathTracker.TryGetReplicatedDeathState(agent, out var agentState)) return true;
 
         __result = agentState;
         return false;

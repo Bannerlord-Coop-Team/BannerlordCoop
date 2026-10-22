@@ -107,7 +107,7 @@ public class CrossOwnerMountCatchUpTests : MissionTestEnvironment
                     var mission = CreateConnectedMission(engine, instance, mapEventId);
                     var controller = instance.Resolve<CoopBattleController>();
                     controller.Session.TryBegin(mapEventId);
-                    BattleSpawnGate.BeginBattle(mapEventId);
+                    BeginCoopBattle(mapEventId, instance);
                     instance.Resolve<IBattleHostRegistry>().Set(
                         mapEventId, new BattleHostAssignment(initialHost, new[] { "A", "B", "C" }, 1));
                     missions.Add(instance, mission);
@@ -359,8 +359,7 @@ public class CrossOwnerMountCatchUpTests : MissionTestEnvironment
         }
         finally
         {
-            foreach (var instance in clients)
-                instance.Call(BattleSpawnGate.EndBattle);
+            EndCoopBattle(clients);
         }
     }
 

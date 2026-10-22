@@ -138,7 +138,7 @@ public class SiegeMachineSimulationTests : IDisposable
         Type type, string methodName, string patchName, int expectedChecks, int keptChecks)
     {
         var original = AccessTools.DeclaredMethod(type, methodName);
-        var patchType = typeof(BattleSpawnGate).Assembly
+        var patchType = typeof(CoopBattleMissionRegistry).Assembly
             .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
         var transpiler = AccessTools.Method(patchType, patchName);
         var nativeCheck = AccessTools.PropertyGetter(typeof(GameNetwork), nameof(GameNetwork.IsClientOrReplay));
@@ -264,25 +264,25 @@ public class SiegeMachineSimulationTests : IDisposable
         bool previousHost = SiegeMissionAuthorityGate.IsLocalAuthority;
         bool previousEnabled = BattleSpawnConfig.Enabled;
         BattleSpawnConfig.Enabled = true;
-        BattleSpawnGate.BeginBattle("ram-authority-test");
         SiegeMissionAuthorityGate.IsAuthorityKnown = authorityKnown;
         SiegeMissionAuthorityGate.IsLocalAuthority = false;
         SiegeMissionAuthorityGate.SetClaimedMachines(
             localSimulator ? new HashSet<int> { ram.Id.Id } : new HashSet<int>(), new HashSet<int>());
+        var battleScope = new ActiveCoopBattleScope("ram-authority-test");
         try
         {
             Assert.False(GameNetwork.IsClientOrReplay);
-            var patchType = typeof(BattleSpawnGate).Assembly
+            var patchType = typeof(CoopBattleMissionRegistry).Assembly
                 .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
             var check = patchType.GetMethod("IsClientForMachine", BindingFlags.Static | BindingFlags.NonPublic);
             Assert.NotNull(check);
             Assert.Equal(replicaBranch, (bool)check.Invoke(null, new object[] { ram }));
-            BattleSpawnGate.EndBattle();
+            battleScope.Registry.EndBattle();
             Assert.False((bool)check.Invoke(null, new object[] { ram }));
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            battleScope.Dispose();
             BattleSpawnConfig.Enabled = previousEnabled;
             SiegeMissionAuthorityGate.IsAuthorityKnown = previousKnown;
             SiegeMissionAuthorityGate.IsLocalAuthority = previousHost;
@@ -329,10 +329,10 @@ public class SiegeMachineSimulationTests : IDisposable
         bool oldKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
         bool oldEnabled = BattleSpawnConfig.Enabled;
         BattleSpawnConfig.Enabled = true;
-        BattleSpawnGate.BeginBattle("ram-arrival-test");
         SiegeMissionAuthorityGate.IsLocalAuthority = false;
         SiegeMissionAuthorityGate.IsAuthorityKnown = true;
         SiegeMissionAuthorityGate.ResetClaimedMachines();
+        var battleScope = new ActiveCoopBattleScope("ram-arrival-test");
         try
         {
             var broker = new TestMessageBroker();
@@ -383,7 +383,7 @@ public class SiegeMachineSimulationTests : IDisposable
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            battleScope.Dispose();
             BattleSpawnConfig.Enabled = oldEnabled;
             SiegeMissionAuthorityGate.IsLocalAuthority = oldHost;
             SiegeMissionAuthorityGate.IsAuthorityKnown = oldKnown;
@@ -424,7 +424,7 @@ public class SiegeMachineSimulationTests : IDisposable
     private static IEnumerable<CodeInstruction> RamTickWithoutNativeNavigation(
         IEnumerable<CodeInstruction> instructions, ILGenerator generator)
     {
-        var patchType = typeof(BattleSpawnGate).Assembly
+        var patchType = typeof(CoopBattleMissionRegistry).Assembly
             .GetType("GameInterface.Services.MapEvents.Patches.SiegeMachineAuthorityPatches");
         var patched = (IEnumerable<CodeInstruction>)AccessTools.Method(patchType, "RamOnTickTranspiler")
             .Invoke(null, new object[] { instructions, generator });

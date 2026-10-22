@@ -15,11 +15,10 @@ internal class SiegeBattleExitPatch
     private static void Postfix(ref BattleEndLogic.ExitResult __result)
     {
         if (!BattleSpawnConfig.Enabled) return;
-        if (!BattleSpawnGate.IsCoopBattleActive) return;
+        if (__result != BattleEndLogic.ExitResult.SurrenderSiege) return;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive) return;
 
-        if (__result == BattleEndLogic.ExitResult.SurrenderSiege)
-        {
-            __result = BattleEndLogic.ExitResult.NeedsPlayerConfirmation;
-        }
+        __result = BattleEndLogic.ExitResult.NeedsPlayerConfirmation;
     }
 }

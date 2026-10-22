@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface;
 using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using System;
@@ -53,8 +54,11 @@ public class MangonelAmmoPickupPatch
             throw new InvalidOperationException($"Failed to bind Mangonel pickup supply: {pickups} pickups, {consumes} consumes.");
     }
 
+    // Finite ammo inside a coop battle comes from the shared supply; no container means vanilla pickup.
     private static bool UsesSharedSupply(RangedSiegeWeapon machine) =>
-        BattleSpawnConfig.Enabled && BattleSpawnGate.IsCoopBattleActive && machine.StartingAmmoCount > 0;
+        BattleSpawnConfig.Enabled && machine.StartingAmmoCount > 0
+        && ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+        && missionRegistry.IsCoopBattleActive;
 
     private static void PickUp(Agent agent, ref MissionWeapon weapon, Mangonel machine)
     {

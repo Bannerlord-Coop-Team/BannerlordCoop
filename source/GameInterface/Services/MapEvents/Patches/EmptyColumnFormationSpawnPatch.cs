@@ -15,7 +15,10 @@ internal class EmptyColumnFormationSpawnPatch
         ref WorldPosition? unitSpawnPosition,
         ref Vec2? unitSpawnDirection)
     {
-        if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive)
+        if (!BattleSpawnConfig.Enabled)
+            return true;
+        if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+            || !missionRegistry.IsCoopBattleActive)
             return true;
         if (!(__instance.Arrangement is ColumnFormation columnFormation))
             return true;

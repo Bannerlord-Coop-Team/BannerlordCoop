@@ -58,6 +58,7 @@ internal class BattleMissionStartHandler : IHandler
     private readonly IMapEventLogger mapEventLogger;
     private readonly IBattleMissionInitializerResolver missionInitializerResolver;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
+    private readonly ICoopBattleMissionRegistry missionRegistry;
     private readonly HideoutRaidHandler hideoutRaids;
     private static long attackMissionStartSequence;
 
@@ -79,6 +80,7 @@ internal class BattleMissionStartHandler : IHandler
         IMapEventLogger mapEventLogger,
         IBattleMissionInitializerResolver missionInitializerResolver,
         IBattleTroopReserveBuilder reserveBuilder,
+        ICoopBattleMissionRegistry missionRegistry,
         HideoutRaidHandler hideoutRaids = null)
     {
         this.messageBroker = messageBroker;
@@ -88,6 +90,7 @@ internal class BattleMissionStartHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         this.missionInitializerResolver = missionInitializerResolver;
         this.reserveBuilder = reserveBuilder;
+        this.missionRegistry = missionRegistry;
         this.hideoutRaids = hideoutRaids;
 
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
@@ -594,7 +597,7 @@ internal class BattleMissionStartHandler : IHandler
 
     private void OpenSiegeMission(NetworkStartSiegeMission payload, DateTime retryDeadline)
     {
-        bool spawnGateEngaged = false;
+        bool battleWindowOpened = false;
         try
         {
             if (!TryGetValidBattle(nameof(NetworkStartSiegeMission), payload.MapEventId, out var battle))
@@ -647,9 +650,9 @@ internal class BattleMissionStartHandler : IHandler
 
             if (BattleSpawnConfig.Enabled)
             {
-                BattleSpawnGate.BeginBattle(payload.MapEventId);
-                spawnGateEngaged = true;
-                Logger.Information("[BattleSync] Engaged spawn gate in OpenSiegeMission: mapEvent={MapEventId}", payload.MapEventId);
+                missionRegistry.BeginBattle(payload.MapEventId);
+                battleWindowOpened = true;
+                Logger.Information("[BattleSync] Opened coop battle window in OpenSiegeMission: mapEvent={MapEventId}", payload.MapEventId);
             }
 
             // No native fallback: SandBoxMissions.OpenSiegeMissionWithDeployment would size to whole-side
@@ -659,7 +662,7 @@ internal class BattleMissionStartHandler : IHandler
                 var mission = siegeLauncher.OpenCoopSiegeBattle(rec, payload.WallHitPointRatios,
                     attackerWeapons, defenderWeapons, payload.IsSallyOut);
                 if (mission != null)
-                    spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
+                    battleWindowOpened = false; // the attached mission lifecycle owns EndBattle from here
                 else
                     Logger.Error("[BattleSync] Coop siege launcher returned no mission");
             }
@@ -676,7 +679,7 @@ internal class BattleMissionStartHandler : IHandler
         }
         finally
         {
-            UnwindSpawnGateAfterFailedOpen(spawnGateEngaged);
+            CloseBattleWindowAfterFailedOpen(battleWindowOpened);
         }
     }
 
@@ -776,7 +779,7 @@ internal class BattleMissionStartHandler : IHandler
     private void OpenAttackMission(string mapEventId, MissionInitializerRecord missionInitializer,
         string initiatingPartyId, long sequence, bool isHideout = false, bool isDirectAssault = false)
     {
-        bool spawnGateEngaged = false;
+        bool battleWindowOpened = false;
         try
         {
             if (!TryGetValidBattle(nameof(NetworkStartAttackMission), mapEventId, out var battle))
@@ -802,15 +805,15 @@ internal class BattleMissionStartHandler : IHandler
             LogAttackMissionLifecycle("opening", sequence, mapEventId);
             InitializePlayerEncounter(battle);
 
-            // Engage the spawn gate BEFORE OpenBattleMission builds the mission — the deployment controller
+            // Open the coop battle window BEFORE OpenBattleMission builds the mission, the deployment controller
             // spawns the initial wave during mission setup (inside OpenBattleMission), earlier than the
-            // CoopBattleController attach. The gate only marks "a coop battle is active" for the spawn patches;
+            // CoopBattleController attach. The window only marks "a coop battle is active" for the spawn patches;
             // who fields which troops is decided by the server-fed reserves (CoopTroopSupplier).
             if (BattleSpawnConfig.Enabled)
             {
-                BattleSpawnGate.BeginBattle(mapEventId);
-                spawnGateEngaged = true;
-                Logger.Information("[BattleSync] Engaged spawn gate in OpenAttackMission: mapEvent={MapEventId}", mapEventId);
+                missionRegistry.BeginBattle(mapEventId);
+                battleWindowOpened = true;
+                Logger.Information("[BattleSync] Opened coop battle window in OpenAttackMission: mapEvent={MapEventId}", mapEventId);
             }
 
             // Coop opens a custom battle mission (per-client troop suppliers) instead of the native one; the
@@ -826,7 +829,7 @@ internal class BattleMissionStartHandler : IHandler
                 var mission = hideoutLauncher.OpenCoopHideoutMission(missionInitializer, isDirectAssault);
                 if (mission != null)
                 {
-                    spawnGateEngaged = false;
+                    battleWindowOpened = false;
                     MissionStateFinalizeDiagnosticsPatch.RecordCorrelation(mission, sequence, mapEventId);
                 }
             }
@@ -835,7 +838,7 @@ internal class BattleMissionStartHandler : IHandler
                 var mission = battleLauncher.OpenCoopFieldBattle(missionInitializer);
                 if (mission != null)
                 {
-                    spawnGateEngaged = false; // the attached mission lifecycle owns EndBattle from here
+                    battleWindowOpened = false; // the attached mission lifecycle owns EndBattle from here
                     MissionStateFinalizeDiagnosticsPatch.RecordCorrelation(mission, sequence, mapEventId);
                     Logger.Information(
                         "[BattleMissionLifecycle] Attack mission opened: sequence={Sequence} mapEvent={MapEventId} scene={Scene} missionStatePresent={MissionStatePresent} missionPresent={MissionPresent}",
@@ -869,7 +872,7 @@ internal class BattleMissionStartHandler : IHandler
         }
         finally
         {
-            UnwindSpawnGateAfterFailedOpen(spawnGateEngaged);
+            CloseBattleWindowAfterFailedOpen(battleWindowOpened);
         }
     }
 
@@ -909,9 +912,12 @@ internal class BattleMissionStartHandler : IHandler
         encounter.IsJoinedBattle = true;
     }
 
-    internal static void UnwindSpawnGateAfterFailedOpen(bool spawnGateEngaged)
+    // Closes the battle window this open attempt opened when no mission lifecycle took ownership of it.
+    internal void CloseBattleWindowAfterFailedOpen(bool battleWindowOpened)
     {
-        if (spawnGateEngaged) BattleSpawnGate.EndBattle();
+        if (!battleWindowOpened) return;
+
+        missionRegistry.EndBattle();
     }
 
     internal static bool ShouldOpenBattleMission(bool isPlayerWounded, string localPartyId, string initiatingPartyId)

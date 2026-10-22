@@ -139,9 +139,9 @@ public class BattleMigrationMirrorTests : MissionTestEnvironment
                 successor.Resolve<IBattleHostRegistry>().Set(mapEventId, new BattleHostAssignment("A", new[] { "B" }));
 
                 // A live coop battle: the movement handler's location-style peer cleanup must stand down (it is
-                // gated on the spawn gate), exactly as in a real battle — otherwise it would despawn A's agents
+                // gated on the coop battle window), exactly as in a real battle — otherwise it would despawn A's agents
                 // wholesale and there would be nothing left to adopt.
-                BattleSpawnGate.BeginBattle(mapEventId);
+                BeginCoopBattle(mapEventId, successor);
 
                 Assert.True(successor.ObjectManager.TryGetObject<MobileParty>(partyIds[0], out var hostParty));
                 var character = (CharacterObject)Game.Current.PlayerTroop;
@@ -176,7 +176,7 @@ public class BattleMigrationMirrorTests : MissionTestEnvironment
         }
         finally
         {
-            BattleSpawnGate.EndBattle();
+            EndCoopBattle(successor);
         }
     }
 }

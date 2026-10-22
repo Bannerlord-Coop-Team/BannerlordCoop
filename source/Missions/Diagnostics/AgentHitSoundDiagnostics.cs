@@ -30,7 +30,7 @@ internal static class AgentHitSoundDiagnostics
     {
         Mission mission = Mission.Current;
         var session = mission?.GetMissionBehavior<CoopBattleController>()?.Session;
-        if (mission == null || session == null || !BattleSpawnGate.IsCoopBattleActive)
+        if (mission == null || session == null || !IsCoopBattleActive())
             return false;
 
         lock (Gate)
@@ -73,6 +73,7 @@ internal static class AgentHitSoundDiagnostics
             return;
 
         Agent attacker = blow.OwnerId < 0 ? null : mission.FindAgentWithIndex(blow.OwnerId);
+        ContainerProvider.TryResolve<IRoutedBlowTracker>(out var routedBlowTracker);
         Add(new
         {
             kind = "registerBlow",
@@ -80,7 +81,7 @@ internal static class AgentHitSoundDiagnostics
             attackerId = AgentId(registry, attacker),
             victimIndex = victim.Index,
             attackerIndex = blow.OwnerId,
-            sourceControllerId = BattleSpawnGate.RoutedBlowSourceControllerId,
+            sourceControllerId = routedBlowTracker?.SourceControllerId,
             damage = blow.InflictedDamage,
             blockedWithShield = collisionData.AttackBlockedWithShield,
             missile = blow.IsMissile,
@@ -118,8 +119,13 @@ internal static class AgentHitSoundDiagnostics
     {
         lock (Gate)
             return recording && ReferenceEquals(observedMission, mission) &&
-                BattleSpawnGate.IsCoopBattleActive;
+                IsCoopBattleActive();
     }
+
+    // Reads this client's coop battle window; no container means a vanilla battle.
+    private static bool IsCoopBattleActive()
+        => ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
+           && missionRegistry.IsCoopBattleActive;
 
     private static string AgentId(INetworkAgentRegistry registry, Agent agent) =>
         registry != null && agent != null &&
