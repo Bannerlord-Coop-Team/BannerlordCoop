@@ -147,45 +147,65 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 
 Vanilla captures a vacant enemy hull when the main agent holds its helm for 3 s while the hull is connected to the
 player's own hull by a bridge (`ShipControllerMachine`), then swaps the two hulls' formations (`NavalShipsLogic.OnShipCaptured`).
-Co-op runs vanilla's timer on the captor's view and lets the hull's current authority decide
-(`Missions/Battles/BattleShipCaptureReplicator.cs`):
+Co-op runs vanilla's timer on the captor's view and lets the hull's current authority decide. The request and decision are
+`Missions/Battles/BattleShipCaptureReplicator.cs`; applying a capture is `ShipCaptureApplier.cs`; the DLC side is
+`INavalShipCaptureEngine` (`Missions.Naval/NavalShipCaptureEngine.cs`).
 
 1. The main agent may start at another owner's helm only when that copy's team is an enemy (`ForeignHelmUsePatch`).
    Vanilla's helm gates the rest: an enemy helm is AI-only until its formation empties (a fresh enemy copy's helm opens to
    the player at once, `NavalShipEngine.SpawnForeignHull`, since its formation may never get a unit here) and disabled for
    players until the hull is vacant and connected.
 2. When the timer runs out, `CoopShipCapturePatch` skips vanilla's swap and publishes `ShipCaptureTimerElapsed`. The captor
-   sends `NetworkShipCaptureRequest` to the hull's authority, or decides at once when it is that authority (the battle
+   sends `NetworkShipCaptureRequest` to the hull's authority alone, or decides at once when it is that authority (the battle
    host capturing an AI hull it simulates).
-3. The authority decides on the real hull (`BattleShipCaptureReplicator.Decide`): it must still simulate it; the captor must
-   be in the mission with a registered hull of its own that still has its formation; the hull must be an enemy's (or the
-   captor's own orphan), not leaving or mid-swap (`busy`), not a storyline hull, not sinking, and vacant by vanilla's rule
-   (its formation all swimming or gone, nothing queued). It applies the capture itself and broadcasts `NetworkShipCaptured`,
-   or sends `NetworkShipCaptureRejected`. An old authority that already gave the hull away answers a late rival
-   `already_captured`.
+3. The authority decides on the real hull (`BattleShipCaptureReplicator.Decide`, reasons in `ShipCaptureRefusal`): it must
+   still simulate it; the captor must be in the mission with a registered hull of its own that still has its formation; the
+   hull must be an enemy's (or the captor's own orphan), not leaving or mid-swap (`Busy`), not a storyline hull, not
+   sinking, and vacant by vanilla's rule, read fresh (its 5 s cached formation query is invalidated first). It applies the
+   capture itself and broadcasts `NetworkShipCaptured`, or sends `NetworkShipCaptureRejected` to the captor alone.
 4. Every client applies `NetworkShipCaptured` in one game-thread step: the authority moves in place
-   (`IBattleShipReplicator.TransferCapturedHull`: sample and condition order restart, the captor adopts its copy with
-   `INavalShipEngine.AdoptHull`, the old authority turns its hull into a copy with `ReleaseHull`; no hull is removed or
+   (`IBattleShipReplicator.TransferHull(..., inPlace: true)`: sample and condition order restart, the captor adopts its copy
+   with `INavalShipEngine.AdoptHull`, the old authority turns its hull into a copy with `ReleaseHull`; no hull is removed or
    replaced), then vanilla's swap runs on the local hulls (`ApplyCapture`, copies keep no controller), the registry records
    the prize and the orphan, and the prize counts as gone from its old side.
 5. The captor sends `NetworkBattleShipCaptured` to the server on the relay channel its fates use, so the server takes the
-   prize's fates from it (section 3).
+   prize's fates from it (section 3), and sends its records of the prize and the orphan to every peer again.
 
-- A confirm is applied even after its sender left or the hull moved to a successor, since mesh routes aren't ordered against
-  the server's departure and migration events: its sender only has to have simulated the hull at some point here
-  (`NetworkShipInfo.HasBeenAuthority`). A repeat changes nothing. A confirm for a hull that is mid-swap, or whose record still
-  waits here, applies once the hull is ready (30 s at most). One that arrives after its captor left here removes the prize,
-  as it left with the captor everywhere else.
+- **Order.** Every hull counts the captures it took part in, as prize or as the captor's hull
+  (`NetworkShipInfo.CaptureSequence`). A confirm carries both hulls' counts on its sender and applies only when they match
+  the receiver's: ahead of them it waits, behind them it is a repeat (counted) or a conflict (logged, the first applied
+  stands). So captures of one hull from different senders apply in the same order everywhere, whichever arrives first.
+- **One decider per place in the order.** A player's hull, or a captured hull, is decided by its current authority, which
+  only a capture of it changes. An AI hull's captures are decided by the battle host of the confirm's epoch: receivers keep
+  the host of every epoch they saw and drop a confirm from anyone else (one that joined later falls back to the hull's
+  current or fielding authority). A promoted host refuses its inherited AI hulls as `Busy` for 2 s
+  (`PromotionSettleSeconds`), so a capture the old host confirmed just before it left reaches it first over the mesh.
+  Residual: an old host's confirm that takes longer than that to arrive conflicts with a successor's capture of the same
+  hull; the conflict is logged (`captureConflicts`), and each client keeps the one it applied first.
+- A confirm is exempt from the membership gate, since mesh routes aren't ordered against the server's departure and
+  migration events, so it applies after its sender left or the hull moved to a successor. A confirm for a hull that is
+  mid-swap, or whose record still waits here, waits until the hull is registered or gone, however long a joiner's
+  deployment takes. One that arrives after its captor left here removes the prize, as it left with the captor everywhere else.
+- A record from a hull's current authority that shows captures this client missed (it never got the confirm) brings a
+  registered hull up to date: a prize is captured through the swap with the captor's hull the record names, an orphan loses
+  its formation. A record of a later capture also replaces a held record of the same ship.
+- **The victim leaves at once (C4).** If a PvP victim confirms and disconnects, a client can get the victim's departure
+  before its confirm and take the prize out with the victim. The captor's records sent again after the capture bring it
+  back: a captured record of a hull this client removed with another departed player reopens and spawns it as the captor's.
+  The server records the capture even after the owner's party left the battle.
 - A request nobody answers in 5 s expires (the authority left before deciding). The captor's player sees one line when a
-  capture is refused, times out or is won by someone else.
-- A late joiner gets the prize's record from the captor, with `CaptorControllerId` (ProtoMember 20), and the orphan's with
-  `Orphaned` (ProtoMember 21); it spawns the orphan into a free formation and then orphans it (`OrphanHull`). A record with
-  a captor replaces a held record of the same ship without one.
+  capture is refused, times out or is won by someone else (the winner's broadcast confirm tells it).
+- A late joiner gets the prize's record from the captor with `CaptorControllerId` (ProtoMember 20), the hull's capture
+  count (22), the captor's hull it was taken with (23) and the side it was taken from (24), and the orphan's with
+  `Orphaned` (21). It spawns the orphan into a free formation and then orphans it (`OrphanHull`), and counts each capture as
+  a hull gone from its side, so it ends the battle by the retreat rule if it becomes the host.
 - PvP: a player's hull is captured the same way, with its owner's client as the authority; vacancy then needs that player's
-  whole formation, its main agent included, swimming or gone.
+  whole formation, its main agent included, swimming or gone. The victim's formation keeps its main agent but no hull, so
+  vanilla's helm checks ask whether a null hull is connected; `CapturedFormationConnectionPatch` answers "not connected".
+- Vanilla points the old owner's crew record of the prize at the captor's orphan. A tracked agent counts as a hull's crew
+  only on the hull's team (`NavalShipEngine.IsHullCrew`), so those swimmers never withdraw with the orphan.
 - When the captor leaves, retreats or disconnects, the prize and the orphan leave with it through the usual departure path
   (they don't follow the host), and the NPC keeps its ship with the battle HP the captor reported.
-
 ### Departure
 
 - **Retreat (Tab, Retreat):** enabled per player. The leaver's mission end removes its hulls and announces each one as
@@ -516,12 +536,14 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   enemy copy's helm opens to the player (section 2, "Capture"), and capture replicates.
 - **Capture limits (not live yet, R46).**
   - The captor's prompt reads vacancy on its copy, where puppets swim on local water and the reserve reads 0, so it may
-    show a hull vacant that its authority then refuses (`not_vacant`); the authority's verdict is the one that counts.
+    show a hull vacant that its authority then refuses (`NotVacant`); the authority's verdict is the one that counts.
   - The orphan gets an AI controller with no formation from vanilla's `UpdateController` on its captor, as in vanilla.
   - A copy whose body doesn't simulate is adopted as it is and only logs a warning; the swap fallback was left out, since
     it would drop the captor's reserve and take its formation off player command.
-  - A late joiner doesn't count a capture made before it joined as a hull gone from its side, so if it becomes the host its
-    retreat rule can miss one.
+  - A capture an old host confirmed more than `PromotionSettleSeconds` before it reaches the successor can conflict with
+    the successor's own capture of that hull; clients keep the one they applied first and log `captureConflicts`.
+  - A client that took a PvP victim's hull out with the victim and then gets the captor's records spawns the prize again,
+    but the captor's crew puppets it already had stay in the orphan's old formation, not the prize's (no swap ran there).
   - A PvP victim's formation keeps vanilla's record pointing at the captor's orphan, so a later reinforcement of the victim
     would target a copy; its client logs a warning when its hull is captured.
 - **Follow-up B, weapon target lists are snapshots.** A late hull is no object target for weapons initialised before it
@@ -563,7 +585,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 |---|---|---|
 | `scenario <preset> [knobs] [ids]` | server | Stages a preset and starts the battle. Refuses while a listed player is still in a battle mission (leave it and finish the post-battle screens first), and heals each listed player's hero to full. |
 | `scenario_status` | client | Preset steps, knobs and `battle.hulls[]` with owner, AI flag, weapon and ram. |
-| `inspect [summary\|brief]` | client | `summary` (or `brief`) prints a `NAVAL_INSPECT_SUMMARY` header (instance, own id, host, epoch, deployment, hull count, the deck puppets' last/max deck error, DEBUG `copyOnCopy`) and one line per hull: the 8-digit id that the hull commands take, hull type, owner (`(npc)` for an AI hull), authority, HP, sail HP, `afloat`/`sinking`/`sunk`, `copy=own\|steered\|written`, and in DEBUG the copy's drift mean/max and `fatesSent`. Without it, the full JSON: session, host epoch, hull streams (per hull `followsHost`, `captor`, `orphan`, `side`, `formation`), `shipCapture` (`captureRequests`, `capturesApplied`, `captureRejections` by reason, `captureExpired`, `confirmsDropped`, `duplicateConfirms`, `pendingRequests` with `waitedSeconds`, `heldConfirms`), `ships[].captureTimer`, damage, weapons, decks, stations, AI fleet, end tally, agents, ships; DEBUG adds `copyProbe`: steering knobs, drift (against the owner's estimated current pose, the latest sample moved on by its age without the lead) and correction per copy, `oscillations10s`/`oscillationsTotal` (sign changes of the along-heading position error to the target, low-passed over the steering's `tau`, outside a 0.1 m deadband; the raw error flips at each sample arrival as the target jumps by the owner's frame-time jitter times its speed, R43), `targetJump` (how far the target moved at each sample arrival), steering cost (`steerMeanMs`, `steerP99Ms`, `steerMaxMs`) with `gcCollections10s` per generation, contact counters, the deck puppets' `maxDeckError` (the largest hull-frame puppet-to-target error, skipping a teleport's or a new deck placement's sample, counted in `deckSamplesSkipped`), `rams[]` (`hasRam` per hull) and the ram counters (`ramTicksGatedOnCopies`, `ramPuppetsSpared`); and `ships[].fatesSent`, the campaign ship fates this client sent for the hull (M6). |
+| `inspect [summary\|brief]` | client | `summary` (or `brief`) prints a `NAVAL_INSPECT_SUMMARY` header (instance, own id, host, epoch, deployment, hull count, the deck puppets' last/max deck error, DEBUG `copyOnCopy`) and one line per hull: the 8-digit id that the hull commands take, hull type, owner (`(npc)` for an AI hull), authority, HP, sail HP, `afloat`/`sinking`/`sunk`, `copy=own\|steered\|written`, and in DEBUG the copy's drift mean/max and `fatesSent`. Without it, the full JSON: session, host epoch, hull streams (per hull `followsHost`, `captor`, `captureSequence`, `orphan`, `side`, `formation`), `shipCapture` (`captureRequests`, `captureRejections` by reason, `captureExpired`, `pendingRequests` with `waitedSeconds`, and `applied`: `capturesApplied`, `recordsApplied`, `confirmsDropped`, `duplicateConfirms`, `captureConflicts`, `heldConfirms`), `ships[].captureTimer`, damage, weapons, decks, stations, AI fleet, end tally, agents, ships; DEBUG adds `copyProbe`: steering knobs, drift (against the owner's estimated current pose, the latest sample moved on by its age without the lead) and correction per copy, `oscillations10s`/`oscillationsTotal` (sign changes of the along-heading position error to the target, low-passed over the steering's `tau`, outside a 0.1 m deadband; the raw error flips at each sample arrival as the target jumps by the owner's frame-time jitter times its speed, R43), `targetJump` (how far the target moved at each sample arrival), steering cost (`steerMeanMs`, `steerP99Ms`, `steerMaxMs`) with `gcCollections10s` per generation, contact counters, the deck puppets' `maxDeckError` (the largest hull-frame puppet-to-target error, skipping a teleport's or a new deck placement's sample, counted in `deckSamplesSkipped`), `rams[]` (`hasRam` per hull) and the ram counters (`ramTicksGatedOnCopies`, `ramPuppetsSpared`); and `ships[].fatesSent`, the campaign ship fates this client sent for the hull (M6). |
 | `fleet [party]` | server and client | Lists each ship of a party on this machine: its id, HP, sail HP and owner. `party` is a controller id, a `MobileParty`/`PartyBase` id, or a party or leader name or id (`Player`, `Player3325`; player parties first, then lord parties), on clients too; without it, the main party on a client and every player's party on the server. Run it before and after a battle on every machine. |
 | `finish_loot [take=<ship>[,<ship>...]\|none\|all]` | client | Finishes the open post-battle loot screens with their own buttons: the party screen takes every troop and prisoner then Done, the inventory takes every item then Done, the ship screen selects and takes each chosen ship (a `Ship_...` id, with or without `Ship_`, or a unique prefix of one) then Confirm, leaving the rest (`take` defaults to `none`). Each confirmation is answered yes. So `PortScreenChangesHandler` takes the ships and `OnPlayerLootShipEnd` sends `NetworkDiscardLootShips`, which releases the M6 loot hold. The next screen usually opens on a later frame, so run it again until it reports no loot screen. Still manual: the captured-lord conversation (`FreeOrCapturePrisonerHeroes`) before the party screen. |
 | `win`, `lose` | battle host | Ends the battle as a victory or defeat for the host's side; peers follow. |
