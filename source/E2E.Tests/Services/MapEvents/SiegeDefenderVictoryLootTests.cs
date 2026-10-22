@@ -162,7 +162,7 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
                 var onEnd = (Action)endOneShot.GetValue(conversations)!;
                 endOneShot.SetValue(conversations, null);
                 onEnd();
-                SetConversationInProgress(conversations, false);
+                conversations.IsConversationInProgress = false;
 
                 MapTick();
                 Assert.IsType<PartyState>(states.ActiveState);
@@ -275,7 +275,7 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
             {
                 Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-                AccessTools.Field(typeof(Settlement), "<Party>k__BackingField").SetValue(settlement, new PartyBase(settlement));
+                settlement.Party = new PartyBase(settlement);
                 party._currentSettlement = settlement;
             });
         }
@@ -482,13 +482,9 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
     private static bool OpenCapturedLordConversation(ConversationManager __instance)
     {
         capturedLordConversations++;
-        SetConversationInProgress(__instance, true);
+        __instance.IsConversationInProgress = true;
         return false;
     }
-
-    private static void SetConversationInProgress(ConversationManager conversations, bool inProgress) =>
-        AccessTools.Property(typeof(ConversationManager), nameof(ConversationManager.IsConversationInProgress))
-            .SetValue(conversations, inProgress);
 
     private static bool CountDefenderVictoryPrompt()
     {
