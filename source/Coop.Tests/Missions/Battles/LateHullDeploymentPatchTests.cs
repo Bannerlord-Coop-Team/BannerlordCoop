@@ -46,5 +46,31 @@ public class LateHullDeploymentPatchTests
     {
         Assert.Equal(expected, LateHullDeploymentPatch.FinishesDeployment(coopNavalBattle, deploymentFinished));
     }
+
+    // R46: weapons list ship targets once, so a late hull refreshes every other fielded hull's ballista, not its own or a removed one's.
+    [Fact]
+    public void WeaponAisToRefresh_EveryFieldedHullsBallistaButTheNewAndRemovedOnes()
+    {
+        var (fielded, fieldedAi) = ArmedHull();
+        var (spawned, _) = ArmedHull();
+        var (removed, _) = ArmedHull();
+        removed._isRemoved = true;
+        var unarmed = ShipTestHulls.Uninitialized<MissionShip>();
+
+        var refreshed = LateHullDeploymentPatch.WeaponAisToRefresh(new[] { fielded, spawned, removed, unarmed, null }, spawned);
+
+        Assert.Same(fieldedAi, Assert.Single(refreshed));
+    }
+
+    // A constructor-skipped hull carrying a ballista whose AI is already built.
+    private static (MissionShip Hull, RangedSiegeWeaponAi Ai) ArmedHull()
+    {
+        var hull = ShipTestHulls.Uninitialized<MissionShip>();
+        var weapon = ShipTestHulls.CreateWeapon();
+        var ai = (RangedSiegeWeaponAi)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(BallistaAI));
+        AccessTools.Field(typeof(UsableMachine), "_ai").SetValue(weapon, ai);
+        hull.ShipSiegeWeapon = weapon;
+        return (hull, ai);
+    }
 }
 #endif

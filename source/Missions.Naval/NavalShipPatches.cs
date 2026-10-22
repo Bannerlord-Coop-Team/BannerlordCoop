@@ -2,6 +2,7 @@
 using Common.Messaging;
 using HarmonyLib;
 using System.Collections.Generic;
+using System.Linq;
 using Missions.Messages;
 using NavalDLC.Missions;
 using NavalDLC.Missions.Deployment;
@@ -66,13 +67,15 @@ internal class LateHullDeploymentPatch
     /// <summary>Re-reads the targetable mission objects of every fielded hull's ballista but the new hull's (deployed above).</summary>
     internal static void RefreshShipWeaponTargets(IEnumerable<MissionShip> ships, MissionShip spawned)
     {
-        foreach (var ship in ships)
-        {
-            if (ship == spawned || ship.IsRemoved) continue;
-
-            (ship.ShipSiegeWeapon?.Ai as RangedSiegeWeaponAi)?.InitializeThreatSeeker();
-        }
+        foreach (var ai in WeaponAisToRefresh(ships, spawned))
+            ai.InitializeThreatSeeker();
     }
+
+    /// <summary>The ranged weapon AIs of the hulls still in the mission, the newly spawned one excepted.</summary>
+    internal static IEnumerable<RangedSiegeWeaponAi> WeaponAisToRefresh(IEnumerable<MissionShip> ships, MissionShip spawned) =>
+        ships.Where(ship => ship != null && ship != spawned && !ship.IsRemoved)
+            .Select(ship => ship.ShipSiegeWeapon?.Ai as RangedSiegeWeaponAi)
+            .Where(ai => ai != null);
 
     // Hulls spawned before deployment ends get it from vanilla's own deployment pass.
     internal static bool FinishesDeployment(bool coopNavalBattle, bool deploymentFinished) => coopNavalBattle && deploymentFinished;
