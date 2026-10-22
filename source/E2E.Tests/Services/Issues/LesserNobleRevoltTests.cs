@@ -21,11 +21,17 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit;
 using Xunit.Abstractions;
@@ -221,6 +227,131 @@ public sealed class LesserNobleRevoltTests : IDisposable
         }, MapEventVisualMethods);
 
         Assert.False(testEnvironment.Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _));
+    }
+
+    public enum RevoltEnding
+    {
+        BattleWon,
+        BattleLost,
+        Agreement,
+        Release,
+        TimedOut,
+        CanceledByWar,
+    }
+
+    private const string StartLog = "Chaghan is stirring up unrest";
+
+    // Player A runs the quest on the first client and player B only mirrors the issue, like after A's accept.
+    private (EnvironmentInstance Owner, EnvironmentInstance Observer) RegisterOwnerAndObserver(string issueId)
+    {
+        var server = testEnvironment.Server;
+        var owner = testEnvironment.Clients.First();
+        var observer = testEnvironment.Clients.Last();
+        RegisterPlayer("player-A", owner);
+        RegisterPlayer("player-B", observer);
+        AddIssueWithQuest(server, issueId, constructed: true);
+        AddIssueWithQuest(owner, issueId);
+        AddIssueWithQuest(observer, issueId);
+
+        foreach (var instance in new[] { server, owner, observer })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(giverId, issueId, "player-A"));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                var issue = giver.Issue;
+                var quest = Assert.IsType<Quest>(issue.IssueQuest);
+
+                // A skipped constructor leaves the stores an ending writes to null.
+                if (issue.JournalEntries == null)
+                {
+                    AccessTools.Field(typeof(IssueBase), nameof(IssueBase._journalEntries)).SetValue(issue, new MBList<JournalLog>());
+                    AccessTools.Field(typeof(IssueBase), nameof(IssueBase.AlternativeSolutionSentTroops)).SetValue(issue, TroopRoster.CreateDummyTroopRoster());
+                }
+
+                AccessTools.Field(typeof(QuestBase), nameof(QuestBase._journalEntries)).SetValue(quest, new MBList<JournalLog>());
+                AccessTools.Field(typeof(QuestBase), nameof(QuestBase.RewardGold)).SetValue(quest, 5700);
+                quest._taskList = new MBList<QuestTaskBase>();
+                quest._lesserNobleName = new TextObject("Chaghan");
+                if (instance != server)
+                {
+                    new JournalLogsCampaignBehavior().RegisterEvents();
+                }
+
+                if (instance == observer)
+                {
+                    using (new AllowedThread())
+                    {
+                        issue.IssueQuest = null;
+                    }
+
+                    return;
+                }
+
+                // The server and the owner both start with the support log.
+                quest._journalEntries.Add(new JournalLog(CampaignTime.Now, new TextObject(StartLog)));
+                if (instance == owner)
+                {
+                    using (new AllowedThread())
+                    {
+                        quest.StartQuest();
+                    }
+
+                    Assert.Contains(quest, Campaign.Current.QuestManager.Quests);
+                }
+            });
+        }
+
+        return (owner, observer);
+    }
+
+    private static TextObject EndingLog(Quest quest, RevoltEnding ending) => ending switch
+    {
+        RevoltEnding.BattleWon => quest.QuestSuccessWithPlayerDefeatedNobleParty,
+        RevoltEnding.BattleLost => quest.QuestFailWithPlayerDefeatedAgainstNobleParty,
+        RevoltEnding.Agreement => quest.QuestSuccessPlayerComesToAnAgreementWithLesserNoblePartyLog,
+        RevoltEnding.Release => quest.QuestFailedAfterTalkingWithLesserNoblePartyLog,
+        RevoltEnding.TimedOut => quest.QuestFailedWithTimeOutLogText,
+        _ => quest.QuestCanceledWarDeclared,
+    };
+
+    // Each ending takes the path the live game takes to the server's branch.
+    private void End(RevoltEnding ending, EnvironmentInstance owner)
+    {
+        var server = testEnvironment.Server;
+        var ownerQuest = QuestOf(owner);
+        var serverQuest = QuestOf(server);
+        void RunAsOwner(Action<Quest> listener) =>
+            server.Call(() => server.Resolve<IOutcomeDispatcher>().RunAsOwners(listener));
+
+        switch (ending)
+        {
+            case RevoltEnding.BattleWon:
+                RunAsOwner(quest => LesserNobleRevoltWorldEventPatches.ApplyBattleEnd(quest, LesserNobleRevoltWorldEventPatches.RevoltBattleEnd.OwnerWon));
+                break;
+            case RevoltEnding.BattleLost:
+                RunAsOwner(quest => LesserNobleRevoltWorldEventPatches.ApplyBattleEnd(quest, LesserNobleRevoltWorldEventPatches.RevoltBattleEnd.OwnerLost));
+                break;
+            case RevoltEnding.Agreement:
+                owner.Call(() => ownerQuest.QuestSuccessPlayerComesToAnAgreementWithLesserNobleParty());
+                break;
+            case RevoltEnding.Release:
+                owner.Call(() => ownerQuest.QuestFailedAfterTalkingWithLesserNobleParty());
+                break;
+            case RevoltEnding.TimedOut:
+                server.Call(() =>
+                {
+                    serverQuest.QuestDueTime = new CampaignTime(CampaignTime.Now.NumTicks - 1);
+                    LesserNobleRevoltWorldEventPatches.HourlyTick();
+                });
+                break;
+            case RevoltEnding.CanceledByWar:
+                // What OnClanChangedKingdom and QuestHelper.CheckWarDeclarationAndFailOrCancelTheQuest call when the realms go to war.
+                RunAsOwner(quest => quest.CompleteQuestWithCancel(quest.QuestCanceledWarDeclared));
+                break;
+        }
+
+        testEnvironment.FlushCoalescer();
     }
 
     [Fact]
@@ -674,5 +805,67 @@ public sealed class LesserNobleRevoltTests : IDisposable
             Assert.Equal(CampaignTime.Days(6f), created.IssueCreationTime);
             Assert.Equal(CampaignTime.Days(26f), created.IssueDueTime);
         });
+    }
+
+    [Theory]
+    [InlineData(RevoltEnding.BattleWon, IssueOutcome.QuestSuccess, 1, 1)]
+    [InlineData(RevoltEnding.BattleLost, IssueOutcome.QuestFail, 0, 1)]
+    [InlineData(RevoltEnding.Agreement, IssueOutcome.QuestSuccess, 1, 1)]
+    [InlineData(RevoltEnding.Release, IssueOutcome.QuestFail, 0, 0)]
+    [InlineData(RevoltEnding.TimedOut, IssueOutcome.QuestFail, 0, 1)]
+    [InlineData(RevoltEnding.CanceledByWar, IssueOutcome.QuestCancel, 0, 0)]
+    public void ServerEnding_AddsItsJournalLineOnceToTheOwnersJournalOnly(RevoltEnding ending, IssueOutcome outcome, int payments, int traitChanges)
+    {
+        const string issueId = "issue_lesser_noble";
+        var server = testEnvironment.Server;
+        var (owner, observer) = RegisterOwnerAndObserver(issueId);
+        var serverQuest = QuestOf(server);
+        var ownerQuest = QuestOf(owner);
+        var expected = string.Empty;
+        server.Call(() => expected = EndingLog(serverQuest, ending).ToString());
+
+        // These pay the owner, so the server runs each once and no client runs them again.
+        using var gold = new MethodCallRecorder(AccessTools.Method(typeof(GiveGoldAction), nameof(GiveGoldAction.ApplyBetweenCharacters)));
+        using var renown = new MethodCallRecorder(AccessTools.Method(typeof(GainRenownAction), nameof(GainRenownAction.Apply)));
+        using var traits = new MethodCallRecorder(AccessTools.Method(typeof(TraitLevelingHelper), nameof(TraitLevelingHelper.OnIssueSolvedThroughQuest),
+            new[] { typeof(Hero), typeof(Tuple<TraitObject, int>[]) }));
+        // The server's release leaves an encounter the test campaign doesnt have.
+        using var encounters = new MethodCallRecorder(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish)));
+
+        End(ending, owner);
+
+        var finalized = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(outcome, finalized.Outcome);
+        server.Call(() => Assert.Single(serverQuest.JournalEntries, log => log.LogText.ToString() == expected));
+
+        owner.Call(() =>
+        {
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Single(ownerQuest.JournalEntries, log => log.LogText.ToString() == StartLog);
+            Assert.Single(ownerQuest.JournalEntries, log => log.LogText.ToString() == expected);
+
+            // Old Quests shows the copy vanilla's journal takes when the quest completes.
+            var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(entry => entry.RelatedHero == ownerQuest.QuestGiver);
+            Assert.NotNull(archive);
+            Assert.True(archive.IsEnded());
+            Assert.Single(archive.GetEntries(), log => log.LogText.ToString() == expected);
+        });
+
+        observer.Call(() =>
+        {
+            Assert.True(observer.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.Null(giver.Issue);
+            Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(entry => entry.RelatedHero == giver));
+        });
+
+        foreach (var recorder in new[] { gold, renown, traits })
+        {
+            Assert.Equal(0, recorder.CountFor(owner));
+            Assert.Equal(0, recorder.CountFor(observer));
+        }
+
+        Assert.Equal(payments, gold.CountFor(server));
+        Assert.Equal(payments, renown.CountFor(server));
+        Assert.Equal(traitChanges, traits.CountFor(server));
     }
 }
