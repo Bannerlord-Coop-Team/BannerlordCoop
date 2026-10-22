@@ -53,6 +53,6 @@ internal class AlternativeSolutionPickerPatches
     private static void FinalizedPrefix(IssueBase __instance)
     {
         if (ModInformation.IsClient && ContainerProvider.TryResolve<IAlternativeSolutionPicker>(out var picker))
-            picker.Close(__instance, cancel: false);
+            picker.Close(__instance, cancel: true);
     }
 }
