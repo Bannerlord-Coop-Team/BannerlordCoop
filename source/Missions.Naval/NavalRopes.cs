@@ -1,7 +1,9 @@
-﻿using Missions.Messages;
+﻿using Common.Logging;
+using Missions.Messages;
 using NavalDLC.Missions.NavalPhysics;
 using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.Objects.UsableMachines;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -40,10 +42,12 @@ internal static class NavalRopes
         internal int DecorationPlanks;
     }
 
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(NavalRopes));
+
     private static readonly Dictionary<ShipAttachmentMachine, RopeRecord> records = new Dictionary<ShipAttachmentMachine, RopeRecord>();
     private static readonly long[] ownForceWrites = new long[3];
     private static readonly long[] foreignForceFiltered = new long[3];
-    private static long replicaRejects, finalsApplied;
+    private static long replicaRejects, finalsApplied, jointStepsSkipped;
     private static string lastReplicaReject;
 
     /// <summary>Set while a received owner state is applied, so the replica gates let it through.</summary>
@@ -55,6 +59,7 @@ internal static class NavalRopes
         Array.Clear(ownForceWrites, 0, ownForceWrites.Length);
         Array.Clear(foreignForceFiltered, 0, foreignForceFiltered.Length);
         replicaRejects = finalsApplied = 0;
+        Interlocked.Exchange(ref jointStepsSkipped, 0);
         lastReplicaReject = null;
         Applying = false;
     }
@@ -100,11 +105,8 @@ internal static class NavalRopes
         }
     }
 
-    /// <summary>Whether a rope end's hull left the mission, or never resolved to one (a joint built against a removed hull).</summary>
-    internal static bool IsGone(MissionShip hull) => hull == null || hull.IsRemoved;
-
-    /// <summary>Whether a rope may hook a hull: never one that left the mission, whose points vanilla still reaches.</summary>
-    internal static bool AllowsTarget(bool targetHullGone) => !targetHullGone;
+    /// <summary>Whether a rope end has no hull: it left the mission, or never resolved to one (a joint built against a removed hull).</summary>
+    internal static bool IsMissingOrRemoved(MissionShip hull) => hull == null || hull.IsRemoved;
 
     internal static bool IsReplicaMachine(ShipAttachmentMachine machine) => machine != null && NavalForeignHulls.Contains(machine.OwnerShip);
 
@@ -385,7 +387,7 @@ internal static class NavalRopes
     internal static bool AllowConnection(ShipAttachmentMachine source, ShipAttachmentPointMachine target)
     {
         if (!AllowsChange(IsReplicaMachine(source), Applying)) return false;
-        if (target == null || AllowsTarget(IsGone(target.OwnerShip))) return true;
+        if (target == null || !IsMissingOrRemoved(target.OwnerShip)) return true;
 
         if (source != null && source.GetPreferredTargetShip() == target.OwnerShip) source.SetPreferredTargetShip(null);
         return false;
@@ -431,12 +433,10 @@ internal static class NavalRopes
         return false;
     }
 
-    // A hook that landed on, or a rope still tied to, a removed hull breaks; the machine tick destroys it next frame.
+    // A rope whose end left breaks here; the machine tick destroys it right after this attachment's tick.
     private static bool BreakIfEndGone(Attachment attachment)
     {
-        if (attachment.State == RopeState.BrokenAndWaitingForRemoval) return false;
-        if (attachment.AttachmentSource?.OwnerShip?.IsRemoved != true && attachment.AttachmentTarget?.OwnerShip?.IsRemoved != true)
-            return false;
+        if (!EndIsGone(attachment)) return false;
 
         Applying = true;
         try
@@ -452,11 +452,37 @@ internal static class NavalRopes
     }
 
     /// <summary>
+    /// Whether a live rope lost an end: its source or target hull left the mission, or its joint was built without one (the
+    /// joint guard skips such a joint's step, so only breaking the rope ends it).
+    /// </summary>
+    internal static bool EndIsGone(Attachment attachment)
+    {
+        if (attachment == null || attachment.State == RopeState.BrokenAndWaitingForRemoval) return false;
+        if (attachment.AttachmentSource?.OwnerShip?.IsRemoved == true || attachment.AttachmentTarget?.OwnerShip?.IsRemoved == true) return true;
+
+        var joint = attachment.ShipAttachmentJoint;
+        return joint != null && !JointHasHulls(joint);
+    }
+
+    /// <summary>
+    /// [Fixed-tick thread] Runs a joint's step only while it has both hulls; the first skip in a mission is logged, since the
+    /// rope tick should break such a rope at once.
+    /// </summary>
+    internal static bool AllowJointStep(ShipAttachmentMachine.ShipAttachmentJoint joint)
+    {
+        if (JointHasHulls(joint)) return true;
+
+        if (Interlocked.Increment(ref jointStepsSkipped) == 1)
+            Logger.Warning("[NavalSync] Skipped the force step of a rope joint missing a hull; its rope breaks on the next rope tick");
+        return false;
+    }
+
+    /// <summary>
     /// [Fixed-tick thread] Whether a joint's two hulls are still in the mission. A joint built after its target hull left
     /// holds no target hull at all, and every one of its force steps dereferences both, so it skips the step instead.
     /// </summary>
     internal static bool JointHasHulls(ShipAttachmentMachine.ShipAttachmentJoint joint) =>
-        joint != null && !IsGone(joint._shipSourceScript) && !IsGone(joint._shipTargetScript);
+        joint != null && !IsMissingOrRemoved(joint._shipSourceScript) && !IsMissingOrRemoved(joint._shipTargetScript);
 
     private static void UpdateReplicaRopeVisual(Attachment attachment, RopeRecord record)
     {
@@ -530,6 +556,7 @@ internal static class NavalRopes
         foreignFiltered = foreignForceFiltered.ToArray(),
         replicaRejects,
         lastReplicaReject,
+        jointStepsSkipped = Interlocked.Read(ref jointStepsSkipped),
         finalsApplied,
         hulls = hulls.Select(hull => new
         {

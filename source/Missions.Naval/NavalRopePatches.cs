@@ -82,7 +82,7 @@ internal class RopeJointHullGuardPatch
 {
     // Runs vanilla's joint step only while both of its hulls are in the mission.
     [HarmonyPrefix]
-    private static bool Prefix(Joint __instance) => NavalRopes.JointHasHulls(__instance);
+    private static bool Prefix(Joint __instance) => NavalRopes.AllowJointStep(__instance);
 }
 
 // Retargeting destroys and recreates a rope; on a copied hull that is the owner's decision.
