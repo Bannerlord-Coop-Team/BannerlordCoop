@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using GameInterface.Services.Smithing.Patches;
@@ -29,6 +30,7 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+    private readonly IPlayerManager playerManager;
     private readonly ICraftingCampaignBehaviorInterface craftingCampaignBehaviorInterface;
     private readonly ISendCoalescer sendCoalescer;
 
@@ -36,12 +38,14 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
+        IPlayerManager playerManager,
         ICraftingCampaignBehaviorInterface craftingCampaignBehaviorInterface,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.playerManager = playerManager;
         this.craftingCampaignBehaviorInterface = craftingCampaignBehaviorInterface;
         this.sendCoalescer = sendCoalescer;
 
@@ -238,6 +242,8 @@ internal class CraftingCampaignBehaviorCraftingHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, data.PlayerHeroId)) return;
+
             if (!TryCreateCraftedWeapon(data))
             {
                 network.Send(peer, new NetworkCreateCraftedWeaponInternalClients(data, null, false));

@@ -10,10 +10,10 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.PlayerCaptivityService.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.TroopRosters.Messages;
-using GameInterface.Services.UI.Notifications.Messages;
 using GameInterface.Services.Villages.Interfaces;
 using LiteNetLib;
 using Serilog;
@@ -42,19 +42,25 @@ internal class PartyDoneLogicHandler : IHandler
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
+    private readonly IRecruitmentSideEffects recruitmentSideEffects;
+    private readonly IPlayerManager playerManager;
 
     public PartyDoneLogicHandler(
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
         ITroopRosterInterface troopRosterInterface,
-        IVillageHostileActionInterface villageHostileActionInterface)
+        IVillageHostileActionInterface villageHostileActionInterface,
+        IRecruitmentSideEffects recruitmentSideEffects,
+        IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
         this.villageHostileActionInterface = villageHostileActionInterface;
+        this.recruitmentSideEffects = recruitmentSideEffects;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<PartyDoneLogicAttempted>(Handle_PartyDoneLogicAttempted);
         messageBroker.Subscribe<NetworkCompleteDoneLogic>(Handle_CompletePartyDoneLogic);
@@ -159,6 +165,7 @@ internal class PartyDoneLogicHandler : IHandler
         
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, message.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(message.MainHeroId, out var mainHero)) return;
 
             if (!TryResolveCompleteDoneLogic(
@@ -706,7 +713,7 @@ internal class PartyDoneLogicHandler : IHandler
         }
     }
 
-    private static void ApplyPrisonerRecruitmentEffects(
+    private void ApplyPrisonerRecruitmentEffects(
         Hero mainHero,
         NetworkCompleteDoneLogic message,
         FlattenedTroopRoster recruitedPrisonersRoster)
@@ -721,18 +728,10 @@ internal class PartyDoneLogicHandler : IHandler
         }
     }
 
-    private static void ApplyPrisonerRecruitmentEffect(Hero mainHero, CharacterObject characterObject)
+    private void ApplyPrisonerRecruitmentEffect(Hero mainHero, CharacterObject characterObject)
     {
         // Replace CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
-        if (mainHero.GetPerkValue(DefaultPerks.Leadership.FamousCommander))
-        {
-            mainHero.PartyBelongedTo.MemberRoster.AddXpToTroop(characterObject, (int)DefaultPerks.Leadership.FamousCommander.SecondaryBonus * 1);
-        }
-        SkillLevelingManager.OnTroopRecruited(mainHero, 1, characterObject.Tier);
-        if (characterObject.Occupation == Occupation.Bandit)
-        {
-            SkillLevelingManager.OnBanditsRecruited(mainHero.PartyBelongedTo, characterObject, 1);
-        }
+        recruitmentSideEffects.Apply(mainHero.PartyBelongedTo, characterObject, 1);
 
         // Replace ApplyPrisonerRecruitmentEffects
         int prisonerRecruitmentMoraleEffect = Campaign.Current.Models.PrisonerRecruitmentCalculationModel.GetPrisonerRecruitmentMoraleEffect(mainHero.PartyBelongedTo.Party, characterObject, 1);
