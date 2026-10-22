@@ -25,7 +25,12 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
+using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Definition;
+using TaleWorlds.SaveSystem.Load;
+using TaleWorlds.SaveSystem.Save;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.HeadmanNeedsToDeliverAHerdIssueBehavior.HeadmanNeedsToDeliverAHerdIssueQuest;
@@ -331,6 +336,74 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             Assert.Null(Object<Hero>(Server, scenario.NotableId).Issue);
             Assert.Equal(3, Party(Server, QuestScenario.ControllerA).ItemRoster.GetItemNumber(Object<ItemObject>(Server, livestockId)));
             Assert.Equal(7, Party(Server, QuestScenario.ControllerB).ItemRoster.GetItemNumber(Object<ItemObject>(Server, livestockId)));
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CleanupSaveRoundtrip_PreservesAcceptedHerdPayloadAndClearsOnlyLoadedRetries(bool takeQuest)
+    {
+        if (takeQuest) Accept(ClientA);
+        Server.Call(() =>
+        {
+            var issue = Object<Hero>(Server, scenario.NotableId).Issue;
+            var cleanup = Server.Resolve<IHeadmanHerdCleanup>();
+            if (takeQuest)
+            {
+                using (new AllowedThread()) issue.IssueQuest.StringId = "herd_saved_quest";
+                cleanup.Remember(issue, Party(Server, QuestScenario.ControllerA));
+            }
+            cleanup.RememberGiverDeath(issue);
+            var data = new CampaignBehaviorDataStore.BehaviorSaveData(true);
+            cleanup.SyncData(data);
+
+            var definitions = new DefinitionContext();
+            definitions.FillWithCurrentTypes();
+            Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
+            var save = new SaveContext(definitions);
+            var metadata = new MetaData();
+            Assert.True(save.Save(data, metadata, out var error), error);
+            var driver = new InMemDriver();
+            Assert.Equal(SaveResult.Success, driver.Save("herd_cleanup", 1, metadata, save.SaveData).GetAwaiter().GetResult().SaveResult);
+            var load = new LoadContext(definitions, driver);
+            Assert.True(load.Load(driver.Load("herd_cleanup"), loadAsLateInitialize: true));
+            var loadedData = Assert.IsType<CampaignBehaviorDataStore.BehaviorSaveData>(load.RootObject);
+            Assert.False(loadedData.IsSaving);
+            Assert.NotSame(data, loadedData);
+            Assert.Same(issue, Assert.Single(cleanup.PendingGiverDeaths));
+
+            cleanup.SyncData(loadedData);
+            Assert.Empty(cleanup.PendingGiverDeaths);
+            Assert.Equal(takeQuest, cleanup.HasRememberedParty(issue));
+            var parties = new Dictionary<string, MobileParty>();
+            var questIds = new Dictionary<string, string>();
+            Assert.True(loadedData.SyncData("coop_herd_cleanup_parties", ref parties));
+            Assert.True(loadedData.SyncData("coop_herd_cleanup_quest_issue_ids", ref questIds));
+            if (takeQuest)
+            {
+                var party = Assert.Single(parties).Value;
+                Assert.NotSame(Party(Server, QuestScenario.ControllerA), party);
+                Assert.Equal(
+                    Party(Server, QuestScenario.ControllerA).ItemRoster.Select(element => element.Amount),
+                    party.ItemRoster.Select(element => element.Amount));
+                Assert.Equal(issue.StringId, Assert.Single(questIds).Value);
+                Assert.Equal(issue.IssueQuest.StringId, Assert.Single(questIds).Key);
+                Assert.Same(issue, Assert.Single(cleanup.RememberedIssues));
+            }
+            else
+            {
+                Assert.Empty(parties);
+                Assert.Empty(questIds);
+            }
+            ClientB.Call(() =>
+            {
+                var clientCleanup = ClientB.Resolve<IHeadmanHerdCleanup>();
+                clientCleanup.RememberGiverDeath(Object<Hero>(ClientB, scenario.NotableId).Issue);
+                clientCleanup.SyncData(loadedData);
+                Assert.Empty(clientCleanup.PendingGiverDeaths);
+                Assert.False(clientCleanup.HasRememberedParty(issue));
+            });
         });
     }
 
@@ -718,7 +791,6 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     {
         private Dictionary<string, MobileParty>? savedParties;
         private Dictionary<string, string>? savedQuestIssueIds;
-        private HashSet<string>? savedPendingGiverDeaths;
         public bool IsLoading { get; set; }
         public bool IsSaving => !IsLoading;
 
@@ -733,11 +805,6 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             {
                 if (IsLoading) data = (T)(object)(savedQuestIssueIds ?? new Dictionary<string, string>());
                 else savedQuestIssueIds = new Dictionary<string, string>((Dictionary<string, string>)(object)data!);
-            }
-            else if (key == "coop_herd_cleanup_pending_giver_deaths")
-            {
-                if (IsLoading) data = (T)(object)(savedPendingGiverDeaths ?? new HashSet<string>());
-                else savedPendingGiverDeaths = new HashSet<string>((HashSet<string>)(object)data!);
             }
             return true;
         }
