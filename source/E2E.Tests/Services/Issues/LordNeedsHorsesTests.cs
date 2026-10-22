@@ -246,6 +246,8 @@ public class LordNeedsHorsesTests : IDisposable
             var agent = new Moq.Mock<TaleWorlds.Core.IAgent>();
             agent.SetupGet(value => value.Character).Returns(giver.CharacterObject);
             Campaign.Current.ConversationManager._conversationAgents.Add(agent.Object);
+            new TaleWorlds.CampaignSystem.CampaignBehaviors.IssuesCampaignBehavior()
+                .issue_offer_player_accept_alternative_4_consequence();
             var logic = new PartyScreenLogic();
             logic.Initialize(PartyScreenLogicInitializationData.CreateBasicInitDataWithMainParty(
                 giver.Issue.AlternativeSolutionSentTroops,
@@ -260,7 +262,7 @@ public class LordNeedsHorsesTests : IDisposable
                 PartyScreenLogic.TroopType.Member, troop, SentTroops, 0, -1);
             using (new AllowedThread()) logic.TransferTroop(command, false);
             Assert.True(logic.DoneLogic(false));
-        });
+        }, new[] { AccessTools.Method(typeof(Helpers.PartyScreenHelper), nameof(Helpers.PartyScreenHelper.OpenScreenAsQuest)) });
         TestEnvironment.FlushCoalescer();
         Assert.Equal(7, OwnersMembers());
         if (finalize)

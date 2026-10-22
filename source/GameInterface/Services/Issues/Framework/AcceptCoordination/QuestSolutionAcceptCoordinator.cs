@@ -144,6 +144,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
                 }
             }
 
+            if (issue.IssueQuest.IsTrackEnabled) issue.IssueQuest.ToggleTrackedObjects();
+
             descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
         }
         catch (Exception e)
@@ -223,6 +225,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             issue._issueDifficultyMultiplier = data.DifficultyMultiplier;
             issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
             issue.IssueDueTime = CampaignTime.Never;
+
+            issue.IssueQuest.IsTrackEnabled = false;
 
             descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
         }, context: nameof(QuestSolutionAcceptCoordinator));
