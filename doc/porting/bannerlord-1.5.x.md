@@ -145,8 +145,9 @@ Each commit body lists its changes.
 These change synced state, so they run on the server only (`DisableV15CampaignBehaviors.cs`):
 `HeroDailyXpCampaignBehavior` (player heroes get no daily xp, as vanilla gives none to the player),
 `EmptyClanPartiesCampaignBehavior` (clients report no empty clan parties, since that list belongs to
-the server's player clan), `PartyConfigurationCampaignBehavior` (its resets reach clients through
-`PartyConfigurationCampaignBehaviorPatches.cs`, above) and `BattleWreckageCampaignBehavior`.
+the server's player clan) and `PartyConfigurationCampaignBehavior` (its resets reach clients through
+`PartyConfigurationCampaignBehaviorPatches.cs`, above). `BattleWreckageCampaignBehavior` is off on
+every role (below).
 
 ### Missions
 
@@ -185,9 +186,41 @@ The branch builds and tests against v1.5.5 with no code change (2026-10-21, Stea
   the server only and are not multiplayer-aware yet (blood feuds: #3819).
 - Naval (War Sails) content stays unsupported, including the set sail and disembark leave paths.
 - v1.5 leaves a `BattleWreckage` after a field battle with a winner and at least 15 casualties: a
-  battle site on land, a wreckage at sea (sea wrecks come only from naval battles). Its behavior runs
-  on the server only and nothing syncs the wrecks to clients, so players cannot see, investigate or
-  loot them; not checked in game (#3837, #3838).
+  battle site on land, a wreckage at sea. `BattleWreckageCampaignBehavior` is disabled on the server
+  and on clients (`DisableBattleWreckageCampaignBehavior`). Co-op's `MBObjectBasePatches.StringIdPrefix`
+  drops the `StringId` of a server-made wreckage, and vanilla's `CampaignObjectManager.AddWreckage` adds
+  it to the saved list before it reads that id, so a field battle that made a wreckage threw inside
+  `MapEvent.FinalizeEventAux` and left an id-less wreckage in the save. Vanilla needs 15+ casualties,
+  a winner, no quest party, fewer than 50 wreckages, a qualifying party mix and a site away from
+  settlements and rivers, and makes small sites 85% of the time. It was not only AI battles:
+  `IsPlayerMapEvent` checks the server's own main party, so a co-op player's field battle could throw
+  too. Every later load then
+  crashed in `CampaignObjectManager.InitializeManagerObjectLists` (seen 2026-10-22 on v1.5.5).
+  - What this loses: looter-faction parties no longer head for land battle sites (the only parties that
+    target land wreckages). Players never saw wrecks
+    in co-op anyway, since nothing syncs them (#3837, #3838). Re-enabling needs the wreckage to get an
+    id (a sync registry, or `typeof(BattleWreckage)` in `MBObjectBasePatches.allowedTypes` after
+    proving `CreateWreckage`'s log entry and map interactable work under co-op).
+  - Save repair: `IdlessWreckageLoadRepairPatch` is a prefix on `CampaignObjectManager.InitializeOnLoad`
+    (`OnGameLoaded` fires too late) and removes wreckages with a null `StringId` before the object
+    lists are built, on the server and on clients, logging how many it dropped. Saves already
+    written by an affected server load again once the fix is deployed on both sides. Checked live on
+    2026-10-22: a server save hit by 7 throws logged "Dropped 7 battle wreckages saved without an id",
+    loaded, and a client that had crashed on it rejoined.
+  - Open: the repair does not undo the rest of the damage. A throw skipped the end of
+    `FinalizeEventAux`, so that battle's parties stay attached to an event that never finished. After
+    the repair, an AI encounter with such a party throws `NullReferenceException` in
+    `PartyBase.set_MapEventSide` from `StartBattleAction` (seen twice on 2026-10-22, events
+    `Created_139` and `Created_171`). A save made after the fix has none; an affected save needs a
+    load repair that detaches parties from unfinished events.
+  - A wreckage already in a hosted save (for example from a single-player v1.5 campaign) no longer
+    expires, because the server no longer registers the hourly tick. Clients still draw it and can
+    click it, which opens a menu clients never registered (existing client path; in-game check owed).
+- Open: v1.5 spawns deserter looter parties with a null `PartyTemplate`
+  (`BanditPartyComponent.CreateLooterParty(..., null, ...)` from `DesertersCampaignBehavior`).
+  `BanditPartyComponentHandler` logs a failed template lookup and returns, so those parties' setup
+  never reaches clients. The fix is to allow a null template on both the send and receive paths, as the
+  caravan handler does for a null leader. Needs its own issue; client-side effect unchecked.
 - A failed courtship can be retried after a season in v1.5. The co-op server refuses that retry, and a
   client loses its courtship attempt history when it reconnects.
 - Two v1.5 AI reactions check the server's main party and player clan, so they never fire for co-op

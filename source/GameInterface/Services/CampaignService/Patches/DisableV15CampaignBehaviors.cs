@@ -1,9 +1,12 @@
 using Common;
+using Common.Logging;
 using GameInterface.Services.Heroes.Extensions;
 using HarmonyLib;
+using Serilog;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.BattleWreckages;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Library;
 
@@ -19,22 +22,20 @@ namespace GameInterface.Services.CampaignService.Patches;
 /// Keyed on Clan.PlayerClan, so it is not multiplayer-aware yet.</item>
 /// <item>PartyConfigurationCampaignBehavior: resets a hero's party commands. Its reset is not synced
 /// by itself; PartyConfigurationCampaignBehaviorPatches makes it reach clients.</item>
-/// <item>BattleWreckageCampaignBehavior: naval battle wreckage (War Sails content, unsupported in coop).</item>
 /// </list>
 /// </summary>
 [HarmonyPatch]
 internal class DisableV15CampaignBehaviors
 {
-    private static IEnumerable<MethodBase> TargetMethods()
+    internal static IEnumerable<MethodBase> TargetMethods()
     {
         yield return AccessTools.Method(typeof(HeroDailyXpCampaignBehavior), nameof(HeroDailyXpCampaignBehavior.RegisterEvents));
         yield return AccessTools.Method(typeof(EmptyClanPartiesCampaignBehavior), nameof(EmptyClanPartiesCampaignBehavior.RegisterEvents));
         yield return AccessTools.Method(typeof(PartyConfigurationCampaignBehavior), nameof(PartyConfigurationCampaignBehavior.RegisterEvents));
-        yield return AccessTools.Method(typeof(BattleWreckageCampaignBehavior), nameof(BattleWreckageCampaignBehavior.RegisterEvents));
     }
 
     [HarmonyPrefix]
-    private static bool Prefix() => ModInformation.IsServer;
+    internal static bool Prefix() => ModInformation.IsServer;
 }
 
 /// <summary>
@@ -64,4 +65,35 @@ internal class EmptyClanPartyLeadersClientPatch
         __result = new MBList<Hero>();
         return false;
     }
+}
+
+/// <summary>
+/// Battle wreckages are off on every role: co-op drops the StringId of a server-made one, which then
+/// throws in AddWreckage and saves an id-less wreckage.
+/// </summary>
+[HarmonyPatch(typeof(BattleWreckageCampaignBehavior), nameof(BattleWreckageCampaignBehavior.RegisterEvents))]
+internal class DisableBattleWreckageCampaignBehavior
+{
+    [HarmonyPrefix]
+    internal static bool Prefix() => false;
+}
+
+/// <summary>
+/// Saves written before the fix hold wreckages without an id, and vanilla's object lists throw on them
+/// during load. OnGameLoaded is too late, so they are dropped before the lists are built.
+/// </summary>
+[HarmonyPatch(typeof(CampaignObjectManager), nameof(CampaignObjectManager.InitializeOnLoad))]
+internal class IdlessWreckageLoadRepairPatch
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<IdlessWreckageLoadRepairPatch>();
+
+    [HarmonyPrefix]
+    private static void Prefix(CampaignObjectManager __instance)
+    {
+        var removed = RemoveIdlessWreckages(__instance);
+        if (removed > 0) Logger.Warning("Dropped {Count} battle wreckages saved without an id", removed);
+    }
+
+    internal static int RemoveIdlessWreckages(CampaignObjectManager manager) =>
+        manager._wreckages?.RemoveAll(wreckage => wreckage == null || wreckage.StringId == null) ?? 0;
 }
