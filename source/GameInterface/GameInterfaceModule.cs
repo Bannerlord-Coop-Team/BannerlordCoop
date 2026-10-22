@@ -160,6 +160,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BattleHostRetentionPolicy>().As<IBattleHostRetentionPolicy>().InstancePerDependency();
         builder.RegisterType<BattleShipFateLedger>().As<IBattleShipFateLedger>().InstancePerLifetimeScope();
         builder.RegisterType<BattleShipFateApplier>().As<IBattleShipFateApplier>().InstancePerDependency();
+        builder.RegisterType<LootShipHold>().As<ILootShipHold>().InstancePerLifetimeScope();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<LocationConversationAgentGuard>().As<ILocationConversationAgentGuard>().InstancePerDependency();
         builder.RegisterType<BattleAgentBudget>().As<IBattleAgentBudget>().InstancePerDependency();

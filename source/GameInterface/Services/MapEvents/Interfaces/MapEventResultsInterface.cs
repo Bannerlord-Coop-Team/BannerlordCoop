@@ -9,6 +9,7 @@ using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Patches;
+using GameInterface.Services.Ships;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 #if DEBUG
@@ -51,13 +52,14 @@ public class MapEventResultsInterface : IMapEventResultsInterface
     private readonly IObjectManager objectManager;
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IRetreatedMapEventPartyTracker retreatedPartyTracker;
+    private readonly ILootShipHold lootShipHold;
 
 #if DEBUG
     private readonly IRaidLootWarningFixture raidLootWarningFixture;
 #endif
 
     public MapEventResultsInterface(IObjectManager objectManager, ITroopRosterInterface troopRosterInterface,
-        IRetreatedMapEventPartyTracker retreatedPartyTracker
+        IRetreatedMapEventPartyTracker retreatedPartyTracker, ILootShipHold lootShipHold
 #if DEBUG
         , IRaidLootWarningFixture raidLootWarningFixture = null
 #endif
@@ -66,6 +68,7 @@ public class MapEventResultsInterface : IMapEventResultsInterface
         this.objectManager = objectManager;
         this.troopRosterInterface = troopRosterInterface;
         this.retreatedPartyTracker = retreatedPartyTracker;
+        this.lootShipHold = lootShipHold;
 #if DEBUG
         this.raidLootWarningFixture = raidLootWarningFixture;
 #endif
@@ -705,6 +708,8 @@ public class MapEventResultsInterface : IMapEventResultsInterface
                 if (playerLootShips.TryGetValue(distributedShip.Value, out List<Ship> playerShips))
                 {
                     playerShips.Add(distributedShip.Key);
+                    // The losing party's finalize would destroy it before the player's loot screen takes or discards it.
+                    lootShipHold.Hold(distributedShip.Key, distributedShip.Value.Party);
                 }
                 else
                 {
