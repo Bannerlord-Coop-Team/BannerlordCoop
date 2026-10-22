@@ -139,113 +139,113 @@ public class CoopBattleController : CoopMissionController
         SiegeInteractionDebugBehavior = siegeInteractionDebugBehavior;
 #endif
 
-            var session = new BattleSession(controllerIdProvider, hostRegistry);
-            Session = session;
-            debugMissionContext = missionContext;
-            coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
-                () => session.IsLocalHost);
-            var casualties = new CasualtyAttributionMap();
+        var session = new BattleSession(controllerIdProvider, hostRegistry);
+        Session = session;
+        debugMissionContext = missionContext;
+        coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
+            () => session.IsLocalHost);
+        var casualties = new CasualtyAttributionMap();
 
-            var deployment = new BattleDeploymentCoordinator(network, messageBroker, session);
-            Deployment = deployment;
+        var deployment = new BattleDeploymentCoordinator(network, messageBroker, session);
+        Deployment = deployment;
 
-            lifecycle = new BattleInstanceLifecycle(
-                network,
-                relayNetwork,
-                messageBroker,
-                objectManager,
-                coopMissionComponent,
-                worldItemRegistry,
-                session,
-                missionContext);
-            deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, coopMissionComponent, session, casualties);
-            routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties, lifecycle);
-            puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
-            puppetDeathApplier = new PuppetDeathApplier(
-                messageBroker,
-                coopMissionComponent,
-                casualties,
-                puppetMountStateRepairer);
-            damageRouter = new BattleDamageRouter(
-                network,
-                messageBroker,
-                coopMissionComponent,
-                session,
-                guardedHitWindow,
-                agentNativeMountState,
-                puppetMountStateRepairer,
-                battleDamageDataMapper);
-            reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
-            OwnedAgentReplicator ownedAgentReplicator = null;
-            authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder, lifecycle,
-                changedAgentIds => ownedAgentReplicator.BroadcastAuthorityRefresh(changedAgentIds));
-            ownedAgentReplicator = new OwnedAgentReplicator(
-                network,
-                messageBroker,
-                objectManager,
-                coopMissionComponent,
-                session,
-                casualties,
-                deployment,
-                spawnBatchCodec,
-                missionWeaponDataMapper,
-                authorityMigrator);
-            replicator = ownedAgentReplicator;
-            puppetSpawner = new PuppetSpawner(
-                messageBroker,
-                objectManager,
-                playerManager,
-                coopMissionComponent,
-                session,
-                casualties,
-                deployment,
-                formationAssigner,
-                agentBudget,
-                missionWeaponDataMapper,
-                puppetRoutApplier,
-                spawnBatchCodec,
-                authorityMigrator);
-            // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch
-            // watermark spans every host-authority message type (engine placement + machine state/authority)
-            // — a superseded hosting generation is dropped consistently across both. The policy is a
-            // per-battle transient (see MissionModule), so this controller's per-battle lifetime resets it.
-            siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session, hostEpochPolicy);
-            siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
-            siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry, session, siegeMachineState, siegeGateHitApplier, hostEpochPolicy);
-            supplyReporter = new SupplyProgressReporter(relayNetwork, session);
+        lifecycle = new BattleInstanceLifecycle(
+            network,
+            relayNetwork,
+            messageBroker,
+            objectManager,
+            coopMissionComponent,
+            worldItemRegistry,
+            session,
+            missionContext);
+        deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, coopMissionComponent, session, casualties);
+        routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties, lifecycle);
+        puppetRoutApplier = new PuppetRoutApplier(messageBroker, coopMissionComponent, casualties);
+        puppetDeathApplier = new PuppetDeathApplier(
+            messageBroker,
+            coopMissionComponent,
+            casualties,
+            puppetMountStateRepairer);
+        damageRouter = new BattleDamageRouter(
+            network,
+            messageBroker,
+            coopMissionComponent,
+            session,
+            guardedHitWindow,
+            agentNativeMountState,
+            puppetMountStateRepairer,
+            battleDamageDataMapper);
+        reinforcementFielder = new ReinforcementFielder(messageBroker, objectManager, coopMissionComponent, session, deployment, formationAssigner, casualties, agentBudget);
+        OwnedAgentReplicator ownedAgentReplicator = null;
+        authorityMigrator = new BattleAuthorityMigrator(relayNetwork, messageBroker, objectManager, playerManager, coopMissionComponent, session, casualties, deployment, formationAssigner, missionContext, reinforcementFielder, lifecycle,
+            changedAgentIds => ownedAgentReplicator.BroadcastAuthorityRefresh(changedAgentIds));
+        ownedAgentReplicator = new OwnedAgentReplicator(
+            network,
+            messageBroker,
+            objectManager,
+            coopMissionComponent,
+            session,
+            casualties,
+            deployment,
+            spawnBatchCodec,
+            missionWeaponDataMapper,
+            authorityMigrator);
+        replicator = ownedAgentReplicator;
+        puppetSpawner = new PuppetSpawner(
+            messageBroker,
+            objectManager,
+            playerManager,
+            coopMissionComponent,
+            session,
+            casualties,
+            deployment,
+            formationAssigner,
+            agentBudget,
+            missionWeaponDataMapper,
+            puppetRoutApplier,
+            spawnBatchCodec,
+            authorityMigrator);
+        // BR-102: ONE host-epoch policy shared by both siege replicators, so its accepted-epoch
+        // watermark spans every host-authority message type (engine placement + machine state/authority)
+        // — a superseded hosting generation is dropped consistently across both. The policy is a
+        // per-battle transient (see MissionModule), so this controller's per-battle lifetime resets it.
+        siegeEngineDeployment = new SiegeEngineDeploymentReplicator(network, messageBroker, session, hostEpochPolicy);
+        siegeMachineState = new SiegeMachineStateReplicator(network, messageBroker, session, coopMissionComponent.AgentRegistry, hostEpochPolicy);
+        siegeWeaponFire = new SiegeWeaponFireReplicator(network, messageBroker, coopMissionComponent.AgentRegistry, session, siegeMachineState, siegeGateHitApplier, hostEpochPolicy);
+        supplyReporter = new SupplyProgressReporter(relayNetwork, session);
 
-            hostRegistryRef = hostRegistry;
-            ResultCommitter = new BattleResultCommitter(network, relayNetwork, session);
-            SiegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
-            messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
-            messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
+        hostRegistryRef = hostRegistry;
+        ResultCommitter = new BattleResultCommitter(network, relayNetwork, session);
+        SiegeEngineStateReporter = new SiegeEngineStateReporter(objectManager, session, hostRegistry, relayNetwork);
+        messageBroker.Subscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot);
+        messageBroker.Subscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned);
 
-            heroAgentAuthorityProbe = ProbeHeroAgentAuthority;
-            BattleSpawnGate.HeroAgentAuthorityProbe = heroAgentAuthorityProbe;
+        heroAgentAuthorityProbe = ProbeHeroAgentAuthority;
+        BattleSpawnGate.HeroAgentAuthorityProbe = heroAgentAuthorityProbe;
 
-            // Decode order clips during battle setup so the first issued order does not hitch.
-            coopMissionComponent.AgentVoiceHandler.WarmUp();
+        // Decode order clips during battle setup so the first issued order does not hitch.
+        coopMissionComponent.AgentVoiceHandler.WarmUp();
     }
 
     protected override void DisposeMission()
     {
         Cleanup(
-            () => { if (Session != null) messageBroker.Publish(this, new BattleMissionEnded(Session.InstanceId)); },
-            () => lifecycle?.Dispose(),
-            () => replicator?.Dispose(),
-            () => deathReporter?.Dispose(),
-            () => routReporter?.Dispose(),
-            () => puppetSpawner?.Dispose(),
-            () => puppetDeathApplier?.Dispose(),
-            () => puppetRoutApplier?.Dispose(),
-            () => damageRouter?.Dispose(),
-            () => authorityMigrator?.Dispose(),
-            () => reinforcementFielder?.Dispose(),
-            () => siegeEngineDeployment?.Dispose(),
+            () => messageBroker.Publish(this, new BattleMissionEnded(Session.InstanceId)),
+            lifecycle.Dispose,
+            replicator.Dispose,
+            deathReporter.Dispose,
+            routReporter.Dispose,
+            puppetSpawner.Dispose,
+            puppetDeathApplier.Dispose,
+            puppetRoutApplier.Dispose,
+            damageRouter.Dispose,
+            authorityMigrator.Dispose,
+            reinforcementFielder.Dispose,
+            siegeEngineDeployment.Dispose,
             () => coopMissionComponent.AgentActionHandler.BindPilotSeats(null, null),
-            () => siegeMachineState?.Dispose(),
-            () => siegeWeaponFire?.Dispose(),
-            () => Deployment?.Dispose(),
+            siegeMachineState.Dispose,
+            siegeWeaponFire.Dispose,
+            Deployment.Dispose,
             () => messageBroker.Unsubscribe<NetworkBattleResultSnapshot>(Handle_BattleResultSnapshot),
             () => messageBroker.Unsubscribe<BattleHostAssignmentApplied>(Handle_BattleHostAssigned),
             () =>

@@ -131,14 +131,6 @@ public abstract class CoopMissionController : MissionBehavior, IDisposable
         else DisposeController();
     }
 
-    // Failed composition owns its graph, but has not acquired the shared mission state.
-    public void Abandon()
-    {
-        if (ended) return;
-        ended = true;
-        Cleanup(DisposeController, () => lifetime?.Dispose());
-    }
-
     private void DisposeController()
     {
         if (disposed) return;

@@ -1,6 +1,4 @@
-﻿using Common.Logging;
-using Serilog;
-using GameInterface;
+﻿using GameInterface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Tournaments.Data;
@@ -50,7 +48,6 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
         typeof(CoopTournamentController),
     };
 
-    private static readonly ILogger Logger = LogManager.GetLogger<CoopTournamentLauncher>();
     private readonly IObjectManager objectManager;
     private readonly ITournamentGameInterface tournamentGameInterface;
     private readonly Func<CoopTournamentController> controllerFactory;
@@ -87,65 +84,23 @@ public class CoopTournamentLauncher : ICoopTournamentLauncher
         CoopTournamentController coopController = null;
         CoopTournamentBehavior tournamentBehavior = null;
         CoopTournamentFightMissionController fightController = null;
-        Mission mission = null;
+        var mission = MissionState.OpenNew(
+            "TournamentFight",
+            initializer,
+            _ => CreateBehaviors(
+                tournamentGame,
+                town.Settlement,
+                town.Culture,
+                !isSpectator,
+                snapshot,
+                out coopController,
+                out tournamentBehavior,
+                out fightController),
+            true,
+            true);
 
-        try
-        {
-            mission = MissionState.OpenNew(
-                "TournamentFight",
-                initializer,
-                _ => CreateBehaviors(
-                    tournamentGame,
-                    town.Settlement,
-                    town.Culture,
-                    !isSpectator,
-                    snapshot,
-                    out coopController,
-                    out tournamentBehavior,
-                    out fightController),
-                true,
-                true);
-
-            if (mission == null)
-            {
-                coopController?.Abandon();
-                uiContext.Clear(snapshot.SessionId);
-                return null;
-            }
-
-            coopController.Initialize(snapshot, tournamentBehavior, fightController, mission);
-            return mission;
-        }
-        catch
-        {
-            try
-            {
-                CloseFailedMission(coopController, mission);
-            }
-            catch (Exception error) { Logger.Error(error, "Failed to close an incomplete tournament mission"); }
-            finally { uiContext.Clear(snapshot.SessionId); }
-            throw;
-        }
-    }
-
-    internal void CloseFailedMission(CoopTournamentController controller, Mission mission)
-    {
-        if (mission == null)
-        {
-            controller?.Abandon();
-            return;
-        }
-
-        try { controller?.Dispose(); }
-        finally
-        {
-            try
-            {
-                if (controller != null && mission.MissionBehaviors.Contains(controller))
-                    mission.RemoveMissionBehavior(controller);
-            }
-            finally { mission.EndMission(); }
-        }
+        coopController.Initialize(snapshot, tournamentBehavior, fightController, mission);
+        return mission;
     }
 
     private IEnumerable<MissionBehavior> CreateBehaviors(

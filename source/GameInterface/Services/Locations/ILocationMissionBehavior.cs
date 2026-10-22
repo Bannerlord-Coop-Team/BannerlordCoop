@@ -11,9 +11,4 @@
     public interface ILocationMissionBehavior
     {
     }
-    /// <summary>Releases a location graph whose composition or attachment failed.</summary>
-    public interface ILocationMissionLifetime : ILocationMissionBehavior
-    {
-        void Abandon();
-    }
 }

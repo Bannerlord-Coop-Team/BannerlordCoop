@@ -32,34 +32,19 @@ internal class CoopBattleBehaviorAttacher : ICoopBattleBehaviorAttacher
     {
         var controller = controllerFactory();
         var behaviors = new List<MissionBehavior> { controller };
-        try
-        {
 #if DEBUG
-            behaviors.Add(controller.SiegeInteractionDebugBehavior);
+        behaviors.Add(controller.SiegeInteractionDebugBehavior);
 #endif
-            behaviors.Add(controller.MapTimeView);
-            behaviors.Add(controller.PlayerNameplateView);
-            behaviors.Add(new BattleResultReadyLogic(
-                controller.ResultCommitter,
-                controller.SiegeEngineStateReporter,
-                messageBroker,
-                controller.Session,
-                controller.Deployment,
-                relayNetwork));
-            foreach (var behavior in behaviors) mission.AddMissionBehavior(behavior);
-            Logger.Information("[BattleSync] Attached coop battle behaviors to mission '{Scene}'", mission.SceneName);
-        }
-        catch
-        {
-            try { controller.Abandon(); }
-            catch (Exception error) { Logger.Error(error, "Failed battle attachment cleanup"); }
-            foreach (var behavior in behaviors)
-            {
-                if (!mission.MissionBehaviors.Contains(behavior)) continue;
-                try { mission.RemoveMissionBehavior(behavior); }
-                catch (Exception error) { Logger.Error(error, "Failed to remove a partially attached battle behavior"); }
-            }
-            throw;
-        }
+        behaviors.Add(controller.MapTimeView);
+        behaviors.Add(controller.PlayerNameplateView);
+        behaviors.Add(new BattleResultReadyLogic(
+            controller.ResultCommitter,
+            controller.SiegeEngineStateReporter,
+            messageBroker,
+            controller.Session,
+            controller.Deployment,
+            relayNetwork));
+        foreach (var behavior in behaviors) mission.AddMissionBehavior(behavior);
+        Logger.Information("[BattleSync] Attached coop battle behaviors to mission '{Scene}'", mission.SceneName);
     }
 }

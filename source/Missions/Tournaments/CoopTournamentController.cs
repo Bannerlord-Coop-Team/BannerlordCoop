@@ -164,24 +164,24 @@ public class CoopTournamentController : CoopMissionController
         MapTimeView = mapTimeView;
         PlayerNameplateView = playerNameplateView;
 
-            this.relayNetwork = relayNetwork;
-            this.worldItemRegistry = worldItemRegistry;
-            this.guardedHitWindow = guardedHitWindow;
-            this.missionContext = missionContext;
-            spectatorAgentManager = spectatorAgentManagerFactory.Create(coopMissionComponent);
-            session = new TournamentMissionSession(controllerIdProvider);
-            coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
-                () => session.IsLocalHost);
-            matchLifecycle = new TournamentMatchLifecycle(coopMissionComponent, worldItemRegistry);
-            agentSpawner = new TournamentAgentSpawner(objectManager, controllerIdProvider, coopMissionComponent);
-            manifestBuilder = new TournamentSpawnManifestBuilder(objectManager, coopMissionComponent);
+        this.relayNetwork = relayNetwork;
+        this.worldItemRegistry = worldItemRegistry;
+        this.guardedHitWindow = guardedHitWindow;
+        this.missionContext = missionContext;
+        spectatorAgentManager = spectatorAgentManagerFactory.Create(coopMissionComponent);
+        session = new TournamentMissionSession(controllerIdProvider);
+        coopMissionComponent.WeaponDropHandler.ConfigureLocalHostProvider(
+            () => session.IsLocalHost);
+        matchLifecycle = new TournamentMatchLifecycle(coopMissionComponent, worldItemRegistry);
+        agentSpawner = new TournamentAgentSpawner(objectManager, controllerIdProvider, coopMissionComponent);
+        manifestBuilder = new TournamentSpawnManifestBuilder(objectManager, coopMissionComponent);
 
-            messageBroker.Subscribe<TournamentSessionUpdated>(Handle_SessionUpdated);
-            messageBroker.Subscribe<TournamentSpawnManifestUpdated>(Handle_ManifestUpdated);
-            messageBroker.Subscribe<NetworkApplyTournamentDamage>(Handle_ApplyTournamentDamage);
-            messageBroker.Subscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut);
-            messageBroker.Subscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState);
-            messageBroker.Subscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded);
+        messageBroker.Subscribe<TournamentSessionUpdated>(Handle_SessionUpdated);
+        messageBroker.Subscribe<TournamentSpawnManifestUpdated>(Handle_ManifestUpdated);
+        messageBroker.Subscribe<NetworkApplyTournamentDamage>(Handle_ApplyTournamentDamage);
+        messageBroker.Subscribe<NetworkTournamentAgentKnockedOut>(Handle_AgentKnockedOut);
+        messageBroker.Subscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState);
+        messageBroker.Subscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded);
     }
 
     public ITournamentMissionSession Session => session;
@@ -2201,7 +2201,7 @@ public class CoopTournamentController : CoopMissionController
             () => messageBroker.Unsubscribe<NetworkTournamentRuntimeState>(Handle_RuntimeState),
             () => messageBroker.Unsubscribe<NetworkTournamentRoundEnded>(Handle_RoundEnded),
             () => pendingLocalDamage.Clear(),
-            () => guardedHitWindow?.Dispose(),
+            guardedHitWindow.Dispose,
             base.DisposeMission);
     }
 }
