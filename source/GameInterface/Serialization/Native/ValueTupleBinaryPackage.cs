@@ -81,7 +81,8 @@ namespace GameInterface.Serialization.Native
                 // sender's runtime packed that don't exist on this runtime's type.
                 if (field == null)
                 {
-                    Logger.Warning("[FieldSkew] {Type} has no field '{Field}' on this runtime; skipping packed value", type.Name, fieldName);
+                    if (FieldSkewLog.FirstTime(type, fieldName))
+                        Logger.Warning("[FieldSkew] {Type} has no field '{Field}' on this runtime; skipping its packed values (logged once per field)", type.Name, fieldName);
                     continue;
                 }
 
