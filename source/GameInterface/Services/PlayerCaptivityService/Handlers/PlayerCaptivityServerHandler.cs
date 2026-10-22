@@ -444,6 +444,8 @@ internal class PlayerCaptivityServerHandler : IHandler
         {
             try
             {
+                if (!playerManager.IsSenderControllingHero(peer, heroId))
+                    return;
                 if (!objectManager.TryGetObjectWithLogging<Hero>(heroId, out var playerHero))
                     return;
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var playerParty))

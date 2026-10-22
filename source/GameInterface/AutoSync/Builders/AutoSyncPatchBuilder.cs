@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -194,7 +195,7 @@ namespace GameInterface.AutoSync.Builders
                 PatchClassName = $"{declaringTypeName}_DynamicPatches",
                 PatchCategory = (string)null,
                 IncludeDeclaredMethods = true,
-                TargetMethods = dynamicRegistryItem.TargetMethods,
+                TargetMethods = ProjectTargets(dynamicRegistryItem.TargetMethods),
                 Prefixes = prefixes,
                 Transpilers = transpilers,
             });
@@ -222,7 +223,7 @@ namespace GameInterface.AutoSync.Builders
                     PatchClassName = $"{declaringTypeName}_Category{categoryIndex}_DynamicPatches",
                     PatchCategory = categorizedTargets.Key,
                     IncludeDeclaredMethods = false,
-                    TargetMethods = categorizedTargets.Value,
+                    TargetMethods = ProjectTargets(categorizedTargets.Value),
                     Prefixes = Enumerable.Empty<string>(),
                     Transpilers = transpilers,
                 });
@@ -234,6 +235,21 @@ namespace GameInterface.AutoSync.Builders
             syntaxTrees.AddRange(messages.Select(m => CSharpSyntaxTree.ParseText(m)));
             syntaxTrees.Add(CSharpSyntaxTree.ParseText(handlerTemplate));
             return syntaxTrees;
+        }
+
+        private static IEnumerable<TargetMethodProjection> ProjectTargets(IEnumerable<MethodInfo> methods)
+        {
+            return methods.Select(method => new TargetMethodProjection
+            {
+                DeclaringType = method.DeclaringType.FullName.Replace('+', '.'),
+                Name = method.Name,
+            });
+        }
+
+        private sealed class TargetMethodProjection
+        {
+            public string DeclaringType { get; set; }
+            public string Name { get; set; }
         }
 
 
