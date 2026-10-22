@@ -1,4 +1,6 @@
-﻿namespace GameInterface.Utils;
+﻿using TaleWorlds.MountAndBlade;
+
+namespace GameInterface.Utils;
 
 /// <summary>
 /// The engine's water clock: lets a synced naval battle make every scene's waves read a time it owns instead of the
@@ -38,7 +40,7 @@ public interface IWaterClock
 public class WaterClock : IWaterClock
 {
     /// <summary>MBCommon.TimeType.Mission (rglTimer_type Tactical_timer), the clock mission scenes' water reads.</summary>
-    public const int MissionTimeType = 1;
+    public const int MissionTimeType = (int)MBCommon.TimeType.Mission;
 
     public bool IsInstalled => NativeWaterClockPatch.IsActive;
 

@@ -82,6 +82,28 @@ public class BattleWaterClockTests
     }
 
     [Fact]
+    public void Client_DropsANonFiniteHostTime()
+    {
+        clock.AcceptHostTime(new NetworkBattleWaterTime(float.NaN, 2));
+        clock.AcceptHostTime(new NetworkBattleWaterTime(float.PositiveInfinity, 2));
+
+        Assert.Equal(0, clock.SamplesAccepted);
+    }
+
+    [Fact]
+    public void AFailedRedirect_IsNotRetriedEveryFrame()
+    {
+        waterClock.RefuseOverride = true;
+
+        clock.Tick(0.016f);
+        clock.Tick(0.016f);
+
+        Assert.Equal(1, waterClock.Begins);
+        Assert.Equal(0, waterClock.Writes);
+        network.VerifyNoOtherCalls();
+    }
+
+    [Fact]
     public void Host_IgnoresTimeSamplesAndBroadcastsItsOwnEverySecond()
     {
         session.SetupGet(s => s.IsLocalHost).Returns(true);
@@ -164,6 +186,7 @@ public class BattleWaterClockTests
     private sealed class FakeWaterClock : IWaterClock
     {
         public bool Installed = true;
+        public bool RefuseOverride;
         public float Vanilla;
         public float BeganAt;
         public int Begins;
@@ -190,6 +213,7 @@ public class BattleWaterClockTests
         {
             if (!Installed) return false;
             Begins++;
+            if (RefuseOverride) return false;
             BeganAt = waterTime;
             WrittenTime = waterTime;
             IsOverriding = true;

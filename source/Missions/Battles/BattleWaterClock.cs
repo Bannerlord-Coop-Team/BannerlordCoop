@@ -41,6 +41,7 @@ public class BattleWaterClock : IBattleWaterClock
     private readonly IWaterClock waterClock;
     private float sinceBroadcast = BroadcastIntervalSeconds;
     private bool overriding;
+    private bool overrideFailed;
 
     public BattleWaterClock(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session,
         IHostEpochPolicy hostEpochPolicy, IWaterClock waterClock, IBattleWaterTimeEstimator estimator)
@@ -63,7 +64,7 @@ public class BattleWaterClock : IBattleWaterClock
 
     public void Tick(float dt)
     {
-        if (!waterClock.IsInstalled) return;
+        if (!waterClock.IsInstalled || overrideFailed) return;
         if (!waterClock.TryReadVanillaTime(WaterClock.MissionTimeType, out var local)) return;
 
         bool isHost = session.IsLocalHost;
@@ -71,7 +72,9 @@ public class BattleWaterClock : IBattleWaterClock
         if (!overriding)
         {
             // The first frame starts from this client's own clock (or the host's, if its time came during loading).
-            if (!waterClock.TryBeginOverride(waterTime)) return;
+            // A failed redirect has been logged; this battle keeps vanilla waves rather than retrying every frame.
+            overrideFailed = !waterClock.TryBeginOverride(waterTime);
+            if (overrideFailed) return;
             overriding = true;
             Logger.Information("[NavalSync] Battle water clock on at {WaterTime} (local {Local}, host {IsHost})", waterTime, local, isHost);
         }
@@ -103,6 +106,7 @@ public class BattleWaterClock : IBattleWaterClock
     internal void AcceptHostTime(NetworkBattleWaterTime sample)
     {
         if (!waterClock.IsInstalled || session.IsLocalHost) return;
+        if (float.IsNaN(sample.WaterTime) || float.IsInfinity(sample.WaterTime)) return;
         if (hostEpochPolicy.IsStale(sample.HostEpoch, session.HostEpoch)) return;
         if (!waterClock.TryReadVanillaTime(WaterClock.MissionTimeType, out var local)) return;
 
