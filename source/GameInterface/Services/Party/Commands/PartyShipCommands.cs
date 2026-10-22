@@ -229,6 +229,7 @@ public class PartyShipCommands
         }
     }
 
+#if DEBUG
     // coop.debug.naval.fleet
     // coop.debug.naval.fleet MobileParty_southern_pirates_13
     /// <summary>
@@ -283,6 +284,7 @@ public class PartyShipCommands
             .ToArray();
         return $"{party.Id} ships={ships.Length}" + (ships.Length == 0 ? "" : ": " + string.Join(", ", ships));
     }
+#endif
 
     // A controller id names the player's party; any other id is looked up as a registered MobileParty or PartyBase.
     private static bool TryGetListedParty(string id, out IObjectManager objectManager, out PartyBase party, out string error)

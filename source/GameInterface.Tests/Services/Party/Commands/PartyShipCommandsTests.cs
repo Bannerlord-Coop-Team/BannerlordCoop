@@ -33,6 +33,7 @@ public class PartyShipCommandsTests
         Assert.Equal(expectedOutput, result.Output);
     }
 
+#if DEBUG
     [Fact]
     public void NavalFleet_RequiresNavalDlc()
     {
@@ -41,6 +42,7 @@ public class PartyShipCommandsTests
         Assert.False(result.Succeeded);
         Assert.Equal("NavalDLC is not active.", result.Output);
     }
+#endif
 
     [Fact]
     public void ListShips_RequiresNavalDlc()
