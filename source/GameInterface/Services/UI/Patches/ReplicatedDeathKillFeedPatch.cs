@@ -17,6 +17,7 @@ namespace GameInterface.Services.UI.Patches;
     new[] { typeof(Agent), typeof(Agent), typeof(AgentState), typeof(KillingBlow) })]
 internal class ReplicatedDeathKillFeedPatch
 {
+    // Swaps in the replicated attacker and blow, and drops the routed hit notification the death supersedes.
     [HarmonyPrefix]
     internal static void Prefix(
         Agent affectedAgent,
@@ -46,8 +47,9 @@ internal class ReplicatedDeathKillFeedPatch
 [HarmonyPatch(typeof(SPPersonalKillNotificationVM), nameof(SPPersonalKillNotificationVM.OnPersonalHit))]
 internal class RoutedPlayerHitNotificationPatch
 {
+    // Hands the hit notification vanilla just added to the tracker when it matches the routed hit being published.
     [HarmonyPostfix]
-    private static void Postfix(
+    internal static void Postfix(
         SPPersonalKillNotificationVM __instance,
         int damageAmount,
         bool isMountDamage)

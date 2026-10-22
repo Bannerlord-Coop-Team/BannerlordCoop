@@ -107,8 +107,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 client.Resolve<IMapEventLogger>(),
                 missionInitializerResolver,
                 null!,
-                missionRegistry,
-                client.Resolve<IRoutedPlayerHitNotificationTracker>());
+                missionRegistry);
 
             try
             {
@@ -246,7 +245,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                 using var handler = new BattleMissionStartHandler(messageBroker, client.ObjectManager,
                     client.Resolve<IPlayerManager>(), client.Resolve<INetwork>(),
                     client.Resolve<IMapEventLogger>(), new RecordingMissionInitializerResolver(), null!,
-                    missionRegistry, client.Resolve<IRoutedPlayerHitNotificationTracker>());
+                    missionRegistry);
                 ContainerProvider.SetContainer(launcherScope);
                 messageBroker.Publish(this, new NetworkStartSiegeMission(mapEvent.MapEventId, 0,
                     new[] { 1f, 1f }, Array.Empty<SiegeEngineState>(), Array.Empty<SiegeEngineState>(),
@@ -330,8 +329,7 @@ public class BattleMissionStartHandlerTests : MapEventTestBase
                     client.Resolve<IMapEventLogger>(),
                     missionInitializerResolver,
                     null!,
-                    client.Resolve<ICoopBattleMissionRegistry>(),
-                    client.Resolve<IRoutedPlayerHitNotificationTracker>());
+                    client.Resolve<ICoopBattleMissionRegistry>());
 
                 messageBroker.Publish(this, new NetworkStartAttackMission(
                     mapEvent.MapEventId,

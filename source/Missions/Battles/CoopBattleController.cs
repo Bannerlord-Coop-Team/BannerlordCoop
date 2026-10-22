@@ -122,8 +122,7 @@ public class CoopBattleController : CoopMissionController
         IBattleAgentAuthorityRegistry agentAuthorityRegistry,
         IPuppetSpawnTracker puppetSpawnTracker,
         IRoutedBlowTracker routedBlowTracker,
-        IReplicatedDeathTracker replicatedDeathTracker,
-        IRoutedPlayerHitNotificationTracker notificationTracker)
+        IReplicatedDeathTracker replicatedDeathTracker)
         : base(
             network,
             messageBroker,
@@ -148,8 +147,7 @@ public class CoopBattleController : CoopMissionController
             worldItemRegistry,
             session,
             missionContext,
-            missionRegistry,
-            notificationTracker);
+            missionRegistry);
         deathReporter = new AgentDeathReporter(network, relayNetwork, messageBroker, coopMissionComponent, session,
             casualties, missionRegistry, replicatedDeathTracker);
         routReporter = new AgentRoutReporter(network, messageBroker, coopMissionComponent, session, casualties, lifecycle);

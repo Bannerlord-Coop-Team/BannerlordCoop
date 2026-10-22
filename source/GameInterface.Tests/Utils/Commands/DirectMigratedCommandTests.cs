@@ -278,6 +278,7 @@ public class DirectMigratedCommandTests
         var commandTypes = GetCommandTypes();
         var builder = new ContainerBuilder();
         builder.RegisterType<CoopBattleMissionRegistry>().As<ICoopBattleMissionRegistry>();
+        builder.RegisterType<RoutedPlayerHitNotificationTracker>().As<IRoutedPlayerHitNotificationTracker>();
         foreach (var type in commandTypes)
             builder.RegisterType(type);
 

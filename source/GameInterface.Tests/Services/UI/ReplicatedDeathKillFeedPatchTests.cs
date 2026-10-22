@@ -6,6 +6,7 @@ using GameInterface.Services.UI.Patches;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.ViewModelCollection.HUD.KillFeed.Personal;
 using Xunit;
 
 namespace GameInterface.Tests.Services.UI;
@@ -49,5 +50,26 @@ public class ReplicatedDeathKillFeedPatchTests
         }
 
         Assert.False(replicatedDeathTracker.TryGetReplicatedDeath(affectedAgent, out _, out _));
+    }
+
+    // The hit postfix hands the routed hit's notification to the tracker, so the victim's replicated death removes it.
+    [Fact]
+    public void HitPostfix_TracksRoutedHitNotification_ForMatchingDeathToRemove()
+    {
+        using var battleScope = new ActiveCoopBattleScope("battle-1");
+        Assert.True(ContainerProvider.TryResolve<IRoutedPlayerHitNotificationTracker>(out var tracker));
+        var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
+        var killFeed = new SPPersonalKillNotificationVM();
+        tracker.EnqueueCombatLogContext(affectedAgent, 50);
+
+        tracker.BeginCombatLog();
+        killFeed.OnPersonalMessage("routed victim");
+        RoutedPlayerHitNotificationPatch.Postfix(killFeed, 50, isMountDamage: false);
+        tracker.EndCombatLog();
+        Assert.Single(killFeed.NotificationList);
+
+        tracker.RemoveRoutedPlayerHitNotification(affectedAgent, 50);
+
+        Assert.Empty(killFeed.NotificationList);
     }
 }

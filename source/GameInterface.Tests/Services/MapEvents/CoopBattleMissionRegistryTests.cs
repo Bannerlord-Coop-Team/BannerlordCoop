@@ -1,5 +1,7 @@
-﻿using GameInterface.Services.MapEvents;
+﻿using Common.Util;
+using GameInterface.Services.MapEvents;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using Xunit;
 
 namespace GameInterface.Tests.Services.MapEvents;
@@ -11,7 +13,7 @@ public class CoopBattleMissionRegistryTests
     [Fact]
     public void IsMissionActive_FalseBeforeAnyMissionBegins()
     {
-        var registry = new CoopBattleMissionRegistry();
+        var registry = new CoopBattleMissionRegistry(new RoutedPlayerHitNotificationTracker());
 
         Assert.False(registry.IsMissionActive);
     }
@@ -20,7 +22,7 @@ public class CoopBattleMissionRegistryTests
     [Fact]
     public void EndMission_SameId_ClosesWindow()
     {
-        var registry = new CoopBattleMissionRegistry();
+        var registry = new CoopBattleMissionRegistry(new RoutedPlayerHitNotificationTracker());
 
         registry.BeginMission("MapEvent_1");
         Assert.True(registry.IsMissionActive);
@@ -33,7 +35,7 @@ public class CoopBattleMissionRegistryTests
     [Fact]
     public void EndMission_StaleId_KeepsNewerWindowOpen()
     {
-        var registry = new CoopBattleMissionRegistry();
+        var registry = new CoopBattleMissionRegistry(new RoutedPlayerHitNotificationTracker());
 
         registry.BeginMission("MapEvent_1");
         registry.BeginMission("MapEvent_2");
@@ -49,7 +51,7 @@ public class CoopBattleMissionRegistryTests
     [Fact]
     public void EndMission_NullId_ClosesWindowBegunWithNullId()
     {
-        var registry = new CoopBattleMissionRegistry();
+        var registry = new CoopBattleMissionRegistry(new RoutedPlayerHitNotificationTracker());
 
         registry.BeginMission(null);
         Assert.True(registry.IsMissionActive);
@@ -62,7 +64,7 @@ public class CoopBattleMissionRegistryTests
     [Fact]
     public void IsCoopBattleActive_FalseBeforeAnyBattleBegins()
     {
-        var registry = new CoopBattleMissionRegistry();
+        var registry = new CoopBattleMissionRegistry(new RoutedPlayerHitNotificationTracker());
 
         Assert.False(registry.IsCoopBattleActive);
         Assert.Null(registry.ActiveMapEventId);
@@ -72,7 +74,7 @@ public class CoopBattleMissionRegistryTests
     [Fact]
     public void BeginBattle_MarksActive_WithTheMapEvent()
     {
-        var registry = new CoopBattleMissionRegistry();
+        var registry = new CoopBattleMissionRegistry(new RoutedPlayerHitNotificationTracker());
 
         registry.BeginBattle("mapEvent-1");
 
@@ -85,7 +87,7 @@ public class CoopBattleMissionRegistryTests
     [Trait("Requirement", "BR-091")]
     public void EndBattle_ClearsActiveBattle_Idempotently()
     {
-        var registry = new CoopBattleMissionRegistry();
+        var registry = new CoopBattleMissionRegistry(new RoutedPlayerHitNotificationTracker());
         registry.BeginBattle("mapEvent-1");
 
         registry.EndBattle();
@@ -103,7 +105,7 @@ public class CoopBattleMissionRegistryTests
     [Fact]
     public void BattleWindow_IsIndependentOfMissionWindow()
     {
-        var registry = new CoopBattleMissionRegistry();
+        var registry = new CoopBattleMissionRegistry(new RoutedPlayerHitNotificationTracker());
 
         registry.BeginBattle("mapEvent-1");
         Assert.False(registry.IsMissionActive);
@@ -118,7 +120,7 @@ public class CoopBattleMissionRegistryTests
     [Fact]
     public void MissingReserveAcceptance_IsPerSide_AndClearedForNextBattle()
     {
-        var registry = new CoopBattleMissionRegistry();
+        var registry = new CoopBattleMissionRegistry(new RoutedPlayerHitNotificationTracker());
         registry.BeginBattle("mapEvent-1");
         registry.AcceptMissingReserveSide(BattleSideEnum.Defender);
 
@@ -140,12 +142,45 @@ public class CoopBattleMissionRegistryTests
     [Fact]
     public void EndBattle_ClearsMissingReserveAcceptance()
     {
-        var registry = new CoopBattleMissionRegistry();
+        var registry = new CoopBattleMissionRegistry(new RoutedPlayerHitNotificationTracker());
         registry.BeginBattle("mapEvent-1");
         registry.AcceptMissingReserveSide(BattleSideEnum.Attacker);
 
         registry.EndBattle();
 
         Assert.False(registry.IsMissingReserveSideAccepted(BattleSideEnum.Attacker));
+    }
+
+    // Opening a battle window drops a replicated death left from an earlier battle, so it cannot remove a new hit.
+    [Fact]
+    public void BeginBattle_ResetsKillFeedTracker()
+    {
+        var tracker = new RoutedPlayerHitNotificationTracker();
+        var registry = new CoopBattleMissionRegistry(tracker);
+        var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
+        bool notificationRemoved = false;
+        tracker.RemoveRoutedPlayerHitNotification(affectedAgent, 50);
+
+        registry.BeginBattle("mapEvent-1");
+        tracker.TrackRoutedPlayerHitNotification(affectedAgent, 50, () => notificationRemoved = true);
+
+        Assert.False(notificationRemoved);
+    }
+
+    // Closing a battle window drops a hit notification still waiting for its replicated death.
+    [Fact]
+    public void EndBattle_ResetsKillFeedTracker()
+    {
+        var tracker = new RoutedPlayerHitNotificationTracker();
+        var registry = new CoopBattleMissionRegistry(tracker);
+        var affectedAgent = ObjectHelper.SkipConstructor<Agent>();
+        bool notificationRemoved = false;
+        registry.BeginBattle("mapEvent-1");
+        tracker.TrackRoutedPlayerHitNotification(affectedAgent, 50, () => notificationRemoved = true);
+
+        registry.EndBattle();
+        tracker.RemoveRoutedPlayerHitNotification(affectedAgent, 50);
+
+        Assert.False(notificationRemoved);
     }
 }

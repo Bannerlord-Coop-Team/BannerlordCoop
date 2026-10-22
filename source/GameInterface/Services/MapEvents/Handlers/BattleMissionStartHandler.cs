@@ -59,7 +59,6 @@ internal class BattleMissionStartHandler : IHandler
     private readonly IBattleMissionInitializerResolver missionInitializerResolver;
     private readonly IBattleTroopReserveBuilder reserveBuilder;
     private readonly ICoopBattleMissionRegistry missionRegistry;
-    private readonly IRoutedPlayerHitNotificationTracker notificationTracker;
     private readonly HideoutRaidHandler hideoutRaids;
     private static long attackMissionStartSequence;
 
@@ -82,7 +81,6 @@ internal class BattleMissionStartHandler : IHandler
         IBattleMissionInitializerResolver missionInitializerResolver,
         IBattleTroopReserveBuilder reserveBuilder,
         ICoopBattleMissionRegistry missionRegistry,
-        IRoutedPlayerHitNotificationTracker notificationTracker,
         HideoutRaidHandler hideoutRaids = null)
     {
         this.messageBroker = messageBroker;
@@ -93,7 +91,6 @@ internal class BattleMissionStartHandler : IHandler
         this.missionInitializerResolver = missionInitializerResolver;
         this.reserveBuilder = reserveBuilder;
         this.missionRegistry = missionRegistry;
-        this.notificationTracker = notificationTracker;
         this.hideoutRaids = hideoutRaids;
 
         messageBroker.Subscribe<NetworkBattleStartRequest>(Handle_NetworkBattleStartRequest);
@@ -654,7 +651,6 @@ internal class BattleMissionStartHandler : IHandler
             if (BattleSpawnConfig.Enabled)
             {
                 missionRegistry.BeginBattle(payload.MapEventId);
-                notificationTracker.Reset();
                 battleWindowOpened = true;
                 Logger.Information("[BattleSync] Opened coop battle window in OpenSiegeMission: mapEvent={MapEventId}", payload.MapEventId);
             }
@@ -816,7 +812,6 @@ internal class BattleMissionStartHandler : IHandler
             if (BattleSpawnConfig.Enabled)
             {
                 missionRegistry.BeginBattle(mapEventId);
-                notificationTracker.Reset();
                 battleWindowOpened = true;
                 Logger.Information("[BattleSync] Opened coop battle window in OpenAttackMission: mapEvent={MapEventId}", mapEventId);
             }
@@ -923,7 +918,6 @@ internal class BattleMissionStartHandler : IHandler
         if (!battleWindowOpened) return;
 
         missionRegistry.EndBattle();
-        notificationTracker.Reset();
     }
 
     internal static bool ShouldOpenBattleMission(bool isPlayerWounded, string localPartyId, string initiatingPartyId)

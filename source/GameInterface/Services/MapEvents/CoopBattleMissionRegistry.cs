@@ -33,15 +33,15 @@ public interface ICoopBattleMissionRegistry
     string ActiveMapEventId { get; }
 
     /// <summary>
-    /// Opens the battle window for <paramref name="mapEventId"/> and clears any reserve timeouts. Callers also reset the
-    /// kill feed with <see cref="IRoutedPlayerHitNotificationTracker.Reset"/>.
+    /// Opens the battle window for <paramref name="mapEventId"/>, clearing any reserve timeouts and the kill-feed
+    /// bookkeeping left from an earlier battle.
     /// </summary>
     void BeginBattle(string mapEventId);
 
     /// <summary>
-    /// Closes the battle window and clears any reserve timeouts. Not keyed like <see cref="EndMission"/>, because its
-    /// only callers (leaving the battle, or a failed open) both mean no coop battle should stay active. Callers also
-    /// reset the kill feed with <see cref="IRoutedPlayerHitNotificationTracker.Reset"/>.
+    /// Closes the battle window, clearing any reserve timeouts and the kill-feed bookkeeping. Not keyed like
+    /// <see cref="EndMission"/>, because its only callers (leaving the battle, or a failed open) both mean no coop
+    /// battle should stay active.
     /// </summary>
     void EndBattle();
 
@@ -62,11 +62,18 @@ public interface ICoopBattleMissionRegistry
 public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
 {
     private readonly object sync = new();
+    private readonly IRoutedPlayerHitNotificationTracker notificationTracker;
     private bool isMissionActive;
     private string missionId;
     private string activeMapEventId;
     private bool defenderReserveTimedOut;
     private bool attackerReserveTimedOut;
+
+    // Takes the kill-feed tracker so opening or closing a battle window always drops its stale entries.
+    public CoopBattleMissionRegistry(IRoutedPlayerHitNotificationTracker notificationTracker)
+    {
+        this.notificationTracker = notificationTracker;
+    }
 
     /// <inheritdoc/>
     public bool IsMissionActive
@@ -135,6 +142,8 @@ public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
             activeMapEventId = mapEventId;
             ClearReserveTimeouts();
         }
+
+        notificationTracker.Reset();
     }
 
     /// <inheritdoc/>
@@ -145,6 +154,8 @@ public class CoopBattleMissionRegistry : ICoopBattleMissionRegistry
             activeMapEventId = null;
             ClearReserveTimeouts();
         }
+
+        notificationTracker.Reset();
     }
 
     /// <inheritdoc/>

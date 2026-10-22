@@ -702,8 +702,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 Server.Resolve<IMapEventLogger>(),
                 Server.Resolve<IBattleMissionInitializerResolver>(),
                 null!,
-                Server.Resolve<ICoopBattleMissionRegistry>(),
-                Server.Resolve<IRoutedPlayerHitNotificationTracker>());
+                Server.Resolve<ICoopBattleMissionRegistry>());
 
             Assert.True(handler.RemoveWoundedNonInitiatorParties(mapEvent, initiatingPartyId));
         }, disabledMethods);
@@ -765,8 +764,7 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
                 Server.Resolve<IMapEventLogger>(),
                 Server.Resolve<IBattleMissionInitializerResolver>(),
                 null!,
-                Server.Resolve<ICoopBattleMissionRegistry>(),
-                Server.Resolve<IRoutedPlayerHitNotificationTracker>());
+                Server.Resolve<ICoopBattleMissionRegistry>());
 
             Assert.True(handler.RemoveWoundedNonInitiatorParties(mapEvent, initiatingPartyId));
         }, disabledMethods);

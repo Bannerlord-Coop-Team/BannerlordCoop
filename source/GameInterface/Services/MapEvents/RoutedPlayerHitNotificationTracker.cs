@@ -37,8 +37,8 @@ public interface IRoutedPlayerHitNotificationTracker
     void RemoveRoutedPlayerHitNotification(Agent affectedAgent, int damage);
 
     /// <summary>
-    /// Drops bookkeeping left from an earlier battle. Every <see cref="ICoopBattleMissionRegistry.BeginBattle"/> and
-    /// <see cref="ICoopBattleMissionRegistry.EndBattle"/> call must be paired with it, otherwise the next kill feed shows stale entries.
+    /// Drops bookkeeping left from an earlier battle. <see cref="ICoopBattleMissionRegistry"/> calls it whenever a
+    /// battle window opens or closes, otherwise the next kill feed would show stale entries.
     /// </summary>
     void Reset();
 }

@@ -115,7 +115,7 @@ public class BattleSharedWavePolicyTests : MissionTestEnvironment
         AccessTools.Property(typeof(MissionBehavior), nameof(MissionBehavior.Mission)).SetValue(spawnLogic, mission);
         AccessTools.Field(typeof(Mission), "_initialAgentCountPerSide").SetValue(mission, new int[2]);
 
-        var handler = new CoopBattleMissionSpawnHandler(defender, attacker, null, new CoopBattleMissionRegistry(),
+        var handler = new CoopBattleMissionSpawnHandler(defender, attacker, null, new CoopBattleMissionRegistry(new RoutedPlayerHitNotificationTracker()),
             BattleSideEnum.Attacker);
         AccessTools.Field(typeof(CoopBattleMissionSpawnHandler), "_missionAgentSpawnLogic").SetValue(handler, spawnLogic);
 

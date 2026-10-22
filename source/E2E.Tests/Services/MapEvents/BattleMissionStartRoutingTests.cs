@@ -40,11 +40,10 @@ public class BattleMissionStartRoutingTests
     [Fact]
     public void FailedMissionOpen_ClosesBattleWindow()
     {
-        var missionRegistry = new CoopBattleMissionRegistry();
+        var missionRegistry = new CoopBattleMissionRegistry(new RoutedPlayerHitNotificationTracker());
         using var messageBroker = new MessageBroker();
         using var handler = new BattleMissionStartHandler(
-            messageBroker, null!, null!, null!, null!, null!, null!, missionRegistry,
-            new RoutedPlayerHitNotificationTracker());
+            messageBroker, null!, null!, null!, null!, null!, null!, missionRegistry);
         missionRegistry.BeginBattle("battle-1");
 
         handler.CloseBattleWindowAfterFailedOpen(battleWindowOpened: true);

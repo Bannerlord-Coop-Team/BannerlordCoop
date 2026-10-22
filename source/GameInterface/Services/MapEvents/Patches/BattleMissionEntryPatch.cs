@@ -53,11 +53,9 @@ internal class BattleMissionEntryPatch
 
         if (!ContainerProvider.TryResolve(out IObjectManager objectManager)) return;
         if (!ContainerProvider.TryResolve(out ICoopBattleMissionRegistry missionRegistry)) return;
-        if (!ContainerProvider.TryResolve(out IRoutedPlayerHitNotificationTracker notificationTracker)) return;
         if (!objectManager.TryGetId(mapEvent, out var mapEventId)) return;
 
         missionRegistry.BeginBattle(mapEventId);
-        notificationTracker.Reset();
         Logger.Information("[BattleSync] Opened coop battle window before mission load: mapEvent={MapEventId}", mapEventId);
     }
 
