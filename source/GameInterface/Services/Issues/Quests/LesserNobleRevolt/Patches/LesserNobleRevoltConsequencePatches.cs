@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Util;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -39,9 +40,21 @@ internal static class LesserNobleRevoltConsequencePatches
             return;
         }
 
-        if (quest._lesserNobleParty?.IsActive == true)
+        var party = quest._lesserNobleParty;
+        if (party?.IsActive == true)
         {
-            DestroyPartyAction.Apply(null, quest._lesserNobleParty);
+            if (AllowedThread.IsThisThreadAllowed())
+            {
+                // Accept rollback cancels under AllowedThread, so replicate destruction after that scope ends.
+                GameThread.EnqueueSafe(() =>
+                {
+                    if (party.IsActive) DestroyPartyAction.Apply(null, party);
+                }, context: nameof(LesserNobleRevoltConsequencePatches));
+            }
+            else
+            {
+                DestroyPartyAction.Apply(null, party);
+            }
         }
 
         // A dismissed mirror quest never reaches AfterFinalize, so its trackers would stay in the save a joiner loads.
