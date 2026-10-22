@@ -28,9 +28,12 @@ internal static class AlternativeSolutionPickerDriver
                 partyPresentationDoneButtonDelegate: PartyScreenHelper.ManageTroopsAndPrisonersDoneHandler));
             logic._partyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
             var transfer = new PartyScreenLogic.PartyCommand();
+            var selectedBefore = issue.AlternativeSolutionSentTroops.GetTroopCount(troop);
+            Assert.True(party.MemberRoster.GetTroopCount(troop) >= count);
             transfer.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right,
                 PartyScreenLogic.TroopType.Member, troop, count, 0, -1);
             using (new AllowedThread()) logic.TransferTroop(transfer, false);
+            Assert.Equal(selectedBefore + count, issue.AlternativeSolutionSentTroops.GetTroopCount(troop));
             Assert.True(logic.DoneLogic(false));
         }
     }
