@@ -14,6 +14,7 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 
 namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 
@@ -187,6 +188,10 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         catch (Exception e)
         {
             Logger.Error(e, "Offering {issue} again after a failed accept failed", issue.StringId);
+        }
+        finally
+        {
+            Campaign.Current.LogEntryHistory._logs.RemoveAll(log => log is JournalLogEntry journal && journal.IsRelatedTo(issue));
         }
     }
 

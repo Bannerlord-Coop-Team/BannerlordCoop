@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Services.Heroes.Messages;
+using Common;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -16,6 +17,7 @@ using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -184,9 +186,11 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory(bool success)
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    public void CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory(bool success, bool fromOlderSave)
     {
         QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
 
@@ -194,6 +198,8 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
         var ownerQuest = (Quest)scenario.QuestOf(ClientA);
         var serverQuest = (Quest)scenario.QuestOf(Server);
+        if (fromOlderSave)
+            QuestJournalHistoryAssertions.RestoreVanillaArchive(Server, serverQuest);
         if (success)
         {
             Stock(Amount);
@@ -207,6 +213,44 @@ public class ArtisanOverpricedGoodsTests : IDisposable
 
         QuestJournalHistoryAssertions.AssertLateJoinHistory(Server, ClientA, ClientB, serverQuest, ownerQuest,
             success ? IssueOutcome.QuestSuccess : IssueOutcome.QuestFail);
+    }
+
+    [Fact]
+    public void FailedAcceptDoesNotLeaveTheNextPlayersArchiveOwnedByTheRejectedPlayer()
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(new[] { Server, ClientB });
+        var harmony = new Harmony($"{nameof(FailedAcceptDoesNotLeaveTheNextPlayersArchiveOwnedByTheRejectedPlayer)}.{Guid.NewGuid():N}");
+        var target = AccessTools.Method(typeof(ArtisanOverpricedGoodsQuestSolutionAcceptStrategy),
+            nameof(ArtisanOverpricedGoodsQuestSolutionAcceptStrategy.Apply));
+        harmony.Patch(target, prefix: new HarmonyMethod(typeof(ArtisanOverpricedGoodsTests), nameof(ThrowOnServerAccept)));
+        try
+        {
+            Accept();
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Server.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+            entry => true)));
+
+        ClientB.Call(() => StartQuest(ClientB, scenario.NotableId));
+        Assert.Equal(QuestScenario.ControllerB, scenario.OwnerOnServer());
+        var serverQuest = scenario.QuestOf(Server);
+        var ownerQuest = (Quest)scenario.QuestOf(ClientB);
+        Server.Call(() => Get<MobileParty>(Server, scenario.OtherPartyId).ItemRoster.AddToCounts(Get<ItemObject>(Server, itemId), Amount));
+        environment.FlushCoalescer();
+        ClientB.Call(() => ownerQuest.DeliverItemsFullyOnConsequence());
+        ClientB.Call(() => ownerQuest.CompleteQuestWithSuccess());
+        QuestJournalHistoryAssertions.AssertLateJoinHistory(Server, ClientB, ClientA, serverQuest, ownerQuest, IssueOutcome.QuestSuccess);
+    }
+
+    private static void ThrowOnServerAccept()
+    {
+        if (ModInformation.IsServer)
+            throw new InvalidOperationException("Stubbed accept failure");
     }
 
     [Theory]

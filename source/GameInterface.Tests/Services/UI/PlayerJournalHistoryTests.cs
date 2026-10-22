@@ -39,6 +39,8 @@ public class PlayerJournalHistoryTests
     public void CampaignSaveRoundTripRetainsOwnerEndingAndJournalText()
     {
         var original = Entry("player-A");
+        original.Id = 42;
+        original.GameTime = CampaignTime.Days(12);
         var metadata = new MetaData { ["ApplicationVersion"] = "v1.4.8.0" };
         var driver = new InMemDriver();
         var saved = SaveManager.Save(original, metadata, "player_journal", driver);
@@ -48,6 +50,8 @@ public class PlayerJournalHistoryTests
         Assert.True(loaded.Successful);
         var restored = Assert.IsType<PlayerJournalLogEntry>(loaded.Root);
         Assert.Equal("player-A", restored.OwnerControllerId);
+        Assert.Equal(original.Id, restored.Id);
+        Assert.Equal(original.GameTime, restored.GameTime);
         Assert.Equal("Finished quest", restored.Title.ToString());
         Assert.True(restored.IsRelatedTo(new MBObjectBase("quest_A")));
         Assert.True(restored.IsEnded());

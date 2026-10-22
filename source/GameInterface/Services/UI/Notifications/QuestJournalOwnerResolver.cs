@@ -1,6 +1,7 @@
 ﻿using GameInterface.Services.Entity;
 using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.ObjectSystem;
 
@@ -9,6 +10,7 @@ namespace GameInterface.Services.UI.Notifications;
 internal interface IQuestJournalOwnerResolver
 {
     JournalLogEntry CreateOwnedEntry(JournalLogEntry entry, params MBObjectBase[] relatedObjects);
+    JournalLogEntry RestoreOwner(JournalLogEntry entry, IssueBase issue);
     bool IsVisible(PlayerJournalLogEntry entry);
 }
 
@@ -35,5 +37,18 @@ internal sealed class QuestJournalOwnerResolver : IQuestJournalOwnerResolver
     public bool IsVisible(PlayerJournalLogEntry entry)
     {
         return !string.IsNullOrEmpty(entry.OwnerControllerId) && entry.OwnerControllerId == controller.ControllerId;
+    }
+
+    public JournalLogEntry RestoreOwner(JournalLogEntry entry, IssueBase issue)
+    {
+        if (entry == null || entry is PlayerJournalLogEntry || !playerManager.TryGetPlayer(Hero.MainHero, out var player))
+            return entry;
+
+        var restored = issue.IssueQuest == null
+            ? new PlayerJournalLogEntry(entry, player.ControllerId, issue)
+            : new PlayerJournalLogEntry(entry, player.ControllerId, issue, issue.IssueQuest);
+        var logs = Campaign.Current.LogEntryHistory._logs;
+        logs[logs.IndexOf(entry)] = restored;
+        return restored;
     }
 }
