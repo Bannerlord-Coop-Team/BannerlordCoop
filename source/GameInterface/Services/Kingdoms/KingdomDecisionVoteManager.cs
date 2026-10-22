@@ -1822,13 +1822,18 @@ namespace GameInterface.Services.Kingdoms
             {
                 if (!state.MissionHoldStartedUtc.HasValue) state.MissionHoldStartedUtc = utcNow;
                 if (utcNow < state.RoundDeadlineUtc.Value) return;
-                if (HasMissionHoldLimitPassed(state, utcNow))
+
+                DateTime? holdLimitUtc = GetMissionHoldLimitUtc(state);
+                if (holdLimitUtc.HasValue && utcNow >= holdLimitUtc.Value)
                 {
                     LogMissionHoldLimitReached(state, heldClanId);
                     return;
                 }
 
-                state.SetRoundDeadline(utcNow + VotingRoundDuration);
+                DateTime extendedDeadlineUtc = utcNow + VotingRoundDuration;
+                if (holdLimitUtc.HasValue && holdLimitUtc.Value < extendedDeadlineUtc) extendedDeadlineUtc = holdLimitUtc.Value;
+
+                state.SetRoundDeadline(extendedDeadlineUtc);
                 LogRoundDeadlineMoved(state, $"extended because clan {heldClanId} is in a mission");
                 return;
             }
@@ -1840,13 +1845,13 @@ namespace GameInterface.Services.Kingdoms
             LogRoundDeadlineMoved(state, "restarted because no unvoted voter is in a mission");
         }
 
-        // Checks the server's optional limit on how long a round may wait for voters in a mission; 0 means no limit.
-        private static bool HasMissionHoldLimitPassed(KingdomDecisionVoteState state, DateTime utcNow)
+        // Returns when the server's optional mission hold limit ends the current hold, or null when no limit is set.
+        private static DateTime? GetMissionHoldLimitUtc(KingdomDecisionVoteState state)
         {
             int limitMinutes = ModConfigProvider.ModOptions.KingdomDecisionMissionHoldLimitMinutes;
-            if (limitMinutes <= 0) return false;
+            if (limitMinutes <= 0) return null;
 
-            return utcNow - state.MissionHoldStartedUtc.Value >= TimeSpan.FromMinutes(limitMinutes);
+            return state.MissionHoldStartedUtc.Value + TimeSpan.FromMinutes(limitMinutes);
         }
 
         // Records that a round stopped waiting for a voter in a mission, so its resolution can be traced in the server log.

@@ -1358,7 +1358,6 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     {
         const string instanceId = "kingdom_vote_long_battle";
         TimeSpan holdLimit = TimeSpan.FromMinutes(10);
-        TimeSpan pastRound = KingdomDecisionVoteManager.VotingRoundDuration + TimeSpan.FromSeconds(1);
         ModOptions previousOptions = ModConfigProvider.ModOptions;
         ModConfigProvider.ModOptions = new ModOptions(new ModOptionsData
         {
@@ -1378,13 +1377,18 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             client1.SimulateMessage(
                 this,
                 new KingdomDecisionVoteRequested(CreateDeclareWarVote(kingdomId, isFinal: true)));
+            DateTime voted = DateTime.UtcNow;
 
             DateTime beforeLimit = enteredMission + holdLimit - TimeSpan.FromSeconds(1);
             Server.Call(() => GetConcreteVoteManager(Server).ProcessVotingRounds(beforeLimit));
 
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>());
 
-            Server.Call(() => GetConcreteVoteManager(Server).ProcessVotingRounds(beforeLimit + pastRound));
+            // The extension stops at the hold limit instead of running a full round past it.
+            DateTime cappedDeadline = new DateTime(GetLatestRoundStatus(kingdomId).DeadlineUtcTicks, DateTimeKind.Utc);
+            Assert.InRange(cappedDeadline, enteredMission + holdLimit, voted + holdLimit);
+
+            Server.Call(() => GetConcreteVoteManager(Server).ProcessVotingRounds(cappedDeadline));
 
             Assert.Single(
                 Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
