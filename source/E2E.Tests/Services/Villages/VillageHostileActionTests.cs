@@ -3525,6 +3525,75 @@ public class VillageHostileActionTests : MapEventTestBase
         }
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RaidJoinerLeave_ReleasesItsLinkedEncounter(bool finishLocalMenus)
+    {
+        var client = Clients.First();
+        var raid = CreateHostileActionWithOnePlayerParty(VillageHostileAction.Raid);
+        var (_, joinerMobilePartyId) = CreatePlayerHeroParty("PlayerTwo");
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerTwo");
+        var joinerPartyId = GetPartyBaseId(joinerMobilePartyId);
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
+            .ToList();
+
+        Server.NetworkSentMessages.Clear();
+        client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkRequestJoinBattle(
+            System.Guid.NewGuid().ToString(), raid.MapEventId, joinerPartyId, BattleSideEnum.Defender)), disabledMethods);
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkJoinBattleReply>()).Accepted);
+
+        EnableHeadlessEncounterFinish(client);
+        var encounter = SetMockPlayerEncounter(client, mapEventId: raid.MapEventId);
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(joinerMobilePartyId, out var party));
+            using (new AllowedThread())
+                Campaign.Current.MainParty = party;
+            Assert.Equal(BattleSideEnum.Defender, party.Party.Side);
+            Assert.Same(party.MapEvent, PlayerEncounter.Battle);
+            Campaign.Current.MapStateData.GameMenuId = "encounter";
+        }, disabledMethods);
+
+        Server.NetworkSentMessages.Clear();
+        client.NetworkSentMessages.Clear();
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(joinerPartyId, out var party));
+            client.Resolve<IMessageBroker>().Publish(this, new PlayerLeaveBattleAttempted(party, finishLocalMenus));
+        }, disabledMethods);
+
+        Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestLeaveBattle>());
+        var departure = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkPartyLeftBattle>());
+        Assert.Equal(joinerPartyId, departure.PartyId);
+        Assert.Equal(finishLocalMenus, departure.FinishLocalMenus);
+        client.Call(() =>
+        {
+            Assert.Null(PlayerEncounter.Battle);
+            if (!finishLocalMenus)
+            {
+                Assert.Same(encounter, PlayerEncounter.Current);
+                Assert.Equal("encounter", Campaign.Current.MapStateData.GameMenuId);
+                client.Resolve<GameInterface.Services.Settlements.Interfaces.ISettlementInterface>().EndSettlementEncounter();
+            }
+            Assert.Null(PlayerEncounter.Current);
+            Assert.Null(Campaign.Current.MapStateData.GameMenuId);
+        }, disabledMethods);
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkMapEventFinalizeAttempted>());
+
+        foreach (var instance in Clients.Append(Server))
+        {
+            AssertHostileActionJoinerLeft(instance, raid.MapEventId, raid.AttackerPartyId, joinerPartyId);
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(raid.MapEventId, out var mapEvent));
+                Assert.False(mapEvent.IsFinalized);
+                Assert.Equal(BattleSideEnum.None, mapEvent.WinningSide);
+            }, disabledMethods);
+        }
+    }
+
     private void AssertHostileActionJoinerPresent(
         EnvironmentInstance instance,
         string mapEventId,
