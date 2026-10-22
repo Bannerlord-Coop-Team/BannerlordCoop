@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using HarmonyLib;
+using System.Collections.Generic;
 using Missions.Messages;
 using NavalDLC.Missions;
 using NavalDLC.Missions.Deployment;
@@ -44,10 +45,14 @@ internal class LateHullDeploymentPatch
 {
     // Runs the deployment steps a late hull needs; each one is safe to repeat on a pooled hull that vanilla deployed before.
     [HarmonyPostfix]
-    private static void Postfix(MissionShip __result)
+    private static void Postfix(NavalShipsLogic __instance, MissionShip __result)
     {
         if (__result == null) return;
         if (!FinishesDeployment(CoopNavalMissionScope.IsActive, Mission.Current?.IsDeploymentFinished == true)) return;
+
+        // A ballista lists its ship targets once, at its own deployment (ThreatSeeker.InitializeTargetableObjects), so in vanilla
+        // every hull is in every list; here hulls arrive after deployment, so the hulls already fielded learn of this one.
+        RefreshShipWeaponTargets(__instance.AllShips, __result);
 
         // Readies the ballista AI's threat seeker, otherwise ThreatSeeker.GetAllThreats throws on its first tick.
         __result.ShipSiegeWeapon?.OnDeploymentFinished();
@@ -56,6 +61,17 @@ internal class LateHullDeploymentPatch
         // The first unit's party feeds a crew perk; a fresh AI fleet or copy formation has no unit yet, so that perk is left out.
         __result.CrewSizeOnMainDeck = MissionGameModels.Current.MissionShipParametersModel
             .CalculateMainDeckCrewSize(__result.ShipOrigin, __result.Formation.GetFirstUnit());
+    }
+
+    /// <summary>Re-reads the targetable mission objects of every fielded hull's ballista but the new hull's (deployed above).</summary>
+    internal static void RefreshShipWeaponTargets(IEnumerable<MissionShip> ships, MissionShip spawned)
+    {
+        foreach (var ship in ships)
+        {
+            if (ship == spawned || ship.IsRemoved) continue;
+
+            (ship.ShipSiegeWeapon?.Ai as RangedSiegeWeaponAi)?.InitializeThreatSeeker();
+        }
     }
 
     // Hulls spawned before deployment ends get it from vanilla's own deployment pass.
