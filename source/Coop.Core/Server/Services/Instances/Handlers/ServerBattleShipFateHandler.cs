@@ -219,8 +219,8 @@ public class ServerBattleShipFateHandler : IHandler
         objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var senderParty);
         bool ownShip = owner == senderParty?.Party;
         ledger.RecordCapture(message.InstanceId, message.CampaignShipId, ownShip ? null : controllerId, message.CaptureSequence);
-        Logger.Information("[NavalSync] Ship {ShipId} of {Owner} captured by {Controller} in battle {Instance}{Own}",
-            message.CampaignShipId, owner.Id, controllerId, message.InstanceId, ownShip ? " (its own ship back)" : "");
+        Logger.Information("[NavalSync] Ship {ShipId} of {Owner} captured by {Controller} in battle {Instance} at capture sequence {Sequence}{Own}",
+            message.CampaignShipId, owner.Id, controllerId, message.InstanceId, message.CaptureSequence, ownShip ? " (its own ship back)" : "");
     }
 
     // Logs a fate the sender may not report.
