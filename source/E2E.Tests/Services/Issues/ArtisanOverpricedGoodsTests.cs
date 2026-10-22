@@ -491,22 +491,14 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         });
         environment.FlushCoalescer();
 
-        // PartyScreenLogic's separate commit has already removed the selected troops on the server.
-        Server.Call(() =>
-        {
-            var party = Get<MobileParty>(Server, scenario.OwnerPartyId);
-            party.MemberRoster.AddToCounts(Get<Hero>(Server, companionId).CharacterObject, -1);
-            party.MemberRoster.AddToCounts(Get<CharacterObject>(Server, troopId), -needed);
-        });
-        environment.FlushCoalescer();
-
         ClientA.Call(() =>
         {
             var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
             var companion = Get<Hero>(ClientA, companionId);
             var troop = Get<CharacterObject>(ClientA, troopId);
             issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-            issue.AlternativeSolutionSentTroops.AddToCounts(troop, needed);
+            AlternativeSolutionPickerDriver.Commit(ClientA, issue, Get<Hero>(ClientA, scenario.OwnerHeroId),
+                Get<MobileParty>(ClientA, scenario.OwnerPartyId), troop, needed);
             issue.AlternativeSolutionStartConsequence();
             issue.StartIssueWithAlternativeSolution();
         });

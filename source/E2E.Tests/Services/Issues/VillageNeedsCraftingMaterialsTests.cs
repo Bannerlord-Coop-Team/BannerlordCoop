@@ -450,11 +450,13 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
             {
                 Campaign.Current.MainParty = ownerParty;
                 ownerParty.MemberRoster.AddToCounts(companion.CharacterObject, -1);
-                ownerParty.MemberRoster.AddToCounts(troop, -6);
+
                 issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                issue.AlternativeSolutionSentTroops.AddToCounts(troop, 6);
+
             }
 
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+            AlternativeSolutionPickerDriver.Commit(ClientA, issue, owner, ownerParty, troop, 6);
             ClientA.Resolve<IMessageBroker>().Publish(this, new AlternativeSolutionAcceptRequested(issue));
         }, AlternativeSolutionLogTexts);
         TestEnvironment.FlushCoalescer();

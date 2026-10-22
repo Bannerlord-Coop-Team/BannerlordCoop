@@ -243,6 +243,8 @@ public class LordNeedsHorsesTests : IDisposable
             Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
             Assert.True(ClientA.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
             Assert.True(ClientA.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+            using var ownerScope = new GameInterface.Services.Entity.MainHeroSubstitutionScope(owner, party);
             var agent = new Moq.Mock<TaleWorlds.Core.IAgent>();
             agent.SetupGet(value => value.Character).Returns(giver.CharacterObject);
             Campaign.Current.ConversationManager._conversationAgents.Add(agent.Object);
