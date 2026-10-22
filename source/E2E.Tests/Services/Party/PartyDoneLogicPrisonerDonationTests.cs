@@ -5,6 +5,8 @@ using E2E.Tests.Util;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
 using System;
 using System.Collections.Generic;
@@ -150,6 +152,10 @@ public class PartyDoneLogicPrisonerDonationTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetId(playerParty.LeaderHero, out var mainHeroId));
             Assert.True(Server.ObjectManager.TryGetId(settlement, out var settlementId));
             Assert.True(Server.ObjectManager.TryGetId(prisoner, out var prisonerId));
+
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.AddPlayer(new Player("RequestingControllerId", mainHeroId, string.Empty, string.Empty, string.Empty)));
+            playerManager.SetPeer("RequestingControllerId", Client.NetPeer);
 
             fixture = new DonationFixture(
                 mainHeroId,
