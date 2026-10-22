@@ -20,7 +20,8 @@ internal static class ShipTestHulls
     // A dropped weapon lying on a deck, which vanilla also treats as a usable point.
     internal static UsableMissionObject CreateWorldItem() => Uninitialized<SpawnedItemEntity>();
 
-    private static T Uninitialized<T>()
+    // A constructor-skipped instance of any script type; native calls on it fail.
+    internal static T Uninitialized<T>()
     {
         var managed = typeof(ScriptComponentBehavior).BaseType!.Assembly.GetType("TaleWorlds.DotNet.Managed")!;
         var field = AccessTools.Field(managed, "_moduleTypes");

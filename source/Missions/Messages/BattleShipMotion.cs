@@ -19,7 +19,10 @@ public readonly struct BattleShipMotion
 
     public float YawRate { get; }
 
-    /// <summary>The owner's committed crew load; null when unknown (none on deck, or a sender that doesn't send it).</summary>
+    /// <summary>
+    /// The owner's committed crew load, <see cref="BattleShipCrewLoad.Empty"/> for a deck known to be empty; null when the
+    /// sample carries none (an older sender, or a frame that committed no weight while agents stood aboard).
+    /// </summary>
     public BattleShipCrewLoad CrewLoad { get; }
 
     /// <summary>Whether the velocity and yaw rate are finite numbers; a bad crew load arrives as unknown instead.</summary>

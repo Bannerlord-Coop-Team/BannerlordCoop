@@ -332,23 +332,41 @@ public class NavalShipEngine : INavalShipEngine
 
     /// <summary>
     /// The crew load vanilla's <c>ApplyAgentForces</c> applies to the hull this step: the committed agent mass and its centre
-    /// in the body's local frame. Null when none is committed.
+    /// in the body's local frame. Null when it is not known this step.
     /// </summary>
     internal static BattleShipCrewLoad ReadCrewLoad(MissionShip ship)
     {
         var physics = ship.Physics;
         if (physics == null || !ship.GameEntity.IsValid) return null;
 
-        return CrewLoadOf(physics._committedTotalMass, physics._committedWeightedAgentsPosition,
-            ship.GameEntity.GetBodyWorldTransform());
+        float mass = physics._committedTotalMass;
+        return CrewLoadOf(mass, physics._committedWeightedAgentsPosition, ship.GameEntity.GetBodyWorldTransform(),
+            mass > 0f || HasAgentAboard(ship));
     }
 
-    /// <summary>Vanilla's crew centre: the mass-weighted world position over the mass, moved into the body frame.</summary>
-    internal static BattleShipCrewLoad CrewLoadOf(float mass, Vec3 weightedPosition, MatrixFrame body)
+    /// <summary>
+    /// Vanilla's crew centre: the mass-weighted world position over the mass, moved into the body frame. No mass reads as an
+    /// empty deck only with nobody aboard; with agents aboard it is a frame that committed none (dt 0), so unknown.
+    /// </summary>
+    internal static BattleShipCrewLoad CrewLoadOf(float mass, Vec3 weightedPosition, MatrixFrame body, bool agentAboard)
     {
-        if (!(mass > 0f)) return null;
+        if (mass > 0f) return BattleShipCrewLoad.Create(mass, body.TransformToLocal(weightedPosition / mass));
 
-        return BattleShipCrewLoad.Create(mass, body.TransformToLocal(weightedPosition / mass));
+        return agentAboard ? null : BattleShipCrewLoad.Empty;
+    }
+
+    // Whether an active agent stands on the hull, the agents vanilla's AgentNavalComponent.OnTick weighs it with.
+    private static bool HasAgentAboard(MissionShip ship)
+    {
+        var mission = Mission.Current;
+        if (mission == null) return false;
+
+        foreach (var agent in mission.Agents)
+        {
+            if (agent.IsActive() && agent.GetComponent<AgentNavalComponent>()?.SteppedShip == ship) return true;
+        }
+
+        return false;
     }
 
     public void TickCopies(float fixedDt) => SteeredCopies.Tick(fixedDt);

@@ -1,5 +1,6 @@
 ﻿#if DEBUG
 using HarmonyLib;
+using Missions.Messages;
 using Missions.Naval;
 using System;
 using TaleWorlds.Engine;
@@ -45,7 +46,7 @@ public class NavalShipEngineTests
         var first = new Vec3(101f, 48f, 3f);
         var second = new Vec3(98f, 55f, 3.5f);
 
-        var load = NavalShipEngine.CrewLoadOf(160f, (80f * first) + (80f * second), body);
+        var load = NavalShipEngine.CrewLoadOf(160f, (80f * first) + (80f * second), body, agentAboard: true);
 
         var centre = body.TransformToParent(load.LocalCentre);
         Assert.Equal(160f, load.Mass);
@@ -54,15 +55,22 @@ public class NavalShipEngineTests
         Assert.Equal(3.25f, centre.z, 3);
     }
 
-    // No agent committed: no load to send, so copies keep vanilla's own weight.
+    // Nobody aboard (the crew boarded an enemy hull): a known-empty deck, so copies take no crew weight.
     [Fact]
-    public void CrewLoadOf_IsUnknownWithoutCommittedMass()
+    public void CrewLoadOf_IsEmptyWithNobodyAboard()
     {
-        Assert.Null(NavalShipEngine.CrewLoadOf(0f, Vec3.Zero, MatrixFrame.Identity));
+        Assert.Same(BattleShipCrewLoad.Empty, NavalShipEngine.CrewLoadOf(0f, Vec3.Zero, MatrixFrame.Identity, agentAboard: false));
+    }
+
+    // Agents aboard but no mass committed is a frame vanilla skipped (dt 0), so it sends no load and copies keep the last.
+    [Fact]
+    public void CrewLoadOf_IsUnknownWithoutCommittedMassWhileAgentsStandAboard()
+    {
+        Assert.Null(NavalShipEngine.CrewLoadOf(0f, Vec3.Zero, MatrixFrame.Identity, agentAboard: true));
     }
 
     // WeakGameEntity.IsValid only compares the pointer with zero; nothing here dereferences it.
-    private static WeakGameEntity ValidEntity() =>
+    internal static WeakGameEntity ValidEntity() =>
         (WeakGameEntity)AccessTools.Constructor(typeof(WeakGameEntity), new[] { typeof(UIntPtr) }).Invoke(new object[] { new UIntPtr(1) });
 }
 #endif

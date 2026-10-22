@@ -72,8 +72,8 @@ sealed class SteeredCopy
     private volatile BattleShipCrewLoad crewLoad;
 
     /// <summary>
-    /// [Game thread writes, physics thread reads] The owner's crew load from its latest sample; null before the first one
-    /// or when the owner reports none, which leaves the copy on vanilla's own crew weight.
+    /// [Game thread writes, fixed tick reads] The owner's crew load from its latest sample that carried one; null before
+    /// the first, which leaves the copy on vanilla's own crew weight.
     /// </summary>
     internal BattleShipCrewLoad CrewLoad
     {
@@ -115,7 +115,8 @@ public class NavalSteeredCopies : INavalSteeredCopies
     {
         if (!copies.TryGetValue(ship, out var copy) || ship.IsRemoved || !ship.GameEntity.IsValid) return;
 
-        copy.CrewLoad = motion.CrewLoad;
+        // A sample without a load keeps the last one, so a frame that committed no weight doesn't drop the copy to vanilla.
+        if (motion.CrewLoad != null) copy.CrewLoad = motion.CrewLoad;
         copy.Steering.ObserveOwner(frame, motion.Velocity, motion.YawRate);
 #if DEBUG
         copy.Diagnostics.TargetJump.Add(Mission.Current?.CurrentTime ?? 0f, copy.Steering.LastTargetJumpMetres);

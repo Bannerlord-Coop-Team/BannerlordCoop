@@ -231,7 +231,7 @@ public class NavalWaterProbeLogic : MissionLogic
                 ["roll"] = Round(hull.Roll, 3),
                 ["w"] = Round(hull.Water, 4),
                 ["crewMass"] = Round(hull.CrewLoad?.Mass ?? 0f, 1),
-                ["crewLocal"] = hull.CrewLoad == null ? null
+                ["crewLocal"] = hull.CrewLoad == null || hull.CrewLoad.IsEmpty ? null
                     : new[] { Round(hull.CrewLoad.LocalCentre.x, 3), Round(hull.CrewLoad.LocalCentre.y, 3), Round(hull.CrewLoad.LocalCentre.z, 3) },
                 ["crewSrc"] = hull.CrewSource,
             }).ToArray(),

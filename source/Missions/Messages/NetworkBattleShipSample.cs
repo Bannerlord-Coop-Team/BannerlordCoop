@@ -27,12 +27,14 @@ public sealed class NetworkBattleShipSample : IEvent
     [ProtoMember(10)] public readonly float VelocityY;
     /// <summary>The owner's body yaw rate in rad/s.</summary>
     [ProtoMember(11)] public readonly float YawRate;
-    /// <summary>The owner's committed crew mass in kg; 0 (or absent from an older sender) means unknown.</summary>
+    /// <summary>The owner's committed crew mass in kg, read only with <see cref="HasCrewLoad"/>.</summary>
     [ProtoMember(12)] public readonly float CrewMass;
     /// <summary>The crew's centre of mass in the owner's hull body frame.</summary>
     [ProtoMember(13)] public readonly float CrewLocalX;
     [ProtoMember(14)] public readonly float CrewLocalY;
     [ProtoMember(15)] public readonly float CrewLocalZ;
+    /// <summary>Whether the sample carries a crew load at all; a zero <see cref="CrewMass"/> then means a known-empty deck.</summary>
+    [ProtoMember(16)] public readonly bool HasCrewLoad;
 
     public NetworkBattleShipSample(Guid shipId, string ownerControllerId, long sequence, float[] frame,
         BattleShipInput input = default, BattleRopeState[] ropes = null, int hostEpoch = 0, BattleShipMotion motion = default)
@@ -49,6 +51,7 @@ public sealed class NetworkBattleShipSample : IEvent
         Input = input;
         if (motion.CrewLoad == null) return;
 
+        HasCrewLoad = true;
         CrewMass = motion.CrewLoad.Mass;
         CrewLocalX = motion.CrewLoad.LocalCentre.x;
         CrewLocalY = motion.CrewLoad.LocalCentre.y;
@@ -60,7 +63,7 @@ public sealed class NetworkBattleShipSample : IEvent
     public bool HasValidFrame => IsValidFrame(Frame);
 
     public BattleShipMotion Motion => new BattleShipMotion(new Vec2(VelocityX, VelocityY), YawRate,
-        BattleShipCrewLoad.Create(CrewMass, new Vec3(CrewLocalX, CrewLocalY, CrewLocalZ)));
+        HasCrewLoad ? BattleShipCrewLoad.Create(CrewMass, new Vec3(CrewLocalX, CrewLocalY, CrewLocalZ)) : null);
 
     public static float[] FromFrame(MatrixFrame frame) => new[]
     {

@@ -1249,32 +1249,54 @@ public class BattleShipReplicatorTests
 
         var copy = Serializer.DeepClone(sample);
 
-        Assert.Equal(0f, copy.CrewMass);
+        Assert.False(copy.HasCrewLoad);
         Assert.Null(copy.Motion.CrewLoad);
     }
 
+    // A crew that left the deck (all boarded an enemy hull) is a known-empty load, not an unknown one.
+    [Fact]
+    public void Sample_RoundTripsAKnownEmptyDeck()
+    {
+        var sample = new NetworkBattleShipSample(Guid.NewGuid(), Peer, 7, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity),
+            motion: new BattleShipMotion(new Vec2(1f, 2f), 0.1f, BattleShipCrewLoad.Empty));
+
+        var copy = Serializer.DeepClone(sample);
+
+        Assert.True(copy.HasCrewLoad);
+        Assert.Same(BattleShipCrewLoad.Empty, copy.Motion.CrewLoad);
+    }
+
+    [Fact]
+    public void CrewLoad_IsEmptyForAZeroMass()
+    {
+        Assert.Same(BattleShipCrewLoad.Empty, BattleShipCrewLoad.Create(0f, new Vec3(1f, 2f, 3f)));
+        Assert.True(BattleShipCrewLoad.Empty.IsEmpty);
+    }
+
     [Theory]
-    [InlineData(0f, 0f, 0f, 0f)]
     [InlineData(-80f, 0f, 0f, 0f)]
     [InlineData(float.NaN, 0f, 0f, 0f)]
     [InlineData(float.PositiveInfinity, 0f, 0f, 0f)]
     [InlineData(80f, float.NaN, 0f, 0f)]
     [InlineData(80f, 0f, float.NegativeInfinity, 0f)]
     [InlineData(80f, 0f, 0f, float.NaN)]
-    public void CrewLoad_IsUnknownForAnEmptyOrNonFiniteLoad(float mass, float x, float y, float z)
+    public void CrewLoad_IsUnknownForANegativeOrNonFiniteLoad(float mass, float x, float y, float z)
     {
         Assert.Null(BattleShipCrewLoad.Create(mass, new Vec3(x, y, z)));
     }
 
-    // A bad crew load is dropped as unknown; it never costs the copy its frame.
+    // A NaN crew mass on the wire reads as unknown; it never costs the copy its frame.
     [Fact]
-    public void ValidateSample_AcceptsASampleWithoutACrewLoad()
+    public void ValidateSample_AcceptsANonFiniteCrewLoad_AsUnknown()
     {
         var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, null, false, CreateHull(), null);
-        var sample = new NetworkBattleShipSample(ship.ShipId, Peer, 1, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity),
-            motion: new BattleShipMotion(new Vec2(1f, 2f), 0.1f, BattleShipCrewLoad.Create(float.NaN, Vec3.Zero)));
+        var sample = Serializer.DeepClone(new NetworkBattleShipSample(ship.ShipId, Peer, 1,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity),
+            motion: new BattleShipMotion(new Vec2(1f, 2f), 0.1f, BattleShipCrewLoad.Create(80f, Vec3.Zero))));
+        typeof(NetworkBattleShipSample).GetField(nameof(NetworkBattleShipSample.CrewMass))!.SetValue(sample, float.NaN);
 
         Assert.Null(BattleShipReplicator.ValidateSample(ship, Own, sample, 0, 0, InMission));
+        Assert.Null(sample.Motion.CrewLoad);
     }
 
     [Theory]

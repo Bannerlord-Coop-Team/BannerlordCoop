@@ -33,8 +33,10 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   `StepAgentWeightMultiplier`, 2 on ships, x g at their mass-weighted centre), and a copy's puppets stand and sit elsewhere
   than the owner's crew (R45: copies of AI-crewed hulls heeled 2.5-4.2 degrees off). Each sample carries the owner's
   committed crew mass and centre in the hull body's frame (`BattleShipCrewLoad`), and `CopyCrewLoadPatch` applies that
-  load on a copy instead of its puppets', with vanilla's in-hull check. A copy weighs its own puppets until a sample
-  carries a load, and whenever the owner reports none; a stale owner's last load stays. Own hulls run vanilla. One rule decides a copy's mode at
+  load on a copy instead of its puppets', with vanilla's in-hull check. A copy weighs its own puppets until the first
+  sample with a load (an older sender never sends one). An owner with nobody aboard, such as a crew that boarded an
+  enemy hull, sends an empty load and the copy takes no crew weight. A sample without a load (a frame that committed
+  none while agents stood aboard) and a stale owner keep the last load. Own hulls run vanilla. One rule decides a copy's mode at
   every sample and step: steered while its body simulates, its owner's frames written otherwise (warning `has no
   simulating body` once per copy; `bodyMode` in `inspect`). `NavalSteeredCopies.Track`/`Forget` are the only writers
   of `NavalForeignHulls`, the static copy set the patches read; spawning, releasing, replacing and removing a hull all
@@ -497,7 +499,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | `rope_list`, `rope_throw`, `rope_status` | client | Lists, throws and shows ropes. |
 | `copy_steer [key=value...]` | client | Shows or tunes the steered copies' knobs here (`gain window softzone clamp tau lead snap`), live. |
 | `water_clock` | client | DEBUG: one `NAVAL_WATER_CLOCK` line with the water clock patch status, the written and vanilla water time and their offset; in a naval battle also the host role, host samples and the offset estimate. |
-| `water_probe start [grid=5] [spacing=40] [seconds=120] \| status \| stop` | client | Samples the water grid for the shared-clock test; each tick logs every hull's `x`, `y`, `yaw` (degrees, counter-clockwise from +x), `z`, `pitch`, `roll`, the water under it and the crew load its physics takes: `crewMass` (kg), `crewLocal` (body-frame centre) and `crewSrc` (`owner` on a copy using its owner's load, otherwise `vanilla`). `start` is refused until deployment has finished. |
+| `water_probe start [grid=5] [spacing=40] [seconds=120] \| status \| stop` | client | Samples the water grid for the shared-clock test; each tick logs every hull's `x`, `y`, `yaw` (degrees, counter-clockwise from +x), `z`, `pitch`, `roll`, the water under it and the crew load its physics takes: `crewMass` (kg), `crewLocal` (body-frame centre, null for none or an empty deck) and `crewSrc` (`owner` on a copy using its owner's load, otherwise `vanilla`). `start` is refused until deployment has finished. |
 | `board_copy [ship] \| status` | client | Teleports the main agent onto a copy's deck (the nearest copy, or the one whose ship id starts with `ship`) at vanilla's deck spot: the hull's player standing point, else the middle inner deck frame (`MissionShip.GetMiddleInnerSpawnGlobalFrame`). Reports the hull-frame `deckError` and `heightAboveSpot`; `status` reports the hull the main agent stands on. The copy's owner reports the puppet's `maxDeckError` in `inspect`. |
 | `immortal [on \| off]` | client | Sets the main agent's vanilla mortality state to `Immortal` (`on`) or `Mortal` (`off`), so blows, routed ones included, take no health; reports it without an argument. A ram's 2 m kill radius (`Agent.Die`) still kills it. |
 

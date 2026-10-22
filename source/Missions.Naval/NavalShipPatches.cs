@@ -135,13 +135,15 @@ internal class CopyCrewLoadPatch
     // The tolerance vanilla's ApplyAgentForces gives its point-in-hull check.
     internal const float BoxEpsilon = 0.1f;
 
-    // [Physics thread] Applies the owner's crew load on a copy that has one; an own hull, or a copy without one yet, runs vanilla.
+    // [Fixed tick] Applies the owner's crew load on a copy that has one, none for an empty deck; an own hull, or a copy
+    // without a load yet, runs vanilla.
     [HarmonyPrefix]
     private static bool Prefix(NavalPhysicsScript __instance)
     {
         bool isCopy = NavalForeignHulls.TryGetCopy(__instance, out var copy);
         var ownerLoad = copy?.CrewLoad;
         if (!AppliesOwnerLoad(isCopy, ownerLoad)) return true;
+        if (ownerLoad.IsEmpty) return false;
 
         var localCentre = ownerLoad.LocalCentre;
         if (!IsInsideHull(__instance.PhysicsBoundingBoxWithoutChildren, localCentre)) return false;
