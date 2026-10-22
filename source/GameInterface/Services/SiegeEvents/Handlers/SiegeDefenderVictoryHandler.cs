@@ -5,7 +5,6 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
-using GameInterface.Services.SiegeEvents.Patches;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -24,6 +23,9 @@ internal class SiegeDefenderVictoryHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly ISiegeEventInterface siegeEventInterface;
+
+    // Game-thread only (armed inside a GameThread closure, drained on CampaignTick).
+    private Settlement pendingSettlement;
 
     public SiegeDefenderVictoryHandler(IMessageBroker messageBroker, IObjectManager objectManager, ISiegeEventInterface siegeEventInterface)
     {
@@ -47,13 +49,13 @@ internal class SiegeDefenderVictoryHandler : IHandler
             if (Array.IndexOf(obj.DefenderPartyIds ?? Array.Empty<string>(), localPartyId) < 0) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
 
-            SiegeDefenderFinishPatch.PendingDefenderVictorySettlement = settlement;
+            pendingSettlement = settlement;
         });
     }
 
     private void Handle_CampaignTick(MessagePayload<CampaignTick> payload)
     {
-        var settlement = SiegeDefenderFinishPatch.PendingDefenderVictorySettlement;
+        var settlement = pendingSettlement;
         if (ModInformation.IsServer || settlement == null) return;
         // The mission screen is still up (or popping): re-establishing PlayerEncounter now is unsafe. Wait.
         if (MissionState.Current != null) return;
@@ -66,7 +68,7 @@ internal class SiegeDefenderVictoryHandler : IHandler
             if (PlayerEncounter.Current != null) return;
         }
 
-        SiegeDefenderFinishPatch.PendingDefenderVictorySettlement = null;
+        pendingSettlement = null;
         siegeEventInterface.PromptSiegeDefenderVictory(settlement);
     }
 
@@ -78,6 +80,6 @@ internal class SiegeDefenderVictoryHandler : IHandler
     {
         messageBroker.Unsubscribe<NetworkPromptSiegeDefenderVictory>(Handle_NetworkPromptSiegeDefenderVictory);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
-        SiegeDefenderFinishPatch.PendingDefenderVictorySettlement = null;
+        pendingSettlement = null;
     }
 }

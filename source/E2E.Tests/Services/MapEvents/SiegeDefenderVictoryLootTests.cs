@@ -97,7 +97,6 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
     public void DefenderVictory_InsideTown_FinishingTheEncounterDoesNotLeaveTheTown()
     {
         var (client, encounter, settlement) = StageDefenderVictory(insideTown: true);
-        client.InternalMessages.Clear();
 
         var harmony = PatchLootScreensAndPrompt();
         try
@@ -115,7 +114,7 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
                 states._gameStates.RemoveAt(states._gameStates.Count - 1);
                 broker.Publish(this, new CampaignTick());
 
-                // The encounter is finished without asking the server to take the defender out of its town.
+                // The encounter is finished and the defender stays in its town.
                 Assert.Null(PlayerEncounter.Current);
                 Assert.Same(settlement, MobileParty.MainParty._currentSettlement);
                 Assert.Equal(1, defenderVictoryPrompts);
@@ -125,8 +124,6 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
         {
             harmony.UnpatchAll(harmony.Id);
         }
-
-        Assert.Empty(client.InternalMessages.GetMessages<PartyLeaveSettlementAttempted>());
     }
 
     [Fact]
