@@ -17,7 +17,7 @@ public class NavalShipCaptureEngine : INavalShipCaptureEngine
 
     private static NavalShipsLogic ShipsLogic => Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
 
-    // Refuses before touching anything when a precondition fails; vanilla's swap then runs guarded (RunVanillaSwap).
+    // Refuses before touching anything when a precondition fails; a throw inside vanilla's swap is logged (RunVanillaSwap).
     public void ApplyCapture(MissionObject prize, MissionObject captorHull)
     {
         var blocker = CheckCapture(prize, captorHull);
@@ -38,8 +38,8 @@ public class NavalShipCaptureEngine : INavalShipCaptureEngine
         captor.InvalidateActiveFormationTroopOnShipCache();
     }
 
-    // Vanilla's swap (NavalShipsLogic.OnShipCaptured) moves the assignments, formations and controllers before it refreshes the
-    // teams' AI, so a throw from that refresh leaves the swap done; it is logged and the capture's bookkeeping still follows.
+    // Diagnostic only: vanilla's swap (NavalShipsLogic.OnShipCaptured) moves assignments, formations and controllers, then runs
+    // the ship orders, the query expiry, ShipCapturedEvent's agent rebinding and the team AI refresh, so a throw half-applies it.
     private static void RunVanillaSwap(MissionShip ship, MissionShip captor)
     {
         try
@@ -48,9 +48,20 @@ public class NavalShipCaptureEngine : INavalShipCaptureEngine
         }
         catch (Exception exception)
         {
-            Logger.Error(exception, "[NavalSync] Vanilla's capture swap of hull {Index} into hull {CaptorIndex}'s formation threw after its checks passed",
-                ship.Index, captor.Index);
+            Logger.Error(exception, "[NavalSync] Vanilla's capture swap of hull {Index} into hull {CaptorIndex}'s formation is half-applied: " +
+                "it threw in its {Stage} after the checks passed", ship.Index, captor.Index, SwapStage(exception.StackTrace));
         }
+    }
+
+    /// <summary>Which step of vanilla's swap a throw came from, read from its stack (the steps run one after another).</summary>
+    internal static string SwapStage(string stackTrace)
+    {
+        if (stackTrace == null) return "unknown step";
+        if (stackTrace.Contains("RefreshTeamAIBehaviorShipReferences")) return "team AI refresh";
+        if (stackTrace.Contains("NavalAgentsLogic.OnShipCaptured")) return "agent rebinding (ShipCapturedEvent)";
+        if (stackTrace.Contains("ForceExpireAll")) return "query expiry";
+        if (stackTrace.Contains("ShipOrder.OnShipCaptured")) return "ship orders";
+        return "assignment and formation swap";
     }
 
     /// <summary>Why vanilla's swap can't run on the two hulls here, or null: everything NavalShipsLogic.OnShipCaptured dereferences.</summary>
@@ -61,7 +72,7 @@ public class NavalShipCaptureEngine : INavalShipCaptureEngine
 
         var shipsLogic = ShipsLogic;
         if (shipsLogic == null) return "no_naval_mission";
-        if (IsGone(ship) || IsGone(captor)) return "hull_removed";
+        if (HasLeftMission(ship) || HasLeftMission(captor)) return "hull_removed";
 
         var formation = captor.Formation;
         if (formation?.Team == null) return "captor_hull_has_no_formation";
@@ -78,7 +89,7 @@ public class NavalShipCaptureEngine : INavalShipCaptureEngine
     }
 
     // A hull that left the mission or lost its entity.
-    private static bool IsGone(MissionShip ship) => ship.IsRemoved || !ship.GameEntity.IsValid;
+    private static bool HasLeftMission(MissionShip ship) => ship.IsRemoved || !ship.GameEntity.IsValid;
 
     // Vanilla's swap gives the captor's assignment to the prize, so the orphan holds none; a joiner's copy had one of its own.
     public void OrphanHull(MissionObject hull)
