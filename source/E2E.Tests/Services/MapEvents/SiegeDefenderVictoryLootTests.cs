@@ -28,6 +28,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
@@ -47,10 +48,12 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
 
     public SiegeDefenderVictoryLootTests(ITestOutputHelper output) : base(output) { }
 
-    [Fact]
-    public void DefenderVictory_ShowsStagedLootBeforeSiegeDefeatedMenu()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DefenderVictory_ShowsStagedLootBeforeSiegeDefeatedMenu(bool destroyedAfterMissionExit)
     {
-        var (client, encounter, _) = StageDefenderVictory(insideTown: false);
+        var (client, encounter, _) = StageDefenderVictory(insideTown: false, destroyedAfterMissionExit);
 
         var harmony = PatchLootScreensAndPrompt();
         try
@@ -260,6 +263,38 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
     }
 
     [Fact]
+    public void DefenderEncounter_WithoutStagedResults_IsClosedWhenTheEventIsDestroyed()
+    {
+        var ctx = CreateServerMapEvent();
+        var client = Clients.First();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(ctx.DefenderPartyId, out var party));
+            mapEvent._mapEventType = MapEvent.BattleTypes.Siege;
+            Campaign.Current.MainParty = party;
+        }, MapEventDisabledMethods);
+
+        // A defender encounter the server never staged results on, destroyed after the mission is gone.
+        var encounter = SetMockPlayerEncounter(client, mapEventId: ctx.MapEventId);
+        EnableHeadlessEncounterFinish(client);
+        client.Call(() =>
+        {
+            encounter.PlayerSide = BattleSideEnum.Defender;
+            encounter.EncounterState = PlayerEncounterState.Begin;
+            encounter._alternativeReceivedLootShips = new List<Ship>();
+            var states = Game.Current.GameStateManager;
+            states._gameStates.Add(states.CreateState<MapState>());
+        }, MapEventDisabledMethods);
+
+        DestroyMapEvent(client, ctx.MapEventId, missionActive: false);
+
+        // The destroy fallback still closes it.
+        client.Call(() => Assert.Null(PlayerEncounter.Current), MapEventDisabledMethods);
+    }
+
+    [Fact]
     public void DefenderVictoryPrompt_StartsTheTownEncounterLocally()
     {
         const string controllerId = "PlayerOne";
@@ -339,9 +374,11 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
 
     /// <summary>
     /// Stages a siege assault defender victory on the client the way the server delivers it: results committed
-    /// while the defender is still in its mission, the event destroyed, then the defender victory prompt.
+    /// while the defender is still in its mission, the event destroyed, then the defender victory prompt. The
+    /// destroy arrives either while the mission is still up or after it has popped back to the map.
     /// </summary>
-    private (EnvironmentInstance Client, PlayerEncounter Encounter, Settlement Settlement) StageDefenderVictory(bool insideTown)
+    private (EnvironmentInstance Client, PlayerEncounter Encounter, Settlement Settlement) StageDefenderVictory(
+        bool insideTown, bool destroyedAfterMissionExit = true)
     {
         var ctx = CreateServerMapEvent();
         var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
@@ -404,13 +441,8 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
                     },
                 })));
 
-        // The defender is still in its siege mission when the server destroys the event, so the destroy
-        // fallback leaves the staged encounter to the mission flow.
-        client.Call(() => client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(
-                client.GetHandle<MapEvent>(ctx.MapEventId))),
-            MapEventDisabledMethods
-                .Append(AccessTools.Method(typeof(MapEventRegistry), "CloseDestroyedMapEventEncounterIfNeeded"))
-                .ToList());
+        // Either way the destroy fallback must leave the staged encounter for the map tick to resume.
+        DestroyMapEvent(client, ctx.MapEventId, missionActive: !destroyedAfterMissionExit);
         client.SimulateMessage(Server.NetPeer, new NetworkPromptSiegeDefenderVictory(
             settlementId, new[] { defenderPartyBaseId! }));
 
@@ -424,6 +456,24 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
         }, MapEventDisabledMethods);
 
         return (client, encounter, settlement!);
+    }
+
+    private void DestroyMapEvent(EnvironmentInstance client, string mapEventId, bool missionActive)
+    {
+        client.Call(() =>
+        {
+            var previousMission = MissionState.Current;
+            if (missionActive) MissionState.Current = ObjectHelper.SkipConstructor<MissionState>();
+            try
+            {
+                client.SimulateMessage(Server.NetPeer, new NetworkDestroyInstance<MapEvent>(
+                    client.GetHandle<MapEvent>(mapEventId)));
+            }
+            finally
+            {
+                MissionState.Current = previousMission;
+            }
+        }, MapEventDisabledMethods);
     }
 
     private IReadOnlyList<MethodBase> MapTickDisabledMethods => MapEventDisabledMethods.Concat(new[]
