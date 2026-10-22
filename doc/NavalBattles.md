@@ -354,18 +354,27 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   mission end, so other scenes run vanilla code. The campaign map's view may stay registered under the mission
   (`MapScreen` toggles its scene view itself, and `0x9B820` has no enabled-view check), so map water can read battle
   time while the battle runs; that is hidden and cosmetic, and map water right after a battle is a live check.
-  - Each scene's ocean keeps its own previous time (the water object at `scene+0x628`, created per scene by `0x1DA040`;
-    only `0x30F230` writes its time), so a new mission scene starts clean.
+  - Each scene's ocean keeps its own previous time (the water object at `scene+0x628`, created per scene by `0x1DA040`
+    and zeroed by `0x30F700`; only `0x30F230` writes its time), so a new mission scene starts clean. A large or
+    negative step in the water time is harmless: `0x30F230` turns it into a dt only for the foam flipbook
+    (`+0x66c += frames * dt`, keeping just the fractional part each frame, so one frame shows a wrong foam frame at
+    most), and the wave phase it passes on is absolute (`t * 0.7 + 1000`). Vanilla already takes the whole
+    accumulated clock as dt on a new scene's first update.
   - Every client starts the battle's water at the same time, 0 (`BattleWaterClock.BattleStartWaterTime`), from
     `AfterStart`, which runs under the loading screen, instead of at its own accumulated clock. Clients that load
     together already agree to within their load-time skew, and the switch from vanilla happens before the battle is
-    visible. A host time that arrived during loading (a late joiner gets one at once) is used as the start instead.
+    visible. The latest host time that arrived during loading (a late joiner gets one at once) is used as the start
+    instead; the mission timer stands during loading (`TickLoading` doesn't tick the mission, `FinishMissionLoading`
+    ticks it twice by 1 ms), so the latest sample is the freshest.
   - The battle host writes its own clock and sends it every second (`NetworkBattleWaterTime`, host-epoch stamped) and at
-    once to a peer entering the battle. A client's first host time is its one adoption: over 2 s of mission time
-    (20 water units) away it jumps once, in either direction, otherwise it is slewed. After that the written time never
-    runs backwards: a client smooths the largest offset of the last 3 samples (transit only makes an offset look
-    smaller), slews toward it at 75% to 125% speed, and snaps only forward, only when all 3 samples are more than 2 s
-    ahead. A promoted host keeps its current offset, so it continues from its own water time.
+    once to a peer entering the battle. From `AfterStart` on, a client's written time never runs backwards: a host time
+    more than 2 s of mission time (20 water units) ahead jumps forward, at once for the first host time and the first
+    after a host change, otherwise only when all of the last 3 samples are that far ahead. Everything else is slewed
+    at 75% to 125% speed toward the largest offset of the last 3 samples (transit only makes an offset look smaller).
+  - A promoted host keeps its current offset, so it continues from its own water time. Election ignores water time, so
+    a promoted member may never have heard the old host (a joiner still on its 0 start). On a host change every client
+    therefore sends its own time to the new host once, and the host jumps forward to any client time more than 2 s
+    ahead; the clients' backward gap to the lagging host only lasts until then.
   - The ship wake renderer reads the same clock at `0x1DAB69` (1e-5 scale, seconds) and is not patched, so wake effects
     stay on each client's local clock.
   - Not compensated: the host time's transit and the frame it waits for the game thread. The R42 fit puts 0.02 s of

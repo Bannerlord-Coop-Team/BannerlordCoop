@@ -48,6 +48,7 @@ public class BattleWaterClock : IBattleWaterClock
     private float sinceBroadcast = BroadcastIntervalSeconds;
     private bool started;
     private bool overriding;
+    private int lastHostEpoch;
 
     public BattleWaterClock(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session,
         IHostEpochPolicy hostEpochPolicy, IWaterClock waterClock, IBattleWaterTimeEstimator estimator)
@@ -89,9 +90,25 @@ public class BattleWaterClock : IBattleWaterClock
         if (!overriding || !waterClock.TryReadVanillaMissionTime(out var local)) return;
 
         bool isHost = session.IsLocalHost;
+        WatchHostChange(isHost);
         float waterTime = Estimator.Advance(local, isHost);
         waterClock.SetWaterTime(waterTime);
         if (isHost) BroadcastEvery(dt, waterTime);
+    }
+
+    // A host change can promote a member whose water lagged: a client re-arms a forward jump and tells the new host its time.
+    private void WatchHostChange(bool isHost)
+    {
+        int epoch = session.HostEpoch;
+        if (epoch == lastHostEpoch) return;
+
+        bool changed = lastHostEpoch != 0;
+        lastHostEpoch = epoch;
+        if (!changed || isHost) return;
+
+        Estimator.RearmAdoption();
+        var host = session.HostControllerId;
+        if (host != null) network.Send(host, new NetworkBattleWaterTime(waterClock.WrittenTime, epoch, fromHost: false));
     }
 
     // Sends the host's water time once per interval.
@@ -110,14 +127,20 @@ public class BattleWaterClock : IBattleWaterClock
         if (!waterClock.IsInstalled) return;
 
         var sample = payload.What;
-        GameThread.RunSafe(() => AcceptHostTime(sample), context: nameof(Handle_NetworkBattleWaterTime));
+        GameThread.RunSafe(() => AcceptWaterTime(sample), context: nameof(Handle_NetworkBattleWaterTime));
     }
 
-    /// <summary>[Game thread] Takes the current host's water time as this client's target.</summary>
-    internal void AcceptHostTime(NetworkBattleWaterTime sample)
+    /// <summary>[Game thread] Takes the current host's water time as this client's target, or on the host a client's report.</summary>
+    internal void AcceptWaterTime(NetworkBattleWaterTime sample)
     {
-        if (!waterClock.IsInstalled || session.IsLocalHost) return;
+        if (!waterClock.IsInstalled) return;
         if (float.IsNaN(sample.WaterTime) || float.IsInfinity(sample.WaterTime)) return;
+        if (!sample.FromHost)
+        {
+            AcceptPeerTime(sample);
+            return;
+        }
+        if (session.IsLocalHost) return;
         if (hostEpochPolicy.IsStale(sample.HostEpoch, session.HostEpoch)) return;
         if (!waterClock.TryReadVanillaMissionTime(out var local)) return;
 
@@ -125,6 +148,16 @@ public class BattleWaterClock : IBattleWaterClock
             Logger.Information("[NavalSync] Adopting the battle host's water time {HostTime} (local {Local})", sample.WaterTime, local);
         Estimator.AddHostSample(sample.WaterTime, local);
         SamplesAccepted++;
+    }
+
+    // [Game thread] On the host: a client's time far ahead means this host lagged when promoted, so it jumps forward to it.
+    private void AcceptPeerTime(NetworkBattleWaterTime report)
+    {
+        if (!overriding || !session.IsLocalHost) return;
+        if (!waterClock.TryReadVanillaMissionTime(out var local)) return;
+
+        if (Estimator.AdoptIfAhead(report.WaterTime, local))
+            Logger.Information("[NavalSync] Promoted host jumped forward to a client's water time {WaterTime}", report.WaterTime);
     }
 
     // [Poller thread] A peer entering the battle gets the host's time at once instead of up to a second later.

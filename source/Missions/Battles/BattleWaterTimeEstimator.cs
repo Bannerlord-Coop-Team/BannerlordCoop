@@ -5,8 +5,8 @@ using System.Linq;
 namespace Missions.Battles;
 
 /// <summary>
-/// Turns the battle host's water time samples into this client's water time: one adoption jump at most, then forward-only
-/// snaps and slewing, so after adoption the written time never runs backwards.
+/// Turns the battle host's water time samples into this client's water time: once begun the written time never runs
+/// backwards, since forward gaps jump and backward ones are only ever slewed.
 /// </summary>
 public interface IBattleWaterTimeEstimator
 {
@@ -25,6 +25,12 @@ public interface IBattleWaterTimeEstimator
     /// <summary>Feeds one host sample, given the local water clock when it was applied.</summary>
     void AddHostSample(float hostTime, float localTime);
 
+    /// <summary>After a host change, lets the next host sample that is far enough ahead jump at once.</summary>
+    void RearmAdoption();
+
+    /// <summary>On the host: jumps forward to a peer's time that is far enough ahead, so a lagging promoted host catches up.</summary>
+    bool AdoptIfAhead(float time, float localTime);
+
     /// <summary>Advances to <paramref name="localTime"/> and returns the water time to write; a host holds its own offset.</summary>
     float Advance(float localTime, bool isHost);
 }
@@ -36,7 +42,7 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
     internal const double SmoothingFactor = 0.3;
     // The applied offset moves at most this fraction of the local advance: waves run at 75% to 125% speed, never backwards.
     internal const double SlewFraction = 0.25;
-    // A forward gap beyond this (20 water units = 2 s of mission time) on every sample of the window is snapped, not slewed.
+    // A forward gap beyond this (20 water units = 2 s of mission time) jumps instead of slewing.
     internal const double SnapThreshold = 20.0;
     // Transit delay only ever makes an offset look smaller, so the window's largest offset is the best estimate.
     internal const int SampleWindow = 3;
@@ -44,8 +50,9 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
     private readonly Queue<double> window = new Queue<double>();
     private double? lastLocal;
     private bool begun;
-    private bool adoptionPending;
-    private bool forwardSnapPending;
+    // The next host sample jumps at once when far enough ahead: the first one, and the first after a host change.
+    private bool adoptionArmed;
+    private bool jumpPending;
 
     public bool HasHostTime { get; private set; }
 
@@ -57,10 +64,11 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
     {
         begun = true;
         lastLocal = localTime;
-        // A host time that arrived during loading is adopted here, before any frame shows the battle's water.
-        if (HasHostTime) AppliedOffset = TargetOffset;
-        else AppliedOffset = TargetOffset = (double)startTime - localTime;
-        adoptionPending = false;
+        // The latest host time that arrived during loading is the start, before any frame shows the battle's water.
+        bool freshHostTime = window.Count > 0;
+        if (freshHostTime) AppliedOffset = TargetOffset = window.Max();
+        else AppliedOffset = TargetOffset = HasHostTime ? TargetOffset : (double)startTime - localTime;
+        adoptionArmed = !freshHostTime;
         return (float)(localTime + AppliedOffset);
     }
 
@@ -70,21 +78,33 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
         window.Enqueue(offset);
         if (window.Count > SampleWindow) window.Dequeue();
 
-        if (!HasHostTime)
+        TargetOffset = HasHostTime ? TargetOffset + (SmoothingFactor * (window.Max() - TargetOffset)) : offset;
+        HasHostTime = true;
+        if (!begun) return;
+
+        if (adoptionArmed)
         {
-            HasHostTime = true;
-            TargetOffset = offset;
-            // The one adoption jump, in either direction; a small disagreement is slewed instead.
-            adoptionPending = begun && Math.Abs(offset - AppliedOffset) > SnapThreshold;
+            adoptionArmed = false;
+            if (offset - AppliedOffset > SnapThreshold) JumpTo(offset);
             return;
         }
 
-        TargetOffset += SmoothingFactor * (window.Max() - TargetOffset);
-        if (window.Count == SampleWindow && window.Min() - AppliedOffset > SnapThreshold)
-        {
-            TargetOffset = window.Max();
-            forwardSnapPending = true;
-        }
+        if (window.Count == SampleWindow && window.Min() - AppliedOffset > SnapThreshold) JumpTo(window.Max());
+    }
+
+    public void RearmAdoption()
+    {
+        adoptionArmed = true;
+        window.Clear();
+    }
+
+    public bool AdoptIfAhead(float time, float localTime)
+    {
+        double offset = (double)time - localTime;
+        if (offset - AppliedOffset <= SnapThreshold) return false;
+
+        AppliedOffset = TargetOffset = offset;
+        return true;
     }
 
     public float Advance(float localTime, bool isHost)
@@ -93,7 +113,7 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
         lastLocal = localTime;
         if (isHost) return Hold(localTime);
 
-        if (adoptionPending || (forwardSnapPending && TargetOffset > AppliedOffset))
+        if (jumpPending && TargetOffset > AppliedOffset)
         {
             AppliedOffset = TargetOffset;
         }
@@ -102,17 +122,22 @@ public class BattleWaterTimeEstimator : IBattleWaterTimeEstimator
             double maxStep = SlewFraction * step;
             AppliedOffset += Math.Max(-maxStep, Math.Min(maxStep, TargetOffset - AppliedOffset));
         }
-        adoptionPending = false;
-        forwardSnapPending = false;
+        jumpPending = false;
         return (float)(localTime + AppliedOffset);
+    }
+
+    // Sets a forward target the next advance jumps to.
+    private void JumpTo(double offset)
+    {
+        TargetOffset = offset;
+        jumpPending = true;
     }
 
     // A host is the time source: it keeps the offset it has, so a promoted host continues from its own current water time.
     private float Hold(float localTime)
     {
         TargetOffset = AppliedOffset;
-        adoptionPending = false;
-        forwardSnapPending = false;
+        jumpPending = false;
         window.Clear();
         return (float)(localTime + AppliedOffset);
     }
