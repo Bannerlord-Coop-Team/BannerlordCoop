@@ -101,6 +101,7 @@ internal class ArtisanJournalHandler : IHandler
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.IssueFinalized))]
 internal class ArtisanJournalFinalizedPatch
 {

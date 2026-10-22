@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithFail))]
 internal class CompleteQuestWithFailDispatchPatch
 {

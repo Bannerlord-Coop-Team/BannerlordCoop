@@ -14,6 +14,7 @@ namespace GameInterface.Services.Issues.Framework.Gating;
 /// player's own issues count, including one with no known owner yet, which is this player's accept
 /// still waiting on the server.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CheckPreconditions))]
 internal class SimilarCommitmentsGatePatch
 {

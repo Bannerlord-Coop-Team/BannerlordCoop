@@ -8,6 +8,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavi
 
 namespace GameInterface.Services.Issues.Quests.ArtisanOverpricedGoods.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class ArtisanOverpricedGoodsBranchPatches
 {

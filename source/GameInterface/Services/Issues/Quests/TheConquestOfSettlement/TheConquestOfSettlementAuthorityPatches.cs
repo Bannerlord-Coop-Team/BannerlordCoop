@@ -17,6 +17,7 @@ namespace GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 using Issue = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssue;
 using Quest = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssueQuest;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal static class TheConquestOfSettlementEventPatches
 {
@@ -68,6 +69,7 @@ internal static class TheConquestOfSettlementEventPatches
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(DiplomacyHelper), nameof(DiplomacyHelper.IsWarCausedByPlayer))]
 internal static class TheConquestOfSettlementWarInitiatorPatch
 {
@@ -82,6 +84,7 @@ internal static class TheConquestOfSettlementWarInitiatorPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.OnIssueUpdated))]
 internal static class TheConquestOfSettlementRewardPatch
 {
@@ -95,6 +98,7 @@ internal static class TheConquestOfSettlementRewardPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
 internal static class TheConquestOfSettlementTimeoutPatch
 {
@@ -103,6 +107,7 @@ internal static class TheConquestOfSettlementTimeoutPatch
 }
 
 // The server times the quest out from its own tick, so the relation penalty needs the owner as the main hero
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut))]
 internal static class TheConquestOfSettlementTimeoutOwnerPatch
 {

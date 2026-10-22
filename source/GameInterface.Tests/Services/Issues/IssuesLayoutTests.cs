@@ -1,6 +1,8 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Issues;
+using GameInterface.Services.Issues.Framework.Gating;
 using GameInterface.Services.Issues.Framework.Interface;
+using HarmonyLib;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -70,5 +72,36 @@ public class IssuesLayoutTests
             .ToList();
 
         Assert.Empty(misshapen);
+    }
+
+    [Fact]
+    public void Patches_AreInTheQuestCategory_ExceptTheAlwaysOnGates()
+    {
+        var alwaysOn = new[]
+        {
+            typeof(IssueTypeAllowlistGate),
+            typeof(DisableIssuesCampaignBehavior),
+            typeof(PlayerHeroIssueOwnerGate),
+            typeof(IssuesCampaignBehaviorSettlementEnteredPatch),
+        };
+
+        var patches = IssueTypes()
+            .Where(type => type.GetCustomAttributes<HarmonyPatch>(false).Any())
+            .ToList();
+
+        var uncategorized = patches
+            .Where(type => !alwaysOn.Contains(type))
+            .Where(type => type.GetCustomAttribute<HarmonyPatchCategory>()?.info.category != GameInterface.HARMONY_QUESTS_CATEGORY)
+            .Select(type => type.FullName)
+            .ToList();
+
+        var categorizedGates = alwaysOn
+            .Where(type => type.GetCustomAttribute<HarmonyPatchCategory>() != null)
+            .Select(type => type.FullName)
+            .ToList();
+
+        Assert.NotEmpty(patches);
+        Assert.Empty(uncategorized);
+        Assert.Empty(categorizedGates);
     }
 }
