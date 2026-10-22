@@ -1666,11 +1666,29 @@ public class VillageHostileActionTests : MapEventTestBase
     public void RaidFinalizeRequest_ForAlreadyDestroyedMapEvent_StillClosesRequesterMenu()
     {
         var client = Clients.First();
+        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        EnableHeadlessEncounterFinish(client);
+        SetMockPlayerEncounter(client);
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+            using (new AllowedThread()) Campaign.Current.MainParty = party;
+            Assert.Null(party.CurrentSettlement);
+            Assert.Null(party.MapEvent);
+            Campaign.Current.MapStateData.GameMenuId = "encounter";
+        });
+        using var menuExit = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
         Server.NetworkSentMessages.Clear();
 
         client.Call(() => client.Resolve<INetwork>().SendAll(new NetworkMapEventFinalizeAttempted("already-finalized-raid")));
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventFinalized>());
+        Assert.Equal(1, menuExit.CountFor(client));
+        client.Call(() =>
+        {
+            Assert.Null(PlayerEncounter.Current);
+            Assert.Null(Campaign.Current.MapStateData.GameMenuId);
+        });
     }
 
     [Fact]
