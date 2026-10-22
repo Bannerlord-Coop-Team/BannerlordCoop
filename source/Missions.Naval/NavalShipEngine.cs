@@ -213,8 +213,8 @@ public class NavalShipEngine : INavalShipEngine
         var frame = ship.GlobalFrame;
         var condition = ReadCondition(ship);
 
-        // Quest5's RemoveShipInternal: no rope or bridge may keep pointing at a removed hull.
-        ship.BreakAllExistingConnections();
+        // Quest5's RemoveShipInternal: no rope or bridge may keep pointing at a removed hull, as in RemoveHull.
+        NavalRopes.BreakConnections(ship);
         SteeredCopies.Forget(ship);
         shipsLogic.RemoveShip(ship);
 

@@ -65,6 +65,8 @@ internal static class NavalRopes
     /// </summary>
     internal static void BreakConnections(MissionShip hull)
     {
+        if (hull == null) return;
+
         Applying = true;
         try
         {
@@ -78,6 +80,31 @@ internal static class NavalRopes
         foreach (var machine in hull.AttachmentMachines)
             records.Remove(machine);
     }
+
+    /// <summary>
+    /// Drops every station's AI preference for a hull that left the mission. Vanilla's removal clears the boarding order but
+    /// not these, and its pilot AI throws at the preferred hull's points (GetBestEnemyAttachment) without a removal check.
+    /// </summary>
+    internal static void ForgetTarget(IEnumerable<MissionShip> ships, MissionShip removed)
+    {
+        if (ships == null || removed == null) return;
+
+        foreach (var ship in ships)
+        {
+            if (ship == removed || ship?.AttachmentMachines == null) continue;
+
+            foreach (var machine in ship.AttachmentMachines)
+            {
+                if (machine?.GetPreferredTargetShip() == removed) machine.SetPreferredTargetShip(null);
+            }
+        }
+    }
+
+    /// <summary>Whether a rope end's hull left the mission, or never resolved to one (a joint built against a removed hull).</summary>
+    internal static bool IsGone(MissionShip hull) => hull == null || hull.IsRemoved;
+
+    /// <summary>Whether a rope may hook a hull: never one that left the mission, whose points vanilla still reaches.</summary>
+    internal static bool AllowsTarget(bool targetHullGone) => !targetHullGone;
 
     internal static bool IsReplicaMachine(ShipAttachmentMachine machine) => machine != null && NavalForeignHulls.Contains(machine.OwnerShip);
 
@@ -354,7 +381,15 @@ internal static class NavalRopes
         record.CurveAngle = angle;
     }
 
-    internal static bool AllowConnection(ShipAttachmentMachine source) => AllowsChange(IsReplicaMachine(source), Applying);
+    // A replica connects only as its owner's state applies, and no rope hooks a hull that left (its stale AI preference goes).
+    internal static bool AllowConnection(ShipAttachmentMachine source, ShipAttachmentPointMachine target)
+    {
+        if (!AllowsChange(IsReplicaMachine(source), Applying)) return false;
+        if (target == null || AllowsTarget(IsGone(target.OwnerShip))) return true;
+
+        if (source != null && source.GetPreferredTargetShip() == target.OwnerShip) source.SetPreferredTargetShip(null);
+        return false;
+    }
 
     internal static bool AllowState(Attachment attachment) => AllowsChange(IsReplica(attachment), Applying);
 
@@ -375,10 +410,12 @@ internal static class NavalRopes
         return false;
     }
 
-    // Replica ropes are drawn from the owner's state; planks keep vanilla's layout tick.
+    // Replica ropes are drawn from the owner's state; planks keep vanilla's layout tick. A rope to a hull that left breaks.
     internal static bool TickRope(Attachment attachment)
     {
         var source = attachment.AttachmentSource;
+        if (BreakIfEndGone(attachment)) return false;
+
         if (!IsReplica(attachment))
         {
             // The throw curve observer refills this when vanilla draws a flying rope this tick.
@@ -393,6 +430,33 @@ internal static class NavalRopes
         UpdateReplicaRopeVisual(attachment, record);
         return false;
     }
+
+    // A hook that landed on, or a rope still tied to, a removed hull breaks; the machine tick destroys it next frame.
+    private static bool BreakIfEndGone(Attachment attachment)
+    {
+        if (attachment.State == RopeState.BrokenAndWaitingForRemoval) return false;
+        if (attachment.AttachmentSource?.OwnerShip?.IsRemoved != true && attachment.AttachmentTarget?.OwnerShip?.IsRemoved != true)
+            return false;
+
+        Applying = true;
+        try
+        {
+            attachment.SetAttachmentState(RopeState.BrokenAndWaitingForRemoval);
+        }
+        finally
+        {
+            Applying = false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// [Fixed-tick thread] Whether a joint's two hulls are still in the mission. A joint built after its target hull left
+    /// holds no target hull at all, and every one of its force steps dereferences both, so it skips the step instead.
+    /// </summary>
+    internal static bool JointHasHulls(ShipAttachmentMachine.ShipAttachmentJoint joint) =>
+        joint != null && !IsGone(joint._shipSourceScript) && !IsGone(joint._shipTargetScript);
 
     private static void UpdateReplicaRopeVisual(Attachment attachment, RopeRecord record)
     {

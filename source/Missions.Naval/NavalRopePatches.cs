@@ -20,7 +20,8 @@ namespace Missions.Naval;
 internal class RopeConnectPatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(ShipAttachmentMachine __instance) => NavalRopes.AllowConnection(__instance);
+    private static bool Prefix(ShipAttachmentMachine __instance, ShipAttachmentPointMachine attachmentPointMachine) =>
+        NavalRopes.AllowConnection(__instance, attachmentPointMachine);
 
     [HarmonyPostfix]
     private static void Postfix(ShipAttachmentMachine __instance) => NavalRopes.ObserveCreated(__instance);
@@ -72,6 +73,16 @@ internal class RopeReplicaTickPatch
 {
     [HarmonyPrefix]
     private static bool Prefix(Attachment __instance) => NavalRopes.TickRope(__instance);
+}
+
+// A joint hooked to a hull that left has no hull to push; its force step is skipped until the rope tick breaks it.
+[HarmonyPatch(typeof(Joint), nameof(Joint.OnFixedTick))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class RopeJointHullGuardPatch
+{
+    // Runs vanilla's joint step only while both of its hulls are in the mission.
+    [HarmonyPrefix]
+    private static bool Prefix(Joint __instance) => NavalRopes.JointHasHulls(__instance);
 }
 
 // Retargeting destroys and recreates a rope; on a copied hull that is the owner's decision.
