@@ -49,6 +49,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly IBattleAgentBudget agentBudget;
     private readonly ICoopShipSnapshotBuilder shipSnapshotBuilder;
     private readonly INavalShipEngine shipEngine;
+    private readonly INavalShipCaptureEngine captureEngine;
     private readonly INavalBattleServicesFactory servicesFactory;
     private readonly IPlayerManager playerManager;
 #if DEBUG
@@ -63,6 +64,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         IBattleAgentBudget agentBudget,
         ICoopShipSnapshotBuilder shipSnapshotBuilder,
         INavalShipEngine shipEngine,
+        INavalShipCaptureEngine captureEngine,
         INavalBattleServicesFactory servicesFactory,
         IPlayerManager playerManager
 #if DEBUG
@@ -77,6 +79,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
 #endif
         this.playerManager = playerManager;
         this.shipEngine = shipEngine;
+        this.captureEngine = captureEngine;
         this.servicesFactory = servicesFactory;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -225,7 +228,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private void AttachNavalServices(Mission mission, BattleSideEnum enemySide)
     {
         var context = mission.GetMissionBehavior<CoopBattleController>().Context;
-        var services = servicesFactory.Create(context, shipEngine);
+        var services = servicesFactory.Create(context, shipEngine, captureEngine);
         var npcFleetSpawner = new NavalNpcFleetSpawner(context.Session, services.ShipReplicator, context.MissionComponent.ShipRegistry,
             shipSnapshotBuilder, objectManager, playerManager, enemySide);
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, npcFleetSpawner, mission.GetMissionBehavior<NavalShipsLogic>()));

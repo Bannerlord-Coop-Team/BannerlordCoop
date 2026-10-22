@@ -1,0 +1,28 @@
+﻿using TaleWorlds.MountAndBlade;
+
+namespace Missions.Battles;
+
+/// <summary>
+/// The NavalDLC side of an in-mission ship capture: vanilla's vacancy and takeover rules on a hull and vanilla's swap of two
+/// hulls' formations. Implemented in Missions.Naval, so Missions binds to no DLC type.
+/// </summary>
+public interface INavalShipCaptureEngine
+{
+    /// <summary>
+    /// [Game thread] Replays vanilla's capture swap (NavalShipsLogic.OnShipCaptured): <paramref name="prize"/> takes the formation,
+    /// team and controller of <paramref name="captorHull"/>, which is left with none. A copy keeps no local controller.
+    /// </summary>
+    void ApplyCapture(MissionObject prize, MissionObject captorHull);
+
+    /// <summary>[Game thread] Leaves a late joiner's copy of a capture's orphan as vanilla's swap left it: no formation, no team.</summary>
+    void OrphanHull(MissionObject hull);
+
+    /// <summary>
+    /// [Game thread] Vanilla's capture vacancy on a hull this client simulates, read fresh: its formation is all swimming or gone
+    /// and nothing is queued.
+    /// </summary>
+    bool IsVacantForCapture(MissionObject hull);
+
+    /// <summary>Whether vanilla lets the hull be captured at all (storyline missions turn it off).</summary>
+    bool CanBeTakenOver(MissionObject hull);
+}

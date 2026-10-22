@@ -97,21 +97,6 @@ public interface INavalShipEngine
     void AdoptHull(MissionObject hull);
 
     /// <summary>
-    /// [Game thread] Replays vanilla's capture swap (NavalShipsLogic.OnShipCaptured): <paramref name="prize"/> takes the formation,
-    /// team and controller of <paramref name="captorHull"/>, which is left with none. A copy keeps no local controller.
-    /// </summary>
-    void ApplyCapture(MissionObject prize, MissionObject captorHull);
-
-    /// <summary>[Game thread] Leaves a late joiner's copy of a capture's orphan as vanilla's swap left it: no formation, no team.</summary>
-    void OrphanHull(MissionObject hull);
-
-    /// <summary>Vanilla's capture vacancy on a hull this client simulates: its formation is all swimming or gone and nothing is queued.</summary>
-    bool IsVacantForCapture(MissionObject hull);
-
-    /// <summary>Whether vanilla lets the hull be captured at all (storyline missions turn it off).</summary>
-    bool CanBeTakenOver(MissionObject hull);
-
-    /// <summary>
     /// [Mission tick] First step of replacing or removing a hull: stops every agent aboard using its machines and parks it off
     /// every hull, and stops tracking the hull's crew, so nobody stands on or is tracked by the hull when it goes.
     /// </summary>

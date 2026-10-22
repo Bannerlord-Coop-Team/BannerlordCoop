@@ -299,6 +299,23 @@ internal class CoopShipCapturePatch
     }
 }
 
+// A captured player's formation keeps its main agent but its assignment no longer has a hull, so the helm's capture checks in
+// ShipControllerMachine.OnTick ask whether a null hull is connected to the orphan every tick; vanilla never captures a player hull.
+[HarmonyPatch(typeof(MissionShip), nameof(MissionShip.AreShipsConnected))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class CapturedFormationConnectionPatch
+{
+    // Answers "not connected" for a missing hull in a co-op battle instead of dereferencing it.
+    [HarmonyPrefix]
+    internal static bool Prefix(MissionShip ship1, MissionShip ship2, ref bool __result)
+    {
+        if (!CoopNavalMissionScope.IsActive || (ship1 != null && ship2 != null)) return true;
+
+        __result = false;
+        return false;
+    }
+}
+
 // The host plans the AI fleet's side after deployment ended; the deployment views (boundary markers) that listen
 // for plans are done by then and throw, and nothing else listens, so that one late plan is not announced.
 [HarmonyPatch(typeof(Mission), nameof(Mission.OnDeploymentPlanMade))]

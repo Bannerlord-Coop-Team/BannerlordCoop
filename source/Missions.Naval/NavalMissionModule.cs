@@ -29,6 +29,9 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalShipEngine>()
             .As<INavalShipEngine>()
             .InstancePerDependency();
+        builder.RegisterType<NavalShipCaptureEngine>()
+            .As<INavalShipCaptureEngine>()
+            .InstancePerDependency();
         builder.RegisterType<NavalSteeredCopies>()
             .As<INavalSteeredCopies>()
             .InstancePerDependency();

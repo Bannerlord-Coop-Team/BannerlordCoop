@@ -404,7 +404,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 return recovered;
             });
             Services = instance.Resolve<INavalBattleServicesFactory>().Create(
-                controller.Context with { ReinforcementFielder = reinforcements.Object, MissionContext = members }, engine);
+                controller.Context with { ReinforcementFielder = reinforcements.Object, MissionContext = members }, engine,
+                engine);
         }
 
         /// <summary>The membership the ship services' gate reads.</summary>

@@ -63,12 +63,13 @@ public interface INavalBattleServices : IDisposable
 public class NavalBattleServices : INavalBattleServices
 {
     private readonly INavalHullAuthority hullAuthority;
+    private readonly IShipCaptureApplier captureApplier;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
 
     public NavalBattleServices(IBattleNetwork network, INetwork relayNetwork, IMessageBroker messageBroker,
         IBattleTeamResolver teamResolver, IObjectManager objectManager, BattleContext context, INavalShipEngine shipEngine,
-        IWaterClock waterClock)
+        INavalShipCaptureEngine captureEngine, IWaterClock waterClock)
     {
         // These services exist only in a naval mission and open with it.
         context.Session.MarkNaval();
@@ -82,10 +83,13 @@ public class NavalBattleServices : INavalBattleServices
         StationUseReplicator = new AgentStationUseReplicator(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, context.Deployment, context.MissionContext);
         ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
-            hullAuthority, conditions, StationUseReplicator);
-        ShipCaptureReplicator = new BattleShipCaptureReplicator(network, relayNetwork, messageBroker, context, shipEngine,
-            ShipReplicator, hullAuthority);
-        DeckPoses =new NavalDeckPoses(context.MissionComponent, shipEngine, StationUseReplicator);
+            hullAuthority, conditions, StationUseReplicator, captureEngine);
+        // After the ship replicator, so a spawn record reaches the applier only once the hull it brings spawned.
+        captureApplier = new ShipCaptureApplier(network, relayNetwork, messageBroker, context, shipEngine, captureEngine, ShipReplicator,
+            hullAuthority);
+        ShipCaptureReplicator = new BattleShipCaptureReplicator(network, messageBroker, context, shipEngine, captureEngine,
+            hullAuthority, captureApplier);
+        DeckPoses = new NavalDeckPoses(context.MissionComponent, shipEngine, StationUseReplicator);
         MigrationReserveFielder = new NavalMigrationReserveFielder(context.Session, context.ReinforcementFielder,
             context.MissionComponent.ShipRegistry, shipEngine, ShipReplicator);
         ShipDamageRouter = new BattleShipDamageRouter(network, messageBroker, context.Session, context.MissionComponent,
@@ -123,6 +127,7 @@ public class NavalBattleServices : INavalBattleServices
     {
         WaterClock.Tick(dt);
         ShipReplicator.Tick(dt);
+        captureApplier.Tick(dt);
         ShipCaptureReplicator.Tick(dt);
         FateReporter.Tick(dt);
         DeckPoses.Tick(dt);
@@ -163,6 +168,7 @@ public class NavalBattleServices : INavalBattleServices
         DeckPoses.Dispose();
         StationUseReplicator.Dispose();
         ShipCaptureReplicator.Dispose();
+        captureApplier.Dispose();
         ShipReplicator.Dispose();
         hullAuthority.Dispose();
     }
@@ -171,7 +177,7 @@ public class NavalBattleServices : INavalBattleServices
 /// <summary>Builds the <see cref="INavalBattleServices"/> of one naval battle on its controller's context.</summary>
 public interface INavalBattleServicesFactory
 {
-    INavalBattleServices Create(BattleContext context, INavalShipEngine shipEngine);
+    INavalBattleServices Create(BattleContext context, INavalShipEngine shipEngine, INavalShipCaptureEngine captureEngine);
 }
 
 /// <inheritdoc cref="INavalBattleServicesFactory"/>
@@ -195,11 +201,11 @@ public class NavalBattleServicesFactory : INavalBattleServicesFactory
         this.waterClock = waterClock;
     }
 
-    public INavalBattleServices Create(BattleContext context, INavalShipEngine shipEngine)
+    public INavalBattleServices Create(BattleContext context, INavalShipEngine shipEngine, INavalShipCaptureEngine captureEngine)
     {
         // Installed on first use: only a client opening a naval battle gets here, and the patch refuses any server anyway.
         waterClock.TryInstall();
         return new NavalBattleServices(network, relayNetwork, messageBroker, teamResolver, objectManager, context, shipEngine,
-            waterClock);
+            captureEngine, waterClock);
     }
 }

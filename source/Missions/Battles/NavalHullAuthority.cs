@@ -23,14 +23,12 @@ public interface INavalHullAuthority : IDisposable
     /// <summary>Opens a scope in which spawned hulls are not registered as this client's own; dispose to close it.</summary>
     IDisposable SuppressSpawnRegistration();
 
-    /// <summary>Gives <paramref name="ship"/> to <paramref name="newAuthority"/>; true when this client now simulates it.</summary>
-    bool Transfer(NetworkShipInfo ship, string newAuthority);
-
     /// <summary>
-    /// Gives a captured hull to its captor in place: a new authority adopts its copy and the old one turns its hull into a copy,
-    /// with no hull removed or replaced. True when this client now simulates it.
+    /// Gives <paramref name="ship"/> to <paramref name="newAuthority"/>; true when this client now simulates it. A new authority
+    /// replaces its copy with a freshly simulated hull, or with <paramref name="inPlace"/> (a capture's captor) adopts the copy
+    /// itself; an old authority turns its hull back into a copy.
     /// </summary>
-    bool TransferInPlace(NetworkShipInfo ship, string newAuthority);
+    bool Transfer(NetworkShipInfo ship, string newAuthority, bool inPlace = false);
 
     /// <summary>Queues replacing a hull this client simulates with a fresh simulated hull of the same ship. Why it cannot, or null.</summary>
     string Replace(Guid shipId);
@@ -112,30 +110,24 @@ public class NavalHullAuthority : INavalHullAuthority
         return new SpawnScope(this);
     }
 
-    public bool Transfer(NetworkShipInfo ship, string newAuthority)
+    public bool Transfer(NetworkShipInfo ship, string newAuthority, bool inPlace = false)
     {
         bool wasOwn = IsOwn(ship);
         ship.CurrentAuthority = newAuthority;
         bool isOwn = IsOwn(ship);
         if (isOwn && !wasOwn)
-            Replace(ship.ShipId);
+            TakeOver(ship, inPlace);
         else if (wasOwn && !isOwn)
             Release(ship);
 
         return isOwn;
     }
 
-    public bool TransferInPlace(NetworkShipInfo ship, string newAuthority)
+    // A steered copy can simulate as it is (capture); a host change still swaps in a hull spawned the way the host spawned it.
+    private void TakeOver(NetworkShipInfo ship, bool inPlace)
     {
-        bool wasOwn = IsOwn(ship);
-        ship.CurrentAuthority = newAuthority;
-        bool isOwn = IsOwn(ship);
-        if (isOwn && !wasOwn)
-            engine.AdoptHull(ship.Hull);
-        else if (wasOwn && !isOwn)
-            Release(ship);
-
-        return isOwn;
+        if (inPlace) engine.AdoptHull(ship.Hull);
+        else Replace(ship.ShipId);
     }
 
     public string Replace(Guid shipId)

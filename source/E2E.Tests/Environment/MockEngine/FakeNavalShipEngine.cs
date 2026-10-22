@@ -14,7 +14,7 @@ namespace E2E.Tests.Environment.MockEngine;
 /// It also checks the removal invariant on every hull the code under test removes or replaces; see
 /// <see cref="AssertRemovalInvariant"/>.
 /// </summary>
-public sealed class FakeNavalShipEngine : INavalShipEngine
+public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEngine
 {
     public const string HullId = "northern_light_ship";
     public const float FullHitPoints = 100f;
@@ -107,7 +107,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         return new BattleShipSpawnData(identity.ShipId, identity.CurrentAuthority, identity.MapEventPartyId, identity.IsNpcParty,
             identity.IsOrphaned ? identity.OrphanedSide : fake.Side, fake.FormationIndex,
             NetworkBattleShipSample.FromFrame(fake.Frame), HullId, null, null, null, null, fake.HitPoints, fake.SailHitPoints, 1, "",
-            identity.OriginalOwner, fake.CampaignShipId, identity.CaptorControllerId, identity.IsOrphaned);
+            identity.OriginalOwner, fake.CampaignShipId, identity.CaptorControllerId, identity.IsOrphaned, identity.CaptureSequence,
+            identity.Capture?.CaptorShipId ?? Guid.Empty, identity.Capture?.FromSide ?? BattleSideEnum.None);
     }
 
     public MissionObject SpawnForeignHull(BattleShipSpawnData data, Team team, out Formation formation)
@@ -240,17 +241,19 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
     public List<(MissionObject Prize, MissionObject CaptorHull)> Captures { get; } = new();
 
     // Vanilla's swap: the prize takes the captor hull's team, side and formation, the captor's crew crews the prize, and the
-    // captor hull is left with none; the prize's old crew keeps no hull.
+    // captor hull is left with none. Vanilla also points the old owner's crew record of the prize at the orphan
+    // (NavalShipAgents.OnShipCaptured), so those agents stay tracked on the orphan while on another team.
     public void ApplyCapture(MissionObject prize, MissionObject captorHull)
     {
         var fake = Of(prize);
         var captor = Of(captorHull);
         Captures.Add((prize, captorHull));
 
-        foreach (var agent in crews.Where(entry => ReferenceEquals(entry.Value, fake)).Select(entry => entry.Key).ToList())
-            crews.Remove(agent);
+        var oldCrew = crews.Where(entry => ReferenceEquals(entry.Value, fake)).Select(entry => entry.Key).ToList();
         foreach (var agent in crews.Where(entry => ReferenceEquals(entry.Value, captor)).Select(entry => entry.Key).ToList())
             crews[agent] = fake;
+        foreach (var agent in oldCrew)
+            crews[agent] = captor;
 
         fake.Team = captor.Team;
         fake.Formation = captor.Formation;
@@ -285,7 +288,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         fake.Seats.Clear();
         foreach (var agent in decks.Where(entry => ReferenceEquals(entry.Value, fake)).Select(entry => entry.Key).ToList())
         {
-            bool isCrew = crews.TryGetValue(agent, out var crew) && ReferenceEquals(crew, fake);
+            bool isCrew = IsCrewOf(agent, fake);
             parked.Add(new HullSwapAgent(agent, isCrew, isParked: true, Vec3.Zero, Vec3.Zero));
             decks.Remove(agent);
         }
@@ -300,7 +303,13 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
 
     /// <summary>The active agents that crew <paramref name="fake"/>.</summary>
     private IEnumerable<Agent> CrewOf(FakeHull fake) =>
-        crews.Where(entry => ReferenceEquals(entry.Value, fake) && entry.Key.IsActive()).Select(entry => entry.Key).ToList();
+        crews.Where(entry => entry.Key.IsActive() && IsCrewOf(entry.Key, fake)).Select(entry => entry.Key).ToList();
+
+    // As NavalShipEngine.IsHullCrew: an orphan has no team, so the old owner's crew vanilla tracks on it never counts. A test
+    // agent without a team stands for crew whose team this harness does not model.
+    private bool IsCrewOf(Agent agent, FakeHull fake) =>
+        crews.TryGetValue(agent, out var crew) && ReferenceEquals(crew, fake)
+        && !(fake.IsOrphaned && agent.Team != null);
 
     /// <summary>The agents a hull's parking lifted clear that nothing has put back or withdrawn yet.</summary>
     public IReadOnlyCollection<Agent> ParkedAgents => parkedFrom.Keys;
@@ -362,6 +371,9 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         if (crewHull != null) crews[agent] = Of(crewHull);
     }
 
+    /// <summary>Makes <paramref name="agent"/> crew of <paramref name="crewHull"/> without standing it on a deck, as a swimmer.</summary>
+    public void AssignCrew(Agent agent, MissionObject crewHull) => crews[agent] = Of(crewHull);
+
     /// <summary>The hull whose deck the agent stands on, or null.</summary>
     public FakeHull? DeckOf(Agent agent) => decks.TryGetValue(agent, out var deck) ? deck : null;
 
@@ -376,7 +388,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             .ToList();
     }
 
-    public MissionObject CrewHullOf(Agent agent) => crews.TryGetValue(agent, out var crew) ? crew.Hull : null!;
+    public MissionObject CrewHullOf(Agent agent) => crews.TryGetValue(agent, out var crew) && IsCrewOf(agent, crew) ? crew.Hull : null!;
 
     public MissionObject NearestFriendlyHull(Agent agent, IReadOnlyCollection<MissionObject> excluded)
     {

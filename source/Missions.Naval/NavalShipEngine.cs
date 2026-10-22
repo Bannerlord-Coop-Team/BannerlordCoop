@@ -83,7 +83,10 @@ public class NavalShipEngine : INavalShipEngine
             identity.OriginalOwner,
             CampaignShipIdOf(hull),
             identity.CaptorControllerId,
-            identity.IsOrphaned);
+            identity.IsOrphaned,
+            identity.CaptureSequence,
+            identity.Capture?.CaptorShipId ?? Guid.Empty,
+            identity.Capture?.FromSide ?? BattleSideEnum.None);
     }
 
     public MissionObject SpawnForeignHull(BattleShipSpawnData data, Team team, out Formation formation)
@@ -145,46 +148,6 @@ public class NavalShipEngine : INavalShipEngine
         ship.SetController(ShipControllerType.None, autoUpdateController: true);
     }
 
-    public void ApplyCapture(MissionObject prize, MissionObject captorHull)
-    {
-        var ship = (MissionShip)prize;
-        var captor = (MissionShip)captorHull;
-        var shipsLogic = ShipsLogic;
-        if (shipsLogic == null || captor.Formation == null)
-        {
-            Logger.Warning("[NavalSync] Could not replay the capture of hull {Index}: the captor's hull {CaptorIndex} has no formation here",
-                ship.Index, captor.Index);
-            return;
-        }
-
-        shipsLogic.OnShipCaptured(ship, captor.Formation);
-        // Vanilla's swap hands both hulls an auto-updated controller; a copy keeps none, so it never steers itself here.
-        if (NavalForeignHulls.Contains(ship)) ship.SetController(ShipControllerType.None, autoUpdateController: false);
-        if (NavalForeignHulls.Contains(captor)) captor.SetController(ShipControllerType.None, autoUpdateController: false);
-        // As the helm's capture branch does once the swap ran.
-        ship.InvalidateActiveFormationTroopOnShipCache();
-        captor.InvalidateActiveFormationTroopOnShipCache();
-    }
-
-    // Vanilla's swap gives the captor's assignment to the prize, so the orphan holds none; a joiner's copy had one of its own.
-    public void OrphanHull(MissionObject hull)
-    {
-        var ship = (MissionShip)hull;
-        var shipsLogic = ShipsLogic;
-        if (shipsLogic != null && shipsLogic.FindAssignmentOfShipOrigin(ship.ShipOrigin, out var assignment))
-        {
-            assignment.RemoveShip();
-            assignment.Clear();
-        }
-
-        ship.SetFormation(null);
-        ship.SetController(ShipControllerType.None, autoUpdateController: false);
-    }
-
-    public bool IsVacantForCapture(MissionObject hull) => ((MissionShip)hull).ShipControllerMachine?.IsAttachedShipVacant() == true;
-
-    public bool CanBeTakenOver(MissionObject hull) => ((MissionShip)hull).CanBeTakenOver;
-
     // Vanilla only removes a hull nobody it keeps stands on (Quest5 frees crewless hulls, ShipRetreatLogic fades the crew
     // aboard), so the agents aboard leave a tick before the hull does, parked the way UnassignAgentAux parks troops.
     public IReadOnlyList<HullSwapAgent> ParkHullAgents(MissionObject hull)
@@ -201,7 +164,7 @@ public class NavalShipEngine : INavalShipEngine
             if (!agent.IsActive() || !agent.IsHuman) continue;
 
             bool isTracked = agentsLogic.IsAgentOnAnyShip(agent, out var onShip) && onShip == ship;
-            bool isCrew = isTracked || (ship.Formation != null && agent.Formation == ship.Formation);
+            bool isCrew = IsHullCrew(isTracked, agent.Team == ship.Team, ship.Formation != null && agent.Formation == ship.Formation);
             bool isAboard = ship.GetIsAgentOnShip(agent) || agent.GetComponent<AgentNavalComponent>()?.SteppedShip == ship
                 || UsesMachineOf(agent, ship);
             if (!isCrew && !isAboard) continue;
@@ -224,6 +187,14 @@ public class NavalShipEngine : INavalShipEngine
 
         return moved;
     }
+
+    /// <summary>
+    /// Whether an agent crews a hull: it is in the hull's formation, or vanilla tracks it on the hull and it is on the hull's
+    /// team. Vanilla's capture swap points the old owner's crew record at the captor's orphan, which has no team, so the old
+    /// owner's swimmers never count as the orphan's crew.
+    /// </summary>
+    internal static bool IsHullCrew(bool isTracked, bool isOnHullsTeam, bool isInHullsFormation) =>
+        isInHullsFormation || (isTracked && isOnHullsTeam);
 
     private static bool UsesMachineOf(Agent agent, MissionShip ship) =>
         agent.CurrentlyUsedGameObject is UsableMissionObject used && used.GameEntity.IsValid && used.GameEntity.Root == ship.GameEntity;

@@ -81,6 +81,18 @@ public class NavalShipEngineTests
         Assert.Equal(expected, NavalShipEngine.OpensHelmToPlayer(hasPlayerTeam, isPlayerSide, formationUnits));
     }
 
+    // C2: vanilla's capture swap points the old owner's crew record at the captor's orphan, which has no team, so those
+    // swimmers are no crew of the orphan and never withdraw with it; a formation member always is crew.
+    [Theory]
+    [InlineData(true, true, false, true)]
+    [InlineData(true, false, false, false)]
+    [InlineData(false, false, true, true)]
+    [InlineData(false, true, false, false)]
+    public void IsHullCrew_NeedsTheHullsFormation_OrTrackingOnItsTeam(bool tracked, bool onHullsTeam, bool inFormation, bool expected)
+    {
+        Assert.Equal(expected, NavalShipEngine.IsHullCrew(tracked, onHullsTeam, inFormation));
+    }
+
     // WeakGameEntity.IsValid only compares the pointer with zero; nothing here dereferences it.
     internal static WeakGameEntity ValidEntity() =>
         (WeakGameEntity)AccessTools.Constructor(typeof(WeakGameEntity), new[] { typeof(UIntPtr) }).Invoke(new object[] { new UIntPtr(1) });

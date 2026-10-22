@@ -172,7 +172,7 @@ public class NetworkShipRegistryTests
     // Capture 2.3 step 3: crew identity is formation-based, so after vanilla's swap the captor's formation names the prize,
     // whose crew and reinforcements it now holds, and the captor's old hull answers for no formation.
     [Fact]
-    public void TryRecordCapture_MapsTheCaptorFormationToThePrize_AndNothingToTheOrphan()
+    public void MarkCapturedAndOrphaned_MapTheCaptorFormationToThePrize_AndNothingToTheOrphan()
     {
         var registry = new NetworkShipRegistry();
         var captorFormation = CreateFormation();
@@ -182,7 +182,9 @@ public class NetworkShipRegistryTests
         registry.TryRegister(prize);
         registry.TryRegister(captorShip);
 
-        Assert.True(registry.TryRecordCapture(prize.ShipId, captorShip.ShipId, "captor", BattleSideEnum.Attacker));
+        Assert.True(registry.TryMarkCaptured(prize.ShipId, new HullCapture("captor", captorShip.ShipId, BattleSideEnum.Defender),
+            captorShip.Formation, 1));
+        Assert.True(registry.TryMarkOrphaned(captorShip.ShipId, BattleSideEnum.Attacker, 1));
 
         Assert.True(registry.TryGetByFormation(captorFormation, out var crewShip));
         Assert.Same(prize, crewShip);
@@ -192,6 +194,8 @@ public class NetworkShipRegistryTests
         Assert.Equal(BattleSideEnum.Attacker, captorShip.OrphanedSide);
         Assert.Equal("captor", prize.CaptorControllerId);
         Assert.False(prize.IsOrphaned);
+        Assert.Equal(1, prize.CaptureSequence);
+        Assert.False(registry.TryMarkOrphaned(prize.ShipId, BattleSideEnum.None, 2));
     }
 
     // A captured AI hull stays with its captor through host changes, migration and NPC reserve fielding (K8).
@@ -200,74 +204,73 @@ public class NetworkShipRegistryTests
     {
         var registry = new NetworkShipRegistry();
         var prize = new NetworkShipInfo(Guid.NewGuid(), "host", "MapEventParty_2", true, CreateHull(), CreateFormation());
-        var captorShip = new NetworkShipInfo(Guid.NewGuid(), "captor", "MapEventParty_1", false, CreateHull(), CreateFormation());
         registry.TryRegister(prize);
-        registry.TryRegister(captorShip);
         bool followedBefore = prize.FollowsBattleHost;
 
-        registry.TryRecordCapture(prize.ShipId, captorShip.ShipId, "captor", BattleSideEnum.Attacker);
+        registry.TryMarkCaptured(prize.ShipId, new HullCapture("captor", Guid.NewGuid(), BattleSideEnum.Defender), CreateFormation(), 1);
 
         Assert.True(followedBefore);
         Assert.False(prize.FollowsBattleHost);
-        Assert.False(captorShip.FollowsBattleHost);
     }
 
-    // A recapture gives an orphan a formation again, and a hull can't capture itself.
+    // A recapture gives an orphan a formation again.
     [Fact]
-    public void TryRecordCapture_BackOfAnOrphan_GivesItTheFormation_AndRefusesTheSameHullTwice()
+    public void MarkCaptured_OfAnOrphan_GivesItTheFormation()
     {
         var registry = new NetworkShipRegistry();
         var formation = CreateFormation();
-        var own = new NetworkShipInfo(Guid.NewGuid(), "captor", "MapEventParty_1", false, CreateHull(), formation);
-        var prize = new NetworkShipInfo(Guid.NewGuid(), "host", "MapEventParty_2", true, CreateHull(), CreateFormation());
+        var own = new NetworkShipInfo(Guid.NewGuid(), "captor", "MapEventParty_1", false, CreateHull(), CreateFormation());
         registry.TryRegister(own);
-        registry.TryRegister(prize);
-        registry.TryRecordCapture(prize.ShipId, own.ShipId, "captor", BattleSideEnum.Attacker);
+        registry.TryMarkOrphaned(own.ShipId, BattleSideEnum.Attacker, 1);
 
-        Assert.True(registry.TryRecordCapture(own.ShipId, prize.ShipId, "captor", BattleSideEnum.Attacker));
+        registry.TryMarkCaptured(own.ShipId, new HullCapture("captor", Guid.NewGuid(), BattleSideEnum.None), formation, 2);
 
         Assert.False(own.IsOrphaned);
         Assert.Same(formation, own.Formation);
-        Assert.True(prize.IsOrphaned);
-        Assert.False(registry.TryRecordCapture(own.ShipId, own.ShipId, "captor", BattleSideEnum.Attacker));
+        Assert.Equal(2, own.CaptureSequence);
     }
 
-    // A confirm sent by a host before a migration still names a controller that simulated the hull (2.3 step 1).
+    // C4: only a ship id that left the mission can be reopened, and it then registers again.
     [Fact]
-    public void HasBeenAuthority_KnowsEveryEarlierAuthority_AndTheFieldingOwner()
+    public void TryReopen_LetsARemovedShipRegisterAgain_AndNothingElse()
     {
-        var ship = new NetworkShipInfo(Guid.NewGuid(), "host", "MapEventParty_2", true, CreateHull(), null);
+        var registry = new NetworkShipRegistry();
+        var removed = Guid.NewGuid();
+        var waiting = Guid.NewGuid();
+        registry.MarkRemoved(removed);
+        registry.MarkAwaiting(waiting);
 
-        ship.CurrentAuthority = "successor";
-        ship.CurrentAuthority = "captor";
-
-        Assert.True(ship.HasBeenAuthority("host"));
-        Assert.True(ship.HasBeenAuthority("successor"));
-        Assert.True(ship.HasBeenAuthority("captor"));
-        Assert.False(ship.HasBeenAuthority("observer"));
-        Assert.False(ship.HasBeenAuthority(null));
+        Assert.True(registry.TryReopen(removed));
+        Assert.False(registry.TryReopen(waiting));
+        Assert.Equal(ShipLifecycle.Unknown, registry.StateOf(removed));
+        Assert.True(registry.TryRegister(new NetworkShipInfo(removed, "captor", null, false, CreateHull(), null)));
     }
 
-    // ProtoMember 20 and 21 carry a captured or orphaned hull to a late joiner; 18 stays retired.
+    // ProtoMember 20 to 24 carry a captured or orphaned hull and its capture count to a late joiner; 18 stays retired.
     [Fact]
-    public void SpawnRecord_RoundTripsItsCaptorAndOrphanState()
+    public void SpawnRecord_RoundTripsItsCaptureState()
     {
+        var captorShipId = Guid.NewGuid();
         var prize = new BattleShipSpawnData(Guid.NewGuid(), "captor", "MapEventParty_2", true, BattleSideEnum.Attacker, 1,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
-            "", "host", "Ship_7", captorControllerId: "captor");
-        var orphan = new BattleShipSpawnData(Guid.NewGuid(), "captor", "MapEventParty_1", false, BattleSideEnum.Attacker, 0,
+            "", "host", "Ship_7", captorControllerId: "captor", captureSequence: 3, capturedWithShipId: captorShipId,
+            capturedFromSide: BattleSideEnum.Defender);
+        var orphan = new BattleShipSpawnData(captorShipId, "captor", "MapEventParty_1", false, BattleSideEnum.Attacker, 0,
             NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
-            "", null, "Ship_8", orphaned: true);
+            "", null, "Ship_8", orphaned: true, captureSequence: 1);
 
         var copies = ProtoBuf.Serializer.DeepClone(new NetworkSpawnBattleShips(new[] { prize, orphan })).Ships;
 
         Assert.Equal("captor", copies[0].CaptorControllerId);
         Assert.False(copies[0].FollowsBattleHost);
         Assert.False(copies[0].Orphaned);
+        Assert.Equal(3, copies[0].CaptureSequence);
+        Assert.Equal(captorShipId, copies[0].CapturedWithShipId);
+        Assert.Equal(BattleSideEnum.Defender, copies[0].CapturedFromSide);
         Assert.True(copies[1].Orphaned);
         Assert.Null(copies[1].CaptorControllerId);
+        Assert.Equal(1, copies[1].CaptureSequence);
     }
-
     private static MissionObject CreateHull() => ShipTestHulls.Create();
 
     private static Formation CreateFormation() => (Formation)RuntimeHelpers.GetUninitializedObject(typeof(Formation));

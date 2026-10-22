@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
-using Common.Network;
 using GameInterface.Services.GameDebug.Messages;
 using Missions.Messages;
 using Missions.Services.Network;
@@ -15,15 +14,15 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Battles;
 
 /// <summary>
-/// Replicates vanilla's in-mission ship capture. The captor runs vanilla's helm timer and asks the hull's current authority,
-/// which decides on the real crew and reserve; every client then replays vanilla's swap and the prize moves to its captor in place.
+/// The request and decision of an in-mission ship capture: the captor runs vanilla's helm timer and asks the hull's current
+/// authority, which decides on the real crew and reserve; <see cref="IShipCaptureApplier"/> applies what it confirms everywhere.
 /// </summary>
 public interface IBattleShipCaptureReplicator : IDisposable
 {
-    /// <summary>[Game thread] Applies confirms that waited for a hull and expires requests no authority answered.</summary>
+    /// <summary>[Game thread] Notices a promotion to battle host and expires requests no authority answered.</summary>
     void Tick(float dt);
 
-    /// <summary>[Game thread] Capture counters, pending requests and held confirms (diagnostics).</summary>
+    /// <summary>[Game thread] Request and refusal counters, pending requests and the applier's state (diagnostics).</summary>
     object Inspect();
 
     /// <summary>[Game thread] How long this client's request for <paramref name="shipId"/> has waited, or null when none waits.</summary>
@@ -37,48 +36,49 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
 
     /// <summary>How long a captor waits for the authority's answer before it tells the player nobody answered.</summary>
     internal const float RequestTimeoutSeconds = 5f;
-    /// <summary>How long a confirm waits for a hull this client has not registered yet before it is dropped.</summary>
-    internal const float HeldConfirmLifetimeSeconds = 30f;
+
+    /// <summary>
+    /// How long a promoted host refuses to capture the AI hulls it inherited, so a capture the old host confirmed just before it
+    /// left reaches it first over the mesh, and every capture of a hull keeps one decider per place in its order.
+    /// </summary>
+    internal const float PromotionSettleSeconds = 2f;
 
     private readonly IBattleNetwork network;
-    private readonly INetwork relayNetwork;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
     private readonly ICoopMissionComponent missionComponent;
     private readonly IMissionContext missionContext;
     private readonly INavalShipEngine engine;
-    private readonly IBattleShipReplicator ships;
+    private readonly INavalShipCaptureEngine captureEngine;
     private readonly INavalHullAuthority hullAuthority;
+    private readonly IShipCaptureApplier applier;
 
     // [Game thread] This client's requests waiting for the authority, by prize ship id, with when each went out.
     private readonly Dictionary<Guid, float> pendingRequests = new Dictionary<Guid, float>();
-    // [Game thread] Confirms for a hull not registered here yet or mid-swap, with when each arrived.
-    private readonly List<HeldConfirm> heldConfirms = new List<HeldConfirm>();
-    // [Game thread] Prizes this client confirmed as their authority, so a late rival request gets an answer.
-    private readonly HashSet<Guid> confirmedHere = new HashSet<Guid>();
-    private readonly Dictionary<string, long> rejections = new Dictionary<string, long>();
+    private readonly Dictionary<ShipCaptureRefusal, long> refusals = new Dictionary<ShipCaptureRefusal, long>();
     private float elapsed;
-    private long captureRequests, requestsIgnored, capturesApplied, captureExpired, confirmsDropped, duplicateConfirms;
-    private string lastDrop;
+    private int seenEpoch;
+    private float? promotedAt;
+    private long captureRequests, captureExpired;
     private bool disposed;
 
-    public BattleShipCaptureReplicator(IBattleNetwork network, INetwork relayNetwork, IMessageBroker messageBroker,
-        BattleContext context, INavalShipEngine engine, IBattleShipReplicator ships, INavalHullAuthority hullAuthority)
+    public BattleShipCaptureReplicator(IBattleNetwork network, IMessageBroker messageBroker, BattleContext context, INavalShipEngine engine,
+        INavalShipCaptureEngine captureEngine, INavalHullAuthority hullAuthority, IShipCaptureApplier applier)
     {
         this.network = network;
-        this.relayNetwork = relayNetwork;
         this.messageBroker = messageBroker;
         session = context.Session;
         missionComponent = context.MissionComponent;
         missionContext = context.MissionContext;
         this.engine = engine;
-        this.ships = ships;
+        this.captureEngine = captureEngine;
         this.hullAuthority = hullAuthority;
+        this.applier = applier;
 
         messageBroker.Subscribe<ShipCaptureTimerElapsed>(Handle_ShipCaptureTimerElapsed);
         messageBroker.Subscribe<NetworkShipCaptureRequest>(Handle_NetworkShipCaptureRequest);
-        messageBroker.Subscribe<NetworkShipCaptured>(Handle_NetworkShipCaptured);
         messageBroker.Subscribe<NetworkShipCaptureRejected>(Handle_NetworkShipCaptureRejected);
+        applier.CaptureApplied += OnCaptureApplied;
     }
 
     // Drops every subscription and whatever still waits.
@@ -87,21 +87,19 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         disposed = true;
         messageBroker.Unsubscribe<ShipCaptureTimerElapsed>(Handle_ShipCaptureTimerElapsed);
         messageBroker.Unsubscribe<NetworkShipCaptureRequest>(Handle_NetworkShipCaptureRequest);
-        messageBroker.Unsubscribe<NetworkShipCaptured>(Handle_NetworkShipCaptured);
         messageBroker.Unsubscribe<NetworkShipCaptureRejected>(Handle_NetworkShipCaptureRejected);
+        applier.CaptureApplied -= OnCaptureApplied;
         pendingRequests.Clear();
-        heldConfirms.Clear();
     }
 
     private INetworkShipRegistry Registry => missionComponent.ShipRegistry;
 
-    // Retries held confirms first, so one that waited for this tick's spawn applies before a request could expire on it.
     public void Tick(float dt)
     {
         if (disposed) return;
 
         elapsed += Math.Max(0f, dt);
-        RetryHeldConfirms();
+        NoticePromotion();
         ExpirePendingRequests();
     }
 
@@ -123,7 +121,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         var captorHull = engine.CrewHullOf(timer.CaptorAgent);
         if (captorHull == null || !Registry.TryGetByHull(captorHull, out var captorShip))
         {
-            Refuse(prize.ShipId, session.OwnControllerId, "captor_hull_invalid");
+            Refuse(prize.ShipId, session.OwnControllerId, ShipCaptureRefusal.CaptorHullInvalid);
             return;
         }
 
@@ -133,7 +131,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
     /// <summary>[Game thread] Decides a capture of a hull this client simulates, or asks its authority once.</summary>
     internal void RequestCapture(NetworkShipInfo prize, NetworkShipInfo captorShip)
     {
-        var request = new NetworkShipCaptureRequest(prize.ShipId, session.OwnControllerId, captorShip.ShipId, session.HostEpoch);
+        var request = new NetworkShipCaptureRequest(prize.ShipId, session.OwnControllerId, captorShip.ShipId);
         if (IsOwn(prize))
         {
             DecideRequest(prize, request);
@@ -143,7 +141,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         if (pendingRequests.ContainsKey(prize.ShipId)) return;
 
         pendingRequests[prize.ShipId] = elapsed;
-        network.SendAll(request);
+        network.Send(prize.CurrentAuthority, request);
         captureRequests++;
         Logger.Information("[NavalSync] Asked {Authority} to confirm capturing hull {ShipId} with hull {CaptorShipId}",
             prize.CurrentAuthority, prize.ShipId, captorShip.ShipId);
@@ -160,50 +158,38 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         }, context: nameof(Handle_NetworkShipCaptureRequest));
     }
 
-    /// <summary>
-    /// [Game thread] Only the prize's current authority decides a request; one that already gave the prize to another captor
-    /// tells a late rival so, and everyone else ignores it.
-    /// </summary>
+    /// <summary>[Game thread] Decides a request sent to this client; a hull it doesn't simulate (any more) is refused as such.</summary>
     internal void AcceptRequest(NetworkShipCaptureRequest request)
     {
-        if (disposed || request == null || session.IsOwn(request.CaptorControllerId)) return;
+        if (disposed || request == null) return;
 
-        if (!Registry.TryGet(request.ShipId, out var prize) || !IsOwn(prize))
+        if (!Registry.TryGet(request.ShipId, out var prize))
         {
-            if (prize != null && confirmedHere.Contains(prize.ShipId) && prize.CaptorControllerId != request.CaptorControllerId)
-            {
-                Refuse(request.ShipId, request.CaptorControllerId, "already_captured");
-                return;
-            }
-
-            requestsIgnored++;
+            Refuse(request.ShipId, request.CaptorControllerId, ShipCaptureRefusal.NotAuthority);
             return;
         }
 
         DecideRequest(prize, request);
     }
 
-    // [Game thread] The authority's decision: apply and broadcast the capture, or refuse it.
+    // [Game thread] The authority's decision: the applier applies and broadcasts the capture, or the captor hears why not.
     private void DecideRequest(NetworkShipInfo prize, NetworkShipCaptureRequest request)
     {
         Registry.TryGet(request.CaptorShipId, out var captorShip);
-        var reason = Decide(FactsOf(prize, request.CaptorControllerId, captorShip));
-        if (reason != null)
+        var refusal = Decide(FactsOf(prize, request.CaptorControllerId, captorShip));
+        if (refusal != null)
         {
-            Refuse(prize.ShipId, request.CaptorControllerId, reason);
+            Refuse(prize.ShipId, request.CaptorControllerId, refusal.Value);
             return;
         }
 
-        var confirm = new NetworkShipCaptured(prize.ShipId, request.CaptorControllerId, captorShip.ShipId, session.OwnControllerId,
-            session.HostEpoch);
-        confirmedHere.Add(prize.ShipId);
-        Apply(prize, captorShip, request.CaptorControllerId);
-        network.SendAll(confirm);
+        applier.ApplyDecided(prize, captorShip, request.CaptorControllerId);
     }
 
     // What the authority knows about a capture request; a missing captor hull reads as invalid.
     private CaptureFacts FactsOf(NetworkShipInfo prize, string captor, NetworkShipInfo captorShip)
     {
+        NoticePromotion();
         bool captorHullValid = captorShip != null && captorShip != prize && captorShip.CurrentAuthority == captor
             && !captorShip.IsOrphaned && !IsGoing(captorShip);
         var prizeSide = engine.SideOf(prize.Hull);
@@ -219,32 +205,32 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
             captorInMission: session.IsOwn(captor) || missionContext.ControllersInMission.Contains(captor),
             captorHullValid: captorHullValid,
             isEnemy: isEnemy,
-            busy: IsGoing(prize) || hullAuthority.IsReplacing(prize.ShipId),
-            canBeTakenOver: engine.CanBeTakenOver(prize.Hull),
+            busy: IsGoing(prize) || hullAuthority.IsReplacing(prize.ShipId) || IsSettlingAfterPromotion(prize),
+            canBeTakenOver: captureEngine.CanBeTakenOver(prize.Hull),
             isSinking: engine.IsSinking(prize.Hull),
-            isVacant: engine.IsVacantForCapture(prize.Hull));
+            isVacant: captureEngine.IsVacantForCapture(prize.Hull));
     }
 
     /// <summary>Why the hull's authority refuses a capture, or null to confirm it; the first failing check names it.</summary>
-    internal static string Decide(CaptureFacts facts)
+    internal static ShipCaptureRefusal? Decide(CaptureFacts facts)
     {
-        if (!facts.IsAuthority) return "not_authority";
-        if (facts.AlreadyCaptured) return "already_captured";
-        if (!facts.CaptorInMission) return "captor_not_in_mission";
-        if (!facts.CaptorHullValid) return "captor_hull_invalid";
-        if (!facts.IsEnemy) return "not_enemy";
-        if (facts.Busy) return "busy";
-        if (!facts.CanBeTakenOver) return "cannot_be_taken_over";
-        if (facts.IsSinking) return "sinking";
-        if (!facts.IsVacant) return "not_vacant";
+        if (!facts.IsAuthority) return ShipCaptureRefusal.NotAuthority;
+        if (facts.AlreadyCaptured) return ShipCaptureRefusal.AlreadyCaptured;
+        if (!facts.CaptorInMission) return ShipCaptureRefusal.CaptorNotInMission;
+        if (!facts.CaptorHullValid) return ShipCaptureRefusal.CaptorHullInvalid;
+        if (!facts.IsEnemy) return ShipCaptureRefusal.NotEnemy;
+        if (facts.Busy) return ShipCaptureRefusal.Busy;
+        if (!facts.CanBeTakenOver) return ShipCaptureRefusal.CannotBeTakenOver;
+        if (facts.IsSinking) return ShipCaptureRefusal.Sinking;
+        if (!facts.IsVacant) return ShipCaptureRefusal.NotVacant;
         return null;
     }
 
-    // A refusal goes to the captor, or straight to the player when this client is the captor.
-    private void Refuse(Guid shipId, string captor, string reason)
+    // A refusal goes to the captor alone, or straight to the player when this client is the captor.
+    private void Refuse(Guid shipId, string captor, ShipCaptureRefusal reason)
     {
-        rejections.TryGetValue(reason, out long count);
-        rejections[reason] = count + 1;
+        refusals.TryGetValue(reason, out long count);
+        refusals[reason] = count + 1;
         Logger.Information("[NavalSync] Refused capturing hull {ShipId} for {Captor}: {Reason}", shipId, captor, reason);
         if (session.IsOwn(captor))
         {
@@ -252,7 +238,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
             return;
         }
 
-        network.SendAll(new NetworkShipCaptureRejected(shipId, captor, reason));
+        network.Send(captor, new NetworkShipCaptureRejected(shipId, captor, reason));
     }
 
     // [Poller thread] Marshals a refusal onto the game thread, where the captor's pending requests live.
@@ -272,139 +258,10 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         TellPlayer(rejection.Reason);
     }
 
-    // [Poller thread] Marshals a capture onto the game thread, behind the spawn records and samples queued before it.
-    private void Handle_NetworkShipCaptured(MessagePayload<NetworkShipCaptured> payload)
+    // A capture applied here ends this client's request for the prize; when someone else's won, the player hears it lost.
+    private void OnCaptureApplied(Guid prizeId, string captor)
     {
-        var confirm = payload.What;
-        GameThread.RunSafe(() =>
-        {
-            if (Mission.Current == null) return;
-            AcceptConfirm(confirm);
-        }, context: nameof(Handle_NetworkShipCaptured));
-    }
-
-    /// <summary>[Game thread] Applies an authority's capture, holds it for a hull not ready here, or drops it with the reason.</summary>
-    internal void AcceptConfirm(NetworkShipCaptured confirm)
-    {
-        if (disposed || confirm == null) return;
-
-        var outcome = TryApplyConfirm(confirm);
-        if (outcome == ConfirmOutcome.Hold) heldConfirms.Add(new HeldConfirm(confirm, elapsed));
-    }
-
-    // Applies the confirm when both hulls are here and settled; a confirm is exempt from the membership gate, since mesh routes
-    // aren't ordered against the server's departure and migration events.
-    private ConfirmOutcome TryApplyConfirm(NetworkShipCaptured confirm)
-    {
-        if (!Registry.TryGet(confirm.ShipId, out var prize))
-            return Registry.IsGone(confirm.ShipId) ? Drop(confirm, "prize_gone") : ConfirmOutcome.Hold;
-
-        if (!Registry.TryGet(confirm.CaptorShipId, out var captorShip))
-        {
-            if (!Registry.IsGone(confirm.CaptorShipId)) return ConfirmOutcome.Hold;
-
-            return LeavesWithDepartedCaptor(prize, confirm);
-        }
-
-        if (hullAuthority.IsReplacing(prize.ShipId) || hullAuthority.IsReplacing(captorShip.ShipId)) return ConfirmOutcome.Hold;
-
-        var rejection = ValidateConfirm(prize, captorShip, confirm);
-        if (rejection == AlreadyApplied)
-        {
-            duplicateConfirms++;
-            return ConfirmOutcome.Done;
-        }
-
-        if (rejection != null) return Drop(confirm, rejection);
-
-        Apply(prize, captorShip, confirm.CaptorControllerId);
-        return ConfirmOutcome.Done;
-    }
-
-    internal const string AlreadyApplied = "already_applied";
-
-    /// <summary>
-    /// Why a capture confirm must be dropped, <see cref="AlreadyApplied"/> for a repeat of one applied here (a successor
-    /// confirming what the old host already did), or null to apply it. Its sender must have simulated the prize at some time.
-    /// </summary>
-    internal static string ValidateConfirm(NetworkShipInfo prize, NetworkShipInfo captorShip, NetworkShipCaptured confirm)
-    {
-        if (captorShip.IsOrphaned && prize.CaptorControllerId == confirm.CaptorControllerId) return AlreadyApplied;
-        if (captorShip.IsOrphaned || captorShip == prize || captorShip.CurrentAuthority != confirm.CaptorControllerId)
-            return "captor_hull_invalid";
-        if (!prize.HasBeenAuthority(confirm.PreviousAuthority)) return "not_authority";
-        return null;
-    }
-
-    // The captor's hull left this client's battle before its capture arrived: elsewhere the prize left with it, so it goes too.
-    private ConfirmOutcome LeavesWithDepartedCaptor(NetworkShipInfo prize, NetworkShipCaptured confirm)
-    {
-        if (missionContext.ControllersInMission.Contains(confirm.CaptorControllerId) || !prize.HasBeenAuthority(confirm.PreviousAuthority))
-            return Drop(confirm, "captor_hull_invalid");
-
-        Logger.Information("[NavalSync] Capture of hull {ShipId} by {Captor} arrived after the captor left; the hull leaves with it",
-            prize.ShipId, confirm.CaptorControllerId);
-        ships.RemoveHullOfDepartedCaptor(prize);
-        return ConfirmOutcome.Done;
-    }
-
-    // [Game thread] One capture on this client, in order: the authority moves in place, vanilla's swap runs on the local hulls,
-    // the registry follows it, and the prize counts as gone from its old side for the retreat rule.
-    private void Apply(NetworkShipInfo prize, NetworkShipInfo captorShip, string captor)
-    {
-        var prizeSide = engine.SideOf(prize.Hull);
-        var captorSide = engine.SideOf(captorShip.Hull);
-        string previousAuthority = prize.CurrentAuthority;
-
-        ships.TransferCapturedHull(prize, captor);
-        engine.ApplyCapture(prize.Hull, captorShip.Hull);
-        Registry.TryRecordCapture(prize.ShipId, captorShip.ShipId, captor, captorSide);
-        if (IsBattleSide(prizeSide) && prizeSide != captorSide) ships.CountCapturedFrom(prizeSide);
-
-        // This client's own request for the prize lost the race, which its player hears about here.
-        if (pendingRequests.Remove(prize.ShipId) && !session.IsOwn(captor)) TellPlayer("already_captured");
-        capturesApplied++;
-        Logger.Information("[NavalSync] Hull {ShipId} of {Previous} captured by {Captor} into hull {CaptorShipId}'s formation; that hull is orphaned",
-            prize.ShipId, previousAuthority, captor, captorShip.ShipId);
-        // The victim's formation record now names the captor's orphan, so a later reinforcement of it would target a copy.
-        if (session.IsOwn(previousAuthority) && !prize.IsNpcParty && !session.IsOwn(captor))
-            Logger.Warning("[NavalSync] This client's hull {ShipId} was captured by {Captor}; its formation has no hull of its own left",
-                prize.ShipId, captor);
-        if (session.IsOwn(captor)) ReportCaptureToServer(prize);
-    }
-
-    // On the relay channel this client's fates use, so the server knows the captor before the prize's first fate from it.
-    private void ReportCaptureToServer(NetworkShipInfo prize)
-    {
-        var campaignShipId = engine.CampaignShipIdOf(prize.Hull);
-        if (string.IsNullOrEmpty(campaignShipId) || !session.HasInstance) return;
-
-        relayNetwork.SendAll(new NetworkBattleShipCaptured(session.InstanceId, campaignShipId));
-    }
-
-    // Counts and logs a confirm this client won't apply.
-    private ConfirmOutcome Drop(NetworkShipCaptured confirm, string reason)
-    {
-        confirmsDropped++;
-        lastDrop = reason;
-        Logger.Information("[NavalSync] Dropped the capture of hull {ShipId} by {Captor} from {Sender}: {Reason}",
-            confirm.ShipId, confirm.CaptorControllerId, confirm.PreviousAuthority, reason);
-        return ConfirmOutcome.Done;
-    }
-
-    // In arrival order; a confirm still waiting past its lifetime is dropped, as its hull never came.
-    private void RetryHeldConfirms()
-    {
-        if (heldConfirms.Count == 0) return;
-
-        foreach (var held in heldConfirms.ToArray())
-        {
-            heldConfirms.Remove(held);
-            if (TryApplyConfirm(held.Confirm) != ConfirmOutcome.Hold) continue;
-
-            if (elapsed - held.ArrivedAt > HeldConfirmLifetimeSeconds) Drop(held.Confirm, "hull_never_registered");
-            else heldConfirms.Add(held);
-        }
+        if (pendingRequests.Remove(prizeId) && !session.IsOwn(captor)) TellPlayer(ShipCaptureRefusal.AlreadyCaptured);
     }
 
     // Nobody answered: the authority left before it decided, so the player can try again at the successor.
@@ -416,28 +273,47 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
             captureExpired++;
             Logger.Information("[NavalSync] Capture request for hull {ShipId} got no answer in {Seconds} s", entry.Key,
                 RequestTimeoutSeconds);
-            TellPlayer("no_answer");
+            TellPlayer(ShipCaptureRefusal.NoAnswer);
         }
     }
 
+    // Starts the settle window when this client became the battle host of a newer epoch than the first one it saw.
+    private void NoticePromotion()
+    {
+        if (session.HostEpoch == seenEpoch) return;
+
+        bool promoted = seenEpoch != 0 && session.IsLocalHost;
+        seenEpoch = session.HostEpoch;
+        if (promoted) promotedAt = elapsed;
+    }
+
+    // An inherited AI hull may still have a capture the old host confirmed on its way here.
+    private bool IsSettlingAfterPromotion(NetworkShipInfo prize) =>
+        IsSettling(prize.FollowsBattleHost, promotedAt.HasValue, elapsed - (promotedAt ?? 0f));
+
+    /// <summary>Whether a promoted host still refuses an AI hull's capture as busy, inside the settle window.</summary>
+    internal static bool IsSettling(bool followsHost, bool promoted, float sincePromotion) =>
+        followsHost && promoted && sincePromotion < PromotionSettleSeconds;
+
     // Vanilla has no failed capture, so the player gets one line naming why.
-    private void TellPlayer(string reason) =>
+    private void TellPlayer(ShipCaptureRefusal reason) =>
         messageBroker.Publish(this, new SendInformationMessage("The ship could not be captured: " + DescribeReason(reason) + "."));
 
-    /// <summary>The player-facing words for a capture refusal reason.</summary>
-    internal static string DescribeReason(string reason)
+    /// <summary>The player-facing words for a capture refusal.</summary>
+    internal static string DescribeReason(ShipCaptureRefusal reason)
     {
         switch (reason)
         {
-            case "not_vacant": return "its crew still holds it";
-            case "sinking": return "it is sinking";
-            case "busy": return "it is changing hands, try again";
-            case "already_captured": return "someone captured it first";
-            case "not_enemy": return "it is not an enemy ship";
-            case "cannot_be_taken_over": return "it can't be taken over";
-            case "captor_hull_invalid": return "your own ship can't take it";
-            case "no_answer": return "nobody answered, try again";
-            default: return reason;
+            case ShipCaptureRefusal.NotVacant: return "its crew still holds it";
+            case ShipCaptureRefusal.Sinking: return "it is sinking";
+            case ShipCaptureRefusal.Busy: return "it is changing hands, try again";
+            case ShipCaptureRefusal.AlreadyCaptured: return "someone captured it first";
+            case ShipCaptureRefusal.NotEnemy: return "it is not an enemy ship";
+            case ShipCaptureRefusal.CannotBeTakenOver: return "it can't be taken over";
+            case ShipCaptureRefusal.CaptorHullInvalid: return "your own ship can't take it";
+            case ShipCaptureRefusal.NoAnswer: return "nobody answered, try again";
+            case ShipCaptureRefusal.NotAuthority: return "it changed hands, try again";
+            default: return "you are not in the battle";
         }
     }
 
@@ -448,42 +324,18 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
     private bool IsGoing(NetworkShipInfo ship) =>
         engine.IsHullRemoved(ship.Hull) || hullAuthority.HullsBeingRemoved.Contains(ship.Hull);
 
-    // An orphan's side reads as none; only a real side counts for the retreat rule.
+    // An orphan's side reads as none; only a real side counts.
     private static bool IsBattleSide(BattleSideEnum side) => side == BattleSideEnum.Attacker || side == BattleSideEnum.Defender;
 
-    // Counters, rejections by reason, waiting requests with their age and held confirms.
+    // Requests, refusals by reason, expiries, waiting requests with their age, and the applier's counters.
     public object Inspect() => new
     {
         captureRequests,
-        requestsIgnored,
-        capturesApplied,
         captureExpired,
-        confirmsDropped,
-        duplicateConfirms,
-        lastDrop,
-        captureRejections = rejections.ToDictionary(entry => entry.Key, entry => entry.Value),
+        captureRejections = refusals.ToDictionary(entry => entry.Key.ToString(), entry => entry.Value),
         pendingRequests = pendingRequests.Select(entry => new { shipId = entry.Key, waitedSeconds = elapsed - entry.Value }).ToArray(),
-        heldConfirms = heldConfirms.Select(held => held.Confirm.ShipId).ToArray(),
+        applied = applier.Inspect(),
     };
-
-    private enum ConfirmOutcome
-    {
-        Done,
-        Hold,
-    }
-
-    // A confirm waiting for its hulls, with when it arrived.
-    private sealed class HeldConfirm
-    {
-        public HeldConfirm(NetworkShipCaptured confirm, float arrivedAt)
-        {
-            Confirm = confirm;
-            ArrivedAt = arrivedAt;
-        }
-
-        public NetworkShipCaptured Confirm { get; }
-        public float ArrivedAt { get; }
-    }
 }
 
 /// <summary>What a captured hull's authority checks before it confirms a capture.</summary>
@@ -512,7 +364,7 @@ public readonly struct CaptureFacts
     public bool CaptorHullValid { get; }
     /// <summary>The prize is on the other side from the captor's hull, or is the captor's own orphan.</summary>
     public bool IsEnemy { get; }
-    /// <summary>The prize is queued to leave or mid-swap here.</summary>
+    /// <summary>The prize is leaving, mid-swap, or an inherited AI hull inside a promoted host's settle window.</summary>
     public bool Busy { get; }
     public bool CanBeTakenOver { get; }
     public bool IsSinking { get; }

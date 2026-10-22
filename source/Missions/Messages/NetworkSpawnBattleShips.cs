@@ -52,6 +52,12 @@ public sealed class BattleShipSpawnData
     [ProtoMember(20)] public readonly string CaptorControllerId;
     /// <summary>Whether a capture took this hull's formation, leaving it with no team; its side is the one it had before.</summary>
     [ProtoMember(21)] public readonly bool Orphaned;
+    /// <summary>How many captures the hull took part in, as prize or as the captor's hull; a joiner applies captures from here.</summary>
+    [ProtoMember(22)] public readonly int CaptureSequence;
+    /// <summary>For a captured hull, the captor's own hull its capture left without a formation.</summary>
+    [ProtoMember(23)] public readonly Guid CapturedWithShipId;
+    /// <summary>For a captured hull, the side it was taken from, which a joiner counts as a hull gone from that side.</summary>
+    [ProtoMember(24)] public readonly BattleSideEnum CapturedFromSide;
 
     public BattleShipSpawnData(
         Guid shipId,
@@ -73,7 +79,10 @@ public sealed class BattleShipSpawnData
         string originalOwnerControllerId = null,
         string campaignShipId = null,
         string captorControllerId = null,
-        bool orphaned = false)
+        bool orphaned = false,
+        int captureSequence = 0,
+        Guid capturedWithShipId = default,
+        BattleSideEnum capturedFromSide = BattleSideEnum.None)
     {
         ShipId = shipId;
         OwnerControllerId = ownerControllerId;
@@ -95,6 +104,9 @@ public sealed class BattleShipSpawnData
         CampaignShipId = campaignShipId;
         CaptorControllerId = captorControllerId;
         Orphaned = orphaned;
+        CaptureSequence = captureSequence;
+        CapturedWithShipId = capturedWithShipId;
+        CapturedFromSide = capturedFromSide;
     }
 
     /// <summary>The player or host that fielded the hull.</summary>
