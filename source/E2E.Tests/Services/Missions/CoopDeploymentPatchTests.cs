@@ -16,6 +16,7 @@ using Xunit;
 namespace E2E.Tests.Services.Missions;
 
 /// <summary>Exercises the deployment patch with synthetic managed objects, without native battle teardown.</summary>
+[Collection(nameof(MissionCurrentCollection))]
 public class CoopDeploymentPatchTests
 {
     [Fact]
