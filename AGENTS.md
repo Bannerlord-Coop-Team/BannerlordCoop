@@ -39,6 +39,12 @@ Network-receive handlers run on the single `Poller` thread, but the object an id
 
 The main solution is `source/Coop.sln`. Game-facing code lives in `source/Coop`, shared networking/serialization in `source/Common`, sync/domain logic in `source/Coop.Core`, and Bannerlord API adapters in `source/GameInterface`. Tests sit beside the code in `source/*.Tests`, `source/Coop.IntegrationTests`, and `source/E2E.Tests`. Deploy templates are in `deploy`, UI prefabs in `UIMovies`, docs in `doc`, and workshop/media assets in `Workshop` and `Images`.
 
+### Area-Specific Instructions
+
+Some folders have their own `AGENTS.md` with rules that apply only there and add to this file. Before you work in one of these folders, read its `AGENTS.md` in full.
+
+- Issues and quests: [`source/GameInterface/Services/Issues/AGENTS.md`](source/GameInterface/Services/Issues/AGENTS.md)
+
 ### Build & Test Commands
 
 Run from the repo root on Windows; the repo expects `mb2` to be a junction to the local Bannerlord install. Prefer the Windows MSBuild/PowerShell for builds, and don't deploy into the live `mb2\Modules` folder unless explicitly asked.
@@ -130,7 +136,7 @@ Tests use xUnit. Add unit tests for logic that does not require Bannerlord to ru
 
 A new Coop.Core server handler that depends on a GameInterface service needs a `RegisterMock<T>` in `Coop.Tests/TestComponentBase.cs`, otherwise every server-container test in `Coop.Tests` fails to build its container.
 
-An empty array of structs in a message arrives as `null`, because protobuf-net writes nothing for it (an empty `byte[]` field arrives non-null), so guard it with `?? Array.Empty<T>()`. `MessageBroker.Publish` catches and logs a subscriber's exception, so an in-process test can pass over a throwing handler: call the handler directly, or assert something it does after its riskiest line.
+An empty array of structs in a message arrives as `null`, because protobuf-net writes nothing for it (an empty `byte[]` field arrives non-null), so guard it with `?? Array.Empty<T>()`. `MessageBroker.Publish` catches and logs a subscriber's exception, so an in-process test can pass over a throwing handler: call the handler directly, or assert something it does after its riskiest line. Count sends and events with `Assert.Single`, not `Assert.Contains`, so a duplicate fails the test.
 
 When a change needs runtime verification, **prefer adding a debug cheat over hand-staging the scenario.** Co-op state is usually impractical to set up by hand (winning a specific battle to take a prisoner, an AI governor change), so add or extend a `coop.debug.*` console command that triggers the exact authoritative action — e.g. `coop.debug.town.set_governor` driving `ChangeGovernorAction`, or `coop.debug.town.imprison_hero` driving `TakePrisonerAction` — and drive the test from the console instead of describing fiddly in-game steps. **Run state-changing cheats on the server only:** the host is authoritative and replicates to clients, so a cheat must originate there (it also lets server-side events fire on the host); use a client purely for read-only inspection (e.g. `coop.debug.location.list_characters`) to confirm what it received.
 
@@ -140,11 +146,11 @@ Write manual-test steps with **real, concrete in-game names and ids — never `<
 
 ### Reviewing Changes (Scope to the Right Tree)
 
-The main working directory is a rotating test bench (see Worktree & Working-Directory Workflow): it normally holds unrelated uncommitted changes, and the shell cwd resets to it between bash calls. So `/code-review` and `/codex-review`, which default to "the current diff," will quietly review the wrong thing unless you scope them — `cd` into the worktree first, or point the review at the PR. When the task is a PR review, review the PR head and cite each finding as a real `source/.../File.cs:NNN` resolved on that branch (not a diff-offset estimate), so it can be acted on without an "ok but what file and line?" round-trip. Co-op assumes cooperative, trusted clients, so don't raise or rank findings as anti-cheat, malicious-client, or forged-packet exploits; frame the same code on its honest failure path (double-click, race, stale local state) instead.
+The main working directory is a rotating test bench (see Worktree & Working-Directory Workflow): it normally holds unrelated uncommitted changes, and the shell cwd resets to it between bash calls. So `/code-review` and `/codex-review`, which default to "the current diff," will quietly review the wrong thing unless you scope them — `cd` into the worktree first, or point the review at the PR. When the task is a PR review, review the PR head and cite each finding as a real `source/.../File.cs:NNN` resolved on that branch (not a diff-offset estimate), so it can be acted on without an "ok but what file and line?" round-trip. Co-op assumes cooperative, trusted clients, so don't raise or rank findings as anti-cheat, malicious-client, or forged-packet exploits; frame the same code on its honest failure path (double-click, race, stale local state) instead. When a reported bug can't be made to fail in a test, reply with the evidence and add the test as a regression check instead of changing code.
 
 ### Commits & Pull Requests
 
-Recent history uses short imperative summaries, for example `fixed deployment` and `Register client player hero and party as controlled on join`. Keep commits focused and reference issues when relevant. Never commit secrets, local tokens, generated build outputs, or local machine paths beyond documented setup notes. PRs should target `development`, describe the behavior change, link related issues, list tests/manual validation, and include screenshots or logs for UI, crash, or gameplay fixes.
+Recent history uses short imperative summaries, for example `fixed deployment` and `Register client player hero and party as controlled on join`. Keep commits focused and reference issues when relevant. Never commit secrets, local tokens, generated build outputs, or local machine paths beyond documented setup notes. PRs should target `development`, describe the behavior change, link related issues, list tests/manual validation, and include screenshots or logs for UI, crash, or gameplay fixes. List a flow the live-test tooling can't drive as not run and file a tooling issue for it. After merging `development` into a PR, re-read the shared files the PR touched, because a conflict resolution can quietly bring back the old version of a method.
 
 Before any `gh pr edit`, re-fetch the live PR (`gh pr view --json title,body`) and edit from that, because PR titles and descriptions may have been manually edited and a cached draft may be stale. Default to not touching the description unless asked, and change only the specific thing requested. Never hand-add any Claude/Anthropic attribution (a `Claude-Session:` trailer, a session URL, `Co-Authored-By`) to a commit or PR.
 
@@ -165,6 +171,7 @@ Every PR must retain an exact `## Bot Changelog Entry` heading. For War Sails up
   - Review/Fix Loop (suggested)
   - Review and report
   - Skip
+- **Offer to update the quest learnings before a quest PR leaves draft.** When the PR touches `source/GameInterface/Services/Issues/`, also ask whether to add what its review and fix commits taught to [`QuestLearnings.md`](source/GameInterface/Services/Issues/QuestLearnings.md), following its update steps.
 - **Don't take maintainer actions unasked.** No merging, approving, closing or reopening PRs/issues, requesting reviewers, or force-pushing a branch someone else is reviewing, unless explicitly told to.
 
 ### Unowned AI Contributions Are Not Accepted
