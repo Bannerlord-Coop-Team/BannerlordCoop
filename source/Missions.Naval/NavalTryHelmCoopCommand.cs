@@ -13,7 +13,7 @@ namespace Missions.Naval;
 // coop.debug.naval.try_helm 72da8e4a force
 /// <summary>
 /// DEBUG: has the main agent try a hull's helm the way the use key does (vanilla's CanUseObject gate, then HandleStartUsingAction),
-/// and reports whether it got the helm, so the co-op block on enemy and copy helms can be checked.
+/// and reports whether it got the helm, so the co-op block on copy helms (an enemy copy's goes through, to capture it) can be checked.
 /// </summary>
 public sealed class NavalTryHelmCoopCommand : ICoopCommand
 {
