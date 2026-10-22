@@ -24,6 +24,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Roster;
@@ -273,6 +274,9 @@ public sealed class LesserNobleRevoltTests : IDisposable
                 AccessTools.Field(typeof(QuestBase), nameof(QuestBase.RewardGold)).SetValue(quest, 5700);
                 quest._taskList = new MBList<QuestTaskBase>();
                 quest._lesserNobleName = new TextObject("Chaghan");
+                // The giver's journal link reads the encyclopedia.
+                Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+                Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
                 if (instance != server)
                 {
                     new JournalLogsCampaignBehavior().RegisterEvents();
