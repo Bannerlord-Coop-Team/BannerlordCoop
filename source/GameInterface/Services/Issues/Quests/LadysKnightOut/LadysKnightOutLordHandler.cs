@@ -7,9 +7,11 @@ using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using LiteNetLib;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Localization;
@@ -45,6 +47,7 @@ internal sealed class LadysKnightOutLordHandler : IHandler
         broker.Subscribe<LadysKnightOutLordTriggered>(HandleTriggered);
         broker.Subscribe<RequestLadysKnightOutLord>(HandleRequest);
         broker.Subscribe<NetworkLadysKnightOutLordAccepted>(HandleAccepted);
+        broker.Subscribe<NetworkIssueOwnershipSnapshot>(HandleOwnershipSnapshot);
     }
 
     public void Dispose()
@@ -52,6 +55,7 @@ internal sealed class LadysKnightOutLordHandler : IHandler
         broker.Unsubscribe<LadysKnightOutLordTriggered>(HandleTriggered);
         broker.Unsubscribe<RequestLadysKnightOutLord>(HandleRequest);
         broker.Unsubscribe<NetworkLadysKnightOutLordAccepted>(HandleAccepted);
+        broker.Unsubscribe<NetworkIssueOwnershipSnapshot>(HandleOwnershipSnapshot);
     }
 
     private void HandleTriggered(MessagePayload<LadysKnightOutLordTriggered> payload)
@@ -98,6 +102,20 @@ internal sealed class LadysKnightOutLordHandler : IHandler
                     player.ControllerId,
                     issue.IssueDifficultyMultiplier,
                     issue.JournalEntries[0].LogText.ToString()));
+            }
+        }, context: nameof(LadysKnightOutLordHandler));
+    }
+
+    private void HandleOwnershipSnapshot(MessagePayload<NetworkIssueOwnershipSnapshot> payload)
+    {
+        if (ModInformation.IsServer) return;
+        GameThread.RunSafe(() =>
+        {
+            foreach (var owner in payload.What.Owners ?? Array.Empty<IssueOwnershipData>())
+            {
+                if (issues.TryResolve(owner.IssueOwnerId, owner.IssueId, out _, out var issue, out _) &&
+                    issue is Issue && issue.IsSolvingWithLordSolution)
+                    issue.IsTriedToSolveBefore = owner.ControllerId == controller.ControllerId;
             }
         }, context: nameof(LadysKnightOutLordHandler));
     }
