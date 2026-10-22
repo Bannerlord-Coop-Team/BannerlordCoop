@@ -19,19 +19,28 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
 
     public string Name => "inspect";
 
-    public string Description => "Reports the coop naval battle session and hull state on this client.";
+    public string Description => "Reports the coop naval battle session and hull state on this client; summary prints one line per hull.";
 
     public CoopCommandSide Side => CoopCommandSide.Client;
 
-    public IExpectedArgs[] ExpectedArgs { get; } = Array.Empty<IExpectedArgs>();
+    public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+    {
+        new ExpectedArgs("mode", "summary (or brief) prints a header and one line per hull instead of the full JSON.", false),
+    };
 
+    // Reports the full JSON state, or with summary the compact per-hull lines.
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
+        if (!NavalInspectSummary.TryParseMode(args, out bool summary, out var error))
+            return new CoopCommandResult(false, error, "command_failed");
+
         var mission = Mission.Current;
         var controller = mission?.GetMissionBehavior<CoopBattleController>();
         var shipsLogic = mission?.GetMissionBehavior<NavalShipsLogic>();
         if (controller == null || shipsLogic == null)
             return new CoopCommandResult(false, "No active coop naval battle mission.", "command_failed");
+
+        if (summary) return new CoopCommandResult(true, NavalInspectSummary.Describe(mission, controller));
 
         var state = new
         {
