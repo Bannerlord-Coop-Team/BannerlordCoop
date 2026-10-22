@@ -41,14 +41,26 @@ public class PlayerJournalHistoryTests
         var original = Entry("player-A");
         original.Id = 42;
         original.GameTime = CampaignTime.Days(12);
+        var history = new LogEntryHistory();
+        var legacy = new JournalLogEntry(new TextObject("Legacy quest"), null, null, false);
+        legacy.Update(new MBList<JournalLog>(), QuestBase.QuestCompleteDetails.Fail);
+        history._logs.Add(legacy);
+        history._logs.Add(original);
+        history._logs.Add(Entry("player-B"));
         var metadata = new MetaData { ["ApplicationVersion"] = "v1.4.8.0" };
         var driver = new InMemDriver();
-        var saved = SaveManager.Save(original, metadata, "player_journal", driver);
+        var saved = SaveManager.Save(history, metadata, "player_journal", driver);
         Assert.True(saved.Successful, string.Join("; ", saved.Errors?.Select(error => error.ToString()) ?? Enumerable.Empty<string>()));
 
         var loaded = SaveManager.Load("player_journal", driver);
         Assert.True(loaded.Successful);
-        var restored = Assert.IsType<PlayerJournalLogEntry>(loaded.Root);
+        var restoredHistory = Assert.IsType<LogEntryHistory>(loaded.Root);
+        Assert.Equal(3, restoredHistory.GameActionLogs.Count);
+        var restoredLegacy = Assert.IsType<JournalLogEntry>(restoredHistory.GameActionLogs[0]);
+        Assert.Equal("Legacy quest", restoredLegacy.Title.ToString());
+        Assert.True(restoredLegacy.IsEndedUnsuccessfully());
+        var restored = Assert.IsType<PlayerJournalLogEntry>(restoredHistory.GameActionLogs[1]);
+        Assert.Equal("player-B", Assert.IsType<PlayerJournalLogEntry>(restoredHistory.GameActionLogs[2]).OwnerControllerId);
         Assert.Equal("player-A", restored.OwnerControllerId);
         Assert.Equal(original.Id, restored.Id);
         Assert.Equal(original.GameTime, restored.GameTime);
