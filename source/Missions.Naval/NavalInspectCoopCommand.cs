@@ -72,12 +72,25 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
                 foreign = NavalForeignHulls.Contains(ship),
                 hitPoints = ship.HitPoints,
                 maxHitPoints = ship.ShipOrigin.MaxHitPoints,
+#if DEBUG
+                fatesSent = FatesSentOf(controller, mission.GetMissionBehavior<CoopNavalBattleBehavior>(), ship),
+#endif
                 position = ship.GlobalFrame.origin.ToString(),
             }).ToArray(),
         };
 
         return new CoopCommandResult(true, "NAVAL_INSPECT " + JsonConvert.SerializeObject(state));
     }
+
+#if DEBUG
+    // How many campaign ship fates this client sent for the hull; null for a hull the registry does not know.
+    private static int? FatesSentOf(CoopBattleController controller, CoopNavalBattleBehavior naval, MissionShip ship)
+    {
+        if (naval == null || !controller.MissionComponent.ShipRegistry.TryGetByHull(ship, out var info)) return null;
+
+        return naval.FateReporter.FatesSentOf(info.ShipId);
+    }
+#endif
 
     // AI hulls with their authority and how many have a pilot at the helm (the AI captain steers through it). A sinking or
     // sunk hull has no controller and needs no pilot, so the afloat counts leave it out.

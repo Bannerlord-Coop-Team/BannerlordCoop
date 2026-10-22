@@ -32,8 +32,10 @@ public class CoopNavalBattleBehavior : MissionLogic
         NpcFleetSpawner = npcFleetSpawner;
         tickNpcFleet = npcFleetSpawner.Tick;
         this.shipsLogic = shipsLogic;
-        // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached.
+        // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached. It runs before
+        // the battle controller leaves (NavalShipsLogic is an earlier behavior), so the last fates precede MissionLeft.
         shipsLogic.MissionEndEvent += ShipReplicator.SendFinalRopes;
+        shipsLogic.MissionEndEvent += services.FateReporter.Flush;
         // Also fires for every hull as NavalShipsLogic.OnEndMission removes them, after the final ropes went out.
         shipsLogic.BeforeShipRemovedEvent += OnBeforeShipRemoved;
         shipsLogic.ShipRemovedEvent += OnShipRemoved;
@@ -55,6 +57,8 @@ public class CoopNavalBattleBehavior : MissionLogic
     public IBattleShipWeaponReplicator ShipWeaponReplicator => services.ShipWeaponReplicator;
 
     public INavalShipEngine Engine => services.Engine;
+
+    public IBattleShipFateReporter FateReporter => services.FateReporter;
 
     public override void OnMissionTick(float dt)
     {
@@ -95,6 +99,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     {
         bool retreatOrdered = ship.IsShipOrderActive && ship.ShipOrder.MovementOrderEnum == ShipOrder.ShipMovementOrderEnum.Retreat;
         var reason = retreated || retreatOrdered ? ShipRemovalReason.Retreat : ShipRemovalReason.Leave;
+        services.FateReporter.ReportRemoval(ship);
         ShipReplicator.AnnounceRemoval(ship, reason, shipsLogic.IsMissionEnding);
     }
 
@@ -124,6 +129,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     {
         CoopNavalMissionScope.IsActive = false;
         shipsLogic.MissionEndEvent -= ShipReplicator.SendFinalRopes;
+        shipsLogic.MissionEndEvent -= services.FateReporter.Flush;
         shipsLogic.BeforeShipRemovedEvent -= OnBeforeShipRemoved;
         shipsLogic.ShipRemovedEvent -= OnShipRemoved;
         services.Dispose();

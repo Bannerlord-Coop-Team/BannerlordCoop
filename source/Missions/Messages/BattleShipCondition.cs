@@ -12,6 +12,7 @@ namespace Missions.Messages;
 public sealed class BattleShipCondition
 {
     public const int MaxPartialCount = 16;
+    public const int Sinking = 1;
     public const int Sunk = 2;
     private const float Tolerance = 0.01f;
 

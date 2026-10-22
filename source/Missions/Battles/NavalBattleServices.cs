@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.ObjectManager;
 using Missions.Agents.Handlers;
 using System;
@@ -6,8 +7,8 @@ using System;
 namespace Missions.Battles;
 
 /// <summary>
-/// [Game thread] The DLC-free ship services of one naval battle mission: hull, station use, weapon and damage traffic and a
-/// promoted host's migration reserve. Ticks them in order and disposes them with the mission.
+/// [Game thread] The DLC-free ship services of one naval battle mission: hull, station use, weapon and damage traffic, the
+/// ship fate reports and a promoted host's migration reserve. Ticks them in order and disposes them with the mission.
 /// </summary>
 public interface INavalBattleServices : IDisposable
 {
@@ -26,9 +27,13 @@ public interface INavalBattleServices : IDisposable
 
     INavalMigrationReserveFielder MigrationReserveFielder { get; }
 
+    /// <summary>Reports the campaign ship fates of the hulls this client simulates to the server.</summary>
+    IBattleShipFateReporter FateReporter { get; }
+
     /// <summary>
-    /// [Game thread] Ticks the hull, deck, station and weapon streams, then <paramref name="beforeMigrationReserve"/>, then the
-    /// migration reserve, so AI hulls fielded in between take recovered reserve in the same tick.
+    /// [Game thread] Ticks the hull stream and its fate reports, the deck, station and weapon streams, then
+    /// <paramref name="beforeMigrationReserve"/>, then the migration reserve, so AI hulls fielded in between take recovered
+    /// reserve in the same tick.
     /// </summary>
     void Tick(float dt, Action beforeMigrationReserve = null);
 }
@@ -37,9 +42,10 @@ public interface INavalBattleServices : IDisposable
 public class NavalBattleServices : INavalBattleServices
 {
     private readonly INavalHullAuthority hullAuthority;
+    private readonly IBattleResultCommitter resultCommitter;
 
-    public NavalBattleServices(IBattleNetwork network, IMessageBroker messageBroker, IBattleTeamResolver teamResolver,
-        IObjectManager objectManager, BattleContext context, INavalShipEngine shipEngine)
+    public NavalBattleServices(IBattleNetwork network, INetwork relayNetwork, IMessageBroker messageBroker,
+        IBattleTeamResolver teamResolver, IObjectManager objectManager, BattleContext context, INavalShipEngine shipEngine)
     {
         // These services exist only in a naval mission and open with it.
         context.Session.MarkNaval();
@@ -59,6 +65,11 @@ public class NavalBattleServices : INavalBattleServices
             shipEngine);
         ShipWeaponReplicator = new BattleShipWeaponReplicator(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, ShipReplicator, context.HostEpochPolicy, context.MissionContext);
+        FateReporter = new BattleShipFateReporter(relayNetwork, context.Session, context.MissionComponent.ShipRegistry, shipEngine);
+
+        // The fates ride ahead of every result report on the relay, so the server holds them when it applies the result.
+        resultCommitter = context.ResultCommitter;
+        resultCommitter.SetBeforeReport(FateReporter.Flush);
     }
 
     public INavalShipEngine Engine { get; }
@@ -75,9 +86,12 @@ public class NavalBattleServices : INavalBattleServices
 
     public INavalMigrationReserveFielder MigrationReserveFielder { get; }
 
+    public IBattleShipFateReporter FateReporter { get; }
+
     public void Tick(float dt, Action beforeMigrationReserve = null)
     {
         ShipReplicator.Tick(dt);
+        FateReporter.Tick(dt);
         DeckPoses.Tick(dt);
         StationUseReplicator.Tick(dt);
         ShipWeaponReplicator.Tick(dt);
@@ -87,6 +101,7 @@ public class NavalBattleServices : INavalBattleServices
 
     public void Dispose()
     {
+        resultCommitter.SetBeforeReport(null);
         ShipWeaponReplicator.Dispose();
         ShipDamageRouter.Dispose();
         DeckPoses.Dispose();
@@ -106,19 +121,21 @@ public interface INavalBattleServicesFactory
 public class NavalBattleServicesFactory : INavalBattleServicesFactory
 {
     private readonly IBattleNetwork network;
+    private readonly INetwork relayNetwork;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleTeamResolver teamResolver;
     private readonly IObjectManager objectManager;
 
-    public NavalBattleServicesFactory(IBattleNetwork network, IMessageBroker messageBroker, IBattleTeamResolver teamResolver,
-        IObjectManager objectManager)
+    public NavalBattleServicesFactory(IBattleNetwork network, INetwork relayNetwork, IMessageBroker messageBroker,
+        IBattleTeamResolver teamResolver, IObjectManager objectManager)
     {
         this.network = network;
+        this.relayNetwork = relayNetwork;
         this.messageBroker = messageBroker;
         this.teamResolver = teamResolver;
         this.objectManager = objectManager;
     }
 
     public INavalBattleServices Create(BattleContext context, INavalShipEngine shipEngine) =>
-        new NavalBattleServices(network, messageBroker, teamResolver, objectManager, context, shipEngine);
+        new NavalBattleServices(network, relayNetwork, messageBroker, teamResolver, objectManager, context, shipEngine);
 }
