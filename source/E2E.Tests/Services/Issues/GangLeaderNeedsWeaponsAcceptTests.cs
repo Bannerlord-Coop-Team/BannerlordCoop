@@ -544,10 +544,10 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
                 troop.Level = 20;
                 playerHero.Gold = startingGoldOverride ?? 100000;
                 startingGold = playerHero.Gold;
-                party.MemberRoster.AddToCounts(playerHero.CharacterObject, 1);
-                party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
-                party.MemberRoster.AddToCounts(troop, SentTroops);
             }
+            party.MemberRoster.AddToCounts(playerHero.CharacterObject, 1);
+            party.MemberRoster.AddToCounts(companion.CharacterObject, 1);
+            party.MemberRoster.AddToCounts(troop, SentTroops);
 
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
             using (difficultyMultiplier is float multiplier
