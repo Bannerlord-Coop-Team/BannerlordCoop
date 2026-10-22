@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using GameInterface.Policies;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
@@ -7,7 +7,6 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
