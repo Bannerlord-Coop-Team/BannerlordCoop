@@ -25,7 +25,7 @@ public class InventoryFoodUpkeepTests
 
         Assert.Equal(expected, Count(logic._rosters[1], grain));
         Assert.Equal(expected, Count(logic._rostersBackup[1], grain));
-        Assert.True(TradeHandler.MatchesInventoryBaseline(logic._rosters[1], inventory.GetInventoryBaseline(logic)));
+        Assert.Equal(expected, inventory.GetInventoryBaseline(logic).Sum(item => item.Amount));
     }
 
     [Fact]
@@ -54,13 +54,14 @@ public class InventoryFoodUpkeepTests
         var logic = CreateLogic(sheep, 2);
         var inventory = new InventoryScreenRosterRefresher();
         inventory.CaptureInventoryBaseline(logic);
-        var server = new ItemRoster(logic._rosters[1]);
         logic._rosters[1].AddToCounts(sheep, -1);
         logic._rosters[1].AddToCounts(meat, 2);
         logic._rostersBackup[1] = new ItemRoster(logic._rosters[1]);
 
-        Assert.True(TradeHandler.MatchesInventoryBaseline(server, inventory.GetInventoryBaseline(logic)));
-        Assert.False(TradeHandler.MatchesInventoryBaseline(server, logic._rostersBackup[1].ToArray()));
+        Assert.Equal(2, inventory.GetInventoryBaseline(logic).Single().Amount);
+        inventory.RestoreInventoryBackup(logic);
+        Assert.Equal(2, Count(logic._rostersBackup[1], sheep));
+        Assert.Equal(0, Count(logic._rostersBackup[1], meat));
     }
 
     [Fact]
@@ -76,12 +77,12 @@ public class InventoryFoodUpkeepTests
         // Simulate the roster backup refresh performed by native slaughter.
         logic._rostersBackup[0] = new ItemRoster(logic._rosters[0]);
         logic._rostersBackup[1] = new ItemRoster(logic._rosters[1]);
-        Assert.False(inventory.TryApplyInventoryUpdate(logic, logic._rosters[0], grain, 2));
+        Assert.True(inventory.TryApplyInventoryUpdate(logic, logic._rosters[0], grain, 2));
 
         inventory.RestoreInventoryBackup(logic);
 
         Assert.Equal(5, Count(logic._rostersBackup[1], grain));
-        Assert.Equal(10, Count(logic._rostersBackup[0], grain));
+        Assert.Equal(12, Count(logic._rostersBackup[0], grain));
         logic._rostersBackup[1].Clear();
         Assert.Equal(5, inventory.GetInventoryBaseline(logic).Single().Amount);
     }
@@ -95,7 +96,7 @@ public class InventoryFoodUpkeepTests
         var initial = new ItemRosterElement[] { new(grain, 10) };
         var submitted = new ItemRosterElement[] { new(grain, 7) };
 
-        Assert.True(TradeHandler.TryRebaseInventoryData(authoritative, initial, submitted, out var rebased));
+        var rebased = TradeHandler.RebaseInventoryData(authoritative, initial, submitted);
         Assert.Equal(5, rebased.Single().Amount);
     }
 
@@ -108,7 +109,7 @@ public class InventoryFoodUpkeepTests
         var initial = new ItemRosterElement[] { new(grain, 10) };
         var submitted = new ItemRosterElement[] { new(grain, 0) };
 
-        Assert.True(TradeHandler.TryRebaseInventoryData(authoritative, initial, submitted, out var rebased));
+        var rebased = TradeHandler.RebaseInventoryData(authoritative, initial, submitted);
         Assert.Empty(rebased);
     }
 
@@ -132,30 +133,53 @@ public class InventoryFoodUpkeepTests
     }
 
     [Fact]
-    public void ServerConsumptionAfterSubmission_RejectsStaleConfirmation()
+    public void EmptyInventoryChangedBeforeDone_PreservesLootAndServerItems()
     {
         var grain = new ItemObject("grain");
+        var loot = new ItemObject("shield");
         var server = new ItemRoster();
-        server.AddToCounts(grain, 5);
-        var baseline = server.ToArray();
-        server.AddToCounts(grain, -2);
+        server.AddToCounts(grain, 3);
+        var submitted = new[] { new ItemRosterElement(loot, 1) };
 
-        Assert.False(TradeHandler.MatchesInventoryBaseline(server, baseline));
-        Assert.Equal(3, server.GetElementNumber(0));
+        var rebased = TradeHandler.RebaseInventoryData(server, null, submitted);
+
+        Assert.Equal(3, rebased.Single(item => item.EquipmentElement.Item == grain).Amount);
+        Assert.Equal(1, rebased.Single(item => item.EquipmentElement.Item == loot).Amount);
+        Assert.Equal(3, TradeHandler.RebaseInventoryData(server, null, null).Single().Amount);
     }
 
     [Fact]
-    public void BaselineComparison_UsesModifierIdentityAndHandlesEmptyWireArray()
+    public void EmptySubmittedWireRoster_RemovesOnlyTheInitialItems()
     {
-        var item = new ItemObject("shield");
-        var modifier = new ItemModifier();
+        var grain = new ItemObject("grain");
+        var loot = new ItemObject("shield");
         var server = new ItemRoster();
-        server.AddToCounts(new EquipmentElement(item, modifier), 1);
-        var differentModifier = new[] { new ItemRosterElement(item, 1) };
+        server.AddToCounts(grain, 3);
+        server.AddToCounts(loot, 1);
 
-        Assert.False(TradeHandler.MatchesInventoryBaseline(server, differentModifier));
-        Assert.True(TradeHandler.MatchesInventoryBaseline(server, server.ToArray()));
-        Assert.True(TradeHandler.MatchesInventoryBaseline(new ItemRoster(), null));
+        var rebased = TradeHandler.RebaseInventoryData(server,
+            new[] { new ItemRosterElement(grain, 3) }, null);
+
+        Assert.Same(loot, rebased.Single().EquipmentElement.Item);
+    }
+
+    [Fact]
+    public void MarketUpdate_PreservesPendingPurchaseAndDoneBaseline()
+    {
+        var grain = new EquipmentElement(new ItemObject("grain"));
+        var logic = CreateLogic(grain, 5);
+        logic._rosters[0].AddToCounts(grain, 10);
+        var inventory = new InventoryScreenRosterRefresher();
+        inventory.CaptureInventoryBaseline(logic);
+        logic._rosters[0].AddToCounts(grain, -3);
+        logic._rosters[1].AddToCounts(grain, 3);
+
+        Assert.True(inventory.TryApplyInventoryUpdate(logic, logic._rosters[0], grain, -2));
+        Assert.Equal(5, Count(logic._rosters[0], grain));
+        Assert.Equal(8, Count(logic._rostersBackup[0], grain));
+        inventory.RestoreInventoryBackup(logic);
+        Assert.Equal(8, Count(logic._rostersBackup[0], grain));
+        Assert.Equal(5, Count(logic._rostersBackup[1], grain));
     }
 
     [Fact]

@@ -19,6 +19,7 @@ public interface IInventoryScreenRosterRefresher : IGameAbstraction
     ItemRosterElement[] GetInventoryBaseline(InventoryLogic logic);
     bool TryApplyInventoryUpdate(ItemRoster roster, EquipmentElement element, int amount);
     bool TryClearInventory(ItemRoster roster);
+    void RestoreInventoryBackup(InventoryLogic logic);
 }
 
 internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
@@ -47,9 +48,7 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
     {
         if (logic == null || !inventoryBaselines.TryGetValue(logic, out var baseline)) return false;
         int side = Array.IndexOf(logic._rosters, roster);
-        // Food upkeep changes the player's roster. Let market-side updates use the
-        // ordinary roster path so another player's open trade is not reset.
-        if (side != 1) return false;
+        if (side < 0) return false;
 
         using (new AllowedThread())
         using (TownMarketDataPatches.SuppressReceivedRosterUpdate())
@@ -78,7 +77,7 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
         var logic = (GameStateManager.Current?.ActiveState as InventoryState)?.InventoryLogic;
         if (logic == null || !inventoryBaselines.TryGetValue(logic, out var baseline)) return false;
         int side = Array.IndexOf(logic._rosters, roster);
-        if (side != 1) return false;
+        if (side < 0) return false;
 
         using (new AllowedThread())
         using (TownMarketDataPatches.SuppressReceivedRosterUpdate())
@@ -93,7 +92,7 @@ internal class InventoryScreenRosterRefresher : IInventoryScreenRosterRefresher
         return true;
     }
 
-    internal void RestoreInventoryBackup(InventoryLogic logic)
+    public void RestoreInventoryBackup(InventoryLogic logic)
     {
         if (!inventoryBaselines.TryGetValue(logic, out var baseline)) return;
         // Slaughter refreshes rosters and equipment together; rollback must do the same.

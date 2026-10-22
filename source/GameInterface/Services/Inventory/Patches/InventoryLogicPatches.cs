@@ -60,8 +60,7 @@ internal class InventoryLogicPatches
             }
         }
 
-        if (!ContainerProvider.TryResolve<IInventoryScreenRosterRefresher>(out var screenInventory) ||
-            !ContainerProvider.TryResolve<IInventoryLogicInterface>(out var inventory))
+        if (!ContainerProvider.TryResolve<IInventoryScreenRosterRefresher>(out var screenInventory))
         {
             logger.Error("Unable to resolve inventory services while closing the inventory screen.");
             __result = false;
@@ -94,6 +93,7 @@ internal class InventoryLogicPatches
         // Reset rosters so they are set on the server side
         using (new AllowedThread())
         {
+            screenInventory.RestoreInventoryBackup(__instance);
             __instance.Reset(true);
         }
 

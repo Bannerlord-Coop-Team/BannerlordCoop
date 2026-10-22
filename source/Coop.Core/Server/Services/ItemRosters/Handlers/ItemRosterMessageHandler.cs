@@ -1,16 +1,10 @@
-﻿using Common;
-using Common.Logging;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Coop.Core.Server.Services.ItemRosters.Messages;
 using GameInterface.Services.ItemObjects;
 using GameInterface.Services.ItemRosters.Messages;
 using GameInterface.Services.ObjectManager;
-using LiteNetLib;
-using System.Collections.Generic;
-using Serilog;
-using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 
 namespace Coop.Core.Server.Services.ItemRosters.Handlers;
@@ -20,7 +14,6 @@ namespace Coop.Core.Server.Services.ItemRosters.Handlers;
 /// </summary>
 public class ItemRosterMessageHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<ItemRosterMessageHandler>();
     // Coalescer channel for per-element ItemRoster updates; member is the item+modifier pair.
     private const string ItemRosterUpdateChannel = "ItemRosterUpdate";
 
@@ -44,7 +37,6 @@ public class ItemRosterMessageHandler : IHandler
         this.itemObjectRegistry = itemObjectRegistry;
         messageBroker.Subscribe<ItemRosterUpdated>(Handle);
         messageBroker.Subscribe<ItemRosterCleared>(Handle);
-        messageBroker.Subscribe<ResendItemRoster>(Handle);
     }
 
     public void Handle(MessagePayload<ItemRosterUpdated> payload)
@@ -102,39 +94,9 @@ public class ItemRosterMessageHandler : IHandler
         network.SendAll(new NetworkItemRosterClear(itemRosterId));
     }
 
-    public void Handle(MessagePayload<ResendItemRoster> payload)
-    {
-        if (payload.Who is not NetPeer peer) return;
-
-        GameThread.RunSafe(() =>
-        {
-            var roster = payload.What.ItemRoster;
-            if (!objectManager.TryGetHandleWithLogging(roster, out uint rosterId)) return;
-            var updates = new List<NetworkItemRosterUpdate>();
-            foreach (var item in roster)
-            {
-                if (!TryGetItemHandle(item.EquipmentElement.Item, out uint itemId))
-                {
-                    Logger.Warning("Unable to resend item roster {RosterId}: item handle is unavailable", rosterId);
-                    return;
-                }
-                uint modifierId = 0;
-                if (item.EquipmentElement.ItemModifier != null &&
-                    !objectManager.TryGetHandleWithLogging(item.EquipmentElement.ItemModifier, out modifierId)) return;
-                updates.Add(new NetworkItemRosterUpdate(rosterId, itemId, modifierId, item.Amount));
-            }
-
-            // Pending deltas already changed the snapshot; deliver them before replacing the roster.
-            coalescer.FlushInstance(rosterId, network);
-            network.Send(peer, new NetworkItemRosterClear(rosterId));
-            foreach (var update in updates) network.Send(peer, update);
-        });
-    }
-
     public void Dispose()
     {
         messageBroker.Unsubscribe<ItemRosterUpdated>(Handle);
         messageBroker.Unsubscribe<ItemRosterCleared>(Handle);
-        messageBroker.Unsubscribe<ResendItemRoster>(Handle);
     }
 }
