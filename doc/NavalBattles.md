@@ -350,10 +350,13 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   record until the owner is a member (log `Holding hull ... until it is a mission member`) and drops one from a departed
   owner (`Dropped hull record ... of departed ...`). Weapon and seat catch-up may hit the same ordering gap; the relay
   ordering itself is unchanged. The hold is not hit live yet: in R41a-3 the race didn't occur.
-- **Follow-up A, late hulls skip `MissionShip.OnDeploymentFinished`.** Hulls fielded after deployment (mainly the AI
-  fleet) miss its standing points, `SetUsableByAIOnly` on enemy helms, `_navalShipsLogic` (needed for capture,
-  `ShipControllerMachine`), model ammo, wake and flotsam, and `IsDeployed`. Fix: call `ship.OnDeploymentFinished()` in
-  `NavalNpcFleetSpawner.SpawnAssignedHulls` when `!hull.IsDeployed` (not for `ReplaceHull`, which would refill ammo).
+- **Follow-up A, late hulls and `MissionShip.OnDeploymentFinished` (partly done, capture P0).** Hulls fielded after
+  deployment (AI fleet, copies, swap replacements) now get the weapon AI, the helm's `OnDeploymentFinished` (standing
+  point components, enemy helm AI-only, the logics its vacancy check reads) and `CrewSizeOnMainDeck`
+  (`LateHullDeploymentPatch`). Still skipped: model ammo (a swap must not refill it), the anchor, wake and flotsam, the
+  rope, oar, climbing and ammo barrel machines' standing point setup, and `IsDeployed`. Until capture replicates, the main
+  agent can't take an enemy hull's helm (`ForeignHelmUsePatch`) and a capture that completes anyway is refused and logged
+  (`CoopShipCaptureRefusalPatch`).
 - **Follow-up B, weapon target lists are snapshots.** A late hull is no object target for weapons initialised before it
   spawned; formations still are.
 - **Silent member after the host left.** A naval battle whose host reported and left concludes once the remaining

@@ -1,12 +1,15 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using HarmonyLib;
 using Missions.Messages;
 using NavalDLC.Missions;
 using NavalDLC.Missions.Deployment;
 using NavalDLC.Missions.MissionLogics;
 using NavalDLC.Missions.Objects;
+using NavalDLC.Missions.Objects.UsableMachines;
 using NavalDLC.Missions.ShipControl;
 using NavalDLC.ViewModelCollection.OrderOfBattle;
+using Serilog;
 using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
@@ -30,26 +33,32 @@ internal class NavalShipSpawnPatch
     }
 }
 
-// Vanilla readies a ship weapon's AI targets only when deployment ends, so a hull spawned later (AI fleet, foreign copy,
-// hull swap) would tick a ballista AI with no target list and throw in ThreatSeeker.GetAllThreats.
+// MissionShip.OnDeploymentFinished only runs on hulls spawned before deployment ends, so a later hull (AI fleet, foreign copy,
+// hull swap) gets the weapon, helm and crew steps here. Ammo and anchor stay as spawned, so a swap doesn't refill ammo.
 [HarmonyPatch(typeof(NavalShipsLogic), nameof(NavalShipsLogic.SpawnShip),
     new[] { typeof(Formation), typeof(MatrixFrame), typeof(bool), typeof(bool) },
     new[] { ArgumentType.Normal, ArgumentType.Ref, ArgumentType.Normal, ArgumentType.Normal })]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
-internal class LateHullWeaponAiPatch
+internal class LateHullDeploymentPatch
 {
-    // RangedSiegeWeapon.OnDeploymentFinished only initializes its AI's threat seeker, as MissionShip.OnDeploymentFinished would.
+    // Runs the deployment steps a late hull needs; each one is safe to repeat on a pooled hull that vanilla deployed before.
     [HarmonyPostfix]
     private static void Postfix(MissionShip __result)
     {
-        if (__result?.ShipSiegeWeapon == null) return;
-        if (!ReadiesWeaponAi(CoopNavalMissionScope.IsActive, Mission.Current?.IsDeploymentFinished == true)) return;
+        if (__result == null) return;
+        if (!FinishesDeployment(CoopNavalMissionScope.IsActive, Mission.Current?.IsDeploymentFinished == true)) return;
 
-        __result.ShipSiegeWeapon.OnDeploymentFinished();
+        // Readies the ballista AI's threat seeker, otherwise ThreatSeeker.GetAllThreats throws on its first tick.
+        __result.ShipSiegeWeapon?.OnDeploymentFinished();
+        // Adds the helm's standing point components, makes an enemy helm AI-only and sets the logic its vacancy check reads.
+        __result.ShipControllerMachine.OnDeploymentFinished();
+        // The first unit's party feeds a crew perk; a fresh AI fleet or copy formation has no unit yet, so that perk is left out.
+        __result.CrewSizeOnMainDeck = MissionGameModels.Current.MissionShipParametersModel
+            .CalculateMainDeckCrewSize(__result.ShipOrigin, __result.Formation.GetFirstUnit());
     }
 
     // Hulls spawned before deployment ends get it from vanilla's own deployment pass.
-    internal static bool ReadiesWeaponAi(bool coopNavalBattle, bool deploymentFinished) => coopNavalBattle && deploymentFinished;
+    internal static bool FinishesDeployment(bool coopNavalBattle, bool deploymentFinished) => coopNavalBattle && deploymentFinished;
 }
 
 // Only the owner runs a hull's ship order; a foreign copy follows the owner's frames.
@@ -190,28 +199,63 @@ internal class AgentStationReleasePatch
     }
 }
 
-// The player can only take the helm of a hull it owns; a copied hull is steered by its owner.
+// The player only takes the helm of an own-side hull it simulates. A copy is steered by its owner, and an enemy helm would run
+// vanilla's capture, which co-op doesn't replicate, while the battle host steered an AI hull it simulates.
 [HarmonyPatch(typeof(Agent), nameof(Agent.HandleStartUsingAction))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ForeignHelmUsePatch
 {
+    // Refuses the main agent's start at a helm it may not take in a co-op battle; any other use goes through.
     [HarmonyPrefix]
-    private static bool Prefix(Agent __instance, UsableMissionObject targetObject) =>
-        AllowsStart(__instance.IsMainAgent, IsForeignHelm(targetObject));
-
-    internal static bool AllowsStart(bool isMainAgent, bool isForeignHelm) => !isMainAgent || !isForeignHelm;
-
-    private static bool IsForeignHelm(UsableMissionObject point)
+    private static bool Prefix(Agent __instance, UsableMissionObject targetObject)
     {
-        if (point is not StandingPoint standingPoint) return false;
+        if (!__instance.IsMainAgent || !CoopNavalMissionScope.IsActive) return true;
 
-        foreach (var ship in NavalForeignHulls.All)
+        var hull = HelmHullOf(targetObject);
+        if (hull == null) return true;
+
+        return AllowsStart(NavalForeignHulls.Contains(hull), IsEnemyHull(hull, __instance));
+    }
+
+    // Whether the main agent may start at a hull's helm: not a copy's, and not an enemy hull's until capture replicates.
+    internal static bool AllowsStart(bool isForeignHelm, bool isEnemyHull) => !isForeignHelm && !isEnemyHull;
+
+    // The hull whose helm owns this standing point, or null when it is no helm.
+    private static MissionShip HelmHullOf(UsableMissionObject point)
+    {
+        var shipsLogic = Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
+        if (point is not StandingPoint standingPoint || shipsLogic == null) return null;
+
+        foreach (var ship in shipsLogic.AllShips)
         {
             var helm = ship.ShipControllerMachine;
             if (helm != null && (helm.PilotStandingPoint == standingPoint || helm.StandingPoints.Contains(standingPoint)))
-                return true;
+                return ship;
         }
 
+        return null;
+    }
+
+    // Vanilla's capture test in ShipControllerMachine.OnTick: the hull's side differs from the agent's team side.
+    private static bool IsEnemyHull(MissionShip hull, Agent agent) => agent.Team != null && hull.BattleSide != agent.Team.Side;
+}
+
+// Vanilla's capture swaps two hulls' formations, sides and controllers on this client alone, so a co-op battle refuses it until
+// capture replicates. The helm gate above keeps the main agent off enemy helms; this catches any other way to the timer.
+[HarmonyPatch(typeof(ShipControllerMachine), nameof(ShipControllerMachine.OnShipCapturedByAgent))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class CoopShipCaptureRefusalPatch
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<CoopShipCaptureRefusalPatch>();
+
+    // Skips NavalShipsLogic.OnShipCaptured in a co-op battle; the elapsed timer has already taken the captor off the helm.
+    [HarmonyPrefix]
+    private static bool Prefix(ShipControllerMachine __instance, Agent captorAgent)
+    {
+        if (!CoopNavalMissionScope.IsActive) return true;
+
+        Logger.Warning("[NavalBattle] Refused capturing hull {Index} for agent {Agent}: in-mission capture is not replicated yet",
+            __instance.AttachedShip?.Index, captorAgent?.Index);
         return false;
     }
 }
