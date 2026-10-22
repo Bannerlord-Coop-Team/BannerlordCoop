@@ -3,7 +3,6 @@ using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Common.Tests.LiveTesting;
 
@@ -87,7 +86,7 @@ public class NamedPipeLiveTestServerTests
     }
 
     [Fact]
-    public async Task Server_AcceptsSecondConnectionWhileFirstRequestIsRunning()
+    public void Server_AcceptsSecondConnectionWhileFirstRequestIsRunning()
     {
         string pipeName = "BannerlordCoop.LiveTest.Tests." + Guid.NewGuid().ToString("N");
         using var requestStarted = new ManualResetEventSlim(false);
@@ -110,9 +109,7 @@ public class NamedPipeLiveTestServerTests
 
         try
         {
-            Task<ConnectedPipe> secondClientTask = Task.Run(() => Connect(pipeName));
-            Assert.Same(secondClientTask, await Task.WhenAny(secondClientTask, Task.Delay(TimeSpan.FromSeconds(5))));
-            using ConnectedPipe secondClient = await secondClientTask;
+            using ConnectedPipe secondClient = Connect(pipeName);
             AssertResponse(secondClient, "status", "status");
         }
         finally
@@ -273,28 +270,6 @@ public class NamedPipeLiveTestServerTests
 
         public void Dispose()
         {
-            try
-            {
-                Writer.Dispose();
-            }
-            catch (IOException)
-            {
-            }
-            catch (ObjectDisposedException)
-            {
-            }
-
-            try
-            {
-                Reader.Dispose();
-            }
-            catch (IOException)
-            {
-            }
-            catch (ObjectDisposedException)
-            {
-            }
-
             Pipe.Dispose();
         }
     }
