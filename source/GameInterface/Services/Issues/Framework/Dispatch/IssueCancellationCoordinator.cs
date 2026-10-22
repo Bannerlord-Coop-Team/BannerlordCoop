@@ -1,0 +1,134 @@
+﻿using Common;
+using Common.Logging;
+using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.Issues.Framework.Interface;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
+
+namespace GameInterface.Services.Issues.Framework.Dispatch;
+
+/// <summary>Keeps cancellation out of vanilla's ownerless deferred troop return queue.</summary>
+internal class IssueCancellationCoordinator : IIssueCancellationCoordinator
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<IssueCancellationCoordinator>();
+    private readonly IQuestTypeRegistry registry;
+    private readonly IIssueOwnerResolver ownerResolver;
+    private readonly IActiveIssueDismisser dismisser;
+    private readonly HashSet<IssueBase> pending = new HashSet<IssueBase>();
+
+    public IssueCancellationCoordinator(IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver, IActiveIssueDismisser dismisser)
+    {
+        this.registry = registry;
+        this.ownerResolver = ownerResolver;
+        this.dismisser = dismisser;
+    }
+
+    public bool BeforeGiverDeath(Hero victim, out IDisposable owner)
+    {
+        owner = null;
+        return victim.Issue == null || PrepareCancellation(victim.Issue, out owner);
+    }
+
+    public bool BeforeCancellation(IssueBase issue, TextObject log, out IDisposable owner)
+    {
+        if (!PrepareCancellation(issue, out owner)) return false;
+
+        if (issue.IssueQuest != null && issue.IssueQuest.IsOngoing && registry.IsRegistered(issue.GetType()))
+        {
+            // OnQuestCompleted ends the issue; letting the enclosing issue method run would end it twice.
+            issue.IssueQuest.CompleteQuestWithCancel(log);
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool PrepareCancellation(IssueBase issue, out IDisposable owner)
+    {
+        owner = null;
+        if (!registry.IsRegistered(issue.GetType())) return true;
+
+        if (ModInformation.IsClient)
+        {
+            if (!QuestEndingReplay.IsActive) return false;
+            // Troops are already returned by the server; replay only detaches this issue.
+            if (issue.IssueQuest == null && issue.IsSolvingWithAlternative)
+            {
+                issue.IssueFinalized();
+                return false;
+            }
+            return true;
+        }
+
+        if (issue.IssueOwner.Issue != issue)
+        {
+            pending.Remove(issue);
+            return false;
+        }
+
+        // OnQuestCompleted only detaches the already finalized quest; its consequences have run.
+        if (issue.IssueQuest != null && !issue.IssueQuest.IsOngoing) return true;
+
+        if (issue.IssueQuest == null && !issue.IsSolvingWithAlternative) return true;
+
+        if (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero))
+        {
+            pending.Remove(issue);
+            dismisser.Dismiss(issue, IssueOutcome.QuestCancel);
+            return false;
+        }
+
+        if (ownerHero.PartyBelongedTo == null)
+        {
+            pending.Add(issue);
+            return false;
+        }
+
+        var scope = new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo);
+        try
+        {
+            if (issue.IsSolvingWithAlternative && !Campaign.Current.Models.IssueModel.CanTroopsReturnFromAlternativeSolution())
+            {
+                pending.Add(issue);
+                return false;
+            }
+
+            pending.Remove(issue);
+            owner = scope;
+            return true;
+        }
+        finally
+        {
+            if (owner == null) scope.Dispose();
+        }
+    }
+
+    public void Retry()
+    {
+        if (ModInformation.IsClient) return;
+
+        foreach (var issue in pending.ToList())
+        {
+            try
+            {
+                if (issue.IssueOwner.Issue != issue)
+                {
+                    pending.Remove(issue);
+                    continue;
+                }
+
+                issue.CompleteIssueWithCancel();
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Retrying cancellation of {issue} failed", issue.StringId);
+            }
+        }
+    }
+}

@@ -122,11 +122,19 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
             return false;
         }
 
+        if (!issue.IssueOwner.IsAlive)
+        {
+            issue.CompleteIssueWithCancel();
+            return false;
+        }
+
         if (!ownerResolver.TryResolveOwnerHero(issue, out var ownerHero))
         {
             Logger.Error("Alternative solution of {issue} has no owning player, it is tried again tomorrow", issue.StringId);
             return false;
         }
+
+        if (ownerHero.PartyBelongedTo == null) return false;
 
         var scope = new MainHeroSubstitutionScope(ownerHero, ownerHero.PartyBelongedTo);
 
