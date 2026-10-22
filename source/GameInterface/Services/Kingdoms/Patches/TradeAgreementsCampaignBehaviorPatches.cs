@@ -8,6 +8,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -82,8 +83,7 @@ internal class TradeAgreementsCampaignBehaviorPatches
             // Falls back to the kingdom leader when no player hero is available.
             targetHero = ResolvedMainHeroContext.ResolvedMainHero ?? kingdom.Leader;
 
-            // TODO: Traits are not synced yet
-            // TraitLevelingHelper.OnTradeAgreementBroken()
+            TraitLevelingHelper.OnTradeAgreementBroken();
         }
 
         if (targetHero == null || otherKingdom.Leader == null) return false;
