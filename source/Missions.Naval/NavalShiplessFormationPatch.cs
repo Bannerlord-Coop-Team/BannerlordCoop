@@ -1,7 +1,9 @@
-﻿using HarmonyLib;
+﻿using Common.Logging;
+using HarmonyLib;
 using NavalDLC.Missions;
 using NavalDLC.Missions.AI.TeamAI;
 using NavalDLC.Missions.MissionLogics;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,12 +20,20 @@ namespace Missions.Naval;
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class NavalShiplessFormationPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<NavalShiplessFormationPatch>();
+
     private static readonly MethodInfo GetShip = AccessTools.Method(typeof(NavalShipsLogic), nameof(NavalShipsLogic.GetShip),
         new[] { typeof(TaleWorlds.Core.TeamSideEnum), typeof(TaleWorlds.Core.FormationClass), typeof(NavalDLC.Missions.Objects.MissionShip).MakeByRefType() });
 
-    // Patches only while vanilla still has an unchecked lookup, so a game update that fixes it leaves nothing to patch.
+    // Patches only while vanilla still has an unchecked lookup, so a game update that fixes it leaves nothing to patch (logged).
     [HarmonyPrepare]
-    private static bool Prepare() => TargetMethods().Any();
+    private static bool Prepare()
+    {
+        if (TargetMethods().Any()) return true;
+
+        Logger.Warning("[NavalSync] No unchecked formation ship lookup found in NavalQuerySystem or ShipOrder; the shipless formation patch is off");
+        return false;
+    }
 
     /// <summary>
     /// The query lambdas of NavalQuerySystem (average own and enemy ship position) and ShipOrder (closest enemy ship) that
