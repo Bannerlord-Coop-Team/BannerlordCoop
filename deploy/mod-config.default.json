@@ -221,6 +221,10 @@
 
     // Toggle players being allowed to join battles when wounded
     // Default is true
-    "playerWoundedBattleEntry": true
+    "playerWoundedBattleEntry": true,
+
+    // Set the time in seconds players have to vote on kingdom decisions.
+    // Default is 60. Values of 0 or lower will default back to 60.
+    "kingdomDecisionVoteTimeoutSeconds": 60
   }
 }
