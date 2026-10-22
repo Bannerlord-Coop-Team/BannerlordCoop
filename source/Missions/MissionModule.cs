@@ -10,6 +10,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.Tournaments;
 using GameInterface.Services.Time.UI;
 using GameInterface.Services.UI.PlayerNameplates;
+using GameInterface.Utils;
 using Missions.Agents;
 using Missions.Agents.Handlers;
 using Missions.Agents.Patches;
@@ -148,6 +149,8 @@ public class MissionModule : Module
         builder.RegisterType<NetworkShipRegistry>().As<INetworkShipRegistry>().InstancePerDependency();
         builder.RegisterType<BattleTeamResolver>().As<IBattleTeamResolver>().InstancePerDependency();
         builder.RegisterType<NavalBattleServicesFactory>().As<INavalBattleServicesFactory>().InstancePerDependency();
+        // Client container only: the native water clock patch is installed from the client start path.
+        builder.RegisterType<WaterClock>().As<IWaterClock>().InstancePerDependency();
         builder.RegisterType<GuardedHitWindow>()
             .As<IGuardedHitWindow>()
             .InstancePerDependency();

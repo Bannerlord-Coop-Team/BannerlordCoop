@@ -59,6 +59,8 @@ public class CoopNavalBattleBehavior : MissionLogic
 
     public IBattleShipFateReporter FateReporter => services.FateReporter;
 
+    public IBattleWaterClock WaterClock => services.WaterClock;
+
     public override void OnMissionTick(float dt)
     {
         base.OnMissionTick(dt);

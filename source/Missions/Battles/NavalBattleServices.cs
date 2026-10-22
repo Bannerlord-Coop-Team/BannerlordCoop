@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils;
 using Missions.Agents.Handlers;
 using Missions.Messages;
 using System;
@@ -32,8 +33,11 @@ public interface INavalBattleServices : IDisposable
     /// <summary>Reports the campaign ship fates of the hulls this client simulates to the server.</summary>
     IBattleShipFateReporter FateReporter { get; }
 
+    /// <summary>The battle host's water time every client's waves read.</summary>
+    IBattleWaterClock WaterClock { get; }
+
     /// <summary>
-    /// [Game thread] Ticks the hull stream and its fate reports, the deck, station and weapon streams, then
+    /// [Game thread] Ticks the water clock, the hull stream and its fate reports, the deck, station and weapon streams, then
     /// <paramref name="beforeMigrationReserve"/>, then the migration reserve, so AI hulls fielded in between take recovered
     /// reserve in the same tick.
     /// </summary>
@@ -60,7 +64,8 @@ public class NavalBattleServices : INavalBattleServices
     private readonly IBattleSession session;
 
     public NavalBattleServices(IBattleNetwork network, INetwork relayNetwork, IMessageBroker messageBroker,
-        IBattleTeamResolver teamResolver, IObjectManager objectManager, BattleContext context, INavalShipEngine shipEngine)
+        IBattleTeamResolver teamResolver, IObjectManager objectManager, BattleContext context, INavalShipEngine shipEngine,
+        IWaterClock waterClock)
     {
         // These services exist only in a naval mission and open with it.
         context.Session.MarkNaval();
@@ -83,6 +88,8 @@ public class NavalBattleServices : INavalBattleServices
         ShipWeaponReplicator = new BattleShipWeaponReplicator(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, ShipReplicator, context.HostEpochPolicy, context.MissionContext);
         FateReporter = new BattleShipFateReporter(relayNetwork, context.Session, context.MissionComponent.ShipRegistry, shipEngine);
+        WaterClock = new BattleWaterClock(network, messageBroker, context.Session, context.HostEpochPolicy, waterClock,
+            new BattleWaterTimeEstimator());
 
         messageBroker.Subscribe<BattleResultReporting>(Handle_BattleResultReporting);
     }
@@ -103,8 +110,11 @@ public class NavalBattleServices : INavalBattleServices
 
     public IBattleShipFateReporter FateReporter { get; }
 
+    public IBattleWaterClock WaterClock { get; }
+
     public void Tick(float dt, Action beforeMigrationReserve = null)
     {
+        WaterClock.Tick(dt);
         ShipReplicator.Tick(dt);
         FateReporter.Tick(dt);
         DeckPoses.Tick(dt);
@@ -137,6 +147,8 @@ public class NavalBattleServices : INavalBattleServices
 
     public void Dispose()
     {
+        // First, so a throwing service below can't leave the engine reading battle water time on the campaign map.
+        WaterClock.Dispose();
         messageBroker.Unsubscribe<BattleResultReporting>(Handle_BattleResultReporting);
         ShipWeaponReplicator.Dispose();
         ShipDamageRouter.Dispose();
@@ -161,17 +173,20 @@ public class NavalBattleServicesFactory : INavalBattleServicesFactory
     private readonly IMessageBroker messageBroker;
     private readonly IBattleTeamResolver teamResolver;
     private readonly IObjectManager objectManager;
+    private readonly IWaterClock waterClock;
 
     public NavalBattleServicesFactory(IBattleNetwork network, INetwork relayNetwork, IMessageBroker messageBroker,
-        IBattleTeamResolver teamResolver, IObjectManager objectManager)
+        IBattleTeamResolver teamResolver, IObjectManager objectManager, IWaterClock waterClock)
     {
         this.network = network;
         this.relayNetwork = relayNetwork;
         this.messageBroker = messageBroker;
         this.teamResolver = teamResolver;
         this.objectManager = objectManager;
+        this.waterClock = waterClock;
     }
 
     public INavalBattleServices Create(BattleContext context, INavalShipEngine shipEngine) =>
-        new NavalBattleServices(network, relayNetwork, messageBroker, teamResolver, objectManager, context, shipEngine);
+        new NavalBattleServices(network, relayNetwork, messageBroker, teamResolver, objectManager, context, shipEngine,
+            waterClock);
 }

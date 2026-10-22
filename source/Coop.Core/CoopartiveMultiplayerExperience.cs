@@ -676,6 +676,9 @@ namespace Coop.Core
 
             GameInterface.ContainerProvider.SetContainer(container);
 
+            // Client start only: the patch redirects this process's native wave clock, which a server never renders.
+            container.Resolve<GameInterface.Utils.IWaterClock>().TryInstall();
+
             // Client process does not own the export directory — only the server writes
             // debug export files. This prevents DebugAutoConnect races on that directory.
             AutoSyncConfiguration.ExportFiles = false;
