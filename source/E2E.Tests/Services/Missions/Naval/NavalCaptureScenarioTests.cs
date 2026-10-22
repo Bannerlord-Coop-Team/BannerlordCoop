@@ -1,0 +1,439 @@
+﻿using Missions.Messages;
+using Newtonsoft.Json.Linq;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
+using Xunit.Abstractions;
+
+namespace E2E.Tests.Services.Missions.Naval;
+
+/// <summary>
+/// In-mission ship capture (M6 capture plan): the captor's elapsed helm timer goes to the captured hull's authority, which
+/// decides on its real crew and broadcasts the capture; every client replays vanilla's swap and the prize moves to its captor
+/// in place. H is the battle host, C the captor and O an observer, all on the attacking side against an AI fleet.
+/// </summary>
+public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
+{
+    public NavalCaptureScenarioTests(ITestOutputHelper output) : base(output, numClients: 3) { }
+
+    // (a) C captures an AI hull H simulates: C owns it, H and O keep a copy of C's, the streams and damage follow C.
+    [Fact]
+    public void CaptorCapturesAnAiHull_OwnsItInPlace_AndItsStreamsAndDamageFollowTheCaptor()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
+        var prize = pirates[0];
+        var lateSampleFromH = h.SentSamples(prize).Last();
+        h.Hull(prize).IsVacant = true;
+
+        TimerElapses(c, prize, captorHull);
+
+        foreach (var peer in new[] { h, c, o })
+        {
+            var ship = peer.Ship(prize);
+            Assert.Equal("C", ship.CurrentAuthority);
+            Assert.Equal("C", ship.CaptorControllerId);
+            Assert.False(ship.FollowsBattleHost);
+            Assert.True(peer.Ship(captorHull).IsOrphaned);
+            Assert.Equal(BattleSideEnum.Attacker, peer.Hull(prize).Side);
+            Assert.Equal(BattleSideEnum.None, peer.Hull(captorHull).Side);
+            Assert.Equal(1L, (long)CaptureStats(peer)["capturesApplied"]!);
+            Assert.Equal(1, peer.Ships.DepartedHulls(BattleSideEnum.Defender));
+        }
+
+        Assert.False(c.Hull(prize).IsCopy);
+        Assert.Contains(c.Ship(prize).Hull, c.Engine.Adoptions);
+        Assert.True(h.Hull(prize).IsCopy);
+        Assert.Contains(h.Ship(prize).Hull, h.Engine.Releases);
+        Assert.True(o.Hull(prize).IsCopy);
+        Assert.Empty(o.Engine.Adoptions);
+
+        // The captor streams the prize from its own count; the old authority's late sample is no longer its.
+        c.Hull(prize).Frame = new MatrixFrame(Mat3.Identity, new Vec3(12f, 250f, 0f));
+        battle.TickAll(2);
+        Assert.Equal(12f, h.Hull(prize).Frame.origin.x, 3);
+        Assert.Equal(12f, o.Hull(prize).Frame.origin.x, 3);
+        o.Call(() => o.Instance.SimulateMessage(h.Network.NetPeer, lateSampleFromH));
+        Assert.Equal("not_authority", (string)o.Stream(prize)["lastReject"]!);
+
+        // A hit on the prize goes to the captor, and every client ends at its HP.
+        o.Hit(prize, 30f);
+        battle.TickAll(2);
+        Assert.Single(c.Hull(prize).AppliedDamage);
+        Assert.Empty(h.Hull(prize).AppliedDamage);
+        Assert.All(new[] { h, c, o }, peer => Assert.Equal(70f, peer.Hull(prize).HitPoints, 3));
+    }
+
+    // (b) The battle host captures an AI hull it simulates: nothing moves, but the prize stops following the host, so when H
+    // leaves the prize and its orphan go with it while the other AI hull moves to the successor.
+    [Fact]
+    public void HostCapturesItsOwnAiHull_ThePrizeAndOrphanLeaveWithTheHost_AndTheRestMoveToTheSuccessor()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out _, out var hostHull);
+        var prize = pirates[0];
+        h.Hull(prize).IsVacant = true;
+
+        TimerElapses(h, prize, hostHull);
+
+        foreach (var peer in new[] { h, c, o })
+        {
+            Assert.Equal("H", peer.Ship(prize).CurrentAuthority);
+            Assert.Equal("H", peer.Ship(prize).CaptorControllerId);
+            Assert.False(peer.Ship(prize).FollowsBattleHost);
+            Assert.True(peer.Ship(hostHull).IsOrphaned);
+        }
+        Assert.Empty(h.Engine.Adoptions);
+        Assert.Empty(h.Engine.Releases);
+        Assert.Empty(h.Network.NetworkSentMessages.GetMessages<NetworkShipCaptureRequest>());
+
+        battle.MigrateHost(h, "C");
+        battle.TickAll(4);
+
+        foreach (var peer in new[] { c, o })
+        {
+            Assert.False(peer.Has(prize), $"{peer.Id} kept the host's prize");
+            Assert.False(peer.Has(hostHull), $"{peer.Id} kept the host's orphan");
+            Assert.Equal("C", peer.Ship(pirates[1]).CurrentAuthority);
+        }
+        Assert.False(c.Hull(pirates[1]).IsCopy);
+    }
+
+    // (c) PvP: the victim's client is the authority of its own hull and confirms the capture; the prize changes sides.
+    [Fact]
+    public void PlayerCapturesAnotherPlayersHull_TheVictimConfirms_AndThePrizeChangesSides()
+    {
+        using var battle = StartNavalBattle(new[]
+        {
+            ("A", BattleSideEnum.Attacker), ("B", BattleSideEnum.Defender), ("O", BattleSideEnum.Attacker),
+        });
+        var (a, b, o) = (battle["A"], battle["B"], battle["O"]);
+        var hullA = battle.FieldPlayerHull(a, new Vec3(0f, 0f, 0f), formationIndex: 0);
+        var hullB = battle.FieldPlayerHull(b, new Vec3(0f, 40f, 0f), formationIndex: 0);
+        battle.FieldPlayerHull(o, new Vec3(80f, 0f, 0f), formationIndex: 0);
+        battle.CommitAll();
+        battle.TickAll(2);
+        b.Hull(hullB).IsVacant = true;
+
+        TimerElapses(a, hullB, hullA);
+
+        foreach (var peer in new[] { a, b, o })
+        {
+            Assert.Equal("A", peer.Ship(hullB).CurrentAuthority);
+            Assert.Equal("A", peer.Ship(hullB).CaptorControllerId);
+            Assert.Equal(BattleSideEnum.Attacker, peer.Hull(hullB).Side);
+            Assert.True(peer.Ship(hullA).IsOrphaned);
+            Assert.Equal(1, peer.Ships.DepartedHulls(BattleSideEnum.Defender));
+        }
+        Assert.True(b.Hull(hullB).IsCopy);
+        Assert.False(a.Hull(hullB).IsCopy);
+        Assert.Single(b.Network.NetworkSentMessages.GetMessages<NetworkShipCaptured>());
+    }
+
+    // The victim's crew still holds the hull, so its client refuses and the captor is told; nothing changes anywhere.
+    [Fact]
+    public void CaptureOfAHullItsCrewStillHolds_IsRefused_AndChangesNothing()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
+        var prize = pirates[0];
+
+        TimerElapses(c, prize, captorHull);
+
+        Assert.Equal("not_vacant", Assert.Single(h.Network.NetworkSentMessages.GetMessages<NetworkShipCaptureRejected>()).Reason);
+        Assert.Null(PendingAge(c, prize));
+        foreach (var peer in new[] { h, c, o })
+        {
+            Assert.Equal("H", peer.Ship(prize).CurrentAuthority);
+            Assert.Null(peer.Ship(prize).CaptorControllerId);
+            Assert.False(peer.Ship(captorHull).IsOrphaned);
+        }
+    }
+
+    // (d) C and O race for one hull: the authority confirms the first request and answers the second as already captured.
+    [Fact]
+    public void TwoCaptorsRaceForOneHull_OneCaptureAppliesEverywhere_AndTheOtherIsRefused()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
+        var prize = pirates[0];
+        var observerHull = o.Registry.Ships.Single(ship => ship.CurrentAuthority == "O").ShipId;
+        h.Hull(prize).IsVacant = true;
+
+        // Both requests are in flight before either captor hears of the other.
+        c.Network.RouteMessages = false;
+        o.Network.RouteMessages = false;
+        TimerElapses(c, prize, captorHull);
+        TimerElapses(o, prize, observerHull);
+        c.Network.RouteMessages = true;
+        o.Network.RouteMessages = true;
+        var requestOfC = c.Network.NetworkSentMessages.GetMessages<NetworkShipCaptureRequest>().Single();
+        var requestOfO = o.Network.NetworkSentMessages.GetMessages<NetworkShipCaptureRequest>().Single();
+        h.Call(() => h.Instance.SimulateMessage(c.Network.NetPeer, requestOfC));
+        h.Call(() => h.Instance.SimulateMessage(o.Network.NetPeer, requestOfO));
+
+        Assert.Single(h.Network.NetworkSentMessages.GetMessages<NetworkShipCaptured>());
+        var refusal = Assert.Single(h.Network.NetworkSentMessages.GetMessages<NetworkShipCaptureRejected>());
+        Assert.Equal("O", refusal.CaptorControllerId);
+        Assert.Equal("already_captured", refusal.Reason);
+        Assert.Null(PendingAge(o, prize));
+        foreach (var peer in new[] { h, c, o })
+        {
+            Assert.Equal("C", peer.Ship(prize).CaptorControllerId);
+            Assert.False(peer.Ship(observerHull).IsOrphaned);
+        }
+    }
+
+    // (e) The old host's confirm before the migration: the prize stays with its captor, and only the other AI hull moves.
+    [Fact]
+    public void CaptureBeforeAHostMigration_ThePrizeStaysWithItsCaptor_AndOnlyTheOtherAiHullMoves()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
+        h.Hull(pirates[0]).IsVacant = true;
+        TimerElapses(c, pirates[0], captorHull);
+
+        battle.MigrateHost(h, "O");
+        battle.TickAll(4);
+
+        foreach (var peer in new[] { c, o })
+        {
+            Assert.Equal("C", peer.Ship(pirates[0]).CurrentAuthority);
+            Assert.Equal("O", peer.Ship(pirates[1]).CurrentAuthority);
+        }
+        Assert.True(o.Hull(pirates[0]).IsCopy);
+        Assert.False(c.Hull(pirates[0]).IsCopy);
+        Assert.False(o.Hull(pirates[1]).IsCopy);
+    }
+
+    // (e) The old host's confirm reaches the successor mid-swap and the captor after the old host left: both apply it, so
+    // every client ends where the clients that heard it first did.
+    [Fact]
+    public void ConfirmFromADepartedHost_ArrivingMidSwapOrAfterItLeft_GivesTheSameStateEverywhere()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
+        var prize = pirates[0];
+        h.Hull(prize).IsVacant = true;
+        h.Network.RouteMessages = false;
+        TimerElapses(c, prize, captorHull);
+        var confirm = h.Network.NetworkSentMessages.GetMessages<NetworkShipCaptured>().Single();
+
+        battle.MigrateHost(h, "O");
+        o.Call(() => o.Instance.SimulateMessage(h.Network.NetPeer, confirm));
+        bool appliedMidSwap = o.Ship(prize).CaptorControllerId != null;
+        battle.TickAll(4);
+        c.Call(() => c.Instance.SimulateMessage(h.Network.NetPeer, confirm));
+
+        Assert.False(appliedMidSwap);
+        foreach (var peer in new[] { c, o })
+        {
+            Assert.Equal("C", peer.Ship(prize).CurrentAuthority);
+            Assert.Equal("C", peer.Ship(prize).CaptorControllerId);
+            Assert.True(peer.Ship(captorHull).IsOrphaned);
+        }
+        Assert.True(o.Hull(prize).IsCopy);
+        Assert.False(c.Hull(prize).IsCopy);
+        Assert.Contains(o.Ship(prize).Hull, o.Engine.Releases);
+        Assert.Null(PendingAge(c, prize));
+    }
+
+    // (e) A request the old host never answered expires on the captor and tells the player; the hull stays an AI hull.
+    [Fact]
+    public void RequestTheOldHostNeverAnswered_Expires_AndTheHullStaysWithTheSuccessor()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
+        c.Network.RouteMessages = false;
+        TimerElapses(c, pirates[0], captorHull);
+        c.Network.RouteMessages = true;
+
+        battle.MigrateHost(h, "O");
+        c.Ticks(130);
+
+        Assert.Null(PendingAge(c, pirates[0]));
+        Assert.Equal(1L, (long)CaptureStats(c)["capturesExpired"]!);
+        Assert.Equal("O", c.Ship(pirates[0]).CurrentAuthority);
+        Assert.Null(c.Ship(pirates[0]).CaptorControllerId);
+    }
+
+    // (f) The captor disconnects: the prize and its orphan leave every client in one batch, and the captor's crew standing on
+    // the orphan is parked as aboard and withdrawn as the prize's crew.
+    [Fact]
+    public void CaptorDisconnects_ThePrizeAndOrphanLeaveEveryClient_WithItsCrewOnTheOrphanWithdrawn()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
+        var prize = pirates[0];
+        h.Hull(prize).IsVacant = true;
+        TimerElapses(c, prize, captorHull);
+        var crewOnOrphan = StandCrewOnOrphan(new[] { h, o }, prize, captorHull);
+
+        battle.Disconnect(c);
+        battle.TickAll(3);
+
+        foreach (var peer in new[] { h, o })
+        {
+            Assert.False(peer.Has(prize));
+            Assert.False(peer.Has(captorHull));
+            Assert.False(crewOnOrphan[peer].IsActive());
+            Assert.Empty(peer.Engine.ParkedAgents);
+            Assert.True(peer.Has(pirates[1]));
+        }
+    }
+
+    // (f) The captor leaves: its mission end announces the prize and the orphan one by one, and each removal keeps its deck clear.
+    [Fact]
+    public void CaptorLeaves_EachOwnHullIsAnnouncedAndRemoved_WithItsCrewOnTheOrphanMovedThenWithdrawn()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
+        var prize = pirates[0];
+        h.Hull(prize).IsVacant = true;
+        TimerElapses(c, prize, captorHull);
+        var crewOnOrphan = StandCrewOnOrphan(new[] { h, o }, prize, captorHull);
+
+        c.Call(() =>
+        {
+            foreach (var ship in c.Registry.Ships.Where(ship => ship.CurrentAuthority == "C").ToList())
+            {
+                c.Ships.AnnounceRemoval(ship.Hull, ShipRemovalReason.Leave, missionEnding: true);
+                c.Engine.VanillaOwnerRemoveShipForTest(ship.Hull);
+            }
+        });
+        Assert.Equal(2, c.Network.NetworkSentMessages.GetMessages<NetworkShipRemoved>().Count());
+        battle.Leave(c);
+        battle.TickAll(4);
+
+        foreach (var peer in new[] { h, o })
+        {
+            Assert.False(peer.Has(prize));
+            Assert.False(peer.Has(captorHull));
+            Assert.False(crewOnOrphan[peer].IsActive());
+            Assert.Empty(peer.Engine.ParkedAgents);
+        }
+    }
+
+    // (g) A player joining after the capture spawns the prize as the captor's hull on its side and the orphan without a formation.
+    [Fact]
+    public void LateJoinerAfterACapture_SpawnsThePrizeAsTheCaptorsHull_AndTheOrphanWithoutAFormation()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out _, out var pirates, out var captorHull, out _,
+            lateJoiner: "O");
+        var prize = pirates[0];
+        h.Hull(prize).IsVacant = true;
+        TimerElapses(c, prize, captorHull);
+
+        var joiner = battle.Join("O");
+        joiner.Commit();
+        battle.AnnounceEntry(joiner);
+        battle.TickAll(2);
+
+        var ship = joiner.Ship(prize);
+        Assert.Equal("C", ship.CurrentAuthority);
+        Assert.Equal("C", ship.CaptorControllerId);
+        Assert.False(ship.FollowsBattleHost);
+        Assert.Equal(BattleSideEnum.Attacker, joiner.Hull(prize).Side);
+        Assert.True(joiner.Ship(captorHull).IsOrphaned);
+        Assert.Null(joiner.Ship(captorHull).Formation);
+        Assert.True(joiner.Hull(captorHull).IsOrphaned);
+        Assert.Equal("H", joiner.Ship(pirates[1]).CurrentAuthority);
+    }
+
+    // (g) A joiner still deploying holds the old authority's record of the prize when the capture arrives: it applies the
+    // capture once the copy spawned.
+    [Fact]
+    public void LateJoinerHoldingThePreCaptureRecord_TakesTheCaptureOnceTheCopySpawned()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out _, out var pirates, out var captorHull, out _,
+            lateJoiner: "O");
+        var prize = pirates[0];
+        var joiner = battle.Join("O");
+        joiner.Engine.IsDeploymentMode = true;
+        joiner.Commit();
+        battle.AnnounceEntry(joiner);
+        battle.TickAll(2);
+        Assert.False(joiner.Has(prize));
+
+        h.Hull(prize).IsVacant = true;
+        TimerElapses(c, prize, captorHull);
+        joiner.Engine.IsDeploymentMode = false;
+        battle.TickAll(2);
+
+        Assert.Equal("C", joiner.Ship(prize).CurrentAuthority);
+        Assert.Equal("C", joiner.Ship(prize).CaptorControllerId);
+        Assert.Equal(BattleSideEnum.Attacker, joiner.Hull(prize).Side);
+        Assert.True(joiner.Ship(captorHull).IsOrphaned);
+        Assert.Equal(1L, (long)CaptureStats(joiner)["capturesApplied"]!);
+    }
+
+    // (h) Q5: once the last AI hull is captured the host counts no hull left on the AI side and one gone from it, which is
+    // vanilla's retreat (CoopNavalBattleEndLogic.KeepsRetreat), while the prize counts for the players' side.
+    [Fact]
+    public void LastAiHullCaptured_TheHostsTallyHasNoAiHullLeftAndOneGoneFromThatSide()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out _, out var pirates, out var captorHull, out var hostHull);
+        h.Hull(pirates[0]).IsVacant = true;
+        h.Hull(pirates[1]).IsVacant = true;
+
+        TimerElapses(c, pirates[0], captorHull);
+        TimerElapses(h, pirates[1], hostHull);
+
+        var enemy = EndTally(h, BattleSideEnum.Defender, liveHumans: 0);
+        var players = EndTally(h, BattleSideEnum.Attacker, liveHumans: 3);
+        Assert.Equal(0, enemy.Hulls);
+        Assert.Equal(2, h.Ships.DepartedHulls(BattleSideEnum.Defender));
+        Assert.Equal(3, players.Hulls);
+    }
+
+    // H, C and O each field a hull on formation 0 of the attacking team; H fields two AI hulls, each standing for a pirate ship.
+    private NavalBattle StartCaptureBattle(out NavalPeer h, out NavalPeer c, out NavalPeer o, out Guid[] pirates,
+        out Guid captorHull, out Guid hostHull, string? lateJoiner = null)
+    {
+        var battle = StartNavalBattle(new[]
+        {
+            ("H", BattleSideEnum.Attacker), ("C", BattleSideEnum.Attacker), ("O", BattleSideEnum.Attacker),
+        }, hostEpoch: 1, lateJoiner == null ? Array.Empty<string>() : new[] { lateJoiner });
+        h = battle["H"];
+        c = battle["C"];
+        o = lateJoiner == null ? battle["O"] : null!;
+        hostHull = battle.FieldPlayerHull(h, new Vec3(0f, 0f, 0f), formationIndex: 0);
+        captorHull = battle.FieldPlayerHull(c, new Vec3(40f, 0f, 0f), formationIndex: 0);
+        if (o != null) battle.FieldPlayerHull(o, new Vec3(80f, 0f, 0f), formationIndex: 0);
+        var host = h;
+        pirates = Enumerable.Range(0, 2)
+            .Select(i => battle.FieldAiHull(host, BattleSideEnum.Defender, new Vec3(30f * i, 300f, 0f), formationIndex: i,
+                campaignShipId: $"Ship_pirate_{i}"))
+            .ToArray();
+        battle.CommitAll();
+        battle.TickAll(2);
+        return battle;
+    }
+
+    // The captor's main agent, crew of its own hull, held the prize's helm for vanilla's capture time on the captor's client.
+    private static void TimerElapses(NavalPeer captor, Guid prize, Guid captorHull)
+    {
+        var main = captor.RegisterAgent(Guid.NewGuid(), captor.Id);
+        var prizeHull = captor.Ship(prize).Hull;
+        var ownHull = captor.Ship(captorHull).Hull;
+        captor.Engine.PlaceAgent(main, prizeHull, ownHull);
+        captor.Call(() => captor.Broker.Publish(captor, new ShipCaptureTimerElapsed(prizeHull, main)));
+    }
+
+    // A puppet of the captor's crew, crewing the prize, standing on the orphan's deck on each observer.
+    private static Dictionary<NavalPeer, Agent> StandCrewOnOrphan(IEnumerable<NavalPeer> observers, Guid prize, Guid orphan)
+    {
+        var crewId = Guid.NewGuid();
+        return observers.ToDictionary(peer => peer, peer =>
+        {
+            var puppet = peer.RegisterAgent(crewId, "C");
+            peer.Engine.PlaceAgent(puppet, peer.Ship(orphan).Hull, peer.Ship(prize).Hull);
+            return puppet;
+        });
+    }
+
+    private static JObject CaptureStats(NavalPeer peer)
+    {
+        JObject stats = null!;
+        peer.Call(() => stats = JObject.FromObject(peer.Captures.Inspect()));
+        return stats;
+    }
+
+    private static float? PendingAge(NavalPeer peer, Guid shipId)
+    {
+        float? age = null;
+        peer.Call(() => age = peer.Captures.PendingRequestAge(shipId));
+        return age;
+    }
+}

@@ -77,8 +77,25 @@ public interface IBattleShipReplicator : IDisposable
     /// </summary>
     void AnnounceRemoval(MissionObject hull, ShipRemovalReason reason, bool missionEnding);
 
-    /// <summary>[Game thread] How many hulls of a side left the mission with their owner, for the end check's retreat rule.</summary>
+    /// <summary>
+    /// [Game thread] How many hulls left a side, with their owner or to a capture, for the end check's retreat rule.
+    /// </summary>
     int DepartedHulls(BattleSideEnum side);
+
+    /// <summary>
+    /// [Game thread] Moves a captured hull to its captor in place at the ordered capture every client applies: its sample and
+    /// condition order restart, the captor adopts its copy and the old authority turns its hull into a copy.
+    /// </summary>
+    void TransferCapturedHull(NetworkShipInfo ship, string captorControllerId);
+
+    /// <summary>[Game thread] Counts a hull a capture took off <paramref name="side"/>, as vanilla's retreat rule sees it gone.</summary>
+    void CountCapturedFrom(BattleSideEnum side);
+
+    /// <summary>
+    /// [Game thread] Removes a hull whose capture arrived after its captor's departure, as it left the battle with its captor
+    /// everywhere else; nobody withdraws with it, since its crew are still the old owner's.
+    /// </summary>
+    void RemoveHullOfDepartedCaptor(NetworkShipInfo ship);
 }
 
 /// <inheritdoc cref="IBattleShipReplicator"/>
@@ -246,17 +263,37 @@ public class BattleShipReplicator : IBattleShipReplicator
     private void TransferHull(NetworkShipInfo ship, string newAuthority)
     {
         bool isOwn = hullAuthority.Transfer(ship, newAuthority);
+        RestartStreams(ship);
+        Logger.Information("[NavalSync] {Kind} hull {ShipId} of {Owner} moved to {Authority}{Local}",
+            ship.IsNpcParty ? "AI" : "Player", ship.ShipId, ship.OriginalOwner, newAuthority,
+            isOwn ? " (this client)" : "");
+    }
 
-        // The old owner's samples no longer describe the hull, whoever simulates it now.
+    // The old owner's samples and conditions no longer describe the hull, whoever simulates it now.
+    private void RestartStreams(NetworkShipInfo ship)
+    {
         var stream = GetStream(ship.ShipId);
         stream.Target = null;
         stream.Accepted = 0;
         stream.AcceptedEpoch = 0;
         conditions.RestartAfterAuthorityMove(ship.ShipId);
-        Logger.Information("[NavalSync] {Kind} hull {ShipId} of {Owner} moved to {Authority}{Local}",
-            ship.IsNpcParty ? "AI" : "Player", ship.ShipId, ship.OriginalOwner, newAuthority,
-            isOwn ? " (this client)" : "");
     }
+
+    public void TransferCapturedHull(NetworkShipInfo ship, string captorControllerId)
+    {
+        // The battle host capturing an AI hull it simulates keeps simulating it; only its host following ends.
+        if (ship.CurrentAuthority == captorControllerId) return;
+
+        bool isOwn = hullAuthority.TransferInPlace(ship, captorControllerId);
+        RestartStreams(ship);
+        Logger.Information("[NavalSync] Captured hull {ShipId} of {Owner} moved in place to its captor {Captor}{Local}",
+            ship.ShipId, ship.OriginalOwner, captorControllerId, isOwn ? " (this client)" : "");
+    }
+
+    public void CountCapturedFrom(BattleSideEnum side) => departedHulls[side] = DepartedHulls(side) + 1;
+
+    public void RemoveHullOfDepartedCaptor(NetworkShipInfo ship) =>
+        RemoveHulls(new[] { ship }, ShipRemovalReason.Leave, DepartingCrew.None);
 
     public string ReplaceNpcHull(Guid shipId)
     {
@@ -607,9 +644,10 @@ public class BattleShipReplicator : IBattleShipReplicator
                 continue;
             }
 
-            // A repeated record (the host announces its AI hulls again at its commit) keeps the first one's place.
+            // A repeated record (the host announces its AI hulls again at its commit) keeps the first one's place; only the
+            // captor's record of a hull captured since replaces the old authority's.
             var held = Held(record.ShipId);
-            if (held.Record != null) continue;
+            if (held.Record != null && !RecordsCapture(record, held.Record)) continue;
 
             held.Record = record;
             held.RecordOrder = ++recordsHeld;
@@ -617,6 +655,11 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         DrainHeldRecords();
     }
+
+    /// <summary>Whether <paramref name="record"/> describes a capture <paramref name="held"/> predates, so it replaces it.</summary>
+    internal static bool RecordsCapture(BattleShipSpawnData record, BattleShipSpawnData held) =>
+        (!string.IsNullOrEmpty(record.CaptorControllerId) && string.IsNullOrEmpty(held.CaptorControllerId))
+        || (record.Orphaned && !held.Orphaned);
 
     private HeldShip Held(Guid shipId)
     {
@@ -715,6 +758,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         Logger.Information("[NavalSync] Spawned foreign hull {ShipId} ({Hull}) of {Owner} on team {Team} formation {Formation}{Held}",
             data.ShipId, data.HullId, data.OwnerControllerId, team.TeamSide, formation?.FormationIndex,
             held.HeldForDeployment ? " after local deployment" : "");
+        // Before the host move below, since a captured AI hull no longer follows the host.
+        if (registered) ApplyRecordedCapture(ship, data);
         // A host change while the record waited only moved the registered hulls.
         var currentAuthority = registered ? CurrentAuthorityOf(ship) : null;
         if (currentAuthority != null && currentAuthority != ship.CurrentAuthority)
@@ -725,6 +770,24 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         ApplyHeldState(held);
         return true;
+    }
+
+    // A capture before this client spawned the hull: the record names its captor, or that the capture took its formation.
+    private void ApplyRecordedCapture(NetworkShipInfo ship, BattleShipSpawnData data)
+    {
+        if (data.Orphaned)
+        {
+            engine.OrphanHull(ship.Hull);
+            Registry.TryMarkOrphaned(ship.ShipId, data.Side);
+            Logger.Information("[NavalSync] Hull {ShipId} of {Owner} lost its formation to a capture before it spawned here",
+                ship.ShipId, ship.CurrentAuthority);
+            return;
+        }
+
+        if (string.IsNullOrEmpty(data.CaptorControllerId)) return;
+
+        Registry.TryMarkCaptured(ship.ShipId, data.CaptorControllerId);
+        Logger.Information("[NavalSync] Hull {ShipId} was captured by {Captor} before it spawned here", ship.ShipId, data.CaptorControllerId);
     }
 
     // Who simulates a hull whose record waited: an AI hull moves with the host, a player's stays with its owner.

@@ -33,7 +33,28 @@ public class NavalHullAuthorityTests
         Assert.False(handedAway);
         Assert.False(authority.IsReplacing(ship.ShipId));
         Assert.Equal(Peer, ship.CurrentAuthority);
-        engine.Verify(e => e.ReleaseNpcHull(hull), Times.Once);
+        engine.Verify(e => e.ReleaseHull(hull), Times.Once);
+    }
+
+    // Capture 2.3 step 4: the captor takes control of its own copy and the old authority turns its hull into a copy; no swap.
+    [Fact]
+    public void TransferInPlace_AdoptsTheCopyOrReleasesTheHull_WithoutQueuingASwap()
+    {
+        var (authority, registry, engine, _) = Create();
+        var hull = ShipTestHulls.Create();
+        var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, "MapEventParty_2", true, hull, null);
+        registry.TryRegister(ship);
+
+        bool adopted = authority.TransferInPlace(ship, Own);
+        bool queuedASwap = authority.IsReplacing(ship.ShipId);
+        bool handedAway = authority.TransferInPlace(ship, Peer);
+
+        Assert.True(adopted);
+        Assert.False(queuedASwap);
+        Assert.False(handedAway);
+        engine.Verify(e => e.AdoptHull(hull), Times.Once);
+        engine.Verify(e => e.ReleaseHull(hull), Times.Once);
+        engine.Verify(e => e.ReplaceHull(It.IsAny<MissionObject>()), Times.Never);
     }
 
     // M8a r1, R33, M8c: vanilla removes no hull its agents stand on, so everyone aboard departing hulls is parked a tick before

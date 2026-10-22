@@ -26,6 +26,12 @@ public interface INavalHullAuthority : IDisposable
     /// <summary>Gives <paramref name="ship"/> to <paramref name="newAuthority"/>; true when this client now simulates it.</summary>
     bool Transfer(NetworkShipInfo ship, string newAuthority);
 
+    /// <summary>
+    /// Gives a captured hull to its captor in place: a new authority adopts its copy and the old one turns its hull into a copy,
+    /// with no hull removed or replaced. True when this client now simulates it.
+    /// </summary>
+    bool TransferInPlace(NetworkShipInfo ship, string newAuthority);
+
     /// <summary>Queues replacing a hull this client simulates with a fresh simulated hull of the same ship. Why it cannot, or null.</summary>
     string Replace(Guid shipId);
 
@@ -119,6 +125,19 @@ public class NavalHullAuthority : INavalHullAuthority
         return isOwn;
     }
 
+    public bool TransferInPlace(NetworkShipInfo ship, string newAuthority)
+    {
+        bool wasOwn = IsOwn(ship);
+        ship.CurrentAuthority = newAuthority;
+        bool isOwn = IsOwn(ship);
+        if (isOwn && !wasOwn)
+            engine.AdoptHull(ship.Hull);
+        else if (wasOwn && !isOwn)
+            Release(ship);
+
+        return isOwn;
+    }
+
     public string Replace(Guid shipId)
     {
         if (!Registry.TryGet(shipId, out var ship)) return "No registered hull has that ship id.";
@@ -165,7 +184,7 @@ public class NavalHullAuthority : INavalHullAuthority
             if (swap.Agents != null) engine.BoardHullAgents(ship.Hull, swap.Agents);
         }
 
-        engine.ReleaseNpcHull(ship.Hull);
+        engine.ReleaseHull(ship.Hull);
     }
 
     // One step per hull per tick: vanilla removes no hull its kept agents stand on, and crews a mid-mission hull the tick

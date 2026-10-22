@@ -238,8 +238,8 @@ internal class AgentStationReleasePatch
     }
 }
 
-// The player only takes the helm of an own-side hull it simulates. A copy is steered by its owner, and an enemy helm would run
-// vanilla's capture, which co-op doesn't replicate, while the battle host steered an AI hull it simulates.
+// A copy is steered by its owner, so the player takes another owner's helm only to capture an enemy hull; vanilla's helm
+// gates that further (AI-only until the formation empties, disabled until vacant) and its timer asks the hull's authority.
 [HarmonyPatch(typeof(Agent), nameof(Agent.HandleStartUsingAction))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class ForeignHelmUsePatch
@@ -256,8 +256,11 @@ internal class ForeignHelmUsePatch
         return AllowsStart(NavalForeignHulls.Contains(hull), IsEnemyHull(hull, __instance));
     }
 
-    // Whether the main agent may start at a hull's helm: not a copy's, and not an enemy hull's until capture replicates.
-    internal static bool AllowsStart(bool isForeignHelm, bool isEnemyHull) => !isForeignHelm && !isEnemyHull;
+    /// <summary>
+    /// Whether the main agent may start at a hull's helm: any hull it simulates, where vanilla's own rules apply, and another
+    /// owner's copy only when that copy's team is an enemy, to capture it. A capture's orphan has no team, so others keep off it.
+    /// </summary>
+    internal static bool AllowsStart(bool isForeignHelm, bool isEnemyHull) => !isForeignHelm || isEnemyHull;
 
     // The hull whose helm owns this standing point, or null when it is no helm.
     private static MissionShip HelmHullOf(UsableMissionObject point)
@@ -275,26 +278,23 @@ internal class ForeignHelmUsePatch
         return null;
     }
 
-    // Vanilla's capture test in ShipControllerMachine.OnTick: the hull's side differs from the agent's team side.
-    private static bool IsEnemyHull(MissionShip hull, Agent agent) => agent.Team != null && hull.BattleSide != agent.Team.Side;
+    // A team that is an enemy of the agent's; an orphan's missing team is none, unlike vanilla's side test, which reads it as -1.
+    private static bool IsEnemyHull(MissionShip hull, Agent agent) => agent.Team != null && hull.Team != null && hull.Team.IsEnemyOf(agent.Team);
 }
 
-// Vanilla's capture swaps two hulls' formations, sides and controllers on this client alone, so a co-op battle refuses it until
-// capture replicates. The helm gate above keeps the main agent off enemy helms; this catches any other way to the timer.
+// Vanilla's capture swaps two hulls' formations, sides and controllers on this client alone. In a co-op battle the elapsed timer
+// goes to the capture replicator instead, and the hull's authority decides and broadcasts the capture every client replays.
 [HarmonyPatch(typeof(ShipControllerMachine), nameof(ShipControllerMachine.OnShipCapturedByAgent))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
-internal class CoopShipCaptureRefusalPatch
+internal class CoopShipCapturePatch
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<CoopShipCaptureRefusalPatch>();
-
     // Skips NavalShipsLogic.OnShipCaptured in a co-op battle; the elapsed timer has already taken the captor off the helm.
     [HarmonyPrefix]
     private static bool Prefix(ShipControllerMachine __instance, Agent captorAgent)
     {
         if (!CoopNavalMissionScope.IsActive) return true;
 
-        Logger.Warning("[NavalBattle] Refused capturing hull {Index} for agent {Agent}: in-mission capture is not replicated yet",
-            __instance.AttachedShip?.Index, captorAgent?.Index);
+        MessageBroker.Instance.Publish(__instance, new ShipCaptureTimerElapsed(__instance.AttachedShip, captorAgent));
         return false;
     }
 }

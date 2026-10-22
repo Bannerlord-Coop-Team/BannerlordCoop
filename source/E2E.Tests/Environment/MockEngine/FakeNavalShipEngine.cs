@@ -105,7 +105,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
     {
         var fake = Of(hull);
         return new BattleShipSpawnData(identity.ShipId, identity.CurrentAuthority, identity.MapEventPartyId, identity.IsNpcParty,
-            fake.Team == null && identity.IsOrphaned ? identity.OrphanedSide : fake.Side, fake.FormationIndex,
+            identity.IsOrphaned ? identity.OrphanedSide : fake.Side, fake.FormationIndex,
             NetworkBattleShipSample.FromFrame(fake.Frame), HullId, null, null, null, null, fake.HitPoints, fake.SailHitPoints, 1, "",
             identity.OriginalOwner, fake.CampaignShipId, identity.CaptorControllerId, identity.IsOrphaned);
     }
@@ -220,11 +220,59 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
 
     public void PinToStation(Agent agent, UsableMissionObject point) => HullOfStation(point).Pins++;
 
-    public void ReleaseNpcHull(MissionObject hull)
+    public void ReleaseHull(MissionObject hull)
     {
         Of(hull).IsCopy = true;
         Releases.Add(hull);
     }
+
+    /// <summary>The copies this client took over in place (capture), in order.</summary>
+    public List<MissionObject> Adoptions { get; } = new();
+
+    // Stands in for dropping the copy's steering: the same hull simulates here from now on.
+    public void AdoptHull(MissionObject hull)
+    {
+        Of(hull).IsCopy = false;
+        Adoptions.Add(hull);
+    }
+
+    /// <summary>Each capture swap this client replayed, as (prize, captor hull).</summary>
+    public List<(MissionObject Prize, MissionObject CaptorHull)> Captures { get; } = new();
+
+    // Vanilla's swap: the prize takes the captor hull's team, side and formation, the captor's crew crews the prize, and the
+    // captor hull is left with none; the prize's old crew keeps no hull.
+    public void ApplyCapture(MissionObject prize, MissionObject captorHull)
+    {
+        var fake = Of(prize);
+        var captor = Of(captorHull);
+        Captures.Add((prize, captorHull));
+
+        foreach (var agent in crews.Where(entry => ReferenceEquals(entry.Value, fake)).Select(entry => entry.Key).ToList())
+            crews.Remove(agent);
+        foreach (var agent in crews.Where(entry => ReferenceEquals(entry.Value, captor)).Select(entry => entry.Key).ToList())
+            crews[agent] = fake;
+
+        fake.Team = captor.Team;
+        fake.Formation = captor.Formation;
+        fake.Side = captor.Side;
+        fake.FormationIndex = captor.FormationIndex;
+        Orphan(captor);
+    }
+
+    public void OrphanHull(MissionObject hull) => Orphan(Of(hull));
+
+    // A hull with no formation has no team either, so its side reads as none, as MissionShip.BattleSide does.
+    private static void Orphan(FakeHull fake)
+    {
+        fake.Team = null;
+        fake.Formation = null;
+        fake.Side = BattleSideEnum.None;
+        fake.IsOrphaned = true;
+    }
+
+    public bool IsVacantForCapture(MissionObject hull) => Of(hull).IsVacant;
+
+    public bool CanBeTakenOver(MissionObject hull) => !Of(hull).CannotBeTakenOver;
 
     // Like the live engine: everyone aboard is parked, and the hull's crew elsewhere is listed without being moved.
     public IReadOnlyList<HullSwapAgent> ParkHullAgents(MissionObject hull)
@@ -561,8 +609,15 @@ public sealed class FakeHull
     }
 
     public MissionObject Hull { get; }
-    public BattleSideEnum Side { get; }
-    public int FormationIndex { get; }
+    /// <summary>The side of the hull's team; none once a capture left it without one.</summary>
+    public BattleSideEnum Side { get; set; }
+    public int FormationIndex { get; set; }
+    /// <summary>Vanilla's capture vacancy on this client's view of the hull: crew all swimming or gone, nothing queued.</summary>
+    public bool IsVacant { get; set; }
+    /// <summary>A storyline hull vanilla never lets be captured.</summary>
+    public bool CannotBeTakenOver { get; set; }
+    /// <summary>A capture took its formation for the prize.</summary>
+    public bool IsOrphaned { get; set; }
     /// <summary>A copy of another owner's hull, or a hull this client handed away.</summary>
     public bool IsCopy { get; set; }
     public MatrixFrame Frame { get; set; } = MatrixFrame.Identity;

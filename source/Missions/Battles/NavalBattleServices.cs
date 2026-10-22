@@ -20,6 +20,9 @@ public interface INavalBattleServices : IDisposable
 
     IBattleShipReplicator ShipReplicator { get; }
 
+    /// <summary>Replicates in-mission ship captures, confirmed by each captured hull's authority.</summary>
+    IBattleShipCaptureReplicator ShipCaptureReplicator { get; }
+
     IAgentStationUseReplicator StationUseReplicator { get; }
 
     INavalDeckPoses DeckPoses { get; }
@@ -37,7 +40,7 @@ public interface INavalBattleServices : IDisposable
     IBattleWaterClock WaterClock { get; }
 
     /// <summary>
-    /// [Game thread] Ticks the water clock, the hull stream and its fate reports, the deck, station and weapon streams, then
+    /// [Game thread] Ticks the water clock, the hull stream, its captures and fate reports, the deck, station and weapon streams, then
     /// <paramref name="beforeMigrationReserve"/>, then the migration reserve, so AI hulls fielded in between take recovered
     /// reserve in the same tick.
     /// </summary>
@@ -80,7 +83,9 @@ public class NavalBattleServices : INavalBattleServices
             shipEngine, context.Deployment, context.MissionContext);
         ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
             hullAuthority, conditions, StationUseReplicator);
-        DeckPoses = new NavalDeckPoses(context.MissionComponent, shipEngine, StationUseReplicator);
+        ShipCaptureReplicator = new BattleShipCaptureReplicator(network, messageBroker, context, shipEngine, ShipReplicator,
+            hullAuthority);
+        DeckPoses =new NavalDeckPoses(context.MissionComponent, shipEngine, StationUseReplicator);
         MigrationReserveFielder = new NavalMigrationReserveFielder(context.Session, context.ReinforcementFielder,
             context.MissionComponent.ShipRegistry, shipEngine, ShipReplicator);
         ShipDamageRouter = new BattleShipDamageRouter(network, messageBroker, context.Session, context.MissionComponent,
@@ -97,6 +102,8 @@ public class NavalBattleServices : INavalBattleServices
     public INavalShipEngine Engine { get; }
 
     public IBattleShipReplicator ShipReplicator { get; }
+
+    public IBattleShipCaptureReplicator ShipCaptureReplicator { get; }
 
     public IAgentStationUseReplicator StationUseReplicator { get; }
 
@@ -116,6 +123,7 @@ public class NavalBattleServices : INavalBattleServices
     {
         WaterClock.Tick(dt);
         ShipReplicator.Tick(dt);
+        ShipCaptureReplicator.Tick(dt);
         FateReporter.Tick(dt);
         DeckPoses.Tick(dt);
         StationUseReplicator.Tick(dt);
@@ -154,6 +162,7 @@ public class NavalBattleServices : INavalBattleServices
         ShipDamageRouter.Dispose();
         DeckPoses.Dispose();
         StationUseReplicator.Dispose();
+        ShipCaptureReplicator.Dispose();
         ShipReplicator.Dispose();
         hullAuthority.Dispose();
     }

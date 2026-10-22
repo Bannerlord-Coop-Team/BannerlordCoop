@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.MapEvents;
+﻿using Common.Logging;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using Missions.Battles;
 using Missions.Messages;
@@ -8,6 +9,7 @@ using NavalDLC.Missions.Objects;
 using NavalDLC.Missions.Objects.UsableMachines;
 using NavalDLC.Missions.ShipControl;
 using NavalDLC.Missions.ShipInput;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -26,6 +28,8 @@ namespace Missions.Naval;
 /// <inheritdoc cref="INavalShipEngine"/>
 public class NavalShipEngine : INavalShipEngine
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<NavalShipEngine>();
+
     private const int MaxPathDepth = 16;
 
     // Clear of every hull and the water, where NavalTeamAgents.UnassignAgentAux parks troops it takes off a ship.
@@ -123,12 +127,58 @@ public class NavalShipEngine : INavalShipEngine
     internal static bool OpensHelmToPlayer(bool hasPlayerTeam, bool isPlayerSide, int formationUnits) =>
         hasPlayerTeam && !isPlayerSide && formationUnits == 0;
 
-    public void ReleaseNpcHull(MissionObject hull)
+    public void ReleaseHull(MissionObject hull)
     {
         var ship = (MissionShip)hull;
         SteeredCopies.Track(ship);
         ship.SetController(ShipControllerType.None, autoUpdateController: false);
     }
+
+    // A steered copy keeps its dynamic body, so dropping it from the copy set is all a new authority needs to simulate it.
+    public void AdoptHull(MissionObject hull)
+    {
+        var ship = (MissionShip)hull;
+        if (!NavalSteeredCopies.IsSimulating(ship))
+            Logger.Warning("[NavalSync] Adopted hull {Index} has no simulating body; it stays where its last sample put it", ship.Index);
+
+        SteeredCopies.Forget(ship);
+        ship.SetController(ShipControllerType.None, autoUpdateController: true);
+    }
+
+    public void ApplyCapture(MissionObject prize, MissionObject captorHull)
+    {
+        var ship = (MissionShip)prize;
+        var captor = (MissionShip)captorHull;
+        var shipsLogic = ShipsLogic;
+        if (shipsLogic == null || captor.Formation == null) return;
+
+        shipsLogic.OnShipCaptured(ship, captor.Formation);
+        // Vanilla's swap hands both hulls an auto-updated controller; a copy keeps none, so it never steers itself here.
+        if (NavalForeignHulls.Contains(ship)) ship.SetController(ShipControllerType.None, autoUpdateController: false);
+        if (NavalForeignHulls.Contains(captor)) captor.SetController(ShipControllerType.None, autoUpdateController: false);
+        // As the helm's capture branch does once the swap ran.
+        ship.InvalidateActiveFormationTroopOnShipCache();
+        captor.InvalidateActiveFormationTroopOnShipCache();
+    }
+
+    // Vanilla's swap gives the captor's assignment to the prize, so the orphan holds none; a joiner's copy had one of its own.
+    public void OrphanHull(MissionObject hull)
+    {
+        var ship = (MissionShip)hull;
+        var shipsLogic = ShipsLogic;
+        if (shipsLogic != null && shipsLogic.FindAssignmentOfShipOrigin(ship.ShipOrigin, out var assignment))
+        {
+            assignment.RemoveShip();
+            assignment.Clear();
+        }
+
+        ship.SetFormation(null);
+        ship.SetController(ShipControllerType.None, autoUpdateController: false);
+    }
+
+    public bool IsVacantForCapture(MissionObject hull) => ((MissionShip)hull).ShipControllerMachine?.IsAttachedShipVacant() == true;
+
+    public bool CanBeTakenOver(MissionObject hull) => ((MissionShip)hull).CanBeTakenOver;
 
     // Vanilla only removes a hull nobody it keeps stands on (Quest5 frees crewless hulls, ShipRetreatLogic fades the crew
     // aboard), so the agents aboard leave a tick before the hull does, parked the way UnassignAgentAux parks troops.

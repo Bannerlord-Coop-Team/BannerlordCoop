@@ -8,17 +8,18 @@ using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
 
-/// <summary>In-mission ship capture is refused in a co-op battle until it replicates.</summary>
-public class CoopShipCaptureRefusalPatchTests
+/// <summary>In a co-op battle vanilla's elapsed capture timer goes to the capture replicator instead of swapping the hulls.</summary>
+public class CoopShipCapturePatchTests
 {
-    // The refusal prefix hooks the helm's capture completion, the one call into NavalShipsLogic.OnShipCaptured.
+    // The prefix hooks the helm's capture completion, the one call into NavalShipsLogic.OnShipCaptured, which the engine replays.
     [Fact]
-    public void Target_CaptureCompletionExists()
+    public void Target_CaptureCompletionAndSwapExist()
     {
         Assert.NotNull(AccessTools.DeclaredMethod(typeof(ShipControllerMachine), nameof(ShipControllerMachine.OnShipCapturedByAgent),
             new[] { typeof(Agent) }));
         Assert.NotNull(AccessTools.DeclaredMethod(typeof(NavalShipsLogic), nameof(NavalShipsLogic.OnShipCaptured),
             new[] { typeof(MissionShip), typeof(Formation) }));
+        Assert.NotNull(AccessTools.DeclaredMethod(typeof(ShipControllerMachine), nameof(ShipControllerMachine.IsAttachedShipVacant)));
     }
 }
 #endif

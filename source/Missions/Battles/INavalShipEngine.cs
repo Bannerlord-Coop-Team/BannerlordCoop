@@ -87,8 +87,29 @@ public interface INavalShipEngine
     /// <summary>[Game thread] Re-targets a seated puppet at its station's user frame on the current hull frame.</summary>
     void PinToStation(Agent agent, UsableMissionObject point);
 
-    /// <summary>[Game thread] Hands an AI (NPC) hull's simulation away from this client: it becomes a copy steered toward its owner's samples.</summary>
-    void ReleaseNpcHull(MissionObject hull);
+    /// <summary>[Game thread] Hands a hull's simulation away from this client: it becomes a copy steered toward its owner's samples.</summary>
+    void ReleaseHull(MissionObject hull);
+
+    /// <summary>
+    /// [Game thread] Takes over simulating a copy in place, as a capture's new authority: it stops following samples and gets an
+    /// auto-updated controller vanilla's rules pick from its formation. Nothing is removed or respawned.
+    /// </summary>
+    void AdoptHull(MissionObject hull);
+
+    /// <summary>
+    /// [Game thread] Replays vanilla's capture swap (NavalShipsLogic.OnShipCaptured): <paramref name="prize"/> takes the formation,
+    /// team and controller of <paramref name="captorHull"/>, which is left with none. A copy keeps no local controller.
+    /// </summary>
+    void ApplyCapture(MissionObject prize, MissionObject captorHull);
+
+    /// <summary>[Game thread] Leaves a late joiner's copy of a capture's orphan as vanilla's swap left it: no formation, no team.</summary>
+    void OrphanHull(MissionObject hull);
+
+    /// <summary>Vanilla's capture vacancy on a hull this client simulates: its formation is all swimming or gone and nothing is queued.</summary>
+    bool IsVacantForCapture(MissionObject hull);
+
+    /// <summary>Whether vanilla lets the hull be captured at all (storyline missions turn it off).</summary>
+    bool CanBeTakenOver(MissionObject hull);
 
     /// <summary>
     /// [Mission tick] First step of replacing or removing a hull: stops every agent aboard using its machines and parks it off

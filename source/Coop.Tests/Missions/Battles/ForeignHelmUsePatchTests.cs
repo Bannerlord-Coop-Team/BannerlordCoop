@@ -7,13 +7,13 @@ namespace Coop.Tests.Missions.Battles;
 /// <summary>Which helms the main agent may take in a co-op naval battle.</summary>
 public class ForeignHelmUsePatchTests
 {
-    // The main agent may take only an own-side helm it simulates: never a copy's, and never an enemy hull's before capture replicates.
+    // Any hull this client simulates goes to vanilla's helm rules; another owner's copy only when it is an enemy, to capture it.
     [Theory]
     [InlineData(false, false, true)]
+    [InlineData(false, true, true)]
     [InlineData(true, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(true, true, false)]
-    public void AllowsStart_StopsThePlayerTakingAForeignOrEnemyHelm(bool isForeignHelm, bool isEnemyHull, bool expected)
+    [InlineData(true, true, true)]
+    public void AllowsStart_OnlyLetsThePlayerOntoAnEnemyCopysHelm(bool isForeignHelm, bool isEnemyHull, bool expected)
     {
         Assert.Equal(expected, ForeignHelmUsePatch.AllowsStart(isForeignHelm, isEnemyHull));
     }

@@ -289,8 +289,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 peer.Commit();
         }
 
-        public Guid FieldPlayerHull(NavalPeer owner, Vec3 position, string? campaignShipId = null) =>
-            owner.FieldOwnHull(owner.Side, position, PartyIds[owner.Id], campaignShipId);
+        public Guid FieldPlayerHull(NavalPeer owner, Vec3 position, string? campaignShipId = null, int? formationIndex = null) =>
+            owner.FieldOwnHull(owner.Side, position, PartyIds[owner.Id], campaignShipId, formationIndex);
 
         public Guid FieldAiHull(NavalPeer host, BattleSideEnum side, Vec3 position, int? formationIndex = null,
             string? campaignShipId = null) =>
@@ -421,6 +421,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         /// <summary>The production naval services over the fake engine, with a reinforcement fielder that hands over <see cref="RecoveredReserve"/>.</summary>
         public INavalBattleServices Services { get; }
         public IBattleShipReplicator Ships => Services.ShipReplicator;
+        public IBattleShipCaptureReplicator Captures => Services.ShipCaptureReplicator;
         public IAgentStationUseReplicator Stations => Services.StationUseReplicator;
         public IBattleShipDamageRouter Damage => Services.ShipDamageRouter;
         public IBattleShipWeaponReplicator Weapons => Services.ShipWeaponReplicator;
@@ -458,16 +459,20 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
 
         /// <summary>
         /// A hull vanilla's team setup fielded for this client, registered as the spawn postfix does; it stands for the party's
-        /// campaign ship <paramref name="campaignShipId"/> when given.
+        /// campaign ship <paramref name="campaignShipId"/> when given, and with a <paramref name="formationIndex"/> it takes
+        /// that formation of the player team, as a captor's hull needs.
         /// </summary>
-        public Guid FieldOwnHull(BattleSideEnum side, Vec3 position, string mapEventPartyId, string? campaignShipId = null)
+        public Guid FieldOwnHull(BattleSideEnum side, Vec3 position, string mapEventPartyId, string? campaignShipId = null,
+            int? formationIndex = null)
         {
             var shipId = Guid.NewGuid();
             Call(() =>
             {
-                var hull = Engine.Field(side, position);
+                var team = formationIndex == null ? null
+                    : side == BattleSideEnum.Attacker ? Mission.AttackerTeam.Shell : Mission.DefenderTeam.Shell;
+                var hull = Engine.Field(side, position, formationIndex ?? 0, team);
                 hull.CampaignShipId = campaignShipId;
-                Assert.True(Registry.TryRegister(new NetworkShipInfo(shipId, Id, mapEventPartyId, false, hull.Hull, null)));
+                Assert.True(Registry.TryRegister(new NetworkShipInfo(shipId, Id, mapEventPartyId, false, hull.Hull, hull.Formation)));
             });
             return shipId;
         }

@@ -921,7 +921,7 @@ public class BattleShipReplicatorTests
         harness.Replicator.Tick(0.1f);
 
         harness.Engine.Verify(e => e.BoardHullAgents(copy, parked), Times.Once);
-        harness.Engine.Verify(e => e.ReleaseNpcHull(copy), Times.Once);
+        harness.Engine.Verify(e => e.ReleaseHull(copy), Times.Once);
         harness.Engine.Verify(e => e.ReplaceHull(It.IsAny<MissionObject>()), Times.Never);
     }
 
@@ -952,7 +952,7 @@ public class BattleShipReplicatorTests
         harness.Replicator.TransferHostHulls(Peer);
 
         Assert.Equal(Peer, ai.CurrentAuthority);
-        harness.Engine.Verify(e => e.ReleaseNpcHull(aiHull), Times.Once);
+        harness.Engine.Verify(e => e.ReleaseHull(aiHull), Times.Once);
     }
 
     [Fact]
@@ -968,7 +968,7 @@ public class BattleShipReplicatorTests
         harness.Replicator.Tick(0.1f);
 
         Assert.Equal("successor", ai.CurrentAuthority);
-        harness.Engine.Verify(e => e.ReleaseNpcHull(It.IsAny<MissionObject>()), Times.Never);
+        harness.Engine.Verify(e => e.ReleaseHull(It.IsAny<MissionObject>()), Times.Never);
         harness.Engine.Verify(e => e.ParkHullAgents(It.IsAny<MissionObject>()), Times.Never);
     }
 
@@ -1356,6 +1356,27 @@ public class BattleShipReplicatorTests
         Assert.Equal(record.SailHitPoints, copy.SailHitPoints);
         Assert.Equal(record.RandomValue, copy.RandomValue);
         Assert.Equal(record.CustomSailPatternId, copy.CustomSailPatternId);
+    }
+
+    // Capture 2.6: a joiner holding the old authority's record of a hull lets the captor's record of it replace it, never the
+    // other way round, so the copy spawns as the captor's.
+    [Theory]
+    [InlineData("captor", false, null, false, true)]
+    [InlineData(null, true, null, false, true)]
+    [InlineData(null, false, "captor", false, false)]
+    [InlineData(null, false, null, true, false)]
+    [InlineData(null, false, null, false, false)]
+    public void RecordsCapture_OnlyACaptureRecordReplacesAHeldOne(string? captor, bool orphaned, string? heldCaptor, bool heldOrphaned,
+        bool expected)
+    {
+        var record = Record(captor, orphaned);
+        var held = Record(heldCaptor, heldOrphaned);
+
+        Assert.Equal(expected, BattleShipReplicator.RecordsCapture(record, held));
+
+        static BattleShipSpawnData Record(string? captorId, bool isOrphaned) => new BattleShipSpawnData(Guid.Empty, Peer,
+            "MapEventParty_1", true, BattleSideEnum.Defender, 0, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity),
+            "northern_light_ship", null, null, null, null, 900f, 400f, 1, "", captorControllerId: captorId, orphaned: isOrphaned);
     }
 
     // An AI hull a later host simulates keeps naming the host that fielded it.
