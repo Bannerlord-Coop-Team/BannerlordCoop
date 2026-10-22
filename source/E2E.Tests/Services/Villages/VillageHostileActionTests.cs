@@ -1929,6 +1929,45 @@ public class VillageHostileActionTests : MapEventTestBase
         }
     }
 
+    [Theory]
+    [InlineData(VillageHostileAction.ForceSupplies, Village.VillageStates.ForcedForSupplies)]
+    [InlineData(VillageHostileAction.ForceVolunteers, Village.VillageStates.ForcedForVolunteers)]
+    public void CleanUpLoadedMapEvents_EndedAiForceEvent_ResetsVillageState(
+        VillageHostileAction action,
+        Village.VillageStates forcedState)
+    {
+        // a save where an AI force event already left the map event manager but still links its parties
+        var aiAttackerMobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var target = CreateVillageTarget();
+        string? mapEventId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(aiAttackerMobilePartyId, out var aiAttackerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            settlement.SettlementHitPoints = 1f;
+
+            var mapEvent = CreateHostileActionMapEvent(aiAttackerParty.Party, settlement.Party, action);
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+            Campaign.Current.MapEventManager._mapEvents.Remove(mapEvent);
+            Assert.Equal(forcedState, settlement.Village.VillageState);
+
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+
+            Assert.True(mapEvent.IsFinalized);
+            Assert.Null(aiAttackerParty.Party.MapEventSide);
+            Assert.Empty(mapEvent.AttackerSide.Parties);
+            Assert.Empty(mapEvent.DefenderSide.Parties);
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(mapEventId);
+        foreach (var instance in Clients.Append(Server))
+        {
+            AssertVillageStateAndHitPoints(instance, target.SettlementId, target.VillageId, Village.VillageStates.Normal, 1f);
+            instance.Call(() => Assert.False(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out _)));
+        }
+    }
+
     [Fact]
     public void ActiveSlowRaidMapEvent_SecondPlayerConversationIsAllowed()
     {

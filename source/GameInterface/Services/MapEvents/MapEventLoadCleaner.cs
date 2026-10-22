@@ -141,7 +141,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             // party then cannot run FinalizeEvent again and replay its results.
             if (!mapEvent.IsFinalized)
             {
-                ResetRaidedVillage(mapEvent);
+                ResetVillageState(mapEvent);
                 mapEvent.State = MapEventState.WaitingRemoval;
             }
 
@@ -161,18 +161,26 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         }
     }
 
-    // WaitingRemoval skips the component's OnBeforeFinalize, which for a raid moves the village off
-    // BeingRaided. Apply only that village state change, not its RaidCompleted event.
-    private static void ResetRaidedVillage(MapEvent mapEvent)
+    // WaitingRemoval skips the component's OnBeforeFinalize and OnFinalize, the only calls that move
+    // the village off the state its OnInitialize set (raid in OnBeforeFinalize, force supplies and
+    // force volunteers in OnFinalize). Apply only that village state change, not the completed events.
+    private static void ResetVillageState(MapEvent mapEvent)
     {
         var settlement = mapEvent.MapEventSettlement;
-        if (!mapEvent.IsRaid || settlement?.Village?.VillageState != Village.VillageStates.BeingRaided)
-            return;
+        var villageState = settlement?.Village?.VillageState;
 
-        if (settlement.SettlementHitPoints <= 1E-05f)
-            ChangeVillageStateAction.ApplyBySettingToLooted(settlement, mapEvent.AttackerSide?.LeaderParty?.MobileParty);
-        else
+        if (mapEvent.IsRaid && villageState == Village.VillageStates.BeingRaided)
+        {
+            if (settlement.SettlementHitPoints <= 1E-05f)
+                ChangeVillageStateAction.ApplyBySettingToLooted(settlement, mapEvent.AttackerSide?.LeaderParty?.MobileParty);
+            else
+                ChangeVillageStateAction.ApplyBySettingToNormal(settlement);
+        }
+        else if ((mapEvent.IsForcingSupplies && villageState == Village.VillageStates.ForcedForSupplies) ||
+            (mapEvent.IsForcingVolunteers && villageState == Village.VillageStates.ForcedForVolunteers))
+        {
             ChangeVillageStateAction.ApplyBySettingToNormal(settlement);
+        }
     }
 
     private void RepairPartySideLinks(MapEvent mapEvent)
