@@ -1,0 +1,21 @@
+{
+  "testBlobPR": "b8b7c3fb0275e72861225061d00050340f7caec7",
+  "priorPRJobs": [
+    "docker-ci-13e05c45b9354efe8b47",
+    "docker-ci-1b755b70ab314b0c8bf0"
+  ],
+  "handlerBlobPR": "fad44626d562bc6ace3bd2808be3c850c058c557",
+  "developmentHead": "257a917924492a228a8b89c56e8f2a858a23c559",
+  "handlerBlobDevelopment": "fad44626d562bc6ace3bd2808be3c850c058c557",
+  "configuration": "isolated Debug on both sources; broad Release on both sources",
+  "result": "Both isolated Debug runs passed1/1. Development Release scoreboard passed; two PR Release failures overlap the unchanged SallyOut deployment test which writes global Mission._current. Development Release failed a different global battle-diagnostics test.",
+  "prHead": "9e4a7c6af488ae5464339f384a8b7ca2215695f2",
+  "testBlobDevelopment": "b8b7c3fb0275e72861225061d00050340f7caec7",
+  "developmentTree": "167de294c97addd46e0940492db73ef17d36d597",
+  "developmentDebugJob": "docker-ci-23bf25cccdb24b8bbdba",
+  "prDebugJob": "docker-ci-d739af25c9a14058bb00",
+  "developmentReleaseJob": "docker-ci-82f4ecf8a2c741c6a8f3",
+  "developmentReleaseScoreboardOutcome": "Passed",
+  "developmentReleaseFailure": "MissionStateFinalizeDiagnosticsPatchTests.ExitDiagnostics_RecordRequestAndResultWithoutChangingMission:52 Assert.Single collection empty",
+  "diagnosis": "Existing unisolated process-global test state. CoopAllowPlayerDeploymentPatchTests sets Mission._current at54 and restores75. It runs in parallel with HitRewardHandlerTests which asserts null before enqueueing game-thread apply. PR failure test intervals overlap deployment mutation; development scoreboard runs after deployment tests. No product scoreboard regression or introduced merge change found."
+}

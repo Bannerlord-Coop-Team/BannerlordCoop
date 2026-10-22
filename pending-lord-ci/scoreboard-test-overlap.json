@@ -1,0 +1,98 @@
+[
+  {
+    "Job": "ci-pending-lord-full-final-result",
+    "Test": "GameInterface.Tests.Services.MapEvents.HitRewardHandlerTests.NetworkScoreboardUpdate_WithoutMission_SkipsObjectResolution",
+    "Outcome": "Failed",
+    "Start": "2026-10-21T21:39:39.1732200-05:00",
+    "End": "2026-10-21T21:39:40.5153308-05:00",
+    "Duration": "00:00:00.4935863"
+  },
+  {
+    "Job": "ci-pending-lord-full-final-result",
+    "Test": "GameInterface.Tests.Services.MapEvents.MissionStateFinalizeDiagnosticsPatchTests.ExitDiagnostics_RecordRequestAndResultWithoutChangingMission",
+    "Outcome": "Passed",
+    "Start": "2026-10-21T21:39:41.9775414-05:00",
+    "End": "2026-10-21T21:39:41.9900034-05:00",
+    "Duration": "00:00:00.0035183"
+  },
+  {
+    "Job": "ci-pending-lord-full-final-result",
+    "Test": "GameInterface.Tests.Services.MapEvents.CoopAllowPlayerDeploymentPatchTests.SallyOutDefenderFinishesDeploymentWithoutTheOrderOfBattleItNeverOpened",
+    "Outcome": "Passed",
+    "Start": "2026-10-21T21:39:39.5687509-05:00",
+    "End": "2026-10-21T21:39:40.5648385-05:00",
+    "Duration": "00:00:00.4854391"
+  },
+  {
+    "Job": "ci-pending-lord-full-final-result",
+    "Test": "GameInterface.Tests.Services.MapEvents.CoopAllowPlayerDeploymentPatchTests.SallyOutAttackerKeepsItsOwnOrderOfBattle",
+    "Outcome": "Passed",
+    "Start": "2026-10-21T21:39:40.5672202-05:00",
+    "End": "2026-10-21T21:39:40.5816444-05:00",
+    "Duration": "00:00:00.0403507"
+  },
+  {
+    "Job": "ci-pending-lord-full-retry-result",
+    "Test": "GameInterface.Tests.Services.MapEvents.HitRewardHandlerTests.NetworkScoreboardUpdate_WithoutMission_SkipsObjectResolution",
+    "Outcome": "Failed",
+    "Start": "2026-10-21T21:45:25.6007008-05:00",
+    "End": "2026-10-21T21:45:26.1190325-05:00",
+    "Duration": "00:00:00.3656347"
+  },
+  {
+    "Job": "ci-pending-lord-full-retry-result",
+    "Test": "GameInterface.Tests.Services.MapEvents.MissionStateFinalizeDiagnosticsPatchTests.ExitDiagnostics_RecordRequestAndResultWithoutChangingMission",
+    "Outcome": "Passed",
+    "Start": "2026-10-21T21:45:25.5994786-05:00",
+    "End": "2026-10-21T21:45:25.9171794-05:00",
+    "Duration": "00:00:00.1986744"
+  },
+  {
+    "Job": "ci-pending-lord-full-retry-result",
+    "Test": "GameInterface.Tests.Services.MapEvents.CoopAllowPlayerDeploymentPatchTests.SallyOutDefenderFinishesDeploymentWithoutTheOrderOfBattleItNeverOpened",
+    "Outcome": "Passed",
+    "Start": "2026-10-21T21:45:25.6005963-05:00",
+    "End": "2026-10-21T21:45:26.6647467-05:00",
+    "Duration": "00:00:00.7580346"
+  },
+  {
+    "Job": "ci-pending-lord-full-retry-result",
+    "Test": "GameInterface.Tests.Services.MapEvents.CoopAllowPlayerDeploymentPatchTests.SallyOutAttackerKeepsItsOwnOrderOfBattle",
+    "Outcome": "Passed",
+    "Start": "2026-10-21T21:45:26.6662673-05:00",
+    "End": "2026-10-21T21:45:26.6975609-05:00",
+    "Duration": "00:00:00.0501146"
+  },
+  {
+    "Job": "ci-development-release-comparison-result",
+    "Test": "GameInterface.Tests.Services.MapEvents.HitRewardHandlerTests.NetworkScoreboardUpdate_WithoutMission_SkipsObjectResolution",
+    "Outcome": "Passed",
+    "Start": "2026-10-21T22:44:48.6177202-05:00",
+    "End": "2026-10-21T22:44:48.8160922-05:00",
+    "Duration": "00:00:00.0080690"
+  },
+  {
+    "Job": "ci-development-release-comparison-result",
+    "Test": "GameInterface.Tests.Services.MapEvents.CoopAllowPlayerDeploymentPatchTests.SallyOutDefenderFinishesDeploymentWithoutTheOrderOfBattleItNeverOpened",
+    "Outcome": "Passed",
+    "Start": "2026-10-21T22:44:45.9556605-05:00",
+    "End": "2026-10-21T22:44:46.9531548-05:00",
+    "Duration": "00:00:01.3262146"
+  },
+  {
+    "Job": "ci-development-release-comparison-result",
+    "Test": "GameInterface.Tests.Services.MapEvents.MissionStateFinalizeDiagnosticsPatchTests.ExitDiagnostics_RecordRequestAndResultWithoutChangingMission",
+    "Outcome": "Failed",
+    "Start": "2026-10-21T22:44:45.4687729-05:00",
+    "End": "2026-10-21T22:44:46.6734493-05:00",
+    "Duration": "00:00:00.6058973"
+  },
+  {
+    "Job": "ci-development-release-comparison-result",
+    "Test": "GameInterface.Tests.Services.MapEvents.CoopAllowPlayerDeploymentPatchTests.SallyOutAttackerKeepsItsOwnOrderOfBattle",
+    "Outcome": "Passed",
+    "Start": "2026-10-21T22:44:46.9557521-05:00",
+    "End": "2026-10-21T22:44:47.2496637-05:00",
+    "Duration": "00:00:00.3443612"
+  }
+]
