@@ -325,7 +325,6 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
                 ownerQuest.QuestAcceptedConsequences();
         }, QuestLogTexts);
 
-
         if (success)
         {
             Server.Call(() =>
