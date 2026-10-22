@@ -4,6 +4,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.LogEntries;
+using TaleWorlds.ObjectSystem;
 
 namespace E2E.Tests.Services.Issues;
 
@@ -16,6 +17,24 @@ internal static class QuestJournalHistoryAssertions
     {
         foreach (var instance in instances)
             instance.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
+    }
+
+    internal static void RestoreVanillaArchive(EnvironmentInstance server, QuestBase quest)
+    {
+        server.Call(() =>
+        {
+            var entry = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                log => log.IsRelatedTo(quest)));
+            var legacy = new JournalLogEntry(entry.Title, entry.RelatedHero, entry.Antagonist, entry.IsSpecial,
+                entry._relatedObjectIds.Select(id => new MBObjectBase(id)).ToArray());
+            legacy.Id = entry.Id;
+            legacy.GameTime = entry.GameTime;
+            legacy._entries = entry._entries;
+            legacy._lastIssueStatus = entry._lastIssueStatus;
+            legacy._questCompletionDetail = entry._questCompletionDetail;
+            var logs = Campaign.Current.LogEntryHistory._logs;
+            logs[logs.IndexOf(entry)] = legacy;
+        });
     }
 
     internal static void AssertLateJoinHistory(EnvironmentInstance server, EnvironmentInstance owner,

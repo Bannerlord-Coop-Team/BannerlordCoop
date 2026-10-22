@@ -310,15 +310,25 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory(bool success)
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    public void CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory(bool success, bool fromOlderSave)
     {
         QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
         Accept();
         Assert.Equal(ControllerA, OwnerOnServer());
         var ownerQuest = QuestOf(ClientA);
         var serverQuest = QuestOf(Server);
+        ClientA.Call(() =>
+        {
+            using (new AllowedThread())
+                ownerQuest.QuestAcceptedConsequences();
+        }, QuestLogTexts);
+
+        if (fromOlderSave)
+            QuestJournalHistoryAssertions.RestoreVanillaArchive(Server, serverQuest);
 
         if (success)
         {

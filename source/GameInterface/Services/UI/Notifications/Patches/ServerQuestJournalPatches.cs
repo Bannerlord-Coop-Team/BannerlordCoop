@@ -1,5 +1,7 @@
 ﻿using Common;
 using HarmonyLib;
+using GameInterface.Policies;
+using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
@@ -13,6 +15,14 @@ namespace GameInterface.Services.UI.Notifications.Patches;
 [HarmonyPatch(typeof(JournalLogsCampaignBehavior))]
 internal static class ServerQuestJournalPatches
 {
+    [HarmonyPatch(nameof(JournalLogsCampaignBehavior.GetRelatedLog), typeof(IssueBase))]
+    [HarmonyPostfix]
+    private static void GetIssueLogPostfix(IssueBase issue, ref JournalLogEntry __result)
+    {
+        if (ModInformation.IsServer && ContainerProvider.TryResolve<IQuestJournalOwnerResolver>(out var resolver))
+            __result = resolver.RestoreOwner(__result, issue);
+    }
+
     [HarmonyPatch(nameof(JournalLogsCampaignBehavior.CreateRelatedLog), typeof(IssueBase))]
     [HarmonyPostfix]
     private static void CreateIssueLogPostfix(IssueBase issue, ref JournalLogEntry __result)
@@ -46,10 +56,19 @@ internal static class PlayerQuestJournalHistoryPatch
     [HarmonyPostfix]
     private static void Postfix(JournalLogEntry __instance, ref bool __result)
     {
-        if (__result && ModInformation.IsClient && __instance is PlayerJournalLogEntry entry &&
+        if (!__result || ModInformation.IsServer)
+            return;
+
+        if (__instance is PlayerJournalLogEntry entry &&
             ContainerProvider.TryResolve<IQuestJournalOwnerResolver>(out var resolver))
         {
             __result = resolver.IsVisible(entry);
+        }
+        else if (__instance.Title.GetID() == "mvzh0HVk" && !CallOriginalPolicy.IsOriginalAllowed() &&
+            ContainerProvider.TryResolve<ITheConquestOfSettlementService>(out var conquest))
+        {
+            // Older conquest archives already have separately saved ownership.
+            __result = conquest.IsVisible(__instance);
         }
     }
 }

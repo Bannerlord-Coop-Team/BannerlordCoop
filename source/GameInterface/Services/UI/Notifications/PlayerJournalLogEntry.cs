@@ -16,6 +16,11 @@ internal sealed class PlayerJournalLogEntry : JournalLogEntry
         : base(entry.Title, entry.RelatedHero, entry.Antagonist, entry.IsSpecial, relatedObjects)
     {
         OwnerControllerId = ownerControllerId;
+        Id = entry.Id;
+        GameTime = entry.GameTime;
+        _entries = entry._entries;
+        _lastIssueStatus = entry._lastIssueStatus;
+        _questCompletionDetail = entry._questCompletionDetail;
     }
 }
 

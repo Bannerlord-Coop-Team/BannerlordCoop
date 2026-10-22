@@ -71,19 +71,6 @@ internal static class TheConquestOfSettlementDiscussionPatch
     }
 }
 
-[HarmonyPatch(typeof(JournalLogEntry), nameof(JournalLogEntry.IsEnded))]
-internal static class TheConquestOfSettlementHistoryPatch
-{
-    [HarmonyPostfix]
-    private static void Postfix(JournalLogEntry __instance, ref bool __result)
-    {
-        if (!__result || __instance.Title.GetID() != "mvzh0HVk" || ModInformation.IsServer ||
-            CallOriginalPolicy.IsOriginalAllowed() ||
-            !ContainerProvider.TryResolve<ITheConquestOfSettlementService>(out var service)) return;
-        __result = service.IsVisible(__instance);
-    }
-}
-
 [HarmonyPatch]
 internal static class TheConquestOfSettlementNotificationPatches
 {
