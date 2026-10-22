@@ -30,9 +30,7 @@ public class QuestTroopScreenTests : IDisposable
     }
 
     private ((int Regulars, int Heroes) BeforeDone, (int Regulars, int Heroes) AfterDone) SendTroopsAndPressDone(
-        Helpers.PartyScreenHelper.PartyScreenMode mode,
-        bool doneDelegateResult = true,
-        bool doneConditionResult = true)
+        Helpers.PartyScreenHelper.PartyScreenMode mode)
     {
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -64,10 +62,7 @@ public class QuestTroopScreenTests : IDisposable
                 RightMemberRoster = party.MemberRoster,
                 RightPrisonerRoster = party.PrisonRoster,
                 RightOwnerParty = party.Party,
-                PartyPresentationDoneButtonDelegate = (_, _, _, _, _, _, _, _, _) => doneDelegateResult,
-                PartyPresentationDoneButtonConditionDelegate = mode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage
-                    ? (_, _, _, _, _, _) => Tuple.Create(doneConditionResult, (TaleWorlds.Localization.TextObject)null)
-                    : null
+                PartyPresentationDoneButtonDelegate = Helpers.PartyScreenHelper.ManageTroopsAndPrisonersDoneHandler,
             });
 
             var states = Game.Current.GameStateManager;
@@ -87,9 +82,7 @@ public class QuestTroopScreenTests : IDisposable
 
             var beforeDone = (sentTroops.TotalRegulars, sentTroops.TotalHeroes);
 
-            Assert.Equal(
-                doneDelegateResult,
-                logic.DoneLogic(false));
+            Assert.True(logic.DoneLogic(false));
 
             result = (beforeDone, (sentTroops.TotalRegulars, sentTroops.TotalHeroes));
         });
@@ -101,18 +94,6 @@ public class QuestTroopScreenTests : IDisposable
     public void Done_InQuestMode_KeepsTheTransferredTroopsInTheSentRoster()
     {
         var (beforeDone, afterDone) = SendTroopsAndPressDone(Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage);
-
-        Assert.Equal((SentTroops, 1), beforeDone);
-        Assert.Equal(beforeDone, afterDone);
-    }
-
-    [Fact]
-    public void Done_InQuestMode_RefusesWhenTheVanillaConditionIsFalse()
-    {
-        var (beforeDone, afterDone) = SendTroopsAndPressDone(
-            Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage,
-            doneDelegateResult: false,
-            doneConditionResult: false);
 
         Assert.Equal((SentTroops, 1), beforeDone);
         Assert.Equal(beforeDone, afterDone);

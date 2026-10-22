@@ -458,9 +458,9 @@ public class MerchantOutlawsTests : IDisposable
             using (new AllowedThread())
             {
                 Get<Hero>(ClientA, scenario.PlayerA.HeroId).Clan = Get<Clan>(ClientA, playerClanId);
-                DeclareWarAction.ApplyInternal(Get<Kingdom>(ClientA, kingdomId), Get<Clan>(ClientA, playerClanId),
-                    DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
             }
+            CampaignEventDispatcher.Instance.OnWarDeclared(Get<Kingdom>(ClientA, kingdomId), Get<Clan>(ClientA, playerClanId),
+                DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility);
         }, TextHelpers);
 
         Assert.True(ownerQuest.IsOngoing);
