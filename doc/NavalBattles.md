@@ -28,7 +28,13 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   which carries the crew), along with any other agent standing on the copy, such as a local main agent that boarded it,
   then the owner's velocity and yaw rate.
   Heave, pitch and roll come from this client's buoyancy on its own water, which now runs on the battle host's water
-  time, so they should match the owner's (see "Waves are synced" in section 6). One rule decides a copy's mode at
+  time, so they should match the owner's (see "Waves are synced" in section 6). The crew's weight is the owner's: vanilla
+  pushes a hull down with the agents on its deck (`NavalPhysics.ApplyAgentForces`: committed agent mass x
+  `StepAgentWeightMultiplier`, 2 on ships, x g at their mass-weighted centre), and a copy's puppets stand and sit elsewhere
+  than the owner's crew (R45: copies of AI-crewed hulls heeled 2.5-4.2 degrees off). Each sample carries the owner's
+  committed crew mass and centre in the hull body's frame (`BattleShipCrewLoad`), and `CopyCrewLoadPatch` applies that
+  load on a copy instead of its puppets', with vanilla's in-hull check. A copy weighs its own puppets until a sample
+  carries a load, and whenever the owner reports none; a stale owner's last load stays. Own hulls run vanilla. One rule decides a copy's mode at
   every sample and step: steered while its body simulates, its owner's frames written otherwise (warning `has no
   simulating body` once per copy; `bodyMode` in `inspect`). `NavalSteeredCopies.Track`/`Forget` are the only writers
   of `NavalForeignHulls`, the static copy set the patches read; spawning, releasing, replacing and removing a hull all
@@ -40,7 +46,7 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
 
 ### Streams
 
-- `BattleShipReplicator` sends each own hull's frame, body velocity and yaw rate, helm input and rope state every 0.05 s
+- `BattleShipReplicator` sends each own hull's frame, body velocity and yaw rate, crew load, helm input and rope state every 0.05 s
   (20 Hz, `SendIntervalSeconds`; a long frame's overshoot carries into the next interval, capped at one, so heavy frames
   keep the rate without a burst). Each accepted sample goes straight to the engine as the copy's steering target. A
   stream counts as expired after 1 s without samples on the receiver's clock, and the steering stops feeding the
@@ -381,7 +387,12 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     clock lag at about 0.015 m mean water difference.
   - Copies still float on local buoyancy, but the local water now matches the owner's, so a copy's heave, pitch and
     roll should match its owner's too. They are pass/fail candidates again for the drift criteria, pending a live run
-    that shows `water_probe` water diffs near 0 in open sea.
+    that shows `water_probe` water diffs near 0 in open sea. R45 confirmed the water (0.02 m) and heave (0.02-0.05 m
+    mean), but copies of AI-crewed hulls rolled 1.9-4.3 degrees off, from the puppets' weight (see section 1); the crew
+    load fix followed. Once a live run verifies it, roll is pass/fail per copy over windows of at least 60 s without
+    sinking, snap or ram contact, on the signed offset copy minus owner: |mean| <= 0.5 degrees, sd <= 1.0 degrees,
+    and a gain of 0.9 to 1.1 (slope of the copy's roll on the owner's, both de-meaned). If AI galleys still show a
+    gain above 1.2 while `water_probe` logs matching crew loads, roll stays report-only.
   - `coop.debug.naval.water_clock` reports the patch status, the written and vanilla water time, their offset and the
     battle's offset estimate.
   - **Each game-version port must re-check the signature** and update it if it no longer matches: the scene field
@@ -486,7 +497,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | `rope_list`, `rope_throw`, `rope_status` | client | Lists, throws and shows ropes. |
 | `copy_steer [key=value...]` | client | Shows or tunes the steered copies' knobs here (`gain window softzone clamp tau lead snap`), live. |
 | `water_clock` | client | DEBUG: one `NAVAL_WATER_CLOCK` line with the water clock patch status, the written and vanilla water time and their offset; in a naval battle also the host role, host samples and the offset estimate. |
-| `water_probe start [grid=5] [spacing=40] [seconds=120] \| status \| stop` | client | Samples the water grid for the shared-clock test; each tick logs every hull's `x`, `y`, `yaw` (degrees, counter-clockwise from +x), `z`, `pitch`, `roll` and the water under it. `start` is refused until deployment has finished. |
+| `water_probe start [grid=5] [spacing=40] [seconds=120] \| status \| stop` | client | Samples the water grid for the shared-clock test; each tick logs every hull's `x`, `y`, `yaw` (degrees, counter-clockwise from +x), `z`, `pitch`, `roll`, the water under it and the crew load its physics takes: `crewMass` (kg), `crewLocal` (body-frame centre) and `crewSrc` (`owner` on a copy using its owner's load, otherwise `vanilla`). `start` is refused until deployment has finished. |
 | `board_copy [ship] \| status` | client | Teleports the main agent onto a copy's deck (the nearest copy, or the one whose ship id starts with `ship`) at vanilla's deck spot: the hull's player standing point, else the middle inner deck frame (`MissionShip.GetMiddleInnerSpawnGlobalFrame`). Reports the hull-frame `deckError` and `heightAboveSpot`; `status` reports the hull the main agent stands on. The copy's owner reports the puppet's `maxDeckError` in `inspect`. |
 | `immortal [on \| off]` | client | Sets the main agent's vanilla mortality state to `Immortal` (`on`) or `Mortal` (`off`), so blows, routed ones included, take no health; reports it without an argument. A ram's 2 m kill radius (`Agent.Die`) still kills it. |
 
