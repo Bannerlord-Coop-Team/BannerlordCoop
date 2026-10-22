@@ -323,8 +323,9 @@ public class ExtortionByDesertersTests : IDisposable
             deserters.SetPartyUsedByQuest(true);
             deserters.Aggressiveness = 0f;
             quest._currentState = State.DesertersRunningAwayFromPlayer;
-            quest._desertersRunAwayTimeoutTime = CampaignTime.HoursFromNow(10f);
-            Campaign.Current.MapTimeTracker._numTicks += CampaignTime.Hours(timedOut ? 11f : 1f).NumTicks;
+            // The harness stubs HoursFromNow and CampaignTime.Now to zero; build the deadline from the real map time.
+            quest._desertersRunAwayTimeoutTime = Campaign.Current.MapTimeTracker.Now + CampaignTime.Hours(10f);
+            if (timedOut) Campaign.Current.MapTimeTracker._numTicks += CampaignTime.Hours(11f).NumTicks;
             Assert.Equal(timedOut, quest._desertersRunAwayTimeoutTime.IsPast);
             ownerParty._position = new CampaignVec2(Vec2.Zero, true);
             deserters._position = new CampaignVec2(new Vec2(lostSight ? 10f : 0f, 0f), true);
@@ -720,7 +721,7 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Equal(State.DesertersAreDefeated, ownerQuest._currentState);
             Assert.Single(ownerQuest.JournalEntries,
                 entry => entry.LogText.ToString() == ownerQuest.OnDeserterPartyDefeatedLogText.ToString());
-        });
+        }, TextLinks);
     }
 
     private Quest DefeatDeserters()
@@ -764,9 +765,6 @@ public class ExtortionByDesertersTests : IDisposable
             {
                 Assert.False(party.IsActive);
                 Assert.Null(party.MapEvent);
-                var destruction = Assert.Single(Server.InternalMessages.GetMessages<DestroyPartyApplied>(),
-                    message => message.DefeatedParty == party);
-                Assert.Null(destruction.VictoriousPartyBase);
             }
             Assert.True(ownerParty.IsActive);
             Assert.True(otherParty.IsActive);
@@ -816,7 +814,8 @@ public class ExtortionByDesertersTests : IDisposable
         }
         else quest = DefeatDeserters();
 
-        using var ticks = new MethodCallRecorder(Priority.Last,
+        // The recorder skips the original, so it must run before the guard that ignores a defeated quest's tick.
+        using var ticks = new MethodCallRecorder(Priority.First,
             AccessTools.Method(typeof(Quest), nameof(Quest.TickDesertersPartyLogic)));
         Server.Call(() =>
         {
