@@ -13,7 +13,6 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -83,38 +82,15 @@ internal class ServerSiegeBreakOutHandler : IHandler
                 {
                     try
                     {
-                        var parties = party.Army?.LeaderParty == party ? party.Army.Parties.ToArray() : new[] { party };
                         int losses = breakOut.GetRequiredCasualties(party, request.IsFromPort);
-                        if (losses > parties.Sum(member => member.MemberRoster.TotalRegulars))
+                        var paidReceipt = new Receipt { Siege = siege, IsFromPort = request.IsFromPort, Result = result };
+                        var paid = SiegeSacrifice.TryApply(objectManager, breakOut, network, coalescer, party, losses,
+                            () => receipts[party] = paidReceipt);
+                        if (paid != null)
                         {
-                            network.Send(peer, result);
-                            return;
+                            result = new NetworkBreakOutResult(request.RequestId, true, paid.CharacterIds, paid.Counts, paid.ArmyCasualties);
+                            paidReceipt.Result = result;
                         }
-                        foreach (var member in parties)
-                        {
-                            if (!objectManager.TryGetHandleWithLogging(member.MemberRoster, out _))
-                                throw new InvalidOperationException("Breakout roster is not registered");
-                            foreach (var element in member.MemberRoster.GetTroopRoster())
-                                if (element.Character.IsRegular && !objectManager.TryGetHandleWithLogging(element.Character, out _))
-                                    throw new InvalidOperationException("Breakout troop is not registered");
-                        }
-                        // Cache only once mutation can begin; affordability and registrations may recover on retry.
-                        receipt = new Receipt { Siege = siege, IsFromPort = request.IsFromPort, Result = result };
-                        receipts[party] = receipt;
-                        var casualties = breakOut.ApplySacrifice(party, losses, out var armyCasualties);
-                        var elements = casualties.GetTroopRoster();
-                        var ids = new uint[elements.Count];
-                        var counts = new int[elements.Count];
-                        for (int index = 0; index < elements.Count; index++)
-                        {
-                            objectManager.TryGetHandleWithLogging(elements[index].Character, out ids[index]);
-                            counts[index] = elements[index].Number;
-                        }
-                        foreach (var member in parties)
-                            if (objectManager.TryGetHandle(member.MemberRoster, out var rosterId))
-                                coalescer?.FlushInstance(rosterId, network);
-                        result = new NetworkBreakOutResult(request.RequestId, true, ids, counts, armyCasualties);
-                        receipt.Result = result;
                     }
                     catch (Exception ex)
                     {

@@ -94,12 +94,15 @@ internal class ClientSiegeBreakOutHandler : IHandler
                 Logger.Warning("Server rejected breakout request {RequestId}", result.RequestId);
                 return;
             }
-            if (result.CharacterIds == null || result.Counts == null || result.CharacterIds.Length != result.Counts.Length) return;
+            // Protobuf sends an empty array as null, e.g. an army leader whose own party lost nobody.
+            var ids = result.CharacterIds ?? Array.Empty<uint>();
+            var counts = result.Counts ?? Array.Empty<int>();
+            if (ids.Length != counts.Length) return;
             var casualties = TroopRoster.CreateDummyTroopRoster();
-            for (int index = 0; index < result.CharacterIds.Length; index++)
+            for (int index = 0; index < ids.Length; index++)
             {
-                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(result.CharacterIds[index], out var character)) return;
-                casualties.AddToCounts(character, result.Counts[index]);
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(ids[index], out var character)) return;
+                casualties.AddToCounts(character, counts[index]);
             }
             breakOut.ShowDebrief(casualties, result.ArmyCasualties, attempt.Request.IsFromPort);
         }, context: nameof(NetworkBreakOutResult));

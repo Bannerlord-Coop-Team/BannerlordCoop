@@ -9,7 +9,17 @@ namespace Coop.Core.Server.Services.SiegeEvents;
 /// The break in each party already paid troops for, so entering the settlement needs a paid break in
 /// and asking again for the same siege is never charged twice.
 /// </summary>
-internal class BreakInReceipts
+internal interface IBreakInReceipts
+{
+    bool TryGet(MobileParty party, SiegeEvent siege, out BreakInReceipts.Receipt receipt);
+    void Set(MobileParty party, BreakInReceipts.Receipt receipt);
+    bool IsPaid(MobileParty party, SiegeEvent siege);
+    void Remove(MobileParty party);
+    void Clear();
+}
+
+/// <inheritdoc cref="IBreakInReceipts"/>
+internal class BreakInReceipts : IBreakInReceipts
 {
     private readonly Dictionary<MobileParty, Receipt> receipts = new();
 

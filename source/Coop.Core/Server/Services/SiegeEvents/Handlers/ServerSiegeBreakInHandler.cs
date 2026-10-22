@@ -11,7 +11,6 @@ using GameInterface.Services.SiegeEvents;
 using LiteNetLib;
 using Serilog;
 using System;
-using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
@@ -31,11 +30,11 @@ internal class ServerSiegeBreakInHandler : IHandler
     private readonly IPlayerManager playerManager;
     private readonly ISiegeBreakOut breakOut;
     private readonly ISendCoalescer coalescer;
-    private readonly BreakInReceipts receipts;
+    private readonly IBreakInReceipts receipts;
 
     public ServerSiegeBreakInHandler(IMessageBroker messageBroker, INetwork network,
         IObjectManager objectManager, IPlayerManager playerManager, ISiegeBreakOut breakOut,
-        BreakInReceipts receipts, ISendCoalescer coalescer = null)
+        IBreakInReceipts receipts, ISendCoalescer coalescer = null)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -88,54 +87,21 @@ internal class ServerSiegeBreakInHandler : IHandler
             return rejected;
         }
 
-        var parties = party.Army?.LeaderParty == party ? party.Army.Parties.ToArray() : new[] { party };
-        if (!AreRostersRegistered(parties)) return rejected;
-
         try
         {
             int losses = breakOut.GetBreakInCasualties(party, siege);
-            // Same as vanilla break_in_menu_accept_on_condition: refuse instead of charging fewer troops than required.
-            if (losses > parties.Sum(member => member.MemberRoster.TotalRegulars))
-            {
-                Logger.Warning("Rejecting break in request {RequestId} for party {PartyId} that cannot pay {Losses} troops",
-                    request.RequestId, request.PartyId, losses);
-                return rejected;
-            }
-            // Cache before mutating so a failure part way through is not retried as a second sacrifice.
-            receipt = new BreakInReceipts.Receipt { Siege = siege, Result = rejected };
-            receipts.Set(party, receipt);
-            var casualties = breakOut.ApplySacrifice(party, losses, out var armyCasualties);
-            var elements = casualties.GetTroopRoster();
-            var ids = new uint[elements.Count];
-            var counts = new int[elements.Count];
-            for (int index = 0; index < elements.Count; index++)
-            {
-                objectManager.TryGetHandleWithLogging(elements[index].Character, out ids[index]);
-                counts[index] = elements[index].Number;
-            }
-            foreach (var member in parties)
-                if (objectManager.TryGetHandle(member.MemberRoster, out var rosterId))
-                    coalescer?.FlushInstance(rosterId, network);
-            receipt.Result = new NetworkBreakInResult(request.RequestId, true, ids, counts, armyCasualties);
-            return receipt.Result;
+            var paidReceipt = new BreakInReceipts.Receipt { Siege = siege, Result = rejected };
+            var paid = SiegeSacrifice.TryApply(objectManager, breakOut, network, coalescer, party, losses,
+                () => receipts.Set(party, paidReceipt));
+            if (paid == null) return rejected;
+            paidReceipt.Result = new NetworkBreakInResult(request.RequestId, true, paid.CharacterIds, paid.Counts, paid.ArmyCasualties);
+            return paidReceipt.Result;
         }
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to apply break in request {RequestId}", request.RequestId);
             return rejected;
         }
-    }
-
-    private bool AreRostersRegistered(MobileParty[] parties)
-    {
-        foreach (var member in parties)
-        {
-            if (!objectManager.TryGetHandleWithLogging(member.MemberRoster, out _)) return false;
-            foreach (var element in member.MemberRoster.GetTroopRoster())
-                if (element.Character.IsRegular && !objectManager.TryGetHandleWithLogging(element.Character, out _))
-                    return false;
-        }
-        return true;
     }
 
     public void Dispose()

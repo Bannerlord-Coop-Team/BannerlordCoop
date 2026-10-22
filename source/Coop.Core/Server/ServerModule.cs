@@ -96,7 +96,7 @@ public class ServerModule : CommonModule
         builder.RegisterType<SettlementEncounterDistanceValidator>()
             .As<ISettlementEncounterDistanceValidator>()
             .InstancePerDependency();
-        builder.RegisterType<BreakInReceipts>().AsSelf().InstancePerLifetimeScope();
+        builder.RegisterType<BreakInReceipts>().As<IBreakInReceipts>().InstancePerLifetimeScope();
 
         // Graceful restart, in Release too.
         builder.RegisterType<ServerAdmissionGate>().As<IServerAdmissionGate>().InstancePerLifetimeScope();

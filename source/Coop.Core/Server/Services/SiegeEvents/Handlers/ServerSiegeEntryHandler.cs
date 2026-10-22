@@ -44,7 +44,7 @@ internal class ServerSiegeEntryHandler : IHandler
     private readonly ISiegeEventInterface siegeEventInterface;
     private readonly ISettlementInterface settlementInterface;
     private readonly ISiegeBreakOut breakOut;
-    private readonly BreakInReceipts breakInReceipts;
+    private readonly IBreakInReceipts breakInReceipts;
 
     public ServerSiegeEntryHandler(
         IMessageBroker messageBroker,
@@ -55,7 +55,7 @@ internal class ServerSiegeEntryHandler : IHandler
         ISiegeEventInterface siegeEventInterface,
         ISettlementInterface settlementInterface,
         ISiegeBreakOut breakOut,
-        BreakInReceipts breakInReceipts)
+        IBreakInReceipts breakInReceipts)
     {
         this.messageBroker = messageBroker;
         this.network = network;

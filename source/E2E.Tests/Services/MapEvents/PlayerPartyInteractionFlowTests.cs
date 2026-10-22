@@ -37,6 +37,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents;
+using GameInterface.Services.SiegeEvents.Messages;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.Villages.Interfaces;
@@ -3227,6 +3228,145 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
         AssertRegularTroops(playerMobilePartyId, troops);
     }
 
+    [Fact]
+    public void BreakIn_ArmyLeaderWhoseOwnPartyLosesNobody_StillGetsTheDebriefAndEnters()
+    {
+        var (client, _, playerPartyId, otherPartyId) = CreateTwoPlayerParties();
+        var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
+        var otherMobilePartyId = GetMobilePartyId(Server, otherPartyId);
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+        PrepareClientSiegeEncounter(
+            client,
+            playerPartyId,
+            siege.SettlementId,
+            enterSettlement: false);
+        var armyTroops = AddRegularTroops(otherMobilePartyId, 200);
+        LeadArmyWithTroopsInAnotherParty(playerMobilePartyId, otherMobilePartyId);
+        Server.Call(() => Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(40));
+        OpenBreakInMenu(client);
+        Server.NetworkSentMessages.Clear();
+
+        client.Call(() => InvokeMenuConsequence("break_in_menu_accept_on_consequence"), MapEventDisabledMethods);
+
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakInResult>());
+        Assert.True(result.Approved);
+        Assert.Empty(result.CharacterIds);
+        AssertRegularTroops(otherMobilePartyId, armyTroops - 40);
+        client.Call(() =>
+        {
+            Assert.Equal("break_in_debrief_menu", Campaign.Current.CurrentMenuContext?.GameMenu?.StringId);
+            var behavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
+            Assert.Equal(0, behavior._breakInOutCasualties.TotalManCount);
+            Assert.Equal(40, behavior._breakInOutArmyCasualties);
+            Assert.False(SiegeBreakOut.IsBreakInPending);
+        });
+
+        RequestContinuation(client, playerMobilePartyId, siege.SettlementId, "army-leader");
+
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakInContinuationApproved>()).Approved);
+        AssertPartyEnteredSettlement(Server, playerMobilePartyId, siege.SettlementId);
+    }
+
+    [Fact]
+    public void GateBreakOut_ArmyLeaderWhoseOwnPartyLosesNobody_StillGetsTheDebrief()
+    {
+        var (client, _, playerPartyId, otherPartyId) = CreateTwoPlayerParties();
+        var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
+        var otherMobilePartyId = GetMobilePartyId(Server, otherPartyId);
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareClientSiegeEncounter(client, playerPartyId, siege.SettlementId);
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(playerMobilePartyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(siege.SettlementId, out var settlement));
+                using (new AllowedThread())
+                    party._currentSettlement = settlement;
+            });
+        }
+        var armyTroops = AddRegularTroops(otherMobilePartyId, 200);
+        LeadArmyWithTroopsInAnotherParty(playerMobilePartyId, otherMobilePartyId);
+        Server.Call(() => Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(0, gateLosses: 30));
+        Server.NetworkSentMessages.Clear();
+
+        client.Call(() =>
+        {
+            Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>()._isBreakingOutFromPort = false;
+            InvokeMenuConsequence("break_out_menu_accept_on_consequence");
+        }, MapEventDisabledMethods);
+
+        var result = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakOutResult>());
+        Assert.True(result.Approved);
+        Assert.Empty(result.CharacterIds);
+        AssertRegularTroops(otherMobilePartyId, armyTroops - 30);
+        client.Call(() =>
+        {
+            var behavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
+            Assert.NotNull(behavior._breakInOutCasualties);
+            Assert.Equal(0, behavior._breakInOutCasualties.TotalManCount);
+            Assert.Equal(30, behavior._breakInOutArmyCasualties);
+        });
+    }
+
+    [Fact]
+    public void BreakIn_NewAttemptThatStopsEarly_ClearsTheRejectLock()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+        PrepareClientSiegeEncounter(
+            client,
+            playerPartyId,
+            siege.SettlementId,
+            enterSettlement: false);
+        AddRegularTroops(playerMobilePartyId, 200);
+        Server.Call(() => Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(40));
+        OpenBreakInMenu(client);
+
+        using (new ReliableMessageDeliveryBlocker<NetworkBreakInResult>())
+            client.Call(() => InvokeMenuConsequence("break_in_menu_accept_on_consequence"), MapEventDisabledMethods);
+        Assert.True(SiegeBreakOut.IsBreakInPending);
+
+        // The encounter moved on, then a new attempt with no besieged settlement stops before sending anything.
+        client.Call(() =>
+        {
+            Campaign.Current.PlayerEncounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            client.Resolve<IMessageBroker>().Publish(this, new BreakInAttempted(MobileParty.MainParty, null));
+            Assert.False(SiegeBreakOut.IsBreakInPending);
+        });
+    }
+
+    // Call before the request. The player leads an army whose only other party holds every regular, so the leader's own party loses nobody.
+    private void LeadArmyWithTroopsInAnotherParty(string leaderMobilePartyId, string memberMobilePartyId)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(leaderMobilePartyId, out var leader));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(memberMobilePartyId, out var member));
+            var army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), leader, Army.ArmyTypes.Patrolling);
+            member.Army = army;
+            foreach (var element in leader.MemberRoster.GetTroopRoster().Where(element => element.Character.IsRegular).ToList())
+                leader.MemberRoster.AddToCounts(element.Character, -element.Number);
+            Assert.Same(army, leader.Army);
+            Assert.Contains(member, army.Parties);
+            Assert.Equal(0, leader.MemberRoster.TotalRegulars);
+        }, MapEventDisabledMethods);
+        TestEnvironment.FlushCoalescer();
+        AssertRegularTroops(leaderMobilePartyId, 0);
+    }
+
     // The client always asks for the port, so only the server's own port, ship and fleet state decides.
     private (EnvironmentInstance client, string playerMobilePartyId, int troops) RequestPortBreakOut(
         bool hasPort, bool hasShips, bool anchoredHere)
@@ -3299,14 +3439,19 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     private sealed class FixedTroopSacrificeModel : DefaultTroopSacrificeModel
     {
         private readonly int losses;
+        private readonly int gateLosses;
 
-        public FixedTroopSacrificeModel(int losses) => this.losses = losses;
+        public FixedTroopSacrificeModel(int losses, int gateLosses = 0)
+        {
+            this.losses = losses;
+            this.gateLosses = gateLosses;
+        }
 
         public override ExplainedNumber GetLostTroopCountForBreakingInBesiegedSettlement(MobileParty party, SiegeEvent siegeEvent) =>
             new ExplainedNumber(losses);
 
         public override ExplainedNumber GetLostTroopCountForBreakingOutOfBesiegedSettlement(MobileParty party, SiegeEvent siegeEvent, bool isBreakingOutFromPort) =>
-            new ExplainedNumber(isBreakingOutFromPort ? losses : 0);
+            new ExplainedNumber(isBreakingOutFromPort ? losses : gateLosses);
     }
 
     private static void InvokeMenuConsequence(string methodName)
