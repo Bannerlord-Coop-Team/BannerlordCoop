@@ -58,13 +58,14 @@ public class NavalShipEngine : INavalShipEngine
         var pieces = campaignShip?._shipPieces.Where(piece => piece.Value != null).ToArray()
             ?? Array.Empty<KeyValuePair<string, ShipUpgradePiece>>();
 
+        // A capture's orphan has no team or formation left, so its record names the side it had and any formation.
         return new BattleShipSpawnData(
             identity.ShipId,
             identity.CurrentAuthority,
             identity.MapEventPartyId,
             identity.IsNpcParty,
-            ship.Team.Side,
-            (int)ship.Formation.FormationIndex,
+            ship.Team?.Side ?? identity.OrphanedSide,
+            ship.Formation == null ? 0 : (int)ship.Formation.FormationIndex,
             NetworkBattleShipSample.FromFrame(ship.GlobalFrame),
             ship.ShipOrigin.Hull.StringId,
             pieces.Select(piece => piece.Key).ToArray(),
@@ -76,7 +77,9 @@ public class NavalShipEngine : INavalShipEngine
             ship.ShipOrigin.RandomValue,
             ship.ShipOrigin.CustomSailPatternId,
             identity.OriginalOwner,
-            CampaignShipIdOf(hull));
+            CampaignShipIdOf(hull),
+            identity.CaptorControllerId,
+            identity.IsOrphaned);
     }
 
     public MissionObject SpawnForeignHull(BattleShipSpawnData data, Team team, out Formation formation)

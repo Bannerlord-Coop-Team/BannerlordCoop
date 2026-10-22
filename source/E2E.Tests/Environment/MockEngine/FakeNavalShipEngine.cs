@@ -105,8 +105,9 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
     {
         var fake = Of(hull);
         return new BattleShipSpawnData(identity.ShipId, identity.CurrentAuthority, identity.MapEventPartyId, identity.IsNpcParty,
-            fake.Side, fake.FormationIndex, NetworkBattleShipSample.FromFrame(fake.Frame), HullId, null, null, null, null,
-            fake.HitPoints, fake.SailHitPoints, 1, "", identity.OriginalOwner, fake.CampaignShipId);
+            fake.Team == null && identity.IsOrphaned ? identity.OrphanedSide : fake.Side, fake.FormationIndex,
+            NetworkBattleShipSample.FromFrame(fake.Frame), HullId, null, null, null, null, fake.HitPoints, fake.SailHitPoints, 1, "",
+            identity.OriginalOwner, fake.CampaignShipId, identity.CaptorControllerId, identity.IsOrphaned);
     }
 
     public MissionObject SpawnForeignHull(BattleShipSpawnData data, Team team, out Formation formation)

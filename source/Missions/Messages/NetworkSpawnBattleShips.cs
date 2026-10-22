@@ -48,6 +48,10 @@ public sealed class BattleShipSpawnData
     // ProtoMember 18 carried the campaign ship id for the hand-back D4 removed; don't reuse it.
     /// <summary>The object-manager id of the campaign ship the hull stands for; a copy keeps it for the ship's fate report.</summary>
     [ProtoMember(19)] public readonly string CampaignShipId;
+    /// <summary>The player whose in-mission capture made this hull its own; empty when nobody captured it.</summary>
+    [ProtoMember(20)] public readonly string CaptorControllerId;
+    /// <summary>Whether a capture took this hull's formation, leaving it with no team; its side is the one it had before.</summary>
+    [ProtoMember(21)] public readonly bool Orphaned;
 
     public BattleShipSpawnData(
         Guid shipId,
@@ -67,7 +71,9 @@ public sealed class BattleShipSpawnData
         int randomValue,
         string customSailPatternId,
         string originalOwnerControllerId = null,
-        string campaignShipId = null)
+        string campaignShipId = null,
+        string captorControllerId = null,
+        bool orphaned = false)
     {
         ShipId = shipId;
         OwnerControllerId = ownerControllerId;
@@ -87,11 +93,13 @@ public sealed class BattleShipSpawnData
         CustomSailPatternId = customSailPatternId;
         OriginalOwnerControllerId = originalOwnerControllerId == ownerControllerId ? null : originalOwnerControllerId;
         CampaignShipId = campaignShipId;
+        CaptorControllerId = captorControllerId;
+        Orphaned = orphaned;
     }
 
     /// <summary>The player or host that fielded the hull.</summary>
     public string OriginalOwner => string.IsNullOrEmpty(OriginalOwnerControllerId) ? OwnerControllerId : OriginalOwnerControllerId;
 
-    /// <summary>An AI hull, as <c>NetworkShipInfo.FollowsBattleHost</c>.</summary>
-    public bool FollowsBattleHost => IsNpcParty;
+    /// <summary>An AI hull nobody captured, as <c>NetworkShipInfo.FollowsBattleHost</c>.</summary>
+    public bool FollowsBattleHost => IsNpcParty && string.IsNullOrEmpty(CaptorControllerId);
 }

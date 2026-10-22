@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
@@ -16,6 +17,18 @@ public interface INetworkShipRegistry
 
     /// <summary>Points <paramref name="shipId"/> at a replacement hull, keeping its identity, authority and party.</summary>
     bool TryRebindHull(Guid shipId, MissionObject hull);
+
+    /// <summary>
+    /// Records an in-mission capture as vanilla's swap leaves it: the prize takes the captor hull's formation and follows its
+    /// captor, and the captor's own hull is left without a formation, last on <paramref name="captorHullSide"/>.
+    /// </summary>
+    bool TryRecordCapture(Guid prizeId, Guid captorShipId, string captorControllerId, BattleSideEnum captorHullSide);
+
+    /// <summary>Records that a hull a late record describes was captured by <paramref name="captorControllerId"/>.</summary>
+    bool TryMarkCaptured(Guid shipId, string captorControllerId);
+
+    /// <summary>Records that a hull a late record describes lost its formation to a capture, last on <paramref name="side"/>.</summary>
+    bool TryMarkOrphaned(Guid shipId, BattleSideEnum side);
 
     /// <summary>Drops a hull that left the mission; its ship id reads <see cref="ShipLifecycle.Removed"/> from then on.</summary>
     bool Remove(Guid shipId);
@@ -49,14 +62,18 @@ public enum ShipLifecycle
     Removed,
 }
 
-/// <summary>One registered hull: who simulates it, who fielded it, and its local mission object and formation.</summary>
+/// <summary>One registered hull: who simulates it, who fielded it, who captured it, and its local mission object and formation.</summary>
 public class NetworkShipInfo
 {
+    // Every controller that simulated the hull here before its current authority.
+    private readonly HashSet<string> formerAuthorities = new HashSet<string>();
+    private string currentAuthority;
+
     public NetworkShipInfo(Guid shipId, string owner, string mapEventPartyId, bool isNpcParty, MissionObject hull, Formation formation,
         string originalOwner = null)
     {
         ShipId = shipId;
-        CurrentAuthority = owner;
+        currentAuthority = owner;
         OriginalOwner = originalOwner ?? owner;
         MapEventPartyId = mapEventPartyId;
         IsNpcParty = isNpcParty;
@@ -65,18 +82,60 @@ public class NetworkShipInfo
     }
 
     public Guid ShipId { get; }
-    public string CurrentAuthority { get; set; }
+
+    /// <summary>The client that simulates the hull now; each earlier one stays known to <see cref="HasBeenAuthority"/>.</summary>
+    public string CurrentAuthority
+    {
+        get => currentAuthority;
+        set
+        {
+            if (currentAuthority != null && currentAuthority != value) formerAuthorities.Add(currentAuthority);
+            currentAuthority = value;
+        }
+    }
+
     public string OriginalOwner { get; }
     public string MapEventPartyId { get; }
     public bool IsNpcParty { get; }
 
-    /// <summary>An AI hull: it moves with every battle host change, and its states follow the host epoch.</summary>
-    public bool FollowsBattleHost => IsNpcParty;
+    /// <summary>The player whose capture made this hull its own, or null; a captured AI hull no longer follows the host.</summary>
+    public string CaptorControllerId { get; private set; }
+
+    /// <summary>A hull whose formation a capture gave to the prize: it has no team or formation left.</summary>
+    public bool IsOrphaned { get; private set; }
+
+    /// <summary>The side an orphaned hull was on before its capture left it without a team.</summary>
+    public BattleSideEnum OrphanedSide { get; private set; } = BattleSideEnum.None;
+
+    /// <summary>An AI hull nobody captured: it moves with every battle host change, and its states follow the host epoch.</summary>
+    public bool FollowsBattleHost => IsNpcParty && CaptorControllerId == null;
 
     public MissionObject Hull { get; private set; }
-    public Formation Formation { get; }
+    public Formation Formation { get; private set; }
 
+    /// <summary>Whether <paramref name="controllerId"/> fielded or simulated this hull at any time this client saw.</summary>
+    public bool HasBeenAuthority(string controllerId) =>
+        controllerId != null && (controllerId == currentAuthority || controllerId == OriginalOwner || formerAuthorities.Contains(controllerId));
+
+    // Points the identity at a replacement hull.
     internal void RebindHull(MissionObject hull) => Hull = hull;
+
+    // The prize of a capture: it crews the captor's formation from now on.
+    internal void MarkCaptured(string captorControllerId, Formation formation)
+    {
+        CaptorControllerId = captorControllerId;
+        Formation = formation;
+        IsOrphaned = false;
+        OrphanedSide = BattleSideEnum.None;
+    }
+
+    // The captor's own hull after its capture: vanilla leaves it with no formation and no team.
+    internal void MarkOrphaned(BattleSideEnum side)
+    {
+        Formation = null;
+        IsOrphaned = true;
+        OrphanedSide = side;
+    }
 }
 
 /// <inheritdoc cref="INetworkShipRegistry"/>
@@ -119,6 +178,32 @@ public class NetworkShipRegistry : INetworkShipRegistry
         if (TryGetByHull(hull, out var other) && other != ship) return false;
 
         ship.RebindHull(hull);
+        return true;
+    }
+
+    public bool TryRecordCapture(Guid prizeId, Guid captorShipId, string captorControllerId, BattleSideEnum captorHullSide)
+    {
+        if (prizeId == captorShipId || !ships.TryGetValue(prizeId, out var prize) || !ships.TryGetValue(captorShipId, out var captorShip))
+            return false;
+
+        prize.MarkCaptured(captorControllerId, captorShip.Formation);
+        captorShip.MarkOrphaned(captorHullSide);
+        return true;
+    }
+
+    public bool TryMarkCaptured(Guid shipId, string captorControllerId)
+    {
+        if (!ships.TryGetValue(shipId, out var ship)) return false;
+
+        ship.MarkCaptured(captorControllerId, ship.Formation);
+        return true;
+    }
+
+    public bool TryMarkOrphaned(Guid shipId, BattleSideEnum side)
+    {
+        if (!ships.TryGetValue(shipId, out var ship)) return false;
+
+        ship.MarkOrphaned(side);
         return true;
     }
 
