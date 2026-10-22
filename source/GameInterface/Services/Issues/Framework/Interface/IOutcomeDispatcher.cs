@@ -2,6 +2,7 @@
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Interface;
 
@@ -12,7 +13,7 @@ public interface IOutcomeDispatcher
 {
     // Whether vanilla may run the quest outcome. A client hands it to the server instead.
     // observed is the issue the server must announce after the outcome ran, null when nothing is to be announced.
-    bool BeforeQuestOutcome(QuestBase quest, IssueOutcome outcome, out IssueBase observed);
+    bool BeforeQuestOutcome(QuestBase quest, IssueOutcome outcome, out IssueBase observed, TextObject log = null);
 
     // Same for the outcomes vanilla finishes an issue with, announced only when the issue has no quest or its quest still runs
     bool BeforeIssueOutcome(IssueBase issue, IssueOutcome outcome, out IssueBase observed);

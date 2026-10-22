@@ -418,6 +418,53 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ServerEnding_ArchivesTheVanillaTextOnceWithoutClientRewards(bool timeout)
+    {
+        foreach (var instance in Instances)
+            instance.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
+        Accept();
+        var ownerQuest = (Quest)scenario.QuestOf(ClientA);
+        var serverQuest = (Quest)scenario.QuestOf(Server);
+        using var gold = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(TaleWorlds.CampaignSystem.Actions.GiveGoldAction), "ApplyInternal"));
+        using var traits = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(TaleWorlds.CampaignSystem.CharacterDevelopment.TraitLevelingHelper), "OnIssueSolvedThroughQuest", new[] { typeof(Hero), typeof(Tuple<TaleWorlds.CampaignSystem.CharacterDevelopment.TraitObject, int>[]) }));
+        var expected = "";
+        Server.Call(() =>
+        {
+            expected = (timeout ? serverQuest.TimeoutQuestLogText : serverQuest.SuccessQuestLogText).ToString();
+            if (timeout) serverQuest.CompleteQuestWithTimeOut();
+            else
+            {
+                serverQuest._givenTradeGoods = Amount;
+                serverQuest.CompleteQuestWithSuccess();
+            }
+        });
+        environment.FlushCoalescer();
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        ClientA.Call(() =>
+        {
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Single(ownerQuest.JournalEntries, log => log.LogText.ToString() == expected);
+            var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+                (TaleWorlds.CampaignSystem.LogEntries.JournalLogEntry entry) => entry.IsRelatedTo(ownerQuest));
+            Assert.NotNull(archive);
+            Assert.True(archive.IsEnded());
+            Assert.Single(archive.GetEntries(), log => log.LogText.ToString() == expected);
+        });
+        ClientB.Call(() => Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+            (TaleWorlds.CampaignSystem.LogEntries.JournalLogEntry entry) => entry.RelatedHero == Get<Hero>(ClientB, scenario.NotableId))));
+        Assert.Equal(timeout ? 0 : 1, gold.CountFor(Server));
+        Assert.Equal(timeout ? 0 : 1, traits.CountFor(Server));
+        foreach (var client in environment.Clients)
+        {
+            Assert.Equal(0, gold.CountFor(client));
+            Assert.Equal(0, traits.CountFor(client));
+        }
+    }
+
     private static void OnMapAfterConversation(EnvironmentInstance client, Action act)
     {
         client.Call(() =>

@@ -274,31 +274,84 @@ public class ScoutEnemyGarrisonsTests : IDisposable
         Assert.Equal(1, calls.CountFor(Server));
     }
 
-    [Fact]
-    public void ReplayedSuccess_AddsTheSuccessEntryToTheOwnerJournal()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ServerEnding_PreservesOneVanillaLineInTheOwnersJournalAndArchive(bool timeout)
     {
+        scoutingDone.Dispose();
         var targetIds = CreateTargets();
-
-        // The success text needs a fully built quest giver and finalizing needs a started quest, the test only counts the log entries
-        using (new MethodCallRecorder(AccessTools.PropertyGetter(typeof(Quest), nameof(Quest.QuestSuccess))))
-        using (new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess))))
-        using (var logs = new MethodCallRecorder(AccessTools.Method(typeof(QuestBase), nameof(QuestBase.AddLog))))
+        var giverId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var ownerId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var instances = TestEnvironment.Clients.Prepend(Server).ToArray();
+        var observer = TestEnvironment.Clients.Last();
+        Quest serverQuest = null!;
+        Quest ownerQuest = null!;
+        foreach (var instance in instances)
         {
-            foreach (var instance in new[] { Client, Server })
+            instance.Call(() =>
             {
-                instance.Call(() =>
+                using (new AllowedThread())
                 {
-                    var quest = QuestWithTargets(Resolve(instance, targetIds));
-
-                    using (new AllowedThread())
+                    Campaign.Current.EncyclopediaManager ??= new TaleWorlds.CampaignSystem.Encyclopedia.EncyclopediaManager();
+                    Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+                    new TaleWorlds.CampaignSystem.CampaignBehaviors.JournalLogsCampaignBehavior().RegisterEvents();
+                    var giver = instance.GetRegisteredObject<Hero>(giverId);
+                    var targets = Resolve(instance, targetIds);
+                    var issue = new Issue(giver, targets.ToList());
+                    issue.StringId = IssueId;
+                    issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
+                    Campaign.Current.IssueManager._issues.Add(giver, issue);
+                    giver.OnIssueCreatedForHero(issue);
+                    if (instance != observer)
                     {
-                        quest.CompleteQuestWithSuccess();
+                        var quest = new Quest(IssueId + "_quest", giver, targets[0], targets[1], targets[2]);
+                        issue.IssueQuest = quest;
+                        if (instance == Server) serverQuest = quest;
+                        else
+                        {
+                            ownerQuest = quest;
+                            quest.StartQuest();
+                        }
                     }
-                });
-            }
-
-            Assert.Equal(1, logs.CountFor(Client));
-            Assert.Equal(0, logs.CountFor(Server));
+                }
+                Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(giverId, IssueId, "player-A"));
+            });
+        }
+        Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player("player-A", ownerId, partyId, "", ""))));
+        TestEnvironment.ConnectRegisteredPlayer(Client, "player-A");
+        Client.Resolve<GameInterface.Services.Entity.IControllerIdProvider>().SetControllerId("player-A");
+        using var renown = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(TaleWorlds.CampaignSystem.Actions.GainRenownAction), "ApplyInternal"));
+        using var influence = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(TaleWorlds.CampaignSystem.Actions.GainKingdomInfluenceAction), "ApplyInternal"));
+        var expected = "";
+        Server.Call(() => expected = (timeout ? serverQuest.QuestTimedOut : serverQuest.QuestSuccess).ToString());
+        Client.Call(() =>
+        {
+            if (timeout) ownerQuest.CompleteQuestWithTimeOut();
+            else ownerQuest.AllScoutingDone();
+        });
+        TestEnvironment.FlushCoalescer();
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
+        Client.Call(() =>
+        {
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Single(ownerQuest.JournalEntries, log => log.LogText.ToString() == expected);
+            var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+                (TaleWorlds.CampaignSystem.LogEntries.JournalLogEntry entry) => entry.IsRelatedTo(ownerQuest));
+            Assert.NotNull(archive);
+            Assert.True(archive.IsEnded());
+            Assert.Single(archive.GetEntries(), log => log.LogText.ToString() == expected);
+        });
+        observer.Call(() => Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+            (TaleWorlds.CampaignSystem.LogEntries.JournalLogEntry entry) => entry.RelatedHero == observer.GetRegisteredObject<Hero>(giverId))));
+        Assert.Equal(timeout ? 0 : 1, renown.CountFor(Server));
+        Assert.Equal(timeout ? 0 : 1, influence.CountFor(Server));
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.Equal(0, renown.CountFor(client));
+            Assert.Equal(0, influence.CountFor(client));
         }
     }
 
