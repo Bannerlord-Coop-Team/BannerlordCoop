@@ -1047,8 +1047,8 @@ public class VillageHostileActionTests : MapEventTestBase
     public void RaidSettlementLeave_DetachesOnlyARequestingDefender(BattleSideEnum side, bool requested)
     {
         var client = Clients.First();
-        RegisterPeer(client, "PlayerOne");
         var (heroId, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
         var aiPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var aiTroopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var target = CreateVillageTarget();
@@ -1060,6 +1060,8 @@ public class VillageHostileActionTests : MapEventTestBase
 
         Server.Call(() =>
         {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(client.NetPeer, out var player));
+            Assert.Equal(mobilePartyId, player.MobilePartyId);
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(aiPartyId, out var ai));
