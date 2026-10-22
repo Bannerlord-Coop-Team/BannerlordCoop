@@ -21,21 +21,6 @@ public class LiveTestProtocolTests
         Assert.Equal("quoted \"value\"", actual.Parameters.GetProperty("arguments")[1].GetString());
     }
 
-    [Theory]
-    [InlineData("disconnect")]
-    [InlineData("reconnect")]
-    public void SessionLifecycleRequestRoundTrip_PreservesMethod(string method)
-    {
-        LiveTestRequest expected = Request(method, "{}");
-
-        string json = LiveTestProtocol.SerializeRequest(expected);
-
-        Assert.True(LiveTestProtocol.TryDeserializeRequest(json, out var actual, out var error));
-        Assert.Null(error);
-        Assert.Equal(method, actual.Method);
-        Assert.Empty(actual.Parameters.EnumerateObject());
-    }
-
     [Fact]
     public void ResponseSerialization_EscapesMultilineOutputOntoOnePhysicalLine()
     {

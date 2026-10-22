@@ -409,31 +409,27 @@ public sealed partial class RunOrchestratorTests : IDisposable
         Assert.Equal("launched", (await runs.StartClientAsync(run.RunId, 1, default)).Outcome);
     }
 
-    [Theory]
-    [InlineData("join")]
-    [InlineData("reconnect")]
-    public async Task ChangedDeployedBuildBlocksClientAdditionAndJoin(string method)
+    [Fact]
+    public async Task ChangedDeployedBuildBlocksClientAdditionAndJoin()
     {
         var run = await runs.StartAsync("test", 1, default);
         preflight.Mvid = Guid.NewGuid();
         Assert.Equal("bridge_build_changed", (await runs.StartClientAsync(run.RunId, 2, default)).Error.Code);
-        var response = await runs.RequestAsync(run.RunId, "client1", method, new { }, true, default);
+        var response = await runs.RequestAsync(run.RunId, "client1", "join", new { }, true, default);
         Assert.Equal("bridge_build_changed", response.Error.Code);
         Assert.Empty(pipe.Methods);
     }
 
-    [Theory]
-    [InlineData("join")]
-    [InlineData("reconnect")]
-    public async Task LoadedBuildMismatchBlocksJoinButMatchingBuildAllowsIt(string method)
+    [Fact]
+    public async Task LoadedBuildMismatchBlocksJoinButMatchingBuildAllowsIt()
     {
         var run = await runs.StartAsync("test", 1, default);
         pipe.Status = new { assemblyMvid = Guid.NewGuid(), protocolVersion = 1 };
-        Assert.Equal("bridge_build_mismatch", (await runs.RequestAsync(run.RunId, "client1", method, new { }, true, default)).Error.Code);
-        Assert.DoesNotContain(method, pipe.Methods);
+        Assert.Equal("bridge_build_mismatch", (await runs.RequestAsync(run.RunId, "client1", "join", new { }, true, default)).Error.Code);
+        Assert.DoesNotContain("join", pipe.Methods);
         pipe.Status = new { assemblyMvid = Guid.Empty, protocolVersion = 1 };
-        Assert.True((await runs.RequestAsync(run.RunId, "client1", method, new { }, true, default)).Ok);
-        Assert.Equal(1, pipe.Methods.Count(m => m == method));
+        Assert.True((await runs.RequestAsync(run.RunId, "client1", "join", new { }, true, default)).Ok);
+        Assert.Equal(1, pipe.Methods.Count(m => m == "join"));
     }
 
     [Fact]

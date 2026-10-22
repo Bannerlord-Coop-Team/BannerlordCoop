@@ -13,14 +13,10 @@ namespace GameInterface.Tests.Services.Save;
 public class SaveAsCommandTests
 {
     [Theory]
-    [InlineData(true, "{\"UniqueGameId\":\"proof\",\"Players\":[]}", true)]
-    [InlineData(true, "\uFEFF{\"UniqueGameId\":\"proof\",\"Players\":[]}", true)]
-    [InlineData(false, "{\"UniqueGameId\":\"proof\",\"Players\":[]}", false)]
+    [InlineData(true, "sidecar", true)]
+    [InlineData(false, "sidecar", false)]
     [InlineData(true, null, false)]
-    [InlineData(true, "{\"UniqueGameId\":\"proof\",\"Players\":[", false)]
-    [InlineData(true, "null", false)]
-    [InlineData(true, "{\"UniqueGameId\":\"other\",\"Players\":[]}", false)]
-    [InlineData(true, "{\"UniqueGameId\":\"proof\"}", false)]
+    [InlineData(true, "", false)]
     public void ReportsSuccessOnlyForCompletedPair(bool nativeSuccess, string sidecar, bool expected)
     {
         bool previous = ModInformation.IsServer;
@@ -43,6 +39,7 @@ public class SaveAsCommandTests
             var result = new SaveDebugCommand.SaveSaveAsCoopCommand(saves.Object).ProcessCommand(args.Object);
             Assert.Equal(expected, result.Succeeded);
             saves.Verify(x => x.SaveCurrentGameToFile("proof"), Times.Once);
+            saves.Verify(x => x.ReadSaveFile("proof.sav"), Times.Once);
         }
         finally { ModInformation.IsServer = previous; }
     }

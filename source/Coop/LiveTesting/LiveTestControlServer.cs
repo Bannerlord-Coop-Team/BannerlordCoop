@@ -60,7 +60,6 @@ namespace Coop.LiveTesting
         private readonly string endpointDirectory;
         private readonly string endpointRegistrationPath;
         private int shutdownScheduled;
-        private readonly ILiveTestClientJoinState clientJoinState;
         private bool trackedRenderingEnabled = true;
         private bool renderStateTrackable = true;
         private int renderToggleCount;
@@ -81,9 +80,7 @@ namespace Coop.LiveTesting
 
             var uiBuilder = new ContainerBuilder();
             uiBuilder.RegisterModule<LiveTestUiModule>();
-            uiBuilder.RegisterType<LiveTestClientJoinState>().As<ILiveTestClientJoinState>().InstancePerDependency();
             uiContainer = uiBuilder.Build();
-            clientJoinState = uiContainer.Resolve<ILiveTestClientJoinState>();
             ui = uiContainer.Resolve<ILiveTestUi>();
             this.isServer = isServer;
             this.logFilePath = logFilePath;
@@ -179,10 +176,6 @@ namespace Coop.LiveTesting
                     return HandleOptionsMenu(request);
                 case "join":
                     return HandleDeferredClientJoin(request);
-                case "disconnect":
-                    return HandleClientDisconnect(request);
-                case "reconnect":
-                    return HandleClientReconnect(request);
                 case "shutdown":
                     return HandleShutdown(request);
                 default:
@@ -732,16 +725,6 @@ namespace Coop.LiveTesting
             return ExecuteOnGameThread(request, () =>
             {
                 bool sessionActive = ContainerProvider.TryResolve<ILogic>(out _);
-                clientJoinState.Refresh(GameStateManager.Current?.ActiveState is InitialState, Campaign.Current != null, sessionActive);
-                if (clientJoinState.Attempted)
-                {
-                    return Failure(
-                        request.Id,
-                        "join_already_attempted",
-                        "The deferred client join was already attempted.",
-                        false);
-                }
-
                 if (!(GameStateManager.Current?.ActiveState is InitialState) || Campaign.Current != null)
                 {
                     return Failure(
@@ -754,19 +737,7 @@ namespace Coop.LiveTesting
                 if (sessionActive)
                     return Failure(request.Id, "client_session_active", "The previous client session is still tearing down.", false);
 
-                if (!clientJoinState.TryBegin())
-                {
-                    return Failure(
-                        request.Id,
-                        "join_already_attempted",
-                        "The deferred client join was already attempted.",
-                        false);
-                }
-
-                bool started;
-                try { started = startAsClient(); }
-                catch { clientJoinState.CompleteStart(false); throw; }
-                clientJoinState.CompleteStart(started);
+                bool started = startAsClient();
                 Logger.Information("[LiveTest] Deferred StartAsClient() returned {Started}", started);
                 if (!started)
                     return Failure(request.Id, "client_start_refused", "The client session did not start; retry once startup is ready.", false);
@@ -775,60 +746,6 @@ namespace Coop.LiveTesting
                     attempted = true,
                     started,
                 });
-            }, true);
-        }
-
-        private LiveTestResponse HandleClientDisconnect(LiveTestRequest request)
-        {
-            if (isServer)
-            {
-                return Failure(request.Id, "client_only", "Only a client process may disconnect.", false);
-            }
-
-            return ExecuteOnGameThread(request, () =>
-            {
-                if (Campaign.Current == null)
-                {
-                    return Failure(request.Id, "client_not_in_campaign", "The client is not in an active campaign.", false);
-                }
-                if (!ContainerProvider.TryResolve<IClientLogic>(out var clientLogic))
-                {
-                    return Failure(request.Id, "client_session_unavailable", "No active client session was found.", false);
-                }
-
-                clientLogic.Disconnect();
-                return Success(request.Id, new { scheduled = true, readyForJoin = false });
-            }, true);
-        }
-
-        private LiveTestResponse HandleClientReconnect(LiveTestRequest request)
-        {
-            if (isServer)
-            {
-                return Failure(request.Id, "client_only", "Only a client process may reconnect.", false);
-            }
-            if (!deferredClientJoinEnabled)
-            {
-                return Failure(request.Id, "manual_join_not_enabled", "The client was not launched for a deferred live-test join.", false);
-            }
-
-            return ExecuteOnGameThread(request, () =>
-            {
-                if (!(GameStateManager.Current?.ActiveState is InitialState) || Campaign.Current != null)
-                {
-                    return Failure(request.Id, "client_not_at_main_menu", "The client must be at the main menu with no campaign loaded before reconnecting.", false);
-                }
-                if (ContainerProvider.TryResolve<ILogic>(out _))
-                {
-                    return Failure(request.Id, "client_session_active", "The previous client session is still tearing down.", false);
-                }
-
-                bool started = startAsClient();
-                clientJoinState.CompleteStart(started);
-                Logger.Information("[LiveTest] Reconnect StartAsClient() returned {Started}", started);
-                if (!started)
-                    return Failure(request.Id, "client_start_refused", "The client session did not start; retry once startup is ready.", false);
-                return Success(request.Id, new { attempted = true, started });
             }, true);
         }
 
@@ -967,9 +884,9 @@ namespace Coop.LiveTesting
                 registeredControllerIds,
                 connectedControllerIds,
                 deferredClientJoinEnabled,
-                readyForClientJoin = !isServer && deferredClientJoinEnabled && clientJoinState.Refresh(
-                    GameStateManager.Current?.ActiveState is InitialState, campaignLoaded, ContainerProvider.TryResolve<ILogic>(out _)),
-                deferredClientJoinAttempted = clientJoinState.Attempted,
+                readyForClientJoin = !isServer && deferredClientJoinEnabled &&
+                    GameStateManager.Current?.ActiveState is InitialState && !campaignLoaded &&
+                    !ContainerProvider.TryResolve<ILogic>(out _),
                 readyForCampaignTests,
                 readyForMissionTests = readyForCampaignTests && missionActive,
             });

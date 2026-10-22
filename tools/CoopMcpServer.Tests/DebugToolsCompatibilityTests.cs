@@ -24,13 +24,7 @@ public sealed class DebugToolsCompatibilityTests
                 Arguments = new[] { "--config", config }, ShutdownTimeout = TimeSpan.FromSeconds(10),
             }), cancellationToken: timeout.Token);
             var tools = await client.ListToolsAsync(cancellationToken: timeout.Token);
-            Assert.Equal(21, tools.Count);
-            foreach (string name in new[] { "disconnect_client", "reconnect_client" })
-            {
-                var lifecycle = tools.Single(t => t.Name == name);
-                Assert.Equal(new[] { "instance", "run_id" }, lifecycle.JsonSchema.GetProperty("properties").EnumerateObject().Select(p => p.Name).Order());
-                Assert.Equal(new[] { "instance", "run_id" }, lifecycle.JsonSchema.GetProperty("required").EnumerateArray().Select(p => p.GetString()).Order());
-            }
+            Assert.Equal(19, tools.Count);
             var baseline = JsonNode.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Data", "DebugTools-5192afea.json"))).AsArray();
             Assert.Equal(17, baseline.Count);
             foreach (var original in baseline)
