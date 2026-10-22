@@ -1091,8 +1091,14 @@ public class VillageHostileActionTests : MapEventTestBase
                 party._currentSettlement = settlement;
             }
             encounter.EncounterSettlementAux = settlement;
-            // Live defenders retain their pre-raid village encounter without a battle reference.
-            Assert.Null(PlayerEncounter.Battle);
+            // Only the attacker owns a raid battle; village defenders keep their pre-raid encounter.
+            if (side == BattleSideEnum.Attacker)
+            {
+                encounter._mapEvent = party.MapEvent;
+                Assert.Same(party.MapEvent, PlayerEncounter.Battle);
+            }
+            else
+                Assert.Null(PlayerEncounter.Battle);
             Assert.Equal(side, party.Party.Side);
             Assert.NotNull(party.MapEvent);
             Campaign.Current.MapStateData.GameMenuId = side == BattleSideEnum.Defender ? "village" : "raiding_village";
@@ -1147,7 +1153,7 @@ public class VillageHostileActionTests : MapEventTestBase
         }
         client.Call(() =>
         {
-            if (detaches)
+            if (side == BattleSideEnum.Defender)
             {
                 Assert.Null(PlayerEncounter.Current);
                 Assert.Null(Campaign.Current.MapStateData.GameMenuId);
