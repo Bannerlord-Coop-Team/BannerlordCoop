@@ -45,7 +45,8 @@ Use the existing framework for each of these instead of building a parallel one:
 
 - A class applied through `PatchAllUncategorized` needs a `[HarmonyPatch]` attribute, even an empty one, otherwise it's never applied.
 - Harmony calls methods named `Prepare`, `Cleanup`, `TargetMethod` and `TargetMethods` on a patch class at patch time, with null arguments. Don't give helpers those names, because a throw there stops all patching.
-- Give each patched method one owner. A `TargetMethods` that yields every method of a type also picks up methods another class patches, so that patch runs twice. Exclude them.
+- Give each patched method one owner. A `TargetMethods` that yields every method of a type also picks up methods another class patches, so the method gets both classes' patches. Exclude them.
+- Check a patch is needed before adding it. Reviewers ask why a patch exists when the path is already blocked.
 
 ## Validation
 

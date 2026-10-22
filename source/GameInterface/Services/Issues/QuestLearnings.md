@@ -34,11 +34,11 @@ it once the user agrees:
 
 ### Server authority
 
-- **Ownership is not enough to accept a request.** A request sent from a stale dialog or a double-click can arrive
-  when the game state no longer allows it: `HearCounterOffer` before the target was beaten, `PersuasionSucceeded`
-  after one failed try, a troop deposit right after sending the companion, a delivery away from the giver's
-  settlement. A handler that checks only the owner and the generation applies it anyway. Check the game state that
-  vanilla's dialog condition checks. (#3810, #3832, #3834)
+- **Ownership is not enough to accept an ending.** A request sent from a stale dialog or a double-click can arrive
+  when the game state no longer allows it. Check the game state vanilla's condition checks on the server:
+  `LordWantsRivalCapturedFinalizationProofStrategy` only accepts a capture it recorded as a `CaptureEntitlement`
+  from the owner's battle, and `GangLeaderNeedsWeaponsDeliveryPatch` refuses a delivery away from the giver's
+  settlement. (#3810, #3834)
 - **Server checks must run as the owner.** `CanAccept`, fee and difficulty checks that run before
   `MainHeroSubstitutionScope` and `IssueDifficultyOverride` use the server's own `PlayerProgress`, which is per
   machine. Run them in the same scope as the charge. (#3834)
@@ -49,8 +49,6 @@ it once the user agrees:
 
 ### Persistence and rejoin
 
-- **Server-owned state set on the owner's client is lost.** `Hideout.IsSpotted` set only on the owner's client
-  never reaches the save, so it's gone after a rejoin. Set server-owned state on the server. (#3800)
 - **In-memory quest state must survive a load.** A service that fills its owner map only at accept is empty after
   a save and load or a rejoin, and a reset that runs after `LoadBehaviorData` wipes what was restored. Rebuild it
   from the save or the join snapshot, and check the `Campaign.OnInitialize` order. (#3821)
@@ -63,15 +61,8 @@ it once the user agrees:
 
 ## Review learnings
 
-- **Answer a finding with a test.** If a reported bug can't be made to fail in a test, reply with the evidence and
-  add the test as a regression check instead of changing code. (#3806, #3812)
 - **Decision callbacks reject on exception.** Wrap them like `AlternativeSolutionAcceptCoordinator.AcceptOnServer`
   does, or the client keeps waiting. (#3795)
 - **Reading a capture fails cleanly on truncated data.** Check lengths before `BinaryReader.ReadString()`. (#3798)
 - **Log skipped cases** in a finalization proof the way `ArmyNeedsSuppliesFinalizationProofStrategy` does. (#3795)
-- **Remove patches that do nothing.** Reviewers ask why a patch exists when the path is already blocked. Check
-  before adding one. (#3800, #3834)
-- **A merge can undo a framework fix.** After merging development, re-read framework files your PR touched. A
-  conflict resolution can quietly bring back the old version of a framework method.
 - **Keep `README.md` and `AGENTS.md` current** when a PR adds a registered quest or closes a known gap. (#3832)
-- **A flow the live-test tooling can't drive** means the tooling needs support, not a gap in the PR.
