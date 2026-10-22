@@ -168,6 +168,16 @@ the server's player clan), `PartyConfigurationCampaignBehavior` (its resets reac
 - Re-implemented methods follow v1.5.4: abdication passes the throne to the most influential clan
   that may rule, the siege aftermath army member test changed, and selling no prisoners sends nothing.
 
+## v1.5.5
+
+The branch builds and tests against v1.5.5 with no code change (2026-10-21, Steam beta, with
+`mb2` pointing at that install):
+
+- Release build: 0 errors. The engine member audit resolves every reference (GameInterface 6,371,
+  Coop.Core 205, Missions 1,485; 0 unresolved).
+- Unit tests: 4,189 passed, 14 skipped, 0 failed.
+- E2E tests in 16 shards: 2,712 tests, 2,707 passed, 5 skipped, 0 failed.
+
 ## Known gaps
 
 - Village force actions always take the encounter path; v1.5's no-resist path is not supported yet.
@@ -229,5 +239,6 @@ clients.
   pass in Release. On Windows, run E2E in 16 shards
   (`sh ../.github/scripts/run-e2e-shard.sh <n> 16` from `source`): with 8, a shard's test filter can
   exceed the command-line length limit.
-- Not done yet: a live session with a server and two clients, a dedicated server boot on v1.5.4, and
+- v1.5.5: see the v1.5.5 section above.
+- Not done yet: a live session with a server and two clients, a dedicated server boot on v1.5.4 or v1.5.5, and
   CI, whose build image still carries v1.4.8 game assemblies.
