@@ -38,7 +38,7 @@ internal static class JournalHistory
 
     /// <summary>
     /// A player who joins or rejoins replaces the history they had with the one in the server's save. The entries are
-    /// copied field by field, the way the save system restores them.
+    /// reconstructed from saved fields through the constructor, with plain related objects retaining their saved ids.
     /// </summary>
     public static void DownloadSaveOf(EnvironmentInstance server, EnvironmentInstance joiner)
     {

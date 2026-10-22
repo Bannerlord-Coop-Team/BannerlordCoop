@@ -6,7 +6,6 @@ using HarmonyLib;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
@@ -28,11 +27,8 @@ internal class JournalLogEntryOwnerPatch
     [HarmonyPrefix]
     private static void Prefix(ref MBObjectBase[] relatedObjects)
     {
-        var issue = relatedObjects.OfType<IssueBase>().FirstOrDefault()
-            ?? relatedObjects.OfType<QuestBase>().Select(IssueManager.GetIssueOfQuest).FirstOrDefault(found => found != null);
-
-        if (issue == null || !ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver) ||
-            !ownerResolver.TryGetOwnerControllerId(issue, out var controllerId))
+        if (!ContainerProvider.TryResolve<IIssueOwnerResolver>(out var ownerResolver) ||
+            !ownerResolver.TryGetOwnerControllerId(relatedObjects, out var controllerId))
         {
             return;
         }
