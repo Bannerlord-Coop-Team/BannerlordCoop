@@ -264,6 +264,12 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
 
     public void OrphanHull(MissionObject hull) => Orphan(Of(hull));
 
+    /// <summary>The reason this client's swap of the next capture can't run, standing for a missing hull or formation; null lets it.</summary>
+    public string CaptureBlocker { get; set; }
+
+    // The live engine checks what vanilla's swap dereferences; the fake refuses only when a test sets a reason.
+    public string CheckCapture(MissionObject prize, MissionObject captorHull) => CaptureBlocker;
+
     // A hull with no formation has no team either, so its side reads as none, as MissionShip.BattleSide does.
     private static void Orphan(FakeHull fake)
     {

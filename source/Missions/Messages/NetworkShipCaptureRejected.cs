@@ -49,4 +49,7 @@ public enum ShipCaptureRefusal
 
     /// <summary>Never sent: nobody answered the captor's request in time.</summary>
     NoAnswer,
+
+    /// <summary>Vanilla's swap can't run on the two hulls at the authority (a hull or formation it needs is missing).</summary>
+    SwapUnavailable,
 }

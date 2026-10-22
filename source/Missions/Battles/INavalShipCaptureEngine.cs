@@ -14,6 +14,12 @@ public interface INavalShipCaptureEngine
     /// </summary>
     void ApplyCapture(MissionObject prize, MissionObject captorHull);
 
+    /// <summary>
+    /// [Game thread] Why vanilla's swap can't run on the two hulls here (a short reason), or null when it can. Checked before
+    /// anything of a capture changes, so a capture is applied whole or not at all.
+    /// </summary>
+    string CheckCapture(MissionObject prize, MissionObject captorHull);
+
     /// <summary>[Game thread] Leaves a late joiner's copy of a capture's orphan as vanilla's swap left it: no formation, no team.</summary>
     void OrphanHull(MissionObject hull);
 

@@ -43,12 +43,13 @@ public class BattleShipCaptureReplicatorTests
     [InlineData(6, ShipCaptureRefusal.CannotBeTakenOver)]
     [InlineData(7, ShipCaptureRefusal.Sinking)]
     [InlineData(8, ShipCaptureRefusal.NotVacant)]
+    [InlineData(9, ShipCaptureRefusal.SwapUnavailable)]
     [InlineData(-1, null)]
     public void Decide_NamesTheFirstFailingCheck(int failing, ShipCaptureRefusal? expected)
     {
         var facts = new CaptureFacts(isAuthority: failing != 0, alreadyCaptured: failing == 1, captorInMission: failing != 2,
             captorHullValid: failing != 3, isEnemy: failing != 4, busy: failing == 5, canBeTakenOver: failing != 6,
-            isSinking: failing == 7, isVacant: failing != 8);
+            isSinking: failing == 7, isVacant: failing != 8, swapReady: failing != 9);
 
         Assert.Equal(expected, BattleShipCaptureReplicator.Decide(facts));
     }
@@ -95,6 +96,57 @@ public class BattleShipCaptureReplicatorTests
         Assert.True(captorShip.IsOrphaned);
         Assert.Equal(1, prize.CaptureSequence);
         Assert.Equal(1, captorShip.CaptureSequence);
+    }
+
+    // R46: a swap vanilla can't run on the authority's hulls is refused before anything changes, so no client half-applies it.
+    [Fact]
+    public void Request_WhoseSwapCannotRunAtTheAuthority_IsRefusedBeforeAnythingChanges()
+    {
+        var harness = new Harness();
+        var prize = harness.Register(Own, BattleSideEnum.Defender, npc: true);
+        var captorShip = harness.Register(Captor, BattleSideEnum.Attacker);
+        harness.Vacant.Add(prize.Hull);
+        harness.CaptureEngine.Setup(e => e.CheckCapture(prize.Hull, captorShip.Hull)).Returns("captor_hull_has_no_formation");
+
+        harness.Exchange.AcceptRequest(new NetworkShipCaptureRequest(prize.ShipId, Captor, captorShip.ShipId));
+
+        harness.Network.Verify(n => n.Send(Captor, It.Is<IMessage>(m => m is NetworkShipCaptureRejected
+            && ((NetworkShipCaptureRejected)m).Reason == ShipCaptureRefusal.SwapUnavailable)), Times.Once);
+        harness.Network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Never);
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(It.IsAny<MissionObject>(), It.IsAny<MissionObject>()), Times.Never);
+        harness.Engine.Verify(e => e.ReleaseHull(It.IsAny<MissionObject>()), Times.Never);
+        Assert.Equal(Own, prize.CurrentAuthority);
+        Assert.Equal(0, prize.CaptureSequence);
+        Assert.False(captorShip.IsOrphaned);
+    }
+
+    // R46: a receiver whose swap can't run drops the confirm whole: no authority move, no registry change, no vanilla swap.
+    [Fact]
+    public void Confirm_WhoseSwapCannotRunHere_IsDroppedWhole()
+    {
+        var harness = new Harness();
+        var prize = harness.Register(Host, BattleSideEnum.Defender, npc: true);
+        var captorShip = harness.Register(Captor, BattleSideEnum.Attacker);
+        harness.CaptureEngine.Setup(e => e.CheckCapture(prize.Hull, captorShip.Hull)).Returns("hull_removed");
+
+        harness.Applier.AcceptConfirm(Confirm(prize, Captor, captorShip, Host));
+
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(It.IsAny<MissionObject>(), It.IsAny<MissionObject>()), Times.Never);
+        harness.Engine.Verify(e => e.ReleaseHull(It.IsAny<MissionObject>()), Times.Never);
+        harness.Engine.Verify(e => e.AdoptHull(It.IsAny<MissionObject>()), Times.Never);
+        Assert.Equal(Host, prize.CurrentAuthority);
+        Assert.Null(prize.CaptorControllerId);
+        Assert.Equal(0, prize.CaptureSequence);
+        Assert.False(captorShip.IsOrphaned);
+        var applied = (JObject)harness.Inspect()["applied"]!;
+        Assert.Equal(1L, (long)applied["swapsBlocked"]!);
+        Assert.Equal("swap_blocked:hull_removed", (string)applied["lastDrop"]!);
+    }
+
+    [Fact]
+    public void DescribeReason_NamesAnUnavailableSwap()
+    {
+        Assert.Contains("can't change hands", BattleShipCaptureReplicator.DescribeReason(ShipCaptureRefusal.SwapUnavailable));
     }
 
     // The crew still holds the hull, so the authority refuses and tells the captor why.

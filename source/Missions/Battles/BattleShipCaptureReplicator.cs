@@ -27,6 +27,12 @@ public interface IBattleShipCaptureReplicator : IDisposable
 
     /// <summary>[Game thread] How long this client's request for <paramref name="shipId"/> has waited, or null when none waits.</summary>
     float? PendingRequestAge(Guid shipId);
+
+    /// <summary>
+    /// [Game thread] Decides a capture of a hull this client simulates, or asks its authority once: where vanilla's elapsed helm
+    /// timer leads, also called directly by the DEBUG capture command's force.
+    /// </summary>
+    void RequestCapture(NetworkShipInfo prize, NetworkShipInfo captorShip);
 }
 
 /// <inheritdoc cref="IBattleShipCaptureReplicator"/>
@@ -129,8 +135,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         RequestCapture(prize, captorShip);
     }
 
-    /// <summary>[Game thread] Decides a capture of a hull this client simulates, or asks its authority once.</summary>
-    internal void RequestCapture(NetworkShipInfo prize, NetworkShipInfo captorShip)
+    public void RequestCapture(NetworkShipInfo prize, NetworkShipInfo captorShip)
     {
         var request = new NetworkShipCaptureRequest(prize.ShipId, session.OwnControllerId, captorShip.ShipId);
         if (IsOwn(prize))
@@ -210,7 +215,8 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
                 || IsCaptorHullOfAPendingRequest(prize.ShipId),
             canBeTakenOver: captureEngine.CanBeTakenOver(prize.Hull),
             isSinking: engine.IsSinking(prize.Hull),
-            isVacant: captureEngine.IsVacantForCapture(prize.Hull));
+            isVacant: captureEngine.IsVacantForCapture(prize.Hull),
+            swapReady: captorShip != null && captureEngine.CheckCapture(prize.Hull, captorShip.Hull) == null);
     }
 
     /// <summary>Why the hull's authority refuses a capture, or null to confirm it; the first failing check names it.</summary>
@@ -225,6 +231,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         if (!facts.CanBeTakenOver) return ShipCaptureRefusal.CannotBeTakenOver;
         if (facts.IsSinking) return ShipCaptureRefusal.Sinking;
         if (!facts.IsVacant) return ShipCaptureRefusal.NotVacant;
+        if (!facts.SwapReady) return ShipCaptureRefusal.SwapUnavailable;
         return null;
     }
 
@@ -318,6 +325,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
             case ShipCaptureRefusal.CannotBeTakenOver: return "it can't be taken over";
             case ShipCaptureRefusal.CaptorHullInvalid: return "your own ship can't take it";
             case ShipCaptureRefusal.NoAnswer: return "nobody answered, try again";
+            case ShipCaptureRefusal.SwapUnavailable: return "the ships can't change hands here";
             case ShipCaptureRefusal.NotAuthority: return "it changed hands, try again";
             default: return "you are not in the battle";
         }
@@ -366,7 +374,7 @@ internal readonly struct PendingRequest
 public readonly struct CaptureFacts
 {
     public CaptureFacts(bool isAuthority, bool alreadyCaptured, bool captorInMission, bool captorHullValid, bool isEnemy, bool busy,
-        bool canBeTakenOver, bool isSinking, bool isVacant)
+        bool canBeTakenOver, bool isSinking, bool isVacant, bool swapReady)
     {
         IsAuthority = isAuthority;
         AlreadyCaptured = alreadyCaptured;
@@ -377,6 +385,7 @@ public readonly struct CaptureFacts
         CanBeTakenOver = canBeTakenOver;
         IsSinking = isSinking;
         IsVacant = isVacant;
+        SwapReady = swapReady;
     }
 
     /// <summary>This client simulates the prize now.</summary>
@@ -394,4 +403,6 @@ public readonly struct CaptureFacts
     public bool IsSinking { get; }
     /// <summary>Vanilla's vacancy on the real hull: its formation all swimming or gone and nothing queued.</summary>
     public bool IsVacant { get; }
+    /// <summary>Vanilla's swap can run on the two hulls here (INavalShipCaptureEngine.CheckCapture).</summary>
+    public bool SwapReady { get; }
 }

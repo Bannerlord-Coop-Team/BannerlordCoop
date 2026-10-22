@@ -57,7 +57,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
     private readonly List<BattleShipSpawnData> heldRecords = new List<BattleShipSpawnData>();
     // [Game thread] The capture applied at each place in each hull's order, to tell a late repeat from a conflict.
     private readonly Dictionary<(Guid ShipId, int Sequence), AppliedCapture> appliedAt = new Dictionary<(Guid, int), AppliedCapture>();
-    private long capturesApplied, recordsApplied, confirmsDropped, duplicateConfirms, captureConflicts;
+    private long capturesApplied, recordsApplied, confirmsDropped, duplicateConfirms, captureConflicts, swapsBlocked;
     private string lastDrop;
     private bool disposed;
 
@@ -102,9 +102,12 @@ public class ShipCaptureApplier : IShipCaptureApplier
         RetryHeldRecords();
     }
 
-    // The confirm goes out first, so peers take the capture through it, not through the records a captor's apply sends.
+    // The confirm goes out first, so peers take the capture through it, not through the records a captor's apply sends. A swap
+    // that can't run here goes nowhere, so no peer applies a capture its decider didn't.
     public void ApplyDecided(NetworkShipInfo prize, NetworkShipInfo captorShip, string captorControllerId)
     {
+        if (SwapBlocked(prize, captorShip, captorControllerId) != null) return;
+
         var confirm = new NetworkShipCaptured(prize.ShipId, captorControllerId, captorShip.ShipId, session.OwnControllerId,
             session.HostEpoch, prize.CaptureSequence, captorShip.CaptureSequence);
         network.SendAll(confirm);
@@ -153,8 +156,23 @@ public class ShipCaptureApplier : IShipCaptureApplier
         var rejection = ValidateSender(prize, confirm.PreviousAuthority);
         if (rejection != null) return Drop(confirm, rejection);
 
+        var blocker = SwapBlocked(prize, captorShip, confirm.CaptorControllerId);
+        if (blocker != null) return Drop(confirm, "swap_blocked:" + blocker);
+
         Apply(prize, captorShip, confirm.CaptorControllerId, confirm.PrizeSequence + 1);
         return ConfirmOutcome.Done;
+    }
+
+    // Why vanilla's swap can't run on the two hulls here, logged with the capture, or null. Checked before anything changes.
+    private string SwapBlocked(NetworkShipInfo prize, NetworkShipInfo captorShip, string captor)
+    {
+        var blocker = captureEngine.CheckCapture(prize.Hull, captorShip.Hull);
+        if (blocker == null) return null;
+
+        swapsBlocked++;
+        Logger.Warning("[NavalSync] Not applying the capture of hull {ShipId} by {Captor} with hull {CaptorShipId}: {Reason}",
+            prize.ShipId, captor, captorShip.ShipId, blocker);
+        return blocker;
     }
 
     /// <summary>
@@ -319,6 +337,8 @@ public class ShipCaptureApplier : IShipCaptureApplier
 
         if (hullAuthority.IsReplacing(prize.ShipId) || hullAuthority.IsReplacing(captorShip.ShipId)) return ConfirmOutcome.Hold;
 
+        if (SwapBlocked(prize, captorShip, record.CaptorControllerId) != null) return ConfirmOutcome.Done;
+
         Logger.Information("[NavalSync] Record of hull {ShipId} shows a capture by {Captor} this client missed; applying it",
             prize.ShipId, record.CaptorControllerId);
         Apply(prize, captorShip, record.CaptorControllerId, record.CaptureSequence);
@@ -373,6 +393,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
         confirmsDropped,
         duplicateConfirms,
         captureConflicts,
+        swapsBlocked,
         lastDrop,
         heldConfirms = heldConfirms.Select(confirm => confirm.ShipId).ToArray(),
         heldRecords = heldRecords.Select(record => record.ShipId).ToArray(),
