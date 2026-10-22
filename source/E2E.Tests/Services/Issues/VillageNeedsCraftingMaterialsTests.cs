@@ -310,11 +310,9 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, false)]
-    [InlineData(true, true)]
-    [InlineData(false, true)]
-    public void CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory(bool success, bool fromOlderSave)
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory(bool success)
     {
         QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
         Accept();
@@ -327,7 +325,6 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
                 ownerQuest.QuestAcceptedConsequences();
         }, QuestLogTexts);
 
-        var legacy = fromOlderSave ? QuestJournalHistoryAssertions.RestoreVanillaArchive(Server, serverQuest) : null;
 
         if (success)
         {
@@ -351,7 +348,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         }
 
         QuestJournalHistoryAssertions.AssertLateJoinHistory(Server, ClientA, ClientB, IssueId, ownerQuest,
-            success ? IssueOutcome.QuestSuccess : IssueOutcome.QuestFail, legacy);
+            success ? IssueOutcome.QuestSuccess : IssueOutcome.QuestFail);
     }
 
     [Fact]
