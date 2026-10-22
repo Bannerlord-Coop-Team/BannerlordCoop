@@ -593,15 +593,11 @@ public class VillageNeedsToolsTests : IDisposable
             var issue = (Issue)notable.Issue;
             var expectedText = "Tools delivery reward: " + expectedStartReward + ".";
             Assert.Equal(expectedText, Assert.Single(issue.JournalEntries).LogText.ToString());
-            var archived = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs(
-                (JournalLogEntry log) => log.IsRelatedTo(issue)));
-            Assert.Equal(expectedText, Assert.Single(archived.GetEntries()).LogText.ToString());
         });
         ClientB.Call(() =>
         {
             Assert.True(ClientB.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
-            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs(
-                (JournalLogEntry log) => log.IsRelatedTo(notable.Issue)));
+            Assert.Equal(string.Empty, Assert.Single(notable.Issue.JournalEntries).LogText.ToString());
         });
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());

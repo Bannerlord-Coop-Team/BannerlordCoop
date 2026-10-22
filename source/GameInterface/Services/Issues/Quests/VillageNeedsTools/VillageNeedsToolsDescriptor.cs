@@ -16,11 +16,12 @@ internal class VillageNeedsToolsDescriptor : IQuestTypeDescriptor
     public VillageNeedsToolsDescriptor(
         VillageNeedsToolsCreationCaptureStrategy creationCaptureStrategy,
         VillageNeedsToolsAcceptStrategy acceptStrategy,
+        VillageNeedsToolsAlternativeSolutionAcceptStrategy alternativeSolutionAcceptStrategy,
         VillageNeedsToolsFinalizationProofStrategy finalizationProofStrategy)
     {
         CreationCaptureStrategy = creationCaptureStrategy;
         QuestSolutionAcceptStrategy = acceptStrategy;
-        AlternativeSolutionAcceptStrategy = acceptStrategy;
+        AlternativeSolutionAcceptStrategy = alternativeSolutionAcceptStrategy;
         FinalizationProofStrategy = finalizationProofStrategy;
     }
 }
