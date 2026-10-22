@@ -758,6 +758,14 @@ public class MerchantOutlawsTests : IDisposable
                 Assert.True(logic.DoneLogic(false));
                 Assert.Equal(sent, issue.AlternativeSolutionSentTroops.GetTroopCount(troop));
             }
+            if (cancelPicker && otherDisconnects)
+            {
+                var state = Game.Current.GameStateManager.CreateState<TaleWorlds.CampaignSystem.GameState.PartyState>();
+                state.PartyScreenLogic = pickerLogic;
+                state.PartyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+                Game.Current.GameStateManager._gameStates.Add(state);
+                Assert.Same(state, Game.Current.GameStateManager.ActiveState);
+            }
         }, TextHelpers);
         environment.FlushCoalescer();
 
@@ -841,6 +849,14 @@ public class MerchantOutlawsTests : IDisposable
                     PartyScreenLogic.TroopType.Member, Get<CharacterObject>(ClientA, troopId), 1, 0, -1);
                 using (new AllowedThread()) pickerLogic.TransferTroop(transfer, false);
                 Assert.Equal(sent + 1, issue.AlternativeSolutionSentTroops.GetTroopCount(Get<CharacterObject>(ClientA, troopId)));
+                if (otherDisconnects)
+                {
+                    var state = Game.Current.GameStateManager.CreateState<TaleWorlds.CampaignSystem.GameState.PartyState>();
+                    state.PartyScreenLogic = pickerLogic;
+                    state.PartyScreenMode = PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+                    Game.Current.GameStateManager._gameStates.Add(state);
+                    Assert.Same(state, Game.Current.GameStateManager.ActiveState);
+                }
             }, TextHelpers);
             if (rejectDone)
             {
