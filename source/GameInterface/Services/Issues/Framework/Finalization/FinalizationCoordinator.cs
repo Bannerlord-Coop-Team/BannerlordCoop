@@ -132,7 +132,7 @@ internal class FinalizationCoordinator : IHandler
 
             using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
             {
-                CompleteOnServer(issue, data.Outcome);
+                CompleteOnServer(issue, descriptor, data.Outcome);
             }
         }, context: nameof(FinalizationCoordinator));
     }
@@ -282,7 +282,7 @@ internal class FinalizationCoordinator : IHandler
         return objectManager.TryGetObjectWithLogging(player.HeroId, out playerHero);
     }
 
-    private void CompleteOnServer(IssueBase issue, IssueOutcome outcome)
+    private void CompleteOnServer(IssueBase issue, IQuestTypeDescriptor descriptor, IssueOutcome outcome)
     {
         if (!IsQuestOutcome(outcome))
         {
@@ -295,6 +295,12 @@ internal class FinalizationCoordinator : IHandler
         if (quest == null)
         {
             Logger.Error("{issue} has no quest to end with {outcome}", issue.StringId, outcome);
+            return;
+        }
+
+        if (outcome == IssueOutcome.QuestSuccess && descriptor.FinalizationProofStrategy != null)
+        {
+            Logger.Warning("Ignoring generic success for {issue}; its quest requires a finalization proof", issue.StringId);
             return;
         }
 
@@ -378,6 +384,7 @@ internal class FinalizationCoordinator : IHandler
                 issue.CompleteIssueWithStayAliveConditionsFailed();
                 return true;
             case IssueOutcome.AlternativeSolution:
+            case IssueOutcome.IssueFinishedByAiLord:
                 issue.IssueFinalized();
                 return true;
             case IssueOutcome.LordAcceptedCounterOffer:
