@@ -55,6 +55,8 @@ public class KingdomBannerColorTests : SyncTestBase
     {
         SendRulerBannerEdit(rulerClient);
 
+        Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkUpdatePlayerBanner>(), message => message.ClanId == rulerClanId);
+
         Server.Call(() =>
         {
             var kingdom = Server.GetRegisteredObject<Kingdom>(kingdomId);
@@ -111,6 +113,8 @@ public class KingdomBannerColorTests : SyncTestBase
     {
         SendRulerBannerEdit(memberClient);
 
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkUpdatePlayerBanner>());
+
         foreach (var instance in Clients.Append(Server))
         {
             instance.Call(() =>
@@ -124,6 +128,32 @@ public class KingdomBannerColorTests : SyncTestBase
                 Assert.Equal(OriginalBannerCode, memberClan.Banner.Serialize());
             });
         }
+    }
+
+    [Fact]
+    public void BannerEdit_RulerLosesLeadershipBeforeGameThreadRuns_IsIgnored()
+    {
+        // Arrives on the poll thread, so the leader check waits for the game thread.
+        Server.SimulateMessage(rulerClient.NetPeer, new NetworkUpdatePlayerBanner(EditedBannerCode, rulerClanId, BackgroundColor, NewIconColor), markGameThread: false);
+
+        Server.Call(() =>
+        {
+            using (new AllowedThread())
+            {
+                Server.GetRegisteredObject<Clan>(rulerClanId)._leader = Server.GetRegisteredObject<Hero>(memberHeroId);
+            }
+        });
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkUpdatePlayerBanner>());
+
+        Server.PumpGameThread();
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkUpdatePlayerBanner>());
+        Server.Call(() =>
+        {
+            Assert.Equal(OldIconColor, Server.GetRegisteredObject<Kingdom>(kingdomId).SecondaryBannerColor);
+            Assert.Equal(OriginalBannerCode, Server.GetRegisteredObject<Clan>(rulerClanId).Banner.Serialize());
+        });
     }
 
     private void SendRulerBannerEdit(EnvironmentInstance sender)

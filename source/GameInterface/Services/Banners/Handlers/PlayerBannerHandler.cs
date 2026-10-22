@@ -4,7 +4,6 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Banners.Messages;
-using GameInterface.Services.Clans;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -26,21 +25,18 @@ namespace GameInterface.Services.Banners.Handlers
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
         private readonly IPlayerManager playerManager;
-        private readonly ICoopClanPermissions permissions;
         private readonly ILogger Logger = LogManager.GetLogger<PlayerBannerHandler>();
 
         public PlayerBannerHandler(
             IMessageBroker messageBroker,
             IObjectManager objectManager,
             INetwork network,
-            IPlayerManager playerManager,
-            ICoopClanPermissions permissions)
+            IPlayerManager playerManager)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
             this.playerManager = playerManager;
-            this.permissions = permissions;
             messageBroker.Subscribe<PlayerBannerChanged>(Handle);
             messageBroker.Subscribe<NetworkUpdatePlayerBanner>(Handle);
         }
@@ -77,21 +73,17 @@ namespace GameInterface.Services.Banners.Handlers
         {
             var payload = obj.What;
 
-            if (objectManager.TryGetObject<Clan>(payload.ClanId, out var clan) == false)
+            GameThread.RunSafe(() =>
             {
-                Logger.Error("Unable to find clan ({clanId})", payload.ClanId);
-                return;
-            }
+                if (objectManager.TryGetObject<Clan>(payload.ClanId, out var clan) == false)
+                {
+                    Logger.Error("Unable to find clan ({clanId})", payload.ClanId);
+                    return;
+                }
 
-            // Only the clan leader may edit the banner, same rule as the banner editor button.
-            if (ModInformation.IsServer && !playerManager.CanManageClan(obj.Who, clan, objectManager, permissions))
-            {
-                Logger.Warning("Ignoring banner edit for clan {clanId} from a player who does not lead it", payload.ClanId);
-                return;
-            }
+                // Only the clan leader may edit the banner, same rule as the banner editor button.
+                if (ModInformation.IsServer && !playerManager.IsSenderClanLeader(obj.Who, clan)) return;
 
-            GameThread.Run(() =>
-            {
                 using (new AllowedThread())
                 {
                     if (clan.Banner == null)
@@ -131,15 +123,12 @@ namespace GameInterface.Services.Banners.Handlers
 
                 if (ModInformation.IsServer)
                 {
+                    network.SendAll(new NetworkUpdatePlayerBanner(payload.BannerCode, payload.ClanId, payload.Color, payload.Color2));
+                    messageBroker.Publish(this, new ClanManagementChanged(clan, ClanManagementRefresh.Identity));
+
                     UpdateKingdomBannerColors(clan);
                 }
-            });
-
-            if (ModInformation.IsServer)
-            {
-                network.SendAll(new NetworkUpdatePlayerBanner(payload.BannerCode, payload.ClanId, payload.Color, payload.Color2));
-                messageBroker.Publish(this, new ClanManagementChanged(clan, ClanManagementRefresh.Identity));
-            }
+            }, context: nameof(PlayerBannerHandler));
         }
 
         /// <summary>
@@ -158,12 +147,10 @@ namespace GameInterface.Services.Banners.Handlers
             // Repaint the member clans now instead of on the next load.
             foreach (var kingdomClan in kingdom.Clans)
             {
-                kingdomClan.UpdateBannerColorsAccordingToKingdom();
+                if (kingdomClan == clan) continue;
 
-                if (kingdomClan != clan)
-                {
-                    messageBroker.Publish(this, new PlayerBannerChanged(kingdomClan));
-                }
+                kingdomClan.UpdateBannerColorsAccordingToKingdom();
+                messageBroker.Publish(this, new PlayerBannerChanged(kingdomClan));
             }
         }
 
