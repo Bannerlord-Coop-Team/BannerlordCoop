@@ -169,6 +169,9 @@ internal class AllianceCampaignBehaviorPatches
     [HarmonyPrefix]
     private static bool OnWarDeclaredPrefix(AllianceCampaignBehavior __instance, IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail detail)
     {
+        // Clients replay the server's war and receive its alliance changes and call-to-war decisions.
+        if (ModInformation.IsClient) return false;
+
         if (faction1.IsKingdomFaction && faction2.IsKingdomFaction)
         {
             Kingdom kingdom = (Kingdom)faction1;

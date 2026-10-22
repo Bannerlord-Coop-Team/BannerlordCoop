@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -27,12 +28,14 @@ public class ArmyHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly IPlayerManager playerManager;
 
-    public ArmyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public ArmyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, IPlayerManager playerManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.playerManager = playerManager;
 
         messageBroker.Subscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
         messageBroker.Subscribe<NetworkAddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
@@ -129,18 +132,22 @@ public class ArmyHandler : IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-        if (objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty mobileParty) == false) return;
-        if (objectManager.TryGetObjectWithLogging<Army>(data.ArmyId, out var army) == false) return;
-        MobileParty clientMobileParty = null;
-        if (!string.IsNullOrEmpty(data.ClientMobilePartyId))
-        {
-            objectManager.TryGetObjectWithLogging(data.ClientMobilePartyId, out clientMobileParty);
-        }
-        ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army, clientMobileParty);
-        if (ModInformation.IsServer)
-        {
-            network.SendAll(new NetworkRemovePartyInArmy(data.ArmyId, data.MobilePartyId, data.ClientMobilePartyId));
-        }
+            if (objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty mobileParty) == false) return;
+            if (objectManager.TryGetObjectWithLogging<Army>(data.ArmyId, out var army) == false) return;
+            MobileParty clientMobileParty = null;
+            if (!string.IsNullOrEmpty(data.ClientMobilePartyId))
+            {
+                objectManager.TryGetObjectWithLogging(data.ClientMobilePartyId, out clientMobileParty);
+            }
+            // Keep the receive allowance on the thread that performs the mutation.
+            using (ModInformation.IsClient ? new AllowedThread() : null)
+            {
+                ArmyPatches.RemoveMobilePartyInArmyImmediate(mobileParty, army, clientMobileParty);
+            }
+            if (ModInformation.IsServer)
+            {
+                network.SendAll(new NetworkRemovePartyInArmy(data.ArmyId, data.MobilePartyId, data.ClientMobilePartyId));
+            }
         });
     }
 
@@ -150,7 +157,9 @@ public class ArmyHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.Army, out var armyId)) return;
 
         bool isSettlement = obj.AiBehaviorObject is Settlement;
-        if (!objectManager.TryGetIdWithLogging(obj.AiBehaviorObject, out var objectId)) return;
+        string objectId = null;
+        if (obj.AiBehaviorObject != null &&
+            !objectManager.TryGetIdWithLogging(obj.AiBehaviorObject, out objectId)) return;
 
         var message = new NetworkSetArmyAiBehaviorObject(armyId, objectId, isSettlement);
 
@@ -166,6 +175,12 @@ public class ArmyHandler : IHandler
             if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
 
             IMapPoint mapPoint;
+            if (obj.AiBehaviorObjectId == null)
+            {
+                ArmyPatches.SetAiBehaviorObject(army, null);
+                return;
+            }
+
             if (obj.IsSettlement)
             {
                 if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.AiBehaviorObjectId, out var settlement)) return;
@@ -202,6 +217,7 @@ public class ArmyHandler : IHandler
         var obj = payload.What;
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(payload.Who, obj.LeaderId)) return;
             if (!objectManager.TryGetObjectWithLogging<Kingdom>(obj.KingdomId, out var kingdom)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.LeaderId, out var leader)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.TargetSettlementId, out var targetSettlement)) return;

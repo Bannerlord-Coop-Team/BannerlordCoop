@@ -285,6 +285,31 @@ public class PlayerManagerTests
         Assert.Same(current, resolved);
     }
 
+    [Theory]
+    [InlineData(true, "Hero", 40f)]
+    [InlineData(true, "Heir", 5f)]
+    [InlineData(false, "Hero", 5f)]
+    public void ReplacePlayer_PreservesServerCrimeForSameHeroOnly(bool isServer, string heroId, float expected)
+    {
+        var wasServer = ModInformation.IsServer;
+        try
+        {
+            ModInformation.IsServer = isServer;
+            var manager = CreatePlayerManager(out _);
+            var original = new Player(ControllerId, "Hero", "Party", "Clan", "Character");
+            original.CrimeRatings["Kingdom_empire_s"] = 40f;
+            var replacement = new Player(ControllerId, heroId, "NewParty", "Clan", "Character");
+            replacement.CrimeRatings["Kingdom_empire_s"] = 5f;
+            Assert.True(manager.AddPlayer(original));
+            Assert.True(manager.ReplacePlayer(original, replacement));
+            Assert.Equal(expected, replacement.CrimeRatings["Kingdom_empire_s"]);
+        }
+        finally
+        {
+            ModInformation.IsServer = wasServer;
+        }
+    }
+
     // Replacing campaign objects preserves the same controller's peer and saved platform name.
     [Fact]
     public void ReplacePlayer_CurrentRegistration_UpdatesControllerAndPeerAtomically()

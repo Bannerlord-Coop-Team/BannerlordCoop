@@ -16,7 +16,7 @@ internal class AutoSyncModule : Module
         builder.RegisterType<AutoSyncPatchCollector>().As<IAutoSyncPatchCollector>().InstancePerLifetimeScope();
 
         builder.RegisterType<AutoSyncRegistry>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncPatcher>().InstancePerLifetimeScope();
+        builder.RegisterType<AutoSyncPatcher>().AsSelf().As<IAutoSyncPatcher>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSyncBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSyncAssemblyInfoBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSyncPatchBuilder>().InstancePerLifetimeScope();

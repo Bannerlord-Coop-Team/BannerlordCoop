@@ -371,6 +371,43 @@ public class ArmyDebugCommand
             return Succeeded(stringBuilder.ToString());
         }
     }
+    public sealed class ArmySetObjectiveCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.army";
+        public string Name => "set_objective";
+        public string Description => "Sets an army objective, or finishes it with None.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("army_id", "The registered army id."),
+            new ExpectedArgs("type", "Settlement, MobileParty, or None."),
+            new ExpectedArgs("object_id", "The registered objective id, or none when finishing."),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Command is only available on the server");
+            if (!ContainerProvider.TryResolve<IObjectManager>(out var manager)) return Failed("Unable to get ObjectManager");
+            if (!manager.TryGetObject<Army>(args[0], out var army)) return Failed($"Unable to get Army with {args[0]}");
+
+            if (args[1] == "None")
+                army.FinishArmyObjective();
+            else if (args[1] == "Settlement")
+            {
+                if (!manager.TryGetObject<Settlement>(args[2], out var settlement)) return Failed($"Unable to get Settlement with {args[2]}");
+                army.AiBehaviorObject = settlement;
+            }
+            else if (args[1] == "MobileParty")
+            {
+                if (!manager.TryGetObject<MobileParty>(args[2], out var party)) return Failed($"Unable to get MobileParty with {args[2]}");
+                army.AiBehaviorObject = party;
+            }
+            else return Failed("Objective type must be Settlement, MobileParty, or None");
+
+            return Succeeded($"Army {args[0]} objective: {args[1]} {args[2]}");
+        }
+    }
+
     // coop.debug.army.info Army_Created_1
     /// <summary>
     /// Info about army
@@ -410,6 +447,13 @@ public class ArmyDebugCommand
             sb.AppendLine($"Armyowner {army.ArmyOwner.Name}");
             sb.AppendLine($"leaderparty owner {army?.LeaderParty.Owner.Name}");
             sb.AppendLine($"armycohesion: {army?.Cohesion}");
+            string objectiveId = null;
+            if (army.AiBehaviorObject != null && !objectManager.TryGetId(army.AiBehaviorObject, out objectiveId))
+                return Failed("Army objective is not registered");
+            sb.AppendLine($"ArmyId: {args[0]}");
+            sb.AppendLine($"ObjectiveType: {army.AiBehaviorObject?.GetType().Name ?? "None"}");
+            sb.AppendLine($"ObjectiveId: {objectiveId ?? "none"}");
+            sb.AppendLine($"Dispersing: {army._armyIsDispersing}");
             return Succeeded(sb.ToString());
         }
     }

@@ -10,14 +10,9 @@ namespace GameInterface.Services.Heroes.Patches.Disable;
 internal class DisablePregnancyCampaignBehavior
 {
     [HarmonyPatch(nameof(PregnancyCampaignBehavior.RegisterEvents))]
-#if TESTER
     static bool Prefix() => ModInformation.IsServer;
-#else
-    static bool Prefix() => false;
-#endif
 }
 
-#if TESTER
 [HarmonyPatch(typeof(PregnancyCampaignBehavior))]
 internal class PregnancyCampaignBehaviorPatches
 {
@@ -43,4 +38,3 @@ internal class PregnancyCampaignBehaviorPatches
         return false;
     }
 }
-#endif

@@ -1,5 +1,6 @@
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.TroopSupply;
 using HarmonyLib;
 using System;
 using TaleWorlds.MountAndBlade;
@@ -27,6 +28,10 @@ internal class BattleAgentSpawnedPatch
         // A puppet being spawned from another owner's broadcast is NOT our troop — don't re-capture it.
         if (BattleSpawnGate.SuppressCapture) return;
         if (__result == null) return;
+
+        if (__result.Origin is CoopAgentOrigin origin && origin.InitialHealth is float health &&
+            health > 0f && !float.IsInfinity(health))
+            __result.Health = Math.Min(__result.Health, health);
 
         MessageBroker.Instance.Publish(__result, new AgentSpawnedInBattle(__result));
     }

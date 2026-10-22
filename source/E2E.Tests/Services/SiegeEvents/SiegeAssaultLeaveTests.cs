@@ -14,6 +14,7 @@ using GameInterface.Configuration;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Extensions;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Interfaces;
 using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -136,8 +137,8 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
             AssertPartyState(instance, partyId, expectMapEvent: false, expectCamp: false);
     }
 
+    // No-camp attacker is covered by SiegeDisconnectTests.BreakSiegeRequest_WithNoCampDuringAssault_*.
     [Theory]
-    [InlineData(false, false, false)]
     [InlineData(true, false, false)]
     [InlineData(false, true, false)]
     [InlineData(true, true, false)]
@@ -199,6 +200,62 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         }
         foreach (var instance in Clients.Append(Server))
             AssertPartyState(instance, mapEvent.AttackerPartyId, expectMapEvent: !lastBesieger, expectCamp: false);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LeaveSoldiersBehindAccept_InSiegeBattle_SacrificesBeforeLeaving(bool sallyOut)
+    {
+        var mapEvent = CreateServerMapEvent();
+        var partyId = JoinNewServerPartyToSide(mapEvent.MapEventId,
+            sallyOut ? BattleSideEnum.Defender : BattleSideEnum.Attacker);
+        SetMapEventType(mapEvent.MapEventId,
+            sallyOut ? MapEvent.BattleTypes.SallyOut : MapEvent.BattleTypes.Siege);
+        var leavingClient = Clients.First();
+        SetMainParty(leavingClient, partyId);
+        var heroId = SetMainHero(leavingClient);
+        RegisterAsPlayerParty("PlayerOne", heroId, partyId);
+        TestEnvironment.ConnectRegisteredPlayer(leavingClient, "PlayerOne");
+        var siegeEventId = SetClientOnlyCamp(leavingClient, partyId);
+        SetCamp(Server, partyId, siegeEventId);
+        AddEncounterGameMenuBehavior(Server);
+
+        using var recorder = new LeftSoldiersBehindRecorder();
+        leavingClient.Call(InvokePatchedLeaveSoldiersBehindAccept, LeaveSoldiersBehindDisabledMethods);
+
+        // The sacrifice goes out ahead of the siege break, so the server applies it while the party is still in its battle.
+        var sent = leavingClient.NetworkSentMessages.ToList();
+        int sacrificeIndex = sent.FindIndex(message => message is NetworkPlayerLeftSoldiersBehind);
+        int breakIndex = sent.FindIndex(message => message is NetworkRequestBreakSiege);
+        Assert.NotEqual(-1, sacrificeIndex);
+        Assert.NotEqual(-1, breakIndex);
+        Assert.True(sacrificeIndex < breakIndex);
+
+        Assert.Equal(new[] { true }, recorder.InMapEvent);
+        AssertPartyState(Server, partyId, expectMapEvent: false, expectCamp: false);
+    }
+
+    [Fact]
+    public void RepeatedLeaveSoldiersBehind_SameMapEvent_SacrificesOnce()
+    {
+        var mapEvent = CreateServerMapEvent();
+        var partyId = JoinNewServerPartyToSide(mapEvent.MapEventId, BattleSideEnum.Attacker);
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        AddEncounterGameMenuBehavior(Server);
+        var client = Clients.First();
+        RegisterAsPlayerParty("PlayerOne", heroId, partyId);
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+
+        using var recorder = new LeftSoldiersBehindRecorder();
+        client.Call(() =>
+        {
+            var network = client.Resolve<INetwork>();
+            network.SendAll(new NetworkPlayerLeftSoldiersBehind(heroId, partyId));
+            network.SendAll(new NetworkPlayerLeftSoldiersBehind(heroId, partyId));
+        }, MapEventDisabledMethods);
+
+        Assert.Equal(new[] { true }, recorder.InMapEvent);
     }
 
     [Fact]
@@ -819,6 +876,45 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         });
     }
 
+    private List<MethodBase> LeaveSoldiersBehindDisabledMethods => MapEventDisabledMethods
+        .Concat(SiegeCreationDisabledMethods)
+        .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu), new[] { typeof(string) }))
+        .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu), new[] { typeof(string) }))
+        .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
+        .ToList();
+
+    private string SetMainHero(EnvironmentInstance instance)
+    {
+        var heroId = TestEnvironment.CreateRegisteredObject<Hero>();
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
+            Game.Current.PlayerTroop = hero.CharacterObject;
+            Assert.Same(hero, Hero.MainHero);
+        });
+        return heroId;
+    }
+
+    private static void AddEncounterGameMenuBehavior(EnvironmentInstance instance)
+    {
+        instance.Call(() =>
+        {
+            if (Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>() != null) return;
+
+            Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(
+                new CampaignBehaviorBase[] { new EncounterGameMenuBehavior() }));
+        });
+    }
+
+    private static void InvokePatchedLeaveSoldiersBehindAccept()
+    {
+        var method = AccessTools.Method(typeof(EncounterGameMenuBehavior), nameof(EncounterGameMenuBehavior.game_menu_encounter_leave_your_soldiers_behind_accept_on_consequence));
+        Assert.NotNull(method);
+
+        var behavior = ObjectHelper.SkipConstructor<EncounterGameMenuBehavior>();
+        method.Invoke(behavior, new object[] { null! });
+    }
+
     private static void AssertPartyState(
         EnvironmentInstance instance,
         string partyId,
@@ -856,6 +952,38 @@ public class SiegeAssaultLeaveTests : MapEventTestBase
         Assert.NotNull(prefix);
 
         return (bool)prefix.Invoke(null, new object[] { "join_siege_event" })!;
+    }
+
+    // Records each server sacrifice and whether the party was still in its map event. The body is skipped
+    // because it needs live campaign models.
+    private sealed class LeftSoldiersBehindRecorder : IDisposable
+    {
+        private static readonly MethodInfo ConsequenceMethod = AccessTools.Method(
+            typeof(EncounterGameMenuBehaviorInterface),
+            nameof(EncounterGameMenuBehaviorInterface.LeftSoldiersBehindConsequence));
+
+        private static List<bool> inMapEvent = new();
+
+        private readonly Harmony harmony = new($"leave-soldiers-behind-recorder-{Guid.NewGuid()}");
+
+        public IReadOnlyList<bool> InMapEvent => inMapEvent;
+
+        public LeftSoldiersBehindRecorder()
+        {
+            inMapEvent = new List<bool>();
+            harmony.Patch(ConsequenceMethod, prefix: new HarmonyMethod(typeof(LeftSoldiersBehindRecorder), nameof(Record)));
+        }
+
+        public void Dispose()
+        {
+            harmony.Unpatch(ConsequenceMethod, HarmonyPatchType.Prefix, harmony.Id);
+        }
+
+        private static bool Record(MobileParty mainParty)
+        {
+            inMapEvent.Add(mainParty.MapEvent != null);
+            return false;
+        }
     }
 
     private sealed class NetworkDeliveryBlocker : IDisposable

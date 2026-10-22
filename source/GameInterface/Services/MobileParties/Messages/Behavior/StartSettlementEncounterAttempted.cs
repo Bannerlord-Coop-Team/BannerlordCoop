@@ -11,12 +11,15 @@ public readonly struct StartSettlementEncounterAttempted : IEvent
 {
     public readonly MobileParty Party;
     public readonly Settlement Settlement;
+    public readonly bool IsAutomaticRecovery;
 
     public StartSettlementEncounterAttempted(
         MobileParty party,
-        Settlement settlement)
+        Settlement settlement,
+        bool isAutomaticRecovery = false)
     {
         Party = party;
         Settlement = settlement;
+        IsAutomaticRecovery = isAutomaticRecovery;
     }
 }

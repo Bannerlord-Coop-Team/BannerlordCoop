@@ -13,6 +13,7 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.TroopRosters.Data;
 using GameInterface.Services.TroopRosters.Interfaces;
 using HarmonyLib;
+using LiteNetLib;
 using Helpers;
 using Moq;
 using SandBox.GauntletUI.Map;
@@ -64,6 +65,11 @@ public abstract class MapEventTestBase : IDisposable
             AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
         };
     }
+
+    protected IReadOnlyList<MethodBase> WithoutNetworkDelivery() => MapEventDisabledMethods
+        .Append(AccessTools.Method(typeof(TestNetworkRouter), nameof(TestNetworkRouter.SendReliablePayload),
+            new[] { typeof(NetPeer), typeof(NetPeer), typeof(byte[]) }))
+        .ToList();
 
     public void Dispose() => TestEnvironment.Dispose();
 
@@ -331,22 +337,6 @@ public abstract class MapEventTestBase : IDisposable
             hero.PartyBelongedToAsPrisoner = captor.Party;
 
             Assert.Equal(captor.Party, hero.PartyBelongedToAsPrisoner);
-        }, MapEventDisabledMethods);
-    }
-
-    /// <summary>
-    /// Releases the hero with <paramref name="heroId"/> from captivity on the server, syncing the cleared
-    /// state to all clients.
-    /// </summary>
-    protected void EndCaptivity(string heroId)
-    {
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
-
-            hero.PartyBelongedToAsPrisoner = null;
-
-            Assert.Null(hero.PartyBelongedToAsPrisoner);
         }, MapEventDisabledMethods);
     }
 
@@ -701,7 +691,11 @@ public abstract class MapEventTestBase : IDisposable
                 PartyScreenHelper.PartyScreenMode.Normal,
                 Server.Resolve<ITroopRosterInterface>().PackTroopRosterOrderData(captorParty.MemberRoster));
 
-            Server.Resolve<IMessageBroker>().Publish(this, message);
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.TryGetPlayer(captorHero, out var captor));
+            Assert.True(playerManager.TryGetPeer(captor.ControllerId, out var captorPeer));
+
+            Server.Resolve<IMessageBroker>().Publish(captorPeer, message);
         }, disabledMethods);
     }
 
@@ -1002,19 +996,6 @@ public abstract class MapEventTestBase : IDisposable
 
         Assert.NotNull(encounter);
         return encounter!;
-    }
-
-    /// <summary>
-    /// Clears <c>PlayerEncounter.Current</c> on the given <paramref name="instance"/>, simulating the player
-    /// leaving an encounter.
-    /// </summary>
-    protected void ClearPlayerEncounter(EnvironmentInstance instance)
-    {
-        instance.Call(() =>
-        {
-            Campaign.Current.PlayerEncounter = null;
-            Assert.Null(PlayerEncounter.Current);
-        }, MapEventDisabledMethods);
     }
 
     /// <summary>

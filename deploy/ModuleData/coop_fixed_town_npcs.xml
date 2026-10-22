@@ -612,4 +612,270 @@
       </EquipmentRoster>
     </Equipments>
   </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_2cb61191"
+    name="{=!}Kuthol"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.sturgia"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_S1"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Hurry up and get on with it."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_sturgia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.segmented_skullcap_over_mail_coif" />
+        <equipment slot="Cape" id="Item.brass_lamellar_shoulder_white" />
+        <equipment slot="Body" id="Item.sturgian_lamellar_fortified" />
+        <equipment slot="Gloves" id="Item.northern_plated_gloves" />
+        <equipment slot="Leg" id="Item.strapped_mail_chausses" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_2dcc1af4"
+    name="{=!}Livviana Neuport"
+    default_group="Infantry"
+    level="1"
+    is_female="true"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.vlandia"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_V7"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Greetings traveler, I&apos;ve grown quite weary."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townswoman_vlandia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Cape" id="Item.female_scarf" />
+        <equipment slot="Body" id="Item.vlandian_woman_dress" />
+        <equipment slot="Leg" id="Item.sturgia_boots_b" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_86cf913d"
+    name="{=!}Hannibal Barca"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.aserai"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_A5"
+    coop_location="lordshall"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="God has given to man no sharper spur to victory than contempt of death, so you should think to yourself that every day is your last. That way, you&apos;re always motivated."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_aserai" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Cape" id="Item.aserai_scale_shoulder_c" />
+        <equipment slot="Body" id="Item.aserai_armor_02" />
+        <equipment slot="Gloves" id="Item.guarded_padded_vambrace" />
+        <equipment slot="Leg" id="Item.wrapped_shoes" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_1c6724bc"
+    name="{=!}Yolda Gezen Egemen"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.vlandia"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_V2"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Başka nerde gezicem ki?"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_vlandia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.heavy_nasalhelm_over_imperial_leather" />
+        <equipment slot="Cape" id="Item.battania_shoulder_furr" />
+        <equipment slot="Body" id="Item.khuzait_heavy_armor" />
+        <equipment slot="Gloves" id="Item.khuzait_heavy_armor_bracer" />
+        <equipment slot="Leg" id="Item.mail_cavalier_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_4d2b8bf4"
+    name="{=!}Jeremy Elbertson"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.empire"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_A1"
+    coop_location="prison"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="You eat one orphan in the desert and all of a sudden you&apos;re a criminal, what has the world come to?"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_empire" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.empire_crown" />
+        <equipment slot="Cape" id="Item.southern_shawl" />
+        <equipment slot="Gloves" id="Item.reinforced_leather_vambraces" />
+        <equipment slot="Leg" id="Item.southern_moccasins" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_538d1444"
+    name="{=!}Saber Storm"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.vlandia"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_EW6"
+    coop_location="center"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Have you seen the rest of the boys? We got a war to win."
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_vlandia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.guards_kettle_over_padded_coif" />
+        <equipment slot="Cape" id="Item.pauldron_over_scale_armor" />
+        <equipment slot="Body" id="Item.ringed_desert_armor" />
+        <equipment slot="Gloves" id="Item.reinforced_mail_mitten" />
+        <equipment slot="Leg" id="Item.mail_cavalier_boots" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_4c46a2b6"
+    name="{=!}Robin Dahood"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.battania"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_V3"
+    coop_location="prison"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="What do you think your looking at, pilgrim? Hit the road, Jack!"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_battania" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.aserai_civil_f_cape" />
+        <equipment slot="Cape" id="Item.battania_cloak_furr" />
+        <equipment slot="Body" id="Item.fur_armor" />
+        <equipment slot="Gloves" id="Item.armwraps" />
+        <equipment slot="Leg" id="Item.assassin_boot" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_32770a02"
+    name="{=!}maraba"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.empire"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_EN1"
+    coop_location="house_1"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="marabanın marbası"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_vlandia" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.brass_aserai_helmet_b_closed" />
+        <equipment slot="Cape" id="Item.aserai_scale_shoulder_a" />
+        <equipment slot="Body" id="Item.sturgia_cavalry_armor" />
+        <equipment slot="Gloves" id="Item.decorated_imperial_gauntlets" />
+        <equipment slot="Leg" id="Item.strapped_shoes" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
+  <NPCCharacter
+    id="coop_fixed_npc_8de19a17"
+    name="{=!}Viktorovich"
+    default_group="Infantry"
+    level="1"
+    is_female="false"
+    is_hero="false"
+    is_template="false"
+    occupation="Townsfolk"
+    culture="Culture.battania"
+    is_hidden_encyclopedia="true"
+    coop_settlement="town_B5"
+    coop_location="tavern"
+    coop_spawn_tag="npc_common"
+    coop_dialogue="Die Heizungsanlagen laufen – wird es nicht Zeit, dass auch wir uns an die Arbeit machen?"
+    coop_enabled="true">
+    <face>
+      <face_key_template value="BodyProperty.townsman_battania" />
+    </face>
+    <skills />
+    <Equipments>
+      <EquipmentRoster civilian="true">
+        <equipment slot="Head" id="Item.battanian_plated_noble_helmet" />
+        <equipment slot="Cape" id="Item.varangian_bra_scale" />
+        <equipment slot="Body" id="Item.desert_scale_armor" />
+        <equipment slot="Gloves" id="Item.mail_mitten_h" />
+        <equipment slot="Leg" id="Item.strapped_mail_chausses" />
+      </EquipmentRoster>
+    </Equipments>
+  </NPCCharacter>
 </NPCCharacters>

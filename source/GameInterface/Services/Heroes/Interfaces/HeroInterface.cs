@@ -14,6 +14,7 @@ using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.Traits.Interfaces;
 using GameInterface.Services.UI.Messages;
 using SandBox.View.Map.Managers;
 using Serilog;
@@ -47,19 +48,22 @@ internal class HeroInterface : IHeroInterface
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IPartyVisibilitySweep partyVisibilitySweep;
     private readonly IPlayerPartyRestorer playerPartyRestorer;
+    private readonly ITraitLevelingHelperInterface traitLevelingHelperInterface;
 
     public HeroInterface(
         IMessageBroker messageBroker,
         IBinaryPackageFactory binaryPackageFactory,
         IObjectManager objectManager,
         IPartyVisibilitySweep partyVisibilitySweep,
-        IPlayerPartyRestorer playerPartyRestorer)
+        IPlayerPartyRestorer playerPartyRestorer,
+        ITraitLevelingHelperInterface traitLevelingHelperInterface)
     {
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
         this.binaryPackageFactory = binaryPackageFactory;
         this.partyVisibilitySweep = partyVisibilitySweep;
         this.playerPartyRestorer = playerPartyRestorer;
+        this.traitLevelingHelperInterface = traitLevelingHelperInterface;
     }
 
     public byte[] PackageMainHero()
@@ -221,6 +225,11 @@ internal class HeroInterface : IHeroInterface
             playerHero.PartyBelongedTo = null;
             messageBroker.Publish(this, new PlayerCaptivityChanged(playerHero.PartyBelongedToAsPrisoner));
         }
+        else
+        {
+            // Vanilla skips the camera target while a saved party is parked for login.
+            playerParty.Party.SetAsCameraFollowParty();
+        }
 
         // The transferred host save carries the server's always-visible party state
         // (PartyVisibilityServerPatches) and the native load path never rebuilds fog of war
@@ -332,6 +341,9 @@ internal class HeroInterface : IHeroInterface
             playerPartyRestorer.Restore(hero, party);
         else
             playerPartyRestorer.RestoreClanMembership(hero);
+
+        // Matches CharacterCreationManager.ApplyFinalEffects setting trait xp from the created hero's levels
+        traitLevelingHelperInterface.InitializeTraitXp(hero);
     }
 
     /// <summary>

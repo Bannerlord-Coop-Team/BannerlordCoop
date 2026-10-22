@@ -91,7 +91,9 @@ internal class MapEventSideDataHandler : IHandler
 
                 using (new AllowedThread())
                 {
-                    side._battleParties.Remove(party);
+                    // Army attachment replay can have added a local entry for the same party.
+                    side._battleParties.RemoveAll(entry =>
+                        entry == party || (party.Party != null && entry.Party == party.Party));
                     if (party.Party?.MobileParty != null)
                         side._nearbyPartiesAddedToPlayerMapEvent.Remove(party.Party.MobileParty);
                     if (party.Party?.MapEventSide == side) party.Party._mapEventSide = null;

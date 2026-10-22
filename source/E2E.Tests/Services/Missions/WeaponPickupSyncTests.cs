@@ -89,7 +89,9 @@ public class WeaponPickupSyncTests
             worldItemDataValue: 11,
             hasWorldItemDataValue: true,
             worldItemModifierId: "ItemModifier_world_item",
-            pickupId: pickupId);
+            pickupId: pickupId,
+            isStuckMissile: true,
+            stackedOntoSlot: true);
         PropertyInfo? property = typeof(NetworkWeaponPickedup).GetProperty(
             nameof(NetworkWeaponPickedup.CurrentEquipment));
         Assert.NotNull(property);
@@ -131,6 +133,8 @@ public class WeaponPickupSyncTests
         Assert.True(received.HasWorldItemDataValue);
         Assert.Equal("ItemModifier_world_item", received.WorldItemModifierId);
         Assert.Equal(pickupId, received.PickupId);
+        Assert.True(received.IsStuckMissile);
+        Assert.True(received.StackedOntoSlot);
     }
 
     [Fact]
@@ -364,6 +368,43 @@ public class WeaponPickupSyncTests
                 target,
                 HarmonyPatchType.All,
                 harmony.Id);
+        }
+    }
+
+    [Fact]
+    public void MissionModule_PatchesNativeWorldItemDropCallbacks()
+    {
+        HarmonyPatchCategoryRegistration registration = Assert.Single(
+            MissionModule.CreatePatchCategoryRegistrations(),
+            candidate => candidate.Category == MissionModule.WeaponDropPatchCategory);
+        var harmony = new Harmony(
+            $"{nameof(MissionModule_PatchesNativeWorldItemDropCallbacks)}.{System.Guid.NewGuid()}");
+        // Native death drops and stuck missiles create their world items through these callbacks.
+        MethodInfo[] targets =
+        {
+            AccessTools.Method(typeof(Mission), nameof(Mission.SpawnWeaponAsDropFromAgentAux)),
+            AccessTools.Method(typeof(Mission), nameof(Mission.SpawnWeaponAsDropFromMissile)),
+            // Every missile ends here, whether it dropped, stuck in an agent or vanished.
+            AccessTools.Method(typeof(Mission), nameof(Mission.OnMissileRemoved)),
+        };
+
+        try
+        {
+            registration.Apply(harmony);
+
+            foreach (MethodInfo target in targets)
+            {
+                Patches patches = Harmony.GetPatchInfo(target);
+                Assert.NotNull(patches);
+                Assert.Contains(
+                    patches.Postfixes,
+                    patch => patch.owner == harmony.Id &&
+                        patch.PatchMethod.DeclaringType.Assembly == typeof(AgentDropPatch).Assembly);
+            }
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
         }
     }
 

@@ -67,7 +67,9 @@ public class AutoSyncFieldBuilder : AutoSyncBuilderBase
             ReadOnly = fieldInfo.IsInitOnly,
             ReadOnlySetterIndex = fieldInfo.IsInitOnly ? GetReadOnlyFieldSetter(fieldInfo) : (int?)null,
             Debug = debug,
-            Coalesce = coalesce
+            Coalesce = coalesce,
+            HeadlessMapEventVisual = fieldInfo.DeclaringType == typeof(TaleWorlds.CampaignSystem.MapEvents.MapEvent)
+                && fieldInfo.Name == nameof(TaleWorlds.CampaignSystem.MapEvents.MapEvent.MapEventVisual)
         };
     }
 }

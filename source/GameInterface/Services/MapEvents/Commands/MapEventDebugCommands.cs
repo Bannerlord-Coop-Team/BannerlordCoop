@@ -13,6 +13,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.MapEvents.Messages.Leave;
@@ -1141,6 +1142,15 @@ public class MapEventDebugCommands
                 return Failed($"Unable to resolve bandit party {args[1]}: {error}");
             }
 
+            if (!ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier))
+            {
+                return Failed("MapEvent initialization barrier is unavailable.");
+            }
+
+            var mapEvent = playerParty.MapEvent;
+            var visual = mapEvent?.MapEventVisual;
+            bool visualRegistered = visual != null && objectManager.TryGetHandle(visual, out _);
+
             objectManager.TryGetId(playerParty, out string playerPartyId);
             objectManager.TryGetId(banditParty, out string banditPartyId);
             objectManager.TryGetId(playerParty.MapEvent, out string playerMapEventId);
@@ -1154,6 +1164,8 @@ public class MapEventDebugCommands
                    $"playerSettlement={playerParty.CurrentSettlement?.StringId ?? "none"}, " +
                    $"banditSettlement={banditParty.CurrentSettlement?.StringId ?? "none"}, " +
                    $"banditActive={banditParty.IsActive}, banditTroops={banditParty.MemberRoster.TotalManCount}, " +
+                   $"graphCommitted={barrier.IsCommitted(mapEvent)}, graphPending={barrier.IsPending(mapEvent)}, " +
+                   $"visualType={visual?.GetType().FullName ?? "none"}, visualRegistered={visualRegistered}, " +
                    $"menu={Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "none"}.");
         }
     }
@@ -1769,6 +1781,42 @@ public class MapEventDebugCommands
             fixture.PartialRoutIssued = true;
             network.SendAll(new NetworkRouteBattleEnemies(mapEventId, enemiesToLeaveFighting: 20));
             return Succeeded($"Ordered fixture enemies to retreat while leaving up to 20 fighting: mapEvent={mapEventId}.");
+        }
+    }
+
+    public sealed class RouteBattleEnemiesCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+        public string Name => "route_enemies";
+        public string Description => "Ask the active mission authority to retreat agents in an exact map event, defaulting to its enemy side.";
+        public CoopCommandSide Side => CoopCommandSide.Server;
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("map_event_id", "The registered map event id.", true),
+            new ExpectedArgs("enemies_to_leave_fighting", "The number of active enemy agents to leave fighting.", true),
+            new ExpectedArgs("side", "Optional attacker or defender side instead of the authority's enemy side.", isRequired: false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient)
+                return Failed("Run this command on the server.");
+            if (args.Count < 2 || args.Count > 3 || !int.TryParse(args[1], out var remaining) || remaining < 0)
+                return Failed("Supply a map event id and a nonnegative enemy count.");
+            BattleSideEnum? side = null;
+            if (args.Count == 3)
+            {
+                if (args[2] == "attacker") side = BattleSideEnum.Attacker;
+                else if (args[2] == "defender") side = BattleSideEnum.Defender;
+                else return Failed("Side must be attacker or defender.");
+            }
+            if (!TryGetObjectManager(out var objects) ||
+                !objects.TryGetObjectWithLogging<MapEvent>(args[0], out var mapEvent) || mapEvent.IsFinalized ||
+                !ContainerProvider.TryResolve<INetwork>(out var network))
+                return Failed("The active map event or network is unavailable.");
+
+            network.SendAll(new NetworkRouteBattleEnemies(args[0], remaining, side));
+            return Succeeded($"Retreat requested for mapEvent={args[0]}, side={side?.ToString() ?? "enemy"}, agentsToLeaveFighting={remaining}. Read mission and campaign state to verify completion.");
         }
     }
 
@@ -2630,6 +2678,57 @@ public class MapEventDebugCommands
 
             var held = ConversationPartyTracker.Instance?.TryGetEngagement(args[0], out _) == true;
             return Succeeded($"Conversation hold for PartyBase id {args[0]}: {(held ? "held" : "released")}.");
+        }
+    }
+
+    public sealed class HoldAiConversationCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.map_event";
+
+        public string Name => "hold_ai_conversation";
+
+        public string Description => "Holds an AI lord party for a player's map conversation.";
+
+        public CoopCommandSide Side => CoopCommandSide.Server;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("controller_id", "The connected player's controller id.", true),
+            new ExpectedArgs("hero_id", "The AI lord's registered hero id.", true),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (ModInformation.IsClient) return Failed("Run this command on the server.");
+            if (!TryGetPlayerParty(args[0], requireReady: true, out var objectManager, out var playerParty, out var error))
+                return Failed(error);
+            if (!ContainerProvider.TryResolve<IPlayerManager>(out var playerManager) ||
+                !playerManager.TryGetPeer(args[0], out var peer) ||
+                !objectManager.TryGetObject(args[1], out Hero aiHero))
+                return Failed("The connected player peer or AI lord is unavailable.");
+
+            var aiParty = aiHero.PartyBelongedTo;
+            if (playerParty?.Party == null || !playerParty.IsActive || playerParty.MapEvent != null ||
+                aiParty?.Party == null || !aiParty.IsActive || aiParty.MapEvent != null ||
+                aiParty.IsPlayerParty() || aiParty.LeaderHero != aiHero ||
+                playerParty.CurrentSettlement != null || aiParty.CurrentSettlement != null ||
+                !objectManager.TryGetId(playerParty.Party, out var playerPartyId) ||
+                !objectManager.TryGetId(aiParty.Party, out var aiPartyId))
+                return Failed("Both parties must be active on the map, with the AI lord leading the target party.");
+
+            var tracker = ConversationPartyTracker.Instance;
+            if (tracker == null)
+                return Failed("The conversation tracker is unavailable.");
+            if (!ConversationPartyHold.TryEngage(
+                    tracker,
+                    peer,
+                    playerPartyId,
+                    aiParty,
+                    aiPartyId,
+                    engagerIsDefender: false))
+                return Failed("The server could not acquire the AI lord party conversation hold.");
+
+            return Succeeded($"Held {aiHero.Name}'s party {aiPartyId} for player {args[0]} ({playerPartyId}).");
         }
     }
 

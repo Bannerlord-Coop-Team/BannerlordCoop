@@ -73,6 +73,10 @@ public class ServerSettlementExitEnterHandler : IHandler
 
         GameThread.RunSafe(() =>
         {
+#if DEBUG
+            Logger.Debug("SettlementEncounterRecovery phase=receive partyHandle={PartyHandle} settlementHandle={SettlementHandle}",
+                payload.PartyId, payload.SettlementId);
+#endif
             if (!DoesPeerControlParty(peer, payload.PartyId))
             {
                 RejectSettlementEncounter(peer, payload, "your party is not controlled by you");
@@ -103,6 +107,10 @@ public class ServerSettlementExitEnterHandler : IHandler
             {
                 if (mobileParty.CurrentSettlement == settlement)
                 {
+#if DEBUG
+                    Logger.Debug("SettlementEncounterRecovery phase=approve branch=already-inside partyHandle={PartyHandle} settlementHandle={SettlementHandle}",
+                        payload.PartyId, payload.SettlementId);
+#endif
                     network.Send(peer, new NetworkStartSettlementEncounter(payload));
                 }
                 else
@@ -132,6 +140,10 @@ public class ServerSettlementExitEnterHandler : IHandler
                 return;
             }
 
+#if DEBUG
+            Logger.Debug("SettlementEncounterRecovery phase=approve branch=validated-entry partyHandle={PartyHandle} settlementHandle={SettlementHandle}",
+                payload.PartyId, payload.SettlementId);
+#endif
             network.Send(peer, new NetworkStartSettlementEncounter(payload));
 
             // Vanilla starts under-siege and under-raid encounters outside the settlement.
@@ -150,6 +162,10 @@ public class ServerSettlementExitEnterHandler : IHandler
         NetworkRequestStartSettlementEncounter payload,
         string reason)
     {
+#if DEBUG
+        Logger.Debug("SettlementEncounterRecovery phase=reject partyHandle={PartyHandle} settlementHandle={SettlementHandle} reason={Reason}",
+            payload.PartyId, payload.SettlementId, reason);
+#endif
         network.Send(peer, new NetworkSettlementEncounterRejected(payload));
         network.Send(
             peer,

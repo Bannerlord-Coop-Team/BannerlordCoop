@@ -57,7 +57,7 @@ namespace GameInterface.Utils
             messageBroker.Subscribe(payloadHandler);
             disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
         }
-        protected void SubscribeGenericReference<TValue, TMessage, TNetworkMessage>()
+        protected void SubscribeGenericReference<TValue, TMessage, TNetworkMessage>(Predicate<TValue> skipUnregisteredValue = null)
             where TMessage : GenericEvent<TInstance, TValue>
             where TNetworkMessage : GenericNetworkReferenceEvent<TInstance, TValue>
         {
@@ -70,6 +70,8 @@ namespace GameInterface.Utils
                 if (!objectManager.TryGetHandleWithLogging(data.Instance, out var instanceId)) return;
 
                 uint valueId = 0;
+                if (data.Value != null && skipUnregisteredValue?.Invoke(data.Value) == true
+                    && !objectManager.TryGetHandle(data.Value, out _)) return;
                 if (data.Value != null && !objectManager.TryGetHandleWithLogging(data.Value, out valueId)) return;
 
                 network.SendAll((TNetworkMessage)ctor.Invoke(new object[] { instanceId, valueId }));

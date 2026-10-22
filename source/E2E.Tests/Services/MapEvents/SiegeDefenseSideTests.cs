@@ -148,11 +148,6 @@ public class SiegeDefenseSideTests : MapEventTestBase
         return battle;
     }
 
-    private IReadOnlyList<MethodBase> WithoutNetworkDelivery() => MapEventDisabledMethods
-        .Append(AccessTools.Method(typeof(TestNetworkRouter), nameof(TestNetworkRouter.SendReliablePayload),
-            new[] { typeof(NetPeer), typeof(NetPeer), typeof(byte[]) }))
-        .ToList();
-
     private static void AssertMembership(EnvironmentInstance instance, string mapEventId,
         string partyId, BattleSideEnum expectedSide, string membershipId)
     {

@@ -8,6 +8,7 @@ using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.TroopRosters.Interfaces;
 using Helpers;
 using LiteNetLib;
@@ -31,6 +32,7 @@ internal class PartyScreenHelperHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
+    private readonly IPlayerManager playerManager;
     private readonly ISendCoalescer sendCoalescer;
 
     public PartyScreenHelperHandler(
@@ -38,12 +40,14 @@ internal class PartyScreenHelperHandler : IHandler
         IObjectManager objectManager,
         INetwork network,
         ITroopRosterInterface troopRosterInterface,
+        IPlayerManager playerManager,
         ISendCoalescer sendCoalescer = null)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
+        this.playerManager = playerManager;
         this.sendCoalescer = sendCoalescer;
         messageBroker.Subscribe<NewClanPartyScreenClosed>(Handle_NewClanPartyScreenClosed);
         messageBroker.Subscribe<CreateClanPartyAfterScreenClose>(Handle_CreateClanPartyAfterScreenClose);
@@ -88,6 +92,7 @@ internal class PartyScreenHelperHandler : IHandler
     {
         GameThread.RunSafe(() =>
         {
+            if (!playerManager.IsSenderControllingHero(obj.Who, obj.What.MainHeroId)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.MainHeroId, out var mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging<Hero>(obj.What.NewLeaderHeroId, out var newLeaderHero)) return;
 
@@ -128,6 +133,7 @@ internal class PartyScreenHelperHandler : IHandler
         });
     }
 
+    // Client side: sends the troops donated on the garrison screen to the server.
     private void Handle_GarrisonDonated(MessagePayload<GarrisonDonated> obj)
     {
         if (!objectManager.TryGetIdWithLogging(obj.What.CurrentSettlement, out var currentSettlementId)) return;
@@ -145,13 +151,19 @@ internal class PartyScreenHelperHandler : IHandler
                 element.Number));
         }
 
+        // Done is allowed without moving any troops, nothing to send then
+        if (troops.Count == 0) return;
+
         var message = new DonateToGarrison(currentSettlementId, troops);
 
         network.SendAll(message);
     }
 
+    // Server side: adds the donated troops to the settlement's garrison, creating it if needed.
     private void Handle_DonateToGarrison(MessagePayload<DonateToGarrison> obj)
     {
+        // protobuf drops an empty list so Troops arrives as null, the foreach below would NRE and kill the dedicated server
+        if (obj.What.Troops == null || obj.What.Troops.Count == 0) return;
         if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.What.CurrentSettlementId, out var currentSettlement)) return;
 
         GameThread.RunSafe(() =>
