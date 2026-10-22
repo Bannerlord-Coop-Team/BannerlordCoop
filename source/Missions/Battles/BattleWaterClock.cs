@@ -23,6 +23,9 @@ public interface IBattleWaterClock : IDisposable
     /// <summary>Host samples accepted so far.</summary>
     int SamplesAccepted { get; }
 
+    /// <summary>[Game thread] Points the engine at the battle's water time; called while the loading screen still hides the scene.</summary>
+    void Start();
+
     /// <summary>[Game thread] Writes this frame's water time and, on the host, broadcasts it every second.</summary>
     void Tick(float dt);
 }
@@ -33,6 +36,9 @@ public class BattleWaterClock : IBattleWaterClock
     private static readonly ILogger Logger = LogManager.GetLogger<BattleWaterClock>();
 
     internal const float BroadcastIntervalSeconds = 1f;
+    // Every client starts the battle's waves here rather than at its own accumulated clock, so clients that load together
+    // already agree to within their load-time skew; 0 is also where vanilla's first mission after launch starts.
+    internal const float BattleStartWaterTime = 0f;
 
     private readonly IBattleNetwork network;
     private readonly IMessageBroker messageBroker;
@@ -40,8 +46,8 @@ public class BattleWaterClock : IBattleWaterClock
     private readonly IHostEpochPolicy hostEpochPolicy;
     private readonly IWaterClock waterClock;
     private float sinceBroadcast = BroadcastIntervalSeconds;
+    private bool started;
     private bool overriding;
-    private bool overrideFailed;
 
     public BattleWaterClock(IBattleNetwork network, IMessageBroker messageBroker, IBattleSession session,
         IHostEpochPolicy hostEpochPolicy, IWaterClock waterClock, IBattleWaterTimeEstimator estimator)
@@ -62,23 +68,28 @@ public class BattleWaterClock : IBattleWaterClock
 
     public int SamplesAccepted { get; private set; }
 
+    public void Start()
+    {
+        if (started) return;
+        started = true;
+        if (!waterClock.IsInstalled || !waterClock.TryReadVanillaMissionTime(out var local)) return;
+
+        float waterTime = Estimator.Begin(local, BattleStartWaterTime);
+        // A failed redirect has been logged; this battle keeps vanilla waves rather than retrying every frame.
+        overriding = waterClock.TryBeginOverride(waterTime);
+        if (overriding)
+            Logger.Information("[NavalSync] Battle water clock on at {WaterTime} (local {Local}, host time {HostTime})",
+                waterTime, local, Estimator.HasHostTime);
+    }
+
     public void Tick(float dt)
     {
-        if (!waterClock.IsInstalled || overrideFailed) return;
-        if (!waterClock.TryReadVanillaTime(WaterClock.MissionTimeType, out var local)) return;
+        // AfterStart normally starts the clock; a battle that skipped it starts on its first tick instead.
+        Start();
+        if (!overriding || !waterClock.TryReadVanillaMissionTime(out var local)) return;
 
         bool isHost = session.IsLocalHost;
         float waterTime = Estimator.Advance(local, isHost);
-        if (!overriding)
-        {
-            // The first frame starts from this client's own clock (or the host's, if its time came during loading).
-            // A failed redirect has been logged; this battle keeps vanilla waves rather than retrying every frame.
-            overrideFailed = !waterClock.TryBeginOverride(waterTime);
-            if (overrideFailed) return;
-            overriding = true;
-            Logger.Information("[NavalSync] Battle water clock on at {WaterTime} (local {Local}, host {IsHost})", waterTime, local, isHost);
-        }
-
         waterClock.SetWaterTime(waterTime);
         if (isHost) BroadcastEvery(dt, waterTime);
     }
@@ -108,7 +119,7 @@ public class BattleWaterClock : IBattleWaterClock
         if (!waterClock.IsInstalled || session.IsLocalHost) return;
         if (float.IsNaN(sample.WaterTime) || float.IsInfinity(sample.WaterTime)) return;
         if (hostEpochPolicy.IsStale(sample.HostEpoch, session.HostEpoch)) return;
-        if (!waterClock.TryReadVanillaTime(WaterClock.MissionTimeType, out var local)) return;
+        if (!waterClock.TryReadVanillaMissionTime(out var local)) return;
 
         if (!Estimator.HasHostTime)
             Logger.Information("[NavalSync] Adopting the battle host's water time {HostTime} (local {Local})", sample.WaterTime, local);

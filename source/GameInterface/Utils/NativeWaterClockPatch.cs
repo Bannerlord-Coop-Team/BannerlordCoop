@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Threading;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Utils;
 
@@ -28,8 +30,8 @@ internal static class NativeWaterClockPatch
     internal const int TableInstructionEnd = 14;
     internal const int ScaleDisplacementOffset = 28;
     internal const int ScaleInstructionEnd = 32;
-    // The int64 tick table holds one accumulated clock per rglTimer_type (MBCommon.TimeType): Application, Mission.
-    internal const int TimeTypeCount = 2;
+    // The int64 tick table holds one accumulated clock per rglTimer_type (MBCommon.TimeType); mission scenes read Mission.
+    private const int MissionTimer = (int)MBCommon.TimeType.Mission;
 
     private const uint ImageScnMemExecute = 0x20000000;
     private const uint PageExecuteReadWrite = 0x40;
@@ -78,27 +80,29 @@ internal static class NativeWaterClockPatch
         }
     }
 
-    /// <summary>Sets the time in seconds the water simulation reads on its next update. Game thread only.</summary>
+    /// <summary>Sets the time the water simulation reads on its next update. Game thread only.</summary>
     /// <remarks>The unit is the engine's water clock: timer ticks (1e5 per second) * 0.0001, so 10 per timer second.</remarks>
-    public static void SetWaterTime(float seconds)
+    public static void SetWaterTime(float waterTime)
     {
         if (!IsActive) return;
 
-        buffer[0] = seconds;
+        buffer[0] = waterTime;
         Marshal.Copy(buffer, 0, waterTimeSlot, 1);
-        WrittenTime = seconds;
+        WrittenTime = waterTime;
     }
 
     /// <summary>Writes the slot, then points the clock load at it. Game thread only, the thread that runs the load.</summary>
-    public static bool TryRedirect(float seconds)
+    public static bool TryRedirect(float waterTime)
     {
         if (!IsActive) return false;
+        if (!IsOnGameThread(nameof(TryRedirect))) return false;
 
-        SetWaterTime(seconds);
+        SetWaterTime(waterTime);
         if (IsRedirected) return true;
         if (!TryWriteCode(originalCode, redirectCode)) return false;
 
         IsRedirected = true;
+        Logger.Debug("Water clock redirected on thread {ThreadId}", Thread.CurrentThread.ManagedThreadId);
         return true;
     }
 
@@ -106,20 +110,31 @@ internal static class NativeWaterClockPatch
     public static void Restore()
     {
         if (!IsRedirected) return;
+        if (!IsOnGameThread(nameof(Restore))) return;
         if (!TryWriteCode(redirectCode, originalCode)) return;
 
         IsRedirected = false;
+        Logger.Debug("Water clock restored on thread {ThreadId}", Thread.CurrentThread.ManagedThreadId);
     }
 
-    /// <summary>The exact value the vanilla load computes for a scene of this time type: (float)ticks * k, read from its own table and constant.</summary>
-    public static bool TryReadVanillaTime(int timeType, out float seconds)
+    /// <summary>The exact value the vanilla load computes for a mission scene: (float)ticks * k, read from its own table and constant.</summary>
+    public static bool TryReadVanillaMissionTime(out float waterTime)
     {
-        seconds = 0f;
-        if (!IsActive || timeType < 0 || timeType >= TimeTypeCount) return false;
+        waterTime = 0f;
+        if (!IsActive) return false;
 
-        float ticks = Marshal.ReadInt64(timeTable, timeType * sizeof(long));
-        seconds = ticks * tickScale;
+        float ticks = Marshal.ReadInt64(timeTable, MissionTimer * sizeof(long));
+        waterTime = ticks * tickScale;
         return true;
+    }
+
+    // The site is only ever executed by the game thread, so a swap from any other thread could tear a running instruction.
+    private static bool IsOnGameThread(string operation)
+    {
+        if (GameThread.Instance.IsGameThread) return true;
+
+        Logger.Error("Water clock {Operation} refused off the game thread (thread {ThreadId})", operation, Thread.CurrentThread.ManagedThreadId);
+        return false;
     }
 
     // Scans the executable sections, allocates the slot and captures both code variants; logs and frees on any failure.

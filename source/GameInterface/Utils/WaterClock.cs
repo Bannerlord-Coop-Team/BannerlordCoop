@@ -1,6 +1,4 @@
-﻿using TaleWorlds.MountAndBlade;
-
-namespace GameInterface.Utils;
+﻿namespace GameInterface.Utils;
 
 /// <summary>
 /// The engine's water clock: lets a synced naval battle make every scene's waves read a time it owns instead of the
@@ -23,8 +21,8 @@ public interface IWaterClock
     /// <summary>Installs the native patch once; client processes only. Returns whether it is installed.</summary>
     bool TryInstall();
 
-    /// <summary>The exact water time vanilla reads for a scene of <paramref name="timeType"/> (an MBCommon.TimeType).</summary>
-    bool TryReadVanillaTime(int timeType, out float waterTime);
+    /// <summary>The exact water time vanilla reads for a mission scene: the mission timer in water units (10 per second).</summary>
+    bool TryReadVanillaMissionTime(out float waterTime);
 
     /// <summary>[Game thread] Writes <paramref name="waterTime"/>, then makes the engine read it instead of its own clock.</summary>
     bool TryBeginOverride(float waterTime);
@@ -39,9 +37,6 @@ public interface IWaterClock
 /// <inheritdoc cref="IWaterClock"/>
 public class WaterClock : IWaterClock
 {
-    /// <summary>MBCommon.TimeType.Mission (rglTimer_type Tactical_timer), the clock mission scenes' water reads.</summary>
-    public const int MissionTimeType = (int)MBCommon.TimeType.Mission;
-
     public bool IsInstalled => NativeWaterClockPatch.IsActive;
 
     public bool IsOverriding => NativeWaterClockPatch.IsRedirected;
@@ -52,8 +47,7 @@ public class WaterClock : IWaterClock
 
     public bool TryInstall() => NativeWaterClockPatch.TryApply();
 
-    public bool TryReadVanillaTime(int timeType, out float waterTime) =>
-        NativeWaterClockPatch.TryReadVanillaTime(timeType, out waterTime);
+    public bool TryReadVanillaMissionTime(out float waterTime) => NativeWaterClockPatch.TryReadVanillaMissionTime(out waterTime);
 
     public bool TryBeginOverride(float waterTime) => NativeWaterClockPatch.TryRedirect(waterTime);
 

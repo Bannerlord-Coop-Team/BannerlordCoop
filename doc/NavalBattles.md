@@ -346,16 +346,27 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   engine frame at `0x9B820`) reads that clock as `(float)ticks[scene+0x6064] * 1e-4`: the int64 table at RVA `0xDA29B0`
   holds one tick count per `MBCommon.TimeType` (1e5 ticks per second), and mission scenes use `Mission`, so the read is
   10 x `GetTotalMissionTime()`. `NativeWaterClockPatch` (GameInterface) replaces that `cvtsi2ss`+`mulss` with
-  `movss xmm1,[slot]`, a float this mod owns. It is installed once from the client start path only (Windows, client
-  role, never on a server or headless build), and only when its signature matches exactly once; otherwise it logs the
-  match count and DLL identity and waves stay vanilla. The redirect is switched on only while a coop naval battle runs
-  and switched back at mission end, so the campaign map and every other scene run vanilla code.
-  - In a battle, `BattleWaterClock` writes the water time every mission tick. The battle host writes its own clock and
-    sends it every second (`NetworkBattleWaterTime`, host-epoch stamped) and at once to a peer entering the battle. A
-    client adopts the first host time at once (the late-join case), then smooths the offset to its local clock and
-    slews toward it at most 25% faster or slower than real time, so waves never pop or run backwards; a disagreement
-    over 2 s of mission time is adopted at once. A promoted host keeps its current offset, so it continues from its own
-    water time. Before the first host time arrives a client writes its own clock, so entering the battle has no jump.
+  `movss xmm1,[slot]`, a float this mod owns. It is installed once, on first use by a client opening a naval battle
+  (Windows, client role; it refuses a server or headless build), and only when its signature matches exactly once;
+  otherwise it logs the match count and DLL identity and waves stay vanilla. The redirect is switched on only while a
+  coop naval battle runs (only from the game thread, the thread that runs the load) and switched back first thing at
+  mission end, so other scenes run vanilla code. The campaign map's view may stay registered under the mission
+  (`MapScreen` toggles its scene view itself, and `0x9B820` has no enabled-view check), so map water can read battle
+  time while the battle runs; that is hidden and cosmetic, and map water right after a battle is a live check.
+  - Each scene's ocean keeps its own previous time (the water object at `scene+0x628`, created per scene by `0x1DA040`;
+    only `0x30F230` writes its time), so a new mission scene starts clean.
+  - Every client starts the battle's water at the same time, 0 (`BattleWaterClock.BattleStartWaterTime`), from
+    `AfterStart`, which runs under the loading screen, instead of at its own accumulated clock. Clients that load
+    together already agree to within their load-time skew, and the switch from vanilla happens before the battle is
+    visible. A host time that arrived during loading (a late joiner gets one at once) is used as the start instead.
+  - The battle host writes its own clock and sends it every second (`NetworkBattleWaterTime`, host-epoch stamped) and at
+    once to a peer entering the battle. A client's first host time is its one adoption: over 2 s of mission time
+    (20 water units) away it jumps once, in either direction, otherwise it is slewed. After that the written time never
+    runs backwards: a client smooths the largest offset of the last 3 samples (transit only makes an offset look
+    smaller), slews toward it at 75% to 125% speed, and snaps only forward, only when all 3 samples are more than 2 s
+    ahead. A promoted host keeps its current offset, so it continues from its own water time.
+  - The ship wake renderer reads the same clock at `0x1DAB69` (1e-5 scale, seconds) and is not patched, so wake effects
+    stay on each client's local clock.
   - Not compensated: the host time's transit and the frame it waits for the game thread. The R42 fit puts 0.02 s of
     clock lag at about 0.015 m mean water difference.
   - Copies still float on local buoyancy, but the local water now matches the owner's, so a copy's heave, pitch and

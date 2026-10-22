@@ -44,7 +44,7 @@ public sealed class NavalWaterClockCoopCommand : ICoopCommand
     {
         string line = $"NAVAL_WATER_CLOCK installed={Bool(waterClock.IsInstalled)} overriding={Bool(waterClock.IsOverriding)} " +
             $"status=\"{waterClock.Status}\"";
-        if (waterClock.TryReadVanillaTime(WaterClock.MissionTimeType, out var vanilla))
+        if (waterClock.TryReadVanillaMissionTime(out var vanilla))
         {
             line += $" written={Number(waterClock.WrittenTime)} vanilla={Number(vanilla)}" +
                 $" offset={Number(waterClock.WrittenTime - vanilla)}";

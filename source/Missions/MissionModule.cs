@@ -149,7 +149,7 @@ public class MissionModule : Module
         builder.RegisterType<NetworkShipRegistry>().As<INetworkShipRegistry>().InstancePerDependency();
         builder.RegisterType<BattleTeamResolver>().As<IBattleTeamResolver>().InstancePerDependency();
         builder.RegisterType<NavalBattleServicesFactory>().As<INavalBattleServicesFactory>().InstancePerDependency();
-        // Client container only: the native water clock patch is installed from the client start path.
+        // Also in the server container, which never opens a naval battle; the patch itself refuses to install on a server.
         builder.RegisterType<WaterClock>().As<IWaterClock>().InstancePerDependency();
         builder.RegisterType<GuardedHitWindow>()
             .As<IGuardedHitWindow>()

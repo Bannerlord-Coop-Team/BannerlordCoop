@@ -45,15 +45,37 @@ public class BattleWaterClockTests
     }
 
     [Fact]
-    public void FirstTick_WithoutHostTime_StartsFromTheVanillaClock()
+    public void Start_WithoutHostTime_BeginsAtTheSharedBattleStartTime()
     {
         waterClock.Vanilla = 1234.5f;
 
-        clock.Tick(0.016f);
+        clock.Start();
 
         Assert.True(waterClock.IsOverriding);
-        Assert.Equal(1234.5f, waterClock.BeganAt);
-        Assert.Equal(1234.5f, waterClock.WrittenTime);
+        Assert.Equal(BattleWaterClock.BattleStartWaterTime, waterClock.BeganAt);
+    }
+
+    [Fact]
+    public void Start_AfterAHostTimeArrivedDuringLoading_BeginsAtTheHostTime()
+    {
+        waterClock.Vanilla = 1000f;
+        clock.AcceptHostTime(new NetworkBattleWaterTime(700f, 2));
+
+        clock.Start();
+
+        Assert.Equal(700f, waterClock.BeganAt);
+    }
+
+    [Fact]
+    public void Tick_StartsTheClockWhenAfterStartWasSkipped()
+    {
+        waterClock.Vanilla = 1000f;
+
+        clock.Tick(0.016f);
+        clock.Start();
+
+        Assert.Equal(1, waterClock.Begins);
+        Assert.Equal(BattleWaterClock.BattleStartWaterTime, waterClock.WrittenTime);
     }
 
     [Fact]
@@ -117,7 +139,7 @@ public class BattleWaterClockTests
         clock.Tick(0.4f);
 
         Assert.Equal(0, clock.SamplesAccepted);
-        network.Verify(n => n.SendAll(It.Is<NetworkBattleWaterTime>(m => m.WaterTime == 1000f && m.HostEpoch == 2)), Times.Once);
+        network.Verify(n => n.SendAll(It.Is<NetworkBattleWaterTime>(m => m.WaterTime == 0f && m.HostEpoch == 2)), Times.Once);
         network.Verify(n => n.SendAll(It.IsAny<IMessage>()), Times.Once);
     }
 
@@ -127,10 +149,12 @@ public class BattleWaterClockTests
         session.SetupGet(s => s.IsLocalHost).Returns(true);
         waterClock.Vanilla = 1000f;
         clock.Tick(0.016f);
+        waterClock.Vanilla = 1010f;
+        clock.Tick(0.016f);
 
         clock.SendTimeTo("peer");
 
-        network.Verify(n => n.Send("peer", It.Is<NetworkBattleWaterTime>(m => m.WaterTime == 1000f && m.HostEpoch == 2)), Times.Once);
+        network.Verify(n => n.Send("peer", It.Is<NetworkBattleWaterTime>(m => m.WaterTime == 10f && m.HostEpoch == 2)), Times.Once);
     }
 
     [Fact]
@@ -203,10 +227,10 @@ public class BattleWaterClockTests
 
         public bool TryInstall() => Installed;
 
-        public bool TryReadVanillaTime(int timeType, out float waterTime)
+        public bool TryReadVanillaMissionTime(out float waterTime)
         {
             waterTime = Vanilla;
-            return Installed && timeType == WaterClock.MissionTimeType;
+            return Installed;
         }
 
         public bool TryBeginOverride(float waterTime)

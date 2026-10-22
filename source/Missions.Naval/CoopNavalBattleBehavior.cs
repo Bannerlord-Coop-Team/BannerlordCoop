@@ -70,6 +70,13 @@ public class CoopNavalBattleBehavior : MissionLogic
         LogAgentCountDrop();
     }
 
+    // Runs inside FinishMissionLoading, so the battle's water time is in place before the loading screen lifts.
+    public override void AfterStart()
+    {
+        base.AfterStart();
+        services.WaterClock.Start();
+    }
+
     // Copies are steered with the physics step, so a velocity change lands on the body before it integrates.
     public override void OnFixedMissionTick(float fixedDt)
     {

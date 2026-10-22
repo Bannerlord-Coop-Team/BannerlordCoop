@@ -186,7 +186,11 @@ public class NavalBattleServicesFactory : INavalBattleServicesFactory
         this.waterClock = waterClock;
     }
 
-    public INavalBattleServices Create(BattleContext context, INavalShipEngine shipEngine) =>
-        new NavalBattleServices(network, relayNetwork, messageBroker, teamResolver, objectManager, context, shipEngine,
+    public INavalBattleServices Create(BattleContext context, INavalShipEngine shipEngine)
+    {
+        // Installed on first use: only a client opening a naval battle gets here, and the patch refuses any server anyway.
+        waterClock.TryInstall();
+        return new NavalBattleServices(network, relayNetwork, messageBroker, teamResolver, objectManager, context, shipEngine,
             waterClock);
+    }
 }

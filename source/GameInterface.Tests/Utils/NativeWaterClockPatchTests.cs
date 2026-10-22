@@ -131,7 +131,7 @@ public class NativeWaterClockPatchTests : IDisposable
         Assert.False(waterClock.TryInstall());
 
         Assert.False(waterClock.IsInstalled);
-        Assert.False(waterClock.TryReadVanillaTime(WaterClock.MissionTimeType, out _));
+        Assert.False(waterClock.TryReadVanillaMissionTime(out _));
         Assert.False(waterClock.TryBeginOverride(1f));
         waterClock.SetWaterTime(1f);
         waterClock.EndOverride();
