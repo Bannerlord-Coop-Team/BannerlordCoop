@@ -80,7 +80,7 @@ public class SettlementEncounterDistanceValidatorTests
         Assert.False(SettlementEncounterDistanceValidator.IsInSiegeCamp(
             Position(40f, 50f), null, slack: 0.5f));
         Assert.False(SettlementEncounterDistanceValidator.IsInSiegeCamp(
-            Position(40f, 50f), new MatrixFrame[0], slack: 0.5f));
+            Position(40f, 50f), System.Array.Empty<MatrixFrame>(), slack: 0.5f));
     }
 
     private static CampaignVec2 Position(float x, float y)

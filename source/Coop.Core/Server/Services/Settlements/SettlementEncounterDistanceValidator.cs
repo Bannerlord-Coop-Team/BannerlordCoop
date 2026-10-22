@@ -103,14 +103,14 @@ internal class SettlementEncounterDistanceValidator : ISettlementEncounterDistan
         {
             Vec2 side = frame.rotation.s.AsVec2;
             Vec2 forward = frame.rotation.f.AsVec2;
-            float determinant = side.x * forward.y - side.y * forward.x;
+            float determinant = (side.x * forward.y) - (side.y * forward.x);
             if (MathF.Abs(determinant) < 1e-6f)
                 continue;
 
             Vec2 offset = position - frame.origin.AsVec2;
-            float sideAmount = MBMath.ClampFloat((offset.x * forward.y - offset.y * forward.x) / determinant, 0f, 1f);
-            float forwardAmount = MBMath.ClampFloat((side.x * offset.y - side.y * offset.x) / determinant, 0f, 1f);
-            Vec2 closest = frame.origin.AsVec2 + side * sideAmount + forward * forwardAmount;
+            float sideAmount = MBMath.ClampFloat(((offset.x * forward.y) - (offset.y * forward.x)) / determinant, 0f, 1f);
+            float forwardAmount = MBMath.ClampFloat(((side.x * offset.y) - (side.y * offset.x)) / determinant, 0f, 1f);
+            Vec2 closest = frame.origin.AsVec2 + (side * sideAmount) + (forward * forwardAmount);
             if (position.Distance(closest) <= slack)
                 return true;
         }

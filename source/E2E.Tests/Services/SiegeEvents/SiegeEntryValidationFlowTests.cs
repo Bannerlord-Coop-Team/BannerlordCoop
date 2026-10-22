@@ -715,7 +715,7 @@ public class SiegeEntryValidationFlowTests : MapEventTestBase
             using (new AllowedThread())
             {
                 settlement.Town.BesiegerCampPositions1 = new[] { campSlot };
-                settlement.Town.BesiegerCampPositions2 = new MatrixFrame[0];
+                settlement.Town.BesiegerCampPositions2 = System.Array.Empty<MatrixFrame>();
                 if (captured)
                     settlement.Town.OwnerClan = party.ActualClan;
                 settlement._lastAttackerParty = ledAssault ? party : null;
