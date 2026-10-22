@@ -326,8 +326,8 @@ internal class PlayerEncounterPatches
         if (ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowedForOwnershipGate())
             return true;
 
-        // Server teardown detaches the party before closing its encounter; receive callbacks must wait for it.
-        var mapEvent = MobileParty.MainParty?.MapEvent;
+        // Receive callbacks must not finalize a live raid owned by this encounter.
+        var mapEvent = PlayerEncounter.Battle;
         if (!mapEvent.IsRaidHostileAction() || mapEvent.IsFinalized)
             return true;
 

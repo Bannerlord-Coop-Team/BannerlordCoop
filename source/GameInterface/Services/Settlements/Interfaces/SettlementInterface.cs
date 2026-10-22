@@ -101,8 +101,9 @@ internal class SettlementInterface : ISettlementInterface
     public void EndSettlementEncounter()
     {
         var mainParty = MobileParty.MainParty;
-        // Leaving a raid's settlement does not end its server-owned battle encounter.
-        if (ModInformation.IsClient && mainParty.MapEvent.IsRaidHostileAction() && !mainParty.MapEvent.IsFinalized)
+        var mapEvent = PlayerEncounter.Battle;
+        // Only an encounter that owns the raid must wait for server battle teardown.
+        if (ModInformation.IsClient && mapEvent.IsRaidHostileAction() && !mapEvent.IsFinalized)
             return;
 
         // Mirror the native leave consequence (game_menu_settlement_leave_on_consequence). The party must
