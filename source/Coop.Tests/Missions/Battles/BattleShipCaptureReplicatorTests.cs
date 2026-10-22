@@ -309,19 +309,59 @@ public class BattleShipCaptureReplicatorTests
         Assert.Equal("not_authority", (string?)harness.Inspect()["applied"]!["lastDrop"]);
     }
 
-    // C5: an AI hull's captures are the battle host's of the confirm's epoch; another member's confirm at that epoch drops.
+    // Review r2 item 2: an AI hull's authority moves with host changes this client may not have seen yet, so its confirm is
+    // ordered by the capture sequence alone; one from an epoch this client never saw applies instead of dropping.
     [Fact]
-    public void Confirm_OfAnAiHull_FromANonHostAtItsEpoch_IsDropped()
+    public void Confirm_OfAnAiHull_FromAHostOfAnEpochThisClientNeverSaw_Applies()
     {
         var harness = new Harness(host: Host);
         var prize = harness.Register(Host, BattleSideEnum.Defender, npc: true);
         var captorShip = harness.Register(Captor, BattleSideEnum.Attacker);
         harness.Applier.Tick(0.1f);
 
-        harness.Applier.AcceptConfirm(Confirm(prize, Captor, captorShip, Observer));
+        harness.Applier.AcceptConfirm(new NetworkShipCaptured(prize.ShipId, Captor, captorShip.ShipId, Successor, 3, 0, 0));
 
-        Assert.Null(prize.CaptorControllerId);
-        Assert.Equal("not_host_at_epoch", (string?)harness.Inspect()["applied"]!["lastDrop"]);
+        Assert.Equal(Captor, prize.CaptorControllerId);
+        Assert.Equal(Captor, prize.CurrentAuthority);
+    }
+
+    // Review r2 item 1: while this client asks to capture another hull with its own, its own hull's next place in the order
+    // belongs to that request's decider, so a capture of its own hull is refused as busy here.
+    [Fact]
+    public void Request_ForTheCaptorHullOfThisClientsPendingRequest_IsBusy()
+    {
+        var harness = new Harness();
+        var target = harness.Register(Observer, BattleSideEnum.Defender);
+        var ownHull = harness.Register(Own, BattleSideEnum.Attacker);
+        var rivalShip = harness.Register(Captor, BattleSideEnum.Defender);
+        harness.Vacant.Add(ownHull.Hull);
+        harness.Exchange.RequestCapture(target, ownHull);
+
+        harness.Exchange.AcceptRequest(new NetworkShipCaptureRequest(ownHull.ShipId, Captor, rivalShip.ShipId));
+        harness.Exchange.Tick(BattleShipCaptureReplicator.RequestTimeoutSeconds + 0.5f);
+        harness.Exchange.AcceptRequest(new NetworkShipCaptureRequest(ownHull.ShipId, Captor, rivalShip.ShipId));
+
+        harness.Network.Verify(n => n.Send(Captor, It.Is<IMessage>(m => m is NetworkShipCaptureRejected
+            && ((NetworkShipCaptureRejected)m).Reason == ShipCaptureRefusal.Busy)), Times.Once);
+        Assert.Equal(Captor, ownHull.CaptorControllerId);
+    }
+
+    // Review r2 item 3: the decider sends its confirm before it applies, so a captor's records sent by the apply never reach a
+    // peer ahead of the confirm.
+    [Fact]
+    public void ApplyDecided_SendsTheConfirmBeforeApplying()
+    {
+        var harness = new Harness();
+        var prize = harness.Register(Own, BattleSideEnum.Defender, npc: true);
+        var captorShip = harness.Register(Captor, BattleSideEnum.Attacker);
+        string? captorWhenSent = "unset";
+        harness.Network.Setup(n => n.SendAll(It.Is<IMessage>(m => m is NetworkShipCaptured)))
+            .Callback(() => captorWhenSent = prize.CaptorControllerId);
+
+        harness.Applier.ApplyDecided(prize, captorShip, Captor);
+
+        Assert.Null(captorWhenSent);
+        Assert.Equal(Captor, prize.CaptorControllerId);
     }
 
     // C5: the old host's confirm and the host change reach two clients in opposite orders; both end in the same state, since
@@ -380,6 +420,61 @@ public class BattleShipCaptureReplicatorTests
         Assert.Equal(2, prize.CaptureSequence);
         Assert.Equal(2, captorShip.CaptureSequence);
         harness.CaptureEngine.Verify(e => e.ApplyCapture(It.IsAny<MissionObject>(), It.IsAny<MissionObject>()), Times.Exactly(2));
+    }
+
+    // A mesh that delivers at once can bring the captor's answering records back while the confirm is being sent; the capture
+    // then applies once here, through them.
+    [Fact]
+    public void ApplyDecided_WhenTheCaptorsRecordsComeBackDuringTheSend_AppliesOnce()
+    {
+        var harness = new Harness();
+        var prize = harness.Register(Own, BattleSideEnum.Defender, npc: true);
+        var captorShip = harness.Register(Captor, BattleSideEnum.Attacker);
+        var record = new BattleShipSpawnData(prize.ShipId, Captor, "MapEventParty_2", true, BattleSideEnum.Attacker, 0,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
+            "", Own, "Ship_7", captorControllerId: Captor, captureSequence: 1, capturedWithShipId: captorShip.ShipId,
+            capturedFromSide: BattleSideEnum.Defender);
+        harness.Network.Setup(n => n.SendAll(It.Is<IMessage>(m => m is NetworkShipCaptured)))
+            .Callback(() => harness.Applier.AcceptRecords(new[] { record }));
+
+        harness.Applier.ApplyDecided(prize, captorShip, Captor);
+
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(prize.Hull, captorShip.Hull), Times.Once);
+        Assert.Equal(1, prize.CaptureSequence);
+        Assert.Equal(1, captorShip.CaptureSequence);
+    }
+
+    // Review r2 item 5: a late repeat of a capture still counts as a repeat once the hull moved on to later captures.
+    [Fact]
+    public void Confirm_LateRepeat_AfterTheHullMovedOn_IsARepeatNotAConflict()
+    {
+        var harness = new Harness();
+        var prize = harness.Register(Host, BattleSideEnum.Defender, npc: true);
+        var captorShip = harness.Register(Captor, BattleSideEnum.Attacker);
+        var first = new NetworkShipCaptured(prize.ShipId, Captor, captorShip.ShipId, Host, 1, 0, 0);
+        harness.Applier.AcceptConfirm(first);
+        harness.Applier.AcceptConfirm(new NetworkShipCaptured(captorShip.ShipId, Captor, prize.ShipId, Captor, 1, 1, 1));
+
+        harness.Applier.AcceptConfirm(first);
+
+        var applied = harness.Inspect()["applied"]!;
+        Assert.Equal(1L, (long)applied["duplicateConfirms"]!);
+        Assert.Equal(0L, (long)applied["captureConflicts"]!);
+    }
+
+    [Theory]
+    [InlineData(true, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, false)]
+    public void Conflicts_OnlyWhenADifferentCaptureWasAppliedAtAPlace(bool samePrizePlace, bool knownPrizePlace, bool expected)
+    {
+        var confirm = new AppliedCapture(Guid.Empty, Guid.Empty, Captor);
+        var other = new AppliedCapture(Guid.Empty, Guid.Empty, Observer);
+        AppliedCapture? atPrize = knownPrizePlace ? (samePrizePlace ? confirm : other) : (AppliedCapture?)null;
+        AppliedCapture? atCaptor = samePrizePlace ? (AppliedCapture?)null : other;
+
+        Assert.Equal(expected, ShipCaptureApplier.Conflicts(atPrize, atCaptor, confirm));
     }
 
     // A repeat of a capture already applied changes nothing; a different capture at the same place in the order is a
@@ -444,6 +539,46 @@ public class BattleShipCaptureReplicatorTests
         Assert.Equal(Captor, prize.CaptorControllerId);
         Assert.True(captorShip.IsOrphaned);
         Assert.Equal(1, prize.CaptureSequence);
+    }
+
+    // Review r2 item 4: a record of a missed capture waits while its hull is mid-swap here, instead of giving up.
+    [Fact]
+    public void CaptorsRecord_OfAHullMidSwap_WaitsForTheSwap()
+    {
+        var harness = new Harness();
+        var prize = harness.Register(Host, BattleSideEnum.Defender, npc: true);
+        var captorShip = harness.Register(Captor, BattleSideEnum.Attacker);
+        prize.CurrentAuthority = Own;
+        harness.HullAuthority.Replace(prize.ShipId);
+        var record = new BattleShipSpawnData(prize.ShipId, Captor, "MapEventParty_2", true, BattleSideEnum.Attacker, 0,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
+            "", Host, "Ship_7", captorControllerId: Captor, captureSequence: 1, capturedWithShipId: captorShip.ShipId,
+            capturedFromSide: BattleSideEnum.Defender);
+
+        harness.Applier.AcceptRecords(new[] { record });
+        bool appliedMidSwap = prize.CaptorControllerId != null;
+        harness.HullAuthority.Dispose();
+        harness.Applier.Tick(0.1f);
+
+        Assert.False(appliedMidSwap);
+        Assert.Equal(Captor, prize.CaptorControllerId);
+        Assert.Equal(1, prize.CaptureSequence);
+    }
+
+    // F8: a request that expired before its own confirm arrived doesn't tell the player someone else captured the hull.
+    [Fact]
+    public void ConfirmOfThisClientsOwnCapture_AfterItsRequestExpired_TellsNothingMore()
+    {
+        var harness = new Harness();
+        var prize = harness.Register(Host, BattleSideEnum.Defender, npc: true);
+        var ownHull = harness.Register(Own, BattleSideEnum.Attacker);
+        harness.Exchange.RequestCapture(prize, ownHull);
+        harness.Exchange.Tick(BattleShipCaptureReplicator.RequestTimeoutSeconds + 0.5f);
+
+        harness.Applier.AcceptConfirm(Confirm(prize, Own, ownHull, Host));
+
+        Assert.Contains("nobody answered", Assert.Single(harness.Told));
+        Assert.Equal(Own, prize.CaptorControllerId);
     }
 
     // A mid-swap prize (a successor taking over its AI hulls) takes the capture after the swap's last phase.

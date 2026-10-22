@@ -53,8 +53,9 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
     private readonly INavalHullAuthority hullAuthority;
     private readonly IShipCaptureApplier applier;
 
-    // [Game thread] This client's requests waiting for the authority, by prize ship id, with when each went out.
-    private readonly Dictionary<Guid, float> pendingRequests = new Dictionary<Guid, float>();
+    // [Game thread] This client's requests waiting for the authority, by prize ship id, with when each went out and the own
+    // hull whose formation would take the prize.
+    private readonly Dictionary<Guid, PendingRequest> pendingRequests = new Dictionary<Guid, PendingRequest>();
     private readonly Dictionary<ShipCaptureRefusal, long> refusals = new Dictionary<ShipCaptureRefusal, long>();
     private float elapsed;
     private int seenEpoch;
@@ -104,7 +105,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
     }
 
     public float? PendingRequestAge(Guid shipId) =>
-        pendingRequests.TryGetValue(shipId, out float sentAt) ? elapsed - sentAt : (float?)null;
+        pendingRequests.TryGetValue(shipId, out var pending) ? elapsed - pending.SentAt : (float?)null;
 
     // [Game thread] Published synchronously by the capture prefix once vanilla's timer ran out and took the pilot off the helm.
     private void Handle_ShipCaptureTimerElapsed(MessagePayload<ShipCaptureTimerElapsed> payload)
@@ -140,7 +141,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
 
         if (pendingRequests.ContainsKey(prize.ShipId)) return;
 
-        pendingRequests[prize.ShipId] = elapsed;
+        pendingRequests[prize.ShipId] = new PendingRequest(elapsed, captorShip.ShipId);
         network.Send(prize.CurrentAuthority, request);
         captureRequests++;
         Logger.Information("[NavalSync] Asked {Authority} to confirm capturing hull {ShipId} with hull {CaptorShipId}",
@@ -205,7 +206,8 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
             captorInMission: session.IsOwn(captor) || missionContext.ControllersInMission.Contains(captor),
             captorHullValid: captorHullValid,
             isEnemy: isEnemy,
-            busy: IsGoing(prize) || hullAuthority.IsReplacing(prize.ShipId) || IsSettlingAfterPromotion(prize),
+            busy: IsGoing(prize) || hullAuthority.IsReplacing(prize.ShipId) || IsSettlingAfterPromotion(prize)
+                || IsCaptorHullOfAPendingRequest(prize.ShipId),
             canBeTakenOver: captureEngine.CanBeTakenOver(prize.Hull),
             isSinking: engine.IsSinking(prize.Hull),
             isVacant: captureEngine.IsVacantForCapture(prize.Hull));
@@ -267,7 +269,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
     // Nobody answered: the authority left before it decided, so the player can try again at the successor.
     private void ExpirePendingRequests()
     {
-        foreach (var entry in pendingRequests.Where(entry => elapsed - entry.Value > RequestTimeoutSeconds).ToArray())
+        foreach (var entry in pendingRequests.Where(entry => elapsed - entry.Value.SentAt > RequestTimeoutSeconds).ToArray())
         {
             pendingRequests.Remove(entry.Key);
             captureExpired++;
@@ -286,6 +288,10 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         seenEpoch = session.HostEpoch;
         if (promoted) promotedAt = elapsed;
     }
+
+    // This client asked to capture another hull with this one: that hull's authority may confirm a capture at this hull's next
+    // place in its order, so deciding a capture of this hull too would give that place two deciders.
+    private bool IsCaptorHullOfAPendingRequest(Guid shipId) => pendingRequests.Values.Any(pending => pending.CaptorShipId == shipId);
 
     // An inherited AI hull may still have a capture the old host confirmed on its way here.
     private bool IsSettlingAfterPromotion(NetworkShipInfo prize) =>
@@ -333,9 +339,27 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         captureRequests,
         captureExpired,
         captureRejections = refusals.ToDictionary(entry => entry.Key.ToString(), entry => entry.Value),
-        pendingRequests = pendingRequests.Select(entry => new { shipId = entry.Key, waitedSeconds = elapsed - entry.Value }).ToArray(),
+        pendingRequests = pendingRequests.Select(entry => new
+        {
+            shipId = entry.Key,
+            captorShipId = entry.Value.CaptorShipId,
+            waitedSeconds = elapsed - entry.Value.SentAt,
+        }).ToArray(),
         applied = applier.Inspect(),
     };
+}
+
+/// <summary>A request of this client waiting for the prize's authority: when it went out and the own hull it would capture with.</summary>
+internal readonly struct PendingRequest
+{
+    public PendingRequest(float sentAt, Guid captorShipId)
+    {
+        SentAt = sentAt;
+        CaptorShipId = captorShipId;
+    }
+
+    public float SentAt { get; }
+    public Guid CaptorShipId { get; }
 }
 
 /// <summary>What a captured hull's authority checks before it confirms a capture.</summary>
@@ -364,7 +388,7 @@ public readonly struct CaptureFacts
     public bool CaptorHullValid { get; }
     /// <summary>The prize is on the other side from the captor's hull, or is the captor's own orphan.</summary>
     public bool IsEnemy { get; }
-    /// <summary>The prize is leaving, mid-swap, or an inherited AI hull inside a promoted host's settle window.</summary>
+    /// <summary>The prize is leaving, mid-swap, an inherited AI hull inside a promoted host's settle window, or this client's own hull a request of it waits on.</summary>
     public bool Busy { get; }
     public bool CanBeTakenOver { get; }
     public bool IsSinking { get; }

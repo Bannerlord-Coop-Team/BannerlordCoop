@@ -74,7 +74,7 @@ public class BattleShipFateLedgerTests
         var ledger = new BattleShipFateLedger();
         ledger.Record(Battle, Fate("Ship_1", 800f), hostEpoch: 2, revision: 9);
 
-        ledger.RecordCapture(Battle, "Ship_1", "captor");
+        ledger.RecordCapture(Battle, "Ship_1", "captor", 1);
         ledger.Record(Battle, Fate("Ship_1", 600f), hostEpoch: 1, revision: 1);
         ledger.Record(Battle, Fate("Ship_1", 650f), hostEpoch: 1, revision: 0);
 
@@ -89,7 +89,7 @@ public class BattleShipFateLedgerTests
         var ledger = new BattleShipFateLedger();
         ledger.Record(Battle, Fate("Ship_1", 0f, sunk: true), hostEpoch: 1, revision: 1);
 
-        ledger.RecordCapture(Battle, "Ship_1", "captor");
+        ledger.RecordCapture(Battle, "Ship_1", "captor", 1);
         ledger.Record(Battle, Fate("Ship_1", 500f), hostEpoch: 1, revision: 1);
 
         Assert.True(Assert.Single(ledger.Take(Battle, _ => true)).Sunk);
@@ -101,12 +101,12 @@ public class BattleShipFateLedgerTests
     public void CapturedBy_ListsTheCaptorsShips_UntilRetakenOrForgotten()
     {
         var ledger = new BattleShipFateLedger();
-        ledger.RecordCapture(Battle, "Ship_1", "captor");
-        ledger.RecordCapture(Battle, "Ship_2", "captor");
-        ledger.RecordCapture(Battle, "Ship_3", "rival");
-        ledger.RecordCapture("MapEvent_2", "Ship_4", "captor");
+        ledger.RecordCapture(Battle, "Ship_1", "captor", 1);
+        ledger.RecordCapture(Battle, "Ship_2", "captor", 1);
+        ledger.RecordCapture(Battle, "Ship_3", "rival", 1);
+        ledger.RecordCapture("MapEvent_2", "Ship_4", "captor", 1);
 
-        ledger.RecordCapture(Battle, "Ship_2", null);
+        ledger.RecordCapture(Battle, "Ship_2", null, 2);
 
         Assert.Equal(new[] { "Ship_1" }, ledger.CapturedBy(Battle, "captor"));
         Assert.Null(ledger.CaptorOf(Battle, "Ship_2"));
@@ -116,6 +116,22 @@ public class BattleShipFateLedgerTests
         Assert.Equal("captor", ledger.CaptorOf("MapEvent_2", "Ship_4"));
     }
 
+    // Review r2 item 6: reports of captures reach the server in any order; the first captor per place in the hull's order
+    // stands, a later place replaces it, and an earlier place changes nothing.
+    [Fact]
+    public void RecordCapture_KeepsTheFirstCaptorPerPlace_AndOnlyALaterPlaceReplacesIt()
+    {
+        var ledger = new BattleShipFateLedger();
+
+        ledger.RecordCapture(Battle, "Ship_1", "captor", 2);
+        ledger.RecordCapture(Battle, "Ship_1", "rival", 2);
+        ledger.RecordCapture(Battle, "Ship_1", "early", 1);
+        string afterTheSamePlace = ledger.CaptorOf(Battle, "Ship_1");
+        ledger.RecordCapture(Battle, "Ship_1", "later", 3);
+
+        Assert.Equal("captor", afterTheSamePlace);
+        Assert.Equal("later", ledger.CaptorOf(Battle, "Ship_1"));
+    }
     [Fact]
     public void Take_FindsNothingForAnUnknownBattle()
     {

@@ -24,10 +24,12 @@ public interface IBattleShipFateLedger
     IReadOnlyList<BattleShipFate> Take(string mapEventId, Func<BattleShipFate, bool> selects);
 
     /// <summary>
-    /// Records that <paramref name="captorControllerId"/> captured the ship in the mission, so only it reports the ship's fate from
-    /// now on and its first report supersedes the held one; a null captor (the owner took it back) clears the record.
+    /// Records that <paramref name="captorControllerId"/> captured the ship at <paramref name="sequence"/> in its hull's capture
+    /// order, so only it reports the ship's fate from now on and its first report supersedes the held one; a null captor (the
+    /// owner took it back) ends the record. The first record per place stands and an earlier place changes nothing, so the
+    /// result doesn't depend on which report arrives first.
     /// </summary>
-    void RecordCapture(string mapEventId, string campaignShipId, string captorControllerId);
+    void RecordCapture(string mapEventId, string campaignShipId, string captorControllerId, int sequence);
 
     /// <summary>The player whose capture of the ship the battle last recorded, or null.</summary>
     string CaptorOf(string mapEventId, string campaignShipId);
@@ -44,8 +46,8 @@ public class BattleShipFateLedger : IBattleShipFateLedger
 {
     // Game thread only: the fate handler records inside GameThread.RunSafe and every apply point runs on the game thread.
     private readonly Dictionary<string, Dictionary<string, HeldFate>> battles = new Dictionary<string, Dictionary<string, HeldFate>>();
-    // Per battle, the captor of each ship captured in the mission.
-    private readonly Dictionary<string, Dictionary<string, string>> captures = new Dictionary<string, Dictionary<string, string>>();
+    // Per battle, the last captor of each ship captured in the mission (null once its owner took it back) and its place.
+    private readonly Dictionary<string, Dictionary<string, CaptureRecord>> captures = new Dictionary<string, Dictionary<string, CaptureRecord>>();
 
     public void Record(string mapEventId, BattleShipFate fate, int hostEpoch, long revision)
     {
@@ -81,31 +83,44 @@ public class BattleShipFateLedger : IBattleShipFateLedger
         return taken;
     }
 
-    public void RecordCapture(string mapEventId, string campaignShipId, string captorControllerId)
+    public void RecordCapture(string mapEventId, string campaignShipId, string captorControllerId, int sequence)
     {
         if (!captures.TryGetValue(mapEventId, out var ships))
         {
-            ships = new Dictionary<string, string>();
+            ships = new Dictionary<string, CaptureRecord>();
             captures.Add(mapEventId, ships);
         }
 
-        if (captorControllerId == null) ships.Remove(campaignShipId);
-        else ships[campaignShipId] = captorControllerId;
+        if (ships.TryGetValue(campaignShipId, out var recorded) && recorded.Sequence >= sequence) return;
 
+        ships[campaignShipId] = new CaptureRecord(captorControllerId, sequence);
         // The new reporter numbers its fates from its own count, so the held one keeps its condition but no order.
         if (battles.TryGetValue(mapEventId, out var held) && held.TryGetValue(campaignShipId, out var fate))
             held[campaignShipId] = new HeldFate(fate.Fate, int.MinValue, long.MinValue);
     }
 
     public string CaptorOf(string mapEventId, string campaignShipId) =>
-        captures.TryGetValue(mapEventId, out var ships) && ships.TryGetValue(campaignShipId, out var captor) ? captor : null;
+        captures.TryGetValue(mapEventId, out var ships) && ships.TryGetValue(campaignShipId, out var record) ? record.Captor : null;
 
     public IReadOnlyCollection<string> CapturedBy(string mapEventId, string captorControllerId) =>
         captures.TryGetValue(mapEventId, out var ships)
-            ? ships.Where(entry => entry.Value == captorControllerId).Select(entry => entry.Key).ToList()
+            ? ships.Where(entry => entry.Value.Captor == captorControllerId).Select(entry => entry.Key).ToList()
             : (IReadOnlyCollection<string>)Array.Empty<string>();
 
     public void ForgetCaptures(string mapEventId) => captures.Remove(mapEventId);
+
+    // A ship's last recorded captor, null once its owner took it back, and the hull's place in its capture order.
+    private readonly struct CaptureRecord
+    {
+        public CaptureRecord(string captor, int sequence)
+        {
+            Captor = captor;
+            Sequence = sequence;
+        }
+
+        public string Captor { get; }
+        public int Sequence { get; }
+    }
 
     // One held fate with the stamp it was reported at.
     private readonly struct HeldFate

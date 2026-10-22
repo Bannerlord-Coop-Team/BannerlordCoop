@@ -652,6 +652,10 @@ public class BattleShipReplicator : IBattleShipReplicator
             if (!record.FollowsBattleHost && departedOwners.Contains(record.OwnerControllerId))
             {
                 Logger.Information("[NavalSync] Dropped hull record {ShipId} of departed {Owner}", record.ShipId, record.OwnerControllerId);
+                // Gone with its owner, so a capture confirm or anything else held for this ship id is dropped too; a captor's record
+                // of it can still bring it back (C4).
+                Registry.MarkRemoved(record.ShipId);
+                leftWith[record.ShipId] = record.OwnerControllerId;
                 continue;
             }
 

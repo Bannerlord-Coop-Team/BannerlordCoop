@@ -28,7 +28,7 @@ public interface IShipCaptureApplier : IDisposable
     /// <summary>[Game thread] Raised once a capture applied here, with the prize's ship id and its captor.</summary>
     event Action<Guid, string> CaptureApplied;
 
-    /// <summary>[Game thread] Remembers the battle host of the current epoch and applies confirms whose hulls are ready now.</summary>
+    /// <summary>[Game thread] Applies confirms and records whose hulls are ready now.</summary>
     void Tick(float dt);
 
     /// <summary>[Game thread] Applied, held, dropped and conflicting captures (diagnostics).</summary>
@@ -53,8 +53,10 @@ public class ShipCaptureApplier : IShipCaptureApplier
 
     // [Game thread] Confirms waiting for a hull this client hasn't registered yet, for a swap, or for an earlier capture.
     private readonly List<NetworkShipCaptured> heldConfirms = new List<NetworkShipCaptured>();
-    // [Game thread] The battle host of every epoch this client saw, which decides the captures of AI hulls in that epoch.
-    private readonly Dictionary<int, string> hostsByEpoch = new Dictionary<int, string>();
+    // [Game thread] Records of missed captures waiting for a hull swap here to finish.
+    private readonly List<BattleShipSpawnData> heldRecords = new List<BattleShipSpawnData>();
+    // [Game thread] The capture applied at each place in each hull's order, to tell a late repeat from a conflict.
+    private readonly Dictionary<(Guid ShipId, int Sequence), AppliedCapture> appliedAt = new Dictionary<(Guid, int), AppliedCapture>();
     private long capturesApplied, recordsApplied, confirmsDropped, duplicateConfirms, captureConflicts;
     private string lastDrop;
     private bool disposed;
@@ -87,6 +89,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
         messageBroker.Unsubscribe<NetworkShipCaptured>(Handle_NetworkShipCaptured);
         messageBroker.Unsubscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
         heldConfirms.Clear();
+        heldRecords.Clear();
     }
 
     private INetworkShipRegistry Registry => missionComponent.ShipRegistry;
@@ -95,16 +98,21 @@ public class ShipCaptureApplier : IShipCaptureApplier
     {
         if (disposed) return;
 
-        RememberHost();
         RetryHeldConfirms();
+        RetryHeldRecords();
     }
 
+    // The confirm goes out first, so peers take the capture through it, not through the records a captor's apply sends.
     public void ApplyDecided(NetworkShipInfo prize, NetworkShipInfo captorShip, string captorControllerId)
     {
         var confirm = new NetworkShipCaptured(prize.ShipId, captorControllerId, captorShip.ShipId, session.OwnControllerId,
             session.HostEpoch, prize.CaptureSequence, captorShip.CaptureSequence);
-        Apply(prize, captorShip, captorControllerId, prize.CaptureSequence + 1);
         network.SendAll(confirm);
+        // A live mesh hands the captor's answering records to a later frame, but a mesh that delivers at once can bring them
+        // back first and the capture already applied here through them; either way it applies once.
+        if (prize.CaptureSequence != confirm.PrizeSequence || captorShip.CaptureSequence != confirm.CaptorSequence) return;
+
+        Apply(prize, captorShip, captorControllerId, prize.CaptureSequence + 1);
     }
 
     // [Poller thread] Marshals a capture onto the game thread, behind the spawn records and samples queued before it.
@@ -127,10 +135,9 @@ public class ShipCaptureApplier : IShipCaptureApplier
     }
 
     // A confirm is exempt from the membership gate, since mesh routes aren't ordered against the server's departure and
-    // migration events; the capture order and the sender's authority at the confirm's epoch decide instead.
+    // migration events; each hull's capture order decides instead, and only the hull's authority decides a place in it.
     private ConfirmOutcome TryApplyConfirm(NetworkShipCaptured confirm)
     {
-        RememberHost();
         if (!Registry.TryGet(confirm.ShipId, out var prize))
             return Registry.IsGone(confirm.ShipId) ? Drop(confirm, "prize_gone") : ConfirmOutcome.Hold;
 
@@ -143,7 +150,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
         if (order == CaptureOrder.Ahead) return ConfirmOutcome.Hold;
         if (order == CaptureOrder.Behind) return Stale(prize, confirm);
 
-        var rejection = ValidateSender(prize, confirm.PreviousAuthority, HostAt(confirm.HostEpoch));
+        var rejection = ValidateSender(prize, confirm.PreviousAuthority);
         if (rejection != null) return Drop(confirm, rejection);
 
         Apply(prize, captorShip, confirm.CaptorControllerId, confirm.PrizeSequence + 1);
@@ -162,21 +169,20 @@ public class ShipCaptureApplier : IShipCaptureApplier
     }
 
     /// <summary>
-    /// Why a confirm's sender may not decide the prize's capture, or null: an AI hull's captures are the battle host's of the
-    /// confirm's epoch (when this client saw it; else its current or fielding authority), any other hull's its current authority.
+    /// Why a confirm's sender may not decide the prize's capture, or null: a hull that doesn't follow the battle host changes
+    /// authority only through captures, so at its place in the order the sender must be its current authority. An AI hull's
+    /// authority also moves with host changes, which aren't ordered against confirms, so the order alone guards it.
     /// </summary>
-    internal static string ValidateSender(NetworkShipInfo prize, string sender, string hostAtEpoch)
-    {
-        if (!prize.FollowsBattleHost) return sender == prize.CurrentAuthority ? null : "not_authority";
-        if (hostAtEpoch != null) return sender == hostAtEpoch ? null : "not_host_at_epoch";
-        return sender == prize.CurrentAuthority || sender == prize.OriginalOwner ? null : "not_authority";
-    }
+    internal static string ValidateSender(NetworkShipInfo prize, string sender) =>
+        prize.FollowsBattleHost || sender == prize.CurrentAuthority ? null : "not_authority";
 
-    // A repeat of the capture applied here at that place in the order changes nothing; a different capture there is a conflict
-    // the single writer per place should have made impossible, so it is logged.
+    // A late repeat of a capture applied here changes nothing. It is a conflict only when this client applied a different
+    // capture at the confirm's place in either hull's order, which one decider per place should make impossible, so it is logged.
     private ConfirmOutcome Stale(NetworkShipInfo prize, NetworkShipCaptured confirm)
     {
-        if (prize.CaptureSequence == confirm.PrizeSequence + 1 && prize.CaptorControllerId == confirm.CaptorControllerId)
+        var capture = new AppliedCapture(confirm.ShipId, confirm.CaptorShipId, confirm.CaptorControllerId);
+        if (!Conflicts(AppliedAt(confirm.ShipId, confirm.PrizeSequence + 1), AppliedAt(confirm.CaptorShipId, confirm.CaptorSequence + 1),
+                capture))
         {
             duplicateConfirms++;
             return ConfirmOutcome.Done;
@@ -190,13 +196,25 @@ public class ShipCaptureApplier : IShipCaptureApplier
         return ConfirmOutcome.Done;
     }
 
+    // The capture this client applied at a hull's place, or null for a place it never saw applied (a joiner's record).
+    private AppliedCapture? AppliedAt(Guid shipId, int sequence) =>
+        appliedAt.TryGetValue((shipId, sequence), out var applied) ? applied : (AppliedCapture?)null;
+
+    /// <summary>
+    /// Whether a late confirm conflicts with what a client applied at its places: a different capture there does, a repeat or
+    /// a place the client never saw applied doesn't.
+    /// </summary>
+    internal static bool Conflicts(AppliedCapture? appliedAtPrizePlace, AppliedCapture? appliedAtCaptorPlace, AppliedCapture confirm) =>
+        (appliedAtPrizePlace.HasValue && !appliedAtPrizePlace.Value.Equals(confirm))
+        || (appliedAtCaptorPlace.HasValue && !appliedAtCaptorPlace.Value.Equals(confirm));
+
     // The captor's hull left this client's battle before its capture arrived: elsewhere the prize left with it, so it goes too.
     private ConfirmOutcome LeavesWithDepartedCaptor(NetworkShipInfo prize, NetworkShipCaptured confirm)
     {
         if (missionContext.ControllersInMission.Contains(confirm.CaptorControllerId)) return Drop(confirm, "captor_hull_gone");
         if (prize.CaptureSequence != confirm.PrizeSequence) return Stale(prize, confirm);
 
-        var rejection = ValidateSender(prize, confirm.PreviousAuthority, HostAt(confirm.HostEpoch));
+        var rejection = ValidateSender(prize, confirm.PreviousAuthority);
         if (rejection != null) return Drop(confirm, rejection);
 
         Logger.Information("[NavalSync] Capture of hull {ShipId} by {Captor} arrived after the captor left; the hull leaves with it",
@@ -215,10 +233,14 @@ public class ShipCaptureApplier : IShipCaptureApplier
         var captorFormation = captorShip.Formation;
         string previousAuthority = prize.CurrentAuthority;
 
+        int captorSequence = captorShip.CaptureSequence + 1;
         ships.TransferHull(prize, captor, inPlace: true);
         captureEngine.ApplyCapture(prize.Hull, captorShip.Hull);
         Registry.TryMarkCaptured(prize.ShipId, new HullCapture(captor, captorShip.ShipId, prizeSide), captorFormation, prizeSequence);
-        Registry.TryMarkOrphaned(captorShip.ShipId, captorSide, captorShip.CaptureSequence + 1);
+        Registry.TryMarkOrphaned(captorShip.ShipId, captorSide, captorSequence);
+        var applied = new AppliedCapture(prize.ShipId, captorShip.ShipId, captor);
+        appliedAt[(prize.ShipId, prizeSequence)] = applied;
+        appliedAt[(captorShip.ShipId, captorSequence)] = applied;
         if (IsBattleSide(prizeSide) && prizeSide != captorSide) ships.CountCapturedFrom(prizeSide);
 
         capturesApplied++;
@@ -232,18 +254,18 @@ public class ShipCaptureApplier : IShipCaptureApplier
         CaptureApplied?.Invoke(prize.ShipId, captor);
         if (!session.IsOwn(captor)) return;
 
-        ReportCaptureToServer(prize);
+        ReportCaptureToServer(prize, prizeSequence);
         // A peer that took the prize out with its departed old authority before the confirm arrived spawns it from these.
         ships.AnnounceHulls(new[] { prize, captorShip });
     }
 
     // On the relay channel this client's fates use, so the server knows the captor before the prize's first fate from it.
-    private void ReportCaptureToServer(NetworkShipInfo prize)
+    private void ReportCaptureToServer(NetworkShipInfo prize, int sequence)
     {
         var campaignShipId = engine.CampaignShipIdOf(prize.Hull);
         if (string.IsNullOrEmpty(campaignShipId) || !session.HasInstance) return;
 
-        relayNetwork.SendAll(new NetworkBattleShipCaptured(session.InstanceId, campaignShipId));
+        relayNetwork.SendAll(new NetworkBattleShipCaptured(session.InstanceId, campaignShipId, sequence));
     }
 
     // [Poller thread] Reads the records on the game thread, after the ship replicator spawned what they bring.
@@ -271,7 +293,8 @@ public class ShipCaptureApplier : IShipCaptureApplier
             if (record.OwnerControllerId != ship.CurrentAuthority && record.OwnerControllerId != record.CaptorControllerId) continue;
 
             if (record.Orphaned) OrphanFromRecord(ship, record);
-            else if (!string.IsNullOrEmpty(record.CaptorControllerId)) CaptureFromRecord(ship, record);
+            else if (!string.IsNullOrEmpty(record.CaptorControllerId) && CaptureFromRecord(ship, record) == ConfirmOutcome.Hold)
+                heldRecords.Add(record);
         }
     }
 
@@ -283,21 +306,37 @@ public class ShipCaptureApplier : IShipCaptureApplier
         recordsApplied++;
     }
 
-    // Replays the missed capture against the captor's hull the record names; without that hull here the record can't place it.
-    private void CaptureFromRecord(NetworkShipInfo prize, BattleShipSpawnData record)
+    // Replays the missed capture against the captor's hull the record names, once neither hull is mid-swap here. A captor's
+    // hull that is missing or already orphaned can't take it (respawning the prize from the record is left out).
+    private ConfirmOutcome CaptureFromRecord(NetworkShipInfo prize, BattleShipSpawnData record)
     {
-        if (!Registry.TryGet(record.CapturedWithShipId, out var captorShip) || captorShip.IsOrphaned
-            || hullAuthority.IsReplacing(prize.ShipId) || hullAuthority.IsReplacing(captorShip.ShipId))
+        if (!Registry.TryGet(record.CapturedWithShipId, out var captorShip) || captorShip.IsOrphaned)
         {
             Logger.Warning("[NavalSync] Record of hull {ShipId} shows a capture by {Captor} this client missed, but the captor's hull " +
                 "{CaptorShipId} can't take it here", prize.ShipId, record.CaptorControllerId, record.CapturedWithShipId);
-            return;
+            return ConfirmOutcome.Done;
         }
+
+        if (hullAuthority.IsReplacing(prize.ShipId) || hullAuthority.IsReplacing(captorShip.ShipId)) return ConfirmOutcome.Hold;
 
         Logger.Information("[NavalSync] Record of hull {ShipId} shows a capture by {Captor} this client missed; applying it",
             prize.ShipId, record.CaptorControllerId);
         Apply(prize, captorShip, record.CaptorControllerId, record.CaptureSequence);
         recordsApplied++;
+        return ConfirmOutcome.Done;
+    }
+
+    // A record waits only for a swap here; it is dropped once its hull is gone or caught up by a confirm.
+    private void RetryHeldRecords()
+    {
+        if (heldRecords.Count == 0) return;
+
+        foreach (var record in heldRecords.ToArray())
+        {
+            heldRecords.Remove(record);
+            if (!Registry.TryGet(record.ShipId, out var prize) || record.CaptureSequence <= prize.CaptureSequence) continue;
+            if (CaptureFromRecord(prize, record) == ConfirmOutcome.Hold) heldRecords.Add(record);
+        }
     }
 
     // In arrival order; a confirm waits until both hulls registered and earlier captures applied, or a hull is gone.
@@ -312,15 +351,6 @@ public class ShipCaptureApplier : IShipCaptureApplier
         }
     }
 
-    // The host this client sees for the current epoch; once seen, an epoch's host never changes.
-    private void RememberHost()
-    {
-        var host = session.HostControllerId;
-        if (host != null && !hostsByEpoch.ContainsKey(session.HostEpoch)) hostsByEpoch[session.HostEpoch] = host;
-    }
-
-    // The host of an epoch this client saw, or null for one it didn't (it joined later).
-    private string HostAt(int epoch) => hostsByEpoch.TryGetValue(epoch, out var host) ? host : null;
 
     // Counts and logs a confirm this client won't apply.
     private ConfirmOutcome Drop(NetworkShipCaptured confirm, string reason)
@@ -345,6 +375,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
         captureConflicts,
         lastDrop,
         heldConfirms = heldConfirms.Select(confirm => confirm.ShipId).ToArray(),
+        heldRecords = heldRecords.Select(record => record.ShipId).ToArray(),
     };
 
     private enum ConfirmOutcome
@@ -352,6 +383,31 @@ public class ShipCaptureApplier : IShipCaptureApplier
         Done,
         Hold,
     }
+}
+
+/// <summary>One capture as a client applied it at a place in a hull's order: the prize, the captor's hull and the captor.</summary>
+public readonly struct AppliedCapture : IEquatable<AppliedCapture>
+{
+    public AppliedCapture(Guid prizeId, Guid captorShipId, string captorControllerId)
+    {
+        PrizeId = prizeId;
+        CaptorShipId = captorShipId;
+        CaptorControllerId = captorControllerId;
+    }
+
+    public Guid PrizeId { get; }
+    public Guid CaptorShipId { get; }
+    public string CaptorControllerId { get; }
+
+    // The same capture: same prize, same captor's hull, same captor.
+    public bool Equals(AppliedCapture other) =>
+        PrizeId == other.PrizeId && CaptorShipId == other.CaptorShipId && CaptorControllerId == other.CaptorControllerId;
+
+    // Value equality, as Equals(AppliedCapture).
+    public override bool Equals(object obj) => obj is AppliedCapture other && Equals(other);
+
+    // Combines the three fields.
+    public override int GetHashCode() => (PrizeId, CaptorShipId, CaptorControllerId).GetHashCode();
 }
 
 /// <summary>Where a capture confirm stands in its hulls' capture order on this client.</summary>

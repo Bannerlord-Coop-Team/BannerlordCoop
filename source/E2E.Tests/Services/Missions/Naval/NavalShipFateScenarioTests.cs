@@ -284,7 +284,7 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
         var shipId = GiveShip(victimPartyId);
         Server.Call(() => Server.GetRegisteredObject<MobileParty>(victimPartyId).Party.MapEventSide = null, MapEventDisabledMethods);
 
-        Server.Call(() => Server.SimulateMessage(a.Instance.NetPeer, new NetworkBattleShipCaptured(battle.MapEventId, shipId)));
+        Server.Call(() => Server.SimulateMessage(a.Instance.NetPeer, new NetworkBattleShipCaptured(battle.MapEventId, shipId, 1)));
         SendFates(a, battle, hostEpoch: 1, revision: 1, new BattleShipFate(shipId, 480f, 120f, false));
         LeaveMission(battle, a);
 
