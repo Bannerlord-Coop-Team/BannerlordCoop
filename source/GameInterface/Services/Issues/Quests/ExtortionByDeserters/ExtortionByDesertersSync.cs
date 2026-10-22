@@ -4,6 +4,7 @@ using Common.Network;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -23,9 +24,10 @@ internal class ExtortionByDesertersSync : IHandler
     private readonly IIssueResolver issues;
     private readonly IIssueOwnerResolver owners;
     private readonly IControllerIdProvider controller;
+    private readonly IPlayerManager players;
 
     public ExtortionByDesertersSync(IMessageBroker broker, INetwork network, IObjectManager objects,
-        IIssueResolver issues, IIssueOwnerResolver owners, IControllerIdProvider controller)
+        IIssueResolver issues, IIssueOwnerResolver owners, IControllerIdProvider controller, IPlayerManager players)
     {
         this.broker = broker;
         this.network = network;
@@ -33,6 +35,7 @@ internal class ExtortionByDesertersSync : IHandler
         this.issues = issues;
         this.owners = owners;
         this.controller = controller;
+        this.players = players;
         broker.Subscribe<NetworkExtortionByDesertersState>(Handle);
     }
 
@@ -48,7 +51,8 @@ internal class ExtortionByDesertersSync : IHandler
 
         var issue = IssueManager.GetIssueOfQuest(quest);
         if (issue == null || !objects.TryGetIdWithLogging(issue.IssueOwner, out var ownerId) ||
-            !owners.TryGetOwnerControllerId(issue, out var controllerId))
+            !owners.TryGetOwnerControllerId(issue, out var controllerId) ||
+            !players.TryGetPeer(controllerId, out var peer))
         {
             return;
         }
@@ -58,7 +62,7 @@ internal class ExtortionByDesertersSync : IHandler
         if (quest._deserterMobileParty != null && !objects.TryGetIdWithLogging(quest._deserterMobileParty, out deserterId)) return;
         if (quest._defenderMobileParty != null && !objects.TryGetIdWithLogging(quest._defenderMobileParty, out defenderId)) return;
 
-        network.SendAll(new NetworkExtortionByDesertersState(ownerId, issue.StringId, controllerId,
+        network.Send(peer, new NetworkExtortionByDesertersState(ownerId, issue.StringId, controllerId,
             deserterId, defenderId, (int)quest._currentState, log, ambush, (byte)notice));
     }
 

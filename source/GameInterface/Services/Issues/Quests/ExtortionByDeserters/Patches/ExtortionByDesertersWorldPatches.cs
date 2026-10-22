@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -37,36 +38,21 @@ internal class ExtortionByDesertersWorldPatches
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPrefix]
-    private static void FinalizeEventPrefix(MapEvent __instance, out List<(Quest Quest, MapEvent MapEvent)> __state)
+    private static void FinalizeEventPrefix(MapEvent __instance, out List<Quest> __state)
     {
-        var affected = new List<(Quest, MapEvent)>();
-        Run(quest => { if (quest._deserterMobileParty?.MapEvent == __instance) affected.Add((quest, __instance)); });
+        var affected = new List<Quest>();
+        Run(quest => { if (quest._deserterMobileParty?.MapEvent == __instance) affected.Add(quest); });
         __state = affected;
     }
 
     [HarmonyPatch(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))]
     [HarmonyPostfix]
-    private static void FinalizeEventPostfix(List<(Quest Quest, MapEvent MapEvent)> __state)
+    private static void FinalizeEventPostfix(List<Quest> __state)
     {
         if (__state == null || __state.Count == 0) return;
         Run(quest =>
         {
-            var affected = __state.FirstOrDefault(item => item.Quest == quest);
-            if (affected.Quest == null) return;
-            if (!quest._deserterBattleFinalizedForTheFirstTime)
-                MapEventEndedPrefix(quest, affected.MapEvent);
-            if (quest.IsOngoing && quest._currentState == State.DesertersMovingToSettlement)
-            {
-                var owner = Hero.MainHero.PartyBelongedTo?.Party;
-                if (owner != null && affected.MapEvent.InvolvedParties.Contains(owner) &&
-                    affected.MapEvent.WinningSide == owner.Side)
-                {
-                    quest._deserterBattleFinalizedForTheFirstTime = true;
-                    quest._currentState = State.DesertersAreDefeated;
-                    quest.AddLog(quest.OnDeserterPartyDefeatedLogText);
-                    Sync(quest, ExtortionByDesertersNotice.DesertersDefeated);
-                }
-            }
+            if (!__state.Contains(quest)) return;
             if (quest._deserterBattleFinalizedForTheFirstTime)
             {
                 if (ContainerProvider.TryResolve<ExtortionByDesertersFinalizationProofStrategy>(out var proof))
@@ -86,6 +72,28 @@ internal class ExtortionByDesertersWorldPatches
     private static void MapStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty) =>
         Run(quest => quest.OnMapEventStarted(mapEvent, attackerParty, defenderParty));
 
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventStarted))]
+    [HarmonyPrefix]
+    private static bool MapStartedPrefix(Quest __instance, MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
+    {
+        if (ModInformation.IsClient || Hero.MainHero.PartyBelongedTo == null) return false;
+        if (attackerParty == PartyBase.MainParty)
+        {
+            if (mapEvent.IsFieldBattle && defenderParty.IsMobile &&
+                defenderParty.MobileParty.HomeSettlement == __instance.QuestSettlement &&
+                defenderParty != __instance._deserterMobileParty?.Party)
+            {
+                __instance.CompleteQuestWithFail(__instance.OnQuestFailed3LogText);
+                __instance.ApplyQuestResult(__instance._questResultFail3);
+            }
+            else if (QuestHelper.CheckMinorMajorCoercion(__instance, mapEvent, attackerParty))
+            {
+                QuestHelper.ApplyGenericMinorMajorCoercionConsequences(__instance, mapEvent);
+            }
+        }
+        return false;
+    }
+
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementLeft))]
     [HarmonyPostfix]
     private static void LeftPostfix(MobileParty party, Settlement settlement)
@@ -96,6 +104,22 @@ internal class ExtortionByDesertersWorldPatches
             if (quest.IsOngoing && party == Hero.MainHero.PartyBelongedTo && settlement == quest.QuestSettlement)
                 quest.TickDesertersPartyLogic();
         });
+    }
+
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnSettlementLeft))]
+    [HarmonyPrefix]
+    private static bool LeftPrefix(Quest __instance, MobileParty party, Settlement settlement)
+    {
+        if (ModInformation.IsClient || Hero.MainHero.PartyBelongedTo == null) return false;
+        var deserters = __instance._deserterMobileParty;
+        var raid = settlement.Party.MapEvent;
+        if (party.IsMainParty && settlement == __instance.QuestSettlement && deserters != null &&
+            raid?.IsRaid == true && raid.AttackerSide.LeaderParty == deserters.Party)
+        {
+            __instance.ApplyQuestResult(__instance._questResultFail2);
+            __instance.CompleteQuestWithFail(__instance.OnQuestFailed2LogText);
+        }
+        return false;
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnVillageBeingRaided))]

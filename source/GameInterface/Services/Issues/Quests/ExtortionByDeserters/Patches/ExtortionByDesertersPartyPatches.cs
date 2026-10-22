@@ -92,16 +92,8 @@ internal class ExtortionByDesertersServerMethodsPatch
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.GameMenuOptionSelected));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnClanChangedKingdom));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnMapEventStarted));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnSettlementLeft));
     }
 
     [HarmonyPrefix]
-    private static bool Prefix(MethodBase __originalMethod)
-    {
-        if (ModInformation.IsClient) return false;
-        if (__originalMethod.Name == nameof(Quest.OnSettlementLeft) || __originalMethod.Name == nameof(Quest.OnMapEventStarted))
-            return Hero.MainHero.PartyBelongedTo != null;
-        return true;
-    }
+    private static bool Prefix() => ModInformation.IsServer;
 }
