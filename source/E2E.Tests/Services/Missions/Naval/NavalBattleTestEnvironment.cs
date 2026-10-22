@@ -289,11 +289,12 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 peer.Commit();
         }
 
-        public Guid FieldPlayerHull(NavalPeer owner, Vec3 position) =>
-            owner.FieldOwnHull(owner.Side, position, PartyIds[owner.Id]);
+        public Guid FieldPlayerHull(NavalPeer owner, Vec3 position, string? campaignShipId = null) =>
+            owner.FieldOwnHull(owner.Side, position, PartyIds[owner.Id], campaignShipId);
 
-        public Guid FieldAiHull(NavalPeer host, BattleSideEnum side, Vec3 position, int? formationIndex = null) =>
-            host.FieldAiHull(side, position, PirateMapEventPartyId, formationIndex);
+        public Guid FieldAiHull(NavalPeer host, BattleSideEnum side, Vec3 position, int? formationIndex = null,
+            string? campaignShipId = null) =>
+            host.FieldAiHull(side, position, PirateMapEventPartyId, formationIndex, campaignShipId);
 
         /// <summary>
         /// Tears the battle down after a last removal invariant check on every client, which fails the scenario. Skipped once a
@@ -455,13 +456,17 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
 
         public void Commit() => Call(() => Controller.Deployment.OnLocalDeploymentFinished());
 
-        /// <summary>A hull vanilla's team setup fielded for this client, registered as the spawn postfix does.</summary>
-        public Guid FieldOwnHull(BattleSideEnum side, Vec3 position, string mapEventPartyId)
+        /// <summary>
+        /// A hull vanilla's team setup fielded for this client, registered as the spawn postfix does; it stands for the party's
+        /// campaign ship <paramref name="campaignShipId"/> when given.
+        /// </summary>
+        public Guid FieldOwnHull(BattleSideEnum side, Vec3 position, string mapEventPartyId, string? campaignShipId = null)
         {
             var shipId = Guid.NewGuid();
             Call(() =>
             {
                 var hull = Engine.Field(side, position);
+                hull.CampaignShipId = campaignShipId;
                 Assert.True(Registry.TryRegister(new NetworkShipInfo(shipId, Id, mapEventPartyId, false, hull.Hull, null)));
             });
             return shipId;
@@ -471,7 +476,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         /// [Battle host] An AI party's hull, registered and announced through the replicator; with a
         /// <paramref name="formationIndex"/> it takes that formation of the side's main team, as the NPC fleet spawner does.
         /// </summary>
-        public Guid FieldAiHull(BattleSideEnum side, Vec3 position, string mapEventPartyId, int? formationIndex = null)
+        public Guid FieldAiHull(BattleSideEnum side, Vec3 position, string mapEventPartyId, int? formationIndex = null,
+            string? campaignShipId = null)
         {
             var shipId = Guid.Empty;
             Call(() =>
@@ -479,6 +485,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
                 var team = formationIndex == null ? null
                     : side == BattleSideEnum.Attacker ? Mission.AttackerTeam.Shell : Mission.DefenderTeam.Shell;
                 var hull = Engine.Field(side, position, formationIndex ?? 0, team);
+                hull.CampaignShipId = campaignShipId;
                 shipId = Ships.RegisterNpcHull(hull.Hull, hull.Formation!, mapEventPartyId);
             });
             Assert.NotEqual(Guid.Empty, shipId);

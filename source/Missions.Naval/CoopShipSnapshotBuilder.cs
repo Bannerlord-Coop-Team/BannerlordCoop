@@ -33,7 +33,7 @@ public class CoopShipSnapshotBuilder : ICoopShipSnapshotBuilder
         // Snapshots stay unregistered, so building one must not reach the campaign ship sync patches.
         using (CallOriginalPolicy.AllowOriginalsForCurrentOperation())
         {
-            var snapshot = Create(source.ShipHull, source.Owner, source);
+            var snapshot = Create(source.ShipHull, source.Owner, source, null);
             snapshot._name = source._name;
             foreach (var piece in source._shipPieces)
                 snapshot._shipPieces[piece.Key] = piece.Value;
@@ -55,7 +55,7 @@ public class CoopShipSnapshotBuilder : ICoopShipSnapshotBuilder
 
         using (CallOriginalPolicy.AllowOriginalsForCurrentOperation())
         {
-            var snapshot = Create(hull, owner, null);
+            var snapshot = Create(hull, owner, null, data.CampaignShipId);
             if (!string.IsNullOrEmpty(data.Name)) snapshot._name = new TextObject(data.Name);
             var slots = data.PieceSlots ?? Array.Empty<string>();
             var pieces = data.PieceIds ?? Array.Empty<string>();
@@ -74,7 +74,7 @@ public class CoopShipSnapshotBuilder : ICoopShipSnapshotBuilder
         }
     }
 
-    private static Ship Create(ShipHull hull, PartyBase owner, Ship source)
+    private static Ship Create(ShipHull hull, PartyBase owner, Ship source, string campaignShipId)
     {
         var snapshot = new Ship(hull);
 
@@ -82,7 +82,7 @@ public class CoopShipSnapshotBuilder : ICoopShipSnapshotBuilder
         snapshot._owner = owner;
 
         // CoopShipSnapshotPatches keep its mission damage out of the campaign (destroy action, skill XP).
-        CoopShipSnapshots.Add(snapshot, source);
+        CoopShipSnapshots.Add(snapshot, source, campaignShipId);
         return snapshot;
     }
 }

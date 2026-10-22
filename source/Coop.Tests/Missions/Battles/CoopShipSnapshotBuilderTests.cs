@@ -1,7 +1,9 @@
 ﻿#if DEBUG
 using GameInterface.Policies;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Missions.Naval;
+using Moq;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -104,6 +106,25 @@ public class CoopShipSnapshotBuilderTests
             recordedOwnedSetters = null;
             harmony.UnpatchAll(harmony.Id);
         }
+    }
+
+    // M6 D1: an own snapshot names its party ship by registry id; another owner's keeps the id its record carried.
+    [Fact]
+    public void CampaignShipIdOf_ReadsTheSourceShipsIdOrTheRecordsId()
+    {
+        var source = CreateOwnedShip(CreateParty(), hitPoints: 600f);
+        var own = new CoopShipSnapshotBuilder().Build(source);
+        var copy = CreateOwnedShip(CreateParty(), hitPoints: 600f);
+        CoopShipSnapshots.Add(copy, null, "Ship_7");
+        var objectManager = new Mock<IObjectManager>();
+        string sourceId = "Ship_3";
+        objectManager.Setup(manager => manager.TryGetId(source, out sourceId)).Returns(true);
+        var engine = new NavalShipEngine(null!, objectManager.Object, null!);
+
+        Assert.Equal("Ship_3", engine.CampaignShipIdOf(own));
+        Assert.Equal("Ship_7", engine.CampaignShipIdOf(copy));
+        Assert.Null(engine.CampaignShipIdOf(source));
+        Assert.Null(engine.CampaignShipIdOf((Ship)null!));
     }
 
     [ThreadStatic]

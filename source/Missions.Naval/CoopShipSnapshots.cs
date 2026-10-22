@@ -11,11 +11,11 @@ internal static class CoopShipSnapshots
 {
     private static readonly ConditionalWeakTable<Ship, Entry> snapshots = new ConditionalWeakTable<Ship, Entry>();
 
-    /// <summary>Records a snapshot of the party's own <paramref name="source"/>, or of another owner's ship without one.</summary>
-    public static void Add(Ship ship, Ship source = null)
+    /// <summary>Records a snapshot of the party's own <paramref name="source"/>, or of another owner's ship by its registry id.</summary>
+    public static void Add(Ship ship, Ship source = null, string campaignShipId = null)
     {
         snapshots.Remove(ship);
-        snapshots.Add(ship, new Entry(source));
+        snapshots.Add(ship, new Entry(source, campaignShipId));
     }
 
     public static bool Contains(Ship ship) => ship != null && snapshots.TryGetValue(ship, out _);
@@ -23,14 +23,20 @@ internal static class CoopShipSnapshots
     /// <summary>The party's own campaign ship a snapshot was built from; null for another owner's ship.</summary>
     public static Ship SourceOf(Ship ship) => ship != null && snapshots.TryGetValue(ship, out var entry) ? entry.Source : null;
 
-    // What the weak table holds for one snapshot: the own campaign ship it was built from, if any.
+    /// <summary>The registry id another owner's record gave the snapshot's campaign ship; null for an own snapshot.</summary>
+    public static string CampaignShipIdOf(Ship ship) =>
+        ship != null && snapshots.TryGetValue(ship, out var entry) ? entry.CampaignShipId : null;
+
+    // What the weak table holds for one snapshot: the own campaign ship it was built from, or the id a record carried.
     private sealed class Entry
     {
-        public Entry(Ship source)
+        public Entry(Ship source, string campaignShipId)
         {
             Source = source;
+            CampaignShipId = campaignShipId;
         }
 
         public Ship Source { get; }
+        public string CampaignShipId { get; }
     }
 }

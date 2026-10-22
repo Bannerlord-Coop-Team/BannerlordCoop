@@ -118,7 +118,32 @@ public class NavalHostMigrationScenarioTests : NavalBattleTestEnvironment
         Assert.Equal(new[] { 8, 7 }, pirates.Select(pirate => (int)c.Stream(pirate)["reserve"]!));
     }
 
-    // vs_pirates for three players; the battle host A simulates two AI hulls.
+    // M6 D1: every copy of an AI hull, and the hull the promoted host swaps in for its copy, keeps the campaign ship id the
+    // host's record carried, so whoever simulates the hull can report that ship's fate.
+    [Fact]
+    public void Migration_CopiesAndTheSwappedInHull_KeepTheCampaignShipId()
+    {
+        using var battle = StartPirateBattle(out var a, out var b, out var c, out var pirates);
+        Assert.All(pirates, pirate =>
+        {
+            Assert.Equal(CampaignShipIdOf(pirate, pirates), b.Hull(pirate).CampaignShipId);
+            Assert.Equal(CampaignShipIdOf(pirate, pirates), c.Hull(pirate).CampaignShipId);
+        });
+
+        battle.MigrateHost(a, "B");
+        b.Ticks(3);
+
+        Assert.All(pirates, pirate =>
+        {
+            Assert.False(b.Hull(pirate).IsCopy);
+            Assert.Equal(CampaignShipIdOf(pirate, pirates), b.Hull(pirate).CampaignShipId);
+            b.Call(() => Assert.Equal(CampaignShipIdOf(pirate, pirates), b.Engine.CampaignShipIdOf(b.Ship(pirate).Hull)));
+        });
+    }
+
+    private static string CampaignShipIdOf(Guid pirate, Guid[] pirates) => $"Ship_pirate_{Array.IndexOf(pirates, pirate)}";
+
+    // vs_pirates for three players; the battle host A simulates two AI hulls, each standing for a pirate campaign ship.
     private NavalBattle StartPirateBattle(out NavalPeer a, out NavalPeer b, out NavalPeer c, out Guid[] pirates)
     {
         var battle = StartNavalBattle(new[]
@@ -130,7 +155,8 @@ public class NavalHostMigrationScenarioTests : NavalBattleTestEnvironment
         c = battle["C"];
         var host = a;
         pirates = Enumerable.Range(0, 2)
-            .Select(i => battle.FieldAiHull(host, BattleSideEnum.Defender, new Vec3(30f * i, 300f, 0f)))
+            .Select(i => battle.FieldAiHull(host, BattleSideEnum.Defender, new Vec3(30f * i, 300f, 0f),
+                campaignShipId: $"Ship_pirate_{i}"))
             .ToArray();
         battle.CommitAll();
         battle.TickAll();

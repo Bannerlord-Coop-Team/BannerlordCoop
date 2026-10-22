@@ -46,6 +46,8 @@ public sealed class BattleShipSpawnData
     /// <summary>The host that fielded an AI hull a later host now simulates; empty when it is the record's owner.</summary>
     [ProtoMember(17)] public readonly string OriginalOwnerControllerId;
     // ProtoMember 18 carried the campaign ship id for the hand-back D4 removed; don't reuse it.
+    /// <summary>The object-manager id of the campaign ship the hull stands for; a copy keeps it for the ship's fate report.</summary>
+    [ProtoMember(19)] public readonly string CampaignShipId;
 
     public BattleShipSpawnData(
         Guid shipId,
@@ -64,7 +66,8 @@ public sealed class BattleShipSpawnData
         float sailHitPoints,
         int randomValue,
         string customSailPatternId,
-        string originalOwnerControllerId = null)
+        string originalOwnerControllerId = null,
+        string campaignShipId = null)
     {
         ShipId = shipId;
         OwnerControllerId = ownerControllerId;
@@ -83,6 +86,7 @@ public sealed class BattleShipSpawnData
         RandomValue = randomValue;
         CustomSailPatternId = customSailPatternId;
         OriginalOwnerControllerId = originalOwnerControllerId == ownerControllerId ? null : originalOwnerControllerId;
+        CampaignShipId = campaignShipId;
     }
 
     /// <summary>The player or host that fielded the hull.</summary>

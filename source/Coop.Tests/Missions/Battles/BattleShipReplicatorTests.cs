@@ -1301,6 +1301,23 @@ public class BattleShipReplicatorTests
         Assert.Null(copies[1].OriginalOwnerControllerId);
     }
 
+    // M6 D1: a copy needs its campaign ship's id to report the ship's fate after it becomes the hull's authority.
+    [Fact]
+    public void SpawnRecord_RoundTripsTheCampaignShipId()
+    {
+        var record = new BattleShipSpawnData(Guid.NewGuid(), "host", "MapEventParty_1", true, BattleSideEnum.Defender, 2,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
+            "", Peer, "Ship_7");
+        var withoutShip = new BattleShipSpawnData(Guid.NewGuid(), Peer, "MapEventParty_1", false, BattleSideEnum.Defender, 2,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), "northern_light_ship", null, null, null, null, 900f, 400f, 1,
+            "");
+
+        var copies = Serializer.DeepClone(new NetworkSpawnBattleShips(new[] { record, withoutShip })).Ships;
+
+        Assert.Equal("Ship_7", copies[0].CampaignShipId);
+        Assert.Null(copies[1].CampaignShipId);
+    }
+
     [Fact]
     public void Tick_SendsTheOwnHullConditionOnceAndThenOnlyWhenItChanges()
     {

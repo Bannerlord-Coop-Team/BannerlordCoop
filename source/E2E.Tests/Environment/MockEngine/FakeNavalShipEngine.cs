@@ -106,7 +106,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         var fake = Of(hull);
         return new BattleShipSpawnData(identity.ShipId, identity.CurrentAuthority, identity.MapEventPartyId, identity.IsNpcParty,
             fake.Side, fake.FormationIndex, NetworkBattleShipSample.FromFrame(fake.Frame), HullId, null, null, null, null,
-            fake.HitPoints, fake.SailHitPoints, 1, "", identity.OriginalOwner);
+            fake.HitPoints, fake.SailHitPoints, 1, "", identity.OriginalOwner, fake.CampaignShipId);
     }
 
     public MissionObject SpawnForeignHull(BattleShipSpawnData data, Team team, out Formation formation)
@@ -128,6 +128,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             Team = team,
             Formation = FormationOf(team, formationIndex),
             SpawnData = data,
+            CampaignShipId = data.CampaignShipId,
         };
         if (ArmsCopies) copy.ArmWeapon();
         hulls.Add(copy);
@@ -273,6 +274,7 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
             Team = old.Team,
             Formation = old.Formation,
             CrewCapacity = old.CrewCapacity,
+            CampaignShipId = old.CampaignShipId,
         };
         hulls.Add(fresh);
         // The replacement takes the old hull's formation, so its crew and the agents parked for boarding it carry over.
@@ -398,6 +400,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
         fake.SpawnableReserve += taken;
         return taken;
     }
+
+    public string CampaignShipIdOf(MissionObject hull) => Of(hull).CampaignShipId!;
 
     // The live engine fades the agent out of the mission, which the mission fixture's FadeOut patch mirrors.
     public void WithdrawAgent(Agent agent)
@@ -588,6 +592,8 @@ public sealed class FakeHull
     /// <summary>The local formation the hull is assigned to, which differs per client for the same ship.</summary>
     public Formation? Formation { get; set; }
     public BattleShipSpawnData? SpawnData { get; set; }
+    /// <summary>The registry id of the campaign ship the hull stands for, or null.</summary>
+    public string? CampaignShipId { get; set; }
     public BattleRopeState[] Ropes { get; set; } = Array.Empty<BattleRopeState>();
     /// <summary>An own hull's body motion its samples send, or the motion a copy's latest sample carried.</summary>
     public BattleShipMotion Motion { get; set; }
