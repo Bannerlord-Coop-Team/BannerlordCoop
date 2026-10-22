@@ -359,6 +359,7 @@ internal class FinalizationCoordinator : IHandler
                 issue.CompleteIssueWithStayAliveConditionsFailed();
                 return true;
             case IssueOutcome.AlternativeSolution:
+            case IssueOutcome.IssueFinishedByAiLord:
                 issue.IssueFinalized();
                 return true;
             case IssueOutcome.LordAcceptedCounterOffer:
