@@ -18,6 +18,7 @@ using GameInterface.Registry.Messages;
 using Common.Messaging;
 using System;
 using System.Linq;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
@@ -132,6 +133,96 @@ public sealed class LesserNobleRevoltTests : IDisposable
         RegisterPlayer(controllerId);
         AddIssueWithQuest(server, issueId);
         server.Call(() => Assert.True(server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(giverId, issueId, controllerId)));
+    }
+
+    // MapEvent.Initialize runs the battle visual's Initialize, which needs a render context the test doesnt have.
+    private static readonly MethodBase[] MapEventVisualMethods =
+    {
+        AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
+    };
+
+    // Player A owns the quest with a real party on the first client, player B on the last client only watches.
+    private (string OwnerPartyId, string RevoltPartyId) RegisterOwnerWithRevoltParty(string issueId)
+    {
+        var server = testEnvironment.Server;
+        var ownerClient = testEnvironment.Clients.First();
+        string ownerPartyId = null;
+        string revoltPartyId = null;
+        server.Call(() =>
+        {
+            var ownerParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var revoltParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            Assert.True(server.ObjectManager.TryGetId(ownerParty, out ownerPartyId));
+            Assert.True(server.ObjectManager.TryGetId(revoltParty, out revoltPartyId));
+        });
+        testEnvironment.FlushCoalescer();
+
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            var owner = ownerParty.LeaderHero;
+            Assert.True(server.ObjectManager.TryGetId(owner, out var heroId));
+            Assert.True(server.ObjectManager.TryGetId(ownerParty.ActualClan, out var clanId));
+            Assert.True(server.ObjectManager.TryGetId(owner.CharacterObject, out var characterId));
+            Assert.True(server.Resolve<IPlayerManager>().AddPlayer(new Player("player-A", heroId, ownerPartyId, clanId, characterId)));
+        });
+        testEnvironment.ConnectRegisteredPlayer(ownerClient, "player-A");
+        ownerClient.Resolve<IControllerIdProvider>().SetControllerId("player-A");
+        RegisterPlayer("player-B", testEnvironment.Clients.Last());
+
+        foreach (var instance in testEnvironment.Clients.Append(server))
+        {
+            AddIssueWithQuest(instance, issueId, revoltPartyId);
+        }
+
+        server.Call(() => Assert.True(server.Resolve<IIssueOwnershipRegistry>().TrySetOwner(giverId, issueId, "player-A")));
+        return (ownerPartyId, revoltPartyId);
+    }
+
+    // Patches stay live, so Initialize fires CampaignEventDispatcher.OnMapEventStarted like MapEventBattleFactory does.
+    private string StartServerBattle(string attackerPartyId, string defenderPartyId)
+    {
+        var server = testEnvironment.Server;
+        string mapEventId = null;
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(attackerPartyId, out var attacker));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(defenderPartyId, out var defender));
+            var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
+            mapEvent.Initialize(attacker.Party, defender.Party, new FieldBattleEventComponent(mapEvent), MapEvent.BattleTypes.FieldBattle);
+            mapEvent.MapEventVisual = null;
+            if (!Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
+            {
+                Campaign.Current.MapEventManager.OnMapEventCreated(mapEvent);
+            }
+
+            Assert.True(server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+        }, MapEventVisualMethods);
+
+        foreach (var instance in testEnvironment.Clients.Append(server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+                mapEvent.Position = new CampaignVec2(default, isOnLand: true);
+            });
+        }
+
+        return mapEventId;
+    }
+
+    // The encounter menu's Leave ends in FinalizeEvent on the owner's client, which asks the server to finalize.
+    private void LeaveBattleOnOwnersClient(string mapEventId)
+    {
+        var ownerClient = testEnvironment.Clients.First();
+        ownerClient.Call(() =>
+        {
+            Assert.True(ownerClient.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            mapEvent.FinalizeEvent();
+        }, MapEventVisualMethods);
+
+        Assert.False(testEnvironment.Server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out _));
     }
 
     [Fact]
@@ -355,6 +446,46 @@ public sealed class LesserNobleRevoltTests : IDisposable
 
         Assert.Equal(2, wins.CountFor(server));
         Assert.Equal(1, losses.CountFor(server));
+    }
+
+    [Fact]
+    public void OwnerRetreat_EndsTheFirstTalkOnTheOwnersClient()
+    {
+        const string issueId = "issue_lesser_noble";
+        var server = testEnvironment.Server;
+        var (ownerPartyId, revoltPartyId) = RegisterOwnerWithRevoltParty(issueId);
+
+        // The owner attacks, like vanilla's "I will talk no more" consequence.
+        var mapEventId = StartServerBattle(ownerPartyId, revoltPartyId);
+        Assert.True(QuestOf(server)._checkForEventEnd);
+
+        LeaveBattleOnOwnersClient(mapEventId);
+
+        Assert.True(QuestOf(server)._firstTalkIsDone);
+        Assert.False(QuestOf(server)._checkForEventEnd);
+
+        // Vanilla's next talk reads these on the owner's client, so it opens on the "snake" line.
+        var ownerQuest = QuestOf(testEnvironment.Clients.First());
+        Assert.True(ownerQuest._firstTalkIsDone);
+        Assert.False(ownerQuest._checkForEventEnd);
+        Assert.False(QuestOf(testEnvironment.Clients.Last())._firstTalkIsDone);
+    }
+
+    [Fact]
+    public void RevoltAttackOnTheOwner_KeepsTheFirstTalkAfterTheOwnerLeaves()
+    {
+        const string issueId = "issue_lesser_noble";
+        var server = testEnvironment.Server;
+        var (ownerPartyId, revoltPartyId) = RegisterOwnerWithRevoltParty(issueId);
+
+        // Vanilla only waits for a battle the owner started against the revolt party.
+        var mapEventId = StartServerBattle(revoltPartyId, ownerPartyId);
+        Assert.False(QuestOf(server)._checkForEventEnd);
+
+        LeaveBattleOnOwnersClient(mapEventId);
+
+        Assert.False(QuestOf(server)._firstTalkIsDone);
+        Assert.False(QuestOf(testEnvironment.Clients.First())._firstTalkIsDone);
     }
 
     [Fact]
