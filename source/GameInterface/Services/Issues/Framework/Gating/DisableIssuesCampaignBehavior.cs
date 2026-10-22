@@ -19,4 +19,9 @@ internal class DisableIssuesCampaignBehavior
     [HarmonyPatch(nameof(IssuesCampaignBehavior.OnGameLoaded))]
     [HarmonyPrefix]
     private static bool OnGameLoadedPrefix() => ModInformation.IsServer;
+
+    // The server already gives the Oratory renown and influence, clients replaying the ending would give it again
+    [HarmonyPatch(nameof(IssuesCampaignBehavior.OnIssueUpdated))]
+    [HarmonyPrefix]
+    private static bool OnIssueUpdatedPrefix() => ModInformation.IsServer;
 }
