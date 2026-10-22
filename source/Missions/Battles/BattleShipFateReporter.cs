@@ -115,12 +115,14 @@ public class BattleShipFateReporter : IBattleShipFateReporter
         return new BattleShipFate(campaignShipId, condition.HitPoints, condition.SailHitPoints, sunk, mitigatedDamage);
     }
 
+    // Whether the server must hear about this fate: its sunk state, HP or sail HP moved, or new damage was mitigated.
     private static bool Differs(BattleShipFate previous, BattleShipFate fate) =>
         previous.Sunk != fate.Sunk
         || Math.Abs(previous.HitPoints - fate.HitPoints) > Tolerance
         || Math.Abs(previous.SailHitPoints - fate.SailHitPoints) > Tolerance
         || fate.MitigatedDamage > Tolerance;
 
+    // Sends the changed fates as one numbered message at this client's host epoch and remembers each as the last one sent.
     private void Send(IReadOnlyList<PendingFate> changed)
     {
         if (changed.Count == 0 || !session.HasInstance) return;

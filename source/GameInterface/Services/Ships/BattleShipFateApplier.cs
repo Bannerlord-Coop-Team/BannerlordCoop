@@ -61,6 +61,7 @@ public class BattleShipFateApplier : IBattleShipFateApplier
         return applied;
     }
 
+    // Grants the fate's XP, then destroys a sunk ship or writes the survivor's battle HP; false when its ship is gone.
     private bool ApplyFate(BattleShipFate fate)
     {
         if (!objectManager.TryGetObjectWithLogging<Ship>(fate.CampaignShipId, out var ship)) return false;

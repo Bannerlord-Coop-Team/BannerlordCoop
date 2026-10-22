@@ -33,5 +33,6 @@ public sealed class BattleShipFate
     public BattleShipFate WithMitigatedDamage(float mitigatedDamage) =>
         new BattleShipFate(CampaignShipId, HitPoints, SailHitPoints, Sunk, mitigatedDamage);
 
+    // NaN or infinity would poison the campaign ship.
     private static bool IsFinite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 }

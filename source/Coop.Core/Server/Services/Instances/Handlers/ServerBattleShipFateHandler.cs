@@ -106,6 +106,7 @@ public class ServerBattleShipFateHandler : IHandler
             RecordFate(message, mapEvent, player.ControllerId, senderParty?.Party, isHostAtEpoch, fate);
     }
 
+    // Holds one fate when the sender may report its ship; logs why it may not otherwise.
     private void RecordFate(NetworkBattleShipFates message, MapEvent mapEvent, string controllerId, PartyBase senderParty,
         bool isHostAtEpoch, BattleShipFate fate)
     {
