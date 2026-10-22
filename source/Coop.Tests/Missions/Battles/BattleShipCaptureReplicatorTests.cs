@@ -120,9 +120,43 @@ public class BattleShipCaptureReplicatorTests
         Assert.False(captorShip.IsOrphaned);
     }
 
-    // R46: a receiver whose swap can't run drops the confirm whole: no authority move, no registry change, no vanilla swap.
+    // R46 review: a receiver whose swap can't run yet holds the confirm without changing anything, and applies it whole once
+    // the swap can run; the hold is logged once, not per retry.
     [Fact]
-    public void Confirm_WhoseSwapCannotRunHere_IsDroppedWhole()
+    public void Confirm_WhoseSwapCannotRunYet_IsHeldUnchanged_AndAppliesOnceItCan()
+    {
+        var harness = new Harness();
+        var prize = harness.Register(Host, BattleSideEnum.Defender, npc: true);
+        var captorShip = harness.Register(Captor, BattleSideEnum.Attacker);
+        string blocker = "captor_hull_has_no_formation";
+        harness.CaptureEngine.Setup(e => e.CheckCapture(prize.Hull, captorShip.Hull)).Returns(() => blocker);
+
+        harness.Applier.AcceptConfirm(Confirm(prize, Captor, captorShip, Host));
+        harness.Applier.Tick(1f);
+        harness.Applier.Tick(1f);
+
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(It.IsAny<MissionObject>(), It.IsAny<MissionObject>()), Times.Never);
+        harness.Engine.Verify(e => e.ReleaseHull(It.IsAny<MissionObject>()), Times.Never);
+        Assert.Equal(Host, prize.CurrentAuthority);
+        Assert.Equal(0, prize.CaptureSequence);
+        Assert.False(captorShip.IsOrphaned);
+        var held = (JObject)harness.Inspect()["applied"]!;
+        Assert.Equal(1L, (long)held["swapsBlocked"]!);
+        Assert.Single((JArray)held["heldConfirms"]!);
+
+        blocker = null;
+        harness.Applier.Tick(1f);
+
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(prize.Hull, captorShip.Hull), Times.Once);
+        Assert.Equal(Captor, prize.CaptorControllerId);
+        Assert.Equal(1, prize.CaptureSequence);
+        Assert.True(captorShip.IsOrphaned);
+        Assert.Empty((JArray)harness.Inspect()["applied"]!["heldConfirms"]!);
+    }
+
+    // R46 review: another client's capture this one still can't replay after the wait is given up, loudly; nothing changed.
+    [Fact]
+    public void Confirm_WhoseSwapNeverRunsHere_IsGivenUpAfterTheWait()
     {
         var harness = new Harness();
         var prize = harness.Register(Host, BattleSideEnum.Defender, npc: true);
@@ -130,17 +164,52 @@ public class BattleShipCaptureReplicatorTests
         harness.CaptureEngine.Setup(e => e.CheckCapture(prize.Hull, captorShip.Hull)).Returns("hull_removed");
 
         harness.Applier.AcceptConfirm(Confirm(prize, Captor, captorShip, Host));
+        harness.Applier.Tick(ShipCaptureApplier.SwapWaitSeconds - 1f);
+        bool heldBeforeTheWait = ((JArray)harness.Inspect()["applied"]!["heldConfirms"]!).Count == 1;
+        harness.Applier.Tick(2f);
 
+        Assert.True(heldBeforeTheWait);
         harness.CaptureEngine.Verify(e => e.ApplyCapture(It.IsAny<MissionObject>(), It.IsAny<MissionObject>()), Times.Never);
-        harness.Engine.Verify(e => e.ReleaseHull(It.IsAny<MissionObject>()), Times.Never);
-        harness.Engine.Verify(e => e.AdoptHull(It.IsAny<MissionObject>()), Times.Never);
         Assert.Equal(Host, prize.CurrentAuthority);
         Assert.Null(prize.CaptorControllerId);
-        Assert.Equal(0, prize.CaptureSequence);
-        Assert.False(captorShip.IsOrphaned);
         var applied = (JObject)harness.Inspect()["applied"]!;
-        Assert.Equal(1L, (long)applied["swapsBlocked"]!);
+        Assert.Empty((JArray)applied["heldConfirms"]!);
+        Assert.Equal(1L, (long)applied["swapsGivenUp"]!);
         Assert.Equal("swap_blocked:hull_removed", (string)applied["lastDrop"]!);
+    }
+
+    // R46 review: every other client gave the prize to its captor, so a captor whose swap never runs still takes the hull over
+    // (authority, registry, records) without vanilla's swap once the wait is out, instead of leaving it simulated by nobody.
+    [Fact]
+    public void Confirm_ToACaptorWhoseSwapNeverRuns_TakesTheHullOverWithoutTheSwap_AfterTheWait()
+    {
+        var harness = new Harness();
+        var prize = harness.Register(Host, BattleSideEnum.Defender, npc: true);
+        var captorShip = harness.Register(Own, BattleSideEnum.Attacker);
+        harness.CaptureEngine.Setup(e => e.CheckCapture(prize.Hull, captorShip.Hull)).Returns("captor_formation_holds_another_hull");
+
+        harness.Applier.AcceptConfirm(Confirm(prize, Own, captorShip, Host));
+        harness.Applier.Tick(ShipCaptureApplier.SwapWaitSeconds - 1f);
+        string authorityDuringTheWait = prize.CurrentAuthority;
+        harness.Applier.Tick(2f);
+
+        Assert.Equal(Host, authorityDuringTheWait);
+        Assert.Equal(Own, prize.CurrentAuthority);
+        Assert.Equal(Own, prize.CaptorControllerId);
+        Assert.Equal(1, prize.CaptureSequence);
+        Assert.True(captorShip.IsOrphaned);
+        harness.Engine.Verify(e => e.AdoptHull(prize.Hull), Times.Once);
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(It.IsAny<MissionObject>(), It.IsAny<MissionObject>()), Times.Never);
+        Assert.Equal(1L, (long)harness.Inspect()["applied"]!["capturesWithoutSwap"]!);
+    }
+
+    [Theory]
+    [InlineData(0f, 29.9f, false)]
+    [InlineData(0f, 30f, true)]
+    [InlineData(5f, 40f, true)]
+    public void SwapWaitExpired_AfterTheBoundedWait(float since, float now, bool expected)
+    {
+        Assert.Equal(expected, ShipCaptureApplier.SwapWaitExpired(since, now));
     }
 
     [Fact]

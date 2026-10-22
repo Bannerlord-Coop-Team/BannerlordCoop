@@ -172,29 +172,64 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         }
     }
 
-    // R46: a receiver whose swap can't run drops the confirm whole instead of throwing halfway; the others apply it.
+    // R46 review: a receiver whose swap can't run yet holds the capture unchanged and applies it whole once the swap can run,
+    // so it ends where its peers are instead of diverging for good.
     [Fact]
-    public void ReceiverWhoseSwapCannotRun_DropsTheConfirmWhole_WhileTheOthersApplyIt()
+    public void ReceiverWhoseSwapCannotRunYet_HoldsTheCapture_AndAppliesItOnceTheStateClears()
     {
         using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
         var prize = pirates[0];
         h.Hull(prize).IsVacant = true;
-        o.Engine.CaptureBlocker = "hull_removed";
+        o.Engine.CaptureBlocker = "captor_hull_has_no_formation";
 
         c.ElapseCaptureTimer(prize, captorHull);
+        o.Tick();
 
         foreach (var peer in new[] { h, c })
+            Assert.Equal("C", peer.Ship(prize).CaptorControllerId);
+        Assert.Equal("H", o.Ship(prize).CurrentAuthority);
+        Assert.Null(o.Ship(prize).CaptorControllerId);
+        Assert.Empty(o.Engine.Captures);
+        Assert.Equal(1L, (long)CaptureStats(o)["applied"]!["swapsBlocked"]!);
+
+        o.Engine.CaptureBlocker = null;
+        o.Tick();
+
+        Assert.Equal("C", o.Ship(prize).CurrentAuthority);
+        Assert.Equal("C", o.Ship(prize).CaptorControllerId);
+        Assert.Equal(1, o.Ship(prize).CaptureSequence);
+        Assert.True(o.Ship(captorHull).IsOrphaned);
+        Assert.Single(o.Engine.Captures);
+        Assert.True(o.Hull(prize).IsCopy);
+    }
+
+    // R46 review: every other client gave the prize to its captor, so a captor whose swap never runs still takes the hull over
+    // without vanilla's swap once the wait is out, rather than leave it simulated by nobody.
+    [Fact]
+    public void CaptorWhoseSwapNeverRuns_TakesTheHullOverWithoutTheSwap_AfterTheWait()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
+        var prize = pirates[0];
+        h.Hull(prize).IsVacant = true;
+        c.Engine.CaptureBlocker = "captor_formation_holds_another_hull";
+
+        c.ElapseCaptureTimer(prize, captorHull);
+        c.Tick();
+        bool captorHeldIt = c.Ship(prize).CurrentAuthority == "H" && c.Hull(prize).IsCopy;
+        c.Tick(global::Missions.Battles.ShipCaptureApplier.SwapWaitSeconds + 1f);
+
+        Assert.True(captorHeldIt);
+        foreach (var peer in new[] { h, c, o })
         {
+            Assert.Equal("C", peer.Ship(prize).CurrentAuthority);
             Assert.Equal("C", peer.Ship(prize).CaptorControllerId);
             Assert.True(peer.Ship(captorHull).IsOrphaned);
         }
 
-        // The captor's records that follow are refused the same way, so the prize never half-changes hands here.
-        Assert.Equal("H", o.Ship(prize).CurrentAuthority);
-        Assert.Null(o.Ship(prize).CaptorControllerId);
-        Assert.Equal(0, o.Ship(prize).CaptureSequence);
-        Assert.Empty(o.Engine.Captures);
-        Assert.True((long)CaptureStats(o)["applied"]!["swapsBlocked"]! >= 1L);
+        Assert.False(c.Hull(prize).IsCopy);
+        Assert.Contains(c.Ship(prize).Hull, c.Engine.Adoptions);
+        Assert.Empty(c.Engine.Captures);
+        Assert.Equal(1L, (long)CaptureStats(c)["applied"]!["capturesWithoutSwap"]!);
     }
 
     // (d) C and O race for one hull: the authority confirms the first request, whose broadcast ends O's request too, and O's
