@@ -836,6 +836,12 @@ public sealed class LesserNobleRevoltTests : IDisposable
 
         var finalized = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(outcome, finalized.Outcome);
+        var endingLog = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkLesserNobleRevoltEndingLog>());
+        Assert.Equal("player-A", endingLog.ControllerId);
+        Assert.Equal(issueId, endingLog.IssueId);
+        // Both go out on the reliable ordered channel, so the owner adds the line before its replay archives the quest.
+        var sent = server.NetworkSentMessages.Messages;
+        Assert.True(sent.FindIndex(message => message is NetworkLesserNobleRevoltEndingLog) < sent.FindIndex(message => message is NetworkIssueFinalized));
         server.Call(() => Assert.Single(serverQuest.JournalEntries, log => log.LogText.ToString() == expected));
 
         owner.Call(() =>
@@ -867,5 +873,33 @@ public sealed class LesserNobleRevoltTests : IDisposable
         Assert.Equal(payments, gold.CountFor(server));
         Assert.Equal(payments, renown.CountFor(server));
         Assert.Equal(traitChanges, traits.CountFor(server));
+    }
+
+    [Fact]
+    public void EndingLog_AddsOnlyTheServerLinesPastTheOwnersJournal()
+    {
+        const string issueId = "issue_lesser_noble";
+        var client = testEnvironment.Clients.First();
+        RegisterPlayer("player-A");
+        AddIssueWithQuest(client, issueId);
+        var quest = QuestOf(client);
+        client.Call(() =>
+        {
+            AccessTools.Field(typeof(QuestBase), nameof(QuestBase._journalEntries)).SetValue(quest, new MBList<JournalLog>());
+            quest._journalEntries.Add(new JournalLog(CampaignTime.Now, new TextObject(StartLog)));
+        });
+
+        void Send(string sentIssueId, string controllerId, params string[] logs) => testEnvironment.Server.Call(() =>
+            testEnvironment.Server.Resolve<INetwork>().SendAll(new NetworkLesserNobleRevoltEndingLog(
+                giverId, sentIssueId, controllerId, logs.Select(log => new TextObject(log)).ToArray())));
+
+        Send(issueId, "player-B", StartLog, "ending");
+        // The giver's earlier issue ended and this one replaced it.
+        Send("issue_lesser_noble_old", "player-A", StartLog, "ending");
+        // A line with the same text as an earlier one is still a new line, and the same journal twice adds it once.
+        Send(issueId, "player-A", StartLog, StartLog);
+        Send(issueId, "player-A", StartLog, StartLog);
+
+        client.Call(() => Assert.Equal(new[] { StartLog, StartLog }, quest.JournalEntries.Select(log => log.LogText.ToString())));
     }
 }
