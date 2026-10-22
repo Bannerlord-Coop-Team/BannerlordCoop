@@ -14,6 +14,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using NavalPhysicsScript = NavalDLC.Missions.NavalPhysics.NavalPhysics;
 
 namespace Missions.Naval;
 
@@ -123,6 +124,42 @@ internal class CopyPairCollisionFilterPatch
 
     /// <summary>Whether two hulls may touch on this client: not when both are copies of other owners' hulls.</summary>
     internal static bool AllowsCollision(bool mineIsCopy, bool otherIsCopy) => !(mineIsCopy && otherIsCopy);
+}
+
+// Vanilla weighs a hull down with the agents standing on it. A copy's puppets stand and sit elsewhere than the owner's crew,
+// which heeled copies 2.5-4.2 degrees off (R45), so a copy takes the owner's crew load from its samples instead.
+[HarmonyPatch(typeof(NavalPhysicsScript), nameof(NavalPhysicsScript.ApplyAgentForces))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class CopyCrewLoadPatch
+{
+    // The tolerance vanilla's ApplyAgentForces gives its point-in-hull check.
+    internal const float BoxEpsilon = 0.1f;
+
+    // [Physics thread] Applies the owner's crew load on a copy that has one; an own hull, or a copy without one yet, runs vanilla.
+    [HarmonyPrefix]
+    private static bool Prefix(NavalPhysicsScript __instance)
+    {
+        bool isCopy = NavalForeignHulls.TryGetCopy(__instance, out var copy);
+        var ownerLoad = copy?.CrewLoad;
+        if (!AppliesOwnerLoad(isCopy, ownerLoad)) return true;
+
+        var localCentre = ownerLoad.LocalCentre;
+        if (!IsInsideHull(__instance.PhysicsBoundingBoxWithoutChildren, localCentre)) return false;
+
+        var force = WeightForce(ownerLoad.Mass, __instance.PhysicsParameters.StepAgentWeightMultiplier);
+        __instance.ApplyGlobalForceAtLocalPos(in localCentre, in force);
+        return false;
+    }
+
+    /// <summary>Whether a hull takes its owner's crew load: only a copy whose owner sent one.</summary>
+    internal static bool AppliesOwnerLoad(bool isCopy, BattleShipCrewLoad ownerLoad) => isCopy && ownerLoad != null;
+
+    /// <summary>Vanilla's crew weight force: the mass times the hull's step weight multiplier times gravity.</summary>
+    internal static Vec3 WeightForce(float mass, float stepAgentWeightMultiplier) =>
+        mass * stepAgentWeightMultiplier * MBGlobals.GravitationalAcceleration;
+
+    /// <summary>Vanilla's check that the crew centre lies within the hull's physics box, which it skips the force without.</summary>
+    internal static bool IsInsideHull(BoundingBox box, Vec3 localCentre) => box.PointInsideBox(localCentre, BoxEpsilon);
 }
 
 // Marks the initial plan of a side so the plan patch below shifts only that plan, not later Order of Battle replans.

@@ -48,7 +48,7 @@ public interface INavalSteeredCopies
 #endif
 }
 
-/// <summary>One tracked copy's steering toward its owner's samples.</summary>
+/// <summary>One tracked copy's steering toward its owner's samples, and the owner's crew load it heels under.</summary>
 #if DEBUG
 public
 #else
@@ -68,6 +68,18 @@ sealed class SteeredCopy
 
     /// <summary>Whether a physics step asked to teleport the copy, which the next mission tick does.</summary>
     internal bool SnapPending { get; set; }
+
+    private volatile BattleShipCrewLoad crewLoad;
+
+    /// <summary>
+    /// [Game thread writes, physics thread reads] The owner's crew load from its latest sample; null before the first one
+    /// or when the owner reports none, which leaves the copy on vanilla's own crew weight.
+    /// </summary>
+    internal BattleShipCrewLoad CrewLoad
+    {
+        get => crewLoad;
+        set => crewLoad = value;
+    }
 
 #if DEBUG
     internal CopyDiagnostics Diagnostics { get; } = new CopyDiagnostics();
@@ -94,14 +106,16 @@ public class NavalSteeredCopies : INavalSteeredCopies
     {
         if (copies.ContainsKey(ship)) return;
 
-        copies.Add(ship, new SteeredCopy(new CopySteering(Knobs)));
-        NavalForeignHulls.Add(ship);
+        var copy = new SteeredCopy(new CopySteering(Knobs));
+        copies.Add(ship, copy);
+        NavalForeignHulls.Add(ship, copy);
     }
 
     public void Observe(MissionShip ship, MatrixFrame frame, BattleShipMotion motion)
     {
         if (!copies.TryGetValue(ship, out var copy) || ship.IsRemoved || !ship.GameEntity.IsValid) return;
 
+        copy.CrewLoad = motion.CrewLoad;
         copy.Steering.ObserveOwner(frame, motion.Velocity, motion.YawRate);
 #if DEBUG
         copy.Diagnostics.TargetJump.Add(Mission.Current?.CurrentTime ?? 0f, copy.Steering.LastTargetJumpMetres);
