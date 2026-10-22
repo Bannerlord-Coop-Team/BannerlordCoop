@@ -74,6 +74,15 @@ public class NavalCaptureCoopCommandsTests
         Assert.Equal(expected, NavalCaptureCoopCommand.IsOwnOrphan(info, "local"));
     }
 
+    // R46 review: force reports where the request went, read back from the replicator after publishing the timer's event.
+    [Theory]
+    [InlineData(true, "request sent to host")]
+    [InlineData(false, "decided here")]
+    public void ForceOutcome_NamesWhereTheRequestWent(bool waiting, string expected)
+    {
+        Assert.StartsWith(expected, NavalCaptureCoopCommand.ForceOutcome(waiting, "host"));
+    }
+
     [Fact]
     public void Swim_WithBadArguments_ShowsTheUsage_AndOutsideABattleFails()
     {

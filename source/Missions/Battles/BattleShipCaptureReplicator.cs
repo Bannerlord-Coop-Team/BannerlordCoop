@@ -27,12 +27,6 @@ public interface IBattleShipCaptureReplicator : IDisposable
 
     /// <summary>[Game thread] How long this client's request for <paramref name="shipId"/> has waited, or null when none waits.</summary>
     float? PendingRequestAge(Guid shipId);
-
-    /// <summary>
-    /// [Game thread] Decides a capture of a hull this client simulates, or asks its authority once: where vanilla's elapsed helm
-    /// timer leads, also called directly by the DEBUG capture command's force.
-    /// </summary>
-    void RequestCapture(NetworkShipInfo prize, NetworkShipInfo captorShip);
 }
 
 /// <inheritdoc cref="IBattleShipCaptureReplicator"/>
@@ -135,7 +129,8 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         RequestCapture(prize, captorShip);
     }
 
-    public void RequestCapture(NetworkShipInfo prize, NetworkShipInfo captorShip)
+    /// <summary>[Game thread] Decides a capture of a hull this client simulates, or asks its authority once.</summary>
+    internal void RequestCapture(NetworkShipInfo prize, NetworkShipInfo captorShip)
     {
         var request = new NetworkShipCaptureRequest(prize.ShipId, session.OwnControllerId, captorShip.ShipId);
         if (IsOwn(prize))

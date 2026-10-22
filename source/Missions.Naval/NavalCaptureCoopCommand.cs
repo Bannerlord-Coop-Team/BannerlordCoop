@@ -1,5 +1,7 @@
 ﻿#if DEBUG
 using Common.Commands;
+using Common.Messaging;
+using Missions.Messages;
 using Missions.Battles;
 using NavalDLC.Missions.Objects;
 using System;
@@ -60,7 +62,7 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
 
         var gates = HelmGates.Read(naval.Engine, main, hull, IsOwnOrphan(info, controller.Session.OwnControllerId));
         if (mode == CaptureMode.Status) return Status(naval, info, gates);
-        if (mode == CaptureMode.Force) return Force(naval, registry, main, info);
+        if (mode == CaptureMode.Force) return Force(naval, main, info);
 
         return StartAtHelm(main, hull, info, gates);
     }
@@ -91,18 +93,28 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
     internal static bool IsOwnOrphan(NetworkShipInfo info, string ownControllerId) =>
         info != null && info.IsOrphaned && info.CurrentAuthority == ownControllerId;
 
-    // Hands the request to the capture replicator as vanilla's elapsed timer does, so only the hull's authority decides.
-    private static CoopCommandResult Force(CoopNavalBattleBehavior naval, INetworkShipRegistry registry, Agent main, NetworkShipInfo info)
+    // Publishes what vanilla's elapsed helm timer publishes (CoopShipCapturePatch), so the replicator asks the hull's authority
+    // exactly as after a real timer; a request already waiting for that hull is reported, not sent again.
+    private static CoopCommandResult Force(CoopNavalBattleBehavior naval, Agent main, NetworkShipInfo info)
     {
-        var captorHull = naval.Engine.CrewHullOf(main);
-        if (captorHull == null || !registry.TryGetByHull(captorHull, out var captorShip))
-            return Failed("NAVAL_CAPTURE ship=" + info.ShipId + " force: the main agent crews no registered hull to capture with.");
+        if (naval.Engine.CrewHullOf(main) == null)
+            return Failed("NAVAL_CAPTURE ship=" + info.ShipId + " force: the main agent crews no hull to capture with.");
 
-        naval.ShipCaptureReplicator.RequestCapture(info, captorShip);
-        return new CoopCommandResult(true, "NAVAL_CAPTURE ship=" + info.ShipId + " forced: request for " + info.CurrentAuthority +
-            " with hull " + captorShip.ShipId + " sent past this copy's helm gates; the answer shows in coop.debug.naval.capture status " +
-            info.ShipId + " and in captureRejections of coop.debug.naval.inspect");
+        var replicator = naval.ShipCaptureReplicator;
+        float? waiting = replicator.PendingRequestAge(info.ShipId);
+        if (waiting.HasValue)
+            return Failed(string.Format(CultureInfo.InvariantCulture, "NAVAL_CAPTURE ship={0} force: a request to {1} has waited {2:0.00} s; " +
+                "nothing sent", info.ShipId, info.CurrentAuthority, waiting.Value));
+
+        MessageBroker.Instance.Publish(main, new ShipCaptureTimerElapsed(info.Hull, main));
+        return new CoopCommandResult(true, "NAVAL_CAPTURE ship=" + info.ShipId + " forced past this copy's helm gates: " +
+            ForceOutcome(replicator.PendingRequestAge(info.ShipId).HasValue, info.CurrentAuthority) +
+            "; see coop.debug.naval.capture status " + info.ShipId + " and captureRejections in coop.debug.naval.inspect");
     }
+
+    /// <summary>What a forced request led to: a request waiting at the hull's authority, or a decision taken here at once.</summary>
+    internal static string ForceOutcome(bool requestWaiting, string authority) =>
+        requestWaiting ? "request sent to " + authority : "decided here (this client simulates it, or the captor hull was refused)";
 
     // Takes the helm the way the player's use key does (Agent.HandleStartUsingAction), after the gates vanilla's prompt reads.
     private static CoopCommandResult StartAtHelm(Agent main, MissionShip hull, NetworkShipInfo info, HelmGates gates)
