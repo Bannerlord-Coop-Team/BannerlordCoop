@@ -12,7 +12,7 @@ using Xunit;
 namespace GameInterface.Tests.Services.MapEvents;
 
 /// <summary>Verifies mission lifecycle identifiers survive until finalization.</summary>
-[Collection(ModInformationRoleCollection.Name)]
+[Collection(nameof(MissionCurrentCollection))]
 public class MissionStateFinalizeDiagnosticsPatchTests
 {
     [Fact]
