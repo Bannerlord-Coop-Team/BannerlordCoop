@@ -1,7 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Locations;
-using GameInterface.Services.MapEvents.Extensions;
+using GameInterface.Services.MapEvents;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
