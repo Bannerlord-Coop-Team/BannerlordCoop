@@ -5,6 +5,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using Common.Network.Messages;
+using Coop.Core.Server.Connections.Messages;
 using HarmonyLib;
 using Helpers;
 using GameInterface.Services.Heroes.Patches;
@@ -916,6 +917,73 @@ public class LadysKnightOutTests : IDisposable
         {
             Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
             Assert.Equal(expectedInfluence, scenario.Server.GetRegisteredObject<Hero>(player.HeroId).Clan.Influence);
+        });
+    }
+
+    [Fact]
+    public void JoiningDuringALordSolutionDoesNotGiveTheNonOwnerItsCompletedJournal()
+    {
+        PrepareLordSolution();
+        var issues = new Dictionary<EnvironmentInstance, IssueBase>();
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                issues[instance] = instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+                new JournalLogsCampaignBehavior().RegisterEvents();
+            });
+
+        var router = scenario.Server.Resolve<TestNetworkRouter>();
+        router.Disconnect(scenario.ClientB.NetPeer);
+        scenario.ClientA.Call(() =>
+        {
+            Campaign.Current.ConversationManager.IsConversationInProgress = true;
+            issues[scenario.ClientA].StartIssueWithLordSolution();
+        });
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+
+        IssueBase.IssueState savedState = default;
+        bool savedTried = false;
+        string savedLog = null!;
+        scenario.Server.Call(() =>
+        {
+            var issue = issues[scenario.Server];
+            Assert.True(issue.IsSolvingWithLordSolution);
+            savedState = issue._issueState;
+            savedTried = issue.IsTriedToSolveBefore;
+            savedLog = Assert.Single(issue.JournalEntries).LogText.ToString();
+        });
+        Assert.True(savedTried);
+        scenario.ClientB.Call(() =>
+        {
+            var issue = issues[scenario.ClientB];
+            // The joining client loads these persisted fields and the pending journal from the server save.
+            issue._issueState = savedState;
+            issue.IsTriedToSolveBefore = savedTried;
+            using (new AllowedThread()) issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(savedLog)));
+            Assert.Null(issue.IssueQuest);
+        });
+        router.Reconnect(scenario.ClientB.NetPeer);
+        scenario.Server.Call(() =>
+        {
+            var broker = scenario.Server.Resolve<IMessageBroker>();
+            broker.Publish(this, new PlayerCampaignEntered(scenario.ClientB.NetPeer));
+            broker.Publish(this, new PlayerCampaignEntered(scenario.ClientA.NetPeer));
+        });
+        scenario.ClientB.Call(() => Assert.True(scenario.ClientB.Resolve<IIssueOwnershipRegistry>()
+            .TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out var owner) && owner == QuestScenario.ControllerA));
+
+        scenario.ClientA.Call(() => issues[scenario.ClientA].CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+        var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
+        Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
+        scenario.ClientA.Call(() => Assert.Single(Campaign.Current.LogEntryHistory
+            .GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(issues[scenario.ClientA]) && entry.IsEnded())));
+        scenario.ClientB.Call(() =>
+        {
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsEnded()));
+            Assert.False(issues[scenario.ClientB].IsTriedToSolveBefore);
+            Assert.Null(scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
         });
     }
 
