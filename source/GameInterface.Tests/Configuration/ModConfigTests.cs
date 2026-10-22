@@ -308,6 +308,7 @@ public class ModConfigTests : IDisposable
         Assert.True(options.CoopClansEnabled);
         Assert.False(options.EnableHeroExecutions);
         Assert.False(options.BlockAiWarDeclarationsOnOfflinePlayers);
+        Assert.Equal(0, options.KingdomDecisionMissionHoldLimitMinutes);
     }
 
     /// <summary>

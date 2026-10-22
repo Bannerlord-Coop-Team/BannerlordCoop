@@ -100,6 +100,8 @@ public sealed class ModOptionsData
 
     public int? PlayerKingdomClanTierRequired { get; set; }
 
+    public int? KingdomDecisionMissionHoldLimitMinutes { get; set; }
+
     public bool? CoopClansEnabled { get; set; }
 
     public bool? SmithingStaminaRecoveryOutsideSettlements { get; set; }

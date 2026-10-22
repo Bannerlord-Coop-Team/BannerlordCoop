@@ -74,6 +74,8 @@ public readonly struct ModOptions
     public readonly bool BlockAiWarDeclarationsOnOfflinePlayers { get; } = false;
     [ProtoMember(26)]
     public readonly int SpawnRateWanderers { get; } = 1;
+    [ProtoMember(27)]
+    public readonly int KingdomDecisionMissionHoldLimitMinutes { get; } = 0;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -98,6 +100,7 @@ public readonly struct ModOptions
         SpawnRateWanderers = modOptionsData.SpawnRateWanderers ?? SpawnRateWanderers;
         WandererLimitScalesWithPlayers = modOptionsData.WandererLimitScalesWithPlayers ?? WandererLimitScalesWithPlayers;
         PlayerKingdomClanTierRequired = modOptionsData.PlayerKingdomClanTierRequired ?? PlayerKingdomClanTierRequired;
+        KingdomDecisionMissionHoldLimitMinutes = modOptionsData.KingdomDecisionMissionHoldLimitMinutes ?? KingdomDecisionMissionHoldLimitMinutes;
         CoopClansEnabled = modOptionsData.CoopClansEnabled ?? CoopClansEnabled;
         SmithingStaminaRecoveryOutsideSettlements = modOptionsData.SmithingStaminaRecoveryOutsideSettlements ?? SmithingStaminaRecoveryOutsideSettlements;
         SmithingStaminaRecoveryMultiplier = modOptionsData.SmithingStaminaRecoveryMultiplier ?? SmithingStaminaRecoveryMultiplier;
