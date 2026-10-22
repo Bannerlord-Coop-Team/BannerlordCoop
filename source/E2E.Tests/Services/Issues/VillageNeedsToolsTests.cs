@@ -236,7 +236,10 @@ public class VillageNeedsToolsTests : IDisposable
         {
             Assert.True(client.ObjectManager.TryGetObject<Hero>(secondGiverId, out var giver));
             giver.Issue.StartIssueWithQuest();
-            giver.Issue.IssueQuest.StartQuest();
+            using (new AllowedThread())
+            {
+                giver.Issue.IssueQuest.StartQuest();
+            }
         }, QuestLogTexts);
 
         Server.Call(() =>
@@ -865,7 +868,10 @@ public class VillageNeedsToolsTests : IDisposable
             Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
             notable.Issue.StartIssueWithQuest();
             var quest = Assert.IsType<Quest>(notable.Issue.IssueQuest);
-            quest.StartQuest();
+            using (new AllowedThread())
+            {
+                quest.StartQuest();
+            }
             quest._numberOfToolsLog = quest.AddDiscreteLog(new TaleWorlds.Localization.TextObject("{=!}Tools"), new TaleWorlds.Localization.TextObject("{=!}Tools"), 0, quest._numberOfRequestedGood);
         }, QuestLogTexts);
     }
