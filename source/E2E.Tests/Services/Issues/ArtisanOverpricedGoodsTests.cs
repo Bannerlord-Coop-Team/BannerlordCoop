@@ -184,6 +184,32 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     }
 
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory(bool success)
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
+
+        Accept();
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+        var ownerQuest = (Quest)scenario.QuestOf(ClientA);
+        var serverQuest = (Quest)scenario.QuestOf(Server);
+        if (success)
+        {
+            Stock(Amount);
+            ClientA.Call(() => ownerQuest.DeliverItemsFullyOnConsequence());
+            ClientA.Call(() => ownerQuest.CompleteQuestWithSuccess());
+        }
+        else
+        {
+            ClientA.Call(() => ownerQuest.CompleteQuestWithFail());
+        }
+
+        QuestJournalHistoryAssertions.AssertLateJoinHistory(Server, ClientA, ClientB, serverQuest, ownerQuest,
+            success ? IssueOutcome.QuestSuccess : IssueOutcome.QuestFail);
+    }
+
+    [Theory]
     [InlineData(false, 5)]
     [InlineData(true, 4)]
     public void Delivery_IsRefusedOutsideTheTownOrWithoutEnoughGoods(bool inTown, int goods)
