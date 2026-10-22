@@ -155,6 +155,22 @@ public class BattleShipFateReporterTests
         Assert.Empty(harness.Sent);
     }
 
+    // M6 D7: each fate carries the damage mitigated since the last one, so the server's sum is the battle's total once.
+    [Fact]
+    public void Fates_CarryTheMitigatedDamageSinceTheLastFate()
+    {
+        var harness = new Harness();
+        var hull = harness.Field(Own, "Ship_1");
+        harness.Mitigated[hull] = 30f;
+        harness.Reporter.Flush();
+        harness.Mitigated[hull] = 50f;
+        harness.Reporter.Flush();
+        harness.Reporter.Flush();
+
+        Assert.Equal(new[] { 30f, 20f }, harness.Sent.Select(sent => Assert.Single(sent.Fates).MitigatedDamage));
+        Assert.All(harness.Sent, sent => Assert.Equal(900f, sent.Fates[0].HitPoints));
+    }
+
     [Theory]
     [InlineData(500f, 0, false)]
     [InlineData(500f, BattleShipCondition.Sinking, true)]
@@ -189,6 +205,8 @@ public class BattleShipFateReporterTests
             Engine.Setup(engine => engine.CampaignShipIdOf(It.IsAny<MissionObject>()))
                 .Returns<MissionObject>(hull => campaignShips[hull]);
             Engine.Setup(engine => engine.IsHullRemoved(It.IsAny<MissionObject>())).Returns<MissionObject>(Removed.Contains);
+            Engine.Setup(engine => engine.ReadMitigatedDamage(It.IsAny<MissionObject>()))
+                .Returns<MissionObject>(hull => Mitigated.TryGetValue(hull, out var damage) ? damage : 0f);
             Network.Setup(network => network.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(Messages.Add);
             Reporter = new BattleShipFateReporter(Network.Object, Session.Object, registry, Engine.Object);
         }
@@ -199,6 +217,7 @@ public class BattleShipFateReporterTests
         public BattleShipFateReporter Reporter { get; }
         public Dictionary<MissionObject, BattleShipCondition> Conditions { get; } = new Dictionary<MissionObject, BattleShipCondition>();
         public HashSet<MissionObject> Removed { get; } = new HashSet<MissionObject>();
+        public Dictionary<MissionObject, float> Mitigated { get; } = new Dictionary<MissionObject, float>();
         public List<IMessage> Messages { get; } = new List<IMessage>();
         public List<NetworkBattleShipFates> Sent => Messages.OfType<NetworkBattleShipFates>().ToList();
 

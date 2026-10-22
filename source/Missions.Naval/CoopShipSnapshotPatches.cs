@@ -21,13 +21,20 @@ internal class SnapshotShipDestroyPatch
     private static bool Prefix(Ship ship) => !CoopShipSnapshots.Contains(ship);
 }
 
-// Mission damage to a snapshot is not campaign ship damage, so it grants its owner party no Boatswain XP.
+// Mission damage to a snapshot is not campaign ship damage, so it grants no Boatswain XP here; the mitigated part is summed and
+// reported with the ship's fate, and the server grants it once (vanilla: 0.1 XP per point of rawDamage - finalDamage).
 [HarmonyPatch(typeof(NavalSkillLevellingManager), nameof(NavalSkillLevellingManager.OnShipDamaged))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class SnapshotShipDamageXpPatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(Ship ship) => !CoopShipSnapshots.Contains(ship);
+    internal static bool Prefix(Ship ship, float rawDamage, float finalDamage)
+    {
+        if (!CoopShipSnapshots.Contains(ship)) return true;
+
+        CoopShipSnapshots.AddMitigatedDamage(ship, Math.Max(rawDamage - finalDamage, 0f));
+        return false;
+    }
 }
 
 // Mission damage and condition sync write a snapshot's hit points, which the campaign ship sync would log as a client

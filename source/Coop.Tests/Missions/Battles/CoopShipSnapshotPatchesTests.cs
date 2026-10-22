@@ -17,6 +17,22 @@ namespace Coop.Tests.Missions.Battles;
 [Collection("Mission.Current")]
 public class CoopShipSnapshotPatchesTests
 {
+    // M6 D7: a snapshot's hits grant no XP here, but their mitigated damage is kept for the fate report; a campaign ship's pass.
+    [Fact]
+    public void DamageXp_SumsASnapshotsMitigatedDamage_AndLetsACampaignShipThrough()
+    {
+        var snapshot = new CoopShipSnapshotBuilder().Build(CreateOwnedShip());
+        var ship = CreateOwnedShip();
+
+        Assert.False(SnapshotShipDamageXpPatch.Prefix(snapshot, rawDamage: 100f, finalDamage: 70f));
+        Assert.False(SnapshotShipDamageXpPatch.Prefix(snapshot, rawDamage: 40f, finalDamage: 50f));
+        Assert.False(SnapshotShipDamageXpPatch.Prefix(snapshot, rawDamage: 20f, finalDamage: 15f));
+        Assert.True(SnapshotShipDamageXpPatch.Prefix(ship, rawDamage: 100f, finalDamage: 70f));
+
+        Assert.Equal(35f, CoopShipSnapshots.MitigatedDamageOf(snapshot));
+        Assert.Equal(0f, CoopShipSnapshots.MitigatedDamageOf(ship));
+    }
+
     // M6 D5: the server's applied ship fates reach clients still in the battle, where the menu context can have no handler.
     [Fact]
     public void MenuRefresh_IsHeldWhileAMissionIsCurrent()

@@ -165,6 +165,9 @@ public interface INavalShipEngine
     /// <summary>The object-manager id of the campaign ship the hull stands for, or null when it stands for none.</summary>
     string CampaignShipIdOf(MissionObject hull);
 
+    /// <summary>The damage the hull's ship upgrades mitigated on hits this client applied so far, the base of Boatswain XP.</summary>
+    float ReadMitigatedDamage(MissionObject hull);
+
     /// <summary>
     /// [Game thread] Takes an agent out of the battle the way vanilla takes a removed hull's crew: it fades out, which reads as
     /// a rout, not a casualty.

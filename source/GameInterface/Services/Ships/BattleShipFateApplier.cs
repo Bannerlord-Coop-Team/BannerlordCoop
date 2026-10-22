@@ -4,6 +4,7 @@ using GameInterface.Services.Ships.Data;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
@@ -12,8 +13,8 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.Ships;
 
 /// <summary>
-/// [Server, game thread] Writes held naval ship fates to the campaign ships with patches live, so every write replicates: a
-/// sunk ship is destroyed, any other ship takes its battle HP and sail HP.
+/// [Server, game thread] Writes held naval ship fates to the campaign ships with patches live, so every write replicates: the
+/// owner's Boatswain gains the battle's XP, then a sunk ship is destroyed and any other takes its battle HP and sail HP.
 /// </summary>
 public interface IBattleShipFateApplier
 {
@@ -67,6 +68,7 @@ public class BattleShipFateApplier : IBattleShipFateApplier
         // A ship with no owner was already destroyed; vanilla's destroy and every HP write expect an owned ship.
         if (ship.Owner == null) return false;
 
+        GrantBoatswainXp(ship, fate.MitigatedDamage);
         if (fate.Sunk)
         {
             Logger.Information("[NavalSync] Ship {ShipId} of {Owner} sank in battle; destroying it", fate.CampaignShipId, ship.Owner.Id);
@@ -81,5 +83,14 @@ public class BattleShipFateApplier : IBattleShipFateApplier
         Logger.Information("[NavalSync] Ship {ShipId} of {Owner} keeps its battle condition: hp {HitPoints}, sail {SailHitPoints}",
             fate.CampaignShipId, ship.Owner.Id, ship.HitPoints, ship.SailHitPoints);
         return true;
+    }
+
+    // Vanilla's per-hit skill call with the battle's mitigated damage as raw and none as final, which grants the owner party's
+    // Boatswain the same 0.1 XP per mitigated point (NavalSkillLevellingManager.OnShipDamaged), once for the whole battle.
+    private static void GrantBoatswainXp(Ship ship, float mitigatedDamage)
+    {
+        if (mitigatedDamage <= 0f) return;
+
+        SkillLevelingManager.OnShipDamaged(ship, mitigatedDamage, 0f);
     }
 }

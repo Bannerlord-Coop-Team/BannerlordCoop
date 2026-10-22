@@ -635,6 +635,8 @@ public class NavalShipEngine : INavalShipEngine
 
     public string CampaignShipIdOf(MissionObject hull) => CampaignShipIdOf(((MissionShip)hull).ShipOrigin as Ship);
 
+    public float ReadMitigatedDamage(MissionObject hull) => CoopShipSnapshots.MitigatedDamageOf(((MissionShip)hull).ShipOrigin as Ship);
+
     /// <summary>
     /// An own snapshot's party ship by its registry id, or the id another owner's record gave the snapshot; null for any other
     /// ship origin.

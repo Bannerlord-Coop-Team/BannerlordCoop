@@ -403,6 +403,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine
 
     public string CampaignShipIdOf(MissionObject hull) => Of(hull).CampaignShipId!;
 
+    public float ReadMitigatedDamage(MissionObject hull) => Of(hull).MitigatedDamage;
+
     // The live engine fades the agent out of the mission, which the mission fixture's FadeOut patch mirrors.
     public void WithdrawAgent(Agent agent)
     {
@@ -594,6 +596,8 @@ public sealed class FakeHull
     public BattleShipSpawnData? SpawnData { get; set; }
     /// <summary>The registry id of the campaign ship the hull stands for, or null.</summary>
     public string? CampaignShipId { get; set; }
+    /// <summary>The damage the ship upgrades mitigated on hits this client applied, as the snapshot XP patch sums it.</summary>
+    public float MitigatedDamage { get; set; }
     public BattleRopeState[] Ropes { get; set; } = Array.Empty<BattleRopeState>();
     /// <summary>An own hull's body motion its samples send, or the motion a copy's latest sample carried.</summary>
     public BattleShipMotion Motion { get; set; }

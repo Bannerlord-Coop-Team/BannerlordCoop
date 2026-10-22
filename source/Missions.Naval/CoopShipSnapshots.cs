@@ -4,8 +4,8 @@ using TaleWorlds.CampaignSystem.Naval;
 namespace Missions.Naval;
 
 /// <summary>
-/// The detached mission ships <see cref="CoopShipSnapshotBuilder"/> built, with the campaign ship each one stands for.
-/// Static because the campaign gates read it; the keys are weak, so a snapshot leaves with its mission.
+/// The detached mission ships <see cref="CoopShipSnapshotBuilder"/> built, with the campaign ship each one stands for and the
+/// damage its upgrades mitigated. Static because the campaign gates read it; the keys are weak, so a snapshot leaves with its mission.
 /// </summary>
 internal static class CoopShipSnapshots
 {
@@ -27,7 +27,20 @@ internal static class CoopShipSnapshots
     public static string CampaignShipIdOf(Ship ship) =>
         ship != null && snapshots.TryGetValue(ship, out var entry) ? entry.CampaignShipId : null;
 
-    // What the weak table holds for one snapshot: the own campaign ship it was built from, or the id a record carried.
+    /// <summary>Adds damage the snapshot's upgrades mitigated on a hit, which vanilla would have turned into Boatswain XP.</summary>
+    public static void AddMitigatedDamage(Ship ship, float mitigatedDamage)
+    {
+        if (ship == null || mitigatedDamage <= 0f || !snapshots.TryGetValue(ship, out var entry)) return;
+
+        entry.MitigatedDamage += mitigatedDamage;
+    }
+
+    /// <summary>The damage the snapshot's upgrades mitigated so far in this mission; 0 for any other ship.</summary>
+    public static float MitigatedDamageOf(Ship ship) =>
+        ship != null && snapshots.TryGetValue(ship, out var entry) ? entry.MitigatedDamage : 0f;
+
+    // What the weak table holds for one snapshot: the own campaign ship it was built from or the id a record carried, and the
+    // damage mitigated on it.
     private sealed class Entry
     {
         public Entry(Ship source, string campaignShipId)
@@ -38,5 +51,6 @@ internal static class CoopShipSnapshots
 
         public Ship Source { get; }
         public string CampaignShipId { get; }
+        public float MitigatedDamage { get; set; }
     }
 }

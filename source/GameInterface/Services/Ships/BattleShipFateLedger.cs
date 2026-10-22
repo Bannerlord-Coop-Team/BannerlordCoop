@@ -13,7 +13,7 @@ public interface IBattleShipFateLedger
 {
     /// <summary>
     /// Holds <paramref name="fate"/> unless the ship's held fate is newer by host epoch, then revision; a sunk ship stays sunk.
-    /// Whether it was held.
+    /// Its mitigated damage adds to the ship's total either way. Whether its condition was held.
     /// </summary>
     bool Record(string mapEventId, BattleShipFate fate, int hostEpoch, long revision);
 
@@ -39,10 +39,18 @@ public class BattleShipFateLedger : IBattleShipFateLedger
         }
 
         var candidate = new HeldFate(fate, hostEpoch, revision);
-        if (ships.TryGetValue(fate.CampaignShipId, out var held) && !candidate.Supersedes(held)) return false;
+        if (!ships.TryGetValue(fate.CampaignShipId, out var held))
+        {
+            ships.Add(fate.CampaignShipId, candidate);
+            return true;
+        }
 
-        ships[fate.CampaignShipId] = candidate;
-        return true;
+        // Each report carries the damage mitigated since the reporter's last one, so every report adds to the total.
+        float mitigatedDamage = held.Fate.MitigatedDamage + fate.MitigatedDamage;
+        bool supersedes = candidate.Supersedes(held);
+        var kept = supersedes ? candidate : held;
+        ships[fate.CampaignShipId] = new HeldFate(kept.Fate.WithMitigatedDamage(mitigatedDamage), kept.HostEpoch, kept.Revision);
+        return supersedes;
     }
 
     public bool HasFates(string mapEventId) => battles.TryGetValue(mapEventId, out var ships) && ships.Count > 0;
