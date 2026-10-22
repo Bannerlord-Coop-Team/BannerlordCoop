@@ -54,11 +54,13 @@ public class SaveAsCommandTests
         {
             var saves = new Mock<ISaveInterface>();
             saves.SetupGet(x => x.CanQueueSave).Returns(true);
+            saves.Setup(x => x.ReadSaveFile(It.IsAny<string>())).Returns((byte[])null);
             saves.Setup(x => x.ReadSaveFile(existingFile)).Returns(new byte[] { 1 });
             var args = new Mock<ICoopCommandArgs>();
             args.Setup(x => x[0]).Returns("proof");
             Assert.False(new SaveDebugCommand.SaveSaveAsCoopCommand(saves.Object).ProcessCommand(args.Object).Succeeded);
             saves.Verify(x => x.SaveCurrentGameToFile(It.IsAny<string>()), Times.Never);
+            saves.Verify(x => x.ReadSaveFile(existingFile), Times.Once);
         }
         finally { ModInformation.IsServer = previous; }
     }
