@@ -1,6 +1,7 @@
 ﻿#if DEBUG
 using Common.Logging;
 using Missions.Battles;
+using Missions.Messages;
 using NavalDLC.Missions.Objects;
 using Newtonsoft.Json;
 using Serilog;
@@ -17,8 +18,8 @@ namespace Missions.Naval;
 /// <summary>
 /// [Game thread] DEBUG: while started, logs one <c>NAVAL_WATER_PROBE</c> JSON line per physics step with every clock this
 /// client has, the water height at a fixed grid (the renderer-backed query NavalPhysics uses) and the position, yaw, heave,
-/// pitch and roll of every registered hull, own or copy. Run on every client at once; the logs are diffed offline to see whether the
-/// water clock is shared. Read only: it changes nothing and sends nothing.
+/// pitch, roll and crew load of every registered hull, own or copy. Run on every client at once; the logs are diffed
+/// offline to see whether the water clock is shared. Read only: it changes nothing and sends nothing.
 /// </summary>
 public class NavalWaterProbeLogic : MissionLogic
 {
@@ -135,10 +136,19 @@ public class NavalWaterProbeLogic : MissionLogic
 
             var frame = hull.GlobalFrame;
             bool isCopy = NavalForeignHulls.Contains(hull);
+            var crewLoad = AppliedCrewLoad(hull, out string crewSource);
             yield return new NavalWaterProbeHull(NavalContactProbe.Short(ship.ShipId), isCopy ? "copy" : "own", NavalSteeredCopies.ModeName(hull),
                 frame.origin.x, frame.origin.y, YawDegrees(frame.rotation.f), frame.origin.z, AxisTiltDegrees(frame.rotation.f.z),
-                AxisTiltDegrees(frame.rotation.s.z), scene.GetWaterLevelAtPosition(frame.origin.AsVec2, true, false));
+                AxisTiltDegrees(frame.rotation.s.z), scene.GetWaterLevelAtPosition(frame.origin.AsVec2, true, false), crewLoad, crewSource);
         }
+    }
+
+    // The crew load the hull's physics takes: the owner's on a copy that has one (CopyCrewLoadPatch), vanilla's committed one otherwise.
+    private static BattleShipCrewLoad AppliedCrewLoad(MissionShip hull, out string source)
+    {
+        var ownerLoad = NavalForeignHulls.TryGetCopy(hull.Physics, out var copy) ? copy.CrewLoad : null;
+        source = ownerLoad != null ? "owner" : "vanilla";
+        return ownerLoad ?? NavalShipEngine.ReadCrewLoad(hull);
     }
 
     // The settings and scene state that decide the water and the physics step on this client.
@@ -220,6 +230,10 @@ public class NavalWaterProbeLogic : MissionLogic
                 ["pitch"] = Round(hull.Pitch, 3),
                 ["roll"] = Round(hull.Roll, 3),
                 ["w"] = Round(hull.Water, 4),
+                ["crewMass"] = Round(hull.CrewLoad?.Mass ?? 0f, 1),
+                ["crewLocal"] = hull.CrewLoad == null ? null
+                    : new[] { Round(hull.CrewLoad.LocalCentre.x, 3), Round(hull.CrewLoad.LocalCentre.y, 3), Round(hull.CrewLoad.LocalCentre.z, 3) },
+                ["crewSrc"] = hull.CrewSource,
             }).ToArray(),
         });
 

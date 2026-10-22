@@ -1,4 +1,5 @@
 ﻿#if DEBUG
+using Missions.Messages;
 using Missions.Naval;
 using Newtonsoft.Json.Linq;
 using System;
@@ -84,6 +85,25 @@ public class NavalWaterProbeTests
         Assert.Equal(0.1235, (double)probed["z"]);
         Assert.Equal(-1.5, (double)probed["pitch"]);
         Assert.Equal(2.25, (double)probed["roll"]);
+    }
+
+    // R45 roll: each hull logs the crew load its physics takes, so owner and copy loads can be compared offline.
+    [Fact]
+    public void Tick_LogsEachHullsCrewLoadAndItsSource()
+    {
+        var loaded = new NavalWaterProbeHull("1d93665a", "copy", "steered", 0f, 0f, 0f, 0f, 0f, 0f, 0f,
+            BattleShipCrewLoad.Create(480.04f, new Vec3(0.5f, -4.12345f, 1.5f)), "owner");
+        var empty = new NavalWaterProbeHull("2e04776b", "own", "own", 0f, 0f, 0f, 0f, 0f, 0f, 0f, null, "vanilla");
+
+        var line = NavalWaterProbeLogic.Tick("abcd1234", 1, 1, 0.016666f, 1f, 1f, 1f, 1L, new[] { 0f }, new[] { loaded, empty });
+
+        var hulls = JObject.Parse(line.Substring(NavalWaterProbeLogic.Tag.Length))["hulls"];
+        Assert.Equal(480.0, (double)hulls[0]["crewMass"]);
+        Assert.Equal(new[] { 0.5, -4.123, 1.5 }, hulls[0]["crewLocal"].ToObject<double[]>());
+        Assert.Equal("owner", (string)hulls[0]["crewSrc"]);
+        Assert.Equal(0.0, (double)hulls[1]["crewMass"]);
+        Assert.Equal(JTokenType.Null, hulls[1]["crewLocal"].Type);
+        Assert.Equal("vanilla", (string)hulls[1]["crewSrc"]);
     }
 
     [Fact]

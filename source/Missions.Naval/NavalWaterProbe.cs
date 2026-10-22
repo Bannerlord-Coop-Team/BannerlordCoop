@@ -1,4 +1,5 @@
 ﻿#if DEBUG
+using Missions.Messages;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -64,8 +65,10 @@ public sealed class NavalWaterProbeSettings
 internal readonly struct NavalWaterProbeHull
 {
     public NavalWaterProbeHull(string shipId, string role, string mode, float x, float y, float yaw, float heave, float pitch,
-        float roll, float water)
+        float roll, float water, BattleShipCrewLoad crewLoad = null, string crewSource = null)
     {
+        CrewLoad = crewLoad;
+        CrewSource = crewSource;
         ShipId = shipId;
         Role = role;
         Mode = mode;
@@ -89,5 +92,9 @@ internal readonly struct NavalWaterProbeHull
     public float Pitch { get; }
     public float Roll { get; }
     public float Water { get; }
+    /// <summary>The crew load the hull's physics takes this step; null when none.</summary>
+    public BattleShipCrewLoad CrewLoad { get; }
+    /// <summary>"owner" when a copy takes its owner's load, "vanilla" when the hull weighs its own agents.</summary>
+    public string CrewSource { get; }
 }
 #endif
