@@ -38,8 +38,8 @@ internal class HeadmanHerdCleanup : IHeadmanHerdCleanup
 
     public bool ReturnAlternativeTroops(IssueBase issue)
     {
-        if (string.IsNullOrEmpty(issue.StringId) || !parties.TryGetValue(issue.StringId, out var party) || party == null)
-            return false;
+        // Completion and cancellation establish the current owner's scope, including after heir replacement.
+        var party = MobileParty.MainParty;
 
         foreach (var element in issue.AlternativeSolutionSentTroops.GetTroopRoster())
         {

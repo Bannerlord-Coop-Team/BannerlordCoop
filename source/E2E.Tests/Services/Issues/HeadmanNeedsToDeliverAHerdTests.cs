@@ -574,12 +574,80 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CompanionEndingAfterOwnerReplacement_ReturnsTroopsToTheCurrentParty(bool giverDies)
+    {
+        var (companionId, troopId) = StartCompanions();
+        var heirId = environment.CreateRegisteredObject<Hero>();
+        var replacementPartyId = environment.CreateRegisteredObject<MobileParty>();
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    var heir = Object<Hero>(instance, heirId);
+                    heir.Clan = PlayerHero(instance, QuestScenario.ControllerA).Clan;
+                    heir._partyBelongedTo = Object<MobileParty>(instance, replacementPartyId);
+                    PlayerHero(instance, QuestScenario.ControllerA)._partyBelongedTo = null;
+                }
+            });
+        }
+        Server.Call(() =>
+        {
+            var player = players.Single(player => player.ControllerId == QuestScenario.ControllerA);
+            Assert.True(Server.Resolve<IPlayerManager>().ReplacePlayer(player,
+                new Player(player.ControllerId, heirId, replacementPartyId, player.ClanId,
+                    player.CharacterObjectId, player.OriginalClanId)));
+            var issue = Object<Hero>(Server, scenario.NotableId).Issue;
+            Assert.True(Server.Resolve<IIssueOwnerResolver>().TryResolveOwnerHero(issue, out var owner));
+            Assert.Same(Object<Hero>(Server, heirId), owner);
+            Object<MobileParty>(Server, replacementPartyId).MemberRoster.Clear();
+            if (giverDies)
+            {
+                var giver = issue.IssueOwner;
+                giver.AddDeathMark(null, KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge);
+                KillCharacterAction.ApplyByDeathMarkForced(giver);
+            }
+            else
+            {
+                issue._failureChance = -1f;
+                issue.CompleteIssueWithAlternativeSolution();
+            }
+            Assert.Empty(issue.AlternativeSolutionSentTroops.GetTroopRoster());
+            Assert.Equal(Hero.CharacterStates.Active, Object<Hero>(Server, companionId).HeroState);
+        });
+        environment.FlushCoalescer();
+
+        Assert.Equal(giverDies ? IssueOutcome.QuestCancel : IssueOutcome.AlternativeSolution,
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                var troop = Object<CharacterObject>(instance, troopId);
+                var companion = Object<Hero>(instance, companionId);
+                var currentParty = Object<MobileParty>(instance, replacementPartyId);
+                Assert.Null(Object<Hero>(instance, scenario.NotableId).Issue);
+                Assert.Equal(40, currentParty.MemberRoster.GetTroopCount(troop));
+                Assert.Equal(1, currentParty.MemberRoster.GetTroopCount(companion.CharacterObject));
+                Assert.Equal(0, Party(instance, QuestScenario.ControllerA).MemberRoster.GetTroopCount(troop));
+                Assert.Equal(0, Party(instance, QuestScenario.ControllerA).MemberRoster.GetTroopCount(companion.CharacterObject));
+                Assert.Equal(0, Party(instance, QuestScenario.ControllerB).MemberRoster.GetTroopCount(troop));
+                Assert.Equal(0, Party(instance, QuestScenario.ControllerB).MemberRoster.GetTroopCount(companion.CharacterObject));
+            });
+        }
+    }
+
     [Fact]
     public void ReturningAlternativeTroopsTwice_AddsThemOnlyOnce()
     {
         var (_, troopId) = StartCompanions();
         Server.Call(() =>
         {
+            using var scope = OwnerScope(Server, QuestScenario.ControllerA);
             var issue = Object<Hero>(Server, scenario.NotableId).Issue;
             var cleanup = Server.Resolve<IHeadmanHerdCleanup>();
             Assert.True(cleanup.ReturnAlternativeTroops(issue));
