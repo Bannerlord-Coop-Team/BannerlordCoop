@@ -33,14 +33,14 @@ internal class SiegeBreakOutPatches
         return false;
     }
 
-    // Reject waits while the server may already be paying the troops. It stays clickable so a timed out wait never strands the player.
+    // Reject waits while the server may already be paying the troops. Accepting again re asks for the same answer, so nobody gets stuck.
     [HarmonyPatch(typeof(EncounterGameMenuBehavior), "break_in_menu_reject_on_consequence")]
     [HarmonyPrefix]
     private static bool BreakInRejectPrefix()
     {
         if (ModInformation.IsServer || !SiegeBreakOut.IsBreakInPending) return true;
         InformationManager.DisplayMessage(new InformationMessage(
-            new TextObject("{=coop_break_in_pending}Waiting for the server to answer your break in.").ToString()));
+            new TextObject("{=coop_break_in_pending}Waiting for the server to answer your break in. Choose \"Go ahead with that.\" to ask again.").ToString()));
         return false;
     }
 

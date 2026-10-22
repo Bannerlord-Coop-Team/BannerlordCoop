@@ -1,7 +1,6 @@
 ﻿using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.SiegeEvents.Patches;
 using System;
-using System.Diagnostics;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -44,11 +43,9 @@ public class SiegeBreakOut : ISiegeBreakOut
     public bool CanBreakOutFromPort(MobileParty party, Settlement settlement) =>
         settlement.HasPort && party.Ships.Any() && party.Anchor != null && party.Anchor.IsAtSettlement(settlement);
 
-    // The server may already be paying the troops, so Reject stays locked until it answers or the wait runs out.
-    private static long breakInPendingSince;
-    public void SetBreakInPending(bool pending) => breakInPendingSince = pending ? Stopwatch.GetTimestamp() : 0;
-    internal static bool IsBreakInPending =>
-        breakInPendingSince != 0 && Stopwatch.GetTimestamp() - breakInPendingSince < Stopwatch.Frequency * 10;
+    // The server may already be paying the troops, so Reject stays locked until it answers or the session ends.
+    internal static bool IsBreakInPending { get; private set; }
+    public void SetBreakInPending(bool pending) => IsBreakInPending = pending;
 
     public bool CanJoinDefenders(MobileParty party, Settlement settlement, bool alreadyEntered)
     {
