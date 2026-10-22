@@ -27,8 +27,8 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   applies, outside the physics step: a teleport to the extrapolated position and heading (`NavalShipsLogic.TeleportShip`,
   which carries the crew), along with any other agent standing on the copy, such as a local main agent that boarded it,
   then the owner's velocity and yaw rate.
-  Heave, pitch and roll come from this client's water, which can differ from the owner's (see "Copies float on local
-  water" in section 6). One rule decides a copy's mode at every sample and step: steered
+  Heave, pitch and roll come from this client's buoyancy on its own water, which now runs on the battle host's water
+  time, so they should match the owner's (see "Waves are synced" in section 6). One rule decides a copy's mode at every sample and step: steered
   while its body simulates, its owner's frames written otherwise (warning `has no simulating body` once per copy;
   `bodyMode` in `inspect`). `NavalSteeredCopies.Track`/`Forget` are the only writers of `NavalForeignHulls`, the static
   copy set the patches read; spawning, releasing, replacing and removing a hull all go through them.
@@ -292,6 +292,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | R41a retreat, leave and disconnect live validation | done (R41a, R41a-2, R41a-3) |
 | R41b probes | done, D3 decided |
 | M10a ram and contact (steered copies) | in progress, R42 next |
+| M10w water clock sync (shared battle wave time) | done in code, pending live check |
 | M10b plank crossing and melee | pending, needs M10a |
 | M6 results parity (fates, Boatswain XP, loot hold) | done in code, R45 next |
 | M6c disengage parity | pending |
@@ -337,16 +338,35 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   be built (`AddPhysics(isStatic)` left no static body). Kinematic and static copies and `copy_body` were deleted.
 - **D2.** A failed AI fleet counts as a players' victory (the land precedent); an aborted battle would need a new
   result state.
-- **Copies float on local water (decided 2026-10-21, known difference).** Water height is a function of the engine's
-  process-wide `MBCommon.GetTotalMissionTime()` (the probe's `total`), which adds up every mission the client has run
-  (conversations, earlier battles) and has no managed setter. So clients with different mission histories see different
-  wave phases: about 1.5 m mean apart in R42's open-sea battle (`battle_terrain_opensea_southern`), about 0.001 m in
-  its coastal one. A copy keeps its local buoyancy: its planar position and yaw follow the owner, while its heave and roll
-  differ from the owner's by about the water mismatch (R42: 1-1.5 m heave and 5-6° roll mean, roll max 26°). Drift
-  criteria are planar plus yaw only; heave, pitch and roll are reported for information. `WaterQuality` and
-  `PhysicsTickRate` are per client too. `water_probe` logs both clocks; align two probes on `total`, not on `mt`. Rejected:
-  - follow the owner's heave, roll and pitch with buoyancy off: the copy would visibly hover over or sink into local waves;
-  - feed the owner's water plane into the copy's buoyancy: the copy would sit in visibly different water here.
+- **Waves are synced (water clock, 2026-10-21, pending live check).** This supersedes "copies float on local water".
+  R42 found that wave height follows the engine's accumulated mission timer, which adds up every mission a client has
+  run, so clients with different mission histories saw different wave phases (1.54 m mean apart in
+  `battle_terrain_opensea_southern`; aligned on the probe's `total` the two clients' water matched to 0.003 m). The
+  native water update (`TaleWorlds.Native.dll` v1.4.8, function at RVA `0x1DA870`, called for every view's scene by the
+  engine frame at `0x9B820`) reads that clock as `(float)ticks[scene+0x6064] * 1e-4`: the int64 table at RVA `0xDA29B0`
+  holds one tick count per `MBCommon.TimeType` (1e5 ticks per second), and mission scenes use `Mission`, so the read is
+  10 x `GetTotalMissionTime()`. `NativeWaterClockPatch` (GameInterface) replaces that `cvtsi2ss`+`mulss` with
+  `movss xmm1,[slot]`, a float this mod owns. It is installed once from the client start path only (Windows, client
+  role, never on a server or headless build), and only when its signature matches exactly once; otherwise it logs the
+  match count and DLL identity and waves stay vanilla. The redirect is switched on only while a coop naval battle runs
+  and switched back at mission end, so the campaign map and every other scene run vanilla code.
+  - In a battle, `BattleWaterClock` writes the water time every mission tick. The battle host writes its own clock and
+    sends it every second (`NetworkBattleWaterTime`, host-epoch stamped) and at once to a peer entering the battle. A
+    client adopts the first host time at once (the late-join case), then smooths the offset to its local clock and
+    slews toward it at most 25% faster or slower than real time, so waves never pop or run backwards; a disagreement
+    over 2 s of mission time is adopted at once. A promoted host keeps its current offset, so it continues from its own
+    water time. Before the first host time arrives a client writes its own clock, so entering the battle has no jump.
+  - Not compensated: the host time's transit and the frame it waits for the game thread. The R42 fit puts 0.02 s of
+    clock lag at about 0.015 m mean water difference.
+  - Copies still float on local buoyancy, but the local water now matches the owner's, so a copy's heave, pitch and
+    roll should match its owner's too. They are pass/fail candidates again for the drift criteria, pending a live run
+    that shows `water_probe` water diffs near 0 in open sea.
+  - `coop.debug.naval.water_clock` reports the patch status, the written and vanilla water time, their offset and the
+    battle's offset estimate.
+  - **Each game-version port must re-check the signature** and update it if it no longer matches: the scene field
+    offset `0x6064` and the register allocation can change on any engine rebuild. It does not match the v1.2.8 GOG DLL.
+  - `WaterQuality` and `PhysicsTickRate` are still per client. `water_probe` logs both clocks; align two probes on
+    `total`, not on `mt`.
 - **Jordan dependencies:**
   - M6 relies on `CampaignShipsSync` replicating a server's `HitPoints`, `SailHitPoints` and `Owner` writes and
     `DestroyShipAction` (E2E-proven);
@@ -444,6 +464,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | `helm <rudder> <row> <sail> [seconds]` | client | Drives the own hull. |
 | `rope_list`, `rope_throw`, `rope_status` | client | Lists, throws and shows ropes. |
 | `copy_steer [key=value...]` | client | Shows or tunes the steered copies' knobs here (`gain window softzone clamp tau lead snap`), live. |
+| `water_clock` | client | DEBUG: one `NAVAL_WATER_CLOCK` line with the water clock patch status, the written and vanilla water time and their offset; in a naval battle also the host role, host samples and the offset estimate. |
 | `water_probe start [grid=5] [spacing=40] [seconds=120] \| status \| stop` | client | Samples the water grid for the shared-clock test; each tick logs every hull's `x`, `y`, `yaw` (degrees, counter-clockwise from +x), `z`, `pitch`, `roll` and the water under it. `start` is refused until deployment has finished. |
 | `board_copy [ship] \| status` | client | Teleports the main agent onto a copy's deck (the nearest copy, or the one whose ship id starts with `ship`) at vanilla's deck spot: the hull's player standing point, else the middle inner deck frame (`MissionShip.GetMiddleInnerSpawnGlobalFrame`). Reports the hull-frame `deckError` and `heightAboveSpot`; `status` reports the hull the main agent stands on. The copy's owner reports the puppet's `maxDeckError` in `inspect`. |
 | `immortal [on \| off]` | client | Sets the main agent's vanilla mortality state to `Immortal` (`on`) or `Mortal` (`off`), so blows, routed ones included, take no health; reports it without an argument. A ram's 2 m kill radius (`Agent.Die`) still kills it. |
