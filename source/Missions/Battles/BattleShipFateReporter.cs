@@ -59,13 +59,12 @@ public class BattleShipFateReporter : IBattleShipFateReporter
     public void Tick(float dt)
     {
         sinceLastSend += Math.Max(0f, dt);
-        var changed = ChangedFates(registry.Ships);
-        if (changed.Count == 0) return;
+        bool due = sinceLastSend >= ReportIntervalSeconds;
+        if (!due && !registry.Ships.Any(IsNewlySinking)) return;
 
-        bool sinking = changed.Any(change => change.Fate.Sunk);
-        if (!sinking && sinceLastSend < ReportIntervalSeconds) return;
-
-        Send(changed);
+        // The interval restarts whether or not anything changed, so an idle battle reads its hulls every 2 s, not every frame.
+        if (due) sinceLastSend = 0f;
+        Send(ChangedFates(registry.Ships));
     }
 
     public void ReportRemoval(MissionObject hull)
@@ -78,6 +77,12 @@ public class BattleShipFateReporter : IBattleShipFateReporter
     public void Flush() => Send(ChangedFates(registry.Ships));
 
     public int FatesSentOf(Guid shipId) => reports.TryGetValue(shipId, out var report) ? report.Sent : 0;
+
+    // An own live hull that started sinking since its last fate went out, which the server must hear about at once.
+    private bool IsNewlySinking(NetworkShipInfo ship) =>
+        session.IsOwn(ship.CurrentAuthority) && !engine.IsHullRemoved(ship.Hull) && engine.IsSinking(ship.Hull)
+        && !(reports.TryGetValue(ship.ShipId, out var report) && report.Last?.Sunk == true)
+        && !string.IsNullOrEmpty(engine.CampaignShipIdOf(ship.Hull));
 
     // The fates of own live hulls that stand for a campaign ship and differ from the last one sent; a sunk ship is final.
     private List<PendingFate> ChangedFates(IEnumerable<NetworkShipInfo> ships)

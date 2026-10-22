@@ -64,6 +64,21 @@ public class BattleShipFateReporterTests
         Assert.Equal(1, harness.Reporter.FatesSentOf(harness.ShipIdOf(second)));
     }
 
+    // Between reports only the cheap sinking check runs each frame; the full condition is read when a report is due.
+    [Fact]
+    public void Tick_ReadsTheConditionsOnlyWhenAReportIsDue()
+    {
+        var harness = new Harness();
+        harness.Field(Own, "Ship_1");
+
+        for (int i = 0; i < 10; i++)
+            harness.Reporter.Tick(0.1f);
+        harness.Engine.Verify(engine => engine.ReadCondition(It.IsAny<MissionObject>()), Times.Never);
+
+        harness.Reporter.Tick(BattleShipFateReporter.ReportIntervalSeconds);
+        harness.Engine.Verify(engine => engine.ReadCondition(It.IsAny<MissionObject>()), Times.Once);
+        Assert.Single(harness.Sent);
+    }
     [Fact]
     public void Tick_NeverSendsASunkShipAgain()
     {
@@ -205,6 +220,8 @@ public class BattleShipFateReporterTests
             Engine.Setup(engine => engine.CampaignShipIdOf(It.IsAny<MissionObject>()))
                 .Returns<MissionObject>(hull => campaignShips[hull]);
             Engine.Setup(engine => engine.IsHullRemoved(It.IsAny<MissionObject>())).Returns<MissionObject>(Removed.Contains);
+            Engine.Setup(engine => engine.IsSinking(It.IsAny<MissionObject>()))
+                .Returns<MissionObject>(hull => Conditions[hull].SinkingState >= BattleShipCondition.Sinking);
             Engine.Setup(engine => engine.ReadMitigatedDamage(It.IsAny<MissionObject>()))
                 .Returns<MissionObject>(hull => Mitigated.TryGetValue(hull, out var damage) ? damage : 0f);
             Network.Setup(network => network.SendAll(It.IsAny<IMessage>())).Callback<IMessage>(Messages.Add);
