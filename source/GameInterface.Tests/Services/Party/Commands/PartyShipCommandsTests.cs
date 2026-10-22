@@ -77,6 +77,85 @@ public class PartyShipCommandsTests
         Assert.Equal(expectedOutput, result.Output);
     }
 
+    private static readonly PartyCandidate PlayerParty = new PartyCandidate("Player", "Player", "Hero_Player", "Player3325");
+    private static readonly PartyCandidate OtherPlayerParty = new PartyCandidate("Player538", "Player538", "Hero_Player538", "Player538");
+    private static readonly PartyCandidate LordParty = new PartyCandidate("lord_1_1_party_1", "Lucon's Party", "lord_1_1", "Lucon");
+    private static readonly PartyCandidate NamesakeLordParty = new PartyCandidate("lord_2_party_1", "Player's Party", "lord_2", "Player3325");
+
+    [Theory]
+    [InlineData("Player", "Player")]
+    [InlineData("player3325", "Player")]
+    [InlineData("Hero_Player538", "Player538")]
+    [InlineData("Lucon", "lord_1_1_party_1")]
+    [InlineData("lucon's party", "lord_1_1_party_1")]
+    public void TryMatchByName_FindsThePartyByIdPartyNameOrLeaderName(string name, string expectedPartyId)
+    {
+        var error = MatchName(name, out var match);
+
+        Assert.Null(error);
+        Assert.Equal(expectedPartyId, match.PartyId);
+    }
+
+    [Fact]
+    public void TryMatchByName_PrefersAPlayerPartyOverALordWithTheSameName()
+    {
+        var error = MatchName("Player3325", out var match);
+
+        Assert.Null(error);
+        Assert.Same(PlayerParty, match);
+    }
+
+    [Fact]
+    public void TryMatchByName_RefusesANameSeveralPartiesInOneTierAnswerTo()
+    {
+        var namesake = new PartyCandidate("Player_copy", "Copy", "Hero_Copy", "Player3325");
+        var error = PartyShipCommands.TryMatchByName("Player3325", candidate => candidate.Names, out PartyCandidate match,
+            new[] { PlayerParty, namesake });
+
+        Assert.Null(match);
+        Assert.Contains("2 parties answer to Player3325", error);
+    }
+
+    [Fact]
+    public void TryMatchByName_ReportsANameNoPartyAnswersTo()
+    {
+        var error = MatchName("testclient1", out var match);
+
+        Assert.Null(match);
+        Assert.Contains("testclient1", error);
+    }
+
+    [Fact]
+    public void TryMatchByName_IgnoresMissingNames()
+    {
+        var unnamed = new PartyCandidate("MobileParty_1", null!, null!, null!);
+        var error = PartyShipCommands.TryMatchByName("MobileParty_1", candidate => candidate.Names, out PartyCandidate match,
+            new[] { unnamed });
+
+        Assert.Null(error);
+        Assert.Same(unnamed, match);
+    }
+
+    // Matches against the player parties first, then every lord party, as fleet does.
+    private static string MatchName(string name, out PartyCandidate match) =>
+        PartyShipCommands.TryMatchByName(name, candidate => candidate.Names, out match,
+            new[] { PlayerParty, OtherPlayerParty },
+            new[] { PlayerParty, OtherPlayerParty, LordParty, NamesakeLordParty });
+
+    // A party's id, name and its leader's id and name, as fleet reads them from a MobileParty.
+    private sealed class PartyCandidate
+    {
+        // Assigns the candidate's names.
+        public PartyCandidate(string partyId, string partyName, string leaderId, string leaderName)
+        {
+            PartyId = partyId;
+            Names = new[] { partyId, partyName, leaderId, leaderName };
+        }
+
+        public string PartyId { get; }
+        public string[] Names { get; }
+    }
+
     private static CoopCommandResult RunWithRole(bool isServer, bool navalDlcActive, ICoopCommand command, params string[] args)
     {
         bool originalIsServer = ModInformation.IsServer;

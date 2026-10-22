@@ -3,9 +3,12 @@ using Common.Commands;
 using Common.Logging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.Villages.Commands;
+using GameInterface.Utils.Commands;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -208,7 +211,7 @@ public class PartyShipCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party", "A player controller id, or a MobileParty or PartyBase id.", true),
+            new ExpectedArgs("party", "A player controller id, a MobileParty or PartyBase id, or a party or hero name.", true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -248,7 +251,7 @@ public class PartyShipCommands
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("party", "A player controller id, or a MobileParty or PartyBase id; every player's party when omitted.", false),
+            new ExpectedArgs("party", "A player controller id, a MobileParty or PartyBase id, or a party or hero name (Player, Player3325); every player's party when omitted.", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -286,7 +289,8 @@ public class PartyShipCommands
     }
 #endif
 
-    // A controller id names the player's party; any other id is looked up as a registered MobileParty or PartyBase.
+    // A controller id names the player's party; any other id is a registered MobileParty or PartyBase, a campaign party id,
+    // or a party's or its leader's display name (Player, Player3325), player parties first.
     private static bool TryGetListedParty(string id, out IObjectManager objectManager, out PartyBase party, out string error)
     {
         party = null;
@@ -300,9 +304,47 @@ public class PartyShipCommands
 
         if (objectManager.TryGetObject<object>(id, out var registered))
             party = registered is MobileParty mobileParty ? mobileParty.Party : registered as PartyBase;
+        if (party == null && CommandHelpers.TryGetMobileParty(id, out var campaignParty, out _))
+            party = campaignParty.Party;
+        if (party != null)
+        {
+            error = null;
+            return true;
+        }
 
-        error = party == null ? $"No player, MobileParty or PartyBase has id {id}." : null;
-        return party != null;
+        var leaderParties = MobileParty.All.Where(candidate => candidate.LeaderHero != null).ToList();
+        var playerParties = leaderParties.Where(candidate => candidate == MobileParty.MainParty || candidate.IsPlayerParty());
+        error = TryMatchByName(id, PartyNames, out var named, playerParties, leaderParties);
+        party = named?.Party;
+        return error == null;
+    }
+
+    // The names a party answers to besides its registry id: its id, its name, and its leader's id and name.
+    private static IEnumerable<string> PartyNames(MobileParty party) => new[]
+    {
+        party.StringId, party.Name?.ToString(), party.LeaderHero?.StringId, party.LeaderHero?.Name?.ToString(),
+    };
+
+    /// <summary>
+    /// Finds the one candidate that answers to <paramref name="name"/> (ignoring case), trying each tier in turn; null, or why
+    /// none or several do.
+    /// </summary>
+    internal static string TryMatchByName<T>(string name, Func<T, IEnumerable<string>> namesOf, out T match, params IEnumerable<T>[] tiers)
+        where T : class
+    {
+        match = null;
+        foreach (var tier in tiers)
+        {
+            var matches = tier.Where(candidate => namesOf(candidate).Any(candidateName =>
+                string.Equals(candidateName, name, StringComparison.OrdinalIgnoreCase))).Distinct().ToList();
+            if (matches.Count > 1) return $"{matches.Count} parties answer to {name}; use a controller id or a MobileParty id.";
+            if (matches.Count == 0) continue;
+
+            match = matches[0];
+            return null;
+        }
+
+        return $"No player, MobileParty, PartyBase or party/hero name matches {name}.";
     }
 
     private static string DescribeId(IObjectManager objectManager, Ship ship) =>
