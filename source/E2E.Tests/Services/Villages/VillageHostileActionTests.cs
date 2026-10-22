@@ -893,6 +893,7 @@ public class VillageHostileActionTests : MapEventTestBase
     [InlineData("finish")]
     [InlineData("stale-reply")]
     [InlineData("request")]
+    [InlineData("settlement-leave")]
     public void RaidFinalization_ClientActionsWaitForServer(string action)
     {
         var owner = Clients.First();
@@ -953,6 +954,7 @@ public class VillageHostileActionTests : MapEventTestBase
             var mapEvent = events[owner];
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
             encounter._mapEvent = mapEvent;
+            encounter.EncounterSettlementAux = settlement;
             encounter.ForceRaid = true;
             Campaign.Current.PlayerEncounter = encounter;
             Campaign.Current.MapStateData.GameMenuId = "raiding_village";
@@ -963,6 +965,11 @@ public class VillageHostileActionTests : MapEventTestBase
             if (action == "stale-reply")
             {
                 owner.SimulateMessage(Server.NetPeer, new NetworkMapEventFinalized());
+            }
+            else if (action == "settlement-leave")
+            {
+                Assert.True(owner.ObjectManager.TryGetHandle(party, out var partyHandle));
+                owner.SimulateMessage(Server.NetPeer, new NetworkPartyLeaveSettlement(partyHandle));
             }
             else if (action == "request")
             {
@@ -1030,6 +1037,58 @@ public class VillageHostileActionTests : MapEventTestBase
             });
         }
         owner.Call(() => Assert.Null(PlayerEncounter.Current));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RaidFinalization_LateReplyPreservesResetVillageEncounter(bool repeatFinalizeRequest)
+    {
+        var owner = Clients.First();
+        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        var target = CreateVillageTarget();
+        EnableHeadlessEncounterFinish(owner);
+        var encounter = SetMockPlayerEncounter(owner);
+        var disabledMethods = MapEventDisabledMethods
+            .Append(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)))
+            .ToList();
+
+        owner.Call(() =>
+        {
+            Assert.True(owner.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+            Assert.True(owner.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = party;
+                party._currentSettlement = settlement;
+            }
+            encounter.EncounterSettlementAux = settlement;
+            Campaign.Current.MapStateData.GameMenuId = "village";
+            Assert.Null(PlayerEncounter.Battle);
+            Assert.Null(party.MapEvent);
+        }, disabledMethods);
+
+        // The reset has already opened a new village encounter when an old reply reaches this client.
+        using var finish = new MethodCallRecorder(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish)));
+        using var menuExit = new MethodCallRecorder(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)));
+        Server.NetworkSentMessages.Clear();
+        owner.Call(() =>
+        {
+            if (repeatFinalizeRequest)
+                owner.Resolve<INetwork>().SendAll(new NetworkMapEventFinalizeAttempted("already-finalized-raid"));
+            else
+                owner.SimulateMessage(Server.NetPeer, new NetworkMapEventFinalized());
+
+            Assert.Same(encounter, PlayerEncounter.Current);
+            Assert.True(owner.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+            Assert.Same(encounter.EncounterSettlementAux, party.CurrentSettlement);
+            Assert.Null(party.MapEvent);
+            Assert.Equal("village", Campaign.Current.MapStateData.GameMenuId);
+        }, disabledMethods);
+        Assert.Equal(0, finish.Count);
+        Assert.Equal(0, menuExit.Count);
+        if (repeatFinalizeRequest)
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMapEventFinalized>());
     }
 
     [Fact]
