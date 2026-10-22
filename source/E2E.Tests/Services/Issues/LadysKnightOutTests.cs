@@ -9,6 +9,7 @@ using Coop.Core.Server.Connections.Messages;
 using HarmonyLib;
 using Helpers;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
@@ -920,8 +921,10 @@ public class LadysKnightOutTests : IDisposable
         });
     }
 
-    [Fact]
-    public void JoiningDuringALordSolutionDoesNotGiveTheNonOwnerItsCompletedJournal()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void JoiningDuringALordSolutionDoesNotGiveTheNonOwnerItsCompletedJournal(bool completesBeforeSnapshot)
     {
         PrepareLordSolution();
         var issues = new Dictionary<EnvironmentInstance, IssueBase>();
@@ -961,18 +964,23 @@ public class LadysKnightOutTests : IDisposable
             issue.IsTriedToSolveBefore = savedTried;
             using (new AllowedThread()) issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(savedLog)));
             Assert.Null(issue.IssueQuest);
+            scenario.ClientB.Resolve<IMessageBroker>().Publish(this, new CampaignReady());
         });
         router.Reconnect(scenario.ClientB.NetPeer);
         scenario.Server.Call(() =>
         {
             var broker = scenario.Server.Resolve<IMessageBroker>();
-            broker.Publish(this, new PlayerCampaignEntered(scenario.ClientB.NetPeer));
+            if (!completesBeforeSnapshot) broker.Publish(this, new PlayerCampaignEntered(scenario.ClientB.NetPeer));
             broker.Publish(this, new PlayerCampaignEntered(scenario.ClientA.NetPeer));
         });
-        scenario.ClientB.Call(() => Assert.True(scenario.ClientB.Resolve<IIssueOwnershipRegistry>()
-            .TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out var owner) && owner == QuestScenario.ControllerA));
+        if (!completesBeforeSnapshot)
+            scenario.ClientB.Call(() => Assert.True(scenario.ClientB.Resolve<IIssueOwnershipRegistry>()
+                .TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out var owner) && owner == QuestScenario.ControllerA));
 
         scenario.ClientA.Call(() => issues[scenario.ClientA].CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+        if (completesBeforeSnapshot)
+            scenario.Server.Call(() => scenario.Server.Resolve<IMessageBroker>()
+                .Publish(this, new PlayerCampaignEntered(scenario.ClientB.NetPeer)));
         var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
         Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
