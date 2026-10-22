@@ -133,9 +133,9 @@ public class LordNeedsHorsesTests : IDisposable
         });
     }
 
-    [Fact]
-    public void TheReturnedMission_LeavesTheOwnersCompletedQuestOutOfTheServersJournalHistory()
+    private void ReturnTheMissionWithTheServersJournalHistoryTracked()
     {
+        ClientB.Resolve<IControllerIdProvider>().SetControllerId("player-B");
         JournalHistory.Track(Server, ClientA, ClientB);
         StartMissionOnServer();
 
@@ -154,8 +154,28 @@ public class LordNeedsHorsesTests : IDisposable
         });
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.Empty(JournalHistory.EntriesOn(Server));
-        Assert.Empty(JournalHistory.EntriesOn(ClientB));
+    }
+
+    [Fact]
+    public void TheReturnedMission_StaysInTheOwnersOldQuestsAfterTheOwnerRejoins()
+    {
+        ReturnTheMissionWithTheServersJournalHistoryTracked();
+
+        JournalHistory.DownloadSaveOf(Server, ClientA);
+
+        var oldQuests = JournalHistory.OldQuestsOn(ClientA);
+        Assert.Single(oldQuests);
+        Assert.Contains("Lord Needs Horses", oldQuests[0]);
+    }
+
+    [Fact]
+    public void TheReturnedMission_IsNotInAnotherPlayersOldQuestsAfterTheyJoin()
+    {
+        ReturnTheMissionWithTheServersJournalHistoryTracked();
+
+        JournalHistory.DownloadSaveOf(Server, ClientB);
+
+        Assert.Empty(JournalHistory.OldQuestsOn(ClientB));
     }
 
     [Fact]

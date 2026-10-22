@@ -202,8 +202,7 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Server.Call(() => Assert.Equal(0, Get<MobileParty>(Server, scenario.OwnerPartyId).ItemRoster.GetItemNumber(Get<ItemObject>(Server, itemId))));
     }
 
-    [Fact]
-    public void FullDelivery_LeavesTheOwnersCompletedQuestOutOfTheServersJournalHistory()
+    private void DeliverFullyWithTheServersJournalHistoryTracked()
     {
         JournalHistory.Track(Server, ClientA, ClientB);
         Accept();
@@ -213,10 +212,28 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         ClientA.Call(() => clientQuest.CompleteQuestWithSuccess());
         environment.FlushCoalescer();
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
 
-        Assert.NotEmpty(JournalHistory.EntriesOn(ClientA));
-        Assert.Empty(JournalHistory.EntriesOn(Server));
-        Assert.Empty(JournalHistory.EntriesOn(ClientB));
+    [Fact]
+    public void FullDelivery_StaysInTheOwnersOldQuestsAfterTheOwnerRejoins()
+    {
+        DeliverFullyWithTheServersJournalHistoryTracked();
+
+        JournalHistory.DownloadSaveOf(Server, ClientA);
+
+        var oldQuests = JournalHistory.OldQuestsOn(ClientA);
+        Assert.Single(oldQuests);
+        Assert.Contains("Overpriced Raw Materials", oldQuests[0]);
+    }
+
+    [Fact]
+    public void FullDelivery_IsNotInAnotherPlayersOldQuestsAfterTheyJoin()
+    {
+        DeliverFullyWithTheServersJournalHistoryTracked();
+
+        JournalHistory.DownloadSaveOf(Server, ClientB);
+
+        Assert.Empty(JournalHistory.OldQuestsOn(ClientB));
     }
 
     [Theory]
