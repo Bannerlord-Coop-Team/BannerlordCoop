@@ -87,6 +87,11 @@ public sealed class LesserNobleRevoltTests : IDisposable
             using (new AllowedThread())
             {
                 var issue = constructed ? new Issue(giver) : ObjectHelper.SkipConstructor<Issue>();
+                if (!constructed)
+                {
+                    AccessTools.Field(typeof(IssueBase), nameof(IssueBase._trackedObjects))
+                        .SetValue(issue, new List<ITrackableCampaignObject>());
+                }
                 issue.IssueOwner = giver;
                 issue.StringId = issueId;
                 issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
@@ -106,6 +111,9 @@ public sealed class LesserNobleRevoltTests : IDisposable
             }
         });
     }
+
+    private static LesserNobleRevoltWorldEventService WorldEvents(EnvironmentInstance instance) =>
+        (LesserNobleRevoltWorldEventService)instance.Resolve<ILesserNobleRevoltWorldEventService>();
 
     private Quest QuestOf(EnvironmentInstance instance)
     {
@@ -269,6 +277,8 @@ public sealed class LesserNobleRevoltTests : IDisposable
                 var issue = giver.Issue;
                 var quest = Assert.IsType<Quest>(issue.IssueQuest);
 
+                Campaign.Current.VisualTrackerManager = new VisualTrackerManager();
+
                 // A skipped constructor leaves the stores an ending writes to null.
                 if (issue.JournalEntries == null)
                 {
@@ -337,10 +347,10 @@ public sealed class LesserNobleRevoltTests : IDisposable
         switch (ending)
         {
             case RevoltEnding.BattleWon:
-                RunAsOwner(quest => LesserNobleRevoltWorldEventPatches.ApplyBattleEnd(quest, LesserNobleRevoltWorldEventPatches.RevoltBattleEnd.OwnerWon));
+                RunAsOwner(quest => WorldEvents(server).ApplyBattleEnd(quest, LesserNobleRevoltWorldEventService.RevoltBattleEnd.OwnerWon));
                 break;
             case RevoltEnding.BattleLost:
-                RunAsOwner(quest => LesserNobleRevoltWorldEventPatches.ApplyBattleEnd(quest, LesserNobleRevoltWorldEventPatches.RevoltBattleEnd.OwnerLost));
+                RunAsOwner(quest => WorldEvents(server).ApplyBattleEnd(quest, LesserNobleRevoltWorldEventService.RevoltBattleEnd.OwnerLost));
                 break;
             case RevoltEnding.Agreement:
                 owner.Call(() => ownerQuest.QuestSuccessPlayerComesToAnAgreementWithLesserNobleParty());
@@ -349,10 +359,10 @@ public sealed class LesserNobleRevoltTests : IDisposable
                 owner.Call(() => ownerQuest.QuestFailedAfterTalkingWithLesserNobleParty());
                 break;
             case RevoltEnding.TimedOut:
-                server.Call(() =>
+                owner.Call(() =>
                 {
-                    serverQuest.QuestDueTime = new CampaignTime(CampaignTime.Now.NumTicks - 1);
-                    LesserNobleRevoltWorldEventPatches.HourlyTick();
+                    ownerQuest.QuestDueTime = new CampaignTime(CampaignTime.Now.NumTicks - 1);
+                    Campaign.Current.QuestManager.HourlyTick();
                 });
                 break;
             case RevoltEnding.CanceledByWar:
@@ -502,7 +512,7 @@ public sealed class LesserNobleRevoltTests : IDisposable
             Assert.True(server.ObjectManager.TryGetId(owner.CharacterObject, out var characterId));
             Assert.True(server.Resolve<IPlayerManager>().AddPlayer(new Player("player-A", heroId, ownerPartyId, clanId, characterId)));
 
-            LesserNobleRevoltWorldEventPatches.RecordOwnerBattle(quest, owner, null);
+            WorldEvents(server).RecordOwnerBattle(quest, owner, null);
             try
             {
                 // What coop's CaptureDefeatedPlayerHeroes does to a player who lost a battle.
@@ -514,7 +524,7 @@ public sealed class LesserNobleRevoltTests : IDisposable
             }
             finally
             {
-                LesserNobleRevoltWorldEventPatches.ForgetOwnerBattle(quest);
+                WorldEvents(server).ForgetOwnerBattle(quest);
             }
         });
     }
@@ -556,6 +566,77 @@ public sealed class LesserNobleRevoltTests : IDisposable
         });
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AnotherPlayersVictoryWithoutTheOwner_CancelsWithoutQuestRewards(bool checkOwnerJournal)
+    {
+        const string issueId = "issue_lesser_noble_third_party";
+        var server = testEnvironment.Server;
+        var (owner, observer) = RegisterOwnerAndObserver(issueId);
+        var quest = QuestOf(server);
+        var ownerQuest = QuestOf(owner);
+        string attackerId = null;
+        string revoltId = null;
+        server.Call(() =>
+        {
+            var attacker = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var revolt = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            Assert.True(server.ObjectManager.TryGetId(attacker, out attackerId));
+            Assert.True(server.ObjectManager.TryGetId(revolt, out revoltId));
+            Assert.True(server.ObjectManager.TryGetId(attacker.LeaderHero, out var heroId));
+            Assert.True(server.ObjectManager.TryGetId(attacker.ActualClan, out var clanId));
+            Assert.True(server.ObjectManager.TryGetId(attacker.LeaderHero.CharacterObject, out var characterId));
+            Assert.True(server.Resolve<IPlayerManager>().AddPlayer(new Player("player-C", heroId, attackerId, clanId, characterId)));
+            Assert.True(server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var player));
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var questOwner));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var ownerParty));
+            using (new AllowedThread()) questOwner._partyBelongedTo = ownerParty;
+            quest._lesserNobleParty = revolt;
+        });
+        testEnvironment.FlushCoalescer();
+        var mapEventId = StartServerBattle(attackerId, revoltId);
+        using var gold = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(GiveGoldAction), nameof(GiveGoldAction.ApplyInternal)));
+        using var renown = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(Clan), nameof(Clan.AddRenown)));
+        using var traits = new MethodCallRecorder(AccessTools.Method(typeof(TraitLevelingHelper), nameof(TraitLevelingHelper.OnIssueSolvedThroughQuest),
+            new[] { typeof(Hero), typeof(Tuple<TraitObject, int>[]) }));
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var battle));
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(server.Resolve<IIssueOwnerResolver>().TryResolveOwnerHero(giver.Issue, out var questOwner));
+            Assert.NotNull(questOwner.PartyBelongedTo);
+            Assert.DoesNotContain(questOwner.PartyBelongedTo.Party, battle.InvolvedParties);
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(attackerId, out var attacker));
+            Assert.Contains(attacker.Party, battle.InvolvedParties);
+            battle._battleState = BattleState.AttackerVictory;
+            CampaignEventDispatcher.Instance.OnMapEventEnded(battle);
+        });
+
+        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Assert.True(quest.IsFinalized);
+        Assert.Equal(0, quest.RelationshipChangeWithQuestGiver);
+        const string reason = "The revolt was defeated by another party. Your agreement has been canceled.";
+        server.Call(() => Assert.Single(quest.JournalEntries, log => log.LogText.ToString() == reason));
+        foreach (var instance in new[] { server, owner, observer })
+        {
+            Assert.Equal(0, gold.CountFor(instance));
+            Assert.Equal(0, renown.CountFor(instance));
+            Assert.Equal(0, traits.CountFor(instance));
+        }
+
+        // Requires #3985: generic finalization must replay the server's reason before archiving.
+        if (checkOwnerJournal)
+        {
+            owner.Call(() =>
+            {
+                var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(entry => entry.RelatedHero == ownerQuest.QuestGiver);
+                Assert.NotNull(archive);
+                Assert.Single(archive.GetEntries(), log => log.LogText.ToString() == reason);
+            });
+        }
+    }
+
     [Fact]
     public void BattleEnds_RunTheMatchingBranchOnTheServer()
     {
@@ -567,21 +648,20 @@ public sealed class LesserNobleRevoltTests : IDisposable
 
         server.Call(() =>
         {
-            LesserNobleRevoltWorldEventPatches.ApplyBattleEnd(quest, LesserNobleRevoltWorldEventPatches.RevoltBattleEnd.Ignored);
+            WorldEvents(server).ApplyBattleEnd(quest, LesserNobleRevoltWorldEventService.RevoltBattleEnd.Ignored);
             Assert.False(quest._firstTalkIsDone);
 
-            LesserNobleRevoltWorldEventPatches.ApplyBattleEnd(quest, LesserNobleRevoltWorldEventPatches.RevoltBattleEnd.NoWinner);
+            WorldEvents(server).ApplyBattleEnd(quest, LesserNobleRevoltWorldEventService.RevoltBattleEnd.NoWinner);
             Assert.True(quest._firstTalkIsDone);
 
-            LesserNobleRevoltWorldEventPatches.ApplyBattleEnd(quest, LesserNobleRevoltWorldEventPatches.RevoltBattleEnd.OwnerLost);
+            WorldEvents(server).ApplyBattleEnd(quest, LesserNobleRevoltWorldEventService.RevoltBattleEnd.OwnerLost);
             Assert.Equal(0, wins.CountFor(server));
             Assert.Equal(1, losses.CountFor(server));
 
-            LesserNobleRevoltWorldEventPatches.ApplyBattleEnd(quest, LesserNobleRevoltWorldEventPatches.RevoltBattleEnd.OwnerWon);
-            LesserNobleRevoltWorldEventPatches.ApplyBattleEnd(quest, LesserNobleRevoltWorldEventPatches.RevoltBattleEnd.ThirdPartyWon);
+            WorldEvents(server).ApplyBattleEnd(quest, LesserNobleRevoltWorldEventService.RevoltBattleEnd.OwnerWon);
         });
 
-        Assert.Equal(2, wins.CountFor(server));
+        Assert.Equal(1, wins.CountFor(server));
         Assert.Equal(1, losses.CountFor(server));
     }
 
@@ -673,27 +753,39 @@ public sealed class LesserNobleRevoltTests : IDisposable
     }
 
     [Fact]
-    public void DueTime_TimesTheQuestOutOnTheServerOnce()
+    public void OwnersHourlyTick_DispatchesTheTimeoutToTheServerOnce()
     {
-        const string issueId = "issue_lesser_noble";
+        const string issueId = "issue_lesser_noble_timeout";
         var server = testEnvironment.Server;
-        RegisterOwner(issueId, "player-A");
-        var quest = QuestOf(server);
-        using var timeouts = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.OnTimedOut)));
-        var hourlyTick = AccessTools.Method(typeof(LesserNobleRevoltWorldEventPatches), nameof(LesserNobleRevoltWorldEventPatches.HourlyTick));
-
-        server.Call(() =>
+        var (owner, observer) = RegisterOwnerAndObserver(issueId);
+        var serverQuest = QuestOf(server);
+        var ownerQuest = QuestOf(owner);
+        using var traits = new MethodCallRecorder(AccessTools.Method(typeof(TraitLevelingHelper), nameof(TraitLevelingHelper.OnIssueSolvedThroughQuest),
+            new[] { typeof(Hero), typeof(Tuple<TraitObject, int>[]) }));
+        server.Call(() => Assert.DoesNotContain(serverQuest, Campaign.Current.QuestManager.Quests));
+        owner.Call(() =>
         {
-            quest.QuestDueTime = CampaignTime.Never;
-            hourlyTick.Invoke(null, null);
-            Assert.Equal(0, timeouts.CountFor(server));
-
-            // The test campaign has no time model, so the due time is set from raw ticks.
-            quest.QuestDueTime = new CampaignTime(CampaignTime.Now.NumTicks - 1);
-            hourlyTick.Invoke(null, null);
+            Assert.Contains(ownerQuest, Campaign.Current.QuestManager.Quests);
+            ownerQuest.QuestDueTime = CampaignTime.Never;
+            Campaign.Current.QuestManager.HourlyTick();
         });
-
-        Assert.Equal(1, timeouts.CountFor(server));
+        Assert.Empty(server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        owner.Call(() =>
+        {
+            ownerQuest.QuestDueTime = new CampaignTime(CampaignTime.Now.NumTicks - 1);
+            Campaign.Current.QuestManager.HourlyTick();
+        });
+        owner.Call(() => Campaign.Current.QuestManager.HourlyTick());
+        Assert.Equal(IssueOutcome.QuestTimeOut, Assert.Single(owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>()).Outcome);
+        Assert.Equal(1, traits.CountFor(server));
+        Assert.Equal(0, traits.CountFor(owner));
+        Assert.Equal(0, traits.CountFor(observer));
+        Assert.True(serverQuest.IsFinalized);
+        Assert.True(ownerQuest.IsFinalized);
+        output.WriteLine("One owner QuestTimeOut request, server endings: {0}",
+            string.Join(", ", server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>().Select(message => message.Outcome)));
+        // Generic dependency: LNR's OnTimedOut nests CompleteQuestWithFail in CompleteQuestWithTimeOut.
+        Assert.Single(server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 
     [Fact]
@@ -896,14 +988,14 @@ public sealed class LesserNobleRevoltTests : IDisposable
             Assert.Contains(quest, Campaign.Current.QuestManager.TrackedObjects[village]);
             Assert.True(Campaign.Current.VisualTrackerManager.CheckTracked(village));
 
-            LesserNobleRevoltWorldEventPatches.RecordOwnerBattle(quest, owner, null);
-            Assert.True(LesserNobleRevoltWorldEventPatches.IsProtectedHero(owner));
+            WorldEvents(server).RecordOwnerBattle(quest, owner, null);
+            Assert.True(WorldEvents(server).IsProtectedHero(owner));
 
             // Nobody owns the quest, so the server-start sweep dismisses it.
             server.Resolve<IMessageBroker>().Publish(this, new AllGameObjectsRegistered());
 
             Assert.Null(giver.Issue);
-            Assert.False(LesserNobleRevoltWorldEventPatches.IsProtectedHero(owner));
+            Assert.False(WorldEvents(server).IsProtectedHero(owner));
             Assert.DoesNotContain(Campaign.Current.QuestManager.TrackedObjects.Values, quests => quests.Contains(quest));
             Assert.False(Campaign.Current.VisualTrackerManager.CheckTracked(village));
             Assert.Contains(otherQuest, Campaign.Current.QuestManager.TrackedObjects[otherVillage]);
@@ -911,6 +1003,53 @@ public sealed class LesserNobleRevoltTests : IDisposable
         });
 
         Assert.Equal(1, destroyed.CountFor(server));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void OwnerMessages_ReachOnlyTheOwnersPeer(bool ownerConnected)
+    {
+        const string issueId = "issue_lesser_noble_recipients";
+        var server = testEnvironment.Server;
+        var (owner, observer) = RegisterOwnerAndObserver(issueId);
+        var settlementId = testEnvironment.CreateRegisteredObject<Settlement>();
+        var partyId = testEnvironment.CreateRegisteredObject<MobileParty>();
+        server.Call(() =>
+        {
+            if (!ownerConnected) server.Resolve<IPlayerManager>().ClearPeer(owner.NetPeer);
+            var quest = QuestOf(server);
+            Assert.True(server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            quest._lesserNobleParty = party;
+            WorldEvents(server).SendJournalUpdate(quest, settlement, 1, false);
+            WorldEvents(server).SendOwnerBattleEnded(quest);
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            var strategy = server.Resolve<IQuestTypeRegistry>().TryGetByName(typeof(Issue).Name, out var descriptor)
+                ? descriptor.QuestSolutionAcceptStrategy : null;
+            Assert.NotNull(strategy);
+            strategy.Apply(giver.Issue, strategy.Capture(giver.Issue));
+        });
+
+        AssertRecipients<NetworkLesserNobleRevoltJournalUpdate>();
+        AssertRecipients<NetworkLesserNobleRevoltOwnerBattleEnded>();
+        AssertRecipients<NetworkLesserNobleRevoltPartyCreated>();
+
+        void AssertRecipients<T>() where T : IMessage
+        {
+            if (ownerConnected)
+            {
+                Assert.Single(server.NetworkSentMessages.GetMessages<T>());
+                Assert.Single(owner.InternalMessages.GetMessages<T>());
+            }
+            else
+            {
+                Assert.Empty(server.NetworkSentMessages.GetMessages<T>());
+                Assert.Empty(owner.InternalMessages.GetMessages<T>());
+            }
+
+            Assert.Empty(observer.InternalMessages.GetMessages<T>());
+        }
     }
 
     [Fact]
@@ -1027,12 +1166,7 @@ public sealed class LesserNobleRevoltTests : IDisposable
 
         var finalized = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(outcome, finalized.Outcome);
-        var endingLog = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkLesserNobleRevoltEndingLog>());
-        Assert.Equal("player-A", endingLog.ControllerId);
-        Assert.Equal(issueId, endingLog.IssueId);
-        // Both go out on the reliable ordered channel, so the owner adds the line before its replay archives the quest.
-        var sent = server.NetworkSentMessages.Messages;
-        Assert.True(sent.FindIndex(message => message is NetworkLesserNobleRevoltEndingLog) < sent.FindIndex(message => message is NetworkIssueFinalized));
+        // Requires #3985: generic finalization must replay the server journal before archiving.
         server.Call(() => Assert.Single(serverQuest.JournalEntries, log => log.LogText.ToString() == expected));
 
         owner.Call(() =>
@@ -1066,31 +1200,4 @@ public sealed class LesserNobleRevoltTests : IDisposable
         Assert.Equal(traitChanges, traits.CountFor(server));
     }
 
-    [Fact]
-    public void EndingLog_AddsOnlyTheServerLinesPastTheOwnersJournal()
-    {
-        const string issueId = "issue_lesser_noble";
-        var client = testEnvironment.Clients.First();
-        RegisterPlayer("player-A");
-        AddIssueWithQuest(client, issueId);
-        var quest = QuestOf(client);
-        client.Call(() =>
-        {
-            AccessTools.Field(typeof(QuestBase), nameof(QuestBase._journalEntries)).SetValue(quest, new MBList<JournalLog>());
-            quest._journalEntries.Add(new JournalLog(CampaignTime.Now, new TextObject(StartLog)));
-        });
-
-        void Send(string sentIssueId, string controllerId, params string[] logs) => testEnvironment.Server.Call(() =>
-            testEnvironment.Server.Resolve<INetwork>().SendAll(new NetworkLesserNobleRevoltEndingLog(
-                giverId, sentIssueId, controllerId, logs.Select(log => new TextObject(log)).ToArray())));
-
-        Send(issueId, "player-B", StartLog, "ending");
-        // The giver's earlier issue ended and this one replaced it.
-        Send("issue_lesser_noble_old", "player-A", StartLog, "ending");
-        // A line with the same text as an earlier one is still a new line, and the same journal twice adds it once.
-        Send(issueId, "player-A", StartLog, StartLog);
-        Send(issueId, "player-A", StartLog, StartLog);
-
-        client.Call(() => Assert.Equal(new[] { StartLog, StartLog }, quest.JournalEntries.Select(log => log.LogText.ToString())));
-    }
 }

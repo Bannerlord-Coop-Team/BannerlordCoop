@@ -34,7 +34,7 @@ internal class IssuesModule : Module
             .InstancePerLifetimeScope();
         builder.RegisterType<LesserNobleRevoltWorldEventService>()
             .As<ILesserNobleRevoltWorldEventService>()
-            .InstancePerDependency();
+            .InstancePerLifetimeScope();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)

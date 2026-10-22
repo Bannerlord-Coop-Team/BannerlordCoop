@@ -2,7 +2,6 @@
 using Common.Messaging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.Issues.Quests.LesserNobleRevolt.Patches;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem.Settlements;
 using Quest = TaleWorlds.CampaignSystem.Issues.LesserNobleRevoltIssueBehavior.LesserNobleRevoltIssueQuest;
@@ -50,11 +49,11 @@ internal sealed class LesserNobleRevoltJournalUpdateHandler : IHandler
 
             if (!data.Notification)
             {
-                LesserNobleRevoltWorldEventPatches.ApplyClientSettlementProgress(quest, settlement, data.VisitCount);
+                LesserNobleRevoltWorldEventService.ApplyClientSettlementProgress(quest, settlement, data.VisitCount);
             }
-            else if (LesserNobleRevoltWorldEventPatches.ShouldApplyClientNotification(quest, data.VisitCount))
+            else if (LesserNobleRevoltWorldEventService.ShouldApplyClientNotification(quest, data.VisitCount))
             {
-                LesserNobleRevoltWorldEventPatches.ApplyClientHourlyJournalNotification(quest, settlement);
+                LesserNobleRevoltWorldEventService.ApplyClientHourlyJournalNotification(quest, settlement);
             }
         }, context: nameof(LesserNobleRevoltJournalUpdateHandler));
     }

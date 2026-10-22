@@ -34,7 +34,10 @@ internal static class LesserNobleRevoltConsequencePatches
 
     internal static void ReleaseQuest(Quest quest)
     {
-        LesserNobleRevoltWorldEventPatches.ForgetOwnerBattle(quest);
+        if (ContainerProvider.TryResolve<ILesserNobleRevoltWorldEventService>(out var service))
+        {
+            service.ForgetOwnerBattle(quest);
+        }
         if (ModInformation.IsClient)
         {
             return;
