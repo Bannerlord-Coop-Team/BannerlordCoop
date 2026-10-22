@@ -189,6 +189,9 @@ internal class BattleSimulationRunHandler : IHandler
 
             MapEventHostileActionConsequences.Apply(mapEvent, attackerParty.Party, "battle simulation attack");
 
+            // The client menu cannot clear the authoritative ambush protection before simulation.
+            mapEvent.IsInvulnerable = false;
+
             // v1: simulate the full participating troop count (null), not the player's selected subset.
             var previousObserver = mapEvent.BattleObserver;
             mapEvent.BattleObserver = observer;
