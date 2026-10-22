@@ -1,14 +1,11 @@
 ﻿using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
-using Helpers;
-using System.Linq;
 using System.IO;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
-using Behavior = TaleWorlds.CampaignSystem.Issues.LordNeedsHorsesIssueBehavior;
 using Issue = TaleWorlds.CampaignSystem.Issues.LordNeedsHorsesIssueBehavior.LordNeedsHorsesIssue;
 
 namespace GameInterface.Services.Issues.Quests.LordNeedsHorses;
@@ -28,7 +25,7 @@ internal class LordNeedsHorsesCreationCaptureStrategy : ICreationCaptureStrategy
 
         using (var stream = new MemoryStream())
         {
-            using (var writer = new System.IO.BinaryWriter(stream))
+            using (var writer = new BinaryWriter(stream))
             {
                 writer.Write(horsesIssue._mountObjectToBeDelivered?.StringId ?? string.Empty);
                 writer.Write(horsesIssue._numMountsToBeDelivered);
@@ -46,7 +43,7 @@ internal class LordNeedsHorsesCreationCaptureStrategy : ICreationCaptureStrategy
 
         using (var stream = new MemoryStream(captured))
         {
-            using (var reader = new System.IO.BinaryReader(stream))
+            using (var reader = new BinaryReader(stream))
             {
                 var mountId = reader.ReadString();
 
@@ -72,30 +69,17 @@ internal class LordNeedsHorsesCreationCaptureStrategy : ICreationCaptureStrategy
             return false;
         }
 
-        // Match IssueStayAliveConditions without constructing an Issue. Constructing one on the server
-        // registers a live issue and its roster before the real creation path runs.
-        if (issueOwner.IsDead || issueOwner.Clan == Clan.PlayerClan ||
-            !(issueOwner.IsKingdomLeader || issueOwner.Clan.Leader == issueOwner) ||
-            Behavior.ComputeMountsOverInfantryCountRatio(issueOwner.PartyBelongedTo, out _) >= 0.8f)
+        // Only rolls the mount and amount, the issue itself is created from the capture
+        var issue = new Issue(issueOwner);
+        CampaignEventDispatcher.Instance.RemoveListeners(issue);
+
+        // Only a clan or kingdom leader with few mounts keeps the issue alive past the next daily tick
+        if (!issue.IssueStayAliveConditions())
         {
             return false;
         }
 
-        var mount = MBObjectManager.Instance.GetObjectTypeList<ItemObject>().Where(item => item.IsMountable && item.Culture == issueOwner.Culture &&
-            !item.NotMerchandise && item.Tierf > 2f && item.Tierf < 3f).ToList().GetRandomElement() ??
-            MBObjectManager.Instance.GetObject<ItemObject>("sumpter_horse");
-        var amount = 1 + (int)TaleWorlds.Library.MathF.Ceiling(12f * Campaign.Current.Models.IssueModel.GetIssueDifficultyMultiplier());
-        captured = Write(mount?.StringId ?? "sumpter_horse", amount, mount?.Value ?? 0);
+        captured = Capture(issue);
         return true;
-    }
-
-    private static byte[] Write(string mountId, int amount, int value)
-    {
-        using var stream = new MemoryStream();
-        using var writer = new System.IO.BinaryWriter(stream);
-        writer.Write(mountId ?? string.Empty);
-        writer.Write(amount);
-        writer.Write(value);
-        return stream.ToArray();
     }
 }

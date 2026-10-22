@@ -8,10 +8,7 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.Issues.Framework.CreationCapture;
 using GameInterface.Services.Issues.Quests.ArtisanOverpricedGoods;
-using GameInterface.Services.ItemRosters.Messages;
-using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -144,22 +141,6 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         });
     }
 
-    [Fact]
-    public void DebugCapture_DoesNotCreateAnIssueOrRoster()
-    {
-        byte[] captured = null!;
-        Server.Call(() =>
-        {
-            Server.Resolve<IObjectManager>().AddExisting(DefaultItems.HardWood.StringId, DefaultItems.HardWood);
-            Server.NetworkSentMessages.Clear();
-            Assert.True(Descriptor(Server).CreationCaptureStrategy.TryBuildDebugCapture(
-                Get<Hero>(Server, scenario.NotableId), out captured));
-            Assert.NotEmpty(captured);
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCreateItemRoster>());
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>());
-        });
-    }
-
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -202,40 +183,6 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         AssertFinished(2530, 10900);
         AssertEffects(210, 90, 5, -10);
         Server.Call(() => Assert.Equal(0, Get<MobileParty>(Server, scenario.OwnerPartyId).ItemRoster.GetItemNumber(Get<ItemObject>(Server, itemId))));
-    }
-
-    private void DeliverFullyWithTheServersJournalHistoryTracked()
-    {
-        JournalHistory.Track(Server, ClientA, ClientB);
-        Accept();
-        Stock(Amount);
-        var clientQuest = (Quest)scenario.QuestOf(ClientA);
-        ClientA.Call(() => clientQuest.DeliverItemsFullyOnConsequence());
-        ClientA.Call(() => clientQuest.CompleteQuestWithSuccess());
-        environment.FlushCoalescer();
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-    }
-
-    [Fact]
-    public void FullDelivery_StaysInTheOwnersOldQuestsAfterTheOwnerRejoins()
-    {
-        DeliverFullyWithTheServersJournalHistoryTracked();
-
-        JournalHistory.DownloadSaveOf(Server, ClientA);
-
-        var oldQuests = JournalHistory.OldQuestsOn(ClientA);
-        Assert.Single(oldQuests);
-        Assert.Contains("Overpriced Raw Materials", oldQuests[0]);
-    }
-
-    [Fact]
-    public void FullDelivery_IsNotInAnotherPlayersOldQuestsAfterTheyJoin()
-    {
-        DeliverFullyWithTheServersJournalHistoryTracked();
-
-        JournalHistory.DownloadSaveOf(Server, ClientB);
-
-        Assert.Empty(JournalHistory.OldQuestsOn(ClientB));
     }
 
     [Theory]

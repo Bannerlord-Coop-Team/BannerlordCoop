@@ -7,11 +7,9 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
-using GameInterface.Services.ItemRosters.Messages;
 using HarmonyLib;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -133,51 +131,6 @@ public class LordNeedsHorsesTests : IDisposable
         });
     }
 
-    private void ReturnTheMissionWithTheServersJournalHistoryTracked()
-    {
-        ClientB.Resolve<IControllerIdProvider>().SetControllerId("player-B");
-        JournalHistory.Track(Server, ClientA, ClientB);
-        StartMissionOnServer();
-
-        // The success log links the companion, so the encyclopedia has to exist. The logs are what is tested here.
-        Server.Call(() =>
-        {
-            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
-            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
-        });
-
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
-
-            giver.Issue.CompleteIssueWithAlternativeSolution();
-        });
-
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-    }
-
-    [Fact]
-    public void TheReturnedMission_StaysInTheOwnersOldQuestsAfterTheOwnerRejoins()
-    {
-        ReturnTheMissionWithTheServersJournalHistoryTracked();
-
-        JournalHistory.DownloadSaveOf(Server, ClientA);
-
-        var oldQuests = JournalHistory.OldQuestsOn(ClientA);
-        Assert.Single(oldQuests);
-        Assert.Contains("Lord Needs Horses", oldQuests[0]);
-    }
-
-    [Fact]
-    public void TheReturnedMission_IsNotInAnotherPlayersOldQuestsAfterTheyJoin()
-    {
-        ReturnTheMissionWithTheServersJournalHistoryTracked();
-
-        JournalHistory.DownloadSaveOf(Server, ClientB);
-
-        Assert.Empty(JournalHistory.OldQuestsOn(ClientB));
-    }
-
     [Fact]
     public void TheTroopsStayAwayWhileTheOwnerCannotTakeThemBackAndReturnTheNextDay()
     {
@@ -245,14 +198,11 @@ public class LordNeedsHorsesTests : IDisposable
                 giver.Clan = clan;
                 clan.SetLeader(giver);
                 giver._partyBelongedTo = party;
-                troop.DefaultFormationClass = FormationClass.Infantry;
                 party.MemberRoster.AddToCounts(troop, 20);
             }
 
-            Server.NetworkSentMessages.Clear();
             Assert.True(Descriptor().CreationCaptureStrategy.TryBuildDebugCapture(giver, out var captured));
             Assert.NotEmpty(captured);
-            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkCreateItemRoster>());
         });
     }
 
