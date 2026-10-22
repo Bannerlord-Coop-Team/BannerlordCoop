@@ -327,8 +327,7 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
                 ownerQuest.QuestAcceptedConsequences();
         }, QuestLogTexts);
 
-        if (fromOlderSave)
-            QuestJournalHistoryAssertions.RestoreVanillaArchive(Server, serverQuest);
+        var legacy = fromOlderSave ? QuestJournalHistoryAssertions.RestoreVanillaArchive(Server, serverQuest) : null;
 
         if (success)
         {
@@ -351,8 +350,8 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
             ClientA.Call(() => ownerQuest.CompleteQuestWithFail(), QuestLogTexts);
         }
 
-        QuestJournalHistoryAssertions.AssertLateJoinHistory(Server, ClientA, ClientB, serverQuest, ownerQuest,
-            success ? IssueOutcome.QuestSuccess : IssueOutcome.QuestFail);
+        QuestJournalHistoryAssertions.AssertLateJoinHistory(Server, ClientA, ClientB, IssueId, ownerQuest,
+            success ? IssueOutcome.QuestSuccess : IssueOutcome.QuestFail, legacy);
     }
 
     [Fact]

@@ -1,10 +1,12 @@
 ﻿using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Entity;
+using GameInterface.Services.UI.Notifications;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.LogEntries;
-using TaleWorlds.ObjectSystem;
+using TaleWorlds.CampaignSystem.Issues;
 
 namespace E2E.Tests.Services.Issues;
 
@@ -19,14 +21,17 @@ internal static class QuestJournalHistoryAssertions
             instance.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
     }
 
-    internal static void RestoreVanillaArchive(EnvironmentInstance server, QuestBase quest)
+    internal static JournalLogEntry RestoreVanillaArchive(EnvironmentInstance server, QuestBase quest)
     {
+        JournalLogEntry legacy = null!;
         server.Call(() =>
         {
+            var issue = IssueManager.GetIssueOfQuest(quest);
+            Assert.NotNull(issue);
+            Assert.False(string.IsNullOrEmpty(issue.StringId));
             var entry = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
-                log => log.IsRelatedTo(quest)));
-            var legacy = new JournalLogEntry(entry.Title, entry.RelatedHero, entry.Antagonist, entry.IsSpecial,
-                entry._relatedObjectIds.Select(id => new MBObjectBase(id)).ToArray());
+                log => log.IsRelatedTo(issue)));
+            legacy = new JournalLogEntry(entry.Title, entry.RelatedHero, entry.Antagonist, entry.IsSpecial, issue, quest);
             legacy.Id = entry.Id;
             legacy.GameTime = entry.GameTime;
             legacy._entries = entry._entries;
@@ -34,15 +39,32 @@ internal static class QuestJournalHistoryAssertions
             legacy._questCompletionDetail = entry._questCompletionDetail;
             var logs = Campaign.Current.LogEntryHistory._logs;
             logs[logs.IndexOf(entry)] = legacy;
+            Assert.Contains(issue.StringId, legacy._relatedObjectIds);
         });
+        return legacy;
     }
 
     internal static void AssertLateJoinHistory(EnvironmentInstance server, EnvironmentInstance owner,
-        EnvironmentInstance observer, QuestBase serverQuest, QuestBase ownerQuest, IssueOutcome outcome)
+        EnvironmentInstance observer, string issueId, QuestBase ownerQuest, IssueOutcome outcome,
+        JournalLogEntry? legacy = null)
     {
+        Assert.False(string.IsNullOrEmpty(issueId));
         Assert.Equal(outcome, Assert.Single(server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        var ownerControllerId = owner.Resolve<IControllerIdProvider>().ControllerId;
+        server.Call(() =>
+        {
+            var entry = Assert.IsType<PlayerJournalLogEntry>(Assert.Single(
+                Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                    log => log._relatedObjectIds.Contains(issueId))));
+            Assert.Equal(ownerControllerId, entry.OwnerControllerId);
+            if (legacy != null)
+            {
+                Assert.Equal(legacy.Id, entry.Id);
+                Assert.Equal(legacy.GameTime, entry.GameTime);
+            }
+        });
         owner.Call(() => Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
-            entry => entry.IsRelatedTo(ownerQuest) && entry.IsEnded())));
+            entry => entry._relatedObjectIds.Contains(issueId) && entry.IsEnded())));
         observer.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
             entry => entry.IsEnded())));
 
@@ -52,14 +74,14 @@ internal static class QuestJournalHistoryAssertions
         {
             LoadHistory(saveHistory);
             Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
-                entry => entry.IsRelatedTo(serverQuest) && entry.IsEnded()));
+                entry => entry._relatedObjectIds.Contains(issueId) && entry.IsEnded()));
         });
         owner.Call(() =>
         {
             // Rejoining replaces the owner's local history with the same server save.
             LoadHistory(saveHistory);
             var entry = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
-                entry => entry.IsRelatedTo(serverQuest) && entry.IsEnded()));
+                entry => entry._relatedObjectIds.Contains(issueId) && entry.IsEnded()));
             Assert.Equal(ownerQuest.Title.ToString(), entry.Title.ToString());
             Assert.Equal(outcome == IssueOutcome.QuestFail, entry.IsEndedUnsuccessfully());
         });

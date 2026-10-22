@@ -2,6 +2,7 @@
 using GameInterface.Services.Players;
 using GameInterface.Services.UI.Notifications;
 using GameInterface.Tests.Services.SiegeEvents;
+using Common.Util;
 using Moq;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -65,7 +66,7 @@ public class PlayerJournalHistoryTests
         Assert.Equal(original.Id, restored.Id);
         Assert.Equal(original.GameTime, restored.GameTime);
         Assert.Equal("Finished quest", restored.Title.ToString());
-        Assert.True(restored.IsRelatedTo(new MBObjectBase("quest_A")));
+        Assert.Equal("quest_A", Assert.Single(restored._relatedObjectIds));
         Assert.True(restored.IsEnded());
         Assert.False(restored.IsEndedUnsuccessfully());
         Assert.Equal("Delivered the goods", Assert.Single(restored.GetEntries()).LogText.ToString());
@@ -73,8 +74,11 @@ public class PlayerJournalHistoryTests
 
     private static PlayerJournalLogEntry Entry(string owner)
     {
-        var entry = new PlayerJournalLogEntry(new JournalLogEntry(new TextObject("Finished quest"), null, null, false),
-            owner, new MBObjectBase("quest_A"));
+        PlayerJournalLogEntry entry;
+        using (new AllowedThread())
+            entry = new PlayerJournalLogEntry(new JournalLogEntry(new TextObject("Finished quest"), null, null, false),
+                owner, new MBObjectBase("quest_A"));
+        Assert.Equal("quest_A", Assert.Single(entry._relatedObjectIds));
         entry.Update(new MBList<JournalLog>
         {
             new JournalLog(CampaignTime.Zero, new TextObject("Delivered the goods")),
