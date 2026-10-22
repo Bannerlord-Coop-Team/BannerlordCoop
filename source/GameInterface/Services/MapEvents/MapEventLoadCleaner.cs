@@ -6,6 +6,7 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Helpers;
+using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -21,28 +22,35 @@ namespace GameInterface.Services.MapEvents;
 public interface IMapEventLoadCleaner
 {
     void FinalizePlayerMapEvents();
+    void RepairOrphanedMapEvents();
 }
 
 internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 {
+    private static readonly AccessTools.FieldRef<MapEvent, TroopUpgradeTracker> TrackerField =
+        AccessTools.FieldRefAccess<MapEvent, TroopUpgradeTracker>("<TroopUpgradeTracker>k__BackingField");
+
     private readonly ILogger logger;
     private readonly IMessageBroker messageBroker;
     private readonly IPlayerManager playerManager;
     private readonly IObjectManager objectManager;
     private readonly IArmyDisbander armyDisbander;
+    private readonly IOrphanedMapEventFinder orphanedMapEventFinder;
 
     public MapEventLoadCleaner(
         ILogger logger,
         IMessageBroker messageBroker,
         IPlayerManager playerManager,
         IObjectManager objectManager,
-        IArmyDisbander armyDisbander)
+        IArmyDisbander armyDisbander,
+        IOrphanedMapEventFinder orphanedMapEventFinder)
     {
         this.logger = logger;
         this.messageBroker = messageBroker;
         this.playerManager = playerManager;
         this.objectManager = objectManager;
         this.armyDisbander = armyDisbander;
+        this.orphanedMapEventFinder = orphanedMapEventFinder;
     }
 
     public void FinalizePlayerMapEvents()
@@ -54,7 +62,15 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
         foreach (var mapEvent in loadedPlayerMapEvents)
         {
-            RepairPartySideLinks(mapEvent);
+            var (repairedLinks, removedEntries) = RepairPartySideLinks(mapEvent);
+            if (repairedLinks > 0 || removedEntries > 0)
+            {
+                logger.Warning(
+                    "Repaired {RepairedLinkCount} party-side links and removed {RemovedEntryCount} stale or duplicate participants from loaded player map event {MapEventId} before finalization",
+                    repairedLinks,
+                    removedEntries,
+                    mapEvent.StringId);
+            }
 
             var involvedMobileParties = mapEvent.InvolvedParties
                 .Where(party => party.IsMobile && party.MobileParty.IsActive)
@@ -103,7 +119,122 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         }
     }
 
-    private void RepairPartySideLinks(MapEvent mapEvent)
+    public void RepairOrphanedMapEvents()
+    {
+        if (Campaign.Current?.MapEventManager == null)
+            return;
+
+        var listed = new HashSet<MapEvent>(Campaign.Current.MapEventManager.MapEvents);
+        var parties = Campaign.Current.CampaignObjectManager.MobileParties
+            .Select(mobileParty => mobileParty.Party)
+            .Concat(Settlement.All.Select(settlement => settlement.Party))
+            .ToList();
+        var orphaned = orphanedMapEventFinder.Find(parties, listed);
+
+        foreach (var mapEvent in orphaned.Finalized)
+        {
+            try
+            {
+                RepairOrphanedMapEvent(mapEvent, orphaned.LinkedParties(mapEvent));
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Failed to repair orphaned map event {MapEventId}", mapEvent.StringId);
+            }
+        }
+
+        foreach (var mapEvent in orphaned.UnlistedLive)
+        {
+            logger.Warning(
+                "Map event {MapEventId} is referenced by {PartyCount} parties but is neither listed by the map event manager nor finalized, leaving it as is",
+                mapEvent.StringId,
+                orphaned.LinkedParties(mapEvent).Count);
+        }
+    }
+
+    private void RepairOrphanedMapEvent(MapEvent mapEvent, IReadOnlyList<PartyBase> linkedParties)
+    {
+        var candidates = linkedParties
+            .Concat((mapEvent._sides ?? Array.Empty<MapEventSide>())
+                .Where(side => side != null)
+                .SelectMany(side => side.Parties)
+                .Select(mapEventParty => mapEventParty?.Party)
+                .Where(party => party != null))
+            .Distinct()
+            .ToArray();
+        var componentName = mapEvent.Component?.GetType().Name;
+        var battleState = mapEvent.BattleState;
+
+        var (repairedLinks, removedEntries) = RepairPartySideLinks(mapEvent);
+        ClearLinksWithoutEntry(mapEvent, candidates);
+        DetachFinalizedEvent(mapEvent);
+
+        foreach (var party in candidates)
+        {
+            if (ReferenceEquals(party._mapEventSide?._mapEvent, mapEvent))
+                party._mapEventSide = null;
+        }
+
+        // A party that now belongs to another live event was not released from this one.
+        var released = candidates.Where(party => party._mapEventSide == null).ToArray();
+        var releasedMobileParties = released.Where(party => party.IsMobile).Select(party => party.MobileParty).ToArray();
+        PublishDestroyedParties(releasedMobileParties);
+
+        foreach (var mobileParty in releasedMobileParties)
+        {
+            if (mobileParty.IsActive && !mobileParty.IsPlayerParty())
+                mobileParty.ResetNavigationToHold();
+        }
+
+        logger.Warning(
+            "Released {PartyCount} parties from orphaned finalized map event {MapEventId} ({Component}, {BattleState}, repaired {RepairedLinkCount} links, removed {RemovedEntryCount} entries): {PartyIds}",
+            released.Length,
+            mapEvent.StringId,
+            componentName,
+            battleState,
+            repairedLinks,
+            removedEntries,
+            string.Join(", ", released.Select(party => party.Id)));
+    }
+
+    // Releasing an army leader also releases its attached parties, and vanilla removal of a linked
+    // party that has no entry in its side reads index -1.
+    private static void ClearLinksWithoutEntry(MapEvent mapEvent, IEnumerable<PartyBase> parties)
+    {
+        foreach (var party in parties)
+        {
+            var side = party._mapEventSide;
+            if (side == null || !ReferenceEquals(side._mapEvent, mapEvent))
+                continue;
+
+            if (!side._battleParties.Any(entry => ReferenceEquals(entry?.Party, party)))
+                party._mapEventSide = null;
+        }
+    }
+
+    // The repair runs before the server state that lets lifetime patches publish, so a party that
+    // DestroyPartyAction removed during the detach is never unregistered otherwise.
+    private void PublishDestroyedParties(IEnumerable<MobileParty> releasedParties)
+    {
+        var campaignParties = Campaign.Current.CampaignObjectManager.MobileParties;
+        foreach (var party in releasedParties)
+        {
+            if (campaignParties.Contains(party) || !objectManager.Contains(party))
+                continue;
+
+            logger.Warning("Unregistering party {PartyId} destroyed while releasing an orphaned map event", party.StringId);
+            messageBroker.Publish(party, new InstanceDestroyed<MobileParty>(party));
+        }
+    }
+
+    private static void RestoreUnsavedState(MapEvent mapEvent)
+    {
+        mapEvent.Component?.AfterLoad(mapEvent);
+        if (TrackerField(mapEvent) == null)
+            TrackerField(mapEvent) = new TroopUpgradeTracker();
+    }
+
+    private (int RepairedLinks, int RemovedEntries) RepairPartySideLinks(MapEvent mapEvent)
     {
         var repairedLinks = 0;
         var removedEntries = 0;
@@ -186,14 +317,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             repairedLinks++;
         }
 
-        if (repairedLinks > 0 || removedEntries > 0)
-        {
-            logger.Warning(
-                "Repaired {RepairedLinkCount} party-side links and removed {RemovedEntryCount} stale or duplicate participants from loaded player map event {MapEventId} before finalization",
-                repairedLinks,
-                removedEntries,
-                mapEvent.StringId);
-        }
+        return (repairedLinks, removedEntries);
     }
 
     private void FinalizeOrRepairEvent(MapEvent mapEvent)
@@ -212,6 +336,17 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             "Detaching {PartyCount} parties from half-finalized loaded player map event {MapEventId}",
             mapEvent.InvolvedParties.Count(),
             mapEvent.StringId);
+        DetachFinalizedEvent(mapEvent);
+    }
+
+    private void DetachFinalizedEvent(MapEvent mapEvent)
+    {
+        // The load restores unsaved state only for events the manager lists. Without it the component's
+        // MapEvent back-reference is null, which FieldBattleEventComponent reads on every party add and
+        // remove, so even a one-party side fails; the position lists and tracker are null as well.
+        if (!Campaign.Current.MapEventManager.MapEvents.Contains(mapEvent))
+            RestoreUnsavedState(mapEvent);
+
         mapEvent.AttackerSide?.HandleMapEventEnd();
         mapEvent.DefenderSide?.HandleMapEventEnd();
         messageBroker.Publish(mapEvent, new MapEventFinalized(mapEvent));

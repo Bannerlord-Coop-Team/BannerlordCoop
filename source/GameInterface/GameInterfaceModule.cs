@@ -172,6 +172,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PlayerSiegeTargetScoring>().As<IPlayerSiegeTargetScoring>().InstancePerDependency();
         builder.RegisterType<ArmyFormationPositionConvergence>().As<IArmyFormationPositionConvergence>().InstancePerDependency();
         builder.RegisterType<MapEventLoadCleaner>().As<IMapEventLoadCleaner>().InstancePerDependency();
+        builder.RegisterType<OrphanedMapEventFinder>().As<IOrphanedMapEventFinder>().InstancePerDependency();
         builder.RegisterType<EncounterMenuConditionRefresher>().As<IEncounterMenuConditionRefresher>().InstancePerDependency();
         builder.RegisterType<PartyScreenRosterRefresher>().As<IPartyScreenRosterRefresher>().InstancePerDependency();
         builder.RegisterType<PlayerTroopXpRelevance>().As<IPlayerTroopXpRelevance>().InstancePerDependency();
