@@ -65,8 +65,6 @@ public sealed class LesserNobleRevoltTests : IDisposable
         client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
     }
 
-
-
     // A constructed issue can be finalized, but only the server has the culture names its constructor needs.
     private void AddIssueWithQuest(EnvironmentInstance instance, string issueId, string revoltPartyId = null, bool constructed = false)
     {
@@ -328,8 +326,6 @@ public sealed class LesserNobleRevoltTests : IDisposable
             Assert.Equal(observerBefore, observer.GetRelation(giver));
         });
     }
-
-
 
     [Fact]
     public void OwnerInARevoltBattle_IsNeitherCapturedNorParked()
