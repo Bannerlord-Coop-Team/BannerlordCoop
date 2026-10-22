@@ -342,7 +342,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void CleanupSaveRoundtrip_PreservesAcceptedHerdPayloadAndClearsOnlyLoadedRetries(bool takeQuest)
+    public void CleanupSaveRoundtrip_PreservesAcceptedHerdPayload(bool takeQuest)
     {
         if (takeQuest) Accept(ClientA);
         Server.Call(() =>
@@ -354,7 +354,6 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
                 using (new AllowedThread()) issue.IssueQuest.StringId = "herd_saved_quest";
                 cleanup.Remember(issue, Party(Server, QuestScenario.ControllerA));
             }
-            cleanup.RememberGiverDeath(issue);
             var data = new CampaignBehaviorDataStore.BehaviorSaveData(true);
             cleanup.SyncData(data);
 
@@ -371,10 +370,8 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             var loadedData = Assert.IsType<CampaignBehaviorDataStore.BehaviorSaveData>(load.RootObject);
             Assert.False(loadedData.IsSaving);
             Assert.NotSame(data, loadedData);
-            Assert.Same(issue, Assert.Single(cleanup.PendingGiverDeaths));
 
             cleanup.SyncData(loadedData);
-            Assert.Empty(cleanup.PendingGiverDeaths);
             Assert.Equal(takeQuest, cleanup.HasRememberedParty(issue));
             var parties = new Dictionary<string, MobileParty>();
             var questIds = new Dictionary<string, string>();
@@ -389,7 +386,6 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
                     party.ItemRoster.Select(element => element.Amount));
                 Assert.Equal(issue.StringId, Assert.Single(questIds).Value);
                 Assert.Equal(issue.IssueQuest.StringId, Assert.Single(questIds).Key);
-                Assert.Same(issue, Assert.Single(cleanup.RememberedIssues));
             }
             else
             {
@@ -399,9 +395,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             ClientB.Call(() =>
             {
                 var clientCleanup = ClientB.Resolve<IHeadmanHerdCleanup>();
-                clientCleanup.RememberGiverDeath(Object<Hero>(ClientB, scenario.NotableId).Issue);
                 clientCleanup.SyncData(loadedData);
-                Assert.Empty(clientCleanup.PendingGiverDeaths);
                 Assert.False(clientCleanup.HasRememberedParty(issue));
             });
         });
@@ -631,29 +625,6 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
 
         Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         ClientA.Call(() => Assert.Empty(Campaign.Current.QuestManager.Quests));
-    }
-
-    [Fact]
-    public void FinalizationAfterGiverRegistryRemoval_StillReachesClients()
-    {
-        StartCompanions();
-        Server.Call(() =>
-        {
-            var giver = Object<Hero>(Server, scenario.NotableId);
-            var issue = giver.Issue;
-            Assert.True(Server.ObjectManager.Remove(giver));
-            issue.CompleteIssueWithCancel();
-        });
-
-        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
-        Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
-        foreach (var instance in new[] { ClientA, ClientB })
-            instance.Call(() =>
-            {
-                Assert.Null(Object<Hero>(instance, scenario.NotableId).Issue);
-                Assert.Equal(0, Party(instance, QuestScenario.ControllerA).ItemRoster.GetItemNumber(Object<ItemObject>(instance, livestockId)));
-            });
     }
 
     private (string CompanionId, string TroopId) StartCompanions()

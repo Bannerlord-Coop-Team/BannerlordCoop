@@ -31,14 +31,9 @@ internal class QuestEventRelay : IQuestEventRelay
             }
 
             // Which quests have the listener is only known at runtime, so it is looked up by its vanilla name
-            var key = (quest.GetType(), listenerName);
-            if (!Listeners.TryGetValue(key, out var listener))
-            {
-                listener = FindListener(key.Item1, key.Item2, parameterTypes);
-                if (listener == null) return;
-                Listeners.TryAdd(key, listener);
-            }
-            listener.Invoke(quest, arguments);
+            var listener = Listeners.GetOrAdd((quest.GetType(), listenerName), key => FindListener(key.Quest, key.Listener, parameterTypes));
+
+            listener?.Invoke(quest, arguments);
         });
     }
 

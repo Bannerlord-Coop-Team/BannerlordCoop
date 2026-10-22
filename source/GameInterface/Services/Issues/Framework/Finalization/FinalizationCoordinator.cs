@@ -123,13 +123,6 @@ internal class FinalizationCoordinator : IHandler
                 return;
             }
 
-            if (data.Outcome == IssueOutcome.QuestSuccess &&
-                descriptor is IBranchOnlyFinalizationDescriptor { SuccessOnlyThroughBranchProof: true })
-            {
-                Logger.Warning("{issue} requires a finalization proof and cannot accept generic success", data.IssueId);
-                return;
-            }
-
             using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
             {
                 CompleteOnServer(issue, descriptor, data.Outcome);
@@ -188,7 +181,7 @@ internal class FinalizationCoordinator : IHandler
 
         var issue = payload.What.Issue;
 
-        if (!TryGetIssueOwnerId(issue, out var issueOwnerId))
+        if (!objectManager.TryGetIdWithLogging(issue.IssueOwner, out var issueOwnerId))
         {
             return;
         }
@@ -196,24 +189,6 @@ internal class FinalizationCoordinator : IHandler
         ownership.Remove(issueOwnerId);
 
         network.SendAll(new NetworkIssueFinalized(issueOwnerId, issue.StringId, payload.What.Outcome));
-    }
-
-    private bool TryGetIssueOwnerId(IssueBase issue, out string issueOwnerId)
-    {
-        if (objectManager.TryGetId(issue.IssueOwner, out issueOwnerId)) return true;
-
-        // A real giver can be removed from the server registry as part of its death before the
-        // outcome event is handled. Its stamped StringId still identifies the client-side hero.
-        if (!string.IsNullOrEmpty(issue.IssueOwner?.StringId))
-        {
-            issueOwnerId = $"Hero_{issue.IssueOwner.StringId}";
-            Logger.Warning("Using the stamped issue owner id {IssueOwnerId} after registry removal", issueOwnerId);
-            return true;
-        }
-
-        Logger.Error("Failed to get issue owner id for {Issue}", issue.StringId);
-        issueOwnerId = null;
-        return false;
     }
 
     // Client only.

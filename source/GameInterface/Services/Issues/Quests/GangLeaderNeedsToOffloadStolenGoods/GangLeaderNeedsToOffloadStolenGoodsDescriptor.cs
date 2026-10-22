@@ -4,7 +4,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoo
 
 namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsToOffloadStolenGoods;
 
-internal class GangLeaderNeedsToOffloadStolenGoodsDescriptor : IQuestTypeDescriptor, IBranchOnlyFinalizationDescriptor
+internal class GangLeaderNeedsToOffloadStolenGoodsDescriptor : IQuestTypeDescriptor
 {
     public Type IssueType => typeof(Issue);
 
@@ -15,7 +15,6 @@ internal class GangLeaderNeedsToOffloadStolenGoodsDescriptor : IQuestTypeDescrip
     public IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy { get; }
 
     public IFinalizationProofStrategy FinalizationProofStrategy { get; }
-    public bool SuccessOnlyThroughBranchProof => true;
 
     public GangLeaderNeedsToOffloadStolenGoodsDescriptor(
         GangLeaderNeedsToOffloadStolenGoodsCreationCaptureStrategy creationCaptureStrategy,

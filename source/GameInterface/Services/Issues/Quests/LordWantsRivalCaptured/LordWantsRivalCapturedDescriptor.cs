@@ -4,7 +4,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.LordWantsRivalCapturedIssueBehavi
 
 namespace GameInterface.Services.Issues.Quests.LordWantsRivalCaptured;
 
-internal class LordWantsRivalCapturedDescriptor : IQuestTypeDescriptor, IBranchOnlyFinalizationDescriptor
+internal class LordWantsRivalCapturedDescriptor : IQuestTypeDescriptor
 {
     public Type IssueType => typeof(Issue);
 
@@ -15,7 +15,6 @@ internal class LordWantsRivalCapturedDescriptor : IQuestTypeDescriptor, IBranchO
     public IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy => null;
 
     public IFinalizationProofStrategy FinalizationProofStrategy { get; }
-    public bool SuccessOnlyThroughBranchProof => true;
 
     public LordWantsRivalCapturedDescriptor(
         LordWantsRivalCapturedCreationCaptureStrategy creationCaptureStrategy,

@@ -4,7 +4,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.
 
 namespace GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons;
 
-internal class ScoutEnemyGarrisonsDescriptor : IQuestTypeDescriptor, IBranchOnlyFinalizationDescriptor
+internal class ScoutEnemyGarrisonsDescriptor : IQuestTypeDescriptor
 {
     public Type IssueType => typeof(Issue);
 
@@ -15,7 +15,6 @@ internal class ScoutEnemyGarrisonsDescriptor : IQuestTypeDescriptor, IBranchOnly
     public IAlternativeSolutionAcceptStrategy AlternativeSolutionAcceptStrategy => null;
 
     public IFinalizationProofStrategy FinalizationProofStrategy { get; }
-    public bool SuccessOnlyThroughBranchProof => true;
 
     public ScoutEnemyGarrisonsDescriptor(
         ScoutEnemyGarrisonsCreationCaptureStrategy creationCaptureStrategy,
