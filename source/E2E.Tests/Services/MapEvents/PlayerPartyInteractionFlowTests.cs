@@ -3144,6 +3144,62 @@ public class PlayerPartyInteractionFlowTests : MapEventTestBase
     }
 
     [Fact]
+    public void BreakIn_WithTooFewRegulars_IsTurnedDownUntilTroopsArriveAndThenPaysOnce()
+    {
+        var (client, _, playerPartyId, _) = CreateTwoPlayerParties();
+        var playerMobilePartyId = GetMobilePartyId(Server, playerPartyId);
+        var siege = CreateSyncedSiege();
+        TestEnvironment.ConnectRegisteredPlayer(client, "PlayerOne");
+        PrepareBreakInDefenderEligibility(
+            playerPartyId,
+            siege.SettlementId,
+            siege.LeaderPartyId);
+        var troops = AddRegularTroops(playerMobilePartyId, 30);
+        var required = troops + 10;
+        Server.Call(() => Campaign.Current.Models.TroopSacrificeModel = new FixedTroopSacrificeModel(required));
+        Server.NetworkSentMessages.Clear();
+
+        RequestBreakIn(client, playerMobilePartyId, siege.SettlementId);
+        RequestContinuation(client, playerMobilePartyId, siege.SettlementId, "unaffordable");
+
+        Assert.False(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakInResult>()).Approved);
+        Assert.False(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakInContinuationApproved>()).Approved);
+        AssertRegularTroops(playerMobilePartyId, troops);
+        AssertPartyOutsideSettlement(Server, playerMobilePartyId);
+
+        troops = AddRegularTroops(playerMobilePartyId, 20);
+        Server.NetworkSentMessages.Clear();
+        RequestBreakIn(client, playerMobilePartyId, siege.SettlementId);
+        RequestBreakIn(client, playerMobilePartyId, siege.SettlementId);
+        RequestContinuation(client, playerMobilePartyId, siege.SettlementId, "affordable");
+
+        Assert.All(Server.NetworkSentMessages.GetMessages<NetworkBreakInResult>(), result => Assert.True(result.Approved));
+        AssertRegularTroops(playerMobilePartyId, troops - required);
+        Assert.True(Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkBreakInContinuationApproved>()).Approved);
+        AssertPartyEnteredSettlement(Server, playerMobilePartyId, siege.SettlementId);
+    }
+
+    private void RequestBreakIn(EnvironmentInstance client, string mobilePartyId, string settlementId)
+    {
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            PayBreakIn(client, party, settlement);
+        }, MapEventDisabledMethods);
+        TestEnvironment.FlushCoalescer();
+    }
+
+    private void RequestContinuation(EnvironmentInstance client, string mobilePartyId, string settlementId, string requestId)
+    {
+        Server.Call(
+            () => Server.SimulateMessage(
+                client.NetPeer,
+                new NetworkRequestBreakInContinuation(requestId, mobilePartyId, settlementId)),
+            MapEventDisabledMethods);
+    }
+
+    [Fact]
     public void PortBreakOut_ServerAppliesTroopLossesSoClientAndServerTotalsMatch()
     {
         var (client, playerMobilePartyId, troops) = RequestPortBreakOut(hasPort: true, hasShips: true, anchoredHere: true);

@@ -94,6 +94,13 @@ internal class ServerSiegeBreakInHandler : IHandler
         try
         {
             int losses = breakOut.GetBreakInCasualties(party, siege);
+            // Same as vanilla break_in_menu_accept_on_condition: refuse instead of charging fewer troops than required.
+            if (losses > parties.Sum(member => member.MemberRoster.TotalRegulars))
+            {
+                Logger.Warning("Rejecting break in request {RequestId} for party {PartyId} that cannot pay {Losses} troops",
+                    request.RequestId, request.PartyId, losses);
+                return rejected;
+            }
             // Cache before mutating so a failure part way through is not retried as a second sacrifice.
             receipt = new BreakInReceipts.Receipt { Siege = siege, Result = rejected };
             receipts.Set(party, receipt);

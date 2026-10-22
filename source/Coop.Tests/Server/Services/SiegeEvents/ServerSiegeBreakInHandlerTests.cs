@@ -171,6 +171,58 @@ public class ServerSiegeBreakInHandlerTests : IDisposable
     }
 
     [Fact]
+    public void PartyWithTooFewRegulars_IsRejectedWithoutLossesOrReceipt()
+    {
+        party.MemberRoster.AddToCounts(troop, -170);
+
+        Send("too-few");
+
+        Assert.False(Assert.Single(Results()).Approved);
+        Assert.Equal(30, party.MemberRoster.TotalRegulars);
+        Assert.False(receipts.TryGet(party, siege, out _));
+        action.Verify(service => service.ApplySacrifice(It.IsAny<MobileParty>(), It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Never);
+    }
+
+    [Fact]
+    public void PartyWithNoRegulars_IsRejectedWithoutLossesOrReceipt()
+    {
+        party.MemberRoster.AddToCounts(troop, -200);
+
+        Send("empty");
+
+        Assert.False(Assert.Single(Results()).Approved);
+        Assert.Equal(0, party.MemberRoster.TotalRegulars);
+        Assert.False(receipts.TryGet(party, siege, out _));
+        action.Verify(service => service.ApplySacrifice(It.IsAny<MobileParty>(), It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Never);
+    }
+
+    [Fact]
+    public void UnaffordableRequest_CanBeRetriedOnceTroopsArrive_AndPaysOnce()
+    {
+        party.MemberRoster.AddToCounts(troop, -170);
+        Send("retry");
+        party.MemberRoster.AddToCounts(troop, 20);
+        Send("retry");
+        Send("retry");
+
+        Assert.Equal(new[] { false, true, true }, Results().Select(result => result.Approved));
+        Assert.Equal(10, party.MemberRoster.TotalRegulars);
+        Assert.True(receipts.IsPaid(party, siege));
+        action.Verify(service => service.ApplySacrifice(party, 40, out It.Ref<int>.IsAny), Times.Once);
+    }
+
+    [Fact]
+    public void ExactlyEnoughRegulars_IsApproved()
+    {
+        party.MemberRoster.AddToCounts(troop, -160);
+
+        Send("exact");
+
+        Assert.True(Assert.Single(Results()).Approved);
+        Assert.Equal(0, party.MemberRoster.TotalRegulars);
+    }
+
+    [Fact]
     public void SacrificeFailure_IsNotRepeatedForTheSameRequest()
     {
         action.Setup(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny))
