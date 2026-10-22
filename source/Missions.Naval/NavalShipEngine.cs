@@ -99,9 +99,26 @@ public class NavalShipEngine : INavalShipEngine
         // The owner decides this hull: no local controller and no auto controller; its body is steered toward the samples.
         ship.SetController(ShipControllerType.None, autoUpdateController: false);
         SteeredCopies.Track(ship);
+        OpenEmptyEnemyHelm(ship, Mission.Current?.PlayerTeam);
         formation = ship.Formation;
         return ship;
     }
+
+    // The late hull patch made an enemy copy's helm AI-only, and vanilla only opens it to the player when a unit leaves its
+    // formation; a copy's formation may never get one here (a late joiner's emptied AI hull), and puppets never pick a station.
+    private static void OpenEmptyEnemyHelm(MissionShip ship, Team playerTeam)
+    {
+        if (!OpensHelmToPlayer(playerTeam != null, ship.BattleSide == playerTeam?.Side, ship.Formation?.CountOfUnits ?? 0)) return;
+
+        ship.ShipControllerMachine.PilotStandingPoint.SetUsableByPlayerOnly();
+    }
+
+    /// <summary>
+    /// Whether a fresh copy's helm opens to the player at once, as MissionShip.OnFormationUnitRemoved opens an enemy helm whose
+    /// formation emptied: an enemy hull with no unit in its formation. Vanilla still disables it for players until it is vacant.
+    /// </summary>
+    internal static bool OpensHelmToPlayer(bool hasPlayerTeam, bool isPlayerSide, int formationUnits) =>
+        hasPlayerTeam && !isPlayerSide && formationUnits == 0;
 
     public void ReleaseNpcHull(MissionObject hull)
     {

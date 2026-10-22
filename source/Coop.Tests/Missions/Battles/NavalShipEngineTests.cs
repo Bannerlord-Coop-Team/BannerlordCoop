@@ -69,6 +69,18 @@ public class NavalShipEngineTests
         Assert.Null(NavalShipEngine.CrewLoadOf(0f, Vec3.Zero, MatrixFrame.Identity, agentAboard: true));
     }
 
+    // Capture P0 2.1: an enemy copy's helm opens to the player while its formation has no unit, as vanilla opens an emptied
+    // enemy helm; an own-side copy, a filled formation or a mission without a player team keep the late hull patch's setting.
+    [Theory]
+    [InlineData(true, false, 0, true)]
+    [InlineData(true, true, 0, false)]
+    [InlineData(true, false, 3, false)]
+    [InlineData(false, false, 0, false)]
+    public void OpensHelmToPlayer_OnlyForAnEmptyEnemyCopy(bool hasPlayerTeam, bool isPlayerSide, int formationUnits, bool expected)
+    {
+        Assert.Equal(expected, NavalShipEngine.OpensHelmToPlayer(hasPlayerTeam, isPlayerSide, formationUnits));
+    }
+
     // WeakGameEntity.IsValid only compares the pointer with zero; nothing here dereferences it.
     internal static WeakGameEntity ValidEntity() =>
         (WeakGameEntity)AccessTools.Constructor(typeof(WeakGameEntity), new[] { typeof(UIntPtr) }).Invoke(new object[] { new UIntPtr(1) });
