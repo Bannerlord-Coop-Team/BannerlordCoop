@@ -380,12 +380,10 @@ internal sealed class ChatVM : ViewModel
 
     private void UpdateGroupChannel(string channelId, ref string previousFactionId, string factionId)
     {
-        bool membershipChanged = !string.Equals(previousFactionId, factionId, StringComparison.Ordinal);
-        if (membershipChanged && !string.IsNullOrEmpty(previousFactionId))
-            ClearGroupChannelHistory(channelId);
-
-        if (membershipChanged)
+        if (!string.Equals(previousFactionId, factionId, StringComparison.Ordinal))
         {
+            if (!string.IsNullOrEmpty(previousFactionId))
+                ClearGroupChannelHistory(channelId);
             previousFactionId = factionId;
         }
 
@@ -394,10 +392,12 @@ internal sealed class ChatVM : ViewModel
 
     private void ClearGroupChannelHistory(string channelId)
     {
-        histories[channelId].Clear();
+        var history = histories[channelId];
+        passiveHistory.RemoveAll(line => history.Contains(line));
+        history.Clear();
         channelsById[channelId].ClearUnreadMessages();
 
-        if (IsOpen && string.Equals(selectedChannel.ControllerId, channelId, StringComparison.Ordinal))
+        if (!IsOpen || string.Equals(selectedChannel.ControllerId, channelId, StringComparison.Ordinal))
             UpdateVisibleLines();
     }
 

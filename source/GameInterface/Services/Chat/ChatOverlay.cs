@@ -259,12 +259,11 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
         {
             gameplayLayer = mapScreen.SceneLayer;
             var mapState = GameStateManager.Current?.ActiveState as MapState;
-            bool atMenu = mapState?.AtMenu == true;
             // MapMenuView focus below keeps escape, encyclopedia, and other map layers out.
-            isMapMenu = atMenu;
+            isMapMenu = mapState?.AtMenu == true;
             isMenuLayerFocused = isMapMenu &&
                 ReferenceEquals(ScreenManager.FocusedLayer, mapScreen.FindLayer<GauntletLayer>(MapMenuLayerName));
-            isOpenableScreen = mapState != null && (!atMenu || isMapMenu);
+            isOpenableScreen = mapState != null;
         }
         else if (topScreen is MissionScreen missionScreen)
         {

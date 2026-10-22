@@ -246,12 +246,17 @@ public class ChatVMTests
         vm.SetGroupChannelMembership(originalClanId, originalKingdomId);
         groupChannel.ExecuteSelection();
         Assert.Contains(vm.VisibleLines, line => line.Text.Contains("old faction line"));
+        vm.SetOpen(false);
+        Assert.Contains(vm.VisibleLines, line => line.Text.Contains("old faction line"));
 
         vm.SetGroupChannelMembership(
             channel == ChatChannel.Clan ? "clan-b" : originalClanId,
             channel == ChatChannel.Kingdom ? "kingdom-b" : originalKingdomId);
 
         Assert.False(groupChannel.HasUnreadMessages);
+        Assert.Empty(vm.VisibleLines);
+
+        vm.SetOpen(true);
         Assert.Empty(vm.VisibleLines);
     }
 
