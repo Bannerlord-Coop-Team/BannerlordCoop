@@ -5,6 +5,7 @@ using GameInterface.Serialization.External;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Services.SiegeEvents;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -13,6 +14,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
+    [Collection(nameof(CampaignCurrentCollection))]
     public class HorseComponentSerializationTest
     {
         ILifetimeScope container;

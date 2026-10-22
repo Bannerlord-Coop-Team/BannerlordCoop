@@ -9,6 +9,7 @@ using GameInterface.Services.Monsters;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Services.SiegeEvents;
 using Common.Messaging;
 using Common.Network;
 using Moq;
@@ -20,6 +21,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Serialization.SerializerTests;
 
+[Collection(nameof(CampaignCurrentCollection))]
 public class MonsterSerializationTest : IDisposable
 {
     private readonly ILifetimeScope container;
