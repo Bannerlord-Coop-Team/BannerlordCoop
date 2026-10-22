@@ -28,10 +28,11 @@ departures and the end of the battle. Campaign ships, ports, storms, rafts and l
   which carries the crew), along with any other agent standing on the copy, such as a local main agent that boarded it,
   then the owner's velocity and yaw rate.
   Heave, pitch and roll come from this client's buoyancy on its own water, which now runs on the battle host's water
-  time, so they should match the owner's (see "Waves are synced" in section 6). One rule decides a copy's mode at every sample and step: steered
-  while its body simulates, its owner's frames written otherwise (warning `has no simulating body` once per copy;
-  `bodyMode` in `inspect`). `NavalSteeredCopies.Track`/`Forget` are the only writers of `NavalForeignHulls`, the static
-  copy set the patches read; spawning, releasing, replacing and removing a hull all go through them.
+  time, so they should match the owner's (see "Waves are synced" in section 6). One rule decides a copy's mode at
+  every sample and step: steered while its body simulates, its owner's frames written otherwise (warning `has no
+  simulating body` once per copy; `bodyMode` in `inspect`). `NavalSteeredCopies.Track`/`Forget` are the only writers
+  of `NavalForeignHulls`, the static copy set the patches read; spawning, releasing, replacing and removing a hull all
+  go through them.
 - A copy collides with this client's own hulls, but its owner stays the authority of everything that happens to it:
   contact and ram damage on a copy is routed to the owner (`BattleShipDamageRouter`). Two copies never touch here
   (`CopyPairCollisionFilterPatch`, a prefix on `MissionShip.CanPhysicsCollideBetweenTwoEntities`), since no client
