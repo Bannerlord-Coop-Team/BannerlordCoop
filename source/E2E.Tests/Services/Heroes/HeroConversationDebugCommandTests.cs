@@ -11,7 +11,9 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
@@ -65,6 +67,32 @@ public class HeroConversationDebugCommandTests : IDisposable
     }
 
     [Fact]
+    public void Open_DuringASiegeOfTheHerosTown_IsRefused()
+    {
+        var townId = testEnvironment.CreateRegisteredObject<Settlement>();
+        var heroId = CreateHeroStayingIn(townId);
+
+        var result = OpenDuringEncounterAt(townId, heroId, (_, town) => town.SiegeEvent = ObjectHelper.SkipConstructor<SiegeEvent>());
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("A player encounter is already active.", result.Output);
+        Assert.Equal(0, openConversation.CountFor(Client));
+    }
+
+    [Fact]
+    public void Open_DuringABattleAtTheHerosTown_IsRefused()
+    {
+        var townId = testEnvironment.CreateRegisteredObject<Settlement>();
+        var heroId = CreateHeroStayingIn(townId);
+
+        var result = OpenDuringEncounterAt(townId, heroId, (encounter, _) => encounter._mapEvent = ObjectHelper.SkipConstructor<MapEvent>());
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("A player encounter is already active.", result.Output);
+        Assert.Equal(0, openConversation.CountFor(Client));
+    }
+
+    [Fact]
     public void Open_DuringAMapEncounter_RefusesAHeroOutsideAnySettlement()
     {
         var heroId = testEnvironment.CreateRegisteredObject<Hero>();
@@ -97,7 +125,34 @@ public class HeroConversationDebugCommandTests : IDisposable
             Assert.True(result.Succeeded, result.Output);
             Assert.Contains("LINE: Who are you?", result.Output);
             Assert.Contains("0: [first_option] I am a trader.", result.Output);
-            Assert.Contains("1: [second_option] I must leave now.", result.Output);
+            Assert.Contains("1: [second_option] I must leave now. (disabled)", result.Output);
+            Assert.DoesNotContain("I am a trader. (disabled)", result.Output);
+        });
+    }
+
+    [Fact]
+    public void Choose_ADisabledOption_IsRefused()
+    {
+        WithConversation(() =>
+        {
+            var result = Choose("1");
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("Option 1 is disabled.", result.Output);
+            Assert.Equal(2, Campaign.Current.ConversationManager.CurOptions.Count);
+        });
+    }
+
+    [Fact]
+    public void Choose_ContinueWhileThePlayerHasAChoice_IsRefused()
+    {
+        WithConversation(() =>
+        {
+            var result = Choose("continue");
+
+            Assert.False(result.Succeeded);
+            Assert.Equal("Pick one of the 2 options instead.", result.Output);
+            Assert.Equal(2, Campaign.Current.ConversationManager.CurOptions.Count);
         });
     }
 
@@ -138,19 +193,22 @@ public class HeroConversationDebugCommandTests : IDisposable
         return heroId;
     }
 
-    private CoopCommandResult OpenDuringEncounterAt(string? settlementId, string heroId)
+    private CoopCommandResult OpenDuringEncounterAt(string? settlementId, string heroId, Action<PlayerEncounter, Settlement>? arrange = null)
     {
         CoopCommandResult result = null!;
 
         Client.Call(() =>
         {
             var encounter = ObjectHelper.SkipConstructor<PlayerEncounter>();
+            Settlement? settlement = null;
             if (settlementId != null)
             {
-                Assert.True(Client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                Assert.True(Client.ObjectManager.TryGetObject(settlementId, out settlement));
                 encounter.EncounterSettlementAux = settlement;
             }
 
+            var previousSiege = settlement?.SiegeEvent;
+            arrange?.Invoke(encounter, settlement!);
             Campaign.Current.PlayerEncounter = encounter;
             try
             {
@@ -160,6 +218,10 @@ public class HeroConversationDebugCommandTests : IDisposable
             finally
             {
                 Campaign.Current.PlayerEncounter = null;
+                if (settlement != null)
+                {
+                    settlement.SiegeEvent = previousSiege;
+                }
             }
         }, new[] { OpenConversationMethod });
 
@@ -176,8 +238,8 @@ public class HeroConversationDebugCommandTests : IDisposable
             manager.IsConversationInProgress = true;
             manager.CurOptions = new List<ConversationSentenceOption>
             {
-                new ConversationSentenceOption { Id = "first_option", Text = new TextObject("I am a trader.") },
-                new ConversationSentenceOption { Id = "second_option", Text = new TextObject("I must leave now.") },
+                new ConversationSentenceOption { Id = "first_option", Text = new TextObject("I am a trader."), IsClickable = true },
+                new ConversationSentenceOption { Id = "second_option", Text = new TextObject("I must leave now."), IsClickable = false },
             };
             manager._currentSentenceText = new TextObject("Who are you?");
 
