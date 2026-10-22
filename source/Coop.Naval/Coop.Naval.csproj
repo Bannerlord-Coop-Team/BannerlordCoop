@@ -186,6 +186,7 @@
       <Private>false</Private>
     </Reference>
     <Publicize Include="NavalDLC.ViewModelCollection" />
+    <Publicize Include="NavalDLC.GauntletUI" />
     <Publicize Include="SandBox.GauntletUI" />
     <Publicize Include="TaleWorlds.ScreenSystem" />
     <Publicize Include="TaleWorlds.MountAndBlade.View" />
