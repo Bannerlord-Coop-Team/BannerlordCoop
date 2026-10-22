@@ -34,7 +34,6 @@ internal class IssuesModule : Module
             .InstancePerLifetimeScope();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
         builder.RegisterType<LadysKnightOutTournamentProgress>().As<ILadysKnightOutTournamentProgress>().InstancePerLifetimeScope();
-        builder.RegisterType<LadysKnightOutHonorProgress>().As<ILadysKnightOutHonorProgress>().InstancePerLifetimeScope();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)
             .Where(IsQuestPiece)
