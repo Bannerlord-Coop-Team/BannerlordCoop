@@ -100,6 +100,9 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalCaptureCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
+        builder.RegisterType<NavalSwimCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
 #endif
     }
 }

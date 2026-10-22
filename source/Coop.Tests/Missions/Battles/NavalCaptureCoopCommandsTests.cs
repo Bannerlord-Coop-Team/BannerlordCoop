@@ -15,6 +15,8 @@ public class NavalCaptureCoopCommandsTests
     [InlineData("status")]
     [InlineData("1d93", "2c11")]
     [InlineData("status", "1d93", "2c11")]
+    [InlineData("status", "force")]
+    [InlineData("force", "1d93")]
     public void Capture_WithBadArguments_ShowsTheUsage(params string[] args)
     {
         var result = new NavalCaptureCoopCommand().ProcessCommand(Args(args));
@@ -26,12 +28,69 @@ public class NavalCaptureCoopCommandsTests
     [Theory]
     [InlineData("1d93")]
     [InlineData("status", "1d93")]
+    [InlineData("1d93", "force")]
+    [InlineData("1d93", "FORCE")]
     public void Capture_OutsideANavalBattle_Fails(params string[] args)
     {
         var result = new NavalCaptureCoopCommand().ProcessCommand(Args(args));
 
         Assert.False(result.Succeeded);
         Assert.Equal("No active coop naval battle mission.", result.Output);
+    }
+
+    // R46: capture status takes two arguments, which the old one-argument definition turned away before the command ran.
+    [Theory]
+    [InlineData(new[] { "1d93" }, NavalCaptureCoopCommand.CaptureMode.Helm, "1d93")]
+    [InlineData(new[] { "status", "1d93" }, NavalCaptureCoopCommand.CaptureMode.Status, "1d93")]
+    [InlineData(new[] { "1d93", "force" }, NavalCaptureCoopCommand.CaptureMode.Force, "1d93")]
+    public void Capture_ParsesEachForm(string[] args, NavalCaptureCoopCommand.CaptureMode mode, string prefix)
+    {
+        Assert.True(NavalCaptureCoopCommand.TryParse(Args(args), out var parsedMode, out var parsedPrefix));
+        Assert.Equal(mode, parsedMode);
+        Assert.Equal(prefix, parsedPrefix);
+    }
+
+    [Fact]
+    public void Capture_DeclaresAnOptionalSecondArgument_SoTheRegistryLetsStatusThrough()
+    {
+        var expected = new NavalCaptureCoopCommand().ExpectedArgs;
+
+        Assert.Equal(2, expected.Length);
+        Assert.True(expected[0].IsRequired);
+        Assert.False(expected[1].IsRequired);
+    }
+
+    // R46 L3: an orphan has no team, so only the registry's orphan flag and authority make it this client's to take back.
+    [Theory]
+    [InlineData(true, "local", true)]
+    [InlineData(true, "other", false)]
+    [InlineData(false, "local", false)]
+    public void IsOwnOrphan_OnlyThisClientsOrphan(bool orphaned, string authority, bool expected)
+    {
+        var info = new global::Missions.Battles.NetworkShipInfo(System.Guid.NewGuid(), authority, "party", false,
+            ShipTestHulls.Create(), null);
+        if (orphaned) info.MarkOrphaned(TaleWorlds.Core.BattleSideEnum.Attacker, 1);
+
+        Assert.Equal(expected, NavalCaptureCoopCommand.IsOwnOrphan(info, "local"));
+    }
+
+    [Fact]
+    public void Swim_WithBadArguments_ShowsTheUsage_AndOutsideABattleFails()
+    {
+        var command = new NavalSwimCoopCommand();
+
+        Assert.Equal(NavalSwimCoopCommand.Usage, command.ProcessCommand(Args()).Output);
+        Assert.Equal("No active coop naval battle mission.", command.ProcessCommand(Args("1d93")).Output);
+    }
+
+    [Fact]
+    public void Swim_LandsClearOfTheStarboardSide_MidwayAlongTheHull()
+    {
+        var offset = NavalSwimCoopCommand.SideOffset(new TaleWorlds.Library.Vec2(-3f, -10f), new TaleWorlds.Library.Vec2(3f, 14f));
+
+        Assert.Equal(3f + NavalSwimCoopCommand.SideClearance, offset.x, 3);
+        Assert.Equal(2f, offset.y, 3);
+        Assert.Equal(0f, offset.z, 3);
     }
 
     [Fact]

@@ -11,34 +11,38 @@ namespace Missions.Naval;
 
 // coop.debug.naval.capture 1d93
 // coop.debug.naval.capture status 1d93
+// coop.debug.naval.capture 1d93 force
 /// <summary>
-/// DEBUG: puts this client's main agent at an enemy hull's helm the way a player takes it, so vanilla's 3 s capture timer
-/// runs and its end goes to the hull's authority; <c>status</c> reports the helm gates, the timer and the request.
+/// DEBUG: puts this client's main agent at a hull's helm the way a player takes it, so vanilla's 3 s capture timer runs and
+/// its end goes to the hull's authority; <c>status</c> reports the gates, timer and request; <c>force</c> sends the request now.
 /// </summary>
 public sealed class NavalCaptureCoopCommand : ICoopCommand
 {
-    internal const string Usage = "Usage: coop.debug.naval.capture <shipId-prefix> | status <shipId-prefix>";
+    internal const string Usage = "Usage: coop.debug.naval.capture <shipId-prefix> [force] | status <shipId-prefix>";
+
+    private const string StatusWord = "status";
+    private const string ForceWord = "force";
 
     public string Prefix => "coop.debug.naval";
 
     public string Name => "capture";
 
-    public string Description => "Moves the main agent to an enemy hull's helm and starts using it, so vanilla's capture timer runs; " +
-        "status reports the helm gates, the timer and the request to the hull's authority.";
+    public string Description => "Moves the main agent to an enemy hull's (or its own orphan's) helm and starts using it, so vanilla's " +
+        "capture timer runs; status reports the helm gates, the timer and the request to the hull's authority; force sends the " +
+        "request at once, past the local helm gates, so the authority's own refusal (NotVacant, Busy...) answers it.";
 
     public CoopCommandSide Side => CoopCommandSide.Client;
 
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
-        new ExpectedArgs("target", "The start of the hull's ship id, as coop.debug.naval.inspect lists it, or status followed by it.", true),
+        new ExpectedArgs("target", "The start of the hull's ship id, as coop.debug.naval.inspect lists it, or status.", true),
+        new ExpectedArgs("option", "After a ship id: force, to send the request past the local helm gates. After status: the ship id.", false),
     };
 
-    // Starts the capture at, or reports on, the one registered hull whose ship id starts with the prefix.
+    // Starts the capture at, reports on, or forces a request for the one registered hull whose ship id starts with the prefix.
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        if (args == null || args.Count < 1 || args.Count > 2) return Failed(Usage);
-        bool status = string.Equals(args[0].Trim(), "status", StringComparison.OrdinalIgnoreCase);
-        if (status != (args.Count == 2)) return Failed(Usage);
+        if (!TryParse(args, out var mode, out var prefix)) return Failed(Usage);
 
         var mission = Mission.Current;
         var controller = mission?.GetMissionBehavior<CoopBattleController>();
@@ -50,14 +54,54 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
         if (main == null || !main.IsActive()) return Failed("There is no living main agent to capture with.");
 
         var registry = controller.MissionComponent.ShipRegistry;
-        var error = NavalReswapCoopCommand.TryResolveShipId(registry.Ships.Select(ship => ship.ShipId), args[args.Count - 1], out var shipId);
+        var error = NavalReswapCoopCommand.TryResolveShipId(registry.Ships.Select(ship => ship.ShipId), prefix, out var shipId);
         if (error != null) return Failed(error);
         if (!registry.TryGet(shipId, out var info) || info.Hull is not MissionShip hull) return Failed("The hull is not a naval ship.");
 
-        var gates = HelmGates.Read(naval.Engine, main, hull);
-        if (status) return Status(naval, info, gates);
+        var gates = HelmGates.Read(naval.Engine, main, hull, IsOwnOrphan(info, controller.Session.OwnControllerId));
+        if (mode == CaptureMode.Status) return Status(naval, info, gates);
+        if (mode == CaptureMode.Force) return Force(naval, registry, main, info);
 
         return StartAtHelm(main, hull, info, gates);
+    }
+
+    /// <summary>Reads <c>ship</c>, <c>ship force</c> or <c>status ship</c>; anything else is a usage error.</summary>
+    internal static bool TryParse(ICoopCommandArgs args, out CaptureMode mode, out string prefix)
+    {
+        mode = CaptureMode.Helm;
+        prefix = null;
+        if (args == null || args.Count < 1 || args.Count > 2) return false;
+
+        bool status = IsWord(args[0], StatusWord);
+        if (args.Count == 1)
+        {
+            prefix = args[0];
+            return !status;
+        }
+
+        mode = status ? CaptureMode.Status : CaptureMode.Force;
+        prefix = status ? args[1] : args[0];
+        return status ? !IsWord(args[1], ForceWord) : IsWord(args[1], ForceWord);
+    }
+
+    // A case-insensitive keyword match.
+    private static bool IsWord(string value, string word) => string.Equals(value?.Trim(), word, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The captor's own orphan, which only it may take back (the authority's NotEnemy rule); it has no team to be an enemy's.</summary>
+    internal static bool IsOwnOrphan(NetworkShipInfo info, string ownControllerId) =>
+        info != null && info.IsOrphaned && info.CurrentAuthority == ownControllerId;
+
+    // Hands the request to the capture replicator as vanilla's elapsed timer does, so only the hull's authority decides.
+    private static CoopCommandResult Force(CoopNavalBattleBehavior naval, INetworkShipRegistry registry, Agent main, NetworkShipInfo info)
+    {
+        var captorHull = naval.Engine.CrewHullOf(main);
+        if (captorHull == null || !registry.TryGetByHull(captorHull, out var captorShip))
+            return Failed("NAVAL_CAPTURE ship=" + info.ShipId + " force: the main agent crews no registered hull to capture with.");
+
+        naval.ShipCaptureReplicator.RequestCapture(info, captorShip);
+        return new CoopCommandResult(true, "NAVAL_CAPTURE ship=" + info.ShipId + " forced: request for " + info.CurrentAuthority +
+            " with hull " + captorShip.ShipId + " sent past this copy's helm gates; the answer shows in coop.debug.naval.capture status " +
+            info.ShipId + " and in captureRejections of coop.debug.naval.inspect");
     }
 
     // Takes the helm the way the player's use key does (Agent.HandleStartUsingAction), after the gates vanilla's prompt reads.
@@ -90,6 +134,14 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
     // A failed command result with output.
     private static CoopCommandResult Failed(string output) => new CoopCommandResult(false, output, "command_failed");
 
+    /// <summary>What the command does with its hull: take the helm, report on it, or send the request at once.</summary>
+    internal enum CaptureMode
+    {
+        Helm,
+        Status,
+        Force,
+    }
+
     /// <summary>What vanilla's helm prompt and capture branch read for the main agent at a hull's helm (ShipControllerMachine.OnTick).</summary>
     private readonly struct HelmGates
     {
@@ -117,15 +169,16 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
         private bool TakenByOther { get; }
         private bool MainIsPilot { get; }
 
-        // Reads every gate from the local hulls; the main agent's own hull is the one its formation crews.
-        public static HelmGates Read(INavalShipEngine engine, Agent main, MissionShip hull)
+        // Reads every gate from the local hulls; the main agent's own hull is the one its formation crews. This client's own
+        // orphan has no team but counts as takeable, as the authority's NotEnemy rule treats it.
+        public static HelmGates Read(INavalShipEngine engine, Agent main, MissionShip hull, bool ownOrphan)
         {
             var helm = hull.ShipControllerMachine;
             var point = helm?.PilotStandingPoint;
             var mainHull = engine.CrewHullOf(main) as MissionShip;
             return new HelmGates(
                 hasHelm: point != null,
-                isEnemy: hull.Team != null && main.Team != null && hull.Team.IsEnemyOf(main.Team),
+                isEnemy: ownOrphan || (hull.Team != null && main.Team != null && hull.Team.IsEnemyOf(main.Team)),
                 canBeTakenOver: hull.CanBeTakenOver,
                 vacantHere: helm?.IsAttachedShipVacant() == true,
                 connected: mainHull != null && MissionShip.AreShipsConnected(mainHull, hull),
@@ -139,7 +192,7 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
         public string Refusal()
         {
             if (!HasHelm) return "the hull has no helm";
-            if (!IsEnemy) return "the hull is not an enemy's";
+            if (!IsEnemy) return "the hull is neither an enemy's nor this client's own orphan";
             if (TakenByOther) return "someone is at the helm";
             if (!UsableByMain) return "the helm is AI-only while its formation has units here";
             if (DisabledForPlayers) return "the helm is disabled until the hull is vacant and connected";
