@@ -167,7 +167,10 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
    (`IBattleShipReplicator.TransferHull(..., inPlace: true)`: sample and condition order restart, the captor adopts its copy
    with `INavalShipEngine.AdoptHull`, the old authority turns its hull into a copy with `ReleaseHull`; no hull is removed or
    replaced), then vanilla's swap runs on the local hulls (`ApplyCapture`, copies keep no controller), the registry records
-   the prize and the orphan, and the prize counts as gone from its old side.
+   the prize and the orphan, and the prize counts as gone from its old side. Nothing of this starts unless vanilla's swap
+   can run on the local hulls (`INavalShipCaptureEngine.CheckCapture`: both hulls in the mission, the captor's hull holds
+   its formation's assignment, both teams have a naval team AI): the authority refuses with `SwapUnavailable`, and a receiver
+   drops the confirm whole (`swapsBlocked`, `lastDrop=swap_blocked:<reason>`), so no client is left with half a capture.
 5. The captor sends `NetworkBattleShipCaptured` to the server on the relay channel its fates use, so the server takes the
    prize's fates from it (section 3), and sends its records of the prize and the orphan to every peer again.
 
@@ -175,6 +178,13 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
   (`NetworkShipInfo.CaptureSequence`). A confirm carries both hulls' counts on its sender and applies only when they match
   the receiver's: ahead of them it waits, behind them it is a repeat (counted) or a conflict (logged, the first applied
   stands). So captures of one hull from different senders apply in the same order everywhere, whichever arrives first.
+- **Swimmers keep the prize's old formation (R46).** Vanilla's vacancy ignores swimmers, and its swim AI moves the crew of a
+  sinking hull into the formation of a floating one (`AgentNavalComponent.CheckAgentOffShip`). So capturing the last afloat
+  hull of a side whose other hull sank leaves its old formation with units and no ship, and vanilla's AI refresh at the end
+  of the swap (`NavalQuerySystem` average ship position) read that formation's ship unchecked: an NRE on every client, then
+  a native crash. Singleplayer can reach the same state. `NavalShiplessFormationPatch` makes the three unchecked lookups
+  (own and enemy average ship position, `ShipOrder`'s closest enemy ship) skip a formation without a ship, as their sibling
+  queries do; the swap also runs guarded, so a throw past the checks is logged and the capture's bookkeeping still follows.
 - **One decider per place in the order.** Only a hull's current authority decides a capture of it. A player's hull, or a
   captured hull, changes authority only through captures, so a confirm for it must come from its current authority at that
   place. An AI hull's authority also moves with host changes, which aren't ordered against confirms, so its confirms are
@@ -265,6 +275,16 @@ When a client removes or replaces a hull:
 - afterwards nobody is left parked (physics force-closed) from the removed hull or parked while crew of it, and nobody
   stands on it.
 
+No rope may hook or stay tied to a removed hull either (R46 freeze). Vanilla's removal breaks the ropes and clears the
+boarding order, but not the rope stations' AI preference (`ShipAttachmentMachine._preferredTargetShip`), and its pilot AI
+throws at the preferred hull's points without a removal check (`GetBestEnemyAttachment`). A hook that landed on a removed
+hull built a joint with no target hull (`ShipAttachmentJoint._shipTargetScript` null, its root entity no longer carries a
+`MissionShip`), whose first fixed-tick force step threw on the native physics thread, and the TaleWorlds Watchdog froze the
+process. Every removal path now keeps it: `NavalRopes.BreakConnections` before `RemoveShip` (departure, capture, migration
+replace), `ForgetTarget` on vanilla's `ShipRemovedEvent` (vanilla's own retreat too), `RopeConnectPatch` refuses a rope to a
+removed hull, `TickRope` breaks one whose end left, and `RopeJointHullGuardPatch` skips a joint missing a hull. A sinking
+hull is not removed (vanilla keeps it in `AllShips`).
+
 Agents may be parked during the removal itself. The swap holds them for the fresh hull, and a removal unparks the ones
 it doesn't withdraw in the same step.
 
@@ -333,7 +353,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   - `IBattleShipFateApplier` writes them with patches live, never under `AllowedThread`, so every write replicates:
     the owner's Boatswain gets the summed mitigated damage once (vanilla's 0.1 XP per point), then a sunk ship goes
     through `DestroyShipAction` and any other ship takes its battle HP and sail HP. `OnShipDamaged` is not called again.
-  - It applies at a member's departure (its party's ships and the ships it captured, so a rejoin reads them), when the
+  - It applies at a member's departure (its party's ships and the ships it captured, so a rejoin reads them; a ship of its
+    party that another player captured stays held, since a capture changes no campaign owner and the prize leaves with its
+    captor, R46), when the
     instance empties or the battle finalizes without a commit (everything left), and in `MapEventPatches.Prefix_OnBattleWon`
     before the results and the loot read the ships.
   - A party left without ships gets its raft from vanilla at `MapEventEnded` (Jordan's raft patches run on the server).
@@ -561,8 +583,13 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     the way; the capture applies when it arrives, without another message.
   - A PvP victim's formation keeps vanilla's record pointing at the captor's orphan, so a later reinforcement of the victim
     would target a copy; its client logs a warning when its hull is captured.
-- **Follow-up B, weapon target lists are snapshots.** A late hull is no object target for weapons initialised before it
-  spawned; formations still are.
+- **Weapon target lists are snapshots (follow-up B, fixed R46).** A ballista lists its ship targets once, at its own
+  deployment (`ThreatSeeker.InitializeTargetableObjects`); `LateHullDeploymentPatch` now refreshes every fielded hull's list
+  when a later hull spawns, so co-op hulls arriving after deployment are targets as in vanilla.
+- **A captured prize's ballista stays idle (vanilla).** `GetAllThreats` drops a target on the weapon's own side for good, so
+  before the capture the prize's ballista already dropped its old side's hulls; after it (`RangedSiegeWeapon.OnShipCaptured`
+  only sets `DefaultSide`) it can't target its new enemies' hulls and skips formations in melee. Its gunner also stops within
+  7 m of an enemy (`Ballista.EnemyRangeToStopUsing`). R46 L1's idle prize matched this; singleplayer behaves the same.
 - **Silent member after the host left.** A naval battle whose host reported and left concludes once the remaining
   members match its report or leave; there is no timeout for a member that stays in the mission without reporting.
 - **Follow-ups from the D4 review (not done):**
@@ -615,7 +642,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | `board_copy [ship] \| status` | client | Teleports the main agent onto a copy's deck (the nearest copy, or the one whose ship id starts with `ship`) at vanilla's deck spot: the hull's player standing point, else the middle inner deck frame (`MissionShip.GetMiddleInnerSpawnGlobalFrame`). Reports the hull-frame `deckError` and `heightAboveSpot`; `status` reports the hull the main agent stands on. The copy's owner reports the puppet's `maxDeckError` in `inspect`. |
 | `immortal [on \| off]` | client | Sets the main agent's vanilla mortality state to `Immortal` (`on`) or `Mortal` (`off`), so blows, routed ones included, take no health; reports it without an argument. A ram's 2 m kill radius (`Agent.Die`) still kills it. |
 | `clear_crew <ship>` | hull's authority | Kills the hull's formation's units (the main agent excepted) and empties its reserve through vanilla, so the deaths replicate and the hull is vacant for a capture; vanilla's vacancy query refreshes within 5 s. |
-| `capture <ship> \| status <ship>` | client | Moves the main agent to an enemy hull's helm and takes it the way the use key does, so vanilla's 3 s timer runs and its end goes to the hull's authority; refuses with the helm gate that fails. `status` reports the authority, captor, orphan flag, `CaptureTimer`, how long this client's request waited and every helm gate (`enemy`, `vacantHere`, `connected`, `usableByMain`, `disabledForPlayers`). |
+| `capture <ship> [force] \| status <ship>` | client | Moves the main agent to an enemy hull's helm (or this client's own orphan's) and takes it the way the use key does, so vanilla's 3 s timer runs and its end goes to the hull's authority; refuses with the helm gate that fails. `status` reports the authority, captor, orphan flag, `CaptureTimer`, how long this client's request waited and every helm gate (`enemy`, `vacantHere`, `connected`, `usableByMain`, `disabledForPlayers`). `force` sends the request at once with the main agent's hull, past this copy's helm gates, so the authority's own refusal (`NotVacant`, `Busy`, `SwapUnavailable`) answers it. |
+| `swim <ship>` | client | Leaves any station and puts the main agent on the water 4 m off the hull's starboard side, midway along it, so swimming, follow-me orders from the water and a swimmer's capture vacancy can be staged. |
 
 `coop.debug.map_event.start_naval` starts a naval battle directly. Everything above except `inspect` and `rope_status` is
 DEBUG only.
