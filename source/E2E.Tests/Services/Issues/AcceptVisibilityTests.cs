@@ -421,4 +421,51 @@ public class AcceptVisibilityTests : IDisposable
         Assert.Empty(otherUpdates);
         Other.Call(() => Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(entry => entry.IsRelatedTo(mirrorIssue))));
     }
+
+    // Starts it as LordSolutionCoordinator does for the owner, without the menu event that brings the merchant.
+    private void StartLordSolutionOnTheOwner(IssueBase issue, string notableId)
+    {
+        Owner.Call(() =>
+        {
+            Assert.True(Owner.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, OwnerControllerId));
+
+            using (new AllowedThread())
+            {
+                issue._issueState = IssueBase.IssueState.SolvingWithLordSolution;
+                issue.IsTriedToSolveBefore = true;
+            }
+        });
+    }
+
+    [Theory]
+    [InlineData(IssueOutcome.LordAcceptedCounterOffer)]
+    [InlineData(IssueOutcome.LordRefusedCounterOffer)]
+    public void LordSolution_OnlyTheOwnerLogsTheCounterOfferEnding(IssueOutcome outcome)
+    {
+        var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var ownerIssue = AddIssue(Owner, notableId);
+        var otherIssue = AddIssue(Other, notableId);
+        ListenForIssueUpdatesOnTheOtherClient();
+        StartLordSolutionOnTheOwner(ownerIssue, notableId);
+        Other.SimulateMessage(this, new NetworkLordSolutionStarted(notableId, IssueId, OwnerControllerId, 1f));
+
+        Owner.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
+        Other.SimulateMessage(this, new NetworkIssueFinalized(notableId, IssueId, outcome));
+
+        Owner.Call(() =>
+        {
+            Assert.Null(ownerIssue.IssueOwner.Issue);
+            Assert.Single(ownerIssue.JournalEntries);
+            Assert.True(ownerIssue.IsTriedToSolveBefore);
+        });
+
+        Other.Call(() =>
+        {
+            Assert.Null(otherIssue.IssueOwner.Issue);
+            Assert.Empty(otherIssue.JournalEntries);
+            Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(entry => entry.IsRelatedTo(otherIssue)));
+        });
+
+        Assert.Empty(otherUpdates);
+    }
 }
