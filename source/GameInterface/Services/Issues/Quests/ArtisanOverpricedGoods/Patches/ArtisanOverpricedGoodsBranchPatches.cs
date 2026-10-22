@@ -2,7 +2,6 @@
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using Quest = TaleWorlds.CampaignSystem.Issues.ArtisanOverpricedGoodsIssueBehavior.ArtisanOverpricedGoodsIssueQuest;
 
@@ -30,13 +29,7 @@ internal class ArtisanOverpricedGoodsBranchPatches
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnCompleteWithSuccess))]
     [HarmonyPrefix]
-    private static bool RewardsPrefix(Quest __instance)
-    {
-        if (ModInformation.IsServer) return true;
-        if (!__instance.JournalEntries.Any(log => log.LogText.ToString() == __instance.SuccessQuestLogText.ToString()))
-            __instance.AddLog(__instance.SuccessQuestLogText);
-        return false;
-    }
+    private static bool RewardsPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnFailed))]
     [HarmonyPrefix]
@@ -44,13 +37,7 @@ internal class ArtisanOverpricedGoodsBranchPatches
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
     [HarmonyPrefix]
-    private static bool TimeoutPrefix(Quest __instance)
-    {
-        if (ModInformation.IsServer) return true;
-        if (!__instance.JournalEntries.Any(log => log.LogText.ToString() == __instance.TimeoutQuestLogText.ToString()))
-            __instance.AddLog(__instance.TimeoutQuestLogText);
-        return false;
-    }
+    private static bool TimeoutPrefix() => ModInformation.IsServer;
 
     private static bool Before(Quest quest, ArtisanOverpricedGoodsBranch branch) =>
         !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) || dispatcher.BeforeQuestBranch(quest, (byte)branch);

@@ -3,6 +3,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
@@ -10,7 +11,7 @@ namespace GameInterface.Services.Issues.Framework.Dispatch;
 internal class CompleteQuestWithBetrayalDispatchPatch
 {
     [HarmonyPrefix]
-    private static bool Prefix(QuestBase __instance, out IssueBase __state)
+    private static bool Prefix(QuestBase __instance, TextObject betrayLog, out IssueBase __state)
     {
         __state = null;
         if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher))
@@ -18,7 +19,7 @@ internal class CompleteQuestWithBetrayalDispatchPatch
             return true;
         }
 
-        return dispatcher.BeforeQuestOutcome(__instance, IssueOutcome.QuestBetrayal, out __state);
+        return dispatcher.BeforeQuestOutcome(__instance, IssueOutcome.QuestBetrayal, out __state, betrayLog);
     }
 
     [HarmonyPostfix]
