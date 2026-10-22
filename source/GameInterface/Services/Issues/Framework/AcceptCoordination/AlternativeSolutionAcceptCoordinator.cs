@@ -148,15 +148,18 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         }
 
         bool troopsAreValid;
+        bool alternativeSolutionIsAcceptable;
         using (new MainHeroSubstitutionScope(playerHero, playerHero.PartyBelongedTo))
         {
             using (new IssueDifficultyOverride(data.DifficultyMultiplier))
             {
+                alternativeSolutionIsAcceptable = descriptor.AlternativeSolutionAcceptStrategy is not IAlternativeSolutionAcceptPrecondition precondition ||
+                    precondition.CanAccept(issue, playerHero);
                 troopsAreValid = troopValidator.AreValid(issue, data.SentTroops);
             }
         }
 
-        if (!troopsAreValid || !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
+        if (!alternativeSolutionIsAcceptable || !troopsAreValid || !ownership.TrySetOwner(data.IssueOwnerId, data.IssueId, player.ControllerId))
         {
             var reason = troopsAreValid ? "issue already owned" : "committed troops do not satisfy the alternative solution";
             var roster = string.Join(", ", (data.SentTroops ?? Array.Empty<TroopRosterElementData>())

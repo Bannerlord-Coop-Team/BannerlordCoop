@@ -38,11 +38,16 @@ public class PlayerCaptivityReleasePositionTests
     private readonly Mock<INetwork> network = new();
     private readonly Mock<ITroopRosterInterface> troopRosterInterface = new();
     private readonly Mock<IVillageHostileActionInterface> villageHostileActionInterface = new();
+    private readonly Mock<IRecruitmentSideEffects> recruitmentSideEffects = new();
+    private readonly Mock<IPlayerManager> playerManager = new();
     private readonly PartyDoneLogicHandler handler;
 
     public PlayerCaptivityReleasePositionTests()
     {
         new SurrogateCollection();
+        playerManager
+            .Setup(m => m.IsSenderControllingHero(It.IsAny<object>(), It.IsAny<string>()))
+            .Returns(true);
         handler = new PartyDoneLogicHandler(
             messageBroker.Object,
             objectManager.Object,
@@ -50,7 +55,9 @@ public class PlayerCaptivityReleasePositionTests
             troopRosterInterface.Object,
             villageHostileActionInterface.Object,
             new Mock<IQuestTypeRegistry>().Object,
-            new Mock<IAlternativeSolutionCommitments>().Object);
+            new Mock<IAlternativeSolutionCommitments>().Object,
+            recruitmentSideEffects.Object,
+            playerManager.Object);
     }
 
     [Fact]

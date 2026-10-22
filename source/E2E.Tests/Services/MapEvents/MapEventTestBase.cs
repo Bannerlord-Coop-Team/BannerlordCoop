@@ -691,7 +691,11 @@ public abstract class MapEventTestBase : IDisposable
                 PartyScreenHelper.PartyScreenMode.Normal,
                 Server.Resolve<ITroopRosterInterface>().PackTroopRosterOrderData(captorParty.MemberRoster));
 
-            Server.Resolve<IMessageBroker>().Publish(this, message);
+            var playerManager = Server.Resolve<IPlayerManager>();
+            Assert.True(playerManager.TryGetPlayer(captorHero, out var captor));
+            Assert.True(playerManager.TryGetPeer(captor.ControllerId, out var captorPeer));
+
+            Server.Resolve<IMessageBroker>().Publish(captorPeer, message);
         }, disabledMethods);
     }
 

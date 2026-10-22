@@ -2,6 +2,7 @@
 
 Scope: everything under `source/GameInterface/Services/Issues/`. The repo root `AGENTS.md` applies too.
 `README.md` here is the short player-facing summary and the debug commands. This file owns the rules.
+Read [`QuestLearnings.md`](QuestLearnings.md) in full too.
 
 ## Layout
 
