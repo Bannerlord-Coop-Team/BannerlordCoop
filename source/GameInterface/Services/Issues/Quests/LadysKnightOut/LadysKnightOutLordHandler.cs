@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Entity;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
@@ -48,6 +49,7 @@ internal sealed class LadysKnightOutLordHandler : IHandler
         broker.Subscribe<RequestLadysKnightOutLord>(HandleRequest);
         broker.Subscribe<NetworkLadysKnightOutLordAccepted>(HandleAccepted);
         broker.Subscribe<NetworkIssueOwnershipSnapshot>(HandleOwnershipSnapshot);
+        broker.Subscribe<CampaignReady>(HandleCampaignReady);
     }
 
     public void Dispose()
@@ -56,6 +58,7 @@ internal sealed class LadysKnightOutLordHandler : IHandler
         broker.Unsubscribe<RequestLadysKnightOutLord>(HandleRequest);
         broker.Unsubscribe<NetworkLadysKnightOutLordAccepted>(HandleAccepted);
         broker.Unsubscribe<NetworkIssueOwnershipSnapshot>(HandleOwnershipSnapshot);
+        broker.Unsubscribe<CampaignReady>(HandleCampaignReady);
     }
 
     private void HandleTriggered(MessagePayload<LadysKnightOutLordTriggered> payload)
@@ -103,6 +106,17 @@ internal sealed class LadysKnightOutLordHandler : IHandler
                     issue.IssueDifficultyMultiplier,
                     issue.JournalEntries[0].LogText.ToString()));
             }
+        }, context: nameof(LadysKnightOutLordHandler));
+    }
+
+    private void HandleCampaignReady(MessagePayload<CampaignReady> payload)
+    {
+        if (ModInformation.IsServer) return;
+        GameThread.RunSafe(() =>
+        {
+            // Join replay can complete a saved issue before its ownership snapshot arrives.
+            foreach (var issue in Campaign.Current.IssueManager.Issues.Values)
+                if (issue is Issue && issue.IsSolvingWithLordSolution) issue.IsTriedToSolveBefore = false;
         }, context: nameof(LadysKnightOutLordHandler));
     }
 
