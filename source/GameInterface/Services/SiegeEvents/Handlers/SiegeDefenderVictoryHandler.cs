@@ -1,7 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
-using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
@@ -15,8 +15,8 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.SiegeEvents.Handlers;
 
 /// <summary>
-/// Once the mission pops, plays a winning siege defender's staged loot flow, then opens the siege-defeated menu
-/// that the server's replicated teardown skips.
+/// Once a winning siege defender has collected its staged loot, opens the siege-defeated menu that the server's
+/// replicated teardown skips.
 /// </summary>
 internal class SiegeDefenderVictoryHandler : IHandler
 {
@@ -59,22 +59,12 @@ internal class SiegeDefenderVictoryHandler : IHandler
         if (ModInformation.IsServer || settlement == null) return;
         // The mission screen is still up (or popping): re-establishing PlayerEncounter now is unsafe. Wait.
         if (MissionState.Current != null) return;
-        // The encounter menu only resumes the staged encounter while the destroyed event is still attached.
-        if (HasStagedBattleResults(PlayerEncounter.Current))
-        {
-            // A capture conversation is still open; updating now would reopen it every tick.
-            if (Campaign.Current.ConversationManager.IsConversationInProgress) return;
-            PlayerEncounter.Update();
-            if (PlayerEncounter.Current != null) return;
-        }
+        // StagedBattleResultUpdatePatch plays out the loot flow; prompt once it has finished the encounter.
+        if (StagedBattleResultUpdatePatch.HasStagedResults(PlayerEncounter.Current)) return;
 
         pendingSettlement = null;
         siegeEventInterface.PromptSiegeDefenderVictory(settlement);
     }
-
-    private static bool HasStagedBattleResults(PlayerEncounter encounter) =>
-        encounter != null && !encounter._leaveEncounter &&
-        MapEventInitializationBarrier.IsBattleResultEncounter(encounter);
 
     public void Dispose()
     {
