@@ -7,6 +7,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Naval;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
 
@@ -71,11 +72,12 @@ internal class SnapshotShipHitPointsSyncScopePatch
 }
 
 // The campaign HitPoints postfix (ShipHitPointsPatches) refreshes the open menu for main-party ships; a snapshot is no
-// campaign ship, and while a mission opens or runs that menu context can have no handler.
+// campaign ship, and while a mission opens or runs that menu context can have no handler. The server's applied ship fates
+// reach clients still in the battle, so no refresh runs during a mission; MapState.OnActivate refreshes the menu on return.
 [HarmonyPatch(typeof(GameMenuManager), nameof(GameMenuManager.RefreshMenuOptions))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class SnapshotShipMenuRefreshPatch
 {
     [HarmonyPrefix]
-    internal static bool Prefix() => !SnapshotShipHitPointsSyncScopePatch.IsWritingSnapshot;
+    internal static bool Prefix() => !SnapshotShipHitPointsSyncScopePatch.IsWritingSnapshot && Mission.Current == null;
 }

@@ -34,6 +34,15 @@ public class PartyShipCommandsTests
     }
 
     [Fact]
+    public void NavalFleet_RequiresNavalDlc()
+    {
+        var result = RunWithRole(true, false, new PartyShipCommands.NavalFleetCoopCommand());
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("NavalDLC is not active.", result.Output);
+    }
+
+    [Fact]
     public void ListShips_RequiresNavalDlc()
     {
         var result = RunWithRole(true, false, new PartyShipCommands.ListShipsCoopCommand(), "PlayerOne");

@@ -2,6 +2,7 @@
 using Common.Commands;
 using Common.Logging;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Villages.Commands;
 using Serilog;
 using System;
@@ -226,6 +227,61 @@ public class PartyShipCommands
             return Succeeded($"{party.Id} ships={ships.Length}" +
                    (ships.Length == 0 ? "" : ": " + string.Join(", ", ships)));
         }
+    }
+
+    // coop.debug.naval.fleet
+    // coop.debug.naval.fleet MobileParty_southern_pirates_13
+    /// <summary>
+    /// Lists the campaign id, HP, sail HP and owner of every ship of a party on this machine; with no party, the main party on
+    /// a client and every player's party on the server.
+    /// </summary>
+    public sealed class NavalFleetCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.naval";
+
+        public string Name => "fleet";
+
+        public string Description => "Lists a party's ships with their id, hit points, sail hit points and owner on this machine.";
+
+        public CoopCommandSide Side => CoopCommandSide.Both;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("party", "A player controller id, or a MobileParty or PartyBase id; every player's party when omitted.", false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            if (!ModInformation.IsNavalDlcActive)
+                return Failed("NavalDLC is not active.");
+
+            if (args.Count == 1)
+            {
+                if (!TryGetListedParty(args[0], out var objectManager, out var party, out var error))
+                    return Failed(error);
+
+                return Succeeded(DescribeFleet(objectManager, party));
+            }
+
+            if (!ContainerProvider.TryResolve<IObjectManager>(out var manager) || !ContainerProvider.TryResolve<IPlayerManager>(out var players))
+                return Failed("Unable to resolve ObjectManager or PlayerManager.");
+
+            var parties = ModInformation.IsClient
+                ? new[] { MobileParty.MainParty?.Party }
+                : players.Players.Select(player => manager.TryGetObject<MobileParty>(player.MobilePartyId, out var party) ? party.Party : null);
+            var fleets = parties.Where(party => party != null).Select(party => DescribeFleet(manager, party)).ToArray();
+            return fleets.Length == 0 ? Failed("No player party to list.") : Succeeded(string.Join("\n", fleets));
+        }
+    }
+
+    // One line per party: its id and ship count, then each ship's registry id, hit points, sail hit points and owner.
+    private static string DescribeFleet(IObjectManager objectManager, PartyBase party)
+    {
+        var ships = party.Ships
+            .Select(ship => $"{DescribeId(objectManager, ship)} hp={ship.HitPoints:0.#}/{ship.MaxHitPoints:0} " +
+                $"sail={ship.SailHitPoints:0.#}/{ship.MaxSailHitPoints:0} owner={ship.Owner?.Id ?? "none"}")
+            .ToArray();
+        return $"{party.Id} ships={ships.Length}" + (ships.Length == 0 ? "" : ": " + string.Join(", ", ships));
     }
 
     // A controller id names the player's party; any other id is looked up as a registered MobileParty or PartyBase.

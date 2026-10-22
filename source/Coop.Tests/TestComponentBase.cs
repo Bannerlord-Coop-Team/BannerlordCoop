@@ -38,6 +38,7 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Interfaces;
 using GameInterface.Services.Save.Interfaces;
 using GameInterface.Services.Settlements.Interfaces;
+using GameInterface.Services.Ships;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.Time.Interfaces;
@@ -150,6 +151,9 @@ internal abstract class TestComponentBase
         RegisterMock<IBattleHostRetentionPolicy>(builder);
         RegisterMock<IBattleTroopLedger>(builder);
         RegisterMock<IRetreatedMapEventPartyTracker>(builder);
+        // ServerBattleShipFateHandler (ServerModule, auto-activated) holds and applies naval ship fates through these.
+        RegisterMock<IBattleShipFateLedger>(builder);
+        RegisterMock<IBattleShipFateApplier>(builder);
         // LocationHostHandler (MissionModule, auto-activated) needs its registry the same way.
         RegisterMock<ILocationHostRegistry>(builder);
         RegisterMock<IRaidAiInterventionConfigInterface>(builder);

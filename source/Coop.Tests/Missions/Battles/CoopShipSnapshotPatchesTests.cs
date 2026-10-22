@@ -13,8 +13,20 @@ using Xunit;
 
 namespace Coop.Tests.Missions.Battles;
 
+// The menu refresh gate reads Mission.Current, which other test classes in this collection set.
+[Collection("Mission.Current")]
 public class CoopShipSnapshotPatchesTests
 {
+    // M6 D5: the server's applied ship fates reach clients still in the battle, where the menu context can have no handler.
+    [Fact]
+    public void MenuRefresh_IsHeldWhileAMissionIsCurrent()
+    {
+        using (new MissionCurrentScope())
+            Assert.False(SnapshotShipMenuRefreshPatch.Prefix());
+
+        Assert.True(SnapshotShipMenuRefreshPatch.Prefix());
+    }
+
     [Fact]
     public void SnapshotHitPointWrites_RunTheDefaultPrioritySyncPrefixInsideTheScope()
     {

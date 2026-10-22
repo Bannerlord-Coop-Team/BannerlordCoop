@@ -47,6 +47,7 @@ using GameInterface.Services.Modules;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Party;
 using GameInterface.Services.Players;
+using GameInterface.Services.Ships;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Commands;
 using GameInterface.Services.Stances;
@@ -157,6 +158,8 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ConversationRestartContextTracker>().As<IConversationRestartContextTracker>().InstancePerLifetimeScope();
         builder.RegisterType<BattleHostRegistry>().As<IBattleHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<BattleHostRetentionPolicy>().As<IBattleHostRetentionPolicy>().InstancePerDependency();
+        builder.RegisterType<BattleShipFateLedger>().As<IBattleShipFateLedger>().InstancePerLifetimeScope();
+        builder.RegisterType<BattleShipFateApplier>().As<IBattleShipFateApplier>().InstancePerDependency();
         builder.RegisterType<LocationHostRegistry>().As<ILocationHostRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<LocationConversationAgentGuard>().As<ILocationConversationAgentGuard>().InstancePerDependency();
         builder.RegisterType<BattleAgentBudget>().As<IBattleAgentBudget>().InstancePerDependency();
