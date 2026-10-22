@@ -1,5 +1,7 @@
+﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Locations;
+using GameInterface.Services.MapEvents.Extensions;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -99,6 +101,9 @@ internal class SettlementInterface : ISettlementInterface
     public void EndSettlementEncounter()
     {
         var mainParty = MobileParty.MainParty;
+        // Leaving a raid's settlement does not end its server-owned battle encounter.
+        if (ModInformation.IsClient && mainParty.MapEvent.IsRaidHostileAction() && !mainParty.MapEvent.IsFinalized)
+            return;
 
         // Mirror the native leave consequence (game_menu_settlement_leave_on_consequence). The party must
         // be moved to the settlement gate (outside) BEFORE finishing — LeaveSettlementAction only clears

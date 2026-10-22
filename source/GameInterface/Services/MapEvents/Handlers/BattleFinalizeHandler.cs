@@ -624,6 +624,10 @@ internal class BattleFinalizeHandler : IHandler
                 activeRaid.IsRaidHostileAction() && !activeRaid.IsFinalized)
                 return;
 
+            // A late reply cannot identify or close the new village encounter opened by a raid reset.
+            if (ModInformation.IsClient && PlayerEncounter.Battle == null && mainParty?.CurrentSettlement?.IsVillage == true)
+                return;
+
             // The local player's battle has ended — clear the recorded mode so the encounter-menu gate
             // (BattleModeEncounterOptionsPatch) no longer treats this event as claimed.
             BattleModeRegistry.End();
