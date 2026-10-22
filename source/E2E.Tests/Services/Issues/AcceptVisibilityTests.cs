@@ -357,6 +357,8 @@ public class AcceptVisibilityTests : IDisposable
             Assert.Null(notable.Issue);
             Assert.Null(otherIssue.IssueQuest);
             Assert.False(otherIssue.IsTriedToSolveBefore);
+            Assert.Empty(otherIssue.JournalEntries);
+            Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(entry => entry.IsRelatedTo(otherIssue)));
         });
 
         Assert.Empty(otherQuestCompletions);
@@ -422,7 +424,9 @@ public class AcceptVisibilityTests : IDisposable
         Other.Call(() => Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(entry => entry.IsRelatedTo(mirrorIssue))));
     }
 
-    // Starts it as LordSolutionCoordinator does for the owner, without the menu event that brings the merchant.
+    // Sets the owner's state and ownership by hand. LordSolutionCoordinator.HandleStarted would also run
+    // StartIssueWithLordSolution under the difficulty override and then BeforeGameMenuOpened, which can open
+    // the merchant conversation or end the issue with a refused counter-offer.
     private void StartLordSolutionOnTheOwner(IssueBase issue, string notableId)
     {
         Owner.Call(() =>

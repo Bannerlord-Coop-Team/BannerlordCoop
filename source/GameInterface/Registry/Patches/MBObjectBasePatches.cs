@@ -21,7 +21,7 @@ internal class MBObjectBasePatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         // Quest journals match by StringId, including after an issue detaches its quest.
-        // Preserve vanilla's issue-derived quest id on both the server and the owner client.
+        // Keep the id vanilla gives every quest type on every machine, usually `<issue id>_quest` for an issue quest.
         if (__instance is QuestBase) return true;
 
         // IssueManager assigns issue identities on the authoritative server.
