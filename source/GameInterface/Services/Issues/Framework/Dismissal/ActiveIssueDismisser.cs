@@ -97,7 +97,7 @@ internal class ActiveIssueDismisser : IHandler
         {
             try
             {
-                if (issue.IsSolvingWithQuest && !OwnerIsConnected(issue))
+                if ((issue.IsSolvingWithQuest || issue.IsSolvingWithLordSolution) && !OwnerIsConnected(issue))
                 {
                     DismissQuest(issue, announce);
                     dismissed++;
