@@ -1,0 +1,6 @@
+[coop.debug.ittest.run conv]
+inProgress=True hero=Hero_CharacterObject_2704 'Nus'
+npc: Thank you my lady. I am indeed honored.
+  [0] I heard you may need some help with a problem? {hero_give_issue}
+  [1] There is something I'd like to discuss. {main_option_discussions_3}
+  [2] I must leave now. {player_is_leaving_neutral_or_friendly}

@@ -1,0 +1,31 @@
+{
+  "Response": {
+    "version": 1,
+    "id": "dc85c66c122b47928f06ee321825e126",
+    "ok": true,
+    "process": {
+      "pid": 109168,
+      "role": "client",
+      "platformId": "testclient2",
+      "runToken": "issue3781-20261022T061638",
+      "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+    },
+    "result": {
+      "captureId": "5e8208da46624295b30f418ca0641b92",
+      "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\VillageCrime-journal-B.bmp",
+      "captureRequested": true,
+      "captureRequestedUtc": "2026-10-22T06:33:07.7340699Z",
+      "captureRequestEngineFrame": 16634,
+      "captureComplete": true,
+      "complete": true,
+      "completionCaptureId": "5e8208da46624295b30f418ca0641b92",
+      "completionObservedUtc": "2026-10-22T06:33:07.9494253Z",
+      "length": 3686454,
+      "lastWriteUtc": "2026-10-22T06:33:07.7680191Z"
+    },
+    "error": null,
+    "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.QuestsState",
+    "cameraReadiness": null
+  },
+  "ExitCode": 0
+}

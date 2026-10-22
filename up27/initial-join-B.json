@@ -1,0 +1,20 @@
+{
+  "Response": {
+    "version": 1,
+    "id": "b0a36a7cec2c4ba6a6878e8f9f8e0004",
+    "ok": true,
+    "process": {
+      "pid": 109168,
+      "role": "client",
+      "platformId": "testclient2",
+      "runToken": "issue3781-20261022T061638",
+      "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+    },
+    "result": {
+      "attempted": true,
+      "started": true
+    },
+    "error": null
+  },
+  "ExitCode": 0
+}

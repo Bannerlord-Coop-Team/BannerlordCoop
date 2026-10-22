@@ -1,0 +1,31 @@
+{
+  "Response": {
+    "version": 1,
+    "id": "af302125c8c3467cbf87337c90464c61",
+    "ok": true,
+    "process": {
+      "pid": 109168,
+      "role": "client",
+      "platformId": "testclient2",
+      "runToken": "issue3781-20261022T061638",
+      "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+    },
+    "result": {
+      "captureId": "6cf71af1d07d481eadc83ab682e470cb",
+      "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\PendingJoin-loading-B.bmp",
+      "captureRequested": true,
+      "captureRequestedUtc": "2026-10-22T06:46:58.6597293Z",
+      "captureRequestEngineFrame": 41439,
+      "captureComplete": true,
+      "complete": true,
+      "completionCaptureId": "6cf71af1d07d481eadc83ab682e470cb",
+      "completionObservedUtc": "2026-10-22T06:46:58.8783231Z",
+      "length": 3686454,
+      "lastWriteUtc": "2026-10-22T06:46:58.692962Z"
+    },
+    "error": null,
+    "activeStateAtCaptureRequest": "TaleWorlds.MountAndBlade.InitialState",
+    "cameraReadiness": null
+  },
+  "ExitCode": 0
+}

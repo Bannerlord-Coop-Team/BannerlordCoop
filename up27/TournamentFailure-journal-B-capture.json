@@ -1,0 +1,31 @@
+{
+  "Response": {
+    "version": 1,
+    "id": "cea01d6201b34e2f9e9514a5521a5ca0",
+    "ok": true,
+    "process": {
+      "pid": 109168,
+      "role": "client",
+      "platformId": "testclient2",
+      "runToken": "issue3781-20261022T061638",
+      "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+    },
+    "result": {
+      "captureId": "1e5d4bcd0d74492d9b6ec9e3ea5d40cf",
+      "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\TournamentFailure-journal-B.bmp",
+      "captureRequested": true,
+      "captureRequestedUtc": "2026-10-22T06:44:14.3818034Z",
+      "captureRequestEngineFrame": 36618,
+      "captureComplete": true,
+      "complete": true,
+      "completionCaptureId": "1e5d4bcd0d74492d9b6ec9e3ea5d40cf",
+      "completionObservedUtc": "2026-10-22T06:44:14.5966948Z",
+      "length": 3686454,
+      "lastWriteUtc": "2026-10-22T06:44:14.4147815Z"
+    },
+    "error": null,
+    "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.QuestsState",
+    "cameraReadiness": null
+  },
+  "ExitCode": 0
+}

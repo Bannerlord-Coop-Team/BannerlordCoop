@@ -1,0 +1,31 @@
+{
+  "Response": {
+    "version": 1,
+    "id": "e62468e204f54afd8022c48146f85d1d",
+    "ok": true,
+    "process": {
+      "pid": 65404,
+      "role": "client",
+      "platformId": "testclient",
+      "runToken": "issue3781-20261022T061638",
+      "processStartedUtc": "2026-10-22T06:23:17.087891Z"
+    },
+    "result": {
+      "captureId": "ef394f73383e481aab81f85f6818daf5",
+      "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\VillageCrime-before-A.bmp",
+      "captureRequested": true,
+      "captureRequestedUtc": "2026-10-22T06:30:12.9693549Z",
+      "captureRequestEngineFrame": 11364,
+      "captureComplete": true,
+      "complete": true,
+      "completionCaptureId": "ef394f73383e481aab81f85f6818daf5",
+      "completionObservedUtc": "2026-10-22T06:30:13.1846348Z",
+      "length": 3686454,
+      "lastWriteUtc": "2026-10-22T06:30:13.0029061Z"
+    },
+    "error": null,
+    "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.QuestsState",
+    "cameraReadiness": null
+  },
+  "ExitCode": 0
+}

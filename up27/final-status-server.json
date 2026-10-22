@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "id": "cb95a2a897684663b4c60f0a494b3487",
+  "ok": true,
+  "process": {
+    "pid": 2816,
+    "role": "server",
+    "platformId": null,
+    "runToken": "issue3781-20261022T061638",
+    "processStartedUtc": "0001-01-01T00:00:00"
+  },
+  "result": {
+    "protocolVersion": 1,
+    "pid": 2816,
+    "role": "server",
+    "platformId": null,
+    "runToken": "issue3781-20261022T061638",
+    "buildVersion": "0.1.7+e5d2345f99e7d785c9fa3391a1b323c81ec9add5",
+    "assemblyMvid": null,
+    "loadedAssemblies": [
+      {
+        "name": "Common",
+        "version": "1.0.0.0",
+        "mvid": "f63dc2a0-2116-4c8a-9701-5d7a91b1d575",
+        "location": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Common.dll"
+      },
+      {
+        "name": "Coop.Core",
+        "version": "1.0.0.0",
+        "mvid": "e018288e-31fb-47c1-abc6-0560d3b55212",
+        "location": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Coop.Core.dll"
+      },
+      {
+        "name": "Coop.Steam",
+        "version": "1.0.0.0",
+        "mvid": "43b37bdd-cefb-45c3-bccc-b0e996e273c6",
+        "location": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Coop.Steam.dll"
+      },
+      {
+        "name": "GameInterface",
+        "version": "1.0.0.0",
+        "mvid": "790cf4d8-d035-479f-8373-ae6082768436",
+        "location": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\GameInterface.dll"
+      },
+      {
+        "name": "Missions",
+        "version": "1.0.0.0",
+        "mvid": "264a3857-297f-4630-8ce2-385dd52f4867",
+        "location": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Missions.dll"
+      }
+    ],
+    "dedicatedServerAssemblies": [
+      {
+        "name": "DedicatedServer.Core",
+        "version": "1.0.0.0",
+        "mvid": "70f453a0-39f7-440d-875f-7b7633456f4b",
+        "location": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\bin\\Win64_Shipping_Server\\DedicatedServer.Core.dll"
+      },
+      {
+        "name": "DedicatedServer.Windows",
+        "version": "0.0.0.0",
+        "mvid": "fb138b69-1eaf-4fdf-a2a6-585ff07d2c63",
+        "location": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\DedicatedServer.Windows\\bin\\Win64_Shipping_Server\\DedicatedServer.Windows.dll"
+      },
+      {
+        "name": "TaleWorlds.Starter.DotNetCore",
+        "version": "1.0.0.0",
+        "mvid": "32337b48-89dc-4214-9ea7-7dad95fdc13d",
+        "location": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\bin\\Win64_Shipping_Server\\TaleWorlds.Starter.DotNetCore.dll"
+      }
+    ],
+    "processStartedUtc": "2026-10-22T06:20:49.2164882Z",
+    "logPath": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\server-data\\logs\\coop-server-20261022-012049.log",
+    "gameThreadInitialized": true,
+    "gameThreadQueueDepth": 0,
+    "commandRegistryReady": true,
+    "activeState": "TaleWorlds.CampaignSystem.GameState.MapState",
+    "topScreen": null,
+    "activeMenu": null,
+    "campaignLoaded": true,
+    "missionActive": false,
+    "coopRunning": true,
+    "coopState": "Coop.Core.Server.States.ServerRunningState",
+    "registeredPlayers": 2,
+    "serving": true,
+    "joinPort": 4200,
+    "connectionRoster": [
+      {
+        "controllerId": "testclient",
+        "connectionInstanceId": "dabfdd5097ac4406b63fec820f95802e",
+        "connected": true,
+        "joinState": "CampaignState"
+      },
+      {
+        "controllerId": "testclient2",
+        "connectionInstanceId": "7fa5b4f9cdd64fa38e70138f24331e35",
+        "connected": true,
+        "joinState": "CampaignState"
+      }
+    ],
+    "moduleValidation": {
+      "coopBuildVersion": "0.1.7+e5d2345f99e7d785c9fa3391a1b323c81ec9add5",
+      "modules": [
+        {
+          "id": "Native",
+          "isOfficial": true,
+          "isDlc": false,
+          "version": {
+            "applicationVersionType": 3,
+            "major": 1,
+            "minor": 4,
+            "revision": 8,
+            "changeSet": 118999
+          }
+        },
+        {
+          "id": "SandBoxCore",
+          "isOfficial": true,
+          "isDlc": false,
+          "version": {
+            "applicationVersionType": 3,
+            "major": 1,
+            "minor": 4,
+            "revision": 8,
+            "changeSet": 118999
+          }
+        },
+        {
+          "id": "Sandbox",
+          "isOfficial": true,
+          "isDlc": false,
+          "version": {
+            "applicationVersionType": 3,
+            "major": 1,
+            "minor": 4,
+            "revision": 8,
+            "changeSet": 118999
+          }
+        },
+        {
+          "id": "Coop",
+          "isOfficial": false,
+          "isDlc": false,
+          "version": {
+            "applicationVersionType": 3,
+            "major": 0,
+            "minor": 1,
+            "revision": 7,
+            "changeSet": 0
+          }
+        },
+        {
+          "id": "DedicatedServer.Windows",
+          "isOfficial": false,
+          "isDlc": false,
+          "version": {
+            "applicationVersionType": 3,
+            "major": 1,
+            "minor": 4,
+            "revision": 8,
+            "changeSet": 0
+          }
+        }
+      ]
+    },
+    "readyForCampaignTests": true,
+    "readyForMissionTests": true
+  },
+  "error": null
+}

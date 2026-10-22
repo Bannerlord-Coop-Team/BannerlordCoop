@@ -1,0 +1,3 @@
+[coop.debug.ittest.run find_lady Sora]
+giver=Hero_lord_1_32 name='Sora' character=lord_1_32 town=town_K3 security=43.654427 clan=Clan_clan_empire_north_2 clanLeader=False mercy=1 softspoken=0 curt=0 issue=-
+giver=Hero_CharacterObject_2727 name='Deasora' character=CharacterObject_2727 town=- security= clan=Clan_clan_empire_north_3 clanLeader=False mercy=0 softspoken=0 curt=0 issue=-

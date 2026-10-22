@@ -1,0 +1,3 @@
+[coop.debug.settlements.owner_state town_ES2]
+SERVER settlement=town_ES2 ownerClan=clan_empire_south_1 ownerLeader=lord_1_14
+LIVE_TEST_JSON={"role":"SERVER","settlement":"town_ES2","ownerClan":"clan_empire_south_1","ownerLeader":"lord_1_14"}

@@ -1,0 +1,2 @@
+[coop.debug.ittest.run mission_lose]
+mission_lose defeated the player agent in arena_empire_a; round=0 othersRemoved=7. The match ends on the next tick and the player is eliminated; then mission_leave.

@@ -1,0 +1,43 @@
+{
+  "Response": {
+    "version": 1,
+    "id": "24d2b144f05248219e893b9577477ec5",
+    "ok": true,
+    "process": {
+      "pid": 109168,
+      "role": "client",
+      "platformId": "testclient2",
+      "runToken": "issue3781-20261022T061638",
+      "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+    },
+    "result": {
+      "captureId": "a729b38f24344e22b1218d70349917a2",
+      "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\PendingJoin-before-completion-B.bmp",
+      "captureRequested": true,
+      "captureRequestedUtc": "2026-10-22T06:48:25.9380869Z",
+      "captureRequestEngineFrame": 43574,
+      "captureComplete": true,
+      "complete": true,
+      "completionCaptureId": "a729b38f24344e22b1218d70349917a2",
+      "completionObservedUtc": "2026-10-22T06:48:26.1204663Z",
+      "length": 3686454,
+      "lastWriteUtc": "2026-10-22T06:48:25.9687867Z"
+    },
+    "error": null,
+    "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.MapState",
+    "cameraReadiness": {
+      "process": {
+        "pid": 109168,
+        "role": "client",
+        "platformId": "testclient2",
+        "runToken": "issue3781-20261022T061638",
+        "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+      },
+      "stableSamples": 3,
+      "observedUtc": "2026-10-22T06:48:25.9067641Z",
+      "camera": "locked=True animation=False fastMove=False",
+      "map": "menuView=False pendingMenuView=False encounterOverlay=False cameraFollowParty=Created_43628 cameraMode=FollowParty followTargetReached=True animation=False fastMove=False loading=False"
+    }
+  },
+  "ExitCode": 0
+}

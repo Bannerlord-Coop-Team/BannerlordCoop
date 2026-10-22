@@ -1,0 +1,31 @@
+{
+  "Response": {
+    "version": 1,
+    "id": "561edc7da90144559d9c316da29ca5ed",
+    "ok": true,
+    "process": {
+      "pid": 65404,
+      "role": "client",
+      "platformId": "testclient",
+      "runToken": "issue3781-20261022T061638",
+      "processStartedUtc": "2026-10-22T06:23:17.087891Z"
+    },
+    "result": {
+      "captureId": "3e96c119c46140f4ad405b2b9847fe12",
+      "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\TournamentFailure-result-A.bmp",
+      "captureRequested": true,
+      "captureRequestedUtc": "2026-10-22T06:42:11.2060918Z",
+      "captureRequestEngineFrame": 32783,
+      "captureComplete": true,
+      "complete": true,
+      "completionCaptureId": "3e96c119c46140f4ad405b2b9847fe12",
+      "completionObservedUtc": "2026-10-22T06:42:11.4229964Z",
+      "length": 3686454,
+      "lastWriteUtc": "2026-10-22T06:42:11.2389097Z"
+    },
+    "error": null,
+    "activeStateAtCaptureRequest": "TaleWorlds.MountAndBlade.MissionState",
+    "cameraReadiness": null
+  },
+  "ExitCode": 0
+}

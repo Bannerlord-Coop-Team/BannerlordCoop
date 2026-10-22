@@ -1,0 +1,494 @@
+[
+  {
+    "path": "VillageCrime-before-A.png",
+    "sha256": "9dee99a7de6eb3d390b33db7335433006747612d3d8f73244b40197b9cfd28db",
+    "processId": 65404,
+    "client": "testclient",
+    "role": "A",
+    "checkpoint": "VillageCrime-before-A",
+    "captureId": "ef394f73383e481aab81f85f6818daf5",
+    "completedUtc": "2026-10-22T06:30:13.1846348Z",
+    "response": {
+      "version": 1,
+      "id": "e62468e204f54afd8022c48146f85d1d",
+      "ok": true,
+      "process": {
+        "pid": 65404,
+        "role": "client",
+        "platformId": "testclient",
+        "runToken": "issue3781-20261022T061638",
+        "processStartedUtc": "2026-10-22T06:23:17.087891Z"
+      },
+      "result": {
+        "captureId": "ef394f73383e481aab81f85f6818daf5",
+        "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\VillageCrime-before-A.bmp",
+        "captureRequested": true,
+        "captureRequestedUtc": "2026-10-22T06:30:12.9693549Z",
+        "captureRequestEngineFrame": 11364,
+        "captureComplete": true,
+        "complete": true,
+        "completionCaptureId": "ef394f73383e481aab81f85f6818daf5",
+        "completionObservedUtc": "2026-10-22T06:30:13.1846348Z",
+        "length": 3686454,
+        "lastWriteUtc": "2026-10-22T06:30:13.0029061Z"
+      },
+      "error": null,
+      "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.QuestsState",
+      "cameraReadiness": null
+    }
+  },
+  {
+    "path": "VillageCrime-before-B.png",
+    "sha256": "d80b8ff249a81e14914a5fe2ea30b184511f3cc4ae7a8d8f5216f273a0e6d62f",
+    "processId": 109168,
+    "client": "testclient2",
+    "role": "B",
+    "checkpoint": "VillageCrime-before-B",
+    "captureId": "7fe5a86931454011addee599033e6b29",
+    "completedUtc": "2026-10-22T06:30:13.6020837Z",
+    "response": {
+      "version": 1,
+      "id": "157f474f93504dcc97cfcaa48682b78b",
+      "ok": true,
+      "process": {
+        "pid": 109168,
+        "role": "client",
+        "platformId": "testclient2",
+        "runToken": "issue3781-20261022T061638",
+        "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+      },
+      "result": {
+        "captureId": "7fe5a86931454011addee599033e6b29",
+        "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\VillageCrime-before-B.bmp",
+        "captureRequested": true,
+        "captureRequestedUtc": "2026-10-22T06:30:13.384969Z",
+        "captureRequestEngineFrame": 11417,
+        "captureComplete": true,
+        "complete": true,
+        "completionCaptureId": "7fe5a86931454011addee599033e6b29",
+        "completionObservedUtc": "2026-10-22T06:30:13.6020837Z",
+        "length": 3686454,
+        "lastWriteUtc": "2026-10-22T06:30:13.4197547Z"
+      },
+      "error": null,
+      "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.QuestsState",
+      "cameraReadiness": null
+    }
+  },
+  {
+    "path": "VillageCrime-journal-A.png",
+    "sha256": "c26eb2739367e4fc85a9c0f77c0ec5a7e1fd1320173c7f50a8aa560832a5c57b",
+    "processId": 65404,
+    "client": "testclient",
+    "role": "A",
+    "checkpoint": "VillageCrime-journal-A",
+    "captureId": "e048cccd66394912803ad64e0a0dede0",
+    "completedUtc": "2026-10-22T06:33:07.5515956Z",
+    "response": {
+      "version": 1,
+      "id": "b619e8e030a64252bf5c811b45247c2b",
+      "ok": true,
+      "process": {
+        "pid": 65404,
+        "role": "client",
+        "platformId": "testclient",
+        "runToken": "issue3781-20261022T061638",
+        "processStartedUtc": "2026-10-22T06:23:17.087891Z"
+      },
+      "result": {
+        "captureId": "e048cccd66394912803ad64e0a0dede0",
+        "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\VillageCrime-journal-A.bmp",
+        "captureRequested": true,
+        "captureRequestedUtc": "2026-10-22T06:33:07.3331691Z",
+        "captureRequestEngineFrame": 16564,
+        "captureComplete": true,
+        "complete": true,
+        "completionCaptureId": "e048cccd66394912803ad64e0a0dede0",
+        "completionObservedUtc": "2026-10-22T06:33:07.5515956Z",
+        "length": 3686454,
+        "lastWriteUtc": "2026-10-22T06:33:07.36963Z"
+      },
+      "error": null,
+      "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.QuestsState",
+      "cameraReadiness": null
+    }
+  },
+  {
+    "path": "VillageCrime-journal-B.png",
+    "sha256": "28dbf07592a79c8df77dc94bd9bdc0f092551e67b1f56f6b303246d344375997",
+    "processId": 109168,
+    "client": "testclient2",
+    "role": "B",
+    "checkpoint": "VillageCrime-journal-B",
+    "captureId": "5e8208da46624295b30f418ca0641b92",
+    "completedUtc": "2026-10-22T06:33:07.9494253Z",
+    "response": {
+      "version": 1,
+      "id": "dc85c66c122b47928f06ee321825e126",
+      "ok": true,
+      "process": {
+        "pid": 109168,
+        "role": "client",
+        "platformId": "testclient2",
+        "runToken": "issue3781-20261022T061638",
+        "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+      },
+      "result": {
+        "captureId": "5e8208da46624295b30f418ca0641b92",
+        "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\VillageCrime-journal-B.bmp",
+        "captureRequested": true,
+        "captureRequestedUtc": "2026-10-22T06:33:07.7340699Z",
+        "captureRequestEngineFrame": 16634,
+        "captureComplete": true,
+        "complete": true,
+        "completionCaptureId": "5e8208da46624295b30f418ca0641b92",
+        "completionObservedUtc": "2026-10-22T06:33:07.9494253Z",
+        "length": 3686454,
+        "lastWriteUtc": "2026-10-22T06:33:07.7680191Z"
+      },
+      "error": null,
+      "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.QuestsState",
+      "cameraReadiness": null
+    }
+  },
+  {
+    "path": "TournamentFailure-before-A.png",
+    "sha256": "ff596edec73feeefc4e4001678d55ca48d9feb9e317c1d9a2cd00189c922706d",
+    "processId": 65404,
+    "client": "testclient",
+    "role": "A",
+    "checkpoint": "TournamentFailure-before-A",
+    "captureId": "58bbe0cffa544f0b9415d3d879f13143",
+    "completedUtc": "2026-10-22T06:41:19.6704329Z",
+    "response": {
+      "version": 1,
+      "id": "38d32abcb4d84ca6a3832d51217452c9",
+      "ok": true,
+      "process": {
+        "pid": 65404,
+        "role": "client",
+        "platformId": "testclient",
+        "runToken": "issue3781-20261022T061638",
+        "processStartedUtc": "2026-10-22T06:23:17.087891Z"
+      },
+      "result": {
+        "captureId": "58bbe0cffa544f0b9415d3d879f13143",
+        "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\TournamentFailure-before-A.bmp",
+        "captureRequested": true,
+        "captureRequestedUtc": "2026-10-22T06:41:19.4309026Z",
+        "captureRequestEngineFrame": 31237,
+        "captureComplete": true,
+        "complete": true,
+        "completionCaptureId": "58bbe0cffa544f0b9415d3d879f13143",
+        "completionObservedUtc": "2026-10-22T06:41:19.6704329Z",
+        "length": 3686454,
+        "lastWriteUtc": "2026-10-22T06:41:19.4641837Z"
+      },
+      "error": null,
+      "activeStateAtCaptureRequest": "TaleWorlds.MountAndBlade.MissionState",
+      "cameraReadiness": null
+    }
+  },
+  {
+    "path": "TournamentFailure-before-B.png",
+    "sha256": "bf7cd200e9e904ca425c867297a9f3470b4f519166331a66629c67230b3e6cc8",
+    "processId": 109168,
+    "client": "testclient2",
+    "role": "B",
+    "checkpoint": "TournamentFailure-before-B",
+    "captureId": "9362ebbfe24e419e9c5533316a27dd50",
+    "completedUtc": "2026-10-22T06:41:20.7656837Z",
+    "response": {
+      "version": 1,
+      "id": "154dcc043a4b45619cc02244268a2d21",
+      "ok": true,
+      "process": {
+        "pid": 109168,
+        "role": "client",
+        "platformId": "testclient2",
+        "runToken": "issue3781-20261022T061638",
+        "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+      },
+      "result": {
+        "captureId": "9362ebbfe24e419e9c5533316a27dd50",
+        "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\TournamentFailure-before-B.bmp",
+        "captureRequested": true,
+        "captureRequestedUtc": "2026-10-22T06:41:20.580847Z",
+        "captureRequestEngineFrame": 31410,
+        "captureComplete": true,
+        "complete": true,
+        "completionCaptureId": "9362ebbfe24e419e9c5533316a27dd50",
+        "completionObservedUtc": "2026-10-22T06:41:20.7656837Z",
+        "length": 3686454,
+        "lastWriteUtc": "2026-10-22T06:41:20.6119856Z"
+      },
+      "error": null,
+      "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.MapState",
+      "cameraReadiness": {
+        "process": {
+          "pid": 109168,
+          "role": "client",
+          "platformId": "testclient2",
+          "runToken": "issue3781-20261022T061638",
+          "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+        },
+        "stableSamples": 3,
+        "observedUtc": "2026-10-22T06:41:20.5499149Z",
+        "camera": "locked=True animation=False fastMove=False",
+        "map": "menuView=False pendingMenuView=False encounterOverlay=False cameraFollowParty=Created_43628 cameraMode=FollowParty followTargetReached=True animation=False fastMove=False loading=False"
+      }
+    }
+  },
+  {
+    "path": "TournamentFailure-journal-A.png",
+    "sha256": "4694d83510e4d2ddde4c90ecc70b94fe0369b90593220491d654d9d5a7c7f58c",
+    "processId": 65404,
+    "client": "testclient",
+    "role": "A",
+    "checkpoint": "TournamentFailure-journal-A",
+    "captureId": "9458d6bfa5a34687887a696351f6aafc",
+    "completedUtc": "2026-10-22T06:44:14.1719020Z",
+    "response": {
+      "version": 1,
+      "id": "285464ab78554d1b9611a391e401618f",
+      "ok": true,
+      "process": {
+        "pid": 65404,
+        "role": "client",
+        "platformId": "testclient",
+        "runToken": "issue3781-20261022T061638",
+        "processStartedUtc": "2026-10-22T06:23:17.087891Z"
+      },
+      "result": {
+        "captureId": "9458d6bfa5a34687887a696351f6aafc",
+        "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\TournamentFailure-journal-A.bmp",
+        "captureRequested": true,
+        "captureRequestedUtc": "2026-10-22T06:44:13.9571503Z",
+        "captureRequestEngineFrame": 36330,
+        "captureComplete": true,
+        "complete": true,
+        "completionCaptureId": "9458d6bfa5a34687887a696351f6aafc",
+        "completionObservedUtc": "2026-10-22T06:44:14.1719020Z",
+        "length": 3686454,
+        "lastWriteUtc": "2026-10-22T06:44:13.9896629Z"
+      },
+      "error": null,
+      "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.QuestsState",
+      "cameraReadiness": null
+    }
+  },
+  {
+    "path": "TournamentFailure-journal-B.png",
+    "sha256": "c09debb2740301786275ea4f660f377c9e34e779ef7b6c7f767ac7d648e69e1f",
+    "processId": 109168,
+    "client": "testclient2",
+    "role": "B",
+    "checkpoint": "TournamentFailure-journal-B",
+    "captureId": "1e5d4bcd0d74492d9b6ec9e3ea5d40cf",
+    "completedUtc": "2026-10-22T06:44:14.5966948Z",
+    "response": {
+      "version": 1,
+      "id": "cea01d6201b34e2f9e9514a5521a5ca0",
+      "ok": true,
+      "process": {
+        "pid": 109168,
+        "role": "client",
+        "platformId": "testclient2",
+        "runToken": "issue3781-20261022T061638",
+        "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+      },
+      "result": {
+        "captureId": "1e5d4bcd0d74492d9b6ec9e3ea5d40cf",
+        "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\TournamentFailure-journal-B.bmp",
+        "captureRequested": true,
+        "captureRequestedUtc": "2026-10-22T06:44:14.3818034Z",
+        "captureRequestEngineFrame": 36618,
+        "captureComplete": true,
+        "complete": true,
+        "completionCaptureId": "1e5d4bcd0d74492d9b6ec9e3ea5d40cf",
+        "completionObservedUtc": "2026-10-22T06:44:14.5966948Z",
+        "length": 3686454,
+        "lastWriteUtc": "2026-10-22T06:44:14.4147815Z"
+      },
+      "error": null,
+      "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.QuestsState",
+      "cameraReadiness": null
+    }
+  },
+  {
+    "path": "PendingJoin-before-completion-A.png",
+    "sha256": "070916461a79dcfcc5e4e6c67de9efe7c63eb9a775e7ea071c1f317d000c15a9",
+    "processId": 65404,
+    "client": "testclient",
+    "role": "A",
+    "checkpoint": "PendingJoin-before-completion-A",
+    "captureId": "72ace087d8ae4a7aa7dcb81fc054061e",
+    "completedUtc": "2026-10-22T06:48:25.0728518Z",
+    "response": {
+      "version": 1,
+      "id": "e7624bde1b03493fb3dad659beb2c0d0",
+      "ok": true,
+      "process": {
+        "pid": 65404,
+        "role": "client",
+        "platformId": "testclient",
+        "runToken": "issue3781-20261022T061638",
+        "processStartedUtc": "2026-10-22T06:23:17.087891Z"
+      },
+      "result": {
+        "captureId": "72ace087d8ae4a7aa7dcb81fc054061e",
+        "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\PendingJoin-before-completion-A.bmp",
+        "captureRequested": true,
+        "captureRequestedUtc": "2026-10-22T06:48:24.8580183Z",
+        "captureRequestEngineFrame": 43847,
+        "captureComplete": true,
+        "complete": true,
+        "completionCaptureId": "72ace087d8ae4a7aa7dcb81fc054061e",
+        "completionObservedUtc": "2026-10-22T06:48:25.0728518Z",
+        "length": 3686454,
+        "lastWriteUtc": "2026-10-22T06:48:24.8893386Z"
+      },
+      "error": null,
+      "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.MapState",
+      "cameraReadiness": {
+        "process": {
+          "pid": 65404,
+          "role": "client",
+          "platformId": "testclient",
+          "runToken": "issue3781-20261022T061638",
+          "processStartedUtc": "2026-10-22T06:23:17.087891Z"
+        },
+        "stableSamples": 3,
+        "observedUtc": "2026-10-22T06:48:24.8271656Z",
+        "camera": "locked=True animation=False fastMove=False",
+        "map": "menuView=False pendingMenuView=False encounterOverlay=False cameraFollowParty=Created_48503 cameraMode=FollowParty followTargetReached=True animation=False fastMove=False loading=False"
+      }
+    }
+  },
+  {
+    "path": "PendingJoin-before-completion-B.png",
+    "sha256": "525fe1b814e4c6bcf6e18dd69be672218c6da19b8580f758ed00b2670b5a4b65",
+    "processId": 109168,
+    "client": "testclient2",
+    "role": "B",
+    "checkpoint": "PendingJoin-before-completion-B",
+    "captureId": "a729b38f24344e22b1218d70349917a2",
+    "completedUtc": "2026-10-22T06:48:26.1204663Z",
+    "response": {
+      "version": 1,
+      "id": "24d2b144f05248219e893b9577477ec5",
+      "ok": true,
+      "process": {
+        "pid": 109168,
+        "role": "client",
+        "platformId": "testclient2",
+        "runToken": "issue3781-20261022T061638",
+        "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+      },
+      "result": {
+        "captureId": "a729b38f24344e22b1218d70349917a2",
+        "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\PendingJoin-before-completion-B.bmp",
+        "captureRequested": true,
+        "captureRequestedUtc": "2026-10-22T06:48:25.9380869Z",
+        "captureRequestEngineFrame": 43574,
+        "captureComplete": true,
+        "complete": true,
+        "completionCaptureId": "a729b38f24344e22b1218d70349917a2",
+        "completionObservedUtc": "2026-10-22T06:48:26.1204663Z",
+        "length": 3686454,
+        "lastWriteUtc": "2026-10-22T06:48:25.9687867Z"
+      },
+      "error": null,
+      "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.MapState",
+      "cameraReadiness": {
+        "process": {
+          "pid": 109168,
+          "role": "client",
+          "platformId": "testclient2",
+          "runToken": "issue3781-20261022T061638",
+          "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+        },
+        "stableSamples": 3,
+        "observedUtc": "2026-10-22T06:48:25.9067641Z",
+        "camera": "locked=True animation=False fastMove=False",
+        "map": "menuView=False pendingMenuView=False encounterOverlay=False cameraFollowParty=Created_43628 cameraMode=FollowParty followTargetReached=True animation=False fastMove=False loading=False"
+      }
+    }
+  },
+  {
+    "path": "PendingJoin-journal-A.png",
+    "sha256": "2b1d4e9b2192cb3601d6e1f859410a553642d2e8322ae8d4897080707d9931fb",
+    "processId": 65404,
+    "client": "testclient",
+    "role": "A",
+    "checkpoint": "PendingJoin-journal-A",
+    "captureId": "971b6676c4d5482faa3a9ebc3f22eca4",
+    "completedUtc": "2026-10-22T06:49:39.9987167Z",
+    "response": {
+      "version": 1,
+      "id": "e6c230bf0d7c4575addb217285bd78a3",
+      "ok": true,
+      "process": {
+        "pid": 65404,
+        "role": "client",
+        "platformId": "testclient",
+        "runToken": "issue3781-20261022T061638",
+        "processStartedUtc": "2026-10-22T06:23:17.087891Z"
+      },
+      "result": {
+        "captureId": "971b6676c4d5482faa3a9ebc3f22eca4",
+        "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\PendingJoin-journal-A.bmp",
+        "captureRequested": true,
+        "captureRequestedUtc": "2026-10-22T06:49:39.783504Z",
+        "captureRequestEngineFrame": 46084,
+        "captureComplete": true,
+        "complete": true,
+        "completionCaptureId": "971b6676c4d5482faa3a9ebc3f22eca4",
+        "completionObservedUtc": "2026-10-22T06:49:39.9987167Z",
+        "length": 3686454,
+        "lastWriteUtc": "2026-10-22T06:49:39.8166463Z"
+      },
+      "error": null,
+      "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.QuestsState",
+      "cameraReadiness": null
+    }
+  },
+  {
+    "path": "PendingJoin-journal-B.png",
+    "sha256": "a902dbd5560e074b3259c2165c030142bf64fee991c565787e5490d576578b18",
+    "processId": 109168,
+    "client": "testclient2",
+    "role": "B",
+    "checkpoint": "PendingJoin-journal-B",
+    "captureId": "bcbb8fb6df554e7895352c2305876295",
+    "completedUtc": "2026-10-22T06:49:40.3882787Z",
+    "response": {
+      "version": 1,
+      "id": "caba78924fde46fea4d526127b40f844",
+      "ok": true,
+      "process": {
+        "pid": 109168,
+        "role": "client",
+        "platformId": "testclient2",
+        "runToken": "issue3781-20261022T061638",
+        "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+      },
+      "result": {
+        "captureId": "bcbb8fb6df554e7895352c2305876295",
+        "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\PendingJoin-journal-B.bmp",
+        "captureRequested": true,
+        "captureRequestedUtc": "2026-10-22T06:49:40.1751587Z",
+        "captureRequestEngineFrame": 45793,
+        "captureComplete": true,
+        "complete": true,
+        "completionCaptureId": "bcbb8fb6df554e7895352c2305876295",
+        "completionObservedUtc": "2026-10-22T06:49:40.3882787Z",
+        "length": 3686454,
+        "lastWriteUtc": "2026-10-22T06:49:40.2069254Z"
+      },
+      "error": null,
+      "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.QuestsState",
+      "cameraReadiness": null
+    }
+  }
+]

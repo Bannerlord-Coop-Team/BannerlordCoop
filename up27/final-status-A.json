@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "id": "8ed2b571ef1143298d182a85b28dcfb9",
+  "ok": true,
+  "process": {
+    "pid": 65404,
+    "role": "client",
+    "platformId": "testclient",
+    "runToken": "issue3781-20261022T061638",
+    "processStartedUtc": "2026-10-22T06:23:17.087891Z"
+  },
+  "result": {
+    "protocolVersion": 1,
+    "uiCapability": "bounded-ui-layers-v1",
+    "pid": 65404,
+    "role": "client",
+    "platformId": "testclient",
+    "runToken": "issue3781-20261022T061638",
+    "buildVersion": "0.1.7+e5d2345f99e7d785c9fa3391a1b323c81ec9add5",
+    "assemblyMvid": "f5289df7-94df-45d5-a765-a9ecebbee04d",
+    "loadedAssemblies": [
+      {
+        "name": "Common",
+        "version": "1.0.0.0",
+        "mvid": "f63dc2a0-2116-4c8a-9701-5d7a91b1d575",
+        "location": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Common.dll"
+      },
+      {
+        "name": "Coop",
+        "version": "1.0.0.0",
+        "mvid": "f5289df7-94df-45d5-a765-a9ecebbee04d",
+        "location": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.dll"
+      },
+      {
+        "name": "Coop.Core",
+        "version": "1.0.0.0",
+        "mvid": "e018288e-31fb-47c1-abc6-0560d3b55212",
+        "location": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.Core.dll"
+      },
+      {
+        "name": "Coop.Steam",
+        "version": "1.0.0.0",
+        "mvid": "43b37bdd-cefb-45c3-bccc-b0e996e273c6",
+        "location": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.Steam.dll"
+      },
+      {
+        "name": "GameInterface",
+        "version": "1.0.0.0",
+        "mvid": "790cf4d8-d035-479f-8373-ae6082768436",
+        "location": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\GameInterface.dll"
+      },
+      {
+        "name": "Missions",
+        "version": "1.0.0.0",
+        "mvid": "264a3857-297f-4630-8ce2-385dd52f4867",
+        "location": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Missions.dll"
+      }
+    ],
+    "processStartedUtc": "2026-10-22T06:23:17.087891Z",
+    "logPath": "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\bin\\Win64_Shipping_Client\\Coop_client.log",
+    "gameThreadInitialized": true,
+    "gameThreadQueueDepth": 0,
+    "commandRegistryReady": true,
+    "activeState": "TaleWorlds.CampaignSystem.GameState.QuestsState",
+    "topScreen": "SandBox.GauntletUI.GauntletQuestsScreen",
+    "activeMenu": "town",
+    "campaignLoaded": true,
+    "requestedSaveName": null,
+    "loadedCampaignId": "TL0aP1afDGZ1",
+    "loadedSaveNameConfirmed": false,
+    "missionActive": false,
+    "coopRunning": true,
+    "coopState": "Coop.Core.Client.States.CampaignState",
+    "registeredPlayers": 2,
+    "registeredPlayerCount": null,
+    "connectedPlayerCount": null,
+    "registeredControllerIds": null,
+    "connectedControllerIds": null,
+    "deferredClientJoinEnabled": true,
+    "readyForClientJoin": false,
+    "deferredClientJoinAttempted": true,
+    "readyForCampaignTests": true,
+    "readyForMissionTests": false
+  },
+  "error": null
+}

@@ -1,0 +1,31 @@
+{
+  "Response": {
+    "version": 1,
+    "id": "caba78924fde46fea4d526127b40f844",
+    "ok": true,
+    "process": {
+      "pid": 109168,
+      "role": "client",
+      "platformId": "testclient2",
+      "runToken": "issue3781-20261022T061638",
+      "processStartedUtc": "2026-10-22T06:23:17.1083431Z"
+    },
+    "result": {
+      "captureId": "bcbb8fb6df554e7895352c2305876295",
+      "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\PendingJoin-journal-B.bmp",
+      "captureRequested": true,
+      "captureRequestedUtc": "2026-10-22T06:49:40.1751587Z",
+      "captureRequestEngineFrame": 45793,
+      "captureComplete": true,
+      "complete": true,
+      "completionCaptureId": "bcbb8fb6df554e7895352c2305876295",
+      "completionObservedUtc": "2026-10-22T06:49:40.3882787Z",
+      "length": 3686454,
+      "lastWriteUtc": "2026-10-22T06:49:40.2069254Z"
+    },
+    "error": null,
+    "activeStateAtCaptureRequest": "TaleWorlds.CampaignSystem.GameState.QuestsState",
+    "cameraReadiness": null
+  },
+  "ExitCode": 0
+}

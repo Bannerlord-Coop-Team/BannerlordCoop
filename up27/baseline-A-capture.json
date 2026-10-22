@@ -1,0 +1,31 @@
+{
+  "Response": {
+    "version": 1,
+    "id": "1feb886d1b624615aaf33752ae7a62cf",
+    "ok": true,
+    "process": {
+      "pid": 65404,
+      "role": "client",
+      "platformId": "testclient",
+      "runToken": "issue3781-20261022T061638",
+      "processStartedUtc": "2026-10-22T06:23:17.087891Z"
+    },
+    "result": {
+      "captureId": "da4130248fa048c897bcd6a26be6dc08",
+      "path": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up27\\retry1\\baseline-A.bmp",
+      "captureRequested": true,
+      "captureRequestedUtc": "2026-10-22T06:24:40.1471185Z",
+      "captureRequestEngineFrame": 1978,
+      "captureComplete": true,
+      "complete": true,
+      "completionCaptureId": "da4130248fa048c897bcd6a26be6dc08",
+      "completionObservedUtc": "2026-10-22T06:24:40.4252881Z",
+      "length": 3686454,
+      "lastWriteUtc": "2026-10-22T06:24:40.1837466Z"
+    },
+    "error": null,
+    "activeStateAtCaptureRequest": "TaleWorlds.MountAndBlade.InitialState",
+    "cameraReadiness": null
+  },
+  "ExitCode": 0
+}
