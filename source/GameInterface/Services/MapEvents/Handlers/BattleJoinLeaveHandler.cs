@@ -535,6 +535,10 @@ internal class BattleJoinLeaveHandler : IHandler
             if (party.MapEventSide != null)
                 party.MapEventSide = null;
 
+            // The server-approved departure releases this encounter without finalizing the continuing raid.
+            if (isMainParty && mapEvent.IsRaidHostileAction() && PlayerEncounter.Battle == mapEvent)
+                PlayerEncounter.Current._mapEvent = null;
+
             // Vanilla discards the client's tracker when its MainParty leaves, but the server's registered tracker stays live.
             if (tracker != null && mapEvent?.IsFinalized == false && mapEvent.TroopUpgradeTracker == null)
             {
