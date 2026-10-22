@@ -21,6 +21,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssueQuest;
@@ -195,7 +196,17 @@ public class LandLordCompanyOfTroubleTests : IDisposable
 
         Server.Call(() =>
         {
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+
+            using (new AllowedThread())
+            {
+                troop.StringId = "company_of_trouble_character";
+            }
+
+            MBObjectManager.Instance.RegisterObject(troop);
+
             var issue = AttachQuest(Server, companyTroopCount: 4);
+            ((Quest)issue.IssueQuest)._troubleCharacterObject = null;
 
             issue.IssueFinalized();
         });

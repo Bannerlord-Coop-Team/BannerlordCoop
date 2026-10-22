@@ -2,9 +2,11 @@
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.ObjectSystem;
 using Quest = TaleWorlds.CampaignSystem.Issues.LandLordCompanyOfTroubleIssueBehavior.LandLordCompanyOfTroubleIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.LandLordCompanyOfTrouble.Patches;
@@ -56,6 +58,12 @@ internal class LandLordCompanyOfTroubleFinalizePatches
         if (ModInformation.IsClient || !(__instance.IssueQuest is Quest quest) || !quest.IsOngoing)
         {
             return;
+        }
+
+        // The field isn't saved and the server never starts the quest, so a loaded save leaves it null
+        if (quest._troubleCharacterObject == null)
+        {
+            quest._troubleCharacterObject = MBObjectManager.Instance.GetObject<CharacterObject>("company_of_trouble_character");
         }
 
         if (!ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) ||
