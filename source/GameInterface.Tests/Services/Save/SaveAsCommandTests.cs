@@ -3,13 +3,12 @@ using Common.Commands;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Save.Commands;
 using Moq;
-using System;
-using System.IO;
 using System.Text;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Save;
 
+[Collection(ModInformationRoleCollection.Name)]
 public class SaveAsCommandTests
 {
     [Theory]
@@ -44,8 +43,10 @@ public class SaveAsCommandTests
         finally { ModInformation.IsServer = previous; }
     }
 
-    [Fact]
-    public void ExistingSaveIsNotOverwritten()
+    [Theory]
+    [InlineData("proof.sav")]
+    [InlineData("proof.json")]
+    public void ExistingSavePairMemberIsNotOverwritten(string existingFile)
     {
         bool previous = ModInformation.IsServer;
         ModInformation.IsServer = true;
@@ -53,7 +54,7 @@ public class SaveAsCommandTests
         {
             var saves = new Mock<ISaveInterface>();
             saves.SetupGet(x => x.CanQueueSave).Returns(true);
-            saves.Setup(x => x.ReadSaveFile("proof.sav")).Returns(new byte[] { 1 });
+            saves.Setup(x => x.ReadSaveFile(existingFile)).Returns(new byte[] { 1 });
             var args = new Mock<ICoopCommandArgs>();
             args.Setup(x => x[0]).Returns("proof");
             Assert.False(new SaveDebugCommand.SaveSaveAsCoopCommand(saves.Object).ProcessCommand(args.Object).Succeeded);
