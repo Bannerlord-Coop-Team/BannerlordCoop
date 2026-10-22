@@ -506,6 +506,7 @@ public class VillageNeedsToolsTests : IDisposable
         var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
         var otherGoldBefore = 0;
         var expectedGold = 0;
+        var expectedStartReward = 0;
         var grainBefore = new Dictionary<EnvironmentInstance, int>();
 
         foreach (var instance in Instances)
@@ -541,6 +542,7 @@ public class VillageNeedsToolsTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
             var issue = (Issue)notable.Issue;
             expectedGold = 10000 - issue.CostOfToolsForAlternativeSolution + (exchange ? 0 : issue._payment) + issue.RewardGold;
+            expectedStartReward = issue.RewardGold;
         });
         TestEnvironment.FlushCoalescer();
 
@@ -554,25 +556,53 @@ public class VillageNeedsToolsTests : IDisposable
         });
         TestEnvironment.FlushCoalescer();
 
+        var startLogGetter = AccessTools.PropertyGetter(typeof(Issue), nameof(Issue.AlternativeSolutionStartLog));
+        var startLogHarmony = new Harmony("bannerlordcoop.3766.companion-start-quote-test");
+        startLogHarmony.Patch(startLogGetter,
+            prefix: new HarmonyMethod(typeof(VillageNeedsToolsTests), nameof(GetAlternativeStartLogWithLocalPricePrefix)));
+        try
+        {
+            ClientA.Call(() =>
+            {
+                Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+                Assert.True(ClientA.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+                Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+                Assert.True(ClientA.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                var issue = notable.Issue;
+
+                using (new AllowedThread())
+                {
+                    Campaign.Current.MainParty = ownerParty;
+                    issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                    issue.AlternativeSolutionSentTroops.AddToCounts(troop, 6);
+                }
+
+                issue.AlternativeSolutionStartConsequence();
+                issue.StartIssueWithAlternativeSolution();
+            }, AlternativeSolutionLogTexts.Where(method => method != startLogGetter));
+            TestEnvironment.FlushCoalescer();
+        }
+        finally
+        {
+            startLogHarmony.Unpatch(startLogGetter, HarmonyPatchType.Prefix, startLogHarmony.Id);
+        }
+
         ClientA.Call(() =>
         {
             Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
-            Assert.True(ClientA.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
-            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
-            Assert.True(ClientA.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
-            var issue = notable.Issue;
-
-            using (new AllowedThread())
-            {
-                Campaign.Current.MainParty = ownerParty;
-                issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                issue.AlternativeSolutionSentTroops.AddToCounts(troop, 6);
-            }
-
-            issue.AlternativeSolutionStartConsequence();
-            issue.StartIssueWithAlternativeSolution();
-        }, AlternativeSolutionLogTexts);
-        TestEnvironment.FlushCoalescer();
+            var issue = (Issue)notable.Issue;
+            var expectedText = "Tools delivery reward: " + expectedStartReward + ".";
+            Assert.Equal(expectedText, Assert.Single(issue.JournalEntries).LogText.ToString());
+            var archived = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs(
+                (JournalLogEntry log) => log.IsRelatedTo(issue)));
+            Assert.Equal(expectedText, Assert.Single(archived.GetEntries()).LogText.ToString());
+        });
+        ClientB.Call(() =>
+        {
+            Assert.True(ClientB.ObjectManager.TryGetObject<Hero>(notableId, out var notable));
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs(
+                (JournalLogEntry log) => log.IsRelatedTo(notable.Issue)));
+        });
 
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
         Assert.Equal(ControllerA, OwnerOnServer());
@@ -969,6 +999,15 @@ public class VillageNeedsToolsTests : IDisposable
     private static bool GetSuccessLogPrefix(ref TaleWorlds.Localization.TextObject __result)
     {
         __result = new TaleWorlds.Localization.TextObject("{=!}You brought the promised tools.");
+        return false;
+    }
+
+    private static bool GetAlternativeStartLogWithLocalPricePrefix(Issue __instance, ref TaleWorlds.Localization.TextObject __result)
+    {
+        // Reproduce divergent local settlement prices without changing the server's reward calculation.
+        var localReward = __instance.RewardGold - (Common.ModInformation.IsServer ? 0 : 350);
+        __result = new TaleWorlds.Localization.TextObject("{=!}Tools delivery reward: {REWARD_GOLD}.");
+        __result.SetTextVariable("REWARD_GOLD", localReward);
         return false;
     }
 
