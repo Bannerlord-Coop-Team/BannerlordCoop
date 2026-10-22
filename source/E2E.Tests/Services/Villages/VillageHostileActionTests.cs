@@ -1057,13 +1057,16 @@ public class VillageHostileActionTests : MapEventTestBase
         {
             Assert.True(owner.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
             Assert.True(owner.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            Assert.True(owner.ObjectManager.TryGetObject<Village>(target.VillageId, out var village));
             using (new AllowedThread())
             {
+                settlement.SetSettlementComponent(village);
                 Campaign.Current.MainParty = party;
                 party._currentSettlement = settlement;
             }
             encounter.EncounterSettlementAux = settlement;
             Campaign.Current.MapStateData.GameMenuId = "village";
+            Assert.True(settlement.IsVillage);
             Assert.Null(PlayerEncounter.Battle);
             Assert.Null(party.MapEvent);
         }, disabledMethods);
