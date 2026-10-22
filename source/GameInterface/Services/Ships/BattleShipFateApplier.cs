@@ -22,8 +22,8 @@ namespace GameInterface.Services.Ships;
 public interface IBattleShipFateApplier
 {
     /// <summary>
-    /// Applies the held fates of the ships <paramref name="party"/> owns and of the ships its player
-    /// <paramref name="controllerId"/> captured in the mission, as that player departs the battle with them.
+    /// Applies the held fates of the ships <paramref name="party"/> owns, except those another player captured, and of the ships
+    /// its player <paramref name="controllerId"/> captured in the mission, as that player departs the battle with them.
     /// </summary>
     void ApplyParty(MapEvent mapEvent, PartyBase party, string controllerId);
 
@@ -51,12 +51,17 @@ public class BattleShipFateApplier : IBattleShipFateApplier
         this.objectManager = objectManager;
     }
 
+    // A capture never changes the campaign owner, so the owner's departure skips a ship another player captured: that one leaves
+    // with its captor, whose departure (or the commit or finalize) applies its fate.
     public void ApplyParty(MapEvent mapEvent, PartyBase party, string controllerId) =>
         Apply(mapEvent, mapEventId =>
         {
             var captured = ledger.CapturedBy(mapEventId, controllerId);
-            return (shipId, ship) => ship.Owner == party || captured.Contains(shipId);
+            return (shipId, ship) => captured.Contains(shipId) || (ship.Owner == party && DepartsWithOwner(ledger.CaptorOf(mapEventId, shipId)));
         });
+
+    /// <summary>Whether a departing owner's ship takes its fate with it: only while no other player holds it captured.</summary>
+    internal static bool DepartsWithOwner(string captorControllerId) => captorControllerId == null;
 
     public void ApplyAll(MapEvent mapEvent) => Apply(mapEvent, mapEventId => (shipId, ship) => true);
 

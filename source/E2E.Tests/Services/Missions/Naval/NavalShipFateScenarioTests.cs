@@ -295,6 +295,33 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
         });
     }
 
+    // R46 bug 4: a capture never changes the campaign owner, so the victim's departure must leave the prize's fate held; it
+    // leaves with its captor, whose departure writes it.
+    [Fact]
+    public void CapturedPlayerShip_TheVictimsDepartureLeavesItsFate_AndTheCaptorsDepartureWritesIt()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out var b, out _);
+        var shipId = GiveShip(PlayerPartyOf("B"));
+
+        Server.Call(() => Server.SimulateMessage(a.Instance.NetPeer, new NetworkBattleShipCaptured(battle.MapEventId, shipId, 1)));
+        SendFates(a, battle, hostEpoch: 1, revision: 1, new BattleShipFate(shipId, 480f, 120f, false));
+        LeaveMission(battle, b);
+
+        AssertShipEverywhere(shipId, ship =>
+        {
+            Assert.Equal(MaxHitPoints, ship.HitPoints, 2);
+            Assert.Equal(MaxSailHitPoints, ship.SailHitPoints, 2);
+        });
+
+        LeaveMission(battle, a);
+
+        AssertShipEverywhere(shipId, ship =>
+        {
+            Assert.Equal(480f, ship.HitPoints, 2);
+            Assert.Equal(120f, ship.SailHitPoints, 2);
+        });
+    }
+
     // The host A fields the AI party's hull for the ship; B captures it with its own hull, which the host confirms.
     private static Guid CaptureAiHull(NavalBattle battle, NavalPeer host, NavalPeer captor, string shipId)
     {
