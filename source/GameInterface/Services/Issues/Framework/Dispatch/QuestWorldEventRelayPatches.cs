@@ -2,6 +2,7 @@
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.MapEvents;
 
@@ -10,6 +11,22 @@ namespace GameInterface.Services.Issues.Framework.Dispatch;
 [HarmonyPatch]
 internal class QuestWorldEventRelayPatches
 {
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
+    [HarmonyPostfix]
+    private static void OnHeroKilledPostfix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification)
+    {
+        Relay("OnHeroKilled", new[] { typeof(Hero), typeof(Hero), typeof(KillCharacterAction.KillCharacterActionDetail), typeof(bool) }, victim, killer, detail, showNotification);
+    }
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnMapEventStarted))]
+    [HarmonyPostfix]
+    private static void OnMapEventStartedPostfix(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
+    {
+        if (!mapEvent.IsForcingSupplies && !mapEvent.IsForcingVolunteers) return;
+
+        Relay("OnMapEventStarted", new[] { typeof(MapEvent), typeof(PartyBase), typeof(PartyBase) }, mapEvent, attackerParty, defenderParty);
+    }
+
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
     [HarmonyPostfix]
     private static void OnWarDeclaredPostfix(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail)

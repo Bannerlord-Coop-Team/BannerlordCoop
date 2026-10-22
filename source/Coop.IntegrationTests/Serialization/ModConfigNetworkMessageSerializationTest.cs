@@ -69,6 +69,7 @@ namespace Coop.IntegrationTests.Serialization
                 GoldFoodInfluenceChangeInBattles = GoldFoodChangeMode.Enabled,
                 GoldFoodInfluenceChangeForDisconnectedPlayers = true,
                 PlayerBattleAiJoinWindowHours = 6,
+                KingdomDecisionVoteTimeoutSeconds = 600,
                 EnsureUnaffiliatedWanderers = false,
                 WandererLimit = 64,
                 SpawnRateWanderers = 2,
@@ -92,6 +93,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(GoldFoodChangeMode.Enabled, copy.GoldFoodInfluenceChangeInBattles);
             Assert.True(copy.GoldFoodInfluenceChangeForDisconnectedPlayers);
             Assert.Equal(6, copy.PlayerBattleAiJoinWindowHours);
+            Assert.Equal(600, copy.KingdomDecisionVoteTimeoutSeconds);
             Assert.False(copy.EnsureUnaffiliatedWanderers);
             Assert.Equal(64, copy.WandererLimit);
             Assert.Equal(2, copy.SpawnRateWanderers);
@@ -143,6 +145,7 @@ namespace Coop.IntegrationTests.Serialization
             GoldFoodInfluenceChangeInBattles = GoldFoodChangeMode.Disabled,
             GoldFoodInfluenceChangeForDisconnectedPlayers = false,
             PlayerBattleAiJoinWindowHours = 0,
+            KingdomDecisionVoteTimeoutSeconds = 0,
             SpeedLimitWhilePlayersInBattle = false,
             EnsureUnaffiliatedWanderers = false,
             WandererLimit = 0,
@@ -172,6 +175,7 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(GoldFoodChangeMode.Disabled, copy.GoldFoodInfluenceChangeInBattles);
             Assert.False(copy.GoldFoodInfluenceChangeForDisconnectedPlayers);
             Assert.Equal(0, copy.PlayerBattleAiJoinWindowHours);
+            Assert.Equal(0, copy.KingdomDecisionVoteTimeoutSeconds);
             Assert.False(copy.SpeedLimitWhilePlayersInBattle);
             Assert.False(copy.EnsureUnaffiliatedWanderers);
             Assert.Equal(0, copy.WandererLimit);

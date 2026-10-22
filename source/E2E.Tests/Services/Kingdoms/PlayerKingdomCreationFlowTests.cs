@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Configuration;
 using Common.Commands;
 using Common.Network;
 using Common.Messaging;
@@ -80,6 +81,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
     private E2ETestEnvironment TestEnvironment { get; }
     private readonly ITestOutputHelper output;
+    private readonly ModOptions previousModOptions = ModConfigProvider.ModOptions;
     private EnvironmentInstance Server => TestEnvironment.Server;
     private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
     private static IKingdomDecisionVoteManager GetVoteManager(EnvironmentInstance instance) =>
@@ -96,6 +98,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     public void Dispose()
     {
         TestEnvironment.Dispose();
+        ModConfigProvider.ModOptions = previousModOptions;
     }
 
     [Fact]
@@ -2613,9 +2616,16 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
     }
 
-    [Fact]
-    public void KingdomDecisionVotes_MissingVoteTimesOutAfterVotingWindow()
+    [Theory]
+    [InlineData(60)]
+    [InlineData(600)]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void KingdomDecisionVotes_MissingVoteTimesOutAfterVotingWindow(int timeoutSeconds)
     {
+        ModConfigProvider.LoadModConfig(new ModOptionsData { KingdomDecisionVoteTimeoutSeconds = timeoutSeconds });
+        Assert.Equal(timeoutSeconds > 0 ? timeoutSeconds : 60, (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds);
+        timeoutSeconds = (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds;
         var player = CreateSyncedPlayerContext();
         var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
@@ -2664,6 +2674,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+
+            GetConcreteVoteManager(Server).ProcessVotingRounds(DateTime.UtcNow.AddSeconds(timeoutSeconds * 0.9));
+            Assert.Same(decision, Assert.Single(kingdom.UnresolvedDecisions));
 
             GetConcreteVoteManager(Server).ProcessVotingRounds(
                 DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration);

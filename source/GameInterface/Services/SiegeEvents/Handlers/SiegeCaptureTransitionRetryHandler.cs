@@ -2,7 +2,10 @@
 using Common.Messaging;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.SiegeEvents.Patches;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -12,8 +15,8 @@ using TaleWorlds.MountAndBlade;
 namespace GameInterface.Services.SiegeEvents.Handlers;
 
 /// <summary>
-/// Client-side deferred settlement-taken transition for siege captures. The prompt arrives before the old map event
-/// is destroyed, so a mission or simulation scoreboard must release its presentation before the aftermath menu opens.
+/// Client-side fallback settlement-taken transition for a prompted siege capture whose encounter End never routes it
+/// (e.g. auto-resolve dropped the encounter first). Waits until the battle has finished resolving.
 /// </summary>
 internal class SiegeCaptureTransitionRetryHandler : IHandler
 {
@@ -33,14 +36,17 @@ internal class SiegeCaptureTransitionRetryHandler : IHandler
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
     }
 
-    /// <summary>Parks a settlement-taken transition until the battle presentation has finished tearing down.</summary>
+    /// <summary>Parks a settlement-taken transition until the battle has finished resolving.</summary>
     internal static void Arm(MobileParty leaderParty, Settlement settlement)
     {
         pendingLeaderParty = leaderParty;
         pendingSettlement = settlement;
     }
 
-    internal static bool IsBattlePresentationActive()
+    /// <summary>True while the battle presentation or the post-battle steps, up to the End that routes, own the encounter.</summary>
+    internal static bool IsBattleStillResolving() => IsBattlePresentationActive() || IsAfterBattleEncounterActive();
+
+    private static bool IsBattlePresentationActive()
     {
         if (MissionState.Current != null) return true;
 
@@ -49,11 +55,33 @@ internal class SiegeCaptureTransitionRetryHandler : IHandler
             .Any(state => state.IsSimulationActive) == true;
     }
 
+    // The encounter's own End routes the leader once its loot steps finish, like vanilla DoEnd. A left encounter
+    // never advances to that End, so it doesn't count.
+    private static bool IsAfterBattleEncounterActive()
+    {
+        var encounter = Campaign.Current?.PlayerEncounter;
+        if (encounter == null || encounter._leaveEncounter) return false;
+
+        switch (encounter.EncounterState)
+        {
+            case PlayerEncounterState.PlayerVictory:
+            case PlayerEncounterState.CaptureHeroes:
+            case PlayerEncounterState.FreeHeroes:
+            case PlayerEncounterState.LootParty:
+            case PlayerEncounterState.LootInventory:
+            case PlayerEncounterState.LootShips:
+            case PlayerEncounterState.End:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     internal static bool TryTakeReady(out MobileParty leaderParty, out Settlement settlement)
     {
         leaderParty = null;
         settlement = null;
-        if (pendingSettlement == null || IsBattlePresentationActive()) return false;
+        if (pendingSettlement == null || IsBattleStillResolving()) return false;
 
         leaderParty = pendingLeaderParty;
         settlement = pendingSettlement;
@@ -66,8 +94,10 @@ internal class SiegeCaptureTransitionRetryHandler : IHandler
     {
         if (ModInformation.IsServer) return;
         if (!TryTakeReady(out var leaderParty, out var settlement)) return;
+        // The encounter End may have opened the menu and the player already picked, which releases the hold.
+        if (!SiegeCaptureMenuHoldPatch.IsHeld(settlement)) return;
 
-        siegeEventInterface.PromptLocalAftermathChoice(leaderParty, settlement);
+        siegeEventInterface.PromptLocalAftermathChoice(leaderParty, settlement, previousOwnerClan: null);
     }
 
     public void Dispose()

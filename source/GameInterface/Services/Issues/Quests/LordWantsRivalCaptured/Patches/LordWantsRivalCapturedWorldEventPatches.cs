@@ -9,7 +9,6 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using Quest = TaleWorlds.CampaignSystem.Issues.LordWantsRivalCapturedIssueBehavior.LordWantsRivalCapturedIssueQuest;
 
@@ -17,7 +16,7 @@ namespace GameInterface.Services.Issues.Quests.LordWantsRivalCaptured.Patches;
 
 /// <summary>
 /// The server runs the world event listeners the framework's QuestEventRelay does not cover as each owning player:
-/// kills, prisoner releases, the quest's own prisoner listener (named OnPrisonerTaken, not OnHeroPrisonerTaken) and map events.
+/// prisoner releases and the quest's own prisoner listener (named OnPrisonerTaken, not OnHeroPrisonerTaken).
 /// </summary>
 [HarmonyPatch(typeof(CampaignEventDispatcher))]
 internal class LordWantsRivalCapturedWorldEventPatches

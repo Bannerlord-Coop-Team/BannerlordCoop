@@ -4,7 +4,6 @@ using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Quest = TaleWorlds.CampaignSystem.Issues.VillageNeedsCraftingMaterialsIssueBehavior.VillageNeedsCraftingMaterialsIssueQuest;
 
@@ -12,7 +11,7 @@ namespace GameInterface.Services.Issues.Quests.VillageNeedsCraftingMaterials.Pat
 
 /// <summary>
 /// The raid and coercion endings are decided by the server, which runs the quest's listeners as each owning
-/// player. The framework relays war and kingdom changes; these two events are specific to a village giver.
+/// player. The framework relays war, kingdom changes and coercion; raids remain specific to a village giver.
 /// </summary>
 [HarmonyPatch]
 internal class VillageNeedsCraftingMaterialsWorldEventPatches
