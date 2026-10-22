@@ -150,7 +150,12 @@ public class NavalShipEngine : INavalShipEngine
         var ship = (MissionShip)prize;
         var captor = (MissionShip)captorHull;
         var shipsLogic = ShipsLogic;
-        if (shipsLogic == null || captor.Formation == null) return;
+        if (shipsLogic == null || captor.Formation == null)
+        {
+            Logger.Warning("[NavalSync] Could not replay the capture of hull {Index}: the captor's hull {CaptorIndex} has no formation here",
+                ship.Index, captor.Index);
+            return;
+        }
 
         shipsLogic.OnShipCaptured(ship, captor.Formation);
         // Vanilla's swap hands both hulls an auto-updated controller; a copy keeps none, so it never steers itself here.
