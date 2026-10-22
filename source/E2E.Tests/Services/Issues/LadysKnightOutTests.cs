@@ -9,6 +9,8 @@ using Coop.Core.Server.Connections.Messages;
 using HarmonyLib;
 using Helpers;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.CoopSessionData;
+using GameInterface.Services.Traits.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
@@ -431,17 +433,16 @@ public class LadysKnightOutTests : IDisposable
     [Fact]
     public void CrimePenaltyChangesOnlyTheOwnersHonorStore()
     {
-        foreach (var client in environment.Clients)
-            client.Call(() =>
+        const string traitId = "lady_honor";
+        foreach (var instance in Instances)
+            instance.Call(() =>
             {
+                var handle = instance.Resolve<TestNetworkRouter>().GetOrCreateFixtureHandle(traitId);
+                Assert.True(instance.ObjectManager.AddExisting(traitId, DefaultTraits.Honor, handle));
                 Campaign.Current.PlayerTraitDeveloper = new PropertyOwner<PropertyObject>();
                 Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Honor, 83);
             });
         Accept(scenario.ClientA);
-        scenario.ClientA.Call(() =>
-        {
-            TraitLevelingHelper.OnIncidentResolved(DefaultTraits.Honor, 100);
-        });
         AddSecondOffer();
         Quest otherQuest = null!;
         scenario.ClientB.Call(() =>
@@ -454,13 +455,26 @@ public class LadysKnightOutTests : IDisposable
         int expectedXp = 0;
         int expectedLevel = 0;
         Hero owner = null!;
+        string ownerId = null!;
+        string otherId = null!;
         var relationBefore = 0;
         scenario.Server.Call(() =>
         {
             var giver = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId);
             Assert.True(scenario.Server.Resolve<IIssueOwnerResolver>().TryResolveOwnerHero(giver.Issue, out owner));
+            Assert.True(scenario.Server.ObjectManager.TryGetId(owner, out ownerId));
+            Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerB, out var other));
+            otherId = other.HeroId;
+            var xp = scenario.Server.Resolve<ICoopSessionProvider>().CoopSession.PlayerTraitData.PlayerTraitXp;
+            xp[ownerId] = new Dictionary<string, int> { [traitId] = 83 };
+            xp[otherId] = new Dictionary<string, int> { [traitId] = 83 };
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+                TraitLevelingHelper.OnIncidentResolved(DefaultTraits.Honor, 100);
+            Assert.Equal(183, xp[ownerId][traitId]);
+            Assert.Equal(83, xp[otherId][traitId]);
             relationBefore = giver.GetRelation(owner);
         });
+        scenario.Server.NetworkSentMessages.Clear();
         scenario.Server.Call(() =>
         {
             var issues = new IssuesCampaignBehavior();
@@ -479,18 +493,23 @@ public class LadysKnightOutTests : IDisposable
             {
                 CampaignEvents.Instance.RemoveListeners(issues);
             }
+            var xp = scenario.Server.Resolve<ICoopSessionProvider>().CoopSession.PlayerTraitData.PlayerTraitXp;
+            Assert.Equal(expectedXp, xp[ownerId][traitId]);
+            Assert.Equal(83, xp[otherId][traitId]);
         });
-        var penalty = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLadysKnightOutHonor>());
-        Assert.Equal(QuestScenario.ControllerA, penalty.ControllerId);
-        Assert.Equal(expectedXp, penalty.Xp);
-        Assert.Equal(expectedLevel, penalty.Level);
-        var relationAfter = 0;
-        scenario.Server.Call(() => relationAfter = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).GetRelation(owner));
-        Assert.Equal(relationBefore - 5, relationAfter);
+        var penalty = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkPlayerTraitXpAdded>());
+        scenario.Server.Call(() =>
+        {
+            Assert.True(scenario.Server.ObjectManager.TryGetHandle(owner, out var ownerHandle));
+            Assert.Equal(ownerHandle, penalty.HeroHandle);
+            Assert.Equal(expectedLevel, owner.GetTraitLevel(DefaultTraits.Honor));
+            Assert.Equal(relationBefore - 5, scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).GetRelation(owner));
+        });
         scenario.ClientA.Call(() =>
         {
-            Assert.Equal(expectedXp, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
-            Assert.Equal(expectedLevel, scenario.ClientA.GetRegisteredObject<Hero>(penalty.HeroId).GetTraitLevel(DefaultTraits.Honor));
+            Assert.Equal(83, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+            Assert.True(scenario.ClientA.ObjectManager.TryGetObject<Hero>(penalty.HeroHandle, out var hero));
+            Assert.Equal(expectedLevel, hero.GetTraitLevel(DefaultTraits.Honor));
         });
         scenario.ClientB.Call(() =>
         {
@@ -500,7 +519,6 @@ public class LadysKnightOutTests : IDisposable
         });
         Assert.Equal(IssueOutcome.QuestFail, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
-
     [Fact]
     public void TimeoutRunsTheOwnersPenaltyAndJournalOnTheServer()
     {
@@ -584,6 +602,12 @@ public class LadysKnightOutTests : IDisposable
     [InlineData(MapEvent.BattleTypes.IsForcingVolunteers)]
     public void TheOwnersVillageCrimeIsForwardedFromTheMapEvent(MapEvent.BattleTypes type)
     {
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                var handle = instance.Resolve<TestNetworkRouter>().GetOrCreateFixtureHandle("lady_honor");
+                Assert.True(instance.ObjectManager.AddExisting("lady_honor", DefaultTraits.Honor, handle));
+            });
         var quest = Accept(scenario.ClientA);
         scenario.Server.Call(() =>
         {
@@ -602,7 +626,7 @@ public class LadysKnightOutTests : IDisposable
             CampaignEventDispatcher.Instance.OnMapEventStarted(mapEvent, owner.PartyBelongedTo.Party, null);
         });
         Assert.Equal(IssueOutcome.QuestFail, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
-        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLadysKnightOutHonor>());
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkPlayerTraitXpAdded>());
         scenario.ClientA.Call(() => Assert.Equal(2, quest.JournalEntries.Count));
         scenario.ClientB.Call(() => Assert.Empty(Campaign.Current.QuestManager.Quests));
     }
