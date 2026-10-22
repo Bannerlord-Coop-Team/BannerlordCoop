@@ -23,6 +23,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -425,6 +426,48 @@ public sealed class RevenueFarmingTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LoadedJournalHistoryIsVisibleOnlyToTheQuestOwner(bool cancel)
+    {
+        Server.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
+        Accept();
+        var serverQuest = Quest(Server);
+        if (cancel) Server.Call(() => serverQuest.CompleteQuestWithCancel(new TextObject("agreement canceled")));
+        else
+        {
+            CompleteCollections();
+            Client.Call(() => Quest(Client).QuestCompletedWithSuccess());
+        }
+        environment.FlushCoalescer();
+
+        var records = new Dictionary<string, object>();
+        JournalLogEntry savedLog = null!;
+        Server.Call(() =>
+        {
+            Assert.True(serverQuest.IsFinalized);
+            savedLog = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>()
+                .Where(entry => entry.IsRelatedTo(serverQuest)));
+            Assert.True(savedLog.IsEnded());
+            Assert.Equal("zqrn2beP", savedLog.Title.GetID());
+            Server.Resolve<IRevenueFarmingSessionStore>().SyncData(new JournalDataStore(true, records));
+        });
+
+        // Rejoin loads the server's journal archive and saved ownership, not just live messages.
+        foreach (var instance in new[] { Client, Observer }) instance.Call(() =>
+        {
+            instance.Resolve<IRevenueFarmingSessionStore>().SyncData(new JournalDataStore(false, records));
+            using (new AllowedThread()) LogEntry.AddLogEntry(savedLog);
+            var loaded = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>()
+                .Where(entry => ReferenceEquals(entry, savedLog)));
+            Assert.Equal(instance == Client, loaded.IsEnded());
+            Assert.NotEmpty(loaded.GetEntries());
+            using (new AllowedThread()) Assert.True(loaded.IsEnded());
+        });
+        Server.Call(() => Assert.True(savedLog.IsEnded()));
+    }
+
+    [Theory]
     [InlineData(false, "client")]
     [InlineData(true, "client")]
     [InlineData(false, "server")]
@@ -608,6 +651,27 @@ public sealed class RevenueFarmingTests : IDisposable
         Collect();
         Tick();
         Client.Call(() => Assert.Equal(80, Quest(Client).RevenueVillages[0].CollectedAmount));
+    }
+
+    private sealed class JournalDataStore : IDataStore
+    {
+        private readonly Dictionary<string, object> records;
+        public bool IsSaving { get; }
+        public bool IsLoading => !IsSaving;
+
+        public JournalDataStore(bool isSaving, Dictionary<string, object> records)
+        {
+            IsSaving = isSaving;
+            this.records = records;
+        }
+
+        public bool SyncData<T>(string key, ref T data)
+        {
+            if (IsSaving) records[key] = data!;
+            else if (records.TryGetValue(key, out var value)) data = (T)value;
+            else return false;
+            return true;
+        }
     }
 
     private void AssertIncidentEffects(EnvironmentInstance instance, string id, int option, bool harmful)
