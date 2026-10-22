@@ -175,24 +175,35 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
   (`NetworkShipInfo.CaptureSequence`). A confirm carries both hulls' counts on its sender and applies only when they match
   the receiver's: ahead of them it waits, behind them it is a repeat (counted) or a conflict (logged, the first applied
   stands). So captures of one hull from different senders apply in the same order everywhere, whichever arrives first.
-- **One decider per place in the order.** A player's hull, or a captured hull, is decided by its current authority, which
-  only a capture of it changes. An AI hull's captures are decided by the battle host of the confirm's epoch: receivers keep
-  the host of every epoch they saw and drop a confirm from anyone else (one that joined later falls back to the hull's
-  current or fielding authority). A promoted host refuses its inherited AI hulls as `Busy` for 2 s
-  (`PromotionSettleSeconds`), so a capture the old host confirmed just before it left reaches it first over the mesh.
-  Residual: an old host's confirm that takes longer than that to arrive conflicts with a successor's capture of the same
-  hull; the conflict is logged (`captureConflicts`), and each client keeps the one it applied first.
-- A confirm is exempt from the membership gate, since mesh routes aren't ordered against the server's departure and
+- **One decider per place in the order.** Only a hull's current authority decides a capture of it. A player's hull, or a
+  captured hull, changes authority only through captures, so a confirm for it must come from its current authority at that
+  place. An AI hull's authority also moves with host changes, which aren't ordered against confirms, so its confirms are
+  ordered by the capture counts alone. Two guards keep one decider per place:
+  - a promoted host refuses its inherited AI hulls as `Busy` for 2 s (`PromotionSettleSeconds`), so a capture the old host
+    confirmed just before it left reaches it first over the mesh;
+  - a client refuses a capture of its own hull as `Busy` while its own request to capture another hull with that hull waits
+    (that request's decider may confirm a capture at the same place of this hull's order).
+  Residual: an old host's confirm that takes longer than the settle window conflicts with a successor's capture of the same
+  hull; the conflict is logged (`captureConflicts`) and each client keeps the one it applied first. A late copy of a capture
+  already applied is a repeat (`duplicateConfirms`), even once the hull moved on; it is a conflict only when this client
+  applied a different capture at that place of either hull's order.
+- The decider sends its confirm before it applies the capture, so peers take it through the confirm rather than through
+  the records the captor sends again; if those records still come back first (a mesh that delivers at once), it applies once.- A confirm is exempt from the membership gate, since mesh routes aren't ordered against the server's departure and
   migration events, so it applies after its sender left or the hull moved to a successor. A confirm for a hull that is
   mid-swap, or whose record still waits here, waits until the hull is registered or gone, however long a joiner's
   deployment takes. One that arrives after its captor left here removes the prize, as it left with the captor everywhere else.
 - A record from a hull's current authority that shows captures this client missed (it never got the confirm) brings a
-  registered hull up to date: a prize is captured through the swap with the captor's hull the record names, an orphan loses
-  its formation. A record of a later capture also replaces a held record of the same ship.
+  registered hull up to date: a prize is captured through the swap with the captor's hull the record names (waiting while
+  either hull is mid-swap here), an orphan loses its formation. A record of a later capture also replaces a held record of the
+  same ship. Not built: when the captor's hull is already orphaned here by that same capture, the prize can't be swapped and
+  would need respawning from the record; it stays as it is and a warning is logged. A record dropped because its owner left
+  marks the ship id removed, so confirms held for it are dropped too.
 - **The victim leaves at once (C4).** If a PvP victim confirms and disconnects, a client can get the victim's departure
   before its confirm and take the prize out with the victim. The captor's records sent again after the capture bring it
   back: a captured record of a hull this client removed with another departed player reopens and spawns it as the captor's.
-  The server records the capture even after the owner's party left the battle.
+  The server records the capture even after the owner's party left the battle, and keeps the first captor per place in the
+  hull's capture order (NetworkBattleShipCaptured.CaptureSequence), so the campaign result doesn't depend on which report
+  arrives first.
 - A request nobody answers in 5 s expires (the authority left before deciding). The captor's player sees one line when a
   capture is refused, times out or is won by someone else (the winner's broadcast confirm tells it).
 - A late joiner gets the prize's record from the captor with `CaptorControllerId` (ProtoMember 20), the hull's capture
@@ -544,6 +555,10 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     the successor's own capture of that hull; clients keep the one they applied first and log `captureConflicts`.
   - A client that took a PvP victim's hull out with the victim and then gets the captor's records spawns the prize again,
     but the captor's crew puppets it already had stay in the orphan's old formation, not the prize's (no swap ran there).
+  - A late joiner counts only a hull's last capture as a hull gone from its side (the record carries only that one), so its
+    retreat tally misses an earlier capture of a hull that was taken again.
+  - A captor's request can expire (5 s, the player hears that nobody answered) while its confirm still waits somewhere on
+    the way; the capture applies when it arrives, without another message.
   - A PvP victim's formation keeps vanilla's record pointing at the captor's orphan, so a later reinforcement of the victim
     would target a copy; its client logs a warning when its hull is captured.
 - **Follow-up B, weapon target lists are snapshots.** A late hull is no object target for weapons initialised before it
