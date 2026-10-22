@@ -68,13 +68,16 @@ internal class TroopRosterInterface : ITroopRosterInterface
     private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterInterface>();
     private readonly IObjectManager objectManager;
     private readonly ITroopRosterLogger troopRosterLogger;
+    private readonly IRecruitmentSideEffects recruitmentSideEffects;
 
     public TroopRosterInterface(
         IObjectManager objectManager,
-        ITroopRosterLogger troopRosterLogger)
+        ITroopRosterLogger troopRosterLogger,
+        IRecruitmentSideEffects recruitmentSideEffects)
     {
         this.objectManager = objectManager;
         this.troopRosterLogger = troopRosterLogger;
+        this.recruitmentSideEffects = recruitmentSideEffects;
     }
 
     public TroopRosterData PackTroopRosterData(TroopRoster troopRoster)
@@ -357,7 +360,7 @@ internal class TroopRosterInterface : ITroopRosterInterface
             MessageBroker.Instance.Publish(this, new VolunteerTypesArrayUpdated(hero, null, index));
 
             mobileParty.MemberRoster.AddToCounts(characterObject, 1, false, 0, 0, true, -1);
-            CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
+            recruitmentSideEffects.Apply(mobileParty, characterObject, 1);
         }
 
         GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, cost, false);
