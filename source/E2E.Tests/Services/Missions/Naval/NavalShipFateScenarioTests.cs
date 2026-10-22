@@ -274,6 +274,27 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
         });
     }
 
+    // C4: a PvP victim can leave right after confirming, before its captor's report reaches the server; the capture is still
+    // recorded, so the captor's fates of the ship count and its departure writes them.
+    [Fact]
+    public void CaptureOfAShipWhoseOwnerAlreadyLeft_IsStillRecorded_AndTheCaptorsFateApplies()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out _, out _);
+        var victimPartyId = PlayerPartyOf("B");
+        var shipId = GiveShip(victimPartyId);
+        Server.Call(() => Server.GetRegisteredObject<MobileParty>(victimPartyId).Party.MapEventSide = null, MapEventDisabledMethods);
+
+        Server.Call(() => Server.SimulateMessage(a.Instance.NetPeer, new NetworkBattleShipCaptured(battle.MapEventId, shipId)));
+        SendFates(a, battle, hostEpoch: 1, revision: 1, new BattleShipFate(shipId, 480f, 120f, false));
+        LeaveMission(battle, a);
+
+        AssertShipEverywhere(shipId, ship =>
+        {
+            Assert.Equal(480f, ship.HitPoints, 2);
+            Assert.Equal(120f, ship.SailHitPoints, 2);
+        });
+    }
+
     // The host A fields the AI party's hull for the ship; B captures it with its own hull, which the host confirms.
     private static Guid CaptureAiHull(NavalBattle battle, NavalPeer host, NavalPeer captor, string shipId)
     {

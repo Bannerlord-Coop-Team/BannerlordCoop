@@ -22,10 +22,10 @@ namespace GameInterface.Services.Ships;
 public interface IBattleShipFateApplier
 {
     /// <summary>
-    /// Applies the held fates of the ships <paramref name="party"/> owns and of the <paramref name="capturedShipIds"/> its player
-    /// captured in the mission, as that player departs the battle with them.
+    /// Applies the held fates of the ships <paramref name="party"/> owns and of the ships its player
+    /// <paramref name="controllerId"/> captured in the mission, as that player departs the battle with them.
     /// </summary>
-    void ApplyParty(MapEvent mapEvent, PartyBase party, IReadOnlyCollection<string> capturedShipIds);
+    void ApplyParty(MapEvent mapEvent, PartyBase party, string controllerId);
 
     /// <summary>Applies every held fate of the battle.</summary>
     void ApplyAll(MapEvent mapEvent);
@@ -51,16 +51,22 @@ public class BattleShipFateApplier : IBattleShipFateApplier
         this.objectManager = objectManager;
     }
 
-    public void ApplyParty(MapEvent mapEvent, PartyBase party, IReadOnlyCollection<string> capturedShipIds) =>
-        Apply(mapEvent, (shipId, ship) => ship.Owner == party || capturedShipIds.Contains(shipId));
+    public void ApplyParty(MapEvent mapEvent, PartyBase party, string controllerId) =>
+        Apply(mapEvent, mapEventId =>
+        {
+            var captured = ledger.CapturedBy(mapEventId, controllerId);
+            return (shipId, ship) => ship.Owner == party || captured.Contains(shipId);
+        });
 
-    public void ApplyAll(MapEvent mapEvent) => Apply(mapEvent, (shipId, ship) => true);
+    public void ApplyAll(MapEvent mapEvent) => Apply(mapEvent, mapEventId => (shipId, ship) => true);
 
     // Resolves each held ship once. A fate whose ship is already gone (destroyed by a finalize, a loot discard) or ownerless is
     // taken and dropped, so the ledger never keeps it; vanilla's destroy and every HP write expect an owned ship.
-    private void Apply(MapEvent mapEvent, Func<string, Ship, bool> selects)
+    private void Apply(MapEvent mapEvent, Func<string, Func<string, Ship, bool>> selectorFor)
     {
         if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId) || !ledger.HasFates(mapEventId)) return;
+
+        var selects = selectorFor(mapEventId);
 
         var ships = new Dictionary<string, Ship>();
         var fates = ledger.Take(mapEventId, fate =>

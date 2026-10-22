@@ -201,16 +201,17 @@ public class ServerBattleShipFateHandler : IHandler
         GameThread.RunSafe(() => RecordCapture(controllerId, message), context: nameof(Handle_NetworkBattleShipCaptured));
     }
 
-    // [Game thread] The captor reports the ship's fates from now on; its own party's ship taken back needs no record.
+    // [Game thread] The captor reports the ship's fates from now on; its own party's ship taken back needs no record. The owner's
+    // party may have left the battle already (a PvP victim that disconnected right after confirming), so it isn't required in it.
     private void RecordCapture(string controllerId, NetworkBattleShipCaptured message)
     {
-        if (!TryGetOpenBattle(controllerId, message.InstanceId, "a ship capture", out var player, out var mapEvent)) return;
+        if (!TryGetOpenBattle(controllerId, message.InstanceId, "a ship capture", out var player, out _)) return;
         if (!objectManager.TryGetObjectWithLogging<Ship>(message.CampaignShipId, out var ship)) return;
 
         var owner = ship.Owner;
-        if (owner?.MapEventSide?.MapEvent != mapEvent)
+        if (owner == null)
         {
-            Logger.Warning("[NavalSync] Dropped the capture of ship {ShipId} by {Controller}: its owner is not in the battle",
+            Logger.Warning("[NavalSync] Dropped the capture of ship {ShipId} by {Controller}: the ship has no owner",
                 message.CampaignShipId, controllerId);
             return;
         }
@@ -251,7 +252,7 @@ public class ServerBattleShipFateHandler : IHandler
         if (!playerManager.TryGetPlayer(departure.ControllerId, out var player)) return;
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.MobilePartyId, out var party)) return;
 
-        applier.ApplyParty(mapEvent, party.Party, ledger.CapturedBy(departure.InstanceId, departure.ControllerId));
+        applier.ApplyParty(mapEvent, party.Party, departure.ControllerId);
     }
 
     // A battle that ends without a result commit (abandoned, orphaned) still applies what its members reported; its captures
