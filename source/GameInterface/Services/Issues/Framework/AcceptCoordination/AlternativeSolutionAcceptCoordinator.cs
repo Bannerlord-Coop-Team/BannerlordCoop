@@ -14,6 +14,7 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
@@ -164,6 +165,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         {
             Logger.Error(e, "Starting the alternative solution of {issue} failed", data.IssueId);
             ownership.Remove(data.IssueOwnerId);
+            Campaign.Current.LogEntryHistory._logs.RemoveAll(entry => entry is JournalLogEntry journal && journal.IsRelatedTo(issue));
             Reject(peer, data, playerHero);
             return;
         }
