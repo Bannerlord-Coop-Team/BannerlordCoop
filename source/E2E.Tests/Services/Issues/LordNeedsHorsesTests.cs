@@ -211,7 +211,8 @@ public class LordNeedsHorsesTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void PendingPickerTroopsReturnWhenCancelledOrTheIssueEnds(bool finalize)
+    [InlineData(true, true)]
+    public void PendingPickerTroopsReturnWhenCancelledOrTheIssueEnds(bool finalize, bool delayedDone = false)
     {
         foreach (var instance in new[] { Server, ClientA, ClientB })
         {
@@ -238,6 +239,8 @@ public class LordNeedsHorsesTests : IDisposable
             party.MemberRoster.AddToCounts(troop, 10);
         });
         TestEnvironment.FlushCoalescer();
+        if (delayedDone)
+            ClientA.Resolve<E2E.Tests.Environment.TestNetworkRouter>().PauseLink(ClientA.NetPeer, Server.NetPeer);
         ClientA.Call(() =>
         {
             Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
@@ -266,7 +269,7 @@ public class LordNeedsHorsesTests : IDisposable
             Assert.True(logic.DoneLogic(false));
         }, new[] { AccessTools.Method(typeof(Helpers.PartyScreenHelper), nameof(Helpers.PartyScreenHelper.OpenScreenAsQuest)) });
         TestEnvironment.FlushCoalescer();
-        Assert.Equal(7, OwnersMembers());
+        Assert.Equal(delayedDone ? 10 : 7, OwnersMembers());
         if (finalize)
         {
             Server.Call(() =>
@@ -281,6 +284,13 @@ public class LordNeedsHorsesTests : IDisposable
                 .issue_offer_player_accept_alternative_5_b_consequence());
         }
         TestEnvironment.FlushCoalescer();
+        if (delayedDone)
+        {
+            var router = ClientA.Resolve<E2E.Tests.Environment.TestNetworkRouter>();
+            router.ResumeLink(ClientA.NetPeer, Server.NetPeer);
+            router.DrainReady();
+            TestEnvironment.FlushCoalescer();
+        }
         Assert.Equal(10, OwnersMembers());
         ClientA.Call(() =>
         {

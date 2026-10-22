@@ -226,7 +226,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
             issue.IssueDueTime = CampaignTime.Never;
 
-            issue.IssueQuest.IsTrackEnabled = false;
+            if (issue.IssueQuest != null) issue.IssueQuest.IsTrackEnabled = false;
 
             descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
         }, context: nameof(QuestSolutionAcceptCoordinator));
