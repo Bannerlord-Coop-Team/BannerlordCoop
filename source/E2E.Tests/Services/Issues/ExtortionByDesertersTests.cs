@@ -7,6 +7,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
+using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.Players;
 using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
@@ -704,7 +705,12 @@ public class ExtortionByDesertersTests : IDisposable
         DefeatDeserters();
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestBranch>());
-        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>(),
+        var notice = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>(),
+            state => state.Notice == (byte)ExtortionByDesertersNotice.DesertersDefeated);
+        Assert.Equal(QuestScenario.ControllerA, notice.ControllerId);
+        Assert.Single(Owner.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(),
+            state => state.Notice == (byte)ExtortionByDesertersNotice.DesertersDefeated);
+        Assert.DoesNotContain(Other.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(),
             state => state.Notice == (byte)ExtortionByDesertersNotice.DesertersDefeated);
         Owner.Call(() =>
         {
@@ -712,6 +718,8 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.Null(ownerQuest._deserterMobileParty);
             Assert.Null(ownerQuest._defenderMobileParty);
             Assert.Equal(State.DesertersAreDefeated, ownerQuest._currentState);
+            Assert.Single(ownerQuest.JournalEntries,
+                entry => entry.LogText.ToString() == ownerQuest.OnDeserterPartyDefeatedLogText.ToString());
         });
     }
 
@@ -719,15 +727,19 @@ public class ExtortionByDesertersTests : IDisposable
     {
         Accept();
         var quest = (Quest)scenario.QuestOf(Server);
-        using var destruction = new MethodCallRecorder(Priority.Last,
-            AccessTools.Method(typeof(DestroyPartyAction), nameof(DestroyPartyAction.Apply)));
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OtherPartyId, out var otherParty));
             var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var defenders = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            // Healthy troops leave both quest parties for cleanup after the real map-event finalization.
             foreach (var party in new[] { deserters, defenders, ownerParty })
-                party.MemberRoster.AddToCounts(party.LeaderHero.CharacterObject, 1);
+            {
+                party.MemberRoster.AddToCounts(GameObjectCreator.CreateInitializedObject<CharacterObject>(), 1);
+                Assert.True(party.IsActive);
+                Assert.True(party.Party.NumberOfHealthyMembers > 0);
+            }
             quest._deserterMobileParty = deserters;
             quest._defenderMobileParty = defenders;
             deserters.SetPartyUsedByQuest(true);
@@ -748,12 +760,23 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.True(quest.IsOngoing);
             battle.FinalizeEventAux();
             Assert.Equal(entries + 1, quest.JournalEntries.Count);
+            foreach (var party in new[] { deserters, defenders })
+            {
+                Assert.False(party.IsActive);
+                Assert.Null(party.MapEvent);
+                var destruction = Assert.Single(Server.InternalMessages.GetMessages<DestroyPartyApplied>(),
+                    message => message.DefeatedParty == party);
+                Assert.Null(destruction.VictoriousPartyBase);
+            }
+            Assert.True(ownerParty.IsActive);
+            Assert.True(otherParty.IsActive);
+            Assert.DoesNotContain(Server.InternalMessages.GetMessages<DestroyPartyApplied>(),
+                message => message.DefeatedParty == ownerParty || message.DefeatedParty == otherParty);
         }, TextLinks.Concat(new[]
         {
             AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)),
             AccessTools.Method(typeof(MapEvent), nameof(MapEvent.MovePartyToSuitablePositionOnMapEventFinalize)),
         }));
-        Assert.Equal(2, destruction.CountFor(Server));
         return quest;
     }
 
