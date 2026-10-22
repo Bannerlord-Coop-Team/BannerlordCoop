@@ -11,6 +11,7 @@ using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
@@ -29,7 +30,7 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         this.ownerResolver = ownerResolver;
     }
 
-    public bool BeforeQuestOutcome(QuestBase quest, IssueOutcome outcome, out IssueBase observed)
+    public bool BeforeQuestOutcome(QuestBase quest, IssueOutcome outcome, out IssueBase observed, TextObject log = null)
     {
         observed = null;
 
@@ -53,7 +54,7 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
             return true;
         }
 
-        messageBroker.Publish(quest, new QuestOutcomeRequested(quest, outcome));
+        messageBroker.Publish(quest, new QuestOutcomeRequested(quest, outcome, log));
         return false;
     }
 
