@@ -144,8 +144,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
                 }
             }
 
-            // Joining clients load this quest with the save, so nothing it tracks may show up as their quest
-            issue.IssueQuest.IsTrackEnabled = false;
+            if (issue.IssueQuest.IsTrackEnabled) issue.IssueQuest.ToggleTrackedObjects();
 
             descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
         }
@@ -226,6 +225,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             issue._issueDifficultyMultiplier = data.DifficultyMultiplier;
             issue._issueState = IssueBase.IssueState.SolvingWithQuestSolution;
             issue.IssueDueTime = CampaignTime.Never;
+
+            issue.IssueQuest.IsTrackEnabled = false;
 
             descriptor.QuestSolutionAcceptStrategy.Apply(issue, data.Captured);
         }, context: nameof(QuestSolutionAcceptCoordinator));

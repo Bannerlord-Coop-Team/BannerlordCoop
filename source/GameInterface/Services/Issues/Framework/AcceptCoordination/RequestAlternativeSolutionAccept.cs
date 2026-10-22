@@ -18,18 +18,16 @@ public readonly struct RequestAlternativeSolutionAccept : ICommand
 
     [ProtoMember(4)]
     public readonly TroopRosterElementData[] SentTroops;
-    [ProtoMember(5)] public readonly bool RequiresCommittedTroops;
 
     public RequestAlternativeSolutionAccept(
         string issueOwnerId,
         string issueId,
         float difficultyMultiplier,
-        TroopRosterElementData[] sentTroops, bool requiresCommittedTroops = false)
+        TroopRosterElementData[] sentTroops)
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
         DifficultyMultiplier = difficultyMultiplier;
         SentTroops = sentTroops;
-        RequiresCommittedTroops = requiresCommittedTroops;
     }
 }

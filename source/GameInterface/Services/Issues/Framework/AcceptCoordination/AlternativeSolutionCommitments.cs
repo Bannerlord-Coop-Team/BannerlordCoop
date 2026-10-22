@@ -74,6 +74,16 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
         return troops.ToData(result);
     }
 
+    public void ReturnForIssue(string issueOwnerId, string issueId)
+    {
+        foreach (var entry in selections.Where(entry => entry.Key.Giver == issueOwnerId && entry.Key.Issue == issueId).ToArray())
+        {
+            selections.Remove(entry.Key);
+            if (!objects.TryGetObjectWithLogging<Hero>(entry.Key.Hero, out var hero) || hero.PartyBelongedTo == null) continue;
+            troops.ReturnTroopsToParty(hero.PartyBelongedTo, troops.ToData(entry.Value.Troops));
+        }
+    }
+
     private void Handle_Applied(MessagePayload<PartyDoneLogicApplied> payload)
     {
         var data = payload.What;
@@ -98,8 +108,8 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
         {
             foreach (var entry in selections.Where(entry => entry.Value.Peer == payload.What.PlayerId).ToArray())
             {
-                if (!objects.TryGetObjectWithLogging<Hero>(entry.Key.Hero, out var hero) || hero.PartyBelongedTo == null) continue;
                 selections.Remove(entry.Key);
+                if (!objects.TryGetObjectWithLogging<Hero>(entry.Key.Hero, out var hero) || hero.PartyBelongedTo == null) continue;
                 troops.ReturnTroopsToParty(hero.PartyBelongedTo, troops.ToData(entry.Value.Troops));
             }
         }, context: nameof(AlternativeSolutionCommitments));

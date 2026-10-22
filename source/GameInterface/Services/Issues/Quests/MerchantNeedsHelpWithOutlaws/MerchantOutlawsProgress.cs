@@ -2,6 +2,7 @@
 using Common.Network;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,12 +23,15 @@ internal class MerchantOutlawsProgress : IMerchantOutlawsProgress
     private readonly IObjectManager objectManager;
     private readonly IIssueOwnerResolver ownerResolver;
     private readonly INetwork network;
+    private readonly IPlayerManager players;
 
-    public MerchantOutlawsProgress(IObjectManager objectManager, IIssueOwnerResolver ownerResolver, INetwork network)
+    public MerchantOutlawsProgress(IObjectManager objectManager, IIssueOwnerResolver ownerResolver, INetwork network,
+        IPlayerManager players)
     {
         this.objectManager = objectManager;
         this.ownerResolver = ownerResolver;
         this.network = network;
+        this.players = players;
     }
 
     public void Send(Quest quest, bool final = false)
@@ -39,6 +43,7 @@ internal class MerchantOutlawsProgress : IMerchantOutlawsProgress
 
         var issue = IssueManager.GetIssueOfQuest(quest);
         if (issue == null || !ownerResolver.TryGetOwnerControllerId(issue, out var controllerId) ||
+            !players.TryGetPeer(controllerId, out var peer) ||
             !objectManager.TryGetIdWithLogging(quest.QuestGiver, out var giverId))
         {
             return;
@@ -53,7 +58,7 @@ internal class MerchantOutlawsProgress : IMerchantOutlawsProgress
             }
         }
 
-        network.SendAll(new NetworkMerchantOutlawsProgress(giverId, issue.StringId, controllerId,
+        network.Send(peer, new NetworkMerchantOutlawsProgress(giverId, issue.StringId, controllerId,
             quest._destroyedPartyCount, quest._recruitedPartyCount, ids.ToArray(),
             final ? quest.JournalEntries.LastOrDefault()?.LogText?.ToString() ?? string.Empty : string.Empty));
     }
@@ -62,9 +67,10 @@ internal class MerchantOutlawsProgress : IMerchantOutlawsProgress
     {
         if (ModInformation.IsClient || !issue.IsSolvingWithAlternative || issue.JournalEntries.Count == 0 ||
             !ownerResolver.TryGetOwnerControllerId(issue, out var controllerId) ||
+            !players.TryGetPeer(controllerId, out var peer) ||
             !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId)) return;
 
-        network.SendAll(new NetworkMerchantOutlawsProgress(giverId, issue.StringId, controllerId,
+        network.Send(peer, new NetworkMerchantOutlawsProgress(giverId, issue.StringId, controllerId,
             0, 0, Array.Empty<string>(), string.Empty,
             issue.JournalEntries.Select(log => log.LogText?.ToString() ?? string.Empty).ToArray(),
             issue.JournalEntries[0].CurrentProgress, issue.JournalEntries[0].Range));

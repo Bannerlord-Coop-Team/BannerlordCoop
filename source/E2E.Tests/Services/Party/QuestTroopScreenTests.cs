@@ -88,7 +88,7 @@ public class QuestTroopScreenTests : IDisposable
             var beforeDone = (sentTroops.TotalRegulars, sentTroops.TotalHeroes);
 
             Assert.Equal(
-                doneDelegateResult || (mode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage && doneConditionResult),
+                doneDelegateResult,
                 logic.DoneLogic(false));
 
             result = (beforeDone, (sentTroops.TotalRegulars, sentTroops.TotalHeroes));
@@ -101,17 +101,6 @@ public class QuestTroopScreenTests : IDisposable
     public void Done_InQuestMode_KeepsTheTransferredTroopsInTheSentRoster()
     {
         var (beforeDone, afterDone) = SendTroopsAndPressDone(Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage);
-
-        Assert.Equal((SentTroops, 1), beforeDone);
-        Assert.Equal(beforeDone, afterDone);
-    }
-
-    [Fact]
-    public void Done_InQuestMode_UsesTheVanillaConditionWhenTheGenericDelegateRefuses()
-    {
-        var (beforeDone, afterDone) = SendTroopsAndPressDone(
-            Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage,
-            doneDelegateResult: false);
 
         Assert.Equal((SentTroops, 1), beforeDone);
         Assert.Equal(beforeDone, afterDone);

@@ -208,6 +208,86 @@ public class LordNeedsHorsesTests : IDisposable
 
     private const int SentTroops = 3;
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PendingPickerTroopsReturnWhenCancelledOrTheIssueEnds(bool finalize)
+    {
+        foreach (var instance in new[] { Server, ClientA, ClientB })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var hero));
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                using (new AllowedThread())
+                {
+                    hero._partyBelongedTo = party;
+                    troop.UpgradeTargets = Array.Empty<CharacterObject>();
+                    var issue = new Issue(giver) { StringId = IssueId };
+                    Campaign.Current.IssueManager._issues.Add(giver, issue);
+                    giver.OnIssueCreatedForHero(issue);
+                }
+            });
+        }
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            party.MemberRoster.AddToCounts(troop, 10);
+        });
+        TestEnvironment.FlushCoalescer();
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.True(ClientA.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
+            Assert.True(ClientA.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            var agent = new Moq.Mock<TaleWorlds.Core.IAgent>();
+            agent.SetupGet(value => value.Character).Returns(giver.CharacterObject);
+            Campaign.Current.ConversationManager._conversationAgents.Add(agent.Object);
+            new TaleWorlds.CampaignSystem.CampaignBehaviors.IssuesCampaignBehavior()
+                .issue_offer_player_accept_alternative_4_consequence();
+            var logic = new PartyScreenLogic();
+            logic.Initialize(PartyScreenLogicInitializationData.CreateBasicInitDataWithMainParty(
+                giver.Issue.AlternativeSolutionSentTroops,
+                TaleWorlds.CampaignSystem.Roster.TroopRoster.CreateDummyTroopRoster(),
+                PartyScreenLogic.TransferState.Transferable, PartyScreenLogic.TransferState.NotTransferable,
+                PartyScreenLogic.TransferState.Transferable, null,
+                Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage,
+                partyPresentationDoneButtonDelegate: Helpers.PartyScreenHelper.ManageTroopsAndPrisonersDoneHandler));
+            logic._partyScreenMode = Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage;
+            var command = new PartyScreenLogic.PartyCommand();
+            command.FillForTransferTroop(PartyScreenLogic.PartyRosterSide.Right,
+                PartyScreenLogic.TroopType.Member, troop, SentTroops, 0, -1);
+            using (new AllowedThread()) logic.TransferTroop(command, false);
+            Assert.True(logic.DoneLogic(false));
+        }, new[] { AccessTools.Method(typeof(Helpers.PartyScreenHelper), nameof(Helpers.PartyScreenHelper.OpenScreenAsQuest)) });
+        TestEnvironment.FlushCoalescer();
+        Assert.Equal(7, OwnersMembers());
+        if (finalize)
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                giver.Issue.CompleteIssueWithTimedOut();
+            }, LogTexts);
+        }
+        else
+        {
+            ClientA.Call(() => TaleWorlds.CampaignSystem.CampaignBehaviors.IssuesCampaignBehavior
+                .issue_offer_player_accept_alternative_5_b_consequence());
+        }
+        TestEnvironment.FlushCoalescer();
+        Assert.Equal(10, OwnersMembers());
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
+            Assert.True(ClientA.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            Assert.Equal(10, party.MemberRoster.GetTroopCount(troop));
+        });
+    }
+
     // The success texts read the companion's encyclopedia link, which these test heroes do not have. The troops coming back is what is tested.
     private static readonly System.Reflection.MethodBase[] LogTexts =
     {

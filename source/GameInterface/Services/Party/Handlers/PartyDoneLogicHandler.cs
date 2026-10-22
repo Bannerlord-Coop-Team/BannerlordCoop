@@ -43,7 +43,7 @@ internal class PartyDoneLogicHandler : IHandler
     private readonly INetwork network;
     private readonly ITroopRosterInterface troopRosterInterface;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
-    private readonly IQuestTypeRegistry questTypes;
+    private readonly IAlternativeSolutionPicker picker;
     private readonly IAlternativeSolutionCommitments commitments;
     private readonly IRecruitmentSideEffects recruitmentSideEffects;
     private readonly IPlayerManager playerManager;
@@ -54,7 +54,7 @@ internal class PartyDoneLogicHandler : IHandler
         INetwork network,
         ITroopRosterInterface troopRosterInterface,
         IVillageHostileActionInterface villageHostileActionInterface,
-        IQuestTypeRegistry questTypes,
+        IAlternativeSolutionPicker picker,
         IAlternativeSolutionCommitments commitments,
         IRecruitmentSideEffects recruitmentSideEffects,
         IPlayerManager playerManager)
@@ -64,7 +64,7 @@ internal class PartyDoneLogicHandler : IHandler
         this.network = network;
         this.troopRosterInterface = troopRosterInterface;
         this.villageHostileActionInterface = villageHostileActionInterface;
-        this.questTypes = questTypes;
+        this.picker = picker;
         this.commitments = commitments;
         this.recruitmentSideEffects = recruitmentSideEffects;
         this.playerManager = playerManager;
@@ -125,16 +125,7 @@ internal class PartyDoneLogicHandler : IHandler
 
         string issueOwnerId = null;
         string issueId = null;
-        if (obj.What.PartyScreenMode == Helpers.PartyScreenHelper.PartyScreenMode.QuestTroopManage)
-        {
-            var issue = Campaign.Current.IssueManager.Issues.Values.FirstOrDefault(value =>
-                ReferenceEquals(value.AlternativeSolutionSentTroops, obj.What.LeftMemberRoster));
-            if (issue != null && questTypes.TryGet(issue.GetType(), out var descriptor) &&
-                descriptor.AlternativeSolutionAcceptStrategy is ICommittedAlternativeSolutionAcceptStrategy &&
-                objectManager.TryGetIdWithLogging(issue.IssueOwner, out issueOwnerId)) issueId = issue.StringId;
-            logger.Information("Quest picker Done: hero={HeroId}, giver={GiverId}, issue={IssueId}, left stacks={Stacks}",
-                mainHeroId, issueOwnerId, issueId, leftMemberRosterData.Data?.Length ?? 0);
-        }
+        picker.TryGetIssue(obj.What.LeftMemberRoster, out issueOwnerId, out issueId);
 
         var message = new NetworkCompleteDoneLogic(
             mainHeroId,

@@ -4,7 +4,7 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Quests.MerchantNeedsHelpWithOutlaws;
 
-internal class MerchantOutlawsAlternativeSolutionAcceptStrategy : IAlternativeSolutionAcceptStrategy, ICommittedAlternativeSolutionAcceptStrategy
+internal class MerchantOutlawsAlternativeSolutionAcceptStrategy : IAlternativeSolutionAcceptStrategy
 {
     // All quest-specific values are deterministic; the framework carries casualties and failure risk.
     public byte[] Capture(IssueBase issue) => Array.Empty<byte>();

@@ -260,6 +260,12 @@ public class MerchantOutlawsTests : IDisposable
     public void TargetChangesMarkOnlyTheOwnersMap()
     {
         Accept();
+        var sentBefore = Server.NetworkSentMessages.GetMessages<NetworkMerchantOutlawsProgress>().Count();
+        var ownerBefore = ClientA.InternalMessages.GetMessages<NetworkMerchantOutlawsProgress>().Count();
+        Server.Call(() => Server.Resolve<IMerchantOutlawsProgress>().Send(Quest(Server)));
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkMerchantOutlawsProgress>().Skip(sentBefore));
+        Assert.Single(ClientA.InternalMessages.GetMessages<NetworkMerchantOutlawsProgress>().Skip(ownerBefore));
+        Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkMerchantOutlawsProgress>());
         var targetId = TargetIds().First();
         var otherHideoutId = environment.CreateRegisteredObject<Hideout>();
         var otherSettlementId = environment.CreateRegisteredObject<Settlement>();
@@ -721,6 +727,7 @@ public class MerchantOutlawsTests : IDisposable
                 issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
             }
 
+            ClientA.Resolve<IAlternativeSolutionPicker>().Open(issue);
             var logic = new PartyScreenLogic();
             pickerLogic = logic;
             logic.Initialize(PartyScreenLogicInitializationData.CreateBasicInitDataWithMainParty(
@@ -805,6 +812,7 @@ public class MerchantOutlawsTests : IDisposable
             {
                 var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
                 var party = Get<MobileParty>(ClientA, scenario.PlayerA.MobilePartyId);
+                ClientA.Resolve<IAlternativeSolutionPicker>().Open(issue);
                 pickerLogic = new PartyScreenLogic();
                 pickerLogic.Initialize(new PartyScreenLogicInitializationData
                 {
@@ -878,6 +886,7 @@ public class MerchantOutlawsTests : IDisposable
                     party.MemberRoster.AddToCounts(companion, -1);
                     issue.AlternativeSolutionSentTroops.AddToCounts(companion, 1);
                 }
+                ClientB.Resolve<IAlternativeSolutionPicker>().Open(issue);
                 var logic = new PartyScreenLogic();
                 logic.Initialize(new PartyScreenLogicInitializationData
                 {
@@ -946,7 +955,7 @@ public class MerchantOutlawsTests : IDisposable
             {
                 if (cancelPicker || reopenPicker)
                 {
-                    using (new AllowedThread()) pickerLogic.Reset(true);
+                    Assert.False(Game.Current.GameStateManager.ActiveState is TaleWorlds.CampaignSystem.GameState.PartyState);
                 }
                 Assert.Null(Get<Hero>(ClientA, scenario.NotableId).Issue);
                 Assert.Equal(1, Get<MobileParty>(ClientA, scenario.PlayerA.MobilePartyId).MemberRoster.GetTroopCount(Get<Hero>(ClientA, companionId).CharacterObject));
@@ -1000,6 +1009,7 @@ public class MerchantOutlawsTests : IDisposable
         }
         Server.Call(() => Campaign.Current.IssueManager.DailyTick(), TextHelpers);
         Assert.Equal(2, ownerIssue.JournalEntries.Count);
+        Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkMerchantOutlawsProgress>());
         foreach (var client in new[] { ClientA, ClientB })
         {
             client.Call(() => Campaign.Current.IssueManager.DailyTick(), TextHelpers);

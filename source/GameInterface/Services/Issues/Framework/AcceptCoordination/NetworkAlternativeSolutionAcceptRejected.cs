@@ -14,12 +14,10 @@ public readonly struct NetworkAlternativeSolutionAcceptRejected : IServerToClien
 
     [ProtoMember(2)]
     public readonly string IssueId;
-    [ProtoMember(3)] public readonly string Reason;
 
-    public NetworkAlternativeSolutionAcceptRejected(string issueOwnerId, string issueId, string reason = null)
+    public NetworkAlternativeSolutionAcceptRejected(string issueOwnerId, string issueId)
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
-        Reason = reason;
     }
 }

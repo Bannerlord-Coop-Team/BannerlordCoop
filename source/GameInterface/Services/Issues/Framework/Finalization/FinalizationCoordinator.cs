@@ -11,6 +11,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -31,6 +32,7 @@ internal class FinalizationCoordinator : IHandler
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IPlayerManager playerManager;
     private readonly IControllerIdProvider controller;
+    private readonly IAlternativeSolutionCommitments commitments;
 
     public FinalizationCoordinator(
         IMessageBroker messageBroker,
@@ -39,7 +41,8 @@ internal class FinalizationCoordinator : IHandler
         IIssueResolver issueResolver,
         IIssueOwnershipRegistry ownership,
         IPlayerManager playerManager,
-        IControllerIdProvider controller)
+        IControllerIdProvider controller,
+        IAlternativeSolutionCommitments commitments)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -48,6 +51,7 @@ internal class FinalizationCoordinator : IHandler
         this.ownership = ownership;
         this.playerManager = playerManager;
         this.controller = controller;
+        this.commitments = commitments;
 
         messageBroker.Subscribe<QuestOutcomeRequested>(Handle_QuestOutcomeRequested);
         messageBroker.Subscribe<QuestBranchRequested>(Handle_QuestBranchRequested);
@@ -186,6 +190,7 @@ internal class FinalizationCoordinator : IHandler
             return;
         }
 
+        commitments.ReturnForIssue(issueOwnerId, issue.StringId);
         ownership.Remove(issueOwnerId);
 
         network.SendAll(new NetworkIssueFinalized(issueOwnerId, issue.StringId, payload.What.Outcome));
@@ -286,11 +291,19 @@ internal class FinalizationCoordinator : IHandler
     {
         var quest = issue.IssueQuest;
 
-        if (quest != null && !Campaign.Current.QuestManager.Quests.Contains(quest))
+        if (quest != null && (!isOwner || !Campaign.Current.QuestManager.Quests.Contains(quest)))
         {
-            // Constructors register dialogue even before the acceptance line starts the quest.
-            quest.FinalizeQuest();
-            quest.AfterFinalize();
+            // Discard mirror bookkeeping without running task cancellation or quest gameplay hooks.
+            quest.ClearRelatedFields();
+            quest._questState = QuestBase.QuestStates.Finalized;
+            quest.OfferDialogFlow = null;
+            quest.DiscussDialogFlow = null;
+            quest.QuestCharacterDialogFlow = null;
+            quest.RemoveAllTrackedObjects();
+            if (!string.IsNullOrEmpty(quest.StringId) &&
+                !Campaign.Current.QuestManager.Quests.Any(other => other != quest && other.StringId == quest.StringId))
+                quest.RemoveAllMapMarkers();
+            Campaign.Current.QuestManager.OnQuestFinalized(quest);
             issue.IssueQuest = null;
             issue.IsTriedToSolveBefore = false;
             quest = null;
@@ -362,6 +375,7 @@ internal class FinalizationCoordinator : IHandler
                 issue.CompleteIssueWithStayAliveConditionsFailed();
                 return true;
             case IssueOutcome.AlternativeSolution:
+            case IssueOutcome.IssueFinishedByAiLord:
                 issue.IssueFinalized();
                 return true;
             case IssueOutcome.LordAcceptedCounterOffer:
