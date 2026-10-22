@@ -426,9 +426,11 @@ public sealed class RevenueFarmingTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void LoadedJournalHistoryIsVisibleOnlyToTheQuestOwner(bool cancel)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void LoadedJournalHistoryIsVisibleOnlyToTheQuestOwner(bool cancel, bool questIdOnly)
     {
         Server.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
         Accept();
@@ -446,10 +448,20 @@ public sealed class RevenueFarmingTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(serverQuest.IsFinalized);
-            savedLog = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>()
-                .Where(entry => entry.IsRelatedTo(serverQuest)));
+            savedLog = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId)));
             Assert.True(savedLog.IsEnded());
             Assert.Equal("zqrn2beP", savedLog.Title.GetID());
+            Assert.Equal(new[] { QuestScenario.IssueId, null! }, savedLog._relatedObjectIds);
+            if (questIdOnly)
+            {
+                // Vanilla can also create an archive entry after the issue detaches its quest.
+                var detachedLog = new JournalLogEntry(savedLog.Title, serverQuest.QuestGiver, null, false, serverQuest);
+                detachedLog.Update(savedLog.GetEntries().ToMBList(), cancel
+                    ? QuestBase.QuestCompleteDetails.Cancel : QuestBase.QuestCompleteDetails.Success);
+                savedLog = detachedLog;
+                Assert.Equal(new[] { serverQuest.StringId }, savedLog._relatedObjectIds);
+            }
             Server.Resolve<IRevenueFarmingSessionStore>().SyncData(new JournalDataStore(true, records));
         });
 
@@ -458,11 +470,17 @@ public sealed class RevenueFarmingTests : IDisposable
         {
             instance.Resolve<IRevenueFarmingSessionStore>().SyncData(new JournalDataStore(false, records));
             using (new AllowedThread()) LogEntry.AddLogEntry(savedLog);
-            var loaded = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>()
-                .Where(entry => ReferenceEquals(entry, savedLog)));
+            var loaded = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => ReferenceEquals(entry, savedLog)));
             Assert.Equal(instance == Client, loaded.IsEnded());
             Assert.NotEmpty(loaded.GetEntries());
             using (new AllowedThread()) Assert.True(loaded.IsEnded());
+
+            var unrelated = new JournalLogEntry(new TextObject("{=other-quest-history}Other quest"),
+                serverQuest.QuestGiver, null, false, serverQuest);
+            unrelated.Update(savedLog.GetEntries().ToMBList(), QuestBase.QuestCompleteDetails.Success);
+            using (new AllowedThread()) LogEntry.AddLogEntry(unrelated);
+            Assert.Contains(unrelated, Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsEnded()));
         });
         Server.Call(() => Assert.True(savedLog.IsEnded()));
     }
