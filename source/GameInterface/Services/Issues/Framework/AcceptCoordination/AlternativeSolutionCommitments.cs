@@ -98,7 +98,7 @@ internal class AlternativeSolutionCommitments : IHandler, IAlternativeSolutionCo
             selection.Troops.AddToCounts(element.Character, element.Number,
                 woundedCount: element.WoundedNumber, xpChange: element.Xp);
         }
-        selections[key] = selection;
+        selections[key] = (data.Requester, selection.Troops);
     }
 
     private void Handle_Disconnected(MessagePayload<PlayerDisconnected> payload)
