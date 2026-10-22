@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.Network;
+using Common;
 using Common.Util;
 using E2E.Tests.Util;
 using HarmonyLib;
@@ -11,6 +12,9 @@ using System.Collections.Generic;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.Issues.Framework.AcceptCoordination;
+using GameInterface.Services.MobileParties.Messages.Lifetime;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using GameInterface.Services.Issues.Quests.LesserNobleRevolt.Patches;
@@ -45,9 +49,11 @@ public sealed class LesserNobleRevoltTests : IDisposable
 {
     private readonly E2ETestEnvironment testEnvironment;
     private readonly string giverId;
+    private readonly ITestOutputHelper output;
 
     public LesserNobleRevoltTests(ITestOutputHelper output)
     {
+        this.output = output;
         testEnvironment = new E2ETestEnvironment(output);
         giverId = testEnvironment.CreateRegisteredObject<Hero>();
     }
@@ -688,6 +694,172 @@ public sealed class LesserNobleRevoltTests : IDisposable
         });
 
         Assert.Equal(1, timeouts.CountFor(server));
+    }
+
+    [Fact]
+    public void FailedAccept_RemovesTheSpawnedPartyFromEveryWorldAndRegistryAndReoffersTheIssue()
+    {
+        const string issueId = "issue_revolt_accept_rollback";
+        var server = testEnvironment.Server;
+        var owner = testEnvironment.Clients.First();
+        var observer = testEnvironment.Clients.Last();
+        using var preconditions = new StubIssuePreconditions(typeof(Issue));
+        RegisterPlayer("player-A", owner);
+        RegisterPlayer("player-B", observer);
+        var troopIds = new[] { testEnvironment.CreateRegisteredObject<CharacterObject>(), testEnvironment.CreateRegisteredObject<CharacterObject>() };
+        Assert.True(server.Resolve<IPlayerManager>().TryGetPlayer("player-A", out var player));
+        var villageIds = new[] { testEnvironment.CreateRegisteredObject<Settlement>(), testEnvironment.CreateRegisteredObject<Settlement>() };
+        var parties = new Dictionary<EnvironmentInstance, MobileParty>();
+        string revoltPartyId = null;
+        uint revoltPartyHandle = 0;
+        Quest spawnedQuest = null;
+        var applyReached = false;
+        bool? serverCleanupAllowed = null;
+        using var probe = new RollbackAcceptProbe(villageIds, () =>
+        {
+            spawnedQuest = QuestOf(server);
+            Assert.False(AllowedThread.IsThisThreadAllowed());
+            Assert.True(server.ObjectManager.TryGetId(spawnedQuest._lesserNobleParty, out revoltPartyId));
+            Assert.True(server.ObjectManager.TryGetHandle(spawnedQuest._lesserNobleParty, out revoltPartyHandle));
+            testEnvironment.FlushCoalescer();
+            foreach (var instance in new[] { server, owner, observer })
+            {
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(revoltPartyId, out var party));
+                    Assert.True(party.IsActive);
+                    parties.Add(instance, party);
+                });
+            }
+
+            applyReached = true;
+        });
+
+        foreach (var instance in new[] { server, owner, observer })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+                using (new AllowedThread())
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopIds[0], out var tier5));
+                    Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopIds[1], out var tier6));
+                    ((BasicCharacterObject)tier5).Level = 26;
+                    ((BasicCharacterObject)tier6).Level = 31;
+                    tier5.UpgradeTargets = new[] { tier6 };
+                    tier6.UpgradeTargets = Array.Empty<CharacterObject>();
+                    giver.Culture.StringId = "khuzait";
+                    giver.Culture._maleNameList = new MBList<TextObject> { new TextObject("Chaghan") };
+                    giver.Culture.EliteBasicTroop = tier5;
+                    Assert.True(instance.ObjectManager.TryGetObject<Hero>(player.HeroId, out var playerHero));
+                    Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var playerParty));
+                    playerHero._partyBelongedTo = playerParty;
+                    Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+                    Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+                    var issue = new Issue(giver);
+                    issue.StringId = issueId;
+                    issue._lesserNobleName = new TextObject("Chaghan");
+                    issue._issueState = IssueBase.IssueState.Ongoing;
+                    Campaign.Current.IssueManager._issues.Add(giver, issue);
+                    giver.OnIssueCreatedForHero(issue);
+                    Campaign.Current.VisualTrackerManager = new VisualTrackerManager();
+                }
+            });
+        }
+
+        server.Call(() => CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, (party, _) =>
+        {
+            if (parties.TryGetValue(server, out var expected) && ReferenceEquals(party, expected))
+            {
+                serverCleanupAllowed = AllowedThread.IsThisThreadAllowed();
+                output.WriteLine($"Server cleanup: AllowedThread={serverCleanupAllowed}");
+            }
+        }));
+
+        // The real decoder throws after the real constructor has spawned and replicated its party.
+        server.SimulateMessage(owner.NetPeer, new RequestQuestSolutionAccept(giverId, issueId, 1f, new byte[] { 0 }));
+        server.PumpGameThread();
+        testEnvironment.FlushCoalescer();
+        foreach (var client in testEnvironment.Clients) client.PumpGameThread();
+
+        Assert.True(applyReached, "The test must reach Apply after construction and client creation, before injecting the failure.");
+        Assert.True(spawnedQuest.IsFinalized);
+        Assert.Single(server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Assert.Empty(server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+        Assert.Empty(server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+            Assert.Null(giver.Issue.IssueQuest);
+            Assert.True(giver.Issue.IsOngoingWithoutQuest);
+            Assert.False(giver.Issue.IsTriedToSolveBefore);
+            Assert.False(server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(giverId, issueId, out _));
+        });
+
+        foreach (var instance in new[] { server, owner, observer })
+        {
+            instance.Call(() => output.WriteLine($"{instance.GetType().Name}: active={parties[instance].IsActive}, registered={instance.ObjectManager.TryGetObject<MobileParty>(revoltPartyId, out _)}, inWorld={Campaign.Current.MobileParties.Contains(parties[instance])}"));
+        }
+
+        Assert.Single(server.InternalMessages.GetMessages<DestroyPartyApplied>());
+        Assert.Single(server.InternalMessages.GetMessages<InstanceDestroyed<MobileParty>>());
+        Assert.Equal(revoltPartyId, Assert.Single(server.NetworkSentMessages.GetMessages<NetworkApplyDestroyParty>()).DefeatedPartyId);
+        Assert.Equal(revoltPartyHandle, Assert.Single(server.NetworkSentMessages.GetMessages<NetworkDestroyInstance<MobileParty>>()).InstanceHandle);
+        Assert.False(serverCleanupAllowed);
+        foreach (var instance in new[] { server, owner, observer })
+        {
+            instance.Call(() =>
+            {
+                Assert.False(parties[instance].IsActive);
+                Assert.False(instance.ObjectManager.TryGetObject<MobileParty>(revoltPartyId, out _));
+                Assert.DoesNotContain(parties[instance], Campaign.Current.MobileParties);
+            });
+        }
+    }
+
+    // Only dialog/render setup and the synthetic campaign's village selection are replaced.
+    // The constructor, SpawnLesserNobleParty, accept coordinator, decoder and destruction all run.
+    private sealed class RollbackAcceptProbe : IDisposable
+    {
+        private static RollbackAcceptProbe current;
+        private readonly Harmony harmony = new("test-revolt-accept-rollback");
+        private readonly string[] villageIds;
+        private readonly Action beforeApply;
+
+        public RollbackAcceptProbe(string[] villageIds, Action beforeApply)
+        {
+            this.villageIds = villageIds;
+            this.beforeApply = beforeApply;
+            current = this;
+            harmony.Patch(AccessTools.Method(typeof(Quest), nameof(Quest.SetDialogs)), prefix: new HarmonyMethod(typeof(RollbackAcceptProbe), nameof(SkipDialogs)));
+            harmony.Patch(AccessTools.Method(typeof(Quest), nameof(Quest.CollectSuitableVillages)), prefix: new HarmonyMethod(typeof(RollbackAcceptProbe), nameof(SelectVillages)));
+            harmony.Patch(AccessTools.Method(typeof(LesserNobleRevoltQuestSolutionAcceptStrategy), nameof(LesserNobleRevoltQuestSolutionAcceptStrategy.Apply)), prefix: new HarmonyMethod(typeof(RollbackAcceptProbe), nameof(BeforeApply)));
+        }
+
+        private static bool SkipDialogs() => false;
+
+        private static bool SelectVillages(Quest __instance)
+        {
+            __instance._suitableVillagesToVisitList = current.villageIds.Select(id =>
+            {
+                Assert.True(GameInterface.ContainerProvider.TryResolve<GameInterface.Services.ObjectManager.IObjectManager>(out var objects));
+                Assert.True(objects.TryGetObject<Settlement>(id, out var village));
+                return village;
+            }).ToList();
+            __instance._visitedVillagesList = new List<Settlement>();
+            return false;
+        }
+
+        private static void BeforeApply()
+        {
+            if (ModInformation.IsServer) current.beforeApply();
+        }
+
+        public void Dispose()
+        {
+            harmony.UnpatchAll(harmony.Id);
+            current = null;
+        }
     }
 
     [Fact]
