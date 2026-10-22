@@ -60,9 +60,13 @@ public class LootShipHold : ILootShipHold
 
     public void Hold(Ship ship, PartyBase looter)
     {
+        objectManager.TryGetId(ship, out var shipId);
+        Logger.Information("[NavalSync] Holding loot ship {ShipId} of {Loser} for {Looter} until its loot screen closes",
+            shipId, ship.Owner?.Id, looter?.Id);
+
         // The setter takes the ship out of the losing party's list, so RemoveParty at its finalize no longer destroys it.
         ship.Owner = null;
-        held[ship] = new HeldShip(looter, UtcNow() + FallbackHoldTime);
+        held[ship] = new HeldShip(shipId, looter, UtcNow() + FallbackHoldTime);
     }
 
     public void Release(PartyBase looter, IReadOnlyCollection<Ship> offered)
@@ -71,9 +75,13 @@ public class LootShipHold : ILootShipHold
         {
             var ship = entry.Key;
             held.Remove(ship);
-            if (offered.Contains(ship)) continue;
+            if (offered.Contains(ship) || IsClaimedOrGone(ship))
+            {
+                LogReleased(entry.Value, ReleaseOutcome(ship));
+                continue;
+            }
 
-            DestroyIfUnclaimed(ship, entry.Value.Looter);
+            DestroyUnclaimed(ship, entry.Value, "its loot screen closed without it");
         }
     }
 
@@ -88,26 +96,36 @@ public class LootShipHold : ILootShipHold
             if (IsClaimedOrGone(ship))
             {
                 held.Remove(ship);
+                LogReleased(entry.Value, ReleaseOutcome(ship));
                 continue;
             }
 
             if (now < entry.Value.ExpiresUtc && !IsLooterGone(entry.Value.Looter)) continue;
 
             held.Remove(ship);
-            DestroyIfUnclaimed(ship, entry.Value.Looter);
+            DestroyUnclaimed(ship, entry.Value, IsLooterGone(entry.Value.Looter) ? "its looter left or disconnected" : "the fallback hold ran out");
         }
     }
 
     // Taken through the loot screen, or already destroyed (its discard, a finalize).
     private bool IsClaimedOrGone(Ship ship) => ship.Owner != null || !objectManager.TryGetId(ship, out _);
 
-    // Destroys a held ship nobody took, through the vanilla destroy that the ship sync replicates.
-    private void DestroyIfUnclaimed(Ship ship, PartyBase looter)
+    // What became of a released ship: taken by a party, destroyed already, or left ownerless for the discard to destroy.
+    private string ReleaseOutcome(Ship ship)
     {
-        if (IsClaimedOrGone(ship)) return;
+        if (ship.Owner != null) return "taken by " + ship.Owner.Id;
 
-        objectManager.TryGetId(ship, out var shipId);
-        Logger.Information("[NavalSync] Destroying unclaimed loot ship {ShipId} of {Looter}", shipId, looter?.Id);
+        return objectManager.TryGetId(ship, out _) ? "discarded by its loot screen" : "already destroyed (discarded)";
+    }
+
+    // One line per ship leaving the hold without the hold destroying it.
+    private static void LogReleased(HeldShip heldShip, string outcome) =>
+        Logger.Information("[NavalSync] Released loot ship {ShipId} held for {Looter}: {Outcome}", heldShip.ShipId, heldShip.Looter?.Id, outcome);
+
+    // Destroys a held ship nobody took (the callers checked it is unclaimed), through the vanilla destroy the ship sync replicates.
+    private static void DestroyUnclaimed(Ship ship, HeldShip heldShip, string reason)
+    {
+        Logger.Information("[NavalSync] Destroying unclaimed loot ship {ShipId} held for {Looter}: {Reason}", heldShip.ShipId, heldShip.Looter?.Id, reason);
         DestroyShipAction.Apply(ship);
     }
 
@@ -115,15 +133,18 @@ public class LootShipHold : ILootShipHold
     private bool IsLooterGone(PartyBase looter) =>
         looter?.MobileParty == null || playerManager.IsOwnerOfPartyDisconnected(looter.MobileParty);
 
-    // The player party a ship was looted for and when its fallback hold runs out.
+    // The held ship's id (kept for the log once it is destroyed), the player party it was looted for and when its hold runs out.
     private readonly struct HeldShip
     {
-        public HeldShip(PartyBase looter, DateTime expiresUtc)
+        // Assigns the held ship's fields.
+        public HeldShip(string shipId, PartyBase looter, DateTime expiresUtc)
         {
+            ShipId = shipId;
             Looter = looter;
             ExpiresUtc = expiresUtc;
         }
 
+        public string ShipId { get; }
         public PartyBase Looter { get; }
         public DateTime ExpiresUtc { get; }
     }

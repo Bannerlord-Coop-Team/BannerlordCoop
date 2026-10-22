@@ -4,6 +4,7 @@ using GameInterface.Services.Ships.Data;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -33,6 +34,9 @@ public class BattleShipFateApplier : IBattleShipFateApplier
 
     // Smaller HP differences are float noise, so the ship keeps its value and no write replicates.
     private const float Tolerance = 0.01f;
+
+    // Vanilla's Boatswain XP per point of mitigated ship damage (NavalSkillLevellingManager.OnShipDamaged), for the log only.
+    private const float BoatswainXpPerMitigatedPoint = 0.1f;
 
     private readonly IBattleShipFateLedger ledger;
     private readonly IObjectManager objectManager;
@@ -72,28 +76,35 @@ public class BattleShipFateApplier : IBattleShipFateApplier
     // Grants the fate's XP, then destroys a sunk ship or writes the survivor's battle HP.
     private static void ApplyFate(Ship ship, BattleShipFate fate)
     {
-        GrantBoatswainXp(ship, fate.MitigatedDamage);
+        GrantBoatswainXp(ship, fate);
         if (fate.Sunk)
         {
-            Logger.Information("[NavalSync] Ship {ShipId} of {Owner} sank in battle; destroying it", fate.CampaignShipId, ship.Owner.Id);
+            Logger.Information("[NavalSync] Ship {ShipId} of {Owner} sank in battle; destroying it (hp {HitPoints}/{MaxHitPoints}, sail {SailHitPoints}/{MaxSailHitPoints})",
+                fate.CampaignShipId, ship.Owner.Id, ship.HitPoints, ship.MaxHitPoints, ship.SailHitPoints, ship.MaxSailHitPoints);
             DestroyShipAction.Apply(ship);
             return;
         }
 
+        float oldHitPoints = ship.HitPoints;
+        float oldSailHitPoints = ship.SailHitPoints;
         float hitPoints = MathF.Clamp(fate.HitPoints, 0f, ship.MaxHitPoints);
         float sailHitPoints = MathF.Clamp(fate.SailHitPoints, 0f, ship.MaxSailHitPoints);
-        if (Math.Abs(ship.HitPoints - hitPoints) > Tolerance) ship.HitPoints = hitPoints;
-        if (Math.Abs(ship.SailHitPoints - sailHitPoints) > Tolerance) ship.SailHitPoints = sailHitPoints;
-        Logger.Information("[NavalSync] Ship {ShipId} of {Owner} keeps its battle condition: hp {HitPoints}, sail {SailHitPoints}",
-            fate.CampaignShipId, ship.Owner.Id, ship.HitPoints, ship.SailHitPoints);
+        if (Math.Abs(oldHitPoints - hitPoints) > Tolerance) ship.HitPoints = hitPoints;
+        if (Math.Abs(oldSailHitPoints - sailHitPoints) > Tolerance) ship.SailHitPoints = sailHitPoints;
+        Logger.Information("[NavalSync] Ship {ShipId} of {Owner} keeps its battle condition: hp {OldHitPoints} -> {HitPoints}, sail {OldSailHitPoints} -> {SailHitPoints}",
+            fate.CampaignShipId, ship.Owner.Id, oldHitPoints, ship.HitPoints, oldSailHitPoints, ship.SailHitPoints);
     }
 
     // Vanilla's per-hit skill call with the battle's mitigated damage as raw and none as final, which grants the owner party's
-    // Boatswain the same 0.1 XP per mitigated point (NavalSkillLevellingManager.OnShipDamaged), once for the whole battle.
-    private static void GrantBoatswainXp(Ship ship, float mitigatedDamage)
+    // Boatswain (its first mate) the same 0.1 XP per mitigated point (NavalSkillLevellingManager.OnShipDamaged), once per battle.
+    private static void GrantBoatswainXp(Ship ship, BattleShipFate fate)
     {
-        if (mitigatedDamage <= 0f) return;
+        if (fate.MitigatedDamage <= 0f) return;
 
-        SkillLevelingManager.OnShipDamaged(ship, mitigatedDamage, 0f);
+        var boatswain = ship.Owner.MobileParty?.GetEffectiveRoleHolder(PartyRole.FirstMate);
+        Logger.Information("[NavalSync] Boatswain {Hero} of {Owner} gains {Xp} skill XP for ship {ShipId} ({MitigatedDamage} mitigated damage)",
+            boatswain?.StringId ?? "none", ship.Owner.Id, fate.MitigatedDamage * BoatswainXpPerMitigatedPoint, fate.CampaignShipId,
+            fate.MitigatedDamage);
+        SkillLevelingManager.OnShipDamaged(ship, fate.MitigatedDamage, 0f);
     }
 }
