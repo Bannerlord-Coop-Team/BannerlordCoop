@@ -28,6 +28,8 @@ internal class LandLordCompanyOfTroubleCompanyDestroyedPatch
             return;
         }
 
+        // DestroyPartyAction is still running for this party, so the finalize cleanup must not destroy it again
+        quest._companyOfTroubleParty = null;
         quest.RelationshipChangeWithQuestGiver = -2;
         quest.AddLog(quest.QuestFailCompanyLeft);
         quest.CompleteQuestWithFail();

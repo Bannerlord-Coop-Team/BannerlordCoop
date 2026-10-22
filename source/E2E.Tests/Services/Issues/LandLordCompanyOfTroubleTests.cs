@@ -371,6 +371,34 @@ public class LandLordCompanyOfTroubleTests : IDisposable
     }
 
     [Fact]
+    public void TheCompanyDestroyedBySomeoneElse_IsNotDestroyedAgainWhenTheQuestEnds()
+    {
+        var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var otherPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        SetOwner();
+        MobileParty company = null!;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(otherPartyId, out var other));
+            var quest = CompanyTurnedHostile(companyPartyId);
+            company = quest._companyOfTroubleParty;
+
+            using (new AllowedThread())
+            {
+                Campaign.Current.MainParty = ownerParty;
+            }
+
+            CampaignEventDispatcher.Instance.OnMobilePartyDestroyed(company, other.Party);
+            quest.OnFinalize();
+        });
+        Server.PumpGameThread();
+
+        Assert.True(company.IsActive);
+    }
+
+    [Fact]
     public void TheOwnerDestroyingTheCompany_LeavesTheEndingToTheBattle()
     {
         var companyPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
