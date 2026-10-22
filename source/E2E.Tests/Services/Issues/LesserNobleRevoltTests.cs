@@ -829,12 +829,27 @@ public sealed class LesserNobleRevoltTests : IDisposable
         server.Call(() => expected = EndingLog(serverQuest, ending).ToString());
 
         // These pay the owner, so the server runs each once and no client runs them again.
-        using var gold = new MethodCallRecorder(AccessTools.Method(typeof(GiveGoldAction), nameof(GiveGoldAction.ApplyBetweenCharacters)));
-        using var renown = new MethodCallRecorder(AccessTools.Method(typeof(GainRenownAction), nameof(GainRenownAction.Apply)));
+        // Release can inline the action forwarders, so record the already-patched gold action and renown writer.
+        using var gold = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(GiveGoldAction), nameof(GiveGoldAction.ApplyInternal)));
+        using var renown = new MethodCallRecorder(Priority.First, AccessTools.Method(typeof(Clan), nameof(Clan.AddRenown)));
         using var traits = new MethodCallRecorder(AccessTools.Method(typeof(TraitLevelingHelper), nameof(TraitLevelingHelper.OnIssueSolvedThroughQuest),
             new[] { typeof(Hero), typeof(Tuple<TraitObject, int>[]) }));
         // The server's release leaves an encounter the test campaign doesnt have.
         using var encounters = new MethodCallRecorder(AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish)));
+
+        // Prove the client guard cannot hide a call, then count only the ending below.
+        foreach (var instance in new[] { server, owner, observer })
+        {
+            instance.Call(() =>
+            {
+                GiveGoldAction.ApplyBetweenCharacters(null, null, 0);
+                ObjectHelper.SkipConstructor<Clan>().AddRenown(0f);
+            });
+            Assert.Equal(1, gold.CountFor(instance));
+            Assert.Equal(1, renown.CountFor(instance));
+        }
+        gold.Clear();
+        renown.Clear();
 
         End(ending, owner);
 
