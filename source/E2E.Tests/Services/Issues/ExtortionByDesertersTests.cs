@@ -4,6 +4,7 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.CoopSessionData;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
@@ -45,6 +46,7 @@ public class ExtortionByDesertersTests : IDisposable
         AccessTools.PropertyGetter(typeof(Hero), nameof(Hero.EncyclopediaLinkWithName)),
     };
     private readonly E2ETestEnvironment environment;
+    private readonly ITestOutputHelper output;
     private readonly QuestScenario scenario;
     private readonly MethodCallRecorder creation;
     private readonly string villageId;
@@ -57,6 +59,7 @@ public class ExtortionByDesertersTests : IDisposable
 
     public ExtortionByDesertersTests(ITestOutputHelper output)
     {
+        this.output = output;
         environment = new E2ETestEnvironment(output);
         // Navigation and party templates need the native map, the framework path does not.
         creation = new MethodCallRecorder(Priority.Last, AccessTools.Method(typeof(Quest), nameof(Quest.CreateDeserterParty)));
@@ -985,6 +988,193 @@ public class ExtortionByDesertersTests : IDisposable
         Assert.Equal(1, destruction.CountFor(Server));
         Assert.Equal(IssueOutcome.QuestCancel,
             Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+    }
+
+    [Theory]
+    [InlineData(99f)]
+    [InlineData(213.6168f)]
+    public void NativeGiverDeath_CancelsBeforeNotableReplacementAndReleasesOnlyTheOwnersQuest(float power)
+    {
+        var ownerQuest = Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        var secondId = AddSecondIssue();
+        Quest otherQuest = null!;
+        Other.Call(() =>
+        {
+            Assert.True(Other.ObjectManager.TryGetObject<Hero>(secondId, out var secondGiver));
+            secondGiver.Issue.StartIssueWithQuest();
+            otherQuest = (Quest)secondGiver.Issue.IssueQuest;
+            otherQuest.StartQuest();
+        }, TextLinks);
+        var replacementId = environment.CreateRegisteredObject<Hero>();
+        var log = string.Empty;
+        Server.Call(() =>
+        {
+            var giver = quest.QuestGiver;
+            var issue = giver.Issue;
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(replacementId, out var replacement));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.OtherHeroId, out var other));
+            var mainHero = Hero.MainHero;
+            var mainParty = MobileParty.MainParty;
+            var now = Campaign.Current.MapTimeTracker.Now;
+            var ownerBefore = (owner.Gold, owner.Clan.Renown, giver.GetRelation(owner));
+            var otherBefore = (other.Gold, other.Clan.Renown, giver.GetRelation(other));
+            var traitXp = Server.Resolve<ICoopSessionProvider>().CoopSession.PlayerTraitData.PlayerTraitXp;
+            traitXp[scenario.OwnerHeroId] = new Dictionary<string, int> { ["Honor"] = 37 };
+            traitXp[scenario.OtherHeroId] = new Dictionary<string, int> { ["Honor"] = 53 };
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(secondId, out var secondGiver));
+            var secondQuest = (Quest)secondGiver.Issue.IssueQuest;
+            var otherDeserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            secondQuest._deserterMobileParty = otherDeserters;
+            otherDeserters.SetPartyUsedByQuest(true);
+            otherDeserters.Ai.SetDoNotMakeNewDecisions(true);
+            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var defenders = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            quest._deserterMobileParty = deserters;
+            quest._defenderMobileParty = defenders;
+            deserters.SetPartyUsedByQuest(true);
+            deserters.Aggressiveness = 0f;
+            deserters.Ai.SetDoNotMakeNewDecisions(true);
+            giver._power = power;
+            using (new AllowedThread()) giver.Clan = null;
+            var ownership = Server.Resolve<IIssueOwnershipRegistry>();
+            Assert.True(Server.Resolve<IIssueOwnerResolver>().TryResolveOwnerHero(issue, out var resolved));
+            Assert.Same(owner, resolved);
+
+            using var native = new NativeNotableDeathScope(replacement);
+            KillCharacterAction.ApplyInternal(giver, null, KillCharacterAction.KillCharacterActionDetail.Murdered,
+                showNotification: true, isForced: true);
+
+            var transferred = Campaign.Current.IssueManager.Issues.TryGetValue(replacement, out var successorIssue);
+            var ownerResolves = Server.Resolve<IIssueOwnerResolver>().TryResolveOwnerHero(issue, out _);
+            var oldKeyRemains = ownership.TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _);
+            output.WriteLine($"power={power} dead={giver.IsDead} deadIssueNull={giver.Issue == null} " +
+                $"transferred={transferred && ReferenceEquals(issue, successorIssue)} ongoing={quest.IsOngoing} " +
+                $"ownerResolves={ownerResolves} oldKeyRemains={oldKeyRemains} " +
+                $"questUsed={deserters.IsCurrentlyUsedByAQuest} noDecisions={deserters.Ai.DoNotMakeNewDecisions}");
+            Assert.Equal(power >= 100f ? 1 : 0, native.Replacements);
+            Assert.True(giver.IsDead);
+            Assert.Null(giver.Issue);
+            Assert.False(quest.IsOngoing);
+            Assert.True(quest.IsFinalized);
+            Assert.False(transferred);
+            Assert.False(oldKeyRemains);
+            Assert.False(ownerResolves);
+            Assert.DoesNotContain(issue, Campaign.Current.IssueManager.Issues.Values);
+            Assert.True(deserters.IsActive);
+            Assert.False(deserters.IsCurrentlyUsedByAQuest);
+            Assert.False(deserters.Ai.DoNotMakeNewDecisions);
+            Assert.Equal(1f, deserters.Aggressiveness);
+            Assert.False(defenders.IsActive);
+            Assert.Null(quest._defenderMobileParty);
+            Assert.Same(mainHero, Hero.MainHero);
+            Assert.Same(mainParty, MobileParty.MainParty);
+            Assert.Equal(now, Campaign.Current.MapTimeTracker.Now);
+            Assert.Equal(ownerBefore, (owner.Gold, owner.Clan.Renown, giver.GetRelation(owner)));
+            Assert.Equal(otherBefore, (other.Gold, other.Clan.Renown, giver.GetRelation(other)));
+            Assert.Equal(37, traitXp[scenario.OwnerHeroId]["Honor"]);
+            Assert.Equal(53, traitXp[scenario.OtherHeroId]["Honor"]);
+            Assert.True(secondQuest.IsOngoing);
+            Assert.True(otherDeserters.IsCurrentlyUsedByAQuest);
+            Assert.True(otherDeserters.Ai.DoNotMakeNewDecisions);
+            Assert.True(ownership.TryGetOwner(secondId, "second_deserters", out var secondOwner));
+            Assert.Equal(QuestScenario.ControllerB, secondOwner);
+            log = Assert.Single(quest.JournalEntries).LogText.ToString();
+            Assert.Contains("died", log);
+        }, TextLinks);
+        Assert.Equal(IssueOutcome.QuestCancel,
+            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        Owner.Call(() =>
+        {
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Single(ownerQuest.JournalEntries, entry => entry.LogText.ToString() == log);
+            Assert.DoesNotContain(ownerQuest, Campaign.Current.QuestManager.Quests);
+        });
+        Other.Call(() =>
+        {
+            Assert.Same(otherQuest, Assert.Single(Campaign.Current.QuestManager.Quests));
+            Assert.True(otherQuest.IsOngoing);
+            Assert.DoesNotContain(otherQuest.JournalEntries, entry => entry.LogText.ToString() == log);
+        });
+        Assert.Single(Owner.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Log == log);
+        Assert.DoesNotContain(Other.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Log == log);
+        Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        Assert.Empty(Other.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        foreach (var client in new[] { Owner, Other })
+            client.Call(() => Assert.False(client.Resolve<IIssueOwnershipRegistry>()
+                .TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NativeGiverDeath_StillTransfersUnacceptedOffersIncludingOtherIssueTypes(bool otherIssueType)
+    {
+        var replacementId = environment.CreateRegisteredObject<Hero>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(replacementId, out var replacement));
+            using (new AllowedThread())
+            {
+                giver.Clan = null;
+                if (otherIssueType)
+                {
+                    var otherIssue = new GangLeaderNeedsToOffloadStolenGoodsIssueBehavior.GangLeaderNeedsToOffloadStolenGoodsIssue(giver, null);
+                    Campaign.Current.IssueManager._issues[giver] = otherIssue;
+                    giver.OnIssueCreatedForHero(otherIssue);
+                }
+            }
+            giver._power = 213.6168f;
+            var issue = giver.Issue;
+            using var native = new NativeNotableDeathScope(replacement);
+            KillCharacterAction.ApplyInternal(giver, null, KillCharacterAction.KillCharacterActionDetail.Murdered,
+                showNotification: true, isForced: true);
+            Assert.Equal(1, native.Replacements);
+            Assert.True(giver.IsDead);
+            Assert.Null(giver.Issue);
+            Assert.Same(issue, replacement.Issue);
+            Assert.Same(replacement, issue.IssueOwner);
+            Assert.Same(issue, Campaign.Current.IssueManager.Issues[replacement]);
+            Assert.False(Campaign.Current.IssueManager.Issues.ContainsKey(giver));
+        }, TextLinks);
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+    }
+
+    private sealed class NativeNotableDeathScope : IDisposable
+    {
+        private static NativeNotableDeathScope? current;
+        private readonly Harmony harmony = new($"deserter-native-death-{Guid.NewGuid()}");
+        private readonly NotablesCampaignBehavior notables = new();
+        private readonly Hero replacement;
+        public int Replacements { get; private set; }
+
+        public NativeNotableDeathScope(Hero replacement)
+        {
+            this.replacement = replacement;
+            current = this;
+            Assert.Equal(100, Campaign.Current.Models.NotablePowerModel.NotableDisappearPowerLimit);
+            // Supply the relative at the native appearance-creation boundary; the death listener and issue transfer run normally.
+            harmony.Patch(AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero)),
+                prefix: new HarmonyMethod(typeof(NativeNotableDeathScope), nameof(CreateRelativePrefix)));
+            notables.RegisterEvents();
+        }
+
+        private static bool CreateRelativePrefix(ref Hero __result)
+        {
+            current!.Replacements++;
+            __result = current.replacement;
+            return false;
+        }
+
+        public void Dispose()
+        {
+            CampaignEvents.Instance.RemoveListeners(notables);
+            harmony.Unpatch(AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero)),
+                HarmonyPatchType.Prefix, harmony.Id);
+            current = null;
+        }
     }
 
     private string AddSecondIssue()

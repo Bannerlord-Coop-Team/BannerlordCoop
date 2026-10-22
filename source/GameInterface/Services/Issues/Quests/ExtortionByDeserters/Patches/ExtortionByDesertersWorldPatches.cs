@@ -20,6 +20,18 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 [HarmonyPatch]
 internal class ExtortionByDesertersWorldPatches
 {
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
+    [HarmonyPrefix]
+    private static void HeroKilledPrefix(Hero victim, Hero killer, KillCharacterAction.KillCharacterActionDetail detail, bool showNotification)
+    {
+        Run(quest =>
+        {
+            // Notables can transfer the issue before the dispatcher's IssueManager receiver runs.
+            if (quest.QuestGiver == victim)
+                Campaign.Current.IssueManager.OnHeroKilled(victim, killer, detail, showNotification);
+        });
+    }
+
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTick))]
     [HarmonyPostfix]
     private static void HourlyTickPostfix() => Run(quest => quest.HourlyTick());
