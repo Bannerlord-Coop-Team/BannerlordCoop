@@ -1,0 +1,306 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="25ee8fbe-718f-453c-b360-5dffec670bb5" name="Andrew@AO-ALIENWARE 2026-10-22 02:05:15" runUser="AO-ALIENWARE\Andrew" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-22T02:05:15.7923255-05:00" queuing="2026-10-22T02:05:15.7923260-05:00" start="2026-10-22T02:05:00.5509988-05:00" finish="2026-10-22T02:05:15.7971268-05:00" />
+  <TestSettings name="default" id="5c067cda-9ac1-46bd-a384-1e7234702af3">
+    <Deployment runDeploymentRoot="Andrew_AO-ALIENWARE_2026-10-22_02_05_15" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="3a7a945b-f9e9-4ae8-8cb9-f276ad0356c9" testId="df993e42-4ccb-21c1-3128-1cd966354b3b" testName="E2E.Tests.Services.Issues.ArtisanOverpricedGoodsTests.CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory" computerName="AO-ALIENWARE" duration="00:00:14.0500282" startTime="2026-10-22T02:05:01.6243522-05:00" endTime="2026-10-22T02:05:15.6841353-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3a7a945b-f9e9-4ae8-8cb9-f276ad0356c9">
+      <Output>
+        <StdOut>Failed to run action on the game thread: "Settlement_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__47(Settlement instance, Settlement__heroesWithoutPartyCache_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Settlement_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__41(Settlement instance, Settlement__boundVillages_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Settlement_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__47(Settlement instance, Settlement__heroesWithoutPartyCache_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Settlement_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__41(Settlement instance, Settlement__boundVillages_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+["ObjectManager"] Failed to get network handle for object of type "TaleWorlds.CampaignSystem.Settlements.TownMarketData"&#xD;
+["ObjectManager"] Failed to get network handle for object of type "TaleWorlds.CampaignSystem.Settlements.TownMarketData"&#xD;
+Failed to run action on the game thread: "Town_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__24(Town instance, Town_Buildings_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Town_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__30(Town instance, Town_BuildingsInProgress_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Town_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__7(Town instance, Town_Workshops_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Town_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__18(Town instance, Town__tradeBoundVillagesCache_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Town_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__24(Town instance, Town_Buildings_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Town_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__30(Town instance, Town_BuildingsInProgress_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Town_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__7(Town instance, Town_Workshops_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Town_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__18(Town instance, Town__tradeBoundVillagesCache_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Settlement_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__47(Settlement instance, Settlement__heroesWithoutPartyCache_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Settlement_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__41(Settlement instance, Settlement__boundVillages_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Settlement_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__47(Settlement instance, Settlement__heroesWithoutPartyCache_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Settlement_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__41(Settlement instance, Settlement__boundVillages_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Settlement_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__47(Settlement instance, Settlement__heroesWithoutPartyCache_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Settlement_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__41(Settlement instance, Settlement__boundVillages_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Settlement_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__47(Settlement instance, Settlement__heroesWithoutPartyCache_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Failed to run action on the game thread: "Settlement_Handler"&#xD;
+System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+   at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__41(Settlement instance, Settlement__boundVillages_SetNetworkMessage data)&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+   at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+   at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+Occupancy pause ownership "acquired": trigger="Created_3" mode=Pause players=["player-A:party=MobileParty_Created_1,settlement=Created_1,mapEvent=none", "player-B:party=MobileParty_Created_3,settlement=Created_1,mapEvent=none"]&#xD;
+["ObjectManager"] Failed to get id for object of type "TaleWorlds.CampaignSystem.CharacterDevelopment.TraitObject", "Honor"&#xD;
+["ObjectManager"] Failed to get id for object of type "TaleWorlds.CampaignSystem.CharacterDevelopment.TraitObject", "Honor"</StdOut>
+        <ErrorInfo>
+          <Message>Assert.Empty() Failure: Collection was not empty&#xD;
+Collection: [Quest status change]</Message>
+          <StackTrace>   at E2E.Tests.Services.Issues.ArtisanOverpricedGoodsTests.&lt;&gt;c__DisplayClass24_0.&lt;CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory&gt;b__5() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\E2E.Tests\Services\Issues\ArtisanOverpricedGoodsTests.cs:line 215&#xD;
+   at E2E.Tests.Environment.Instance.EnvironmentInstance.Call(Action callFunction, IEnumerable`1 disabledMethods) in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\E2E.Tests\Environment\Instance\EnvironmentInstance.cs:line 179&#xD;
+   at E2E.Tests.Services.Issues.ArtisanOverpricedGoodsTests.CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\E2E.Tests\Services\Issues\ArtisanOverpricedGoodsTests.cs:line 210</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="E2E.Tests.Services.Issues.ArtisanOverpricedGoodsTests.CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory" storage="c:\users\andrew\codexwindows\worktrees\bannerlordcoop\3781-ladys-knight-out\source\e2e.tests\bin\release\net6.0\e2e.tests.dll" id="df993e42-4ccb-21c1-3128-1cd966354b3b">
+      <Execution id="3a7a945b-f9e9-4ae8-8cb9-f276ad0356c9" />
+      <TestMethod codeBase="C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\E2E.Tests\bin\Release\net6.0\E2E.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="E2E.Tests.Services.Issues.ArtisanOverpricedGoodsTests" name="CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="df993e42-4ccb-21c1-3128-1cd966354b3b" executionId="3a7a945b-f9e9-4ae8-8cb9-f276ad0356c9" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="1" executed="1" passed="0" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.0.2+dd36e86129 (64-bit .NET 6.0.36)&#xD;
+[xUnit.net 00:00:00.14]   Discovering: E2E.Tests&#xD;
+[xUnit.net 00:00:00.37]   Discovered:  E2E.Tests&#xD;
+[xUnit.net 00:00:00.39]   Starting:    E2E.Tests&#xD;
+[xUnit.net 00:00:14.47]       Assert.Empty() Failure: Collection was not empty&#xD;
+[xUnit.net 00:00:14.47]       Collection: [Quest status change]&#xD;
+[xUnit.net 00:00:14.47]       Stack Trace:&#xD;
+[xUnit.net 00:00:14.47]         C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\E2E.Tests\Services\Issues\ArtisanOverpricedGoodsTests.cs(215,0): at E2E.Tests.Services.Issues.ArtisanOverpricedGoodsTests.&lt;&gt;c__DisplayClass24_0.&lt;CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory&gt;b__5()&#xD;
+[xUnit.net 00:00:14.47]         C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\E2E.Tests\Environment\Instance\EnvironmentInstance.cs(179,0): at E2E.Tests.Environment.Instance.EnvironmentInstance.Call(Action callFunction, IEnumerable`1 disabledMethods)&#xD;
+[xUnit.net 00:00:14.47]         C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\E2E.Tests\Services\Issues\ArtisanOverpricedGoodsTests.cs(210,0): at E2E.Tests.Services.Issues.ArtisanOverpricedGoodsTests.CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory()&#xD;
+[xUnit.net 00:00:14.47]       Output:&#xD;
+[xUnit.net 00:00:14.47]         Failed to run action on the game thread: "Settlement_Handler"&#xD;
+[xUnit.net 00:00:14.47]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.47]            at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__47(Settlement instance, Settlement__heroesWithoutPartyCache_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.47]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.47]         Failed to run action on the game thread: "Settlement_Handler"&#xD;
+[xUnit.net 00:00:14.47]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.47]            at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__41(Settlement instance, Settlement__boundVillages_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.47]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.47]         Failed to run action on the game thread: "Settlement_Handler"&#xD;
+[xUnit.net 00:00:14.47]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.47]            at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__47(Settlement instance, Settlement__heroesWithoutPartyCache_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.47]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.47]         Failed to run action on the game thread: "Settlement_Handler"&#xD;
+[xUnit.net 00:00:14.47]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.47]            at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__41(Settlement instance, Settlement__boundVillages_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.47]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.47]         ["ObjectManager"] Failed to get network handle for object of type "TaleWorlds.CampaignSystem.Settlements.TownMarketData"&#xD;
+[xUnit.net 00:00:14.47]         ["ObjectManager"] Failed to get network handle for object of type "TaleWorlds.CampaignSystem.Settlements.TownMarketData"&#xD;
+[xUnit.net 00:00:14.47]         Failed to run action on the game thread: "Town_Handler"&#xD;
+[xUnit.net 00:00:14.47]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.47]            at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__24(Town instance, Town_Buildings_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.47]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.47]         Failed to run action on the game thread: "Town_Handler"&#xD;
+[xUnit.net 00:00:14.47]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.47]            at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__30(Town instance, Town_BuildingsInProgress_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.47]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.47]         Failed to run action on the game thread: "Town_Handler"&#xD;
+[xUnit.net 00:00:14.47]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.47]            at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__7(Town instance, Town_Workshops_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.47]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.47]         Failed to run action on the game thread: "Town_Handler"&#xD;
+[xUnit.net 00:00:14.47]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.47]            at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__18(Town instance, Town__tradeBoundVillagesCache_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.47]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.47]         Failed to run action on the game thread: "Town_Handler"&#xD;
+[xUnit.net 00:00:14.47]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.47]            at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__24(Town instance, Town_Buildings_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.47]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.47]         Failed to run action on the game thread: "Town_Handler"&#xD;
+[xUnit.net 00:00:14.47]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.47]            at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__30(Town instance, Town_BuildingsInProgress_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.47]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.47]         Failed to run action on the game thread: "Town_Handler"&#xD;
+[xUnit.net 00:00:14.47]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.47]            at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__7(Town instance, Town_Workshops_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.47]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.47]         Failed to run action on the game thread: "Town_Handler"&#xD;
+[xUnit.net 00:00:14.47]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.47]            at AutoSync.Town_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__18(Town instance, Town__tradeBoundVillagesCache_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.47]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.47]         Failed to run action on the game thread: "Settlement_Handler"&#xD;
+[xUnit.net 00:00:14.47]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.47]            at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__47(Settlement instance, Settlement__heroesWithoutPartyCache_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.47]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.47]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.47]         Failed to run action on the game thread: "Settlement_Handler"&#xD;
+[xUnit.net 00:00:14.47]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.48]            at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__41(Settlement instance, Settlement__boundVillages_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.48]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.48]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.48]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.48]         Failed to run action on the game thread: "Settlement_Handler"&#xD;
+[xUnit.net 00:00:14.48]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.48]            at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__47(Settlement instance, Settlement__heroesWithoutPartyCache_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.48]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.48]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.48]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.48]         Failed to run action on the game thread: "Settlement_Handler"&#xD;
+[xUnit.net 00:00:14.48]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.48]            at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__41(Settlement instance, Settlement__boundVillages_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.48]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.48]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.48]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.48]         Failed to run action on the game thread: "Settlement_Handler"&#xD;
+[xUnit.net 00:00:14.48]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.48]            at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__47(Settlement instance, Settlement__heroesWithoutPartyCache_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.48]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.48]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.48]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.48]         Failed to run action on the game thread: "Settlement_Handler"&#xD;
+[xUnit.net 00:00:14.48]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.48]            at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__41(Settlement instance, Settlement__boundVillages_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.48]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.48]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.48]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.48]         Failed to run action on the game thread: "Settlement_Handler"&#xD;
+[xUnit.net 00:00:14.48]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.48]            at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__47(Settlement instance, Settlement__heroesWithoutPartyCache_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.48]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.48]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.48]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.48]         Failed to run action on the game thread: "Settlement_Handler"&#xD;
+[xUnit.net 00:00:14.48]         System.NullReferenceException: Object reference not set to an instance of an object.&#xD;
+[xUnit.net 00:00:14.48]            at AutoSync.Settlement_Handler.&lt;&gt;c__DisplayClass1_0.&lt;.ctor&gt;b__41(Settlement instance, Settlement__boundVillages_SetNetworkMessage data)&#xD;
+[xUnit.net 00:00:14.48]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass9_1`2.&lt;SubscribeNetwork&gt;b__2() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 93&#xD;
+[xUnit.net 00:00:14.48]            at GameInterface.Utils.GenericHandler`2.&lt;&gt;c__DisplayClass11_0.&lt;MarshalApply&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\GameInterface\Utils\GenericHandler.cs:line 134&#xD;
+[xUnit.net 00:00:14.48]            at Common.GameThread.&lt;&gt;c__DisplayClass55_0.&lt;WrapSafe&gt;b__0() in C:\Users\Andrew\CodexWindows\worktrees\BannerlordCoop\3781-ladys-knight-out\source\Common\GameThread.cs:line 852&#xD;
+[xUnit.net 00:00:14.48]         Occupancy pause ownership "acquired": trigger="Created_3" mode=Pause players=["player-A:party=MobileParty_Created_1,settlement=Created_1,mapEvent=none", "player-B:party=MobileParty_Created_3,settlement=Created_1,mapEvent=none"]&#xD;
+[xUnit.net 00:00:14.48]         ["ObjectManager"] Failed to get id for object of type "TaleWorlds.CampaignSystem.CharacterDevelopment.TraitObject", "Honor"&#xD;
+[xUnit.net 00:00:14.48]         ["ObjectManager"] Failed to get id for object of type "TaleWorlds.CampaignSystem.CharacterDevelopment.TraitObject", "Honor"&#xD;
+[xUnit.net 00:00:14.49]   Finished:    E2E.Tests&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="AO-ALIENWARE" outcome="Error" timestamp="2026-10-22T02:05:15.6875332-05:00">
+        <Text>[xUnit.net 00:00:14.47]     E2E.Tests.Services.Issues.ArtisanOverpricedGoodsTests.CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

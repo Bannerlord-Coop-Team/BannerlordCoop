@@ -1,0 +1,52 @@
+diff --git a/source/E2E.Tests/Services/Issues/ArtisanOverpricedGoodsTests.cs b/source/E2E.Tests/Services/Issues/ArtisanOverpricedGoodsTests.cs
+index 6b4bcb68b..51f51a40d 100644
+--- a/source/E2E.Tests/Services/Issues/ArtisanOverpricedGoodsTests.cs
++++ b/source/E2E.Tests/Services/Issues/ArtisanOverpricedGoodsTests.cs
+@@ -16,6 +16,7 @@ using TaleWorlds.CampaignSystem.Conversation;
+ using TaleWorlds.CampaignSystem.Encyclopedia;
+ using TaleWorlds.CampaignSystem.GameState;
+ using TaleWorlds.CampaignSystem.Issues;
++using TaleWorlds.CampaignSystem.LogEntries;
+ using TaleWorlds.CampaignSystem.Party;
+ using TaleWorlds.CampaignSystem.Settlements;
+ using TaleWorlds.Core;
+@@ -183,6 +184,39 @@ public class ArtisanOverpricedGoodsTests : IDisposable
+         Server.Call(() => Assert.Equal(0, Get<MobileParty>(Server, scenario.OwnerPartyId).ItemRoster.GetItemNumber(Get<ItemObject>(Server, itemId))));
+     }
+ 
++    [Fact]
++    public void CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory()
++    {
++        foreach (var instance in Instances)
++            instance.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
++
++        Accept();
++        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
++        var ownerQuest = (Quest)scenario.QuestOf(ClientA);
++        var serverQuest = (Quest)scenario.QuestOf(Server);
++        Stock(Amount);
++        ClientA.Call(() => ownerQuest.DeliverItemsFullyOnConsequence());
++        ClientA.Call(() => ownerQuest.CompleteQuestWithSuccess());
++
++        Assert.Equal(IssueOutcome.QuestSuccess,
++            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
++        ClientA.Call(() => Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
++            entry => entry.IsRelatedTo(ownerQuest) && entry.IsEnded())));
++        ClientB.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
++            entry => entry.IsEnded())));
++
++        LogEntry[] saveHistory = null!;
++        Server.Call(() => saveHistory = Campaign.Current.LogEntryHistory.GameActionLogs.ToArray());
++        ClientB.Call(() =>
++        {
++            // A join loads the server's saved history before the quest screen reads completed entries.
++            Campaign.Current.LogEntryHistory._logs.Clear();
++            Campaign.Current.LogEntryHistory._logs.AddRange(saveHistory);
++            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
++                entry => entry.IsRelatedTo(serverQuest) && entry.IsEnded()));
++        });
++    }
++
+     [Theory]
+     [InlineData(false, 5)]
+     [InlineData(true, 4)]
