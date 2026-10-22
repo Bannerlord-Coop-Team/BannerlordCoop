@@ -50,6 +50,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
             deploymentCommitted = controller.Deployment.IsCommitted,
             ownReservePresent = mission.GetMissionBehavior<CoopNavalSetupGuard>()?.ReservePresent,
             shipSync = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipReplicator.Inspect(),
+            shipCapture = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipCaptureReplicator.Inspect(),
             shipDamage = mission.GetMissionBehavior<CoopNavalBattleBehavior>()?.ShipDamageRouter.Inspect(),
             shipDamageGate = NavalShipDamageGate.Inspect(),
 #if DEBUG
@@ -76,6 +77,7 @@ public sealed class NavalInspectCoopCommand : ICoopCommand
                 hasPlayerStandingPoint = ship.HasPlayerStandingPointEntity,
                 captain = ship.Captain?.Character?.StringId,
                 helm = ship.ShipControllerMachine?.PilotAgent?.Character?.StringId,
+                captureTimer = ship.ShipControllerMachine?.CaptureTimer,
                 controller = ship.Controller?.ControllerType.ToString() ?? "None",
                 activeBody = ship.GameEntity.IsValid ? (bool?)ship.GameEntity.HasDynamicRigidBodyAndActiveSimulation() : null,
                 foreign = NavalForeignHulls.Contains(ship),

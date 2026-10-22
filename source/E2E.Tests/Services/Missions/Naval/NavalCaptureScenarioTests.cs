@@ -245,7 +245,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         c.Ticks(130);
 
         Assert.Null(PendingAge(c, pirates[0]));
-        Assert.Equal(1L, (long)CaptureStats(c)["capturesExpired"]!);
+        Assert.Equal(1L, (long)CaptureStats(c)["captureExpired"]!);
         Assert.Equal("O", c.Ship(pirates[0]).CurrentAuthority);
         Assert.Null(c.Ship(pirates[0]).CaptorControllerId);
     }

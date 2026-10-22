@@ -43,6 +43,8 @@ public class CoopNavalBattleBehavior : MissionLogic
 
     public IBattleShipReplicator ShipReplicator => services.ShipReplicator;
 
+    public IBattleShipCaptureReplicator ShipCaptureReplicator => services.ShipCaptureReplicator;
+
     public IAgentStationUseReplicator StationUseReplicator => services.StationUseReplicator;
 
     public INavalDeckPoses DeckPoses => services.DeckPoses;

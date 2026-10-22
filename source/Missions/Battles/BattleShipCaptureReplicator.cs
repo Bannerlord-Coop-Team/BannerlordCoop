@@ -58,7 +58,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
     private readonly HashSet<Guid> confirmedHere = new HashSet<Guid>();
     private readonly Dictionary<string, long> rejections = new Dictionary<string, long>();
     private float elapsed;
-    private long requestsSent, requestsIgnored, capturesApplied, capturesExpired, confirmsDropped, duplicateConfirms;
+    private long captureRequests, requestsIgnored, capturesApplied, captureExpired, confirmsDropped, duplicateConfirms;
     private string lastDrop;
     private bool disposed;
 
@@ -144,7 +144,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
 
         pendingRequests[prize.ShipId] = elapsed;
         network.SendAll(request);
-        requestsSent++;
+        captureRequests++;
         Logger.Information("[NavalSync] Asked {Authority} to confirm capturing hull {ShipId} with hull {CaptorShipId}",
             prize.CurrentAuthority, prize.ShipId, captorShip.ShipId);
     }
@@ -413,7 +413,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         foreach (var entry in pendingRequests.Where(entry => elapsed - entry.Value > RequestTimeoutSeconds).ToArray())
         {
             pendingRequests.Remove(entry.Key);
-            capturesExpired++;
+            captureExpired++;
             Logger.Information("[NavalSync] Capture request for hull {ShipId} got no answer in {Seconds} s", entry.Key,
                 RequestTimeoutSeconds);
             TellPlayer("no_answer");
@@ -454,10 +454,10 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
     // Counters, rejections by reason, waiting requests with their age and held confirms.
     public object Inspect() => new
     {
-        requestsSent,
+        captureRequests,
         requestsIgnored,
         capturesApplied,
-        capturesExpired,
+        captureExpired,
         confirmsDropped,
         duplicateConfirms,
         lastDrop,

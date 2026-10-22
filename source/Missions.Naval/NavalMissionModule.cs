@@ -91,6 +91,12 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalTryHelmCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
+        builder.RegisterType<NavalClearCrewCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
+        builder.RegisterType<NavalCaptureCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
 #endif
     }
 }

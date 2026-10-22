@@ -175,7 +175,7 @@ public class BattleShipCaptureReplicatorTests
         Assert.Equal(0, toldBefore);
         Assert.Contains("nobody answered", Assert.Single(harness.Told));
         Assert.Null(harness.Captures.PendingRequestAge(prize.ShipId));
-        Assert.Equal(1L, (long)harness.Inspect()["capturesExpired"]!);
+        Assert.Equal(1L, (long)harness.Inspect()["captureExpired"]!);
     }
 
     // Q7: a refusal reaches the player once, for the request still waiting.
@@ -404,6 +404,7 @@ public class BattleShipCaptureReplicatorTests
             session.SetupGet(s => s.InstanceId).Returns("MapEvent_1");
             session.Setup(s => s.IsOwn(It.IsAny<string>())).Returns((string id) => id == Own);
             session.SetupGet(s => s.IsNaval).Returns(true);
+            session.SetupGet(s => s.HasInstance).Returns(true);
 
             Engine.SetupGet(e => e.Hulls).Returns(() => LiveHulls);
             Engine.Setup(e => e.AgentsOnDeck(It.IsAny<MissionObject>())).Returns(Array.Empty<Agent>());
