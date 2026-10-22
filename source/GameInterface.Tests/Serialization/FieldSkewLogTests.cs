@@ -1,4 +1,7 @@
 ﻿using GameInterface.Serialization;
+using Serilog;
+using Serilog.Core;
+using Serilog.Events;
 using System.Collections.Generic;
 using Xunit;
 
@@ -8,12 +11,18 @@ public class FieldSkewLogTests
 {
     private sealed class SkewedA { }
     private sealed class SkewedB { }
+    private sealed class Skewed<T> { }
+
+    private sealed class CollectingSink : ILogEventSink
+    {
+        public List<LogEvent> Events { get; } = new List<LogEvent>();
+        public void Emit(LogEvent logEvent) => Events.Add(logEvent);
+    }
 
     [Fact]
     public void FirstTime_IsTrueOncePerTypeAndField()
     {
         Assert.True(FieldSkewLog.FirstTime(typeof(SkewedA), "_syncRoot"));
-        Assert.False(FieldSkewLog.FirstTime(typeof(SkewedA), "_syncRoot"));
         Assert.False(FieldSkewLog.FirstTime(typeof(SkewedA), "_syncRoot"));
 
         Assert.True(FieldSkewLog.FirstTime(typeof(SkewedA), "_version"));
@@ -21,15 +30,25 @@ public class FieldSkewLogTests
     }
 
     [Fact]
-    public void FirstTime_ReportsABurstOnlyOnce()
+    public void FirstTime_TreatsEveryClosedGenericAsOneType()
     {
-        int reported = 0;
-        for (int i = 0; i < 3675; i++)
-        {
-            if (FieldSkewLog.FirstTime(typeof(List<SkewedB>), "_syncRoot"))
-                reported++;
-        }
+        Assert.True(FieldSkewLog.FirstTime(typeof(Skewed<SkewedA>), "_syncRoot"));
+        Assert.False(FieldSkewLog.FirstTime(typeof(Skewed<SkewedB>), "_syncRoot"));
+        Assert.False(FieldSkewLog.FirstTime(typeof(Skewed<int>), "_syncRoot"));
+    }
 
-        Assert.Equal(1, reported);
+    [Fact]
+    public void WarnOnce_LogsOneWarningForRepeatedSkew()
+    {
+        var sink = new CollectingSink();
+        var logger = new LoggerConfiguration().MinimumLevel.Verbose().WriteTo.Sink(sink).CreateLogger();
+
+        FieldSkewLog.WarnOnce(logger, typeof(List<SkewedA>), "_skewTestField");
+        FieldSkewLog.WarnOnce(logger, typeof(List<SkewedB>), "_skewTestField");
+        FieldSkewLog.WarnOnce(logger, typeof(List<SkewedA>), "_skewTestField");
+
+        var warning = Assert.Single(sink.Events);
+        Assert.Equal(LogEventLevel.Warning, warning.Level);
+        Assert.Contains("_skewTestField", warning.RenderMessage());
     }
 }

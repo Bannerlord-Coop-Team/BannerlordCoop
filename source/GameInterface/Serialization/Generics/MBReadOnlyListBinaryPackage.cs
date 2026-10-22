@@ -68,8 +68,7 @@ namespace GameInterface.Serialization.Generics
                 // the null SetValue here was the join-time hero-transfer fatal. Skip unknowns.
                 if (field == null)
                 {
-                    if (FieldSkewLog.FirstTime(type, fieldName))
-                        Logger.Warning("[FieldSkew] {Type} has no field '{Field}' on this runtime; skipping its packed values (logged once per field)", type.Name, fieldName);
+                    FieldSkewLog.WarnOnce(Logger, type, fieldName);
                     continue;
                 }
 

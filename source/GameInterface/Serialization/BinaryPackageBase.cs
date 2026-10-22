@@ -99,8 +99,7 @@ namespace GameInterface.Serialization
                 // the null FieldInfo took down the join-time hero transfer on the server.
                 if (field == null)
                 {
-                    if (FieldSkewLog.FirstTime(type, fieldName))
-                        Logger.Warning("[FieldSkew] {Type} has no field '{Field}' on this runtime; skipping its packed values (logged once per field)", type.Name, fieldName);
+                    FieldSkewLog.WarnOnce(Logger, type, fieldName);
                     continue;
                 }
 
