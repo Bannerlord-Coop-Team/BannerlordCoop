@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Configuration;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
@@ -68,7 +69,10 @@ namespace GameInterface.Services.Kingdoms
 
     public class KingdomDecisionVoteManager : IKingdomDecisionVoteManager, IDisposable
     {
-        internal static readonly TimeSpan VotingRoundDuration = TimeSpan.FromSeconds(60);
+        internal static TimeSpan VotingRoundDuration => TimeSpan.FromSeconds(
+            ModConfigProvider.ModOptions.KingdomDecisionVoteTimeoutSeconds > 0
+                ? ModConfigProvider.ModOptions.KingdomDecisionVoteTimeoutSeconds
+                : 60);
         private static readonly TimeSpan VotingRoundTickInterval = TimeSpan.FromSeconds(1);
         private static readonly ILogger Logger = LogManager.GetLogger(typeof(KingdomDecisionVoteManager));
         private readonly Dictionary<KingdomDecision, KingdomDecisionVoteState> DecisionStates = new Dictionary<KingdomDecision, KingdomDecisionVoteState>();

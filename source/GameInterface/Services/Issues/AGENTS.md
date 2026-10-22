@@ -2,6 +2,7 @@
 
 Scope: everything under `source/GameInterface/Services/Issues/`. The repo root `AGENTS.md` applies too.
 `README.md` here is the short player-facing summary and the debug commands. This file owns the rules.
+Read [`QuestLearnings.md`](QuestLearnings.md) in full too.
 
 ## Layout
 
@@ -37,8 +38,8 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    quest is never started but reads as ongoing, and a joiner loads it from the save.
 6. Anything the server writes into a per-player store is shared by every player. Before running a vanilla
    outcome, decompile it and look for `Campaign.Current.Player*`, `MainParty` and `Hero.MainHero` stores that
-   `MainHeroSubstitutionScope` does not swap. Trait XP is skipped for this (`Framework/Rewards/QuestTraitXpPatches.cs`),
-   and `IFaction.MainHeroCrimeRating`, read by `DiplomacyHelper.IsWarCausedByPlayer`, stays the server's.
+   `MainHeroSubstitutionScope` does not swap. Trait XP is kept per player by `Services/Traits/Patches/TraitLevelingHelperPatches.cs`,
+   so trait outcomes run inside the scope, and `IFaction.MainHeroCrimeRating`, read by `DiplomacyHelper.IsWarCausedByPlayer`, stays the server's.
 7. UI bookkeeping the server runs for players leaks into the save a joiner downloads. The server skips quest
    pop-ups and unread markers (`Services/UI/Notifications/Patches/ServerQuest*Patches.cs`). For a new server path,
    check what reacts to `AddLog`, `OnIssueUpdated` and `OnQuestCompleted`.
