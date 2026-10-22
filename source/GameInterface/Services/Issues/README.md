@@ -21,8 +21,9 @@ Use a server and a client. All commands are `coop.debug.issues.*`.
 
 - `list_types` (both sides) lists the registered quest types.
 - `give <hero_id> <quest_type>` (server) gives a notable or a lord an issue. Player heroes are refused.
-- `complete <hero_id> [success|fail|betrayal|cancel|timeout]` (server) ends it. With an accepted quest it
-  runs the outcome as the owner. Without one only `timeout` and `cancel` work. It calls
+- `complete <hero_id> [success|fail|betrayal|cancel|timeout|ailord]` (server) ends it. With an accepted quest it
+  runs the outcome as the owner. Without one only `timeout`, `cancel` and `ailord` work, `ailord` has the
+  settlement owner's clan leader solve it the way an AI lord would. It calls
   `CompleteQuestWithSuccess()` and the other endings directly, so it skips the quest's branch methods, where
   vanilla pays rewards, moves items and changes settlements. Use it to check that an ending is announced and
   replayed, not that a success pays out.
