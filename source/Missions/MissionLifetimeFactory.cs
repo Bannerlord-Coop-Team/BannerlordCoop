@@ -26,7 +26,6 @@ public sealed class MissionLifetimeFactory : IMissionLifetimeFactory
 
     public MissionLifetimeFactory(ILifetimeScope session)
     {
-        if (session == null) throw new ArgumentNullException(nameof(session));
         this.session = session;
         session.CurrentScopeEnding += OnSessionEnding;
     }
