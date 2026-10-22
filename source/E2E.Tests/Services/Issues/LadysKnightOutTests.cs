@@ -964,9 +964,9 @@ public class LadysKnightOutTests : IDisposable
             issue.IsTriedToSolveBefore = savedTried;
             using (new AllowedThread()) issue.AddLog(new JournalLog(CampaignTime.Now, new TextObject(savedLog)));
             Assert.Null(issue.IssueQuest);
-            scenario.ClientB.Resolve<IMessageBroker>().Publish(this, new CampaignReady());
         });
         router.Reconnect(scenario.ClientB.NetPeer);
+        scenario.ClientB.Call(() => scenario.ClientB.Resolve<IMessageBroker>().Publish(this, new CampaignReady()));
         scenario.Server.Call(() =>
         {
             var broker = scenario.Server.Resolve<IMessageBroker>();
