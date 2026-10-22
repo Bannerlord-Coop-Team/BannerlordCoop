@@ -4,7 +4,7 @@ using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.Players;
 using GameInterface.Services.Ships.Data;
-using GameInterface.Services.Ships.Messages;
+using Common.Network.Messages;
 using Missions.Messages;
 using Moq;
 using TaleWorlds.CampaignSystem;
@@ -36,10 +36,9 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
     {
         using var battle = StartServerBattle(atSea: true, out var a, out _, out var concluded);
         var shipId = GiveShip(PlayerPartyOf("A"));
-        var hull = Damage(battle, a, shipId, hitPoints: 640f, sailHitPoints: 210f);
+        Damage(battle, a, shipId, hitPoints: 640f, sailHitPoints: 210f);
 
         a.Tick(BattleShipFateReporterInterval);
-        Assert.Equal(1, a.Services.FateReporter.FatesSentOf(hull));
         LeaveMission(battle, a);
 
         Assert.Equal(0, concluded());
@@ -64,6 +63,24 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
         AssertDestroyedEverywhere(shipId, partyId);
     }
 
+    // M6 review C1: a player's last fates and its disconnect can arrive in one poll batch, and the disconnect clears its peer
+    // before the game thread records them; the sender is resolved as they arrive, so they still apply at its departure.
+    [Fact]
+    public void Fates_FollowedByADisconnectInTheSameBatch_StillApplyAtTheDeparture()
+    {
+        using var battle = StartServerBattle(atSea: true, out _, out var b, out _);
+        var partyId = PlayerPartyOf("B");
+        var shipId = GiveShip(partyId);
+
+        // Both arrive on the poll thread, so the record waits on the game thread queue behind the disconnect's peer clear.
+        Server.SimulateMessage(b.Instance.NetPeer, new NetworkBattleShipFates(battle.MapEventId, 1, 1,
+            new[] { new BattleShipFate(shipId, 0f, 100f, sunk: true) }), markGameThread: false);
+        Server.SimulateMessage(this, new PlayerDisconnected(b.Instance.NetPeer, default), markGameThread: false);
+        b.Instance.Call(b.Network.Stop);
+
+        AssertDestroyedEverywhere(shipId, partyId);
+    }
+
     // The commit runs at the start of OnBattleWon, so the loot (CommitMapEventResults) finds sunk AI ships destroyed and
     // survivors at their battle HP; vanilla's after-defeat damage then comes on top of that.
     [Fact]
@@ -77,9 +94,9 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
         var survivor = battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(40f, 300f, 0f), campaignShipId: survivorId);
         battle.CommitAll();
         battle.TickAll();
+        // No tick after this: the result report's flush carries both fates.
         SinkHull(a, sunkId);
         a.Hull(survivor).HitPoints = 450f;
-        a.Tick();
 
         float? survivorHpAtLoot = null;
         bool sunkGoneAtLoot = false;

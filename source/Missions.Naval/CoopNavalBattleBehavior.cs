@@ -34,8 +34,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         this.shipsLogic = shipsLogic;
         // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached. It runs before
         // the battle controller leaves (NavalShipsLogic is an earlier behavior), so the last fates precede MissionLeft.
-        shipsLogic.MissionEndEvent += ShipReplicator.SendFinalRopes;
-        shipsLogic.MissionEndEvent += services.FateReporter.Flush;
+        shipsLogic.MissionEndEvent += services.OnMissionEnding;
         // Also fires for every hull as NavalShipsLogic.OnEndMission removes them, after the final ropes went out.
         shipsLogic.BeforeShipRemovedEvent += OnBeforeShipRemoved;
         shipsLogic.ShipRemovedEvent += OnShipRemoved;
@@ -99,8 +98,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     {
         bool retreatOrdered = ship.IsShipOrderActive && ship.ShipOrder.MovementOrderEnum == ShipOrder.ShipMovementOrderEnum.Retreat;
         var reason = retreated || retreatOrdered ? ShipRemovalReason.Retreat : ShipRemovalReason.Leave;
-        services.FateReporter.ReportRemoval(ship);
-        ShipReplicator.AnnounceRemoval(ship, reason, shipsLogic.IsMissionEnding);
+        services.OnBeforeHullRemoved(ship, reason, shipsLogic.IsMissionEnding);
     }
 
     // A removed hull is pooled during deployment and its entity removed later, so no copy reference may outlive it.
@@ -128,8 +126,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     public override void OnEndMissionInternal()
     {
         CoopNavalMissionScope.IsActive = false;
-        shipsLogic.MissionEndEvent -= ShipReplicator.SendFinalRopes;
-        shipsLogic.MissionEndEvent -= services.FateReporter.Flush;
+        shipsLogic.MissionEndEvent -= services.OnMissionEnding;
         shipsLogic.BeforeShipRemovedEvent -= OnBeforeShipRemoved;
         shipsLogic.ShipRemovedEvent -= OnShipRemoved;
         services.Dispose();

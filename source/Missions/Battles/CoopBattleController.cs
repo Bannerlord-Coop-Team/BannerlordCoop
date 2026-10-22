@@ -133,7 +133,7 @@ public class CoopBattleController : CoopMissionController
         var casualties = new CasualtyAttributionMap();
 
         var deployment = new BattleDeploymentCoordinator(network, messageBroker, session);
-        var resultCommitter = new BattleResultCommitter(network, relayNetwork, session);
+        var resultCommitter = new BattleResultCommitter(network, relayNetwork, session, messageBroker);
 
         lifecycle = new BattleInstanceLifecycle(
             network,

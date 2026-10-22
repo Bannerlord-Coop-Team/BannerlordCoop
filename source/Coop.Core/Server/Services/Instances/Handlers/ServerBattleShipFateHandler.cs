@@ -9,7 +9,6 @@ using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.Players;
 using GameInterface.Services.Ships;
 using GameInterface.Services.Ships.Data;
-using GameInterface.Services.Ships.Messages;
 using LiteNetLib;
 using Missions.Messages;
 using Serilog;
@@ -66,28 +65,48 @@ public class ServerBattleShipFateHandler : IHandler
         messageBroker.Unsubscribe<MapEventFinalized>(Handle_MapEventFinalized);
     }
 
-    // Queued behind the sender's earlier messages, so a departure it sent after these fates applies them.
+    // Resolves the sender here on the poll thread, as the peer's disconnect in the same batch clears it before the game thread
+    // runs; the record is queued behind the sender's earlier messages, so a departure it sent after these fates applies them.
     private void Handle_NetworkBattleShipFates(MessagePayload<NetworkBattleShipFates> payload)
     {
         if (ModInformation.IsClient || payload.Who is not NetPeer peer) return;
 
         var message = payload.What;
-        GameThread.RunSafe(() => Record(peer, message), context: nameof(Handle_NetworkBattleShipFates));
-    }
-
-    // [Game thread] Holds each fate of a ship the sender may report for, while the battle is open and the sender is in it.
-    private void Record(NetPeer peer, NetworkBattleShipFates message)
-    {
-        if (!playerManager.TryGetPlayer(peer, out var player))
+        if (!TryGetCurrentController(peer, out var controllerId))
         {
-            Logger.Warning("[NavalSync] Dropped ship fates for {Instance}: the sender has no registered player", message.InstanceId);
+            Logger.Warning("[NavalSync] Dropped ship fates for {Instance}: the sender is not a registered player's current peer",
+                message.InstanceId);
             return;
         }
 
-        if (!missionManager.TryGetControllers(message.InstanceId, out var members) || !members.Contains(player.ControllerId))
+        GameThread.RunSafe(() => Record(controllerId, message), context: nameof(Handle_NetworkBattleShipFates));
+    }
+
+    // The controller a peer currently stands for; a stale peer of a player that reconnected stands for nobody.
+    private bool TryGetCurrentController(NetPeer peer, out string controllerId)
+    {
+        controllerId = null;
+        if (!playerManager.TryGetPlayer(peer, out var player) || !playerManager.TryGetPeer(player.ControllerId, out var currentPeer)
+            || !ReferenceEquals(currentPeer, peer))
+            return false;
+
+        controllerId = player.ControllerId;
+        return true;
+    }
+
+    // [Game thread] Holds each fate of a ship the sender may report for, while the battle is open and the sender is in it.
+    private void Record(string controllerId, NetworkBattleShipFates message)
+    {
+        if (!playerManager.TryGetPlayer(controllerId, out var player))
+        {
+            Logger.Warning("[NavalSync] Dropped ship fates from {Controller}: it is no registered player", controllerId);
+            return;
+        }
+
+        if (!missionManager.TryGetControllers(message.InstanceId, out var members) || !members.Contains(controllerId))
         {
             Logger.Information("[NavalSync] Dropped ship fates from {Controller}: it is not in battle {Instance}",
-                player.ControllerId, message.InstanceId);
+                controllerId, message.InstanceId);
             return;
         }
 
@@ -95,18 +114,19 @@ public class ServerBattleShipFateHandler : IHandler
         if (!mapEvent.IsNavalMapEvent || mapEvent.IsFinalized || mapEvent.HasCalculatedResults())
         {
             Logger.Information("[NavalSync] Dropped ship fates from {Controller}: battle {Instance} is not at sea or already has its results",
-                player.ControllerId, message.InstanceId);
+                controllerId, message.InstanceId);
             return;
         }
 
         objectManager.TryGetObject<MobileParty>(player.MobilePartyId, out var senderParty);
         bool isHostAtEpoch = hostRegistry.TryGet(message.InstanceId, out var assignment)
-            && assignment.HostControllerId == player.ControllerId && assignment.Epoch == message.HostEpoch;
+            && assignment.HostControllerId == controllerId && assignment.Epoch == message.HostEpoch;
         foreach (var fate in message.Fates ?? Array.Empty<BattleShipFate>())
-            RecordFate(message, mapEvent, player.ControllerId, senderParty?.Party, isHostAtEpoch, fate);
+            RecordFate(message, mapEvent, controllerId, senderParty?.Party, isHostAtEpoch, fate);
     }
 
-    // Holds one fate when the sender may report its ship; logs why it may not otherwise.
+    // Holds one fate when the sender may report its ship: its own party's, or as the battle host at the current epoch an AI
+    // party's in the battle. Logs why otherwise.
     private void RecordFate(NetworkBattleShipFates message, MapEvent mapEvent, string controllerId, PartyBase senderParty,
         bool isHostAtEpoch, BattleShipFate fate)
     {
@@ -114,32 +134,43 @@ public class ServerBattleShipFateHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<Ship>(fate.CampaignShipId, out var ship)) return;
 
         var owner = ship.Owner;
-        var rejection = RejectionOf(owner == senderParty, owner != null, owner?.MapEventSide?.MapEvent == mapEvent,
-            owner.IsPlayerParty(), isHostAtEpoch);
-        if (rejection != null)
+        if (owner == null)
         {
-            Logger.Warning("[NavalSync] Dropped the fate of ship {ShipId} from {Controller}: {Reason}", fate.CampaignShipId,
-                controllerId, rejection);
+            DropFate(fate, controllerId, "the ship has no owner");
+            return;
+        }
+
+        if (owner == senderParty)
+        {
+            ledger.Record(message.InstanceId, fate, message.HostEpoch, message.Revision);
+            return;
+        }
+
+        if (owner.MapEventSide?.MapEvent != mapEvent)
+        {
+            DropFate(fate, controllerId, "its owner is not in the battle");
+            return;
+        }
+
+        if (owner.IsPlayerParty())
+        {
+            DropFate(fate, controllerId, "another player owns it");
+            return;
+        }
+
+        if (!isHostAtEpoch)
+        {
+            DropFate(fate, controllerId, "the sender is not the battle host at this epoch");
             return;
         }
 
         ledger.Record(message.InstanceId, fate, message.HostEpoch, message.Revision);
     }
 
-    /// <summary>
-    /// Why a sender may not report a ship's fate, or null: a player reports its own party's ships, and the battle host at the
-    /// current epoch reports the ships of the AI parties in the battle.
-    /// </summary>
-    internal static string RejectionOf(bool ownedBySender, bool hasOwner, bool ownerInBattle, bool ownedByPlayer, bool isHostAtEpoch)
-    {
-        if (!hasOwner) return "the ship has no owner";
-        if (ownedBySender) return null;
-        if (!ownerInBattle) return "its owner is not in the battle";
-        if (ownedByPlayer) return "another player owns it";
-        if (!isHostAtEpoch) return "the sender is not the battle host at this epoch";
-        return null;
-    }
-
+    // Logs a fate the sender may not report.
+    private static void DropFate(BattleShipFate fate, string controllerId, string reason) =>
+        Logger.Warning("[NavalSync] Dropped the fate of ship {ShipId} from {Controller}: {Reason}", fate.CampaignShipId,
+            controllerId, reason);
     // A departing player's ships take their fates now, so a return or a later result reads them; an emptied battle takes all.
     private void Handle_MissionMemberDeparted(MessagePayload<MissionMemberDeparted> payload)
     {

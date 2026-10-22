@@ -1,4 +1,4 @@
-# Naval Battles
+﻿# Naval Battles
 
 The one page to read before touching co-op naval battles (War Sails). It covers the mission side only: hulls, crews,
 departures and the end of the battle. Campaign ships, ports, storms, rafts and loot are Jordan's (`Coop.Naval`,
@@ -227,7 +227,8 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     sail HP, sunk (sinking or 0 HP) and the damage mitigated since its last report (`BattleShipFateReporter`,
     `NetworkBattleShipFates` over the relay). A sinking hull reports at once, other changes at most every 2 s, and a
     removed hull, the mission's end (`NavalShipsLogic.MissionEndEvent`, before `MissionLeft`) and every result report
-    (`IBattleResultCommitter.SetBeforeReport`) flush the rest.
+    (the committer publishes `BattleResultReporting` just before `NetworkBattleResultReady`) flush the rest;
+    `NavalBattleServices` wires all three.
   - The server holds each fate (`ServerBattleShipFateHandler`, `IBattleShipFateLedger`) when the sender is in the
     instance and reports its own party's ship, or is the battle host at the current epoch and reports an AI party's ship.
     The newest by host epoch then revision wins, a sunk ship stays sunk, and fates are dropped once the results were
@@ -249,8 +250,9 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
   the after-defeat damage on top of their battle HP, as in vanilla. A player's share is held by `LootShipHold`: it
   leaves the losing party at once (a replicated `Owner = null`, no destroy), so that party's finalize (`RemoveParty`
   destroys its ships) no longer kills ships the loot screen still offers. Taking one (`ApplyByLooting`) and discarding
-  the rest (`LootShipsHandler`) work after the finalize; a held ship nobody took is destroyed when its looter disconnects
-  or after 15 minutes.
+  the rest (`LootShipsHandler`) work after the finalize. The discard releases the hold; a held ship nobody took is
+  destroyed when its looter disconnects, or after a 2 hour fallback for a loot screen that never closes (the ship screen
+  comes after the troop and item loot and any conversations).
 
 ## 4. Status
 
@@ -350,7 +352,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
     `DestroyShipAction` (E2E-proven);
   - the campaign side of a mid-battle retreat (the party at sea, rafts) is his;
   - ship loot and distribution are his. M6 adds, for his review, one `LootShipHold.Hold` call in
-    `MapEventResultsInterface.LootDefeatedPartyShips` and an explicit ownerless-ship case in `LootShipsHandler`;
+    `MapEventResultsInterface.LootDefeatedPartyShips` (and a constructor parameter); `LootShipsHandler` and
     `PortScreenChangesHandler` needed no change, since the offered ships keep their handles;
   - suggested: his `ShipHitPointsPatches` postfix should skip the refresh during a mission or with a null menu (M6 guards
     it from `SnapshotShipMenuRefreshPatch`);

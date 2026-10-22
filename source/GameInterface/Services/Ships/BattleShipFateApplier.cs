@@ -3,6 +3,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Ships.Data;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -18,11 +19,11 @@ namespace GameInterface.Services.Ships;
 /// </summary>
 public interface IBattleShipFateApplier
 {
-    /// <summary>Applies the held fates of the ships <paramref name="party"/> owns, as its player departs the battle. How many applied.</summary>
-    int ApplyParty(MapEvent mapEvent, PartyBase party);
+    /// <summary>Applies the held fates of the ships <paramref name="party"/> owns, as its player departs the battle.</summary>
+    void ApplyParty(MapEvent mapEvent, PartyBase party);
 
-    /// <summary>Applies every held fate of the battle. How many applied.</summary>
-    int ApplyAll(MapEvent mapEvent);
+    /// <summary>Applies every held fate of the battle.</summary>
+    void ApplyAll(MapEvent mapEvent);
 }
 
 /// <inheritdoc cref="IBattleShipFateApplier"/>
@@ -42,39 +43,41 @@ public class BattleShipFateApplier : IBattleShipFateApplier
         this.objectManager = objectManager;
     }
 
-    public int ApplyParty(MapEvent mapEvent, PartyBase party) => Apply(mapEvent, ship => ship.Owner == party);
+    public void ApplyParty(MapEvent mapEvent, PartyBase party) => Apply(mapEvent, ship => ship.Owner == party);
 
-    public int ApplyAll(MapEvent mapEvent) => Apply(mapEvent, ship => true);
+    public void ApplyAll(MapEvent mapEvent) => Apply(mapEvent, ship => true);
 
-    // A fate whose ship is gone is taken too, so the ledger never keeps it; applying it then finds nothing to write.
-    private int Apply(MapEvent mapEvent, Func<Ship, bool> selects)
+    // Resolves each held ship once. A fate whose ship is already gone (destroyed by a finalize, a loot discard) or ownerless is
+    // taken and dropped, so the ledger never keeps it; vanilla's destroy and every HP write expect an owned ship.
+    private void Apply(MapEvent mapEvent, Func<Ship, bool> selects)
     {
-        if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId) || !ledger.HasFates(mapEventId)) return 0;
+        if (mapEvent == null || !objectManager.TryGetId(mapEvent, out var mapEventId) || !ledger.HasFates(mapEventId)) return;
 
-        var fates = ledger.Take(mapEventId, fate => !objectManager.TryGetObject<Ship>(fate.CampaignShipId, out var ship) || selects(ship));
-        int applied = 0;
+        var ships = new Dictionary<string, Ship>();
+        var fates = ledger.Take(mapEventId, fate =>
+        {
+            if (!objectManager.TryGetObject<Ship>(fate.CampaignShipId, out var ship) || ship.Owner == null) return true;
+            if (!selects(ship)) return false;
+
+            ships[fate.CampaignShipId] = ship;
+            return true;
+        });
+
         foreach (var fate in fates)
         {
-            if (ApplyFate(fate)) applied++;
+            if (ships.TryGetValue(fate.CampaignShipId, out var ship)) ApplyFate(ship, fate);
         }
-
-        return applied;
     }
 
-    // Grants the fate's XP, then destroys a sunk ship or writes the survivor's battle HP; false when its ship is gone.
-    private bool ApplyFate(BattleShipFate fate)
+    // Grants the fate's XP, then destroys a sunk ship or writes the survivor's battle HP.
+    private static void ApplyFate(Ship ship, BattleShipFate fate)
     {
-        if (!objectManager.TryGetObjectWithLogging<Ship>(fate.CampaignShipId, out var ship)) return false;
-
-        // A ship with no owner was already destroyed; vanilla's destroy and every HP write expect an owned ship.
-        if (ship.Owner == null) return false;
-
         GrantBoatswainXp(ship, fate.MitigatedDamage);
         if (fate.Sunk)
         {
             Logger.Information("[NavalSync] Ship {ShipId} of {Owner} sank in battle; destroying it", fate.CampaignShipId, ship.Owner.Id);
             DestroyShipAction.Apply(ship);
-            return true;
+            return;
         }
 
         float hitPoints = MathF.Clamp(fate.HitPoints, 0f, ship.MaxHitPoints);
@@ -83,7 +86,6 @@ public class BattleShipFateApplier : IBattleShipFateApplier
         if (Math.Abs(ship.SailHitPoints - sailHitPoints) > Tolerance) ship.SailHitPoints = sailHitPoints;
         Logger.Information("[NavalSync] Ship {ShipId} of {Owner} keeps its battle condition: hp {HitPoints}, sail {SailHitPoints}",
             fate.CampaignShipId, ship.Owner.Id, ship.HitPoints, ship.SailHitPoints);
-        return true;
     }
 
     // Vanilla's per-hit skill call with the battle's mitigated damage as raw and none as final, which grants the owner party's

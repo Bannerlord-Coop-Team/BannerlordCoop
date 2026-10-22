@@ -1,8 +1,8 @@
 ﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Missions.Messages;
 using Serilog;
-using System;
 using TaleWorlds.Core;
 
 namespace Missions.Battles;
@@ -27,12 +27,6 @@ public interface IBattleResultCommitter
 
     /// <summary>Get the resolved state for a late joiner's mesh catch-up.</summary>
     bool TryGetResolvedState(out BattleState battleState);
-
-    /// <summary>
-    /// [Game thread] Runs <paramref name="beforeReport"/> right before each result report goes out, so a battle type's own report
-    /// (the naval ship fates) reaches the server ahead of it on the same relay channel; null clears it.
-    /// </summary>
-    void SetBeforeReport(Action beforeReport);
 }
 
 /// <inheritdoc cref="IBattleResultCommitter"/>
@@ -47,13 +41,15 @@ public class BattleResultCommitter : IBattleResultCommitter
     private BattleState resolvedState;
     private BattleState reportedState;
     private int reportedEpoch;
-    private Action beforeReport;
+    private readonly IMessageBroker messageBroker;
 
-    public BattleResultCommitter(IBattleNetwork battleNetwork, INetwork relayNetwork, IBattleSession session)
+    public BattleResultCommitter(IBattleNetwork battleNetwork, INetwork relayNetwork, IBattleSession session,
+        IMessageBroker messageBroker)
     {
         this.battleNetwork = battleNetwork;
         this.relayNetwork = relayNetwork;
         this.session = session;
+        this.messageBroker = messageBroker;
     }
 
     public void ReportResolvedResult(MissionResult result)
@@ -103,7 +99,8 @@ public class BattleResultCommitter : IBattleResultCommitter
 
         Logger.Information("[BattleSync] Reporting resolved mission result {State} for instance {Instance} at host epoch {Epoch}",
             battleState, session.InstanceId, hostEpoch);
-        beforeReport?.Invoke();
+        // Publish is synchronous and catches subscriber exceptions, so their reports go out first and can't block this one.
+        messageBroker.Publish(this, new BattleResultReporting(session.InstanceId));
         relayNetwork.SendAll(new NetworkBattleResultReady(session.InstanceId, battleState, hostEpoch));
 
         if (session.IsLocalHost)
@@ -116,7 +113,6 @@ public class BattleResultCommitter : IBattleResultCommitter
         }
     }
 
-    public void SetBeforeReport(Action beforeReport) => this.beforeReport = beforeReport;
 
     internal static bool IsAlreadyReported(BattleState reportedState, int reportedEpoch, BattleState battleState, int hostEpoch)
         => IsSupportedResultState(reportedState) && reportedState == battleState && reportedEpoch == hostEpoch;

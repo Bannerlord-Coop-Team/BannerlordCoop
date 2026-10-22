@@ -3,9 +3,8 @@
 namespace GameInterface.Services.Ships.Data;
 
 /// <summary>
-/// What a naval battle did to one campaign ship, as the client simulating its hull saw it: hull and sail HP, whether it sank
-/// (Ship.OnShipDamaged destroys a ship at 0 HP), and the damage its upgrades mitigated since the last report, which vanilla
-/// turns into the owner party's Boatswain XP per hit.
+/// What a naval battle did to one campaign ship as its simulating client saw it: hull and sail HP, whether it sank, and the
+/// damage its upgrades mitigated since the last report (the base of Boatswain XP).
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public sealed class BattleShipFate

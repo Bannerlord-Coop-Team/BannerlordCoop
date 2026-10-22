@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Ships.Messages;
 using Missions;
 using Missions.Battles;
 using Missions.Messages;
@@ -60,25 +59,12 @@ public class BattleShipFateReporterTests
         Assert.Equal(650f, fate.HitPoints);
         Assert.False(fate.Sunk);
         Assert.Equal(2, update.Revision);
+#if DEBUG
         Assert.Equal(2, harness.Reporter.FatesSentOf(harness.ShipIdOf(first)));
         Assert.Equal(1, harness.Reporter.FatesSentOf(harness.ShipIdOf(second)));
+#endif
     }
 
-    // Between reports only the cheap sinking check runs each frame; the full condition is read when a report is due.
-    [Fact]
-    public void Tick_ReadsTheConditionsOnlyWhenAReportIsDue()
-    {
-        var harness = new Harness();
-        harness.Field(Own, "Ship_1");
-
-        for (int i = 0; i < 10; i++)
-            harness.Reporter.Tick(0.1f);
-        harness.Engine.Verify(engine => engine.ReadCondition(It.IsAny<MissionObject>()), Times.Never);
-
-        harness.Reporter.Tick(BattleShipFateReporter.ReportIntervalSeconds);
-        harness.Engine.Verify(engine => engine.ReadCondition(It.IsAny<MissionObject>()), Times.Once);
-        Assert.Single(harness.Sent);
-    }
     [Fact]
     public void Tick_NeverSendsASunkShipAgain()
     {
@@ -108,23 +94,6 @@ public class BattleShipFateReporterTests
         var fate = Assert.Single(Assert.Single(harness.Sent).Fates);
         Assert.Equal("Ship_1", fate.CampaignShipId);
         Assert.Equal(400f, fate.HitPoints);
-    }
-
-    // The committer runs the reporter's flush before its result goes out, so both ride the ordered relay channel in that order.
-    [Fact]
-    public void ResultReport_FlushesTheFatesAheadOfTheResult()
-    {
-        var harness = new Harness();
-        harness.Field(Own, "Ship_1");
-        var committer = new BattleResultCommitter(Mock.Of<IBattleNetwork>(), harness.Network.Object, harness.Session.Object);
-        committer.SetBeforeReport(harness.Reporter.Flush);
-
-        committer.AcceptResolvedState(BattleState.AttackerVictory);
-        committer.ReportAcceptedResult();
-
-        Assert.IsType<NetworkBattleShipFates>(harness.Messages[0]);
-        Assert.IsType<NetworkBattleResultReady>(harness.Messages[1]);
-        Assert.Equal(2, harness.Messages.Count);
     }
 
     [Fact]

@@ -3,7 +3,7 @@ using GameInterface.Services.Ships.Data;
 using ProtoBuf;
 using System;
 
-namespace GameInterface.Services.Ships.Messages;
+namespace Missions.Messages;
 
 /// <summary>
 /// [Client to server] The fates of the naval hulls a client simulates in a battle, numbered by <see cref="Revision"/> at the

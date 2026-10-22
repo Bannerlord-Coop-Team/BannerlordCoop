@@ -13,9 +13,9 @@ public interface IBattleShipFateLedger
 {
     /// <summary>
     /// Holds <paramref name="fate"/> unless the ship's held fate is newer by host epoch, then revision; a sunk ship stays sunk.
-    /// Its mitigated damage adds to the ship's total either way. Whether its condition was held.
+    /// Its mitigated damage adds to the ship's total either way.
     /// </summary>
-    bool Record(string mapEventId, BattleShipFate fate, int hostEpoch, long revision);
+    void Record(string mapEventId, BattleShipFate fate, int hostEpoch, long revision);
 
     /// <summary>Whether any fate of the battle waits to be applied.</summary>
     bool HasFates(string mapEventId);
@@ -30,7 +30,7 @@ public class BattleShipFateLedger : IBattleShipFateLedger
     // Game thread only: the fate handler records inside GameThread.RunSafe and every apply point runs on the game thread.
     private readonly Dictionary<string, Dictionary<string, HeldFate>> battles = new Dictionary<string, Dictionary<string, HeldFate>>();
 
-    public bool Record(string mapEventId, BattleShipFate fate, int hostEpoch, long revision)
+    public void Record(string mapEventId, BattleShipFate fate, int hostEpoch, long revision)
     {
         if (!battles.TryGetValue(mapEventId, out var ships))
         {
@@ -42,15 +42,13 @@ public class BattleShipFateLedger : IBattleShipFateLedger
         if (!ships.TryGetValue(fate.CampaignShipId, out var held))
         {
             ships.Add(fate.CampaignShipId, candidate);
-            return true;
+            return;
         }
 
         // Each report carries the damage mitigated since the reporter's last one, so every report adds to the total.
         float mitigatedDamage = held.Fate.MitigatedDamage + fate.MitigatedDamage;
-        bool supersedes = candidate.Supersedes(held);
-        var kept = supersedes ? candidate : held;
+        var kept = candidate.Supersedes(held) ? candidate : held;
         ships[fate.CampaignShipId] = new HeldFate(kept.Fate.WithMitigatedDamage(mitigatedDamage), kept.HostEpoch, kept.Revision);
-        return supersedes;
     }
 
     public bool HasFates(string mapEventId) => battles.TryGetValue(mapEventId, out var ships) && ships.Count > 0;

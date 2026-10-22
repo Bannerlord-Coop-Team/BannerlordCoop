@@ -1,7 +1,6 @@
 ﻿using Common.Logging;
 using Common.Network;
 using GameInterface.Services.Ships.Data;
-using GameInterface.Services.Ships.Messages;
 using Missions.Messages;
 using Serilog;
 using System;
@@ -26,8 +25,10 @@ public interface IBattleShipFateReporter
     /// <summary>[Game thread] Sends every own hull's changed fate now, ahead of a result report or the mission's end.</summary>
     void Flush();
 
+#if DEBUG
     /// <summary>How many fates of a ship this client sent (diagnostics).</summary>
     int FatesSentOf(Guid shipId);
+#endif
 }
 
 /// <inheritdoc cref="IBattleShipFateReporter"/>
@@ -76,7 +77,9 @@ public class BattleShipFateReporter : IBattleShipFateReporter
 
     public void Flush() => Send(ChangedFates(registry.Ships));
 
+#if DEBUG
     public int FatesSentOf(Guid shipId) => reports.TryGetValue(shipId, out var report) ? report.Sent : 0;
+#endif
 
     // An own live hull that started sinking since its last fate went out, which the server must hear about at once.
     private bool IsNewlySinking(NetworkShipInfo ship) =>
@@ -147,7 +150,9 @@ public class BattleShipFateReporter : IBattleShipFateReporter
 
             report.Last = change.Fate;
             report.ReportedMitigatedDamage += change.Fate.MitigatedDamage;
+#if DEBUG
             report.Sent++;
+#endif
             if (change.Fate.Sunk)
                 Logger.Information("[NavalSync] Reported campaign ship {CampaignShipId} of hull {ShipId} sunk", change.Fate.CampaignShipId,
                     change.ShipId);
@@ -172,6 +177,8 @@ public class BattleShipFateReporter : IBattleShipFateReporter
     {
         public BattleShipFate Last;
         public float ReportedMitigatedDamage;
+#if DEBUG
         public int Sent;
+#endif
     }
 }

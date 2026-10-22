@@ -2,7 +2,9 @@
 using Common.Network;
 using GameInterface.Services.ObjectManager;
 using Missions.Agents.Handlers;
+using Missions.Messages;
 using System;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Battles;
 
@@ -36,19 +38,34 @@ public interface INavalBattleServices : IDisposable
     /// reserve in the same tick.
     /// </summary>
     void Tick(float dt, Action beforeMigrationReserve = null);
+
+    /// <summary>
+    /// [Game thread] Vanilla is about to remove <paramref name="hull"/>: its fate goes to the server and its removal to the
+    /// peers (<see cref="IBattleShipReplicator.AnnounceRemoval"/>).
+    /// </summary>
+    void OnBeforeHullRemoved(MissionObject hull, ShipRemovalReason reason, bool missionEnding);
+
+    /// <summary>
+    /// [Game thread] The mission ends while every hull is still live: the own ropes go out once more and the last fates are
+    /// flushed, ahead of this client's MissionLeft.
+    /// </summary>
+    void OnMissionEnding();
 }
 
 /// <inheritdoc cref="INavalBattleServices"/>
 public class NavalBattleServices : INavalBattleServices
 {
     private readonly INavalHullAuthority hullAuthority;
-    private readonly IBattleResultCommitter resultCommitter;
+    private readonly IMessageBroker messageBroker;
+    private readonly IBattleSession session;
 
     public NavalBattleServices(IBattleNetwork network, INetwork relayNetwork, IMessageBroker messageBroker,
         IBattleTeamResolver teamResolver, IObjectManager objectManager, BattleContext context, INavalShipEngine shipEngine)
     {
         // These services exist only in a naval mission and open with it.
         context.Session.MarkNaval();
+        this.messageBroker = messageBroker;
+        session = context.Session;
         Engine = shipEngine;
         hullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, shipEngine, context.TroopWithdrawal);
         var conditions = new BattleShipConditionStream(network, context.Session, shipEngine, context.HostEpochPolicy,
@@ -67,9 +84,7 @@ public class NavalBattleServices : INavalBattleServices
             shipEngine, ShipReplicator, context.HostEpochPolicy, context.MissionContext);
         FateReporter = new BattleShipFateReporter(relayNetwork, context.Session, context.MissionComponent.ShipRegistry, shipEngine);
 
-        // The fates ride ahead of every result report on the relay, so the server holds them when it applies the result.
-        resultCommitter = context.ResultCommitter;
-        resultCommitter.SetBeforeReport(FateReporter.Flush);
+        messageBroker.Subscribe<BattleResultReporting>(Handle_BattleResultReporting);
     }
 
     public INavalShipEngine Engine { get; }
@@ -99,9 +114,30 @@ public class NavalBattleServices : INavalBattleServices
         MigrationReserveFielder.Tick();
     }
 
+    public void OnBeforeHullRemoved(MissionObject hull, ShipRemovalReason reason, bool missionEnding)
+    {
+        FateReporter.ReportRemoval(hull);
+        ShipReplicator.AnnounceRemoval(hull, reason, missionEnding);
+    }
+
+    public void OnMissionEnding()
+    {
+        ShipReplicator.SendFinalRopes();
+        FateReporter.Flush();
+    }
+
+    // [Game thread] Published by this client's result committer right before its result report, so the fates ride ahead of it
+    // on the relay and the server holds them when it applies the result.
+    private void Handle_BattleResultReporting(MessagePayload<BattleResultReporting> payload)
+    {
+        if (payload.What.InstanceId != session.InstanceId) return;
+
+        FateReporter.Flush();
+    }
+
     public void Dispose()
     {
-        resultCommitter.SetBeforeReport(null);
+        messageBroker.Unsubscribe<BattleResultReporting>(Handle_BattleResultReporting);
         ShipWeaponReplicator.Dispose();
         ShipDamageRouter.Dispose();
         DeckPoses.Dispose();
