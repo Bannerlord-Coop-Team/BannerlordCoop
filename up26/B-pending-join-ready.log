@@ -1,0 +1,3 @@
+83484 server  state=MapState menu= campaign=True readyCampaign=True players=2 roster=testclient:True,testclient2:True mission=False
+102396 client testclient2 state=MapState menu=town campaign=True readyCampaign=True players=2 roster=: mission=False
+116740 client testclient state=MapState menu= campaign=True readyCampaign=True players=2 roster=: mission=False
