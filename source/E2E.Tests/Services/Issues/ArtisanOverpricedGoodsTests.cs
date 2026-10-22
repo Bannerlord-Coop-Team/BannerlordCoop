@@ -186,19 +186,15 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     }
 
     [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, false)]
-    [InlineData(true, true)]
-    [InlineData(false, true)]
-    public void CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory(bool success, bool fromOlderSave)
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory(bool success)
     {
         QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
 
         Accept();
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
         var ownerQuest = (Quest)scenario.QuestOf(ClientA);
-        var serverQuest = (Quest)scenario.QuestOf(Server);
-        var legacy = fromOlderSave ? QuestJournalHistoryAssertions.RestoreVanillaArchive(Server, serverQuest) : null;
         if (success)
         {
             Stock(Amount);
@@ -211,7 +207,7 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         }
 
         QuestJournalHistoryAssertions.AssertLateJoinHistory(Server, ClientA, ClientB, QuestScenario.IssueId, ownerQuest,
-            success ? IssueOutcome.QuestSuccess : IssueOutcome.QuestFail, legacy);
+            success ? IssueOutcome.QuestSuccess : IssueOutcome.QuestFail);
     }
 
     [Fact]

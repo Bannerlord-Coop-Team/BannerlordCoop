@@ -15,14 +15,6 @@ namespace GameInterface.Services.UI.Notifications.Patches;
 [HarmonyPatch(typeof(JournalLogsCampaignBehavior))]
 internal static class ServerQuestJournalPatches
 {
-    [HarmonyPatch(nameof(JournalLogsCampaignBehavior.GetRelatedLog), typeof(IssueBase))]
-    [HarmonyPostfix]
-    private static void GetIssueLogPostfix(IssueBase issue, ref JournalLogEntry __result)
-    {
-        if (ModInformation.IsServer && ContainerProvider.TryResolve<IQuestJournalOwnerResolver>(out var resolver))
-            __result = resolver.RestoreOwner(__result, issue);
-    }
-
     [HarmonyPatch(nameof(JournalLogsCampaignBehavior.CreateRelatedLog), typeof(IssueBase))]
     [HarmonyPostfix]
     private static void CreateIssueLogPostfix(IssueBase issue, ref JournalLogEntry __result)

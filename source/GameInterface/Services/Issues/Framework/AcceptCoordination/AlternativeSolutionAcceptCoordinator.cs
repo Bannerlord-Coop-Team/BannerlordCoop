@@ -9,12 +9,12 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Notifications;
 using LiteNetLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
@@ -38,6 +38,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
     private readonly IAlternativeSolutionTroopValidator troopValidator;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IIssueAcceptPreconditions acceptPreconditions;
+    private readonly IQuestJournalOwnerResolver journal;
 
     public AlternativeSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -48,7 +49,8 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         IPlayerManager playerManager,
         IAlternativeSolutionTroopValidator troopValidator,
         IControllerIdProvider controllerIdProvider,
-        IIssueAcceptPreconditions acceptPreconditions)
+        IIssueAcceptPreconditions acceptPreconditions,
+        IQuestJournalOwnerResolver journal)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -59,6 +61,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         this.troopValidator = troopValidator;
         this.controllerIdProvider = controllerIdProvider;
         this.acceptPreconditions = acceptPreconditions;
+        this.journal = journal;
 
         messageBroker.Subscribe<AlternativeSolutionAcceptRequested>(Handle_AlternativeSolutionAcceptRequested);
         messageBroker.Subscribe<RequestAlternativeSolutionAccept>(Handle_RequestAlternativeSolutionAccept);
@@ -165,7 +168,7 @@ internal class AlternativeSolutionAcceptCoordinator : IHandler
         {
             Logger.Error(e, "Starting the alternative solution of {issue} failed", data.IssueId);
             ownership.Remove(data.IssueOwnerId);
-            Campaign.Current.LogEntryHistory._logs.RemoveAll(entry => entry is JournalLogEntry journal && journal.IsRelatedTo(issue));
+            journal.DiscardArchive(issue);
             Reject(peer, data, playerHero);
             return;
         }

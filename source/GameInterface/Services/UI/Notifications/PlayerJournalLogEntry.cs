@@ -29,7 +29,9 @@ internal sealed class PlayerJournalLogEntry : JournalLogEntry
 /// </summary>
 public sealed class PlayerJournalSaveableTypeDefiner : SaveableTypeDefiner
 {
-    public PlayerJournalSaveableTypeDefiner() : base(44_186_004)
+    private const int SaveBaseId = 44_186_100;
+
+    public PlayerJournalSaveableTypeDefiner() : base(SaveBaseId)
     {
     }
 

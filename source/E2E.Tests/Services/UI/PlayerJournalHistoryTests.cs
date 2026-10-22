@@ -1,4 +1,7 @@
 ﻿using E2E.Tests.Environment;
+using Common.Util;
+using GameInterface.Services.UI.Notifications;
+using TaleWorlds.CampaignSystem.Issues;
 using GameInterface.Services.Entity;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.LogEntries;
@@ -21,6 +24,28 @@ public class PlayerJournalHistoryTests : IDisposable
     }
 
     public void Dispose() => environment.Dispose();
+
+    [Fact]
+    public void DiscardingRejectedIssueArchivePreservesUnrelatedHistory()
+    {
+        environment.Server.Call(() =>
+        {
+            var issue = ObjectHelper.SkipConstructor<CapturedByBountyHuntersIssueBehavior.CapturedByBountyHuntersIssue>();
+            using (new AllowedThread())
+                issue.StringId = "rejected_issue";
+            Assert.Equal("rejected_issue", issue.StringId);
+            var rejected = new JournalLogEntry(new TextObject("Rejected quest"), null, null, false, issue);
+            var unrelated = new JournalLogEntry(new TextObject("Other quest"), null, null, false);
+            var history = Campaign.Current.LogEntryHistory._logs;
+            history.Clear();
+            history.Add(rejected);
+            history.Add(unrelated);
+
+            environment.Server.Resolve<IQuestJournalOwnerResolver>().DiscardArchive(issue);
+
+            Assert.Same(unrelated, Assert.Single(history));
+        });
+    }
 
     [Theory]
     [InlineData(true)]
