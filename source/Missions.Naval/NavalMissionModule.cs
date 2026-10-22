@@ -88,6 +88,9 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalWaterClockCoopCommand>()
             .As<ICoopCommand>()
             .InstancePerDependency();
+        builder.RegisterType<NavalTryHelmCoopCommand>()
+            .As<ICoopCommand>()
+            .InstancePerDependency();
 #endif
     }
 }
