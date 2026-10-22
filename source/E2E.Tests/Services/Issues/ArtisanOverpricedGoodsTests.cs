@@ -202,6 +202,23 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Server.Call(() => Assert.Equal(0, Get<MobileParty>(Server, scenario.OwnerPartyId).ItemRoster.GetItemNumber(Get<ItemObject>(Server, itemId))));
     }
 
+    [Fact]
+    public void FullDelivery_LeavesTheOwnersCompletedQuestOutOfTheServersJournalHistory()
+    {
+        JournalHistory.Track(Server, ClientA, ClientB);
+        Accept();
+        Stock(Amount);
+        var clientQuest = (Quest)scenario.QuestOf(ClientA);
+        ClientA.Call(() => clientQuest.DeliverItemsFullyOnConsequence());
+        ClientA.Call(() => clientQuest.CompleteQuestWithSuccess());
+        environment.FlushCoalescer();
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+
+        Assert.NotEmpty(JournalHistory.EntriesOn(ClientA));
+        Assert.Empty(JournalHistory.EntriesOn(Server));
+        Assert.Empty(JournalHistory.EntriesOn(ClientB));
+    }
+
     [Theory]
     [InlineData(false, 5)]
     [InlineData(true, 4)]

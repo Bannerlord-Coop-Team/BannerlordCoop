@@ -11,6 +11,7 @@ using GameInterface.Services.ItemRosters.Messages;
 using HarmonyLib;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -130,6 +131,31 @@ public class LordNeedsHorsesTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
             Assert.Null(giver.Issue);
         });
+    }
+
+    [Fact]
+    public void TheReturnedMission_LeavesTheOwnersCompletedQuestOutOfTheServersJournalHistory()
+    {
+        JournalHistory.Track(Server, ClientA, ClientB);
+        StartMissionOnServer();
+
+        // The success log links the companion, so the encyclopedia has to exist. The logs are what is tested here.
+        Server.Call(() =>
+        {
+            Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
+            Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
+        });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverId, out var giver));
+
+            giver.Issue.CompleteIssueWithAlternativeSolution();
+        });
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Empty(JournalHistory.EntriesOn(Server));
+        Assert.Empty(JournalHistory.EntriesOn(ClientB));
     }
 
     [Fact]
