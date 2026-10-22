@@ -323,10 +323,32 @@ public class NavalShipEngine : INavalShipEngine
 
     public BattleShipMotion ReadMotion(MissionObject hull)
     {
-        var entity = ((MissionShip)hull).GameEntity;
+        var ship = (MissionShip)hull;
+        var entity = ship.GameEntity;
         if (!entity.IsValid) return default;
 
-        return new BattleShipMotion(entity.GetLinearVelocity().AsVec2, entity.GetAngularVelocity().z);
+        return new BattleShipMotion(entity.GetLinearVelocity().AsVec2, entity.GetAngularVelocity().z, ReadCrewLoad(ship));
+    }
+
+    /// <summary>
+    /// The crew load vanilla's <c>ApplyAgentForces</c> applies to the hull this step: the committed agent mass and its centre
+    /// in the body's local frame. Null when none is committed.
+    /// </summary>
+    internal static BattleShipCrewLoad ReadCrewLoad(MissionShip ship)
+    {
+        var physics = ship.Physics;
+        if (physics == null || !ship.GameEntity.IsValid) return null;
+
+        return CrewLoadOf(physics._committedTotalMass, physics._committedWeightedAgentsPosition,
+            ship.GameEntity.GetBodyWorldTransform());
+    }
+
+    /// <summary>Vanilla's crew centre: the mass-weighted world position over the mass, moved into the body frame.</summary>
+    internal static BattleShipCrewLoad CrewLoadOf(float mass, Vec3 weightedPosition, MatrixFrame body)
+    {
+        if (!(mass > 0f)) return null;
+
+        return BattleShipCrewLoad.Create(mass, body.TransformToLocal(weightedPosition / mass));
     }
 
     public void TickCopies(float fixedDt) => SteeredCopies.Tick(fixedDt);

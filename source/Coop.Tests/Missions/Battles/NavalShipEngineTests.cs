@@ -3,6 +3,7 @@ using HarmonyLib;
 using Missions.Naval;
 using System;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Xunit;
 
@@ -31,6 +32,33 @@ public class NavalShipEngineTests
         AccessTools.Field(typeof(ScriptComponentBehavior), "_gameEntity").SetValue(point, ValidEntity());
 
         Assert.Throws<NullReferenceException>(() => engine.ApplyStationUse(null!, point, inUse: true));
+    }
+
+    // R45 roll: the owner sends vanilla's crew centre in its body frame, so a copy at the same pose applies it at the same world point.
+    [Fact]
+    public void CrewLoadOf_IsVanillasCrewCentreInTheBodyFrame()
+    {
+        var rotation = Mat3.Identity;
+        rotation.RotateAboutUp(1.2f);
+        rotation.RotateAboutForward(0.07f);
+        var body = new MatrixFrame(rotation, new Vec3(100f, 50f, 2f));
+        var first = new Vec3(101f, 48f, 3f);
+        var second = new Vec3(98f, 55f, 3.5f);
+
+        var load = NavalShipEngine.CrewLoadOf(160f, (80f * first) + (80f * second), body);
+
+        var centre = body.TransformToParent(load.LocalCentre);
+        Assert.Equal(160f, load.Mass);
+        Assert.Equal(99.5f, centre.x, 3);
+        Assert.Equal(51.5f, centre.y, 3);
+        Assert.Equal(3.25f, centre.z, 3);
+    }
+
+    // No agent committed: no load to send, so copies keep vanilla's own weight.
+    [Fact]
+    public void CrewLoadOf_IsUnknownWithoutCommittedMass()
+    {
+        Assert.Null(NavalShipEngine.CrewLoadOf(0f, Vec3.Zero, MatrixFrame.Identity));
     }
 
     // WeakGameEntity.IsValid only compares the pointer with zero; nothing here dereferences it.

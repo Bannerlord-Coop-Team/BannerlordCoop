@@ -1224,6 +1224,59 @@ public class BattleShipReplicatorTests
         Assert.Equal(0.2f, copy.Motion.YawRate);
     }
 
+    // R45 roll: copies heel under the owner's crew load, which rides each sample as mass and a hull-local centre.
+    [Fact]
+    public void Sample_RoundTripsTheOwnersCrewLoad()
+    {
+        var load = BattleShipCrewLoad.Create(480f, new Vec3(0.75f, -6.5f, 2.25f));
+        var sample = new NetworkBattleShipSample(Guid.NewGuid(), Peer, 7,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), motion: new BattleShipMotion(new Vec2(1f, 2f), 0.1f, load));
+
+        var copy = Serializer.DeepClone(sample);
+
+        Assert.Equal(480f, copy.Motion.CrewLoad.Mass);
+        Assert.Equal(0.75f, copy.Motion.CrewLoad.LocalCentre.x);
+        Assert.Equal(-6.5f, copy.Motion.CrewLoad.LocalCentre.y);
+        Assert.Equal(2.25f, copy.Motion.CrewLoad.LocalCentre.z);
+    }
+
+    // An older sender writes no crew fields; the copy then keeps vanilla's own crew weight.
+    [Fact]
+    public void Sample_WithoutACrewLoad_ArrivesAsUnknown()
+    {
+        var sample = new NetworkBattleShipSample(Guid.NewGuid(), Peer, 7,
+            NetworkBattleShipSample.FromFrame(MatrixFrame.Identity), motion: new BattleShipMotion(new Vec2(1f, 2f), 0.1f));
+
+        var copy = Serializer.DeepClone(sample);
+
+        Assert.Equal(0f, copy.CrewMass);
+        Assert.Null(copy.Motion.CrewLoad);
+    }
+
+    [Theory]
+    [InlineData(0f, 0f, 0f, 0f)]
+    [InlineData(-80f, 0f, 0f, 0f)]
+    [InlineData(float.NaN, 0f, 0f, 0f)]
+    [InlineData(float.PositiveInfinity, 0f, 0f, 0f)]
+    [InlineData(80f, float.NaN, 0f, 0f)]
+    [InlineData(80f, 0f, float.NegativeInfinity, 0f)]
+    [InlineData(80f, 0f, 0f, float.NaN)]
+    public void CrewLoad_IsUnknownForAnEmptyOrNonFiniteLoad(float mass, float x, float y, float z)
+    {
+        Assert.Null(BattleShipCrewLoad.Create(mass, new Vec3(x, y, z)));
+    }
+
+    // A bad crew load is dropped as unknown; it never costs the copy its frame.
+    [Fact]
+    public void ValidateSample_AcceptsASampleWithoutACrewLoad()
+    {
+        var ship = new NetworkShipInfo(Guid.NewGuid(), Peer, null, false, CreateHull(), null);
+        var sample = new NetworkBattleShipSample(ship.ShipId, Peer, 1, NetworkBattleShipSample.FromFrame(MatrixFrame.Identity),
+            motion: new BattleShipMotion(new Vec2(1f, 2f), 0.1f, BattleShipCrewLoad.Create(float.NaN, Vec3.Zero)));
+
+        Assert.Null(BattleShipReplicator.ValidateSample(ship, Own, sample, 0, 0, InMission));
+    }
+
     [Theory]
     [InlineData(float.NaN, 0f, 0f)]
     [InlineData(0f, float.PositiveInfinity, 0f)]
