@@ -23,9 +23,6 @@ internal static class LesserNobleRevoltWorldEventPatches
     private static readonly Dictionary<Quest, (Hero Owner, MapEvent Battle)> ActiveOwnerBattles =
         new Dictionary<Quest, (Hero Owner, MapEvent Battle)>();
 
-    // The owner client's own record of the revolt battle it started, for its dialogue state only.
-    private static readonly Dictionary<Quest, MapEvent> ClientOwnerBattles = new Dictionary<Quest, MapEvent>();
-
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTickParty))]
     [HarmonyPostfix]
     private static void HourlyTickParty(MobileParty mobileParty)
@@ -123,27 +120,7 @@ internal static class LesserNobleRevoltWorldEventPatches
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventStarted))]
     [HarmonyPrefix]
-    private static bool MapEventStartedPrefix(Quest __instance, MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
-    {
-        if (ModInformation.IsServer)
-        {
-            return true;
-        }
-
-        // Like vanilla, only ever set: another battle starting must not clear a pending revolt battle.
-        var playerParty = MobileParty.MainParty?.Party;
-        if (__instance.IsOngoing &&
-            __instance._lesserNobleParty != null &&
-            playerParty != null &&
-            attackerParty == playerParty &&
-            defenderParty == __instance._lesserNobleParty.Party)
-        {
-            __instance._checkForEventEnd = true;
-            ClientOwnerBattles[__instance] = mapEvent;
-        }
-
-        return false;
-    }
+    private static bool MapEventStartedPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnClanChangedKingdom))]
     [HarmonyPrefix]
@@ -155,27 +132,10 @@ internal static class LesserNobleRevoltWorldEventPatches
         }
     }
 
+    // The server ends the battle in MapEventEnded and announces it to the owner's client.
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnMapEventEnd))]
     [HarmonyPrefix]
-    private static bool MapEventEndedPrefix(Quest __instance, MapEvent obj)
-    {
-        if (ModInformation.IsClient && __instance._checkForEventEnd &&
-            IsClientOwnerBattleEnd(__instance, obj))
-        {
-            __instance._firstTalkIsDone = true;
-            __instance._checkForEventEnd = false;
-            ClientOwnerBattles.Remove(__instance);
-        }
-
-        return false;
-    }
-
-    // Matches the server's EndOwnerBattle, which also resets when the revolt party left the battle.
-    internal static bool IsClientOwnerBattleEnd(Quest quest, MapEvent mapEvent)
-    {
-        return (ClientOwnerBattles.TryGetValue(quest, out var battle) && battle == mapEvent) ||
-            (quest._lesserNobleParty != null && mapEvent.InvolvedParties.Contains(quest._lesserNobleParty.Party));
-    }
+    private static bool MapEventEndedPrefix() => false;
 
     // The server fails the quest when it times out, a client replaying the timeout only ends its copy
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
@@ -242,7 +202,13 @@ internal static class LesserNobleRevoltWorldEventPatches
     {
         quest._firstTalkIsDone = true;
         quest._checkForEventEnd = false;
-        ActiveOwnerBattles.Remove(quest);
+
+        // Vanilla's next talk reads the owner client's copy, which never sees the server's battle end.
+        if (ActiveOwnerBattles.Remove(quest) &&
+            ContainerProvider.TryResolve<ILesserNobleRevoltWorldEventService>(out var service))
+        {
+            service.SendOwnerBattleEnded(quest);
+        }
     }
 
     internal enum RevoltBattleEnd
@@ -278,7 +244,6 @@ internal static class LesserNobleRevoltWorldEventPatches
     internal static void ForgetOwnerBattle(Quest quest)
     {
         ActiveOwnerBattles.Remove(quest);
-        ClientOwnerBattles.Remove(quest);
     }
 
     internal static void RecordOwnerBattle(Quest quest, Hero owner, MapEvent battle) =>

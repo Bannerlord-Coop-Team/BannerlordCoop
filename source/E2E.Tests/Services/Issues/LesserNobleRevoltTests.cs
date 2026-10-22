@@ -461,6 +461,10 @@ public sealed class LesserNobleRevoltTests : IDisposable
 
         LeaveBattleOnOwnersClient(mapEventId);
 
+        var ended = Assert.Single(server.NetworkSentMessages.GetMessages<NetworkLesserNobleRevoltOwnerBattleEnded>());
+        Assert.Equal(giverId, ended.IssueOwnerId);
+        Assert.Equal(issueId, ended.IssueId);
+        Assert.Equal("player-A", ended.ControllerId);
         Assert.True(QuestOf(server)._firstTalkIsDone);
         Assert.False(QuestOf(server)._checkForEventEnd);
 
@@ -484,8 +488,35 @@ public sealed class LesserNobleRevoltTests : IDisposable
 
         LeaveBattleOnOwnersClient(mapEventId);
 
+        Assert.Empty(server.NetworkSentMessages.GetMessages<NetworkLesserNobleRevoltOwnerBattleEnded>());
         Assert.False(QuestOf(server)._firstTalkIsDone);
         Assert.False(QuestOf(testEnvironment.Clients.First())._firstTalkIsDone);
+    }
+
+    [Fact]
+    public void OwnerBattleEnded_ForAnotherPlayerOrAnEndedIssue_LeavesTheQuestAlone()
+    {
+        const string issueId = "issue_lesser_noble";
+        var client = testEnvironment.Clients.First();
+        RegisterPlayer("player-A");
+        AddIssueWithQuest(client, issueId);
+
+        void Send(string sentIssueId, string controllerId) => testEnvironment.Server.Call(() =>
+            testEnvironment.Server.Resolve<INetwork>().SendAll(
+                new NetworkLesserNobleRevoltOwnerBattleEnded(giverId, sentIssueId, controllerId)));
+
+        Send(issueId, "player-B");
+        // The giver's earlier issue ended and this one replaced it.
+        Send("issue_lesser_noble_old", "player-A");
+        var quest = QuestOf(client);
+        Assert.False(quest._firstTalkIsDone);
+
+        client.Call(() => quest._checkForEventEnd = true);
+        Send(issueId, "player-A");
+        Send(issueId, "player-A");
+
+        Assert.True(quest._firstTalkIsDone);
+        Assert.False(quest._checkForEventEnd);
     }
 
     [Fact]
