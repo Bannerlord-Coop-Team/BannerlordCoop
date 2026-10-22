@@ -19,22 +19,41 @@ public class RoutedPlayerHitCombatLogPatchTests
     public void AddCombatLogPatch_HoldsResolvedTrackerLockUntilFinalizer()
     {
         using var battleScope = new ActiveCoopBattleScope("battle-1");
+        Assert.True(ContainerProvider.TryResolve<IRoutedPlayerHitNotificationTracker>(out var tracker));
         var attackerAgent = ObjectHelper.SkipConstructor<Agent>();
 
-        RoutedPlayerHitCombatLogPatch.Prefix(out var tracker);
-        Assert.NotNull(tracker);
+        RoutedPlayerHitCombatLogPatch.Prefix(out var lockScope);
+        Assert.NotNull(lockScope);
         var otherThreadEnqueue = new Thread(() => tracker.EnqueueCombatLogContext(null!, 0));
         try
         {
             otherThreadEnqueue.Start();
             Assert.False(otherThreadEnqueue.Join(TimeSpan.FromMilliseconds(100)));
-            RoutedPlayerHitCombatLogPatch.Postfix(attackerAgent, null!, default, tracker);
+            RoutedPlayerHitCombatLogPatch.Postfix(attackerAgent, null!, default, lockScope);
         }
         finally
         {
-            RoutedPlayerHitCombatLogPatch.Finalizer(null!, tracker);
+            RoutedPlayerHitCombatLogPatch.Finalizer(null!, lockScope);
         }
 
+        Assert.True(otherThreadEnqueue.Join(TimeSpan.FromSeconds(5)));
+    }
+
+    // When vanilla's enqueue throws, the finalizer still releases the lock and hands the same exception back.
+    [Fact]
+    public void AddCombatLogPatch_ReleasesLockAndReturnsException_WhenEnqueueThrows()
+    {
+        using var battleScope = new ActiveCoopBattleScope("battle-1");
+        Assert.True(ContainerProvider.TryResolve<IRoutedPlayerHitNotificationTracker>(out var tracker));
+        var thrown = new InvalidOperationException("enqueue failed");
+
+        RoutedPlayerHitCombatLogPatch.Prefix(out var lockScope);
+        Assert.NotNull(lockScope);
+        var returned = RoutedPlayerHitCombatLogPatch.Finalizer(thrown, lockScope);
+
+        Assert.Same(thrown, returned);
+        var otherThreadEnqueue = new Thread(() => tracker.EnqueueCombatLogContext(null!, 0));
+        otherThreadEnqueue.Start();
         Assert.True(otherThreadEnqueue.Join(TimeSpan.FromSeconds(5)));
     }
 
@@ -44,9 +63,9 @@ public class RoutedPlayerHitCombatLogPatchTests
     {
         using var battleScope = new ActiveCoopBattleScope(null!);
 
-        RoutedPlayerHitCombatLogPatch.Prefix(out var tracker);
+        RoutedPlayerHitCombatLogPatch.Prefix(out var lockScope);
 
-        Assert.Null(tracker);
+        Assert.Null(lockScope);
     }
 
     // The publish patch exposes the queued routed hit through the resolved tracker and clears it afterwards.
@@ -66,5 +85,24 @@ public class RoutedPlayerHitCombatLogPatchTests
         RoutedPlayerHitCombatLogContextPatch.Finalizer(state);
 
         Assert.False(tracker.TryGetCurrentRoutedPlayerHit(out _, out _));
+    }
+
+    // Without a container the publish patch resolves no tracker, so it exposes nothing and its finalizer does nothing.
+    [Fact]
+    public void GenerateCombatLogPatch_SkipsTracker_WhenResolveFails()
+    {
+        bool hadPreviousContainer = ContainerProvider.TryGetContainer(out var previousContainer);
+        ContainerProvider.Clear();
+        try
+        {
+            RoutedPlayerHitCombatLogContextPatch.Prefix(out var state);
+
+            Assert.Null(state);
+            RoutedPlayerHitCombatLogContextPatch.Finalizer(state);
+        }
+        finally
+        {
+            if (hadPreviousContainer) ContainerProvider.SetContainer(previousContainer);
+        }
     }
 }

@@ -73,22 +73,23 @@ internal class RoutedPlayerHitCombatLogPatch
 {
     // Holds the tracker's lock across vanilla's enqueue, because AddCombatLogSafe can run on several threads.
     [HarmonyPrefix]
-    internal static void Prefix(out IRoutedPlayerHitNotificationTracker __state)
+    internal static void Prefix(out IDisposable __state)
     {
         __state = null;
         if (!BattleSpawnConfig.Enabled) return;
         if (!ContainerProvider.TryResolve<ICoopBattleMissionRegistry>(out var missionRegistry)
             || !missionRegistry.IsCoopBattleActive) return;
-        if (!ContainerProvider.TryResolve(out __state)) return;
+        if (!ContainerProvider.TryResolve<IRoutedPlayerHitNotificationTracker>(out var notificationTracker)) return;
 
-        __state.BeginCombatLogEnqueue();
+        __state = notificationTracker.BeginCombatLogEnqueue();
     }
 
     // Mirrors the entry vanilla just enqueued, marking it when it is the player's hit on a routed puppet.
     [HarmonyPostfix]
-    internal static void Postfix(Agent attackerAgent, Agent victimAgent, CombatLogData combatLog, IRoutedPlayerHitNotificationTracker __state)
+    internal static void Postfix(Agent attackerAgent, Agent victimAgent, CombatLogData combatLog, IDisposable __state)
     {
         if (__state == null) return;
+        if (!ContainerProvider.TryResolve<IRoutedPlayerHitNotificationTracker>(out var notificationTracker)) return;
 
         bool isRoutedPlayerHit = !AllowedThread.IsThisThreadAllowed()
             && attackerAgent == Agent.Main
@@ -98,14 +99,14 @@ internal class RoutedPlayerHitCombatLogPatch
             && !combatLog.IsFatalDamage
             && combatLog.TotalDamage > 0;
 
-        __state.EnqueueCombatLogContext(isRoutedPlayerHit ? victimAgent : null, combatLog.TotalDamage);
+        notificationTracker.EnqueueCombatLogContext(isRoutedPlayerHit ? victimAgent : null, combatLog.TotalDamage);
     }
 
     // Releases the lock even when vanilla's enqueue throws.
     [HarmonyFinalizer]
-    internal static Exception Finalizer(Exception __exception, IRoutedPlayerHitNotificationTracker __state)
+    internal static Exception Finalizer(Exception __exception, IDisposable __state)
     {
-        __state?.EndCombatLogEnqueue();
+        __state?.Dispose();
         return __exception;
     }
 }

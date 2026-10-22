@@ -12,11 +12,8 @@ namespace GameInterface.Services.MapEvents;
 /// </summary>
 public interface IRoutedPlayerHitNotificationTracker
 {
-    /// <summary>Takes the combat-log lock until <see cref="EndCombatLogEnqueue"/>, so mirrored entries keep vanilla's queue order.</summary>
-    void BeginCombatLogEnqueue();
-
-    /// <summary>Releases the combat-log lock taken by <see cref="BeginCombatLogEnqueue"/>.</summary>
-    void EndCombatLogEnqueue();
+    /// <summary>Holds the combat-log lock until disposed on the same thread, so mirrored entries keep vanilla's queue order.</summary>
+    IDisposable BeginCombatLogEnqueue();
 
     /// <summary>Mirrors one vanilla combat-log entry, with its routed victim or null when it is not a routed player hit.</summary>
     void EnqueueCombatLogContext(Agent routedPlayerHitAgent, int damage);
@@ -55,16 +52,7 @@ public class RoutedPlayerHitNotificationTracker : IRoutedPlayerHitNotificationTr
     private readonly ThreadLocal<CombatLogContext> currentRoutedPlayerHit = new ThreadLocal<CombatLogContext>();
 
     /// <inheritdoc/>
-    public void BeginCombatLogEnqueue()
-    {
-        Monitor.Enter(sync);
-    }
-
-    /// <inheritdoc/>
-    public void EndCombatLogEnqueue()
-    {
-        Monitor.Exit(sync);
-    }
+    public IDisposable BeginCombatLogEnqueue() => new LockScope(sync);
 
     /// <inheritdoc/>
     public void EnqueueCombatLogContext(Agent routedPlayerHitAgent, int damage)
@@ -173,6 +161,29 @@ public class RoutedPlayerHitNotificationTracker : IRoutedPlayerHitNotificationTr
     {
         long oldestAllowedTimestamp = Stopwatch.GetTimestamp() - RoutedPlayerHitNotificationLifetime;
         routedPlayerHitNotifications.RemoveAll(notification => notification.RecordedAt < oldestAllowedTimestamp);
+    }
+
+    /// <summary>Holds a monitor lock from construction until the first dispose.</summary>
+    private sealed class LockScope : IDisposable
+    {
+        private object heldLock;
+
+        // Blocks until lockObject is free, then holds it.
+        public LockScope(object lockObject)
+        {
+            Monitor.Enter(lockObject);
+            heldLock = lockObject;
+        }
+
+        // Releases the lock; later calls do nothing.
+        public void Dispose()
+        {
+            var lockObject = heldLock;
+            if (lockObject == null) return;
+
+            heldLock = null;
+            Monitor.Exit(lockObject);
+        }
     }
 
     /// <summary>The routed victim, if any, and damage mirrored for one vanilla combat-log entry.</summary>
