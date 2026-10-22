@@ -727,7 +727,10 @@ internal class SiegeEventInterface : ISiegeEventInterface, IDisposable
             {
                 EnterSettlementAction.ApplyForParty(MobileParty.MainParty, settlement);
             }
-            EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
+            // Vanilla StartSettlementEncounter's main party branch, run here because the co-op prefix would send it
+            // to the server, and the late approval would reopen the town menu over siege_attacker_defeated.
+            PlayerEncounter.Start();
+            PlayerEncounter.Current.Init(MobileParty.MainParty.Party, settlement.Party, settlement);
 
             if (Campaign.Current?.CurrentMenuContext != null)
             {

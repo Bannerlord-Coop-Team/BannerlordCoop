@@ -1,9 +1,11 @@
 ﻿using Common.Messaging;
 using Common.Util;
 using Coop.Core.Client.Services.MobileParties.Messages;
+using Coop.Core.Server.Services.MobileParties.Messages;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Data;
 using GameInterface.Services.MapEvents.Messages;
@@ -258,7 +260,7 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
     }
 
     [Fact]
-    public void DefenderVictory_LateTownEncounterApproval_KeepsSiegeDefeatedMenu()
+    public void DefenderVictoryPrompt_StartsTheTownEncounterLocally()
     {
         const string controllerId = "PlayerOne";
         var client = Clients.First();
@@ -278,6 +280,7 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
             });
         }
 
+        client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
         client.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
@@ -288,7 +291,7 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
             states._gameStates.Add(map);
             map._menuContext = Game.Current.ObjectManager.CreateObject<MenuContext>();
             map._menuContext.GameMenu = ObjectHelper.SkipConstructor<GameMenu>();
-            map._menuContext.GameMenu.StringId = "siege_attacker_defeated";
+            map._menuContext.GameMenu.StringId = "town_outside";
         });
 
         var harmony = new Harmony($"siege-defender-menu.{Guid.NewGuid()}");
@@ -298,17 +301,20 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
             prefix: new HarmonyMethod(typeof(SiegeDefenderVictoryLootTests), nameof(SwitchMenu)));
         try
         {
-            // The server answers the prompt's town encounter request after siege_attacker_defeated is open.
             client.Call(() =>
             {
                 Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
-                client.Resolve<IMessageBroker>().Publish(this, new StartSettlementEncounterAttempted(MobileParty.MainParty, settlement));
+                client.Resolve<ISiegeEventInterface>().PromptSiegeDefenderVictory(settlement);
             });
 
-            Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
+            // No town encounter request goes out, so no late approval can reopen the town menu.
+            Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkStartSettlementEncounter>());
             client.Call(() =>
             {
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
                 Assert.NotNull(PlayerEncounter.Current);
+                Assert.Same(settlement, MobileParty.MainParty.CurrentSettlement);
                 Assert.Equal("siege_attacker_defeated", Campaign.Current.CurrentMenuContext.GameMenu.StringId);
             });
         }
@@ -317,6 +323,7 @@ public class SiegeDefenderVictoryLootTests : MapEventTestBase
             harmony.UnpatchAll(harmony.Id);
         }
     }
+
     // Vanilla PlayerEncounter.Init opens the settlement's encounter menu.
     private static bool OpenTownMenuOnInit()
     {
