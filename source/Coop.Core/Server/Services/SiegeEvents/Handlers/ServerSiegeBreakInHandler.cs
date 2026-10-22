@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
+using Coop.Core.Server.Services.Settlements;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -31,10 +32,12 @@ internal class ServerSiegeBreakInHandler : IHandler
     private readonly ISiegeBreakOut breakOut;
     private readonly ISendCoalescer coalescer;
     private readonly IBreakInReceipts receipts;
+    private readonly ISettlementEncounterDistanceValidator distanceValidator;
 
     public ServerSiegeBreakInHandler(IMessageBroker messageBroker, INetwork network,
         IObjectManager objectManager, IPlayerManager playerManager, ISiegeBreakOut breakOut,
-        IBreakInReceipts receipts, ISendCoalescer coalescer = null)
+        IBreakInReceipts receipts, ISettlementEncounterDistanceValidator distanceValidator,
+        ISendCoalescer coalescer = null)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -42,6 +45,7 @@ internal class ServerSiegeBreakInHandler : IHandler
         this.playerManager = playerManager;
         this.breakOut = breakOut;
         this.receipts = receipts;
+        this.distanceValidator = distanceValidator;
         this.coalescer = coalescer;
         messageBroker.Subscribe<NetworkRequestBreakIn>(Handle);
     }
@@ -75,17 +79,21 @@ internal class ServerSiegeBreakInHandler : IHandler
             return rejected;
         }
 
+        // Vanilla only offers the break in to a party at the settlement that can still join the defenders. Checked before
+        // the receipt too, so a request that lands after the siege moved on or the party was moved is turned down.
+        string reason = "the party cannot join the defenders";
+        if (!breakOut.CanJoinDefenders(party, settlement, alreadyEntered: false) ||
+            !distanceValidator.TryValidate(party, settlement, out reason))
+        {
+            Logger.Warning("Rejecting break in request {RequestId} for party {PartyId} and settlement {SettlementId}: {Reason}",
+                request.RequestId, request.PartyId, request.SettlementId, reason);
+            return rejected;
+        }
+
         // Asking again for the same siege, even after leaving the menu, gets the first answer instead of losing troops twice.
         if (receipts.TryGet(party, siege, out var receipt))
             return new NetworkBreakInResult(request.RequestId, receipt.Result.Approved,
                 receipt.Result.CharacterIds, receipt.Result.Counts, receipt.Result.ArmyCasualties);
-
-        if (!breakOut.CanJoinDefenders(party, settlement, alreadyEntered: false))
-        {
-            Logger.Warning("Rejecting break in request {RequestId} for party {PartyId} and settlement {SettlementId}",
-                request.RequestId, request.PartyId, request.SettlementId);
-            return rejected;
-        }
 
         try
         {

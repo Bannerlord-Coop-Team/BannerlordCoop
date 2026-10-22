@@ -2,6 +2,7 @@
 using Common.Tests.Utils;
 using Common.Util;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
+using Coop.Core.Server.Services.Settlements;
 using Coop.Core.Server.Services.SiegeEvents;
 using Coop.Core.Server.Services.SiegeEvents.Handlers;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
@@ -31,6 +32,7 @@ public class ServerSiegeBreakInHandlerTests : IDisposable
     private readonly Mock<IObjectManager> objects = new();
     private readonly Mock<IPlayerManager> players = new();
     private readonly Mock<ISiegeBreakOut> action = new();
+    private readonly Mock<ISettlementEncounterDistanceValidator> distance = new();
     private readonly MobileParty party = ObjectHelper.SkipConstructor<MobileParty>();
     private readonly Settlement settlement = ObjectHelper.SkipConstructor<Settlement>();
     private readonly SiegeEvent siege = ObjectHelper.SkipConstructor<SiegeEvent>();
@@ -64,6 +66,8 @@ public class ServerSiegeBreakInHandlerTests : IDisposable
         roster.AddToCounts(troop, 200);
 
         action.Setup(service => service.CanJoinDefenders(party, settlement, false)).Returns(true);
+        string inRange = null;
+        distance.Setup(validator => validator.TryValidate(party, settlement, out inRange)).Returns(true);
         action.Setup(service => service.GetBreakInCasualties(party, siege)).Returns(40);
         action.Setup(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny))
             .Returns((MobileParty current, int losses, out int armyLosses) =>
@@ -74,7 +78,7 @@ public class ServerSiegeBreakInHandlerTests : IDisposable
                 casualties.AddToCounts(troop, losses);
                 return casualties;
             });
-        handler = new ServerSiegeBreakInHandler(broker, network, objects.Object, players.Object, action.Object, receipts);
+        handler = new ServerSiegeBreakInHandler(broker, network, objects.Object, players.Object, action.Object, receipts, distance.Object);
     }
 
     [Fact]
@@ -250,6 +254,43 @@ public class ServerSiegeBreakInHandlerTests : IDisposable
         Send("first");
 
         Assert.All(Results(), result => Assert.False(result.Approved));
+        action.Verify(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Once);
+    }
+
+    [Fact]
+    public void PartyMovedAwayFromTheSettlement_IsRejectedWithoutLossesOrReceipt()
+    {
+        string tooFar = "your party is too far from the settlement";
+        distance.Setup(validator => validator.TryValidate(party, settlement, out tooFar)).Returns(false);
+
+        Send("moved-away");
+
+        Assert.False(Assert.Single(Results()).Approved);
+        Assert.Equal(200, party.MemberRoster.TotalRegulars);
+        Assert.False(receipts.TryGet(party, siege, out _));
+        action.Verify(service => service.ApplySacrifice(It.IsAny<MobileParty>(), It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void PaidBreakIn_IsNotApprovedAgainOnceThePartyCanNoLongerGetIn(bool movedAway)
+    {
+        Send("paid");
+        if (movedAway)
+        {
+            string tooFar = "your party is too far from the settlement";
+            distance.Setup(validator => validator.TryValidate(party, settlement, out tooFar)).Returns(false);
+        }
+        else
+        {
+            action.Setup(service => service.CanJoinDefenders(party, settlement, false)).Returns(false);
+        }
+
+        Send("late-retry");
+
+        Assert.Equal(new[] { true, false }, Results().Select(result => result.Approved));
+        Assert.Equal(160, party.MemberRoster.TotalRegulars);
         action.Verify(service => service.ApplySacrifice(party, It.IsAny<int>(), out It.Ref<int>.IsAny), Times.Once);
     }
 

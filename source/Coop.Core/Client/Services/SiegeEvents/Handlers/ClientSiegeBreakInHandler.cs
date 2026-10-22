@@ -4,11 +4,13 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.SiegeEvents;
 using GameInterface.Services.SiegeEvents.Messages;
 using Serilog;
 using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
@@ -96,7 +98,6 @@ internal class ClientSiegeBreakInHandler : IHandler
             if (pending == null || pending.Request.RequestId != result.RequestId) return;
             var attempt = pending;
             SetPending(null);
-            if (!attempt.IsCurrent()) return;
             if (!result.Approved)
             {
                 Logger.Warning("Server rejected break in request {RequestId}", result.RequestId);
@@ -105,6 +106,15 @@ internal class ClientSiegeBreakInHandler : IHandler
             // Protobuf sends an empty array as null, e.g. an army leader whose own party lost nobody.
             var ids = result.CharacterIds ?? Array.Empty<uint>();
             var counts = result.Counts ?? Array.Empty<int>();
+            if (!attempt.IsCurrent())
+            {
+                // The server already took the troops and the roster sync carries that, so say why nobody got in.
+                int lost = counts.Sum() + Math.Max(0, result.ArmyCasualties);
+                Logger.Warning("Break in request {RequestId} was paid after the siege encounter changed", result.RequestId);
+                messageBroker.Publish(this, new SendInformationMessage(
+                    $"The siege changed before your break in went through. {lost} troops were already lost getting there."));
+                return;
+            }
             if (ids.Length != counts.Length) return;
             var casualties = TroopRoster.CreateDummyTroopRoster();
             for (int index = 0; index < ids.Length; index++)
