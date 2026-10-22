@@ -2,7 +2,9 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using GameInterface.Services.MapEvents.Interfaces;
+using GameInterface.Services.SiegeEvents.Handlers;
 using GameInterface.Services.SiegeEvents.Interfaces;
+using GameInterface.Services.SiegeEvents.Patches;
 using HarmonyLib;
 using Moq;
 using TaleWorlds.CampaignSystem;
@@ -13,18 +15,19 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.SiegeEvents;
 
-/// <summary>Verifies the end of a won siege hands an army member to the aftermath route (#3903).</summary>
-public class ArmyMemberSiegeAftermathTests : IDisposable
+/// <summary>Verifies the end of a won siege hands its leader or an army member to the aftermath route (#3903).</summary>
+public class SiegeAftermathEndRouteTests : IDisposable
 {
     private readonly E2ETestEnvironment environment;
 
-    public ArmyMemberSiegeAftermathTests(ITestOutputHelper output)
+    public SiegeAftermathEndRouteTests(ITestOutputHelper output)
     {
         environment = new E2ETestEnvironment(output);
     }
@@ -37,7 +40,7 @@ public class ArmyMemberSiegeAftermathTests : IDisposable
         var client = environment.Clients.First();
         var settlementId = environment.CreateRegisteredObject<Settlement>();
         var siegeEvents = new Mock<ISiegeEventInterface>();
-        siegeEvents.Setup(siegeEvent => siegeEvent.TryRouteArmyMemberToAftermath(It.IsAny<MapEvent>())).Returns(true);
+        siegeEvents.Setup(siegeEvent => siegeEvent.TryRouteToAftermath(It.IsAny<MapEvent>())).Returns(true);
         MapEvent? siege = null;
 
         client.Call(() =>
@@ -61,7 +64,7 @@ public class ArmyMemberSiegeAftermathTests : IDisposable
         });
 
         // the route is keyed off the ending encounter's own map event, like vanilla DoEnd
-        siegeEvents.Verify(siegeEvent => siegeEvent.TryRouteArmyMemberToAftermath(siege), Times.Once);
+        siegeEvents.Verify(siegeEvent => siegeEvent.TryRouteToAftermath(siege), Times.Once);
     }
 
     [Fact]
@@ -98,6 +101,72 @@ public class ArmyMemberSiegeAftermathTests : IDisposable
 
         // only the route's own Finish of the stale encounter, not the plain end-of-battle one as well
         Assert.Equal(1, finishRecorder.CountFor(client));
+    }
+
+    [Fact]
+    public void EndState_PromptedLeaderOfWonSiege_GetsTheChoiceAfterTheLootSteps()
+    {
+        var client = environment.Clients.First();
+        var settlementId = environment.CreateRegisteredObject<Settlement>();
+        var mainPartyId = environment.CreateRegisteredObject<MobileParty>();
+
+        // record (and skip) the engine-side encounter calls; the menu switch runs for real
+        using var finishRecorder = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish)));
+        using var settlementEntryRecorder = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(EnterSettlementAction), nameof(EnterSettlementAction.ApplyForParty)),
+            AccessTools.Method(typeof(EncounterManager), nameof(EncounterManager.StartSettlementEncounter)));
+
+        var siegeEvents = client.Resolve<ISiegeEventInterface>();
+        var playerEncounters = client.Resolve<IPlayerEncounterInterface>();
+
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(mainPartyId, out var mainParty));
+            var lordComponent = ObjectHelper.SkipConstructor<LordPartyComponent>();
+            lordComponent._leader = Hero.MainHero;
+            mainParty._partyComponent = lordComponent;
+            Campaign.Current.MainParty = mainParty;
+
+            // a vassal's capture: the fief has gone to the ruler, so the defeated owner only comes with the prompt
+            var defeatedClan = ObjectHelper.SkipConstructor<Clan>();
+            var wonSiege = CreateMapEvent(settlement);
+            var aftermathBehavior = GetAftermathBehavior();
+            aftermathBehavior._besiegerParty = mainParty;
+            aftermathBehavior._wasPlayerArmyMember = false;
+            var menuContext = SeedStaleEncounterMenu(aftermathBehavior);
+
+            // the client finalizes the won siege, then the server's prompt lands while the loot steps still run
+            siegeEvents.SetLocalAftermathNarrationContext(settlement, wonSiege);
+            var encounter = CreateEndingEncounter(wonSiege);
+            encounter.EncounterState = PlayerEncounterState.LootParty;
+            Campaign.Current.PlayerEncounter = encounter;
+            try
+            {
+                siegeEvents.PromptLocalAftermathChoice(mainParty, settlement, defeatedClan);
+                Assert.Equal("encounter", menuContext.GameMenu.StringId);
+
+                encounter.EncounterState = PlayerEncounterState.End;
+                playerEncounters.UpdateInternalAfterBattle(encounter);
+            }
+            finally
+            {
+                Campaign.Current.PlayerEncounter = null;
+                SiegeCaptureTransitionRetryHandler.TryTakeReady(out _, out _);
+                SiegeCaptureMenuHoldPatch.Release(settlement);
+            }
+
+            Assert.Same(mainParty, aftermathBehavior._besiegerParty);
+            Assert.Same(defeatedClan, aftermathBehavior._prevSettlementOwnerClan);
+            // vanilla menu_settlement_taken routes the besieger to the Devastate/Pillage/Mercy choice
+            Assert.Same(menuContext, Campaign.Current.CurrentMenuContext);
+            Assert.Equal("menu_settlement_taken_player_leader", menuContext.GameMenu.StringId);
+        });
+
+        // only the route's own Finish of the ended encounter, not the plain end-of-battle one as well
+        Assert.Equal(1, finishRecorder.CountFor(client));
+        Assert.Equal(2, settlementEntryRecorder.CountFor(client));
     }
 
     [Fact]
@@ -169,17 +238,23 @@ public class ArmyMemberSiegeAftermathTests : IDisposable
         }
         mainParty._army = army;
 
+        var aftermathBehavior = GetAftermathBehavior();
+        aftermathBehavior._besiegerParty = leaderParty;
+        aftermathBehavior._wasPlayerArmyMember = true;
+        siegeEvents.SetLocalAftermathNarrationContext(settlement, wonSiege);
+        return aftermathBehavior;
+    }
+
+    // Returns the client's siege aftermath behavior, adding one when the harness campaign has none.
+    private static SiegeAftermathCampaignBehavior GetAftermathBehavior()
+    {
         if (Campaign.Current.GetCampaignBehavior<SiegeAftermathCampaignBehavior>() == null)
         {
             Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(
                 new CampaignBehaviorBase[] { new SiegeAftermathCampaignBehavior() }));
         }
 
-        var aftermathBehavior = Campaign.Current.GetCampaignBehavior<SiegeAftermathCampaignBehavior>();
-        aftermathBehavior._besiegerParty = leaderParty;
-        aftermathBehavior._wasPlayerArmyMember = true;
-        siegeEvents.SetLocalAftermathNarrationContext(settlement, wonSiege);
-        return aftermathBehavior;
+        return Campaign.Current.GetCampaignBehavior<SiegeAftermathCampaignBehavior>();
     }
 
     // Builds a map event at the given settlement (null for a field fight).
@@ -243,8 +318,9 @@ public class ArmyMemberSiegeAftermathTests : IDisposable
             aftermathBehavior.AddGameMenus(new CampaignGameStarter(menus, Campaign.Current.ConversationManager));
         }
 
-        // The member narration's text needs a fully built army and settlement; only where it lands is under test.
+        // The narrations' text needs a fully built army and settlement; only where they land is under test.
         menus.GetGameMenu("menu_settlement_taken_player_army_member").OnInit = _ => { };
+        menus.GetGameMenu("menu_settlement_taken_player_leader").OnInit = _ => { };
 
         var context = Game.Current.ObjectManager.CreateObject<MenuContext>();
         context.GameMenu = ObjectHelper.SkipConstructor<GameMenu>();
