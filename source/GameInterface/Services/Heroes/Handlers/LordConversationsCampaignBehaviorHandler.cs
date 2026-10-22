@@ -4,11 +4,13 @@ using Common.Messaging;
 using Common.Network;
 using Common.Network.Coalescing;
 using GameInterface.Services.Heroes.Messages.LordConversations;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Heroes.Handlers;
@@ -198,9 +200,11 @@ internal class LordConversationsCampaignBehaviorHandler : IHandler
 
             EndCaptivityAction.ApplyByReleasedByChoice(conversationHero, mainHero);
             ChangeRelationAction.ApplyRelationChangeBetweenHeroes(mainHero, conversationHero, LetLordGoReward);
-            
-            // TODO
-            //TraitLevelingHelper.OnLordFreed(conversationHero);
+
+            using (new MainHeroSubstitutionScope(mainHero, mainHero.PartyBelongedTo))
+            {
+                TraitLevelingHelper.OnLordFreed(conversationHero);
+            }
         },
         context: nameof(Handle_NetworkLordFreedToRelease));
     }
