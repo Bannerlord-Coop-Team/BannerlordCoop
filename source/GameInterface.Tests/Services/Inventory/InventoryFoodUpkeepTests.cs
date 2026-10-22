@@ -70,6 +70,7 @@ public class InventoryFoodUpkeepTests
         var grain = new EquipmentElement(new ItemObject("grain"));
         var logic = CreateLogic(grain, 5);
         logic._rosters[0].AddToCounts(grain, 10);
+        logic._rostersBackup[0] = new ItemRoster(logic._rosters[0]);
         var inventory = new InventoryScreenRosterRefresher();
         inventory.CaptureInventoryBaseline(logic);
         logic._rosters[1].AddToCounts(grain, -5);
@@ -169,6 +170,7 @@ public class InventoryFoodUpkeepTests
         var grain = new EquipmentElement(new ItemObject("grain"));
         var logic = CreateLogic(grain, 5);
         logic._rosters[0].AddToCounts(grain, 10);
+        logic._rostersBackup[0] = new ItemRoster(logic._rosters[0]);
         var inventory = new InventoryScreenRosterRefresher();
         inventory.CaptureInventoryBaseline(logic);
         logic._rosters[0].AddToCounts(grain, -3);
