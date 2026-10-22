@@ -14,6 +14,7 @@ using Helpers;
 using LiteNetLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -25,6 +26,7 @@ using SandBox.GauntletUI.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 using Issue = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssue;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
@@ -247,6 +249,156 @@ public class ExtortionByDesertersTests : IDisposable
             Assert.True(quest.IsOngoing);
         });
         Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+    }
+
+    [Theory]
+    [InlineData(0, IssueOutcome.QuestFail, -10)]
+    [InlineData(1, IssueOutcome.QuestFail, -5)]
+    [InlineData(2, IssueOutcome.QuestCancel, 0)]
+    public void VillageRaided_EndsTheOwnersQuestWithTheRaidersConsequences(
+        int attacker, IssueOutcome outcome, int relationChange)
+    {
+        var ownerQuest = Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        var log = string.Empty;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var ownerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OtherPartyId, out var otherParty));
+            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var defenders = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            quest._deserterMobileParty = deserters;
+            quest._defenderMobileParty = defenders;
+            deserters.SetPartyUsedByQuest(true);
+            deserters.Aggressiveness = 0f;
+            deserters.MemberRoster.AddToCounts(deserters.LeaderHero.CharacterObject, 1);
+            ownerParty.CurrentSettlement = null;
+            var raider = attacker == 0 ? deserters : attacker == 1 ? ownerParty : otherParty;
+            // Seed the raid graph without announcing an unrelated field-battle start.
+            var raid = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            raid.MapEventVisual = null;
+            raid._mapEventType = MapEvent.BattleTypes.Raid;
+            raid.MapEventSettlement = quest.QuestSettlement;
+            raid._sides[(int)BattleSideEnum.Attacker] = new MapEventSide(raid, BattleSideEnum.Attacker, raider.Party);
+            raid._sides[(int)BattleSideEnum.Defender] = new MapEventSide(raid, BattleSideEnum.Defender, quest.QuestSettlement.Party);
+            raider.MapEventSide = raid.AttackerSide;
+            quest.QuestSettlement.Party.MapEventSide = raid.DefenderSide;
+            log = (attacker == 0 ? quest.OnQuestFailed2LogText :
+                attacker == 1 ? quest.OnQuestFailed3LogText : quest.OnQuestCancel2LogText).ToString();
+
+            AssertQuestPenalty(quest, relationChange,
+                () => CampaignEventDispatcher.Instance.OnVillageBeingRaided(quest.QuestSettlement.Village));
+
+            Assert.True(deserters.IsActive);
+            Assert.False(deserters.IsCurrentlyUsedByAQuest);
+            Assert.Equal(1f, deserters.Aggressiveness);
+            Assert.Same(deserters, quest._deserterMobileParty);
+            Assert.False(defenders.IsActive);
+            Assert.Null(quest._defenderMobileParty);
+            Assert.True(ownerParty.IsActive);
+            Assert.True(otherParty.IsActive);
+        }, TextLinks.Append(AccessTools.Method(typeof(MapEvent), nameof(MapEvent.MovePartyToSuitablePositionOnMapEventFinalize))));
+        AssertQuestEnding(ownerQuest, outcome, log);
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void RunningDeserters_LostSightTakesPriorityOverTheTenHourDeadline(bool lostSight, bool timedOut)
+    {
+        var ownerQuest = Accept();
+        var quest = (Quest)scenario.QuestOf(Server);
+        var log = string.Empty;
+        // The disabled SeeingRange getter pins sight at zero without the native map.
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var ownerHero));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(scenario.OwnerPartyId, out var ownerParty));
+            var deserters = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var defenders = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            quest._deserterMobileParty = deserters;
+            quest._defenderMobileParty = defenders;
+            deserters.SetPartyUsedByQuest(true);
+            deserters.Aggressiveness = 0f;
+            quest._currentState = State.DesertersRunningAwayFromPlayer;
+            quest._desertersRunAwayTimeoutTime = CampaignTime.HoursFromNow(10f);
+            Campaign.Current.MapTimeTracker._numTicks += CampaignTime.Hours(timedOut ? 11f : 1f).NumTicks;
+            Assert.Equal(timedOut, quest._desertersRunAwayTimeoutTime.IsPast);
+            ownerParty._position = new CampaignVec2(Vec2.Zero, true);
+            deserters._position = new CampaignVec2(new Vec2(lostSight ? 10f : 0f, 0f), true);
+            Assert.Equal(lostSight, deserters.Position.Distance(ownerParty.Position) > ownerParty.SeeingRange + 3f);
+            log = quest.OnQuestFailed1LogText.ToString();
+
+            AssertQuestPenalty(quest, -10, () =>
+            {
+                using (new MainHeroSubstitutionScope(ownerHero, ownerParty)) quest.TickDesertersPartyLogic();
+            });
+
+            Assert.False(defenders.IsActive);
+            Assert.Null(quest._defenderMobileParty);
+            Assert.Equal(lostSight, deserters.IsActive);
+            if (lostSight)
+            {
+                Assert.Same(deserters, quest._deserterMobileParty);
+                Assert.False(deserters.IsCurrentlyUsedByAQuest);
+                Assert.Equal(1f, deserters.Aggressiveness);
+            }
+            else Assert.Null(quest._deserterMobileParty);
+        }, TextLinks.Append(AccessTools.PropertyGetter(typeof(MobileParty), nameof(MobileParty.SeeingRange))));
+        AssertQuestEnding(ownerQuest, IssueOutcome.QuestFail, log);
+    }
+
+    private void AssertQuestPenalty(Quest quest, int relationChange, Action callback)
+    {
+        Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.OwnerHeroId, out var ownerHero));
+        Assert.True(Server.ObjectManager.TryGetObject<Hero>(scenario.OtherHeroId, out var otherHero));
+        var giver = quest.QuestGiver;
+        var town = quest.QuestSettlement.Village.Bound.Town;
+        giver.AddPower(100);
+        town.Prosperity = 1000;
+        var power = giver.Power;
+        var security = town.Security;
+        var prosperity = town.Prosperity;
+        var ownerRelation = giver.GetRelation(ownerHero);
+        var otherRelation = giver.GetRelation(otherHero);
+
+        var issues = new IssuesCampaignBehavior();
+        issues.RegisterEvents();
+        try
+        {
+            callback();
+        }
+        finally
+        {
+            CampaignEvents.Instance.RemoveListeners(issues);
+        }
+
+        Assert.False(quest.IsOngoing);
+        Assert.Equal(relationChange, quest.RelationshipChangeWithQuestGiver);
+        Assert.Equal(ownerRelation + relationChange, giver.GetRelation(ownerHero));
+        Assert.Equal(otherRelation, giver.GetRelation(otherHero));
+        Assert.Equal(power + (relationChange == 0 ? 0 : -10), giver.Power);
+        Assert.Equal(security + (relationChange == 0 ? 0 : -10), town.Security);
+        Assert.Equal(prosperity + (relationChange == 0 ? 0 : -50), town.Prosperity);
+    }
+
+    private void AssertQuestEnding(Quest ownerQuest, IssueOutcome outcome, string log)
+    {
+        Assert.Equal(outcome, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        var state = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkExtortionByDesertersState>(),
+            state => state.Log == log);
+        Assert.Equal(QuestScenario.ControllerA, state.ControllerId);
+        Assert.Single(Owner.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Log == log);
+        Assert.DoesNotContain(Other.InternalMessages.GetMessages<NetworkExtortionByDesertersState>(), state => state.Log == log);
+        Owner.Call(() =>
+        {
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.Single(ownerQuest.JournalEntries, entry => entry.LogText.ToString() == log);
+        });
+        Other.Call(() => Assert.DoesNotContain(Campaign.Current.QuestManager.Quests, item => item is Quest));
+        Assert.Empty(Owner.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
+        Assert.Empty(Other.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
     }
 
     [Theory]

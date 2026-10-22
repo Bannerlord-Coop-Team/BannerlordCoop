@@ -237,10 +237,14 @@ internal class ExtortionByDesertersWorldPatches
                 }
                 break;
             case State.DesertersRunningAwayFromPlayer:
-                if (deserters.Position.Distance(ownerParty.Position) > ownerParty.SeeingRange + 3f ||
-                    __instance._desertersRunAwayTimeoutTime.IsPast)
+                if (deserters.Position.Distance(ownerParty.Position) > ownerParty.SeeingRange + 3f)
                 {
-                    if (__instance._desertersRunAwayTimeoutTime.IsPast) __instance.DestroyDeserterParty();
+                    __instance.ApplyQuestResult(__instance._questResultFail1);
+                    __instance.CompleteQuestWithFail(__instance.OnQuestFailed1LogText);
+                }
+                else if (__instance._desertersRunAwayTimeoutTime.IsPast)
+                {
+                    __instance.DestroyDeserterParty();
                     __instance.ApplyQuestResult(__instance._questResultFail1);
                     __instance.CompleteQuestWithFail(__instance.OnQuestFailed1LogText);
                 }
