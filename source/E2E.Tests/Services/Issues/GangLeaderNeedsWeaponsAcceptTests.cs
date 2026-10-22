@@ -579,10 +579,11 @@ public class GangLeaderNeedsWeaponsEligibilityTests : GangLeaderNeedsWeaponsAcce
             {
                 Campaign.Current.MainParty = party;
                 giver.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
-                giver.Issue.AlternativeSolutionSentTroops.AddToCounts(troop, SentTroops);
+
             }
 
             Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(PlayerA.HeroId, out var clientOwner));
+            AlternativeSolutionPickerDriver.Commit(ClientA, giver.Issue, clientOwner, party, troop, SentTroops);
             clientGoldBefore = clientOwner.Gold;
             using (difficultyMultiplier is float multiplier
                 ? new IssueDifficultyOverride(multiplier)
