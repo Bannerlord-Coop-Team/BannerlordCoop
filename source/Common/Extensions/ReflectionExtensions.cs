@@ -2,11 +2,18 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Common.Logging;
+using Serilog;
 
 namespace Common.Extensions;
 
 public static class ReflectionExtensions
 {
+    private static readonly ILogger Logger = LogManager.GetLogger(typeof(ReflectionExtensions));
+
+    private const int MaxLoggedLoaderErrors = 5;
+    private const int MaxLoggedTypeNames = 10;
+
     /// <summary>
     /// Gets all types in an AppDomain
     /// </summary>
@@ -26,20 +33,96 @@ public static class ReflectionExtensions
         Assembly[] assemblies = domain.GetAssemblies();
         foreach (Assembly _assembly in assemblies)
         {
-            try
-            {
-                foreach (Type type in _assembly.GetTypes())
-                {
-                    if (type.Namespace == null) continue;
-                    if (type.Namespace.StartsWith(namespacePrefix) == false) continue;
-
-                    types.Add(type);
-                }
-            }
-            catch (ReflectionTypeLoadException) { }
+            types.AddRange(FilterLoadableTypes(_assembly.FullName, _assembly.GetTypes, namespacePrefix));
         }
 
         return types;
+    }
+
+    /// <summary>
+    /// Enumerates one assembly's types, skipping any that cannot be inspected.
+    /// </summary>
+    /// <remarks>
+    /// Optional dependencies that are not installed make GetTypes throw a
+    /// ReflectionTypeLoadException (use its non-null Types) and make reading
+    /// Namespace on a nested type throw when the enclosing type cannot load.
+    /// </remarks>
+    internal static List<Type> FilterLoadableTypes(string assemblyName, Func<Type[]> getTypes, string namespacePrefix)
+    {
+        namespacePrefix = namespacePrefix ?? string.Empty;
+
+        Type[] candidates;
+        string[] loaderErrors = Array.Empty<string>();
+        try
+        {
+            candidates = getTypes();
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            candidates = ex.Types ?? Array.Empty<Type>();
+            loaderErrors = (ex.LoaderExceptions ?? Array.Empty<Exception>())
+                .Where(error => error != null)
+                .Select(error => error.Message)
+                .Distinct()
+                .Take(MaxLoggedLoaderErrors)
+                .ToArray();
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Skipped assembly {AssemblyName}: its types could not be loaded", assemblyName);
+            return new List<Type>();
+        }
+
+        List<Type> result = new List<Type>();
+        int skipped = 0;
+        List<string> skippedNames = new List<string>();
+        foreach (Type type in candidates)
+        {
+            if (type == null)
+            {
+                skipped++;
+                continue;
+            }
+
+            try
+            {
+                string typeNamespace = type.Namespace;
+                if (typeNamespace == null) continue;
+                if (typeNamespace.StartsWith(namespacePrefix) == false) continue;
+            }
+            catch (Exception)
+            {
+                skipped++;
+                skippedNames.Add(SafeName(type));
+                continue;
+            }
+
+            result.Add(type);
+        }
+
+        if (skipped > 0)
+        {
+            Logger.Warning(
+                "Skipped {SkippedCount} unloadable types in assembly {AssemblyName}. Named: {SkippedTypes}. Loader errors: {LoaderErrors}",
+                skipped,
+                assemblyName,
+                string.Join(", ", skippedNames.Distinct().Take(MaxLoggedTypeNames)),
+                string.Join(" | ", loaderErrors));
+        }
+
+        return result;
+    }
+
+    private static string SafeName(Type type)
+    {
+        try
+        {
+            return type.FullName ?? type.Name;
+        }
+        catch (Exception)
+        {
+            return "<unnamed>";
+        }
     }
 
     /// <summary>
