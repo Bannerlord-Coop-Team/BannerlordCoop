@@ -859,19 +859,13 @@ internal class SettlementCommands
             if (ModInformation.IsClient) return Failed("This function can only be used by the server");
 
 
-            string partyBaseId = args[1];
             if (TryResolveSettlementComponent(objectManager, resolver, args[0], out var settlementComponent, out var componentError) == false)
                 return Failed(componentError);
 
-            var foundSettlement = resolver.TryResolveSettlement(partyBaseId, out var settlement, out var settlementError);
-            var foundParty = resolver.TryResolveMobileParty(partyBaseId, out var mobileParty, out var partyError);
-            if (foundSettlement && foundParty)
-                return Failed($"'{partyBaseId}' matches both Settlement {settlement.Name} ({settlement.StringId}) and MobileParty {mobileParty.Name} ({mobileParty.StringId}); use an id.");
-            if (foundSettlement == false && foundParty == false)
-                return Failed($"PartyBase '{partyBaseId}' was not found. {settlementError} {partyError}");
+            if (!resolver.TryResolvePartyBase(args[1], out var partyBase, out var partyError))
+                return Failed(partyError);
 
-            var partyBase = foundSettlement ? settlement.Party : mobileParty.Party;
-            var ownerId = foundSettlement ? settlement.StringId : mobileParty.StringId;
+            var ownerId = partyBase.IsSettlement ? partyBase.Settlement.StringId : partyBase.MobileParty.StringId;
 
             settlementComponent.Owner = partyBase;
 

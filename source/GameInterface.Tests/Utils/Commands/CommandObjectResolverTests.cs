@@ -6,6 +6,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
 
 namespace GameInterface.Tests.Utils.Commands;
@@ -298,5 +300,33 @@ public class CommandObjectResolverTests
         Assert.True(resolver.IsAmbiguous(ambiguous));
         Assert.False(resolver.IsAmbiguous(missing));
         Assert.False(resolver.IsAmbiguous(null));
+    }
+
+    [Fact]
+    public void PartyBaseResolve_SettlementRegistryId_ReturnsSettlementParty()
+    {
+        var settlement = ObjectHelper.SkipConstructor<Settlement>();
+        settlement.Party = ObjectHelper.SkipConstructor<PartyBase>();
+        object settlementObject = settlement;
+        var objectManager = new Mock<IObjectManager>();
+        objectManager.Setup(m => m.TryGetObject<object>("town_ES1", out settlementObject)).Returns(true);
+        var resolver = new CommandObjectResolver(objectManager.Object);
+
+        Assert.True(resolver.TryResolvePartyBase("town_ES1", out var value, out _));
+        Assert.Same(settlement.Party, value);
+    }
+
+    [Fact]
+    public void PartyBaseResolve_MobilePartyRegistryId_ReturnsMobilePartyParty()
+    {
+        var party = ObjectHelper.SkipConstructor<MobileParty>();
+        party.Party = ObjectHelper.SkipConstructor<PartyBase>();
+        object partyObject = party;
+        var objectManager = new Mock<IObjectManager>();
+        objectManager.Setup(m => m.TryGetObject<object>("CoopParty_1", out partyObject)).Returns(true);
+        var resolver = new CommandObjectResolver(objectManager.Object);
+
+        Assert.True(resolver.TryResolvePartyBase("CoopParty_1", out var value, out _));
+        Assert.Same(party.Party, value);
     }
 }

@@ -253,8 +253,11 @@ internal static class TroopXpTransferFixtureCommands
             if (!resolver.TryResolveMobileParty(args[0], out var playerParty, out var error)) return Failed(error);
             if (!resolver.TryResolveCharacterObject(args[2], out var character, out error)) return Failed(error);
 
+            // A missing clan party is a valid observation (it may have been destroyed), but an ambiguous name is not.
+            bool clanPartyResolved = resolver.TryResolveMobileParty(args[1], out var clanParty, out error);
+            if (!clanPartyResolved && resolver.IsAmbiguous(error)) return Failed(error);
+
             var playerState = ReadRosterState(playerParty.MemberRoster, character);
-            bool clanPartyResolved = resolver.TryResolveMobileParty(args[1], out var clanParty, out _);
             var clanPartyState = clanPartyResolved
                 ? ReadRosterState(clanParty.MemberRoster, character)
                 : default;

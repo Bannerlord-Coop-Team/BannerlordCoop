@@ -27,6 +27,8 @@ public interface ICommandObjectResolver
     // Also matches the Village's own id and its Settlement id or name.
     bool TryResolveVillage(string query, out Village village, out string error);
     bool TryResolveMobileParty(string query, out MobileParty party, out string error);
+    // A settlement's or mobile party's PartyBase; ids of either owner win over names, and a name shared across both is ambiguous.
+    bool TryResolvePartyBase(string query, out PartyBase party, out string error);
     bool TryResolveArmy(string query, out Army army, out string error);
     bool TryResolveCharacterObject(string query, out CharacterObject character, out string error);
     bool TryResolveItemObject(string query, out ItemObject item, out string error);
@@ -75,13 +77,24 @@ public class CommandObjectResolver : ICommandObjectResolver
         ResolveGameObject("Settlement", query, () => Settlement.All, s => s.Name, out settlement, out error);
 
     public bool TryResolveTown(string query, out Town town, out string error) =>
-        ResolveGameObject("Town", query, () => Town.AllTowns, t => t.Settlement?.Name, out town, out error, t => t.Settlement);
+        ResolveGameObject("Town", query, () => Town.AllFiefs, t => t.Settlement?.Name, out town, out error, t => IdsOfWithSettlement(t, t.Settlement));
 
     public bool TryResolveVillage(string query, out Village village, out string error) =>
-        ResolveGameObject("Village", query, () => Village.All, v => v.Settlement?.Name, out village, out error, v => v.Settlement);
+        ResolveGameObject("Village", query, () => Village.All, v => v.Settlement?.Name, out village, out error, v => IdsOfWithSettlement(v, v.Settlement));
 
     public bool TryResolveMobileParty(string query, out MobileParty party, out string error) =>
         ResolveGameObject("Mobile party", query, () => MobileParty.All, p => p.Name, out party, out error);
+
+    public bool TryResolvePartyBase(string query, out PartyBase party, out string error) =>
+        ResolveGameObject(
+            "Party",
+            query,
+            () => Settlement.All.Select(s => s.Party).Concat(MobileParty.All.Select(p => p.Party)),
+            p => p.Name,
+            out party,
+            out error,
+            IdsOfPartyBase,
+            LookupPartyBase);
 
     public bool TryResolveArmy(string query, out Army army, out string error) =>
         ResolveGameObject("Army", query, () => Kingdom.All.SelectMany(k => k.Armies), a => a.Name, out army, out error);
@@ -107,15 +120,16 @@ public class CommandObjectResolver : ICommandObjectResolver
         Func<T, TextObject> nameOf,
         out T value,
         out string error,
-        Func<T, Settlement> settlementOf = null) where T : class
+        Func<T, IEnumerable<string>> idsOf = null,
+        Func<string, T> registryLookup = null) where T : class
     {
-        Func<T, IEnumerable<string>> idsOf = IdsOf<T>;
-        if (settlementOf != null)
-            idsOf = candidate => IdsOfWithSettlement(candidate, settlementOf(candidate));
+        idsOf = idsOf ?? IdsOf<T>;
+        registryLookup = registryLookup ?? LookupRegistry<T>;
+        Func<T, string> displayIdOf = candidate => FirstId(idsOf(candidate));
 
         bool hasCampaign = Campaign.Current != null;
         Func<IEnumerable<T>> liveCandidates = hasCampaign ? candidates : Enumerable.Empty<T>;
-        if (TryMatch(typeName, query, liveCandidates, LookupRegistry<T>, false, idsOf, candidate => nameOf(candidate)?.ToString(), DisplayIdOf<T>, out value, out error))
+        if (TryMatch(typeName, query, liveCandidates, registryLookup, false, idsOf, candidate => nameOf(candidate)?.ToString(), displayIdOf, out value, out error))
             return true;
 
         if (!hasCampaign && !string.IsNullOrWhiteSpace(query))
@@ -131,6 +145,18 @@ public class CommandObjectResolver : ICommandObjectResolver
             return typed;
 
         return objectManager.TryGetObject<object>(id, out var found) ? found as T : null;
+    }
+
+    // A registry id of the owning settlement or mobile party, or of the PartyBase itself.
+    private PartyBase LookupPartyBase(string id) =>
+        LookupRegistry<Settlement>(id)?.Party ?? LookupRegistry<MobileParty>(id)?.Party ?? LookupRegistry<PartyBase>(id);
+
+    // The owning settlement's or mobile party's ids first, so candidate lists print the id users already know, then the PartyBase's own.
+    private IEnumerable<string> IdsOfPartyBase(PartyBase party)
+    {
+        object owner = (object)party.Settlement ?? party.MobileParty;
+        var ownerIds = owner == null ? Enumerable.Empty<string>() : IdsOf(owner);
+        return ownerIds.Concat(IdsOf(party));
     }
 
     // The ids a candidate answers to: its registry id and, for MBObjectBase types, its StringId.
@@ -157,8 +183,10 @@ public class CommandObjectResolver : ICommandObjectResolver
     }
 
     // The id printed in candidate lists: the registry id, falling back to StringId.
-    private string DisplayIdOf<T>(T candidate) =>
-        IdsOf(candidate).FirstOrDefault(id => !string.IsNullOrEmpty(id)) ?? "no id";
+    private string DisplayIdOf<T>(T candidate) => FirstId(IdsOf(candidate));
+
+    // The first non-empty id, or "no id".
+    private static string FirstId(IEnumerable<string> ids) => ids.FirstOrDefault(id => !string.IsNullOrEmpty(id)) ?? "no id";
 
     // Pure resolution core: registry hit, then candidate id match, then unique case-insensitive name match.
     internal static bool TryMatch<T>(

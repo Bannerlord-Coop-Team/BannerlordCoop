@@ -187,39 +187,17 @@ namespace GameInterface.Services.ItemRosters.Commands
             }
         }
 
-        // Resolves a settlement or mobile party by name or id and returns its roster, failing when neither or both match.
+        // Resolves a settlement or mobile party by name or id and returns its roster and display name.
         private static bool TryFindItemRoster(ICommandObjectResolver resolver, string query, out ItemRoster roster, out string name, out string error)
         {
             roster = null;
             name = null;
 
-            var isSettlement = resolver.TryResolveSettlement(query, out var settlement, out var settlementError);
-            var isParty = resolver.TryResolveMobileParty(query, out var party, out var partyError);
+            if (!resolver.TryResolvePartyBase(query, out var party, out error)) return false;
 
-            if (isSettlement && isParty)
-            {
-                error = $"'{query}' matches both a settlement and a party; use an id. Settlement: {settlement.Name} ({settlement.StringId}), party: {party.Name} ({party.StringId})";
-                return false;
-            }
-
-            if (isSettlement)
-            {
-                roster = settlement.ItemRoster;
-                name = settlement.Name.ToString();
-                error = null;
-                return true;
-            }
-
-            if (isParty)
-            {
-                roster = party.ItemRoster;
-                name = party.Name.ToString();
-                error = null;
-                return true;
-            }
-
-            error = $"{settlementError} {partyError}";
-            return false;
+            roster = party.ItemRoster;
+            name = party.Name.ToString();
+            return true;
         }
 
         // Replaces characters that are invalid in file names, since owner names come from user-facing text.
