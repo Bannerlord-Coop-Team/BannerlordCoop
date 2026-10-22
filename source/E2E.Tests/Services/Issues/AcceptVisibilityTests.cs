@@ -166,8 +166,8 @@ public class AcceptVisibilityTests : IDisposable
             var archiveA = new JournalLogEntry(questA.Title, giverA, null, false, questA);
             LogEntry.AddLogEntry(archiveB);
             LogEntry.AddLogEntry(archiveA);
-            // IssueManager detaches B before the journal listener sees its completion. Exercise
-            // the real journal lookup with A's archive last, as in the two-owner live run.
+            // B has no issue, so the journal finds its archive by quest StringId and takes the newest match.
+            // A's archive is newest, so with null quest ids B's ending would close A's archive.
             var journal = new TaleWorlds.CampaignSystem.CampaignBehaviors.JournalLogsCampaignBehavior();
             using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(giverB, giverB.PartyBelongedTo))
             {
