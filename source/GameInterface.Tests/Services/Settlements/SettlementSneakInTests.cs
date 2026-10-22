@@ -81,6 +81,9 @@ public class SettlementSneakInTests
         var network = new Mock<INetwork>();
         var sessionInteractionsInterface = new Mock<ISessionInteractionsPlayerDataInterface>();
         var playerManager = new Mock<IPlayerManager>();
+        playerManager
+            .Setup(m => m.IsSenderControllingHero(It.IsAny<object>(), It.IsAny<string>()))
+            .Returns(true);
 
         var syncPolicy = new Mock<ISyncPolicy>();
         syncPolicy.Setup(policy => policy.AllowOriginal()).Returns(false);
@@ -115,7 +118,8 @@ public class SettlementSneakInTests
                 messageBroker,
                 objectManager.Object,
                 network.Object,
-                sessionInteractionsInterface.Object);
+                sessionInteractionsInterface.Object,
+                playerManager.Object);
 
             using var captivityHandler = new PlayerCaptivityServerHandler(
                 objectManager.Object,
