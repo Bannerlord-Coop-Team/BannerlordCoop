@@ -107,6 +107,13 @@ public class HeadmanNeedsGrainTests : IDisposable
             foreach (var player in new[] { scenario.PlayerA, scenario.PlayerB })
                 Get<MobileParty>(Server, player.PartyId).ItemRoster.Clear();
         });
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                foreach (var trait in new[] { DefaultTraits.Mercy, DefaultTraits.Generosity, DefaultTraits.Honor })
+                    if (!instance.ObjectManager.TryGetId(trait, out _))
+                        Assert.True(instance.ObjectManager.AddExisting(trait.StringId, trait));
+            });
         environment.FlushCoalescer();
     }
 
@@ -149,46 +156,18 @@ public class HeadmanNeedsGrainTests : IDisposable
     }
 
     [Fact]
-    public void TraitSeed_KeepsGenerosityUntilItsRewardIsAcknowledged()
-    {
-        Server.Call(() =>
-        {
-            var owner = Get<Hero>(Server, scenario.PlayerA.HeroId);
-            var rewards = Server.Resolve<IHeadmanNeedsGrainTraitRewards>();
-            var model = Campaign.Current.Models.CharacterDevelopmentModel;
-            var startingXp = model.GetTraitXpRequiredForTraitLevel(DefaultTraits.Generosity, 1) - 25;
-            rewards.Seed(owner, new Dictionary<string, int> { [DefaultTraits.Generosity.StringId] = startingXp });
-            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
-            {
-                rewards.Apply(DefaultTraits.Mercy, 70, owner, ActionNotes.QuestSuccess);
-                rewards.Apply(DefaultTraits.Generosity, 50, owner, ActionNotes.QuestSuccess);
-            }
-            model.GetTraitLevelForTraitXp(owner, DefaultTraits.Generosity, startingXp + 50,
-                out var expectedLevel, out var expectedXp);
-            rewards.Seed(owner, new Dictionary<string, int>
-            {
-                [DefaultTraits.Mercy.StringId] = 70,
-                [DefaultTraits.Generosity.StringId] = startingXp,
-            });
-            Assert.Equal(expectedLevel, owner.GetTraitLevel(DefaultTraits.Generosity));
-            rewards.Seed(owner, new Dictionary<string, int> { [DefaultTraits.Generosity.StringId] = expectedXp });
-            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
-                rewards.Apply(DefaultTraits.Generosity, 1, owner, ActionNotes.QuestSuccess);
-            var reward = Server.NetworkSentMessages.GetMessages<NetworkHeadmanNeedsGrainTraitReward>().Last();
-            Assert.Equal(expectedXp + 1, reward.RemainingXp);
-        });
-    }
-    [Fact]
     public void Delivery_PreservesTraitLevelThresholdCrossing()
     {
         var expectedLevel = 0;
         var expectedXp = 0;
-        ClientA.Call(() =>
+        Server.Call(() =>
         {
             var model = Campaign.Current.Models.CharacterDevelopmentModel;
+            var owner = Get<Hero>(Server, scenario.PlayerA.HeroId);
             var xp = model.GetTraitXpRequiredForTraitLevel(DefaultTraits.Generosity, 1) - 25;
-            Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Generosity, xp);
-            model.GetTraitLevelForTraitXp(Hero.MainHero, DefaultTraits.Generosity, xp + 50, out expectedLevel, out expectedXp);
+            Server.Resolve<GameInterface.Services.Traits.Interfaces.ITraitLevelingHelperInterface>()
+                .AddTraitXp(owner, DefaultTraits.Generosity, xp, ActionNotes.DefaultNote, owner);
+            model.GetTraitLevelForTraitXp(owner, DefaultTraits.Generosity, xp + 50, out expectedLevel, out expectedXp);
             Assert.True(expectedLevel > 0);
         });
         Accept();
@@ -196,7 +175,7 @@ public class HeadmanNeedsGrainTests : IDisposable
         ClientA.Call(() => QuestHere(ClientA).Success(), Texts);
         foreach (var instance in Instances)
             instance.Call(() => Assert.Equal(expectedLevel, Get<Hero>(instance, scenario.PlayerA.HeroId).GetTraitLevel(DefaultTraits.Generosity)));
-        ClientA.Call(() => Assert.Equal(expectedXp, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity)));
+        ClientA.Call(() => Assert.Equal(expectedXp, ServerTraitXp(scenario.PlayerA.HeroId, DefaultTraits.Generosity)));
     }
 
     [Fact]
@@ -252,12 +231,12 @@ public class HeadmanNeedsGrainTests : IDisposable
         ClientA.Call(() =>
         {
             Assert.Single(ownerQuest.JournalEntries.Where(log => log.LogText.Value == ownerQuest.SuccessLog.Value));
-            Assert.Equal(70, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Mercy));
-            Assert.Equal(50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
+            Assert.Equal(70, ServerTraitXp(scenario.PlayerA.HeroId, DefaultTraits.Mercy));
+            Assert.Equal(50, ServerTraitXp(scenario.PlayerA.HeroId, DefaultTraits.Generosity));
             ownerQuest.Success();
-            Assert.Equal(50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
+            Assert.Equal(50, ServerTraitXp(scenario.PlayerA.HeroId, DefaultTraits.Generosity));
         }, Texts);
-        ClientB.Call(() => Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity)));
+        ClientB.Call(() => Assert.Equal(0, ServerTraitXp(scenario.PlayerB.HeroId, DefaultTraits.Generosity)));
         Server.Call(() => Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity)));
     }
 
@@ -290,122 +269,16 @@ public class HeadmanNeedsGrainTests : IDisposable
     {
         Accept();
 
-        ClientA.Call(() => TraitLevelingHelper.AddPlayerTraitXPAndLogEntry(
-            DefaultTraits.Generosity, delta, ActionNotes.DefaultNote, Hero.MainHero), Texts);
+        Server.Call(() =>
+        {
+            var owner = Get<Hero>(Server, scenario.PlayerA.HeroId);
+            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
+                TraitLevelingHelper.AddPlayerTraitXPAndLogEntry(DefaultTraits.Generosity, delta, ActionNotes.DefaultNote, owner);
+        }, Texts);
         StageDelivery(true, true);
         ClientA.Call(() => QuestHere(ClientA).Success(), Texts);
-        ClientA.Call(() => Assert.Equal(50 + delta, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity)));
-        ClientB.Call(() => Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity)));
-    }
-
-    [Fact]
-    public void RestoredReward_AcknowledgesPendingXpBeforeLaterLocalProgress()
-    {
-        IHeadmanNeedsGrainTraitRewards serverRewards = null!;
-        Server.Call(() =>
-        {
-            serverRewards = new HeadmanNeedsGrainTraitRewards(
-                new Moq.Mock<Common.Network.INetwork>().Object, Server.ObjectManager);
-            var owner = Get<Hero>(Server, scenario.PlayerA.HeroId);
-            serverRewards.Seed(owner, new Dictionary<string, int> { [DefaultTraits.Generosity.StringId] = 0 });
-            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
-                serverRewards.Apply(DefaultTraits.Generosity, 50, owner, ActionNotes.QuestSuccess);
-        });
-        var previousSeeds = ClientA.NetworkSentMessages.GetMessages<RequestHeadmanNeedsGrainTraitSeed>().Count();
-        ClientA.Call(() =>
-        {
-            var rewards = ClientA.Resolve<IHeadmanNeedsGrainTraitRewards>();
-            var owner = Get<Hero>(ClientA, scenario.PlayerA.HeroId);
-            var records = new Dictionary<string, object>
-            {
-                ["_coop_grain_trait_progress"] = new Dictionary<Hero, Dictionary<string, int>>
-                {
-                    [owner] = new() { [DefaultTraits.Generosity.StringId] = 50 },
-                },
-            };
-            rewards.SyncData(new TestDataStore(false, records));
-        });
-        var restoredSeeds = ClientA.NetworkSentMessages.GetMessages<RequestHeadmanNeedsGrainTraitSeed>().ToArray();
-        Assert.Equal(previousSeeds + 1, restoredSeeds.Length);
-        Server.Call(() => serverRewards.Seed(Get<Hero>(Server, scenario.PlayerA.HeroId), restoredSeeds.Last().Values));
-        ClientA.Call(() =>
-        {
-            Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(DefaultTraits.Generosity, 75);
-            ClientA.Resolve<IHeadmanNeedsGrainTraitRewards>().RequestSeed();
-        });
-        var laterSeed = ClientA.NetworkSentMessages.GetMessages<RequestHeadmanNeedsGrainTraitSeed>().Last();
-        Server.Call(() =>
-        {
-            var owner = Get<Hero>(Server, scenario.PlayerA.HeroId);
-            serverRewards.Seed(owner, laterSeed.Values);
-            using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
-                serverRewards.Apply(DefaultTraits.Generosity, 25, owner, ActionNotes.QuestSuccess);
-            var records = new Dictionary<string, object>();
-            serverRewards.SyncData(new TestDataStore(true, records));
-            var progress = (Dictionary<Hero, Dictionary<string, int>>)records["_coop_grain_trait_progress"];
-            Assert.Equal(100, progress[owner][DefaultTraits.Generosity.StringId]);
-        });
-    }
-    [Fact]
-    public void LoadedTraitProgress_IsRestoredAfterSwitchingFromTheSavedHeroToTheLocalPlayer()
-    {
-        textHarmony.Patch(AccessTools.Method(typeof(ChangePlayerCharacterAction), nameof(ChangePlayerCharacterAction.Apply)),
-            prefix: new HarmonyMethod(typeof(HeadmanNeedsGrainTests), nameof(SkipMapCharacterSwitch)) { priority = Priority.First });
-        ClientA.Call(() =>
-        {
-            var first = Get<Hero>(ClientA, scenario.PlayerA.HeroId);
-            var second = Get<Hero>(ClientA, scenario.PlayerB.HeroId);
-            var records = new Dictionary<string, object>
-            {
-                ["_coop_grain_trait_progress"] = new Dictionary<Hero, Dictionary<string, int>>
-                {
-                    [first] = new() { [DefaultTraits.Generosity.StringId] = 123 },
-                    [second] = new() { [DefaultTraits.Generosity.StringId] = 456 },
-                },
-            };
-            Game.Current.PlayerTroop = second.CharacterObject;
-            var rewards = ClientA.Resolve<IHeadmanNeedsGrainTraitRewards>();
-            rewards.SyncData(new TestDataStore(false, records));
-            Assert.Equal(456, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
-            Game.Current.PlayerTroop = first.CharacterObject;
-            ChangePlayerCharacterAction.Apply(first);
-            Assert.Equal(123, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
-        }, Texts);
-    }
-
-    [Fact]
-    public void RemoteTraitReward_ForNonLocalOwner_IsRestoredAfterSwitchingBack()
-    {
-        textHarmony.Patch(AccessTools.Method(typeof(ChangePlayerCharacterAction), nameof(ChangePlayerCharacterAction.Apply)),
-            prefix: new HarmonyMethod(typeof(HeadmanNeedsGrainTests), nameof(SkipMapCharacterSwitch)) { priority = Priority.First });
-        ClientA.Call(() =>
-        {
-            var owner = Get<Hero>(ClientA, scenario.PlayerA.HeroId);
-            var local = Get<Hero>(ClientA, scenario.PlayerB.HeroId);
-            var trait = DefaultTraits.Generosity;
-            var startingXp = 123;
-            var amount = 20;
-            var records = new Dictionary<string, object>
-            {
-                ["_coop_grain_trait_progress"] = new Dictionary<Hero, Dictionary<string, int>>
-                {
-                    [owner] = new() { [trait.StringId] = startingXp },
-                },
-            };
-            Game.Current.PlayerTroop = local.CharacterObject;
-            var rewards = ClientA.Resolve<IHeadmanNeedsGrainTraitRewards>();
-            rewards.SyncData(new TestDataStore(false, records));
-            Campaign.Current.PlayerTraitDeveloper.SetPropertyValue(trait, 999);
-
-            var model = Campaign.Current.Models.CharacterDevelopmentModel;
-            model.GetTraitLevelForTraitXp(owner, trait, startingXp + amount, out var level, out var remainingXp);
-            ClientA.SimulateMessage(this, new NetworkHeadmanNeedsGrainTraitReward(
-                scenario.PlayerA.HeroId, otherNotableId, trait.StringId, amount, (int)ActionNotes.DefaultNote, level, remainingXp));
-
-            Game.Current.PlayerTroop = owner.CharacterObject;
-            ChangePlayerCharacterAction.Apply(owner);
-            Assert.Equal(remainingXp, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(trait));
-        }, Texts);
+        ClientA.Call(() => Assert.Equal(50 + delta, ServerTraitXp(scenario.PlayerA.HeroId, DefaultTraits.Generosity)));
+        ClientB.Call(() => Assert.Equal(0, ServerTraitXp(scenario.PlayerB.HeroId, DefaultTraits.Generosity)));
     }
 
     private static Hero companionPickerGiver;
@@ -578,7 +451,7 @@ public class HeadmanNeedsGrainTests : IDisposable
             ClientA.Call(() =>
             {
                 Assert.Single(ownerQuest.JournalEntries.Where(log => log.LogText.Value.Contains("accused of a crime")));
-                Assert.Equal(-50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+                Assert.Equal(-50, ServerTraitXp(scenario.PlayerA.HeroId, DefaultTraits.Honor));
             });
             foreach (var instance in Instances)
                 instance.Call(() => Assert.Equal(90f, Get<Hero>(instance, scenario.NotableId).Power));
@@ -636,8 +509,8 @@ public class HeadmanNeedsGrainTests : IDisposable
             Assert.True(secondQuest.IsOngoing);
             Assert.Equal(0, secondQuest._playerAcceptedQuestLog.CurrentProgress);
             Assert.Equal(0, Get<MobileParty>(ClientB, scenario.PlayerB.PartyId).ItemRoster.GetItemNumber(DefaultItems.Grain));
-            Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
-            Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
+            Assert.Equal(0, ServerTraitXp(scenario.PlayerB.HeroId, DefaultTraits.Honor));
+            Assert.Equal(0, ServerTraitXp(scenario.PlayerB.HeroId, DefaultTraits.Generosity));
             Assert.Same(secondQuest, Get<Hero>(ClientB, secondGiverId).Issue.IssueQuest);
         });
     }
@@ -681,12 +554,12 @@ public class HeadmanNeedsGrainTests : IDisposable
         var outcomes = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>().ToDictionary(m => m.IssueId, m => m.Outcome);
         Assert.Equal(IssueOutcome.QuestFail, outcomes[QuestScenario.IssueId]);
         Assert.Equal(IssueOutcome.QuestCancel, outcomes[secondIssueId]);
-        ClientA.Call(() => Assert.Equal(-50, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor)));
+        ClientA.Call(() => Assert.Equal(-50, ServerTraitXp(scenario.PlayerA.HeroId, DefaultTraits.Honor)));
         ClientB.Call(() =>
         {
             Assert.False(secondQuest.IsOngoing);
             Assert.Single(secondQuest.JournalEntries.Where(log => log.LogText.Value == secondQuest.CancelLogOnWarDeclared.Value));
-            Assert.Equal(0, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Honor));
+            Assert.Equal(0, ServerTraitXp(scenario.PlayerB.HeroId, DefaultTraits.Honor));
         });
     }
 
@@ -817,7 +690,7 @@ public class HeadmanNeedsGrainTests : IDisposable
         }
         ClientA.Call(() =>
         {
-            Assert.Equal(failure ? 0 : 30, Campaign.Current.PlayerTraitDeveloper.GetPropertyValue(DefaultTraits.Generosity));
+            Assert.Equal(failure ? 0 : 30, ServerTraitXp(scenario.PlayerA.HeroId, DefaultTraits.Generosity));
             if (failure)
                 Assert.Single(ownerIssue.JournalEntries.Where(log => log.LogText.Value.Contains("has failed to resolve the matter")));
             else
@@ -905,6 +778,19 @@ public class HeadmanNeedsGrainTests : IDisposable
         {
             new Behavior { _averageGrainPriceInCalradia = 25 },
         }));
+    }
+
+    private int ServerTraitXp(string heroId, TraitObject trait)
+    {
+        var value = 0;
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetId(trait, out var traitId));
+            var data = Server.Resolve<GameInterface.CoopSessionData.ICoopSessionProvider>()
+                .CoopSession.PlayerTraitData.PlayerTraitXp;
+            if (data.TryGetValue(heroId, out var traits)) traits.TryGetValue(traitId, out value);
+        });
+        return value;
     }
 
     private Issue IssueHere(EnvironmentInstance instance) => (Issue)Get<Hero>(instance, scenario.NotableId).Issue;

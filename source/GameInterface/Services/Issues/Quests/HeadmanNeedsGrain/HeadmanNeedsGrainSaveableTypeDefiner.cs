@@ -21,6 +21,5 @@ public sealed class HeadmanNeedsGrainSaveableTypeDefiner : SaveableTypeDefiner
     public override void DefineContainerDefinitions()
     {
         ConstructContainerDefinition(typeof(Dictionary<HeadmanNeedsGrainIssueBehavior.HeadmanNeedsGrainIssue, Settlement>));
-        ConstructContainerDefinition(typeof(Dictionary<Hero, Dictionary<string, int>>));
     }
 }

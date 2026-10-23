@@ -19,54 +19,11 @@ namespace GameInterface.Services.Issues.Quests.HeadmanNeedsGrain.Patches;
 [HarmonyPatch]
 internal class HeadmanNeedsGrainBranchPatches
 {
-    [HarmonyPatch(typeof(Quest), nameof(Quest.QuestAcceptedConsequences))]
-    [HarmonyPrefix]
-    private static void AcceptPrefix()
-    {
-        if (ModInformation.IsClient && ContainerProvider.TryResolve<IHeadmanNeedsGrainTraitRewards>(out var traits)) traits.RequestSeed();
-    }
-
-    [HarmonyPatch(typeof(ChangePlayerCharacterAction), nameof(ChangePlayerCharacterAction.Apply))]
-    [HarmonyPostfix]
-    private static void RestoreTraitsPostfix(Hero hero)
-    {
-        if (ModInformation.IsClient && hero == Hero.MainHero && ContainerProvider.TryResolve<IHeadmanNeedsGrainTraitRewards>(out var traits))
-            traits.Restore(hero);
-    }
-
-    [HarmonyPatch(typeof(TraitLevelingHelper), nameof(TraitLevelingHelper.AddPlayerTraitXPAndLogEntry))]
-    [HarmonyPostfix]
-    private static void RefreshTraitsPostfix()
-    {
-        if (ModInformation.IsClient && ContainerProvider.TryResolve<IHeadmanNeedsGrainTraitRewards>(out var traits)) traits.RefreshSeed();
-    }
-
     [HarmonyPatch(typeof(Quest), nameof(Quest.Success))]
     [HarmonyPrefix]
-    private static bool SuccessPrefix(Quest __instance, out bool __state)
-    {
-        var allowed = !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) ||
-            dispatcher.BeforeQuestBranch(__instance, (byte)HeadmanNeedsGrainBranch.DeliverGrain);
-        __state = allowed && ModInformation.IsServer;
-        return allowed;
-    }
-
-    [HarmonyPatch(typeof(Quest), nameof(Quest.Success))]
-    [HarmonyPostfix]
-    private static void SuccessPostfix(Quest __instance, bool __state)
-    {
-        if (!__state || !ContainerProvider.TryResolve<IHeadmanNeedsGrainTraitRewards>(out var traits)) return;
-        traits.Apply(DefaultTraits.Mercy, 70, __instance.QuestGiver, ActionNotes.QuestSuccess);
-        traits.Apply(DefaultTraits.Generosity, 50, __instance.QuestGiver, ActionNotes.QuestSuccess);
-    }
-
-    [HarmonyPatch(typeof(Issue), nameof(Issue.AlternativeSolutionEndWithSuccessConsequence))]
-    [HarmonyPostfix]
-    private static void AlternativeSuccessPostfix(Issue __instance)
-    {
-        if (ModInformation.IsServer && ContainerProvider.TryResolve<IHeadmanNeedsGrainTraitRewards>(out var traits))
-            traits.Apply(DefaultTraits.Generosity, 30, __instance.IssueOwner, ActionNotes.QuestSuccess);
-    }
+    private static bool SuccessPrefix(Quest __instance) =>
+        !ContainerProvider.TryResolve<IOutcomeDispatcher>(out var dispatcher) ||
+        dispatcher.BeforeQuestBranch(__instance, (byte)HeadmanNeedsGrainBranch.DeliverGrain);
 
     // A dialogue-end callback has no ambient village on the dedicated server.
     [HarmonyPatch(typeof(Quest), nameof(Quest.Success))]
@@ -99,8 +56,7 @@ internal class HeadmanNeedsGrainBranchPatches
         if (ModInformation.IsClient) return false;
         __instance.QuestGiver.AddPower(-10f);
         __instance.RelationshipChangeWithQuestGiver = -5;
-        if (ContainerProvider.TryResolve<IHeadmanNeedsGrainTraitRewards>(out var traits))
-            traits.Apply(DefaultTraits.Honor, -50, Hero.MainHero, ActionNotes.QuestFailed);
+        TraitLevelingHelper.AddPlayerTraitXPAndLogEntry(DefaultTraits.Honor, -50, ActionNotes.QuestFailed, Hero.MainHero);
 
         var settlement = Hero.MainHero.PartyBelongedTo?.MapEvent?.MapEventSettlement ?? __instance.QuestGiver.CurrentSettlement;
         var log = new TextObject("{=9w1RbVEk}You are accused of a crime in {SETTLEMENT}, and {QUEST_GIVER.LINK} no longer wants your help.");
@@ -116,7 +72,6 @@ internal class HeadmanNeedsGrainBranchPatches
     {
         if (ModInformation.IsClient)
         {
-            if (ContainerProvider.TryResolve<IHeadmanNeedsGrainTraitRewards>(out var traits)) traits.RequestSeed();
             return false;
         }
         if (TaleWorlds.CampaignSystem.Hero.MainHero.Gold < __instance.AlternativeSolutionNeededGold)

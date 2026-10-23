@@ -16,8 +16,6 @@ internal class HeadmanNeedsGrainPricePersistencePatches
     [HarmonyPostfix]
     private static void SyncDataPostfix(HeadmanNeedsGrainIssueBehavior __instance, IDataStore dataStore)
     {
-        if (ContainerProvider.TryResolve<IHeadmanNeedsGrainTraitRewards>(out var traits)) traits.SyncData(dataStore);
-
         int price = __instance._averageGrainPriceInCalradia;
         dataStore.SyncData(SaveKey, ref price);
 
