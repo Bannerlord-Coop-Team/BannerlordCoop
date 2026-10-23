@@ -45,6 +45,10 @@ public class NetworkConfig : INetworkConfig
     // three within a campaign frame or two for negligible poll-thread cost.
     public TimeSpan NetworkPollInterval => TimeSpan.FromMilliseconds(25);
 
+    public IPAddress BindAddressIPv4 => IPAddress.Any;
+
+    public IPAddress BindAddressIPv6 => IPAddress.IPv6Any;
+
     #region MeshNetwork
     private string LanAddressText { get; set; } = "127.0.0.1";
     /// <summary>

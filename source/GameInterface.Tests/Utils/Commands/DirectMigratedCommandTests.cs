@@ -85,7 +85,7 @@ public class DirectMigratedCommandTests
     {
         string[] countReaders = GetCommandTypes()
             .Where(type => CallsArgumentCount(type.GetMethod(nameof(ICoopCommand.ProcessCommand))))
-            .Select(type => ((ICoopCommand)Activator.CreateInstance(type)).Name)
+            .Select(type => CommandTestFactory.Create<ICoopCommand>(type).Name)
             .OrderBy(name => name)
             .ToArray();
 
@@ -273,7 +273,7 @@ public class DirectMigratedCommandTests
     private static ICoopCommand[] CreateCommands()
     {
         return GetCommandTypes()
-            .Select(type => (ICoopCommand)Activator.CreateInstance(type))
+            .Select(CommandTestFactory.Create<ICoopCommand>)
             .ToArray();
     }
 

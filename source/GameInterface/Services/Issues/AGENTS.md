@@ -10,8 +10,8 @@ Read [`QuestLearnings.md`](QuestLearnings.md) in full too.
   vanilla issue behavior, named without `IssueBehavior`. If `Framework/` needs a change for one quest, stop and ask.
 - A quest is registered only by having a descriptor. `IssuesModule` registers every class in
   `GameInterface.Services.Issues.Quests` that implements `IQuestTypeDescriptor` or a strategy interface, and
-  `Framework/Gating/IssueTypeAllowlistGate.cs` turns off `RegisterEvents` for every other issue behavior. Do not
-  add a per-quest "disable this behavior" patch, it will fight the gate.
+  `Framework/CreationCapture/UnregisteredIssueBehaviorPatches.cs` turns off `RegisterEvents` for every other issue
+  behavior. Do not add a per-quest "disable this behavior" patch, it will fight those patches.
 - `IssuesLayoutTests` in `GameInterface.Tests` checks that `Framework/` interfaces sit in `Framework.Interface` and that
   messages are public readonly structs, with network commands as `[ProtoContract(SkipConstructor = true)]`.
 
@@ -27,7 +27,7 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    `descriptor.FinalizationProofStrategy != null`; a separate descriptor marker is not needed.
 3. The first accepter owns the issue, decided by `IIssueOwnershipRegistry.TrySetOwner` on the server. Clients
    keep a mirror of the registry, filled from accept messages and the join snapshot and emptied on
-   `NetworkIssueFinalized`. `Framework/Gating/SimilarCommitmentsGatePatch.cs` reads it inside
+   `NetworkIssueFinalized`. `Framework/AcceptCoordination/SimilarCommitmentsPatch.cs` reads it inside
    `IssueBase.CheckPreconditions` so vanilla's one-issue-per-type check counts only the player's own issues, so a
    stale mirror changes whether a player can accept.
 4. A non-owner client ends with the issue marked taken (`_issueState` set) and nothing else: no quest, no
@@ -58,7 +58,7 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
 10. `Replay` cancels the owner's running quest after an issue-only ending (`IssueStayAliveFailed`,
     `IssueTimedOut`), because vanilla's `IssueFinalized` detaches the quest first and would leave it in the
     journal. On the server `BeforeIssueOutcome` announces such an issue only while its quest still runs.
-11. Players and their clans never offer issues. `Framework/Gating/PlayerHeroIssueOwnerGate.cs` turns
+11. Players and their clans never offer issues. `Framework/CreationCapture/PlayerHeroIssueOwnerPatch.cs` turns
     `Hero.CanHaveCampaignIssues` off for them on the server, vanilla only excludes `Clan.PlayerClan`.
 
 ## Adding a quest type

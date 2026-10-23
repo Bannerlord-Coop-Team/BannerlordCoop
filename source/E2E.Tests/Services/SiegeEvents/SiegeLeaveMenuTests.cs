@@ -655,7 +655,7 @@ public class SiegeLeaveMenuTests : IDisposable
         string prefixName = methodName.Contains("lead_assault")
             ? "LeadAssaultConditionPrefix"
             : "OrderAssaultConditionPrefix";
-        var prefix = AccessTools.Method(typeof(SiegeAssaultCommandGatePatch), prefixName);
+        var prefix = AccessTools.Method(typeof(SiegeEventCampaignBehaviorPatches), prefixName);
         Assert.NotNull(prefix);
 
         var args = new MenuCallbackArgs((MenuContext)null, null);

@@ -1,4 +1,6 @@
 ﻿using Common;
+using System;
+using GameInterface.Services.ItemRosters.Messages;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -115,7 +117,8 @@ internal class TradeHandler : IHandler
             currentSettlementComponentId,
             boughtItems,
             soldItems,
-            what.ForceTransferId
+            what.ForceTransferId,
+            what.InitialPlayerRoster
         );
 
         network.SendAll(message);
@@ -143,6 +146,9 @@ internal class TradeHandler : IHandler
             MobileParty currentMobileParty = null;
             if (message.CurrentMobilePartyId != null && !objectManager.TryGetObjectWithLogging<MobileParty>(message.CurrentMobilePartyId, out currentMobileParty)) return;
 
+            var toItemRosterData = RebaseInventoryData(
+                toRoster, message.InitialPlayerRoster, message.ToItemRosterData);
+
             var boughtItems = ResolveTradeItems(message.BoughtItems);
             var soldItems = ResolveTradeItems(message.SoldItems);
 
@@ -165,7 +171,6 @@ internal class TradeHandler : IHandler
             }
 
             var fromItemRosterData = message.FromItemRosterData;
-            var toItemRosterData = message.ToItemRosterData;
             var totalAmount = message.TotalAmount;
             var merchantGold = message.MerchantGold;
 
@@ -212,6 +217,50 @@ internal class TradeHandler : IHandler
             );
         });
     }
+
+    internal static ItemRosterElement[] RebaseInventoryData(
+        ItemRoster authoritativeRoster,
+        ItemRosterElement[] initialRoster,
+        ItemRosterElement[] submittedRoster)
+    {
+        initialRoster ??= Array.Empty<ItemRosterElement>();
+        submittedRoster ??= Array.Empty<ItemRosterElement>();
+        var elements = new List<EquipmentElement>();
+        AddUniqueElements(elements, initialRoster);
+        AddUniqueElements(elements, submittedRoster);
+
+        var rebased = new ItemRoster(authoritativeRoster);
+        foreach (var element in elements)
+        {
+            long delta = (long)FindAmount(submittedRoster, element) - FindAmount(initialRoster, element);
+            int current = FindAmount(rebased, element);
+            int final = (int)Math.Max(0L, Math.Min(int.MaxValue, current + delta));
+            if (final != current) rebased.AddToCounts(element, final - current);
+        }
+        return rebased.ToArray();
+    }
+
+    private static void AddUniqueElements(List<EquipmentElement> elements, IEnumerable<ItemRosterElement> roster)
+    {
+        foreach (var item in roster)
+        {
+            var element = item.EquipmentElement;
+            if (element.Item == null || elements.Any(existing => SameElement(existing, element))) continue;
+            elements.Add(element);
+        }
+    }
+
+    private static int FindAmount(IEnumerable<ItemRosterElement> roster, EquipmentElement element)
+    {
+        foreach (var item in roster)
+        {
+            if (SameElement(item.EquipmentElement, element)) return item.Amount;
+        }
+        return 0;
+    }
+
+    private static bool SameElement(EquipmentElement left, EquipmentElement right)
+        => left.Item == right.Item && left.ItemModifier == right.ItemModifier;
 
     private bool TryValidateForceTransfer(CompleteTrade message, NetPeer peer)
     {
