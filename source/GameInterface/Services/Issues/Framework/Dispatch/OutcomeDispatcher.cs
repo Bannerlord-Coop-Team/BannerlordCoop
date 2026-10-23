@@ -61,12 +61,15 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
     {
         observed = null;
 
-        if (CallOriginalPolicy.IsOriginalAllowed())
+        var registered = registry.IsRegistered(issue.GetType());
+
+        // A vanilla listener replayed on a client, like entering a settlement, can end a stale issue there, only the server's ending may
+        if (registered && ModInformation.IsClient && AllowedThread.IsThisThreadAllowed() && !QuestEndingReplay.IsActive)
         {
-            return true;
+            return false;
         }
 
-        if (!registry.IsRegistered(issue.GetType()))
+        if (CallOriginalPolicy.IsOriginalAllowed() || !registered)
         {
             return true;
         }
