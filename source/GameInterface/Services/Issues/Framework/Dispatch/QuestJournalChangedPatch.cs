@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
 /// <summary>Mirrors local history while received server snapshots remain one-way.</summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnQuestLogAdded))]
 internal class QuestJournalChangedPatch
 {

@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
 /// <summary>Observes UI progress that the unstarted authoritative quest does not calculate.</summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(JournalLog), nameof(JournalLog.UpdateCurrentProgress))]
 internal class QuestJournalProgressPatch
 {
