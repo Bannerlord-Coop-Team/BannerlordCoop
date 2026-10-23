@@ -238,7 +238,16 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
 - Vanilla points the old owner's crew record of the prize at the captor's orphan. A tracked agent counts as a hull's crew
   only on the hull's team (`NavalShipEngine.IsHullCrew`), so those swimmers never withdraw with the orphan.
 - When the captor leaves, retreats or disconnects, the prize and the orphan leave with it through the usual departure path
-  (they don't follow the host), and the NPC keeps its ship with the battle HP the captor reported.
+  (they don't follow the host), and the NPC keeps its ship with the battle HP the captor reported. The captor's own mission
+  end announces only the prize: vanilla's `NavalShipsLogic.RemoveShip` acts only through the ship assignment holding a hull,
+  and the orphan holds none, so its peers remove the orphan when the captor leaves. `NavalShipEngine.RemoveHull` lends an
+  assignment-less hull a free assignment for that removal, so vanilla's `RemoveShipAux` takes it out of `AllShips` and the
+  scene and raises the removal events (R47 bug A).
+- Vanilla's off-ship check (`AgentNavalComponent.CheckAgentOffShip`, every 5 s per AI agent) drops an agent from its hull's
+  crew and formation when it stands on a hull whose navmesh island holds neither its formation's hull nor any allied
+  formation's. After a capture the orphan has no formation, so the captor's troops still on the orphan's deck lose their
+  formation as soon as the prize and the orphan part (ropes cut, the prize sails off, or the orphan's AI drifts away). This is
+  vanilla behaviour, not a sync loss; it was R47's "bug B" (battle 3), where the prize sailed 50 m off before the migration.
 ### Departure
 
 - **Retreat (Tab, Retreat):** enabled per player. The leaver's mission end removes its hulls and announces each one as
@@ -577,7 +586,7 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 - **Follow-up A, late hulls and `MissionShip.OnDeploymentFinished` (partly done, capture P0).** Hulls fielded after
   deployment (AI fleet, copies, swap replacements) now get the weapon AI, the helm's `OnDeploymentFinished` (standing
   point components, enemy helm AI-only, the logics its vacancy check reads) and `CrewSizeOnMainDeck`
-  (`LateHullDeploymentPatch`). Still skipped: model ammo (a swap must not refill it), the anchor, wake and flotsam, the
+  (`LateHullDeploymentPatch`). Still skipped: model ammo (a swap carries the old hull's ammo over), the anchor, wake and flotsam, the
   rope, oar, climbing and ammo barrel machines' standing point setup, and `IsDeployed`. The capture side is done: a fresh
   enemy copy's helm opens to the player (section 2, "Capture"), and capture replicates.
 - **Capture limits (not live yet, R46).**
@@ -655,10 +664,12 @@ vanilla removing an owner's own hull calls `VanillaOwnerRemoveShipForTest` inste
 | `water_clock` | client | DEBUG: one `NAVAL_WATER_CLOCK` line with the water clock patch status, the written and vanilla water time and their offset; in a naval battle also the host role, host samples and the offset estimate. |
 | `water_probe start [grid=5] [spacing=40] [seconds=120] \| status \| stop` | client | Samples the water grid for the shared-clock test; each tick logs every hull's `x`, `y`, `yaw` (degrees, counter-clockwise from +x), `z`, `pitch`, `roll`, the water under it and the crew load its physics takes: `crewMass` (kg), `crewLocal` (body-frame centre, null for none or an empty deck) and `crewSrc` (`owner` on a copy using its owner's load, otherwise `vanilla`). `start` is refused until deployment has finished. |
 | `board_copy [ship] \| status` | client | Teleports the main agent onto a copy's deck (the nearest copy, or the one whose ship id starts with `ship`) at vanilla's deck spot: the hull's player standing point, else the middle inner deck frame (`MissionShip.GetMiddleInnerSpawnGlobalFrame`). Reports the hull-frame `deckError` and `heightAboveSpot`; `status` reports the hull the main agent stands on. The copy's owner reports the puppet's `maxDeckError` in `inspect`. |
-| `immortal [on \| off]` | client | Sets the main agent's vanilla mortality state to `Immortal` (`on`) or `Mortal` (`off`), so blows, routed ones included, take no health; reports it without an argument. A ram's 2 m kill radius (`Agent.Die`) still kills it. |
+| `immortal [on \| off]` | client | Sets the main agent's vanilla mortality state to `Immortal` (`on`) or `Mortal` (`off`), so blows, routed ones included, take no health; reports it without an argument. A ram's 2 m kill radius (`Agent.Die`) still kills it. `on` with no living main agent arms it, and the naval behavior applies it on the first tick the main agent lives (R47: the hero was killed mortal seconds after spawning). |
 | `clear_crew <ship>` | hull's authority | Kills the hull's formation's units (the main agent excepted) and empties its reserve through vanilla, so the deaths replicate and the hull is vacant for a capture; vanilla's vacancy query refreshes within 5 s. |
-| `capture <ship> [force] \| status <ship>` | client | Moves the main agent to an enemy hull's helm (or this client's own orphan's) and takes it the way the use key does, so vanilla's 3 s timer runs and its end goes to the hull's authority; refuses with the helm gate that fails. `status` reports the authority, captor, orphan flag, `CaptureTimer`, how long this client's request waited and every helm gate (`enemy`, `vacantHere`, `connected`, `usableByMain`, `disabledForPlayers`). `force` publishes what vanilla's elapsed timer publishes (`ShipCaptureTimerElapsed`) with the main agent's hull, past this copy's helm gates, so the authority's own refusal (`NotVacant`, `Busy`, `SwapUnavailable`) answers it; a request already waiting for the hull is reported and not sent again. |
+| `capture <ship> [force [twice]] \| status <ship>` | client | Moves the main agent to an enemy hull's helm (or this client's own orphan's) and takes it the way the use key does, so vanilla's 3 s timer runs and its end goes to the hull's authority; refuses with the helm gate that fails. `status` reports the authority, captor, orphan flag, `CaptureTimer`, how long this client's request waited and every helm gate (`enemy`, `vacantHere`, `connected`, `usableByMain`, `disabledForPlayers`). `force` publishes what vanilla's elapsed timer publishes (`ShipCaptureTimerElapsed`) with the main agent's hull, past this copy's helm gates, so the authority's own refusal (`NotVacant`, `Busy`, `SwapUnavailable`) answers it; a request already waiting for the hull is reported and not sent again. `force twice` forces two in the same frame, so the second meets the first one still waiting (one `NAVAL_CAPTURE_TWICE` line with both outcomes). |
 | `swim <ship>` | client | Leaves any station and puts the main agent on the water 4 m off the hull's starboard side, midway along it, so swimming, follow-me orders from the water and a swimmer's capture vacancy can be staged. |
+| `order <followme\|charge\|hold>` | client | Selects the main agent's formation in the player's order controller and issues the order to it alone, as the order menu does (vanilla's `NavalOrderController` turns follow-me into a ship follow order on the main agent's formation ship). One `NAVAL_ORDER` line with the formation's movement order, its hull's ship order, the main agent's formation ship and whether it swims; a throw inside vanilla's order is reported as `threw=`. |
+| `fire <weapon-ship> <target-ship> [status]` | client simulating the weapon | Snaps the weapon hull's ship ballista onto the target hull's `ShipTargetMissionObject` and calls vanilla's `Shoot`, so the bolt goes out through the same capture and replication path as an AI shot (`shipWeapons.shotsSent` here, `shotsReplayed` on peers). Needs a gunner and a loaded weapon (`Idle`). `status` shoots nothing and reports state, ammo, gunner, `disabledForAi` (an enemy within the 7 m stop range), distance, `inArc` (`CanShootAtPoint`) and `aiWouldShoot` (`CanShootAtThreat`: line of fire, friendly hulls, the nearest agent on a flat shot). |
 
 `coop.debug.map_event.start_naval` starts a naval battle directly. Everything above except `inspect` and `rope_status` is
 DEBUG only.
