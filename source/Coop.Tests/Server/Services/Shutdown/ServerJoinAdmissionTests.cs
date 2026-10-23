@@ -43,45 +43,45 @@ using Xunit;
 namespace Coop.Tests.Server.Services.Shutdown;
 
 /// <summary>Drives <see cref="CoopServer.OnConnectionRequest"/>, <see cref="CoopServer.OnPeerConnected"/> and the client reject popup over loopback.</summary>
-public class ServerAdmissionGateTests
+public class ServerJoinAdmissionTests
 {
-    private const string Password = "join-gate-test";
+    private const string Password = "join-admission-test";
     private const string RestartingPopup = "The server is restarting. Try again in a few minutes.";
     private const string PasswordPopup = "The server password is incorrect.";
     private const string SaveName = "MP";
 
     [Fact]
-    public void Gate_StartsOpenAndTogglesBothWays()
+    public void Admission_StartsOpenAndTogglesBothWays()
     {
-        var gate = new ServerAdmissionGate();
-        Assert.True(gate.IsOpen);
+        var admission = new ServerJoinAdmission();
+        Assert.True(admission.IsOpen);
 
-        gate.Close();
-        Assert.False(gate.IsOpen);
+        admission.Close();
+        Assert.False(admission.IsOpen);
 
-        gate.Open();
-        Assert.True(gate.IsOpen);
+        admission.Open();
+        Assert.True(admission.IsOpen);
     }
 
     [Fact]
-    public void ClosedGate_CorrectPassword_ShowsTheRestartingPopup()
+    public void ClosedJoins_CorrectPassword_ShowsTheRestartingPopup()
     {
-        Assert.Equal(RestartingPopup, ConnectAndReadPopup(gateOpen: false, Password));
+        Assert.Equal(RestartingPopup, ConnectAndReadPopup(joinsOpen: false, Password));
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void WrongPassword_IsRefusedForThePasswordWhetherOrNotTheGateIsClosed(bool gateOpen)
+    public void WrongPassword_IsRefusedForThePasswordWhetherOrNotJoinsAreClosed(bool joinsOpen)
     {
-        Assert.Equal(PasswordPopup, ConnectAndReadPopup(gateOpen, "wrong"));
+        Assert.Equal(PasswordPopup, ConnectAndReadPopup(joinsOpen, "wrong"));
     }
 
     [Fact]
-    public void OpenGate_CorrectPassword_Connects()
+    public void OpenJoins_CorrectPassword_Connects()
     {
         using var broker = new TestMessageBroker();
-        RunLoopback(broker, gateOpen: true, Password,
+        RunLoopback(broker, joinsOpen: true, Password,
             () => broker.GetMessagesFromType<NetworkConnected>().Any());
 
         Assert.Empty(broker.GetMessagesFromType<SendPopupMessage>());
@@ -90,7 +90,7 @@ public class ServerAdmissionGateTests
     [Theory]
     [InlineData(false, Password, RestartingPopup)]
     [InlineData(true, "wrong", PasswordPopup)]
-    public void RejectPopup_OutlivesTheTeardownThatEndsTheSession(bool gateOpen, string suppliedPassword, string expected)
+    public void RejectPopup_OutlivesTheTeardownThatEndsTheSession(bool joinsOpen, string suppliedPassword, string expected)
     {
         using var broker = new TestMessageBroker();
         var shown = new ConcurrentQueue<string>();
@@ -100,7 +100,7 @@ public class ServerAdmissionGateTests
         Action<MessagePayload<EndCoopMode>> tearDown = _ => session.Cancel();
         broker.Subscribe(tearDown);
 
-        RunLoopback(broker, gateOpen, suppliedPassword, () => !shown.IsEmpty, session);
+        RunLoopback(broker, joinsOpen, suppliedPassword, () => !shown.IsEmpty, session);
 
         Assert.Equal(expected, Assert.Single(shown));
         GC.KeepAlive(tearDown);
@@ -121,16 +121,16 @@ public class ServerAdmissionGateTests
     }
 
     [Fact]
-    public void TryAdmit_RegistersOnlyWhileTheGateIsOpen()
+    public void TryAdmit_RegistersOnlyWhileJoinsAreOpen()
     {
-        var gate = new ServerAdmissionGate();
+        var admission = new ServerJoinAdmission();
         int registered = 0;
 
-        Assert.True(gate.TryAdmit(() => registered++));
-        gate.Close();
-        Assert.False(gate.TryAdmit(() => registered++));
-        gate.Open();
-        Assert.True(gate.TryAdmit(() => registered++));
+        Assert.True(admission.TryAdmit(() => registered++));
+        admission.Close();
+        Assert.False(admission.TryAdmit(() => registered++));
+        admission.Open();
+        Assert.True(admission.TryAdmit(() => registered++));
 
         Assert.Equal(2, registered);
     }
@@ -163,7 +163,7 @@ public class ServerAdmissionGateTests
     }
 
     [Fact]
-    public async Task RegistrationOverlappingTheGateClosing_IsDrainedBeforeTheSave()
+    public async Task RegistrationOverlappingJoinsClosing_IsDrainedBeforeTheSave()
     {
         using var race = new RegistrationRace();
         race.ConnectAndHoldRegistration();
@@ -185,10 +185,10 @@ public class ServerAdmissionGateTests
             registration = RunOnOwnThread(race.Register);
             Assert.True(registering.Wait(TimeSpan.FromSeconds(5)), "The registration never started.");
             shutdown = RunOnOwnThread(race.ScheduleShutdownNow);
-            Assert.True(race.Gate.Closing.Wait(TimeSpan.FromSeconds(5)), "The shutdown never started closing the gate.");
+            Assert.True(race.Admission.Closing.Wait(TimeSpan.FromSeconds(5)), "The shutdown never started closing joins.");
 
             await Task.WhenAny(shutdown, Task.Delay(300));
-            Assert.False(shutdown.IsCompleted, "The shutdown got past the gate while a registration was still running.");
+            Assert.False(shutdown.IsCompleted, "The shutdown got past join admission while a registration was still running.");
         }
         finally
         {
@@ -211,10 +211,10 @@ public class ServerAdmissionGateTests
     private static Task RunOnOwnThread(Action action) =>
         Task.Factory.StartNew(action, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
-    private static string ConnectAndReadPopup(bool gateOpen, string suppliedPassword)
+    private static string ConnectAndReadPopup(bool joinsOpen, string suppliedPassword)
     {
         using var broker = new TestMessageBroker();
-        RunLoopback(broker, gateOpen, suppliedPassword, () => broker.GetMessagesFromType<SendPopupMessage>().Any());
+        RunLoopback(broker, joinsOpen, suppliedPassword, () => broker.GetMessagesFromType<SendPopupMessage>().Any());
 
         Assert.Empty(broker.GetMessagesFromType<NetworkConnected>());
         return Assert.Single(broker.GetMessagesFromType<SendPopupMessage>()).Text;
@@ -222,27 +222,27 @@ public class ServerAdmissionGateTests
 
     private static void RunLoopback(
         TestMessageBroker broker,
-        bool gateOpen,
+        bool joinsOpen,
         string suppliedPassword,
         Func<bool> complete,
         CancellationTokenSource? session = null)
     {
-        var gate = new ServerAdmissionGate();
-        if (!gateOpen) gate.Close();
+        var admission = new ServerJoinAdmission();
+        if (!joinsOpen) admission.Close();
 
         using var cancellation = new CancellationTokenSource();
-        using var server = CreateServer(new TestMessageBroker(), gate, cancellation);
+        using var server = CreateServer(new TestMessageBroker(), admission, cancellation);
 
         RunLoopback(broker, server.OnConnectionRequest, suppliedPassword, complete, session);
     }
 
-    private static CoopServer CreateServer(TestMessageBroker broker, IServerAdmissionGate gate, CancellationTokenSource session) => new CoopServer(
+    private static CoopServer CreateServer(TestMessageBroker broker, IServerJoinAdmission admission, CancellationTokenSource session) => new CoopServer(
         CreateConfig(Password).Object,
         broker,
         Mock.Of<IPacketManager>(),
         Mock.Of<IMessagePacketHandler>(),
         Mock.Of<IConnectionMessageQueue>(),
-        gate,
+        admission,
         new JoinPeerTerminator(),
         Mock.Of<IControllerIdProvider>(),
         Mock.Of<IMissionManager>(),
@@ -322,7 +322,7 @@ public class ServerAdmissionGateTests
     private sealed class RegistrationRace : IDisposable
     {
         public readonly TestMessageBroker ServerBroker = new TestMessageBroker();
-        public readonly SignallingAdmissionGate Gate = new SignallingAdmissionGate();
+        public readonly SignallingJoinAdmission Admission = new SignallingJoinAdmission();
         public readonly ConnectionCollection Connections;
         public readonly ServerShutdownCoordinator Coordinator;
         public readonly ConcurrentQueue<string> ServerEvents = new ConcurrentQueue<string>();
@@ -339,7 +339,7 @@ public class ServerAdmissionGateTests
 
         public RegistrationRace()
         {
-            server = CreateServer(ServerBroker, Gate, serverSession);
+            server = CreateServer(ServerBroker, Admission, serverSession);
             Connections = new ConnectionCollection(ServerBroker, CreateConnectionContext(ServerBroker));
             // Subscribed after the collection, so it runs once the peer is in it.
             recordRegistration = _ => ServerEvents.Enqueue("registered");
@@ -355,7 +355,7 @@ public class ServerAdmissionGateTests
                 Mock.Of<INetwork>(),
                 Connections,
                 new JoinPeerTerminator(),
-                Gate,
+                Admission,
                 saves.Object,
                 Mock.Of<IMissionManager>(),
                 () => DateTime.UtcNow,
@@ -407,7 +407,7 @@ public class ServerAdmissionGateTests
         }
 
         public void PumpUntil(Func<bool> complete) =>
-            ServerAdmissionGateTests.PumpUntil(serverTransport, clientTransport, clientSession.Token, complete);
+            ServerJoinAdmissionTests.PumpUntil(serverTransport, clientTransport, clientSession.Token, complete);
 
         public void Dispose()
         {
@@ -419,7 +419,7 @@ public class ServerAdmissionGateTests
             server.Dispose();
             clientSession.Dispose();
             serverSession.Dispose();
-            Gate.Dispose();
+            Admission.Dispose();
         }
 
         private static ConnectionContext CreateConnectionContext(TestMessageBroker broker) => new ConnectionContext(
@@ -446,24 +446,24 @@ public class ServerAdmissionGateTests
             Mock.Of<IJoinValidationDenialLog>());
     }
 
-    /// <summary>The real gate, which also signals once a shutdown has started closing it.</summary>
-    private sealed class SignallingAdmissionGate : IServerAdmissionGate, IDisposable
+    /// <summary>The real join admission, which also signals once a shutdown has started closing it.</summary>
+    private sealed class SignallingJoinAdmission : IServerJoinAdmission, IDisposable
     {
         public readonly ManualResetEventSlim Closing = new ManualResetEventSlim();
 
-        private readonly ServerAdmissionGate gate = new ServerAdmissionGate();
+        private readonly ServerJoinAdmission admission = new ServerJoinAdmission();
 
-        public bool IsOpen => gate.IsOpen;
+        public bool IsOpen => admission.IsOpen;
 
-        public void Open() => gate.Open();
+        public void Open() => admission.Open();
 
         public void Close()
         {
             Closing.Set();
-            gate.Close();
+            admission.Close();
         }
 
-        public bool TryAdmit(Action register) => gate.TryAdmit(register);
+        public bool TryAdmit(Action register) => admission.TryAdmit(register);
 
         public void Dispose() => Closing.Dispose();
     }
