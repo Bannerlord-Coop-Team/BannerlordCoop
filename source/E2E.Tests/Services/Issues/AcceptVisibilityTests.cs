@@ -170,6 +170,9 @@ public class AcceptVisibilityTests : IDisposable
             // Only the placeholder the daily tick reads, the sender's real entry is not copied
             Assert.Single(otherIssue.JournalEntries);
             Assert.Equal(accepted.State.ReturnTimeTicks, otherIssue.AlternativeSolutionReturnTimeForTroops.NumTicks);
+
+            Campaign.Current.IssueManager.DailyTick();
+            Assert.True(otherIssue.IsSolvingWithAlternative);
         });
 
         Assert.Empty(otherUpdates);

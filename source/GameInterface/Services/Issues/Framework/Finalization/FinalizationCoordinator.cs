@@ -259,6 +259,12 @@ internal class FinalizationCoordinator : IHandler
 
     private void CompleteOnServer(IssueBase issue, IQuestTypeDescriptor descriptor, IssueOutcome outcome)
     {
+        if (outcome == IssueOutcome.QuestSuccess && descriptor.FinalizationProofStrategy != null)
+        {
+            Logger.Warning("{issue} requires a branch proof instead of generic quest success", issue.StringId);
+            return;
+        }
+
         if (!IsQuestOutcome(outcome))
         {
             Logger.Error("{outcome} cannot be requested for {issue}", outcome, issue.StringId);
@@ -285,6 +291,13 @@ internal class FinalizationCoordinator : IHandler
     private static void Replay(IssueBase issue, IssueOutcome outcome, bool isOwner)
     {
         var quest = issue.IssueQuest;
+
+        // The server already returned these troops; replaying vanilla cancellation would return them twice.
+        if (quest == null && issue.IsSolvingWithAlternative && outcome == IssueOutcome.QuestCancel)
+        {
+            issue.IssueFinalized();
+            return;
+        }
 
         if (quest != null && !Campaign.Current.QuestManager.Quests.Contains(quest))
         {

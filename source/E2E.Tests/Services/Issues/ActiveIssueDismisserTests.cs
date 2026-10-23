@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Common.Network.Messages;
 using Common.Util;
 using E2E.Tests.Environment;
@@ -290,3 +290,4 @@ public class ActiveIssueDismisserTests : IDisposable
         Assert.Empty(Client.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
     }
 }
+

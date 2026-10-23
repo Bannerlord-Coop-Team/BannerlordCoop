@@ -22,6 +22,7 @@ internal sealed class QuestScenario
 
     private readonly E2ETestEnvironment testEnvironment;
     private readonly Func<EnvironmentInstance, Hero, IssueBase>? issueFactory;
+    private readonly Action<EnvironmentInstance, string>? setupIssue;
 
     public string NotableId { get; }
     public string OwnerHeroId { get; }
@@ -43,10 +44,17 @@ internal sealed class QuestScenario
         (OwnerHeroId, OwnerPartyId) = RegisterPlayer(ClientA, ControllerA);
         (OtherHeroId, OtherPartyId) = RegisterPlayer(ClientB, ControllerB);
 
-        foreach (var instance in new[] { Server, ClientA, ClientB })
-        {
-            AddIssue(instance);
-        }
+        foreach (var instance in new[] { Server, ClientA, ClientB }) AddIssue(instance);
+    }
+
+    public QuestScenario(E2ETestEnvironment testEnvironment, Action<EnvironmentInstance, string> setupIssue)
+    {
+        this.testEnvironment = testEnvironment;
+        this.setupIssue = setupIssue;
+        NotableId = testEnvironment.CreateRegisteredObject<Hero>();
+        (OwnerHeroId, OwnerPartyId) = RegisterPlayer(ClientA, ControllerA);
+        (OtherHeroId, OtherPartyId) = RegisterPlayer(ClientB, ControllerB);
+        foreach (var instance in new[] { Server, ClientA, ClientB }) AddIssue(instance);
     }
 
     public void Accept(EnvironmentInstance client)
@@ -121,6 +129,11 @@ internal sealed class QuestScenario
 
             using (new AllowedThread())
             {
+                if (setupIssue != null)
+                {
+                    setupIssue(instance, NotableId);
+                    return;
+                }
                 var issue = issueFactory?.Invoke(instance, notable) ?? new AllowedIssue(notable, null);
                 issue.StringId = IssueId;
                 issue._issueState = IssueBase.IssueState.Ongoing;
