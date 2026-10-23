@@ -1127,7 +1127,7 @@ public sealed class LesserNobleRevoltTests : IDisposable
     [InlineData(RevoltEnding.BattleLost, IssueOutcome.QuestFail, 0, 1)]
     [InlineData(RevoltEnding.Agreement, IssueOutcome.QuestSuccess, 1, 1)]
     [InlineData(RevoltEnding.Release, IssueOutcome.QuestFail, 0, 0)]
-    [InlineData(RevoltEnding.TimedOut, IssueOutcome.QuestFail, 0, 1)]
+    [InlineData(RevoltEnding.TimedOut, IssueOutcome.QuestTimeOut, 0, 1)]
     [InlineData(RevoltEnding.CanceledByWar, IssueOutcome.QuestCancel, 0, 0)]
     public void ServerEnding_AddsItsJournalLineOnceToTheOwnersJournalOnly(RevoltEnding ending, IssueOutcome outcome, int payments, int traitChanges)
     {
