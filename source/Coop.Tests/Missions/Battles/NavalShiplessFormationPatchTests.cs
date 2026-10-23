@@ -211,7 +211,36 @@ public class NavalShiplessFormationPatchTests
 
         ShiplessSelectedFormationOrdersPatch.Restore(selected, taken);
         Assert.Equal(formations, selected);
-        Assert.Equal(5, ShiplessSelectedFormationOrdersPatch.TargetMethods().Count(method => method != null));
+        Assert.Equal(6, ShiplessSelectedFormationOrdersPatch.TargetMethods().Count(method => method != null));
+    }
+
+    // R48 round 5 review: a selection that is all hull-less (a swimming captured player selecting all) is emptied for the order,
+    // so the setter is skipped, as several read SelectedFormations[0]; the restore still puts every formation back.
+    [Fact]
+    public void AllSelectedFormationsWithoutAHull_SkipTheSetter_AndAreRestored()
+    {
+        var formations = Enumerable.Range(0, 2)
+            .Select(_ => (TaleWorlds.MountAndBlade.Formation)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(
+                typeof(TaleWorlds.MountAndBlade.Formation)))
+            .ToArray();
+        var selected = formations.ToList();
+
+        var taken = ShiplessSelectedFormationOrdersPatch.TakeShipless(selected, _ => false);
+
+        Assert.Empty(selected);
+        Assert.False(ShiplessSelectedFormationOrdersPatch.RunsOrder(selected.Count, taken.Count));
+        ShiplessSelectedFormationOrdersPatch.Restore(selected, taken);
+        Assert.Equal(formations, selected);
+    }
+
+    [Theory]
+    [InlineData(0, 2, false)]
+    [InlineData(1, 1, true)]
+    [InlineData(2, 0, true)]
+    [InlineData(0, 0, true)]
+    public void RunsOrder_UnlessTakingTheHullLessOnesEmptiedTheSelection(int selectedLeft, int taken, bool expected)
+    {
+        Assert.Equal(expected, ShiplessSelectedFormationOrdersPatch.RunsOrder(selectedLeft, taken));
     }
 
     // A cancelled ramming on a hull without an AI controller stops, keeping its ignored target as vanilla does.

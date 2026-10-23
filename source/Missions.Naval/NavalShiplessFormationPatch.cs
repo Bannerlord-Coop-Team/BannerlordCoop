@@ -250,7 +250,9 @@ internal class FollowOrderWithoutTargetPatch
 /// <summary>
 /// Any player formation with live units is selectable, and a player whose hull was captured keeps one with no hull; the naval
 /// order setters then call ShipOrder on its null hull. In a co-op naval battle they run on the selection's formations with a
-/// hull only, and the full selection is restored after.
+/// hull only, and the full selection is restored after; their callers raise OnOrderIssued after that restore, on the full
+/// selection (SetOrderWithPosition raises it itself, on the hulled formations it moved). With no hulled formation left the
+/// setter is skipped, as several read SelectedFormations[0].
 /// </summary>
 [HarmonyPatch]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
@@ -259,19 +261,21 @@ internal class ShiplessSelectedFormationOrdersPatch
     // The order setters that read every selected formation's hull unchecked.
     internal static IEnumerable<MethodBase> TargetMethods() =>
         new[] { "SetNavalEngageWithTargetFormation", "SetNavalSkirmishWithTargetFormation", "SetNavalStop", "SetNavalRetreat",
-            "SetNavalFollowOrder" }
+            "SetNavalFollowOrder", "SetOrderWithPosition" }
             .Select(name => AccessTools.DeclaredMethod(typeof(NavalOrderController), name));
 
-    // Takes the selected formations without a hull out of the selection for the order, keeping where each stood.
+    // Takes the selected formations without a hull out of the selection for the order, keeping where each stood; skips the
+    // setter when that left nothing (the finalizer still restores).
     [HarmonyPrefix]
-    internal static void Prefix(OrderController __instance, out List<(int Index, Formation Formation)> __state)
+    internal static bool Prefix(OrderController __instance, out List<(int Index, Formation Formation)> __state)
     {
         __state = null;
         var shipsLogic = NavalShiplessFormations.ShipsLogic;
-        if (!CoopNavalMissionScope.IsActive || shipsLogic == null) return;
+        if (!CoopNavalMissionScope.IsActive || shipsLogic == null) return true;
 
         __state = TakeShipless(__instance._selectedFormations, formation =>
             NavalShiplessFormations.ShipOf(shipsLogic, formation, out bool known) != null || !known);
+        return RunsOrder(__instance._selectedFormations.Count, __state.Count);
     }
 
     // Puts them back where they stood, whether the order returned or threw.
@@ -291,6 +295,9 @@ internal class ShiplessSelectedFormationOrdersPatch
         for (int i = taken.Count - 1; i >= 0; i--) selected.RemoveAt(taken[i].Item1);
         return taken;
     }
+
+    /// <summary>Whether the setter runs: not when taking the hull-less formations out emptied the selection.</summary>
+    internal static bool RunsOrder(int selectedLeft, int taken) => selectedLeft > 0 || taken == 0;
 
     /// <summary>Inserts the taken formations back at their indices, lowest first.</summary>
     internal static void Restore(IList<Formation> selected, List<(int Index, Formation Formation)> taken)

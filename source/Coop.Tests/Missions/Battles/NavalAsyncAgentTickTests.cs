@@ -5,6 +5,7 @@ using Xunit;
 namespace Coop.Tests.Missions.Battles;
 
 /// <summary>R48 re-review: work outside the mission tick reads whether the async agent tick runs, without waiting.</summary>
+[Collection("Mission.Current")]
 public class NavalAsyncAgentTickTests
 {
     [Theory]

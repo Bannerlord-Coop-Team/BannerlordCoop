@@ -216,7 +216,8 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
   skips both orders, `SkirmishOrderWithoutTargetPatch` skips a skirmish order at a missing hull (also the player's order
   controller), `EngageOrderWithoutTargetPatch` and `FollowOrderWithoutTargetPatch` do the same for engage (charging
   swimmers) and follow (follow-me while swimming), `ShiplessSelectedFormationOrdersPatch` runs the naval order setters on the
-  selected formations with a hull only (a captured player's own formation has none), and
+  selected formations with a hull only (a captured player's own formation has none; skipped when none is left; also
+  `SetOrderWithPosition`, as a co-op hull removal now expires every team's 5 s naval query lists too), and
   `RammingCancelWithoutAiControllerPatch` skips the controller call of a ramming whose hull lost its AI controller.
 - **One decider per place in the order.** Only a hull's current authority decides a capture of it. A player's hull, or a
   captured hull, changes authority only through captures, so a confirm for it must come from its current authority at that
