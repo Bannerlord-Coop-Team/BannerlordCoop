@@ -46,6 +46,6 @@ public readonly struct AlternativeSolutionJournalEntry
         Type = log.Type;
     }
 
-    public JournalLog ToJournalLog() => new JournalLog(CampaignTime.FromTicks(LogTimeTicks),
+    public JournalLog ToJournalLog() => new JournalLog(new CampaignTime(LogTimeTicks),
         new TextObject(Text), TaskName == null ? null : new TextObject(TaskName), Progress, Range, Type);
 }
