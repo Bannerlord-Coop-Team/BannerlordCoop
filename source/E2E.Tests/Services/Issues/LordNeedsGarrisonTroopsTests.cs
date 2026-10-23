@@ -119,22 +119,20 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
     }
 
     [Fact]
-    public void DeliveryProof_RefusesAnUnknownBranchAndMissingTroops()
+    public void DeliveryProofRefusesAnUnknownBranch()
     {
         testEnvironment.Server.Call(() =>
         {
             var quest = Uninitialized<Quest>();
-            quest._requestedTroopAmount = 5;
-            quest._requestedTroopType = DefaultPartyTroop();
-
             var strategy = (LordNeedsGarrisonTroopsFinalizationProofStrategy)Descriptor(testEnvironment.Server).FinalizationProofStrategy;
             Assert.False(strategy.TryRunBranch(quest, 0));
-            Assert.True(strategy.TryRunBranch(quest, (byte)LordNeedsGarrisonTroopsBranch.TroopsDelivered));
         });
     }
 
-    [Fact]
-    public void DeliveryProofRunsVanillaHandInWhenTheOwnerCarriesTheTroops()
+    [Theory]
+    [InlineData(4, 0)]
+    [InlineData(5, 1)]
+    public void DeliveryProofRunsVanillaHandInOnlyWhenTheOwnerCarriesEnoughTroops(int troopCount, int expectedHandIns)
     {
         using var tracking = new MethodCallRecorder(AccessTools.Method(typeof(Quest), nameof(Quest.PlayerTransferredTroopsToGarrisonCommander)));
         var partyId = testEnvironment.CreateRegisteredObject<MobileParty>();
@@ -151,7 +149,7 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
             settlement.SetSettlementComponent(town);
             GarrisonPartyComponent.CreateGarrisonParty("test-garrison", settlement);
             party.CurrentSettlement = settlement;
-            party.MemberRoster.AddToCounts(troop, 5);
+            party.MemberRoster.AddToCounts(troop, troopCount);
 
             var quest = Uninitialized<Quest>();
             quest._questState = QuestBase.QuestStates.Ongoing;
@@ -167,7 +165,7 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
             {
                 Assert.True(Descriptor(testEnvironment.Server).FinalizationProofStrategy.TryRunBranch(
                     quest, (byte)LordNeedsGarrisonTroopsBranch.TroopsDelivered));
-                Assert.Equal(1, tracking.CountFor(testEnvironment.Server));
+                Assert.Equal(expectedHandIns, tracking.CountFor(testEnvironment.Server));
             }
             finally
             {
@@ -186,6 +184,4 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
     private static T Uninitialized<T>() where T : class =>
         (T)RuntimeHelpers.GetUninitializedObject(typeof(T));
 
-    private static CharacterObject DefaultPartyTroop() =>
-        (CharacterObject)RuntimeHelpers.GetUninitializedObject(typeof(CharacterObject));
 }
