@@ -1,0 +1,78 @@
+{
+  "source": {
+    "source_root": "/home/pwisorlowska/worktrees/BannerlordCoop/3781-ladys-knight-out",
+    "head": "b57cac1124a4f04a634f56d164819a1055473cba",
+    "tree": "59747186e122f966fb96295a925d97207509fff0",
+    "base_head": "b57cac1124a4f04a634f56d164819a1055473cba",
+    "run_token": "issue3781-20261023T171247",
+    "dedicated_head": "bb76bea12d5aacd11f5c2868b72440ebd9a58bc9",
+    "dedicated_tree": "68d932b347bdc3e10ff20fbd92ca92f21dca03ae",
+    "ensure_sha": "b4c57ef5993441a4c5e2012f95928f6f22b2f295c17e177f848f77e7fdd9168c",
+    "run_sha": "fae33feb339d0954b56e58bcdf2f67dc3edab4d31420801f6d1ccf09f23c1c6a",
+    "inputs": "/home/pwisorlowska/.codex/runtime/issue-to-pr/local-dedicated-server",
+    "live_root": "/mnt/c/Users/Andrew/.codex-runtime/live-testing/BannerlordCoop"
+  },
+  "fixtureManifest": {
+    "fixture": {
+      "path": "artifacts/IssueToPr/ittest/IssueLiveTestKit.cs",
+      "sha256": "662e7f2a72924b72a74b036d8b15c09f0337b122b69b6d30f66e0614db248863"
+    },
+    "targets": {
+      "path": "artifacts/IssueToPr/ittest/IssueLiveTestKit.targets",
+      "sha256": "42e174a8b62d0285a164b850615b1194445adb096f011c2ffc228f87f456fdd7"
+    },
+    "source": {
+      "head": "b57cac1124a4f04a634f56d164819a1055473cba",
+      "tree": "59747186e122f966fb96295a925d97207509fff0"
+    },
+    "sourceRoot": "/home/pwisorlowska/worktrees/BannerlordCoop/3781-ladys-knight-out"
+  },
+  "fixtureManifestSha256": "3fbc476dcb9fc826b9522ca7533643cab319c4b827f940f73adfe3c502fb0027",
+  "modules": {
+    "server": {
+      "Common": "ae6da126-582f-46b5-9279-67af461de417",
+      "Coop.Core": "33c896b0-e283-48bd-9e90-909b7f646832",
+      "Coop.Steam": "e9e69ed4-434d-49f4-9baf-fb82d921bc2d",
+      "GameInterface": "5a92f6da-e76b-4eb2-bac2-b2a8e3909493",
+      "Missions": "4ad54c02-e011-4a38-9131-126bb2e98060"
+    },
+    "A": {
+      "Common": "ae6da126-582f-46b5-9279-67af461de417",
+      "Coop": "f5289df7-94df-45d5-a765-a9ecebbee04d",
+      "Coop.Core": "33c896b0-e283-48bd-9e90-909b7f646832",
+      "Coop.Steam": "e9e69ed4-434d-49f4-9baf-fb82d921bc2d",
+      "GameInterface": "5a92f6da-e76b-4eb2-bac2-b2a8e3909493",
+      "Missions": "4ad54c02-e011-4a38-9131-126bb2e98060"
+    },
+    "B": {
+      "Common": "ae6da126-582f-46b5-9279-67af461de417",
+      "Coop": "f5289df7-94df-45d5-a765-a9ecebbee04d",
+      "Coop.Core": "33c896b0-e283-48bd-9e90-909b7f646832",
+      "Coop.Steam": "e9e69ed4-434d-49f4-9baf-fb82d921bc2d",
+      "GameInterface": "5a92f6da-e76b-4eb2-bac2-b2a8e3909493",
+      "Missions": "4ad54c02-e011-4a38-9131-126bb2e98060"
+    }
+  },
+  "moduleFileSha256": {
+    "Common": "301ce0a15b04f8a36e351de3559fbacf4c26957b40635107921a08d4da0de724",
+    "Coop": "9d21bd2b21f282bb524f0a885d014e0405528f7e2a9b13a03313d46a8fada49b",
+    "Coop.Core": "1b84bdcfe15f1acddb08044f6d6a64cb4e5e07f521cdc4ae5d306aa1061769dd",
+    "Coop.Steam": "ab4bb3e993ff115709e01584ed7355bea817f6e4d277d538a718656865e8eac3",
+    "GameInterface": "a54d4ee158248b63a61535745f3703ba15f15dc4e1f724822d29df86e3291035",
+    "Missions": "b88d41e08b17b4fde47911227cf5a6139a376c94e0229fbbea2c22ee417b91c3"
+  },
+  "finalStatuses": {
+    "server": "final-status-server.json",
+    "A": "final-status-A.json",
+    "B": "final-status-B.json"
+  },
+  "processes": {
+    "serverEngine": 39068,
+    "serverLauncher": 43196,
+    "A": 65108,
+    "B": 61488,
+    "clientShell": 62428,
+    "clientLaunchHost": 52336
+  },
+  "gameVersion": "8C209EA08A500075BA005B09394206F5E32B632EC2FF97282CBC040BBAA8D2E3"
+}

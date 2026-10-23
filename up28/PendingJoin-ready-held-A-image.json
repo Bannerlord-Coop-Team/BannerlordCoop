@@ -1,0 +1,60 @@
+{
+    "role":  "A",
+    "processId":  65108,
+    "runToken":  "issue3781-20261023T171247",
+    "checkpoint":  "PendingJoin-ready-held",
+    "capture":  {
+                    "index":  0,
+                    "processId":  65108,
+                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28/PendingJoin-ready-held-A.bmp",
+                    "exitCode":  0,
+                    "response":  {
+                                     "version":  1,
+                                     "id":  "8386659d52d347e19f7de5afd7227f4c",
+                                     "ok":  true,
+                                     "process":  {
+                                                     "pid":  65108,
+                                                     "role":  "client",
+                                                     "platformId":  "testclient",
+                                                     "runToken":  "issue3781-20261023T171247",
+                                                     "processStartedUtc":  "2026-10-23T17:22:54.3074319Z"
+                                                 },
+                                     "result":  {
+                                                    "captureId":  "0a40f8746b9243ce831158d90c54dc37",
+                                                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\PendingJoin-ready-held-A.bmp",
+                                                    "captureRequested":  true,
+                                                    "captureRequestedUtc":  "2026-10-23T17:52:54.043535Z",
+                                                    "captureRequestEngineFrame":  52269,
+                                                    "captureComplete":  true,
+                                                    "complete":  true,
+                                                    "completionCaptureId":  "0a40f8746b9243ce831158d90c54dc37",
+                                                    "completionObservedUtc":  "2026-10-23T17:52:54.2616212Z",
+                                                    "length":  3686454,
+                                                    "lastWriteUtc":  "2026-10-23T17:52:54.0801137Z"
+                                                },
+                                     "error":  null,
+                                     "activeStateAtCaptureRequest":  "TaleWorlds.CampaignSystem.GameState.MapState",
+                                     "cameraReadiness":  {
+                                                             "process":  {
+                                                                             "pid":  65108,
+                                                                             "role":  "client",
+                                                                             "platformId":  "testclient",
+                                                                             "runToken":  "issue3781-20261023T171247",
+                                                                             "processStartedUtc":  "2026-10-23T17:22:54.3074319Z"
+                                                                         },
+                                                             "stableSamples":  3,
+                                                             "observedUtc":  "2026-10-23T17:52:54.0117418Z",
+                                                             "camera":  "locked=True animation=False fastMove=False",
+                                                             "map":  "menuView=False pendingMenuView=False encounterOverlay=False cameraFollowParty=Created_48503 cameraMode=FollowParty followTargetReached=True animation=False fastMove=False loading=False"
+                                                         }
+                                 },
+                    "initialAttempt":  null
+                },
+    "image":  {
+                  "sourceBmpPath":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\PendingJoin-ready-held-A.bmp",
+                  "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\PendingJoin-ready-held-A.png",
+                  "width":  1280,
+                  "height":  960,
+                  "sha256":  "955982eb9b7e5d17f3994325edf9f2093beb155d7f9604179e168764b0d90a1f"
+              }
+}

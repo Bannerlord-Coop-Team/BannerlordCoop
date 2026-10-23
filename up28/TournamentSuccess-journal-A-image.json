@@ -1,0 +1,48 @@
+{
+    "role":  "A",
+    "processId":  65108,
+    "runToken":  "issue3781-20261023T171247",
+    "checkpoint":  "TournamentSuccess-journal",
+    "capture":  {
+                    "index":  0,
+                    "processId":  65108,
+                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28/TournamentSuccess-journal-A.bmp",
+                    "exitCode":  0,
+                    "response":  {
+                                     "version":  1,
+                                     "id":  "541a6aba23ff417d8c92be7677d1d52a",
+                                     "ok":  true,
+                                     "process":  {
+                                                     "pid":  65108,
+                                                     "role":  "client",
+                                                     "platformId":  "testclient",
+                                                     "runToken":  "issue3781-20261023T171247",
+                                                     "processStartedUtc":  "2026-10-23T17:22:54.3074319Z"
+                                                 },
+                                     "result":  {
+                                                    "captureId":  "29d30ffb182e48f0b84a028a86bc6513",
+                                                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentSuccess-journal-A.bmp",
+                                                    "captureRequested":  true,
+                                                    "captureRequestedUtc":  "2026-10-23T17:49:22.0178045Z",
+                                                    "captureRequestEngineFrame":  45932,
+                                                    "captureComplete":  true,
+                                                    "complete":  true,
+                                                    "completionCaptureId":  "29d30ffb182e48f0b84a028a86bc6513",
+                                                    "completionObservedUtc":  "2026-10-23T17:49:22.2322162Z",
+                                                    "length":  3686454,
+                                                    "lastWriteUtc":  "2026-10-23T17:49:22.0529808Z"
+                                                },
+                                     "error":  null,
+                                     "activeStateAtCaptureRequest":  "TaleWorlds.CampaignSystem.GameState.QuestsState",
+                                     "cameraReadiness":  null
+                                 },
+                    "initialAttempt":  null
+                },
+    "image":  {
+                  "sourceBmpPath":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentSuccess-journal-A.bmp",
+                  "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentSuccess-journal-A.png",
+                  "width":  1280,
+                  "height":  960,
+                  "sha256":  "11c97b9120b5d4487eff56b54910d9e0424795beb39244bfa729e6484c3a395d"
+              }
+}

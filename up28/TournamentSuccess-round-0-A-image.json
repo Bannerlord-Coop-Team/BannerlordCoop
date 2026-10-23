@@ -1,0 +1,48 @@
+{
+    "role":  "A",
+    "processId":  65108,
+    "runToken":  "issue3781-20261023T171247",
+    "checkpoint":  "TournamentSuccess-round-0",
+    "capture":  {
+                    "index":  0,
+                    "processId":  65108,
+                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28/TournamentSuccess-round-0-A.bmp",
+                    "exitCode":  0,
+                    "response":  {
+                                     "version":  1,
+                                     "id":  "c544bb21a5694a72a0d37bff93053b2b",
+                                     "ok":  true,
+                                     "process":  {
+                                                     "pid":  65108,
+                                                     "role":  "client",
+                                                     "platformId":  "testclient",
+                                                     "runToken":  "issue3781-20261023T171247",
+                                                     "processStartedUtc":  "2026-10-23T17:22:54.3074319Z"
+                                                 },
+                                     "result":  {
+                                                    "captureId":  "1ce989f67cf940a9b4bd4be96057a521",
+                                                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentSuccess-round-0-A.bmp",
+                                                    "captureRequested":  true,
+                                                    "captureRequestedUtc":  "2026-10-23T17:45:50.6049979Z",
+                                                    "captureRequestEngineFrame":  39736,
+                                                    "captureComplete":  true,
+                                                    "complete":  true,
+                                                    "completionCaptureId":  "1ce989f67cf940a9b4bd4be96057a521",
+                                                    "completionObservedUtc":  "2026-10-23T17:45:50.8205921Z",
+                                                    "length":  3686454,
+                                                    "lastWriteUtc":  "2026-10-23T17:45:50.6372205Z"
+                                                },
+                                     "error":  null,
+                                     "activeStateAtCaptureRequest":  "TaleWorlds.MountAndBlade.MissionState",
+                                     "cameraReadiness":  null
+                                 },
+                    "initialAttempt":  null
+                },
+    "image":  {
+                  "sourceBmpPath":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentSuccess-round-0-A.bmp",
+                  "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentSuccess-round-0-A.png",
+                  "width":  1280,
+                  "height":  960,
+                  "sha256":  "22dd4f95d785480657b080e72c1d2185e68709d757ebddd9ac1689aa8ad2df27"
+              }
+}

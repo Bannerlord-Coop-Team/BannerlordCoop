@@ -1,0 +1,48 @@
+{
+    "role":  "A",
+    "processId":  65108,
+    "runToken":  "issue3781-20261023T171247",
+    "checkpoint":  "PendingJoin-journal",
+    "capture":  {
+                    "index":  0,
+                    "processId":  65108,
+                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28/PendingJoin-journal-A.bmp",
+                    "exitCode":  0,
+                    "response":  {
+                                     "version":  1,
+                                     "id":  "e3c5975997cd439088f51b158a44cd65",
+                                     "ok":  true,
+                                     "process":  {
+                                                     "pid":  65108,
+                                                     "role":  "client",
+                                                     "platformId":  "testclient",
+                                                     "runToken":  "issue3781-20261023T171247",
+                                                     "processStartedUtc":  "2026-10-23T17:22:54.3074319Z"
+                                                 },
+                                     "result":  {
+                                                    "captureId":  "9a4bd97eeaf84e71a313c0bbc31906b8",
+                                                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\PendingJoin-journal-A.bmp",
+                                                    "captureRequested":  true,
+                                                    "captureRequestedUtc":  "2026-10-23T17:54:42.732273Z",
+                                                    "captureRequestEngineFrame":  55520,
+                                                    "captureComplete":  true,
+                                                    "complete":  true,
+                                                    "completionCaptureId":  "9a4bd97eeaf84e71a313c0bbc31906b8",
+                                                    "completionObservedUtc":  "2026-10-23T17:54:42.9457944Z",
+                                                    "length":  3686454,
+                                                    "lastWriteUtc":  "2026-10-23T17:54:42.7645317Z"
+                                                },
+                                     "error":  null,
+                                     "activeStateAtCaptureRequest":  "TaleWorlds.CampaignSystem.GameState.QuestsState",
+                                     "cameraReadiness":  null
+                                 },
+                    "initialAttempt":  null
+                },
+    "image":  {
+                  "sourceBmpPath":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\PendingJoin-journal-A.bmp",
+                  "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\PendingJoin-journal-A.png",
+                  "width":  1280,
+                  "height":  960,
+                  "sha256":  "dd0953c7f713529df1aa4642e9c858d724d0e809109e78dd2a195d3633cd2eb7"
+              }
+}

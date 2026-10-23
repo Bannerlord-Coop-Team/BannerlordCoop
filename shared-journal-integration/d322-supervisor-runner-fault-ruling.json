@@ -1,0 +1,16 @@
+{
+  "reportedBy": "Supervisor",
+  "reportedUtc": "2026-10-23T17:06:00Z",
+  "jobId": "docker-ci-d322eb5e41164192b06f",
+  "classification": "RUNNER FAULT",
+  "budgetCharged": false,
+  "sourceChangeRequired": false,
+  "head": "b57cac1124a4f04a634f56d164819a1055473cba",
+  "eventLogFindings": {
+    "dotnet": "AccessViolationException in System.Private.CoreLib at16:57:18Z",
+    "hardware": "FATAL WHEA at16:16Z reboot"
+  },
+  "diagnosticDirectory": "Removed by job cleanup",
+  "accessRule": "SSH HIVE supervisor-only, no further attempts",
+  "authorizedNext": "One new-ID same focused87 HIVE submission; if PASS single full Release; repeated crash STOP"
+}

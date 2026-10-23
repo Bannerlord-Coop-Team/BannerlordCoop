@@ -1,0 +1,60 @@
+{
+    "role":  "A",
+    "processId":  65108,
+    "runToken":  "issue3781-20261023T171247",
+    "checkpoint":  "TournamentSuccess-accept",
+    "capture":  {
+                    "index":  0,
+                    "processId":  65108,
+                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28/TournamentSuccess-accept-A.bmp",
+                    "exitCode":  0,
+                    "response":  {
+                                     "version":  1,
+                                     "id":  "3ea9c72db08c4c3b82dc831f0166bbd0",
+                                     "ok":  true,
+                                     "process":  {
+                                                     "pid":  65108,
+                                                     "role":  "client",
+                                                     "platformId":  "testclient",
+                                                     "runToken":  "issue3781-20261023T171247",
+                                                     "processStartedUtc":  "2026-10-23T17:22:54.3074319Z"
+                                                 },
+                                     "result":  {
+                                                    "captureId":  "8558a39fe6aa45a6aad70fc833acab32",
+                                                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentSuccess-accept-A.bmp",
+                                                    "captureRequested":  true,
+                                                    "captureRequestedUtc":  "2026-10-23T17:44:44.2536557Z",
+                                                    "captureRequestEngineFrame":  37800,
+                                                    "captureComplete":  true,
+                                                    "complete":  true,
+                                                    "completionCaptureId":  "8558a39fe6aa45a6aad70fc833acab32",
+                                                    "completionObservedUtc":  "2026-10-23T17:44:44.4716430Z",
+                                                    "length":  3686454,
+                                                    "lastWriteUtc":  "2026-10-23T17:44:44.2893842Z"
+                                                },
+                                     "error":  null,
+                                     "activeStateAtCaptureRequest":  "TaleWorlds.CampaignSystem.GameState.MapState",
+                                     "cameraReadiness":  {
+                                                             "process":  {
+                                                                             "pid":  65108,
+                                                                             "role":  "client",
+                                                                             "platformId":  "testclient",
+                                                                             "runToken":  "issue3781-20261023T171247",
+                                                                             "processStartedUtc":  "2026-10-23T17:22:54.3074319Z"
+                                                                         },
+                                                             "stableSamples":  3,
+                                                             "observedUtc":  "2026-10-23T17:44:44.2219127Z",
+                                                             "camera":  "locked=True animation=False fastMove=False",
+                                                             "map":  "menuView=False pendingMenuView=False encounterOverlay=False cameraFollowParty=Created_48503 cameraMode=FollowParty followTargetReached=True animation=False fastMove=False loading=False"
+                                                         }
+                                 },
+                    "initialAttempt":  null
+                },
+    "image":  {
+                  "sourceBmpPath":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentSuccess-accept-A.bmp",
+                  "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentSuccess-accept-A.png",
+                  "width":  1280,
+                  "height":  960,
+                  "sha256":  "dd588f5b7cbbec85c8521f78001fe7c6fcf02282169e58be7502dc5d7d1f5e95"
+              }
+}

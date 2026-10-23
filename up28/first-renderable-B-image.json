@@ -1,0 +1,48 @@
+{
+    "role":  "B",
+    "processId":  61488,
+    "runToken":  "issue3781-20261023T171247",
+    "checkpoint":  "first-renderable",
+    "capture":  {
+                    "index":  1,
+                    "processId":  61488,
+                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28/first-renderable-B.bmp",
+                    "exitCode":  0,
+                    "response":  {
+                                     "version":  1,
+                                     "id":  "26d743d8d2c34b26b7a5c1ac622d5dbc",
+                                     "ok":  true,
+                                     "process":  {
+                                                     "pid":  61488,
+                                                     "role":  "client",
+                                                     "platformId":  "testclient2",
+                                                     "runToken":  "issue3781-20261023T171247",
+                                                     "processStartedUtc":  "2026-10-23T17:22:54.3249393Z"
+                                                 },
+                                     "result":  {
+                                                    "captureId":  "76654b61cf1d47e5a123b0cb0ff6ad7f",
+                                                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\first-renderable-B.bmp",
+                                                    "captureRequested":  true,
+                                                    "captureRequestedUtc":  "2026-10-23T17:24:22.0474471Z",
+                                                    "captureRequestEngineFrame":  2041,
+                                                    "captureComplete":  true,
+                                                    "complete":  true,
+                                                    "completionCaptureId":  "76654b61cf1d47e5a123b0cb0ff6ad7f",
+                                                    "completionObservedUtc":  "2026-10-23T17:24:22.3048935Z",
+                                                    "length":  3686454,
+                                                    "lastWriteUtc":  "2026-10-23T17:24:22.0864587Z"
+                                                },
+                                     "error":  null,
+                                     "activeStateAtCaptureRequest":  "TaleWorlds.MountAndBlade.InitialState",
+                                     "cameraReadiness":  null
+                                 },
+                    "initialAttempt":  null
+                },
+    "image":  {
+                  "sourceBmpPath":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\first-renderable-B.bmp",
+                  "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\first-renderable-B.png",
+                  "width":  1280,
+                  "height":  960,
+                  "sha256":  "2a4993743b6988a7201c658eb314df3aa554b0f0318dff54395be090f9e5a442"
+              }
+}

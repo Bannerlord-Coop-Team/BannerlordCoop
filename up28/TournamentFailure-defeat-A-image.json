@@ -1,0 +1,48 @@
+{
+    "role":  "A",
+    "processId":  65108,
+    "runToken":  "issue3781-20261023T171247",
+    "checkpoint":  "TournamentFailure-defeat",
+    "capture":  {
+                    "index":  0,
+                    "processId":  65108,
+                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28/TournamentFailure-defeat-A.bmp",
+                    "exitCode":  0,
+                    "response":  {
+                                     "version":  1,
+                                     "id":  "424507bf5ed8410883107b0ff777179d",
+                                     "ok":  true,
+                                     "process":  {
+                                                     "pid":  65108,
+                                                     "role":  "client",
+                                                     "platformId":  "testclient",
+                                                     "runToken":  "issue3781-20261023T171247",
+                                                     "processStartedUtc":  "2026-10-23T17:22:54.3074319Z"
+                                                 },
+                                     "result":  {
+                                                    "captureId":  "76d62c3494bf4e9a8754b798dd138c58",
+                                                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentFailure-defeat-A.bmp",
+                                                    "captureRequested":  true,
+                                                    "captureRequestedUtc":  "2026-10-23T17:41:25.0471375Z",
+                                                    "captureRequestEngineFrame":  31977,
+                                                    "captureComplete":  true,
+                                                    "complete":  true,
+                                                    "completionCaptureId":  "76d62c3494bf4e9a8754b798dd138c58",
+                                                    "completionObservedUtc":  "2026-10-23T17:41:25.2735517Z",
+                                                    "length":  3686454,
+                                                    "lastWriteUtc":  "2026-10-23T17:41:25.0882865Z"
+                                                },
+                                     "error":  null,
+                                     "activeStateAtCaptureRequest":  "TaleWorlds.MountAndBlade.MissionState",
+                                     "cameraReadiness":  null
+                                 },
+                    "initialAttempt":  null
+                },
+    "image":  {
+                  "sourceBmpPath":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentFailure-defeat-A.bmp",
+                  "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentFailure-defeat-A.png",
+                  "width":  1280,
+                  "height":  960,
+                  "sha256":  "5c43f8901ca14c93ae9d3f8e72fcc12cad2972d83308dd46a84f9b2cffa7a534"
+              }
+}

@@ -1,0 +1,71 @@
+{
+    "schemaVersion":  1,
+    "runToken":  "issue3781-20261023T171247",
+    "startedUtc":  "2026-10-23T17:55:10.6192497Z",
+    "completedUtc":  "2026-10-23T17:55:20.4029853Z",
+    "initialProcessIds":  [
+                              39068,
+                              43196,
+                              61488,
+                              65108
+                          ],
+    "remainingProcessIds":  [
+
+                            ],
+    "stopAttempted":  true,
+    "verifiedAbsent":  true,
+    "inventoryAttempts":  2,
+    "inventoryErrors":  [
+
+                        ],
+    "stopErrors":  [
+
+                   ],
+    "gracefulShutdownAttempts":  [
+                                     {
+                                         "processId":  39068,
+                                         "runToken":  "issue3781-20261023T171247",
+                                         "requestWritten":  true,
+                                         "identityVerified":  true,
+                                         "error":  null,
+                                         "startedUtc":  "2026-10-23T17:55:11.6303326Z",
+                                         "completedUtc":  "2026-10-23T17:55:11.7086868Z"
+                                     },
+                                     {
+                                         "processId":  43196,
+                                         "runToken":  null,
+                                         "requestWritten":  false,
+                                         "identityVerified":  false,
+                                         "error":  "Exception calling \"Connect\" with \"1\" argument(s): \"The operation has timed out.\"",
+                                         "startedUtc":  "2026-10-23T17:55:11.7172643Z",
+                                         "completedUtc":  "2026-10-23T17:55:13.2107782Z"
+                                     },
+                                     {
+                                         "processId":  61488,
+                                         "runToken":  "issue3781-20261023T171247",
+                                         "requestWritten":  true,
+                                         "identityVerified":  true,
+                                         "error":  null,
+                                         "startedUtc":  "2026-10-23T17:55:13.2107782Z",
+                                         "completedUtc":  "2026-10-23T17:55:13.2162860Z"
+                                     },
+                                     {
+                                         "processId":  65108,
+                                         "runToken":  "issue3781-20261023T171247",
+                                         "requestWritten":  true,
+                                         "identityVerified":  true,
+                                         "error":  null,
+                                         "startedUtc":  "2026-10-23T17:55:13.2167881Z",
+                                         "completedUtc":  "2026-10-23T17:55:13.2258539Z"
+                                     }
+                                 ],
+    "processTreeStopAttempts":  [
+                                    {
+                                        "processId":  65108,
+                                        "exitCode":  null,
+                                        "error":  "ERROR: The process \"65108\" not found.",
+                                        "startedUtc":  "2026-10-23T17:55:17.2602644Z",
+                                        "completedUtc":  "2026-10-23T17:55:18.7323166Z"
+                                    }
+                                ]
+}

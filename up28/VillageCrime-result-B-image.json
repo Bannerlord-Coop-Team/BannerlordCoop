@@ -1,0 +1,60 @@
+{
+    "role":  "B",
+    "processId":  61488,
+    "runToken":  "issue3781-20261023T171247",
+    "checkpoint":  "VillageCrime-result",
+    "capture":  {
+                    "index":  1,
+                    "processId":  61488,
+                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28/VillageCrime-result-B.bmp",
+                    "exitCode":  0,
+                    "response":  {
+                                     "version":  1,
+                                     "id":  "d0a38d6a1ea34d068c8f7ae0712f57b5",
+                                     "ok":  true,
+                                     "process":  {
+                                                     "pid":  61488,
+                                                     "role":  "client",
+                                                     "platformId":  "testclient2",
+                                                     "runToken":  "issue3781-20261023T171247",
+                                                     "processStartedUtc":  "2026-10-23T17:22:54.3249393Z"
+                                                 },
+                                     "result":  {
+                                                    "captureId":  "d329948c71c94cdb94626640b039621e",
+                                                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\VillageCrime-result-B.bmp",
+                                                    "captureRequested":  true,
+                                                    "captureRequestedUtc":  "2026-10-23T17:32:45.1247376Z",
+                                                    "captureRequestEngineFrame":  16510,
+                                                    "captureComplete":  true,
+                                                    "complete":  true,
+                                                    "completionCaptureId":  "d329948c71c94cdb94626640b039621e",
+                                                    "completionObservedUtc":  "2026-10-23T17:32:45.3122397Z",
+                                                    "length":  3686454,
+                                                    "lastWriteUtc":  "2026-10-23T17:32:45.1620597Z"
+                                                },
+                                     "error":  null,
+                                     "activeStateAtCaptureRequest":  "TaleWorlds.CampaignSystem.GameState.MapState",
+                                     "cameraReadiness":  {
+                                                             "process":  {
+                                                                             "pid":  61488,
+                                                                             "role":  "client",
+                                                                             "platformId":  "testclient2",
+                                                                             "runToken":  "issue3781-20261023T171247",
+                                                                             "processStartedUtc":  "2026-10-23T17:22:54.3249393Z"
+                                                                         },
+                                                             "stableSamples":  3,
+                                                             "observedUtc":  "2026-10-23T17:32:45.0935085Z",
+                                                             "camera":  "locked=True animation=False fastMove=False",
+                                                             "map":  "menuView=True pendingMenuView=True encounterOverlay=False cameraFollowParty=Created_43628 cameraMode=FollowParty followTargetReached=True animation=False fastMove=False loading=False"
+                                                         }
+                                 },
+                    "initialAttempt":  null
+                },
+    "image":  {
+                  "sourceBmpPath":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\VillageCrime-result-B.bmp",
+                  "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\VillageCrime-result-B.png",
+                  "width":  1280,
+                  "height":  960,
+                  "sha256":  "59c669f58948c59bc645caf23e2c1c41528ed2d6b8541621398e2f88073ab103"
+              }
+}

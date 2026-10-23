@@ -1,0 +1,1106 @@
+{
+  "initial-players-server": {
+    "source": "initial-players-server.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 10900,
+        "renown": 1187.4495,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "150",
+        "giverRelation": "-",
+        "atWarWithGiver": "-"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "uninitialized",
+        "giverRelation": "-",
+        "atWarWithGiver": "-"
+      }
+    ],
+    "rawOutput": "side=dedicated-server kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=10900 renown=1187.4495 influence=64 honorLevel=0 canonicalServerHonorXp=150 giverRelation=- atWarWithGiver=-\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=uninitialized giverRelation=- atWarWithGiver=-\r\n"
+  },
+  "crime-before-server": {
+    "source": "crime-before-server.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 10900,
+        "renown": 1187.4495,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "150",
+        "giverRelation": -9,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "uninitialized",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=LadysKnightOutIssue id=issue_1215 state=SolvingWithQuestSolution owner=testclient tried=True difficulty=0.1 stayAlive=True security=40 town=town_ES2 townOwner=Clan_clan_empire_south_1 dueTicks=9223372036854775807 lordCost=18 currentQuestAttached=True\r\nobservedIssueId=issue_1215 issueLogs=0 retained=False\r\nobservedQuest=issue_1215_quest ongoing=True finalized=False startedHere=False questLogs=0 goal=2 due=Autumn 12, 1091\r\n\nside=dedicated-server kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=10900 renown=1187.4495 influence=64 honorLevel=0 canonicalServerHonorXp=150 giverRelation=-9 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=uninitialized giverRelation=-29 atWarWithGiver=False\r\n"
+  },
+  "crime-before-A": {
+    "source": "crime-before-A.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 10900,
+        "renown": 1187.449,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -9,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 10900,
+        "renown": 1187.449,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -9,
+        "atWarWithGiver": "True"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=LadysKnightOutIssue id=issue_1215 state=SolvingWithQuestSolution owner=testclient tried=True difficulty=0.1 stayAlive=True security=40 town=town_ES2 townOwner=Clan_clan_empire_south_1 dueTicks=9223372036854775807 lordCost=18 currentQuestAttached=True\r\nobservedIssueId=issue_1215 issueLogs=0 retained=False\r\nobservedQuest=issue_1215_quest ongoing=True finalized=False startedHere=True questLogs=1 goal=2 due=Autumn 12, 1091\r\nquestLog: <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> from Northern Empire, has asked you to be her champion in an upcoming tournament. She expects you to fight in her name and reach at least 2.\nYou told her that you will honor her name in a tournament.\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=10900 renown=1187.449 influence=64 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-9 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-29 atWarWithGiver=False\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=10900 renown=1187.449 influence=64 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-9 atWarWithGiver=True\r\nlocalHonorXp=0\r\n"
+  },
+  "crime-before-B": {
+    "source": "crime-before-B.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 10900,
+        "renown": 1187.449,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -9,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=LadysKnightOutIssue id=issue_1215 state=SolvingWithQuestSolution owner=testclient tried=False difficulty=0.1 stayAlive=True security=40 town=town_ES2 townOwner=Clan_clan_empire_south_1 dueTicks=9223372036854775807 lordCost=18 currentQuestAttached=False\r\nobservedIssueId=issue_1215 issueLogs=0 retained=False\r\nobservedQuest=none\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=10900 renown=1187.449 influence=64 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-9 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-29 atWarWithGiver=False\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-29 atWarWithGiver=False\r\nlocalHonorXp=0\r\n"
+  },
+  "crime-settled-server": {
+    "source": "crime-settled-server.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.4495,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "uninitialized",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=none id=- state= owner=- tried= difficulty= stayAlive= security=40 town=town_ES2 townOwner=Clan_clan_empire_south_1 dueTicks= lordCost= currentQuestAttached=False\r\nobservedIssueId=issue_1215 issueLogs=0 retained=True\r\nobservedQuest=issue_1215_quest ongoing=False finalized=True startedHere=False questLogs=1 goal=2 due=Autumn 12, 1091\r\nquestLog: You have been accused of a crime, and <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> has declared that you are no longer her champion.\r\n\nside=dedicated-server kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11008 renown=1187.4495 influence=64 honorLevel=0 canonicalServerHonorXp=100 giverRelation=-14 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=uninitialized giverRelation=-29 atWarWithGiver=False\r\n"
+  },
+  "crime-settled-A": {
+    "source": "crime-settled-A.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.449,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.449,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=none id=- state= owner=- tried= difficulty= stayAlive= security=40 town=town_ES2 townOwner=Clan_clan_empire_south_1 dueTicks= lordCost= currentQuestAttached=False\r\nobservedIssueId=issue_1215 issueLogs=0 retained=True\r\nobservedQuest=issue_1215_quest ongoing=False finalized=True startedHere=False questLogs=2 goal=2 due=Autumn 12, 1091\r\nquestLog: <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> from Northern Empire, has asked you to be her champion in an upcoming tournament. She expects you to fight in her name and reach at least 2.\nYou told her that you will honor her name in a tournament.\r\nquestLog: You have been accused of a crime, and <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> has declared that you are no longer her champion.\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11008 renown=1187.449 influence=64 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-14 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-29 atWarWithGiver=False\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11008 renown=1187.449 influence=64 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-14 atWarWithGiver=True\r\nlocalHonorXp=0\r\n"
+  },
+  "failure-before-server": {
+    "source": "failure-before-server.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.4495,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 9,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "uninitialized",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=LadysKnightOutIssue id=issue_1216 state=SolvingWithQuestSolution owner=testclient tried=True difficulty=0.1 stayAlive=True security=40 town=town_ES2 townOwner=Clan_clan_empire_south_1 dueTicks=9223372036854775807 lordCost=18 currentQuestAttached=True\r\nobservedIssueId=issue_1216 issueLogs=0 retained=False\r\nobservedQuest=issue_1216_quest ongoing=True finalized=False startedHere=False questLogs=0 goal=2 due=Autumn 12, 1091\r\n\nside=dedicated-server kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11008 renown=1187.4495 influence=64 honorLevel=0 canonicalServerHonorXp=100 giverRelation=9 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=uninitialized giverRelation=-29 atWarWithGiver=False\r\n"
+  },
+  "failure-before-A": {
+    "source": "failure-before-A.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.449,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 9,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.449,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 9,
+        "atWarWithGiver": "True"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=LadysKnightOutIssue id=issue_1216 state=SolvingWithQuestSolution owner=testclient tried=True difficulty=0.1 stayAlive=True security=40 town=town_ES2 townOwner=Clan_clan_empire_south_1 dueTicks=9223372036854775807 lordCost=18 currentQuestAttached=True\r\nobservedIssueId=issue_1216 issueLogs=0 retained=False\r\nobservedQuest=issue_1216_quest ongoing=True finalized=False startedHere=True questLogs=1 goal=2 due=Autumn 12, 1091\r\nquestLog: <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> from Northern Empire, has asked you to be her champion in an upcoming tournament. She expects you to fight in her name and reach at least 2.\nYou told her that you will honor her name in a tournament.\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11008 renown=1187.449 influence=64 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=9 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-29 atWarWithGiver=False\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11008 renown=1187.449 influence=64 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=9 atWarWithGiver=True\r\nlocalHonorXp=0\r\n"
+  },
+  "failure-before-B": {
+    "source": "failure-before-B.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.449,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 9,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=LadysKnightOutIssue id=issue_1216 state=SolvingWithQuestSolution owner=testclient tried=False difficulty=0.1 stayAlive=True security=40 town=town_ES2 townOwner=Clan_clan_empire_south_1 dueTicks=9223372036854775807 lordCost=18 currentQuestAttached=False\r\nobservedIssueId=issue_1216 issueLogs=0 retained=False\r\nobservedQuest=none\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11008 renown=1187.449 influence=64 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=9 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-29 atWarWithGiver=False\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-29 atWarWithGiver=False\r\nlocalHonorXp=0\r\n"
+  },
+  "failure-settlement-read-2-server": {
+    "source": "failure-settlement-read-2-server.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.4495,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 4,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "uninitialized",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=none id=- state= owner=- tried= difficulty= stayAlive= security=40 town=town_ES2 townOwner=Clan_clan_empire_south_1 dueTicks= lordCost= currentQuestAttached=False\r\nobservedIssueId=issue_1216 issueLogs=0 retained=True\r\nobservedQuest=issue_1216_quest ongoing=False finalized=True startedHere=False questLogs=1 goal=2 due=Autumn 12, 1091\r\nquestLog: You have failed to reach round 2 in the tournament. <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> will certainly be disappointed.\r\n\nside=dedicated-server kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11008 renown=1187.4495 influence=64 honorLevel=0 canonicalServerHonorXp=100 giverRelation=4 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=uninitialized giverRelation=-29 atWarWithGiver=False\r\n"
+  },
+  "failure-settlement-read-2-A": {
+    "source": "failure-settlement-read-2-A.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.449,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 4,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.449,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 4,
+        "atWarWithGiver": "True"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=none id=- state= owner=- tried= difficulty= stayAlive= security=40 town=town_ES2 townOwner=Clan_clan_empire_south_1 dueTicks= lordCost= currentQuestAttached=False\r\nobservedIssueId=issue_1216 issueLogs=0 retained=True\r\nobservedQuest=issue_1216_quest ongoing=False finalized=True startedHere=False questLogs=2 goal=2 due=Autumn 12, 1091\r\nquestLog: <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> from Northern Empire, has asked you to be her champion in an upcoming tournament. She expects you to fight in her name and reach at least 2.\nYou told her that you will honor her name in a tournament.\r\nquestLog: You have failed to reach round 2 in the tournament. <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> will certainly be disappointed.\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11008 renown=1187.449 influence=64 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=4 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-29 atWarWithGiver=False\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11008 renown=1187.449 influence=64 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=4 atWarWithGiver=True\r\nlocalHonorXp=0\r\n"
+  },
+  "success-before-server": {
+    "source": "success-before-server.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.4495,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 4,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "uninitialized",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=LadysKnightOutIssue id=issue_1217 state=SolvingWithQuestSolution owner=testclient tried=True difficulty=0.1 stayAlive=True security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks=9223372036854775807 lordCost=18 currentQuestAttached=True\r\nobservedIssueId=issue_1217 issueLogs=0 retained=False\r\nobservedQuest=issue_1217_quest ongoing=True finalized=False startedHere=False questLogs=0 goal=2 due=Autumn 12, 1091\r\n\nside=dedicated-server kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11008 renown=1187.4495 influence=64 honorLevel=0 canonicalServerHonorXp=100 giverRelation=4 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=uninitialized giverRelation=-29 atWarWithGiver=False\r\n"
+  },
+  "success-before-A": {
+    "source": "success-before-A.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.449,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 4,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.449,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 4,
+        "atWarWithGiver": "True"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=LadysKnightOutIssue id=issue_1217 state=SolvingWithQuestSolution owner=testclient tried=True difficulty=0.1 stayAlive=True security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks=9223372036854775807 lordCost=18 currentQuestAttached=True\r\nobservedIssueId=issue_1217 issueLogs=0 retained=False\r\nobservedQuest=issue_1217_quest ongoing=True finalized=False startedHere=True questLogs=1 goal=2 due=Autumn 12, 1091\r\nquestLog: <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> from Northern Empire, has asked you to be her champion in an upcoming tournament. She expects you to fight in her name and reach at least 2.\nYou told her that you will honor her name in a tournament.\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11008 renown=1187.449 influence=64 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=4 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-29 atWarWithGiver=False\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11008 renown=1187.449 influence=64 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=4 atWarWithGiver=True\r\nlocalHonorXp=0\r\n"
+  },
+  "success-before-B": {
+    "source": "success-before-B.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.449,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 4,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=LadysKnightOutIssue id=issue_1217 state=SolvingWithQuestSolution owner=testclient tried=False difficulty=0.1 stayAlive=True security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks=9223372036854775807 lordCost=18 currentQuestAttached=False\r\nobservedIssueId=issue_1217 issueLogs=0 retained=False\r\nobservedQuest=none\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11008 renown=1187.449 influence=64 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=4 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-29 atWarWithGiver=False\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-29 atWarWithGiver=False\r\nlocalHonorXp=0\r\n"
+  },
+  "success-quest-result-server": {
+    "source": "success-quest-result-server.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1188.4495,
+        "influence": 65,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 10,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "uninitialized",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=none id=- state= owner=- tried= difficulty= stayAlive= security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks= lordCost= currentQuestAttached=False\r\nobservedIssueId=issue_1217 issueLogs=0 retained=True\r\nobservedQuest=issue_1217_quest ongoing=False finalized=True startedHere=False questLogs=1 goal=2 due=Autumn 12, 1091\r\nquestLog: You received a message from <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a>.\n\"Thank you for fighting so valiantly in my name. Please take these 750 denars with our gratitude.\"\r\n\nside=dedicated-server kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1188.4495 influence=65 honorLevel=0 canonicalServerHonorXp=100 giverRelation=10 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=uninitialized giverRelation=-29 atWarWithGiver=False\r\n"
+  },
+  "success-quest-result-A": {
+    "source": "success-quest-result-A.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1188.449,
+        "influence": 65,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 10,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1188.449,
+        "influence": 65,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 10,
+        "atWarWithGiver": "True"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=none id=- state= owner=- tried= difficulty= stayAlive= security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks= lordCost= currentQuestAttached=False\r\nobservedIssueId=issue_1217 issueLogs=0 retained=True\r\nobservedQuest=issue_1217_quest ongoing=False finalized=True startedHere=False questLogs=2 goal=2 due=Autumn 12, 1091\r\nquestLog: <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> from Northern Empire, has asked you to be her champion in an upcoming tournament. She expects you to fight in her name and reach at least 2.\nYou told her that you will honor her name in a tournament.\r\nquestLog: You received a message from <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a>.\n\"Thank you for fighting so valiantly in my name. Please take these 750 denars with our gratitude.\"\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1188.449 influence=65 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=10 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-29 atWarWithGiver=False\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1188.449 influence=65 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=10 atWarWithGiver=True\r\nlocalHonorXp=0\r\n"
+  },
+  "success-quest-result-B": {
+    "source": "success-quest-result-B.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1188.449,
+        "influence": 65,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 10,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=none id=- state= owner=- tried= difficulty= stayAlive= security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks= lordCost= currentQuestAttached=False\r\nobservedIssueId=issue_1217 issueLogs=0 retained=True\r\nobservedQuest=none\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1188.449 influence=65 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=10 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-29 atWarWithGiver=False\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-29 atWarWithGiver=False\r\nlocalHonorXp=0\r\n"
+  },
+  "success-after-tournament-award-server": {
+    "source": "success-after-tournament-award-server.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1191.4495,
+        "influence": 65,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 10,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "uninitialized",
+        "giverRelation": -29,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_lord_1_32 name='Sora' liveIssue=none id=- state= owner=- tried= difficulty= stayAlive= security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks= lordCost= currentQuestAttached=False\r\nobservedIssueId=issue_1217 issueLogs=0 retained=True\r\nobservedQuest=issue_1217_quest ongoing=False finalized=True startedHere=False questLogs=1 goal=2 due=Autumn 12, 1091\r\nquestLog: You received a message from <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a>.\n\"Thank you for fighting so valiantly in my name. Please take these 750 denars with our gratitude.\"\r\n\nside=dedicated-server kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1191.4495 influence=65 honorLevel=0 canonicalServerHonorXp=100 giverRelation=10 atWarWithGiver=True\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=uninitialized giverRelation=-29 atWarWithGiver=False\r\n"
+  },
+  "pending-before-server": {
+    "source": "pending-before-server.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1191.4495,
+        "influence": 100,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 0,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "uninitialized",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      }
+    ],
+    "rawOutput": "giver=Hero_CharacterObject_2704 name='Nus' liveIssue=LadysKnightOutIssue id=issue_1218 state=Ongoing owner=- tried=False difficulty=0.1 stayAlive=True security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks=79226543177336 lordCost=18 currentQuestAttached=False\r\nobservedIssueId=issue_1218 issueLogs=0 retained=False\r\nobservedQuest=none\r\n\nside=dedicated-server kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1191.4495 influence=100 honorLevel=0 canonicalServerHonorXp=100 giverRelation=0 atWarWithGiver=False\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=uninitialized giverRelation=-14 atWarWithGiver=True\r\n"
+  },
+  "pending-before-A": {
+    "source": "pending-before-A.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1191.449,
+        "influence": 100,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 0,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1191.449,
+        "influence": 100,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 0,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_CharacterObject_2704 name='Nus' liveIssue=LadysKnightOutIssue id=issue_1218 state=Ongoing owner=- tried=False difficulty=0.1 stayAlive=True security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks=79226543177336 lordCost=18 currentQuestAttached=False\r\nobservedIssueId=issue_1218 issueLogs=0 retained=False\r\nobservedQuest=none\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1191.449 influence=100 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=0 atWarWithGiver=False\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-14 atWarWithGiver=True\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1191.449 influence=100 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=0 atWarWithGiver=False\r\nlocalHonorXp=0\r\n"
+  },
+  "pending-accepted-server": {
+    "source": "pending-accepted-server.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1191.4495,
+        "influence": 100,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 0,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "uninitialized",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      }
+    ],
+    "rawOutput": "giver=Hero_CharacterObject_2704 name='Nus' liveIssue=LadysKnightOutIssue id=issue_1218 state=SolvingWithLordSolution owner=testclient tried=True difficulty=0.1 stayAlive=True security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks=79226543177336 lordCost=18 currentQuestAttached=False\r\nobservedIssueId=issue_1218 issueLogs=1 retained=False\r\nissueLog: <a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> from Aserai, has told you about of the tournament at the <a style=\"Link.Settlement\" href=\"event:Settlement-town_ES1\"><b>Danustica</b></a>. She wants you to be her champion. She expects you to reach round 2.\r\nobservedQuest=none\r\n\nside=dedicated-server kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1191.4495 influence=100 honorLevel=0 canonicalServerHonorXp=100 giverRelation=0 atWarWithGiver=False\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=uninitialized giverRelation=-14 atWarWithGiver=True\r\n"
+  },
+  "pending-accepted-A": {
+    "source": "pending-accepted-A.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1191.449,
+        "influence": 100,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 0,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1191.449,
+        "influence": 100,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 0,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_CharacterObject_2704 name='Nus' liveIssue=LadysKnightOutIssue id=issue_1218 state=SolvingWithLordSolution owner=testclient tried=True difficulty=0.1 stayAlive=True security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks=79226543177336 lordCost=18 currentQuestAttached=False\r\nobservedIssueId=issue_1218 issueLogs=1 retained=False\r\nissueLog: <a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> from Aserai, has told you about of the tournament at the <a style=\"Link.Settlement\" href=\"event:Settlement-town_ES1\"><b>Danustica</b></a>. She wants you to be her champion. She expects you to reach round 2.\r\nobservedQuest=none\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1191.449 influence=100 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=0 atWarWithGiver=False\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-14 atWarWithGiver=True\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1191.449 influence=100 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=0 atWarWithGiver=False\r\nlocalHonorXp=0\r\n"
+  },
+  "pending-joined-server": {
+    "source": "pending-joined-server.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1191.4495,
+        "influence": 100,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 0,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "uninitialized",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      }
+    ],
+    "rawOutput": "giver=Hero_CharacterObject_2704 name='Nus' liveIssue=LadysKnightOutIssue id=issue_1218 state=SolvingWithLordSolution owner=testclient tried=True difficulty=0.1 stayAlive=True security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks=79226543177336 lordCost=18 currentQuestAttached=False\r\nobservedIssueId=issue_1218 issueLogs=1 retained=False\r\nissueLog: <a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> from Aserai, has told you about of the tournament at the <a style=\"Link.Settlement\" href=\"event:Settlement-town_ES1\"><b>Danustica</b></a>. She wants you to be her champion. She expects you to reach round 2.\r\nobservedQuest=none\r\n\nside=dedicated-server kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1191.4495 influence=100 honorLevel=0 canonicalServerHonorXp=100 giverRelation=0 atWarWithGiver=False\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=uninitialized giverRelation=-14 atWarWithGiver=True\r\n"
+  },
+  "pending-joined-A": {
+    "source": "pending-joined-A.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1191.449,
+        "influence": 100,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 0,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1191.449,
+        "influence": 100,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 0,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_CharacterObject_2704 name='Nus' liveIssue=LadysKnightOutIssue id=issue_1218 state=SolvingWithLordSolution owner=testclient tried=True difficulty=0.1 stayAlive=True security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks=79226543177336 lordCost=18 currentQuestAttached=False\r\nobservedIssueId=issue_1218 issueLogs=1 retained=False\r\nissueLog: <a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> from Aserai, has told you about of the tournament at the <a style=\"Link.Settlement\" href=\"event:Settlement-town_ES1\"><b>Danustica</b></a>. She wants you to be her champion. She expects you to reach round 2.\r\nobservedQuest=none\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1191.449 influence=100 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=0 atWarWithGiver=False\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-14 atWarWithGiver=True\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1191.449 influence=100 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=0 atWarWithGiver=False\r\nlocalHonorXp=0\r\n"
+  },
+  "pending-joined-B": {
+    "source": "pending-joined-B.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1191.449,
+        "influence": 100,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 0,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      }
+    ],
+    "rawOutput": "giver=Hero_CharacterObject_2704 name='Nus' liveIssue=LadysKnightOutIssue id=issue_1218 state=SolvingWithLordSolution owner=testclient tried=False difficulty=0.1 stayAlive=True security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks=79226543177336 lordCost=18 currentQuestAttached=False\r\nobservedIssueId=issue_1218 issueLogs=1 retained=False\r\nissueLog: <a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> from Aserai, has told you about of the tournament at the <a style=\"Link.Settlement\" href=\"event:Settlement-town_ES1\"><b>Danustica</b></a>. She wants you to be her champion. She expects you to reach round 2.\r\nobservedQuest=none\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1191.449 influence=100 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=0 atWarWithGiver=False\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-14 atWarWithGiver=True\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-14 atWarWithGiver=True\r\nlocalHonorXp=0\r\n"
+  },
+  "pending-after-server": {
+    "source": "pending-after-server.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1198.4495,
+        "influence": 82,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 6,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "uninitialized",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      }
+    ],
+    "rawOutput": "giver=Hero_CharacterObject_2704 name='Nus' liveIssue=none id=- state= owner=- tried= difficulty= stayAlive= security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks= lordCost= currentQuestAttached=False\r\nobservedIssueId=issue_1218 issueLogs=2 retained=True\r\nissueLog: <a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> from Aserai, has told you about of the tournament at the <a style=\"Link.Settlement\" href=\"event:Settlement-town_ES1\"><b>Danustica</b></a>. She wants you to be her champion. She expects you to reach round 2.\r\nissueLog: You told <a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> that instead of her request, the next tournament held will be held in her honor.\r\nobservedQuest=none\r\n\nside=dedicated-server kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1198.4495 influence=82 honorLevel=0 canonicalServerHonorXp=100 giverRelation=6 atWarWithGiver=False\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=uninitialized giverRelation=-14 atWarWithGiver=True\r\n"
+  },
+  "pending-after-A": {
+    "source": "pending-after-A.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1198.449,
+        "influence": 82,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 6,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1198.449,
+        "influence": 82,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 6,
+        "atWarWithGiver": "False"
+      }
+    ],
+    "rawOutput": "giver=Hero_CharacterObject_2704 name='Nus' liveIssue=none id=- state= owner=- tried= difficulty= stayAlive= security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks= lordCost= currentQuestAttached=False\r\nobservedIssueId=issue_1218 issueLogs=2 retained=True\r\nissueLog: <a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> from Aserai, has told you about of the tournament at the <a style=\"Link.Settlement\" href=\"event:Settlement-town_ES1\"><b>Danustica</b></a>. She wants you to be her champion. She expects you to reach round 2.\r\nissueLog: You told <a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> that instead of her request, the next tournament held will be held in her honor.\r\nobservedQuest=none\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1198.449 influence=82 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=6 atWarWithGiver=False\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-14 atWarWithGiver=True\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1198.449 influence=82 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=6 atWarWithGiver=False\r\nlocalHonorXp=0\r\n"
+  },
+  "pending-after-B": {
+    "source": "pending-after-B.json",
+    "players": [
+      {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1198.449,
+        "influence": 82,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": 6,
+        "atWarWithGiver": "False"
+      },
+      {
+        "controller": "testclient2",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      },
+      {
+        "controller": "LOCAL_MAIN_HERO",
+        "hero": "Hero_Created_4193",
+        "party": "MobileParty_Created_43628",
+        "clan": "Clan_Player",
+        "gold": 10000,
+        "renown": 547.8492,
+        "influence": 1.5,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "unavailable",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      }
+    ],
+    "rawOutput": "giver=Hero_CharacterObject_2704 name='Nus' liveIssue=none id=- state= owner=- tried= difficulty= stayAlive= security=40 town=town_ES1 townOwner=Clan_Player12 dueTicks= lordCost= currentQuestAttached=False\r\nobservedIssueId=issue_1218 issueLogs=1 retained=True\r\nissueLog: <a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> from Aserai, has told you about of the tournament at the <a style=\"Link.Settlement\" href=\"event:Settlement-town_ES1\"><b>Danustica</b></a>. She wants you to be her champion. She expects you to reach round 2.\r\nobservedQuest=none\r\n\nside=client kit=3781-shared-journal-r1 sourceHead=b57cac1124a4f04a634f56d164819a1055473cba\r\ncontroller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=11758 renown=1198.449 influence=82 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=6 atWarWithGiver=False\r\ncontroller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-14 atWarWithGiver=True\r\ncontroller=LOCAL_MAIN_HERO hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-14 atWarWithGiver=True\r\nlocalHonorXp=0\r\n"
+  }
+}

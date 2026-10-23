@@ -1,0 +1,48 @@
+{
+    "role":  "B",
+    "processId":  61488,
+    "runToken":  "issue3781-20261023T171247",
+    "checkpoint":  "PendingJoin-transfer",
+    "capture":  {
+                    "index":  1,
+                    "processId":  61488,
+                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28/PendingJoin-transfer-B.bmp",
+                    "exitCode":  0,
+                    "response":  {
+                                     "version":  1,
+                                     "id":  "30fe6901823e4812b14aa260f84e815e",
+                                     "ok":  true,
+                                     "process":  {
+                                                     "pid":  61488,
+                                                     "role":  "client",
+                                                     "platformId":  "testclient2",
+                                                     "runToken":  "issue3781-20261023T171247",
+                                                     "processStartedUtc":  "2026-10-23T17:22:54.3249393Z"
+                                                 },
+                                     "result":  {
+                                                    "captureId":  "ccdefad7f04c4fb3900e03e5696f55c3",
+                                                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\PendingJoin-transfer-B.bmp",
+                                                    "captureRequested":  true,
+                                                    "captureRequestedUtc":  "2026-10-23T17:51:24.6104566Z",
+                                                    "captureRequestEngineFrame":  49933,
+                                                    "captureComplete":  true,
+                                                    "complete":  true,
+                                                    "completionCaptureId":  "ccdefad7f04c4fb3900e03e5696f55c3",
+                                                    "completionObservedUtc":  "2026-10-23T17:51:24.8284337Z",
+                                                    "length":  3686454,
+                                                    "lastWriteUtc":  "2026-10-23T17:51:24.6426213Z"
+                                                },
+                                     "error":  null,
+                                     "activeStateAtCaptureRequest":  "TaleWorlds.MountAndBlade.InitialState",
+                                     "cameraReadiness":  null
+                                 },
+                    "initialAttempt":  null
+                },
+    "image":  {
+                  "sourceBmpPath":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\PendingJoin-transfer-B.bmp",
+                  "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\PendingJoin-transfer-B.png",
+                  "width":  1280,
+                  "height":  960,
+                  "sha256":  "c04d9f9cf800b23bc4a85beaab9ddfe82c97f4d426fa2af2a73bb4c214221b30"
+              }
+}

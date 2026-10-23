@@ -1,0 +1,48 @@
+{
+    "role":  "B",
+    "processId":  61488,
+    "runToken":  "issue3781-20261023T171247",
+    "checkpoint":  "VillageCrime-journal",
+    "capture":  {
+                    "index":  1,
+                    "processId":  61488,
+                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28/VillageCrime-journal-B.bmp",
+                    "exitCode":  0,
+                    "response":  {
+                                     "version":  1,
+                                     "id":  "8a34dc348f454d089ff2b94af9d6ba8d",
+                                     "ok":  true,
+                                     "process":  {
+                                                     "pid":  61488,
+                                                     "role":  "client",
+                                                     "platformId":  "testclient2",
+                                                     "runToken":  "issue3781-20261023T171247",
+                                                     "processStartedUtc":  "2026-10-23T17:22:54.3249393Z"
+                                                 },
+                                     "result":  {
+                                                    "captureId":  "1b5a5bc5cafb4d80b80bacd669038b4b",
+                                                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\VillageCrime-journal-B.bmp",
+                                                    "captureRequested":  true,
+                                                    "captureRequestedUtc":  "2026-10-23T17:33:24.1874147Z",
+                                                    "captureRequestEngineFrame":  17676,
+                                                    "captureComplete":  true,
+                                                    "complete":  true,
+                                                    "completionCaptureId":  "1b5a5bc5cafb4d80b80bacd669038b4b",
+                                                    "completionObservedUtc":  "2026-10-23T17:33:24.4333985Z",
+                                                    "length":  3686454,
+                                                    "lastWriteUtc":  "2026-10-23T17:33:24.219982Z"
+                                                },
+                                     "error":  null,
+                                     "activeStateAtCaptureRequest":  "TaleWorlds.CampaignSystem.GameState.QuestsState",
+                                     "cameraReadiness":  null
+                                 },
+                    "initialAttempt":  null
+                },
+    "image":  {
+                  "sourceBmpPath":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\VillageCrime-journal-B.bmp",
+                  "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\VillageCrime-journal-B.png",
+                  "width":  1280,
+                  "height":  960,
+                  "sha256":  "5f28e7642f2eb7db866bb756082b5313b4f7060fa3067dd96066053e9d126958"
+              }
+}

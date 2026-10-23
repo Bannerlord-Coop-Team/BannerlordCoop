@@ -1,0 +1,553 @@
+{
+  "status": "DONE-bench",
+  "overall": "PARTIAL",
+  "gameplay": "PASS",
+  "serverAndJoinerJournalIsolation": "PASS",
+  "reason": "All four gameplay flows and server/B owner-scoped save transfer passed. A live local archives are vanilla/legacy-unowned, so an assertion that every new archive on every endpoint has persisted OwnerControllerId=testclient is not met.",
+  "identity": "runtime-identity.json",
+  "flows": [
+    {
+      "flow": "VillageCrime",
+      "behaviorStatus": "PASS",
+      "serverAndJoinerHistoryStatus": "PASS",
+      "strictAllEndpointOwnerTagStatus": "PARTIAL",
+      "issueId": "issue_1215",
+      "giver": "Hero_lord_1_32",
+      "questId": "issue_1215_quest",
+      "serverArchiveId": 41032,
+      "joinerArchiveId": 41032,
+      "serverOwnerControllerId": "testclient",
+      "joinerOwnerControllerId": "testclient",
+      "serverIsEnded": true,
+      "joinerIsEnded": false,
+      "ownerLocalArchiveId": 41040,
+      "ownerLocalIsEnded": true,
+      "ownerLocalOwnerControllerId": null,
+      "ownerLocalTypeLabel": "legacy-unowned",
+      "ownerBefore": {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 10900,
+        "renown": 1187.4495,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "150",
+        "giverRelation": -9,
+        "atWarWithGiver": "True"
+      },
+      "ownerAfter": {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.4495,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": -14,
+        "atWarWithGiver": "True"
+      },
+      "screenshots": [
+        "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\VillageCrime-journal-A.png",
+        "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\VillageCrime-journal-B.png"
+      ]
+    },
+    {
+      "flow": "TournamentFailure",
+      "behaviorStatus": "PASS",
+      "serverAndJoinerHistoryStatus": "PASS",
+      "strictAllEndpointOwnerTagStatus": "PARTIAL",
+      "issueId": "issue_1216",
+      "giver": "Hero_lord_1_32",
+      "questId": "issue_1216_quest",
+      "serverArchiveId": 41037,
+      "joinerArchiveId": 41037,
+      "serverOwnerControllerId": "testclient",
+      "joinerOwnerControllerId": "testclient",
+      "serverIsEnded": true,
+      "joinerIsEnded": false,
+      "ownerLocalArchiveId": 41046,
+      "ownerLocalIsEnded": true,
+      "ownerLocalOwnerControllerId": null,
+      "ownerLocalTypeLabel": "legacy-unowned",
+      "ownerBefore": {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.4495,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 9,
+        "atWarWithGiver": "True"
+      },
+      "ownerAfter": {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.4495,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 4,
+        "atWarWithGiver": "True"
+      },
+      "screenshots": [
+        "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentFailure-journal-A.png",
+        "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentFailure-journal-B.png"
+      ]
+    },
+    {
+      "flow": "TournamentSuccess",
+      "behaviorStatus": "PASS",
+      "serverAndJoinerHistoryStatus": "PASS",
+      "strictAllEndpointOwnerTagStatus": "PARTIAL",
+      "issueId": "issue_1217",
+      "giver": "Hero_lord_1_32",
+      "questId": "issue_1217_quest",
+      "serverArchiveId": 41040,
+      "joinerArchiveId": 41040,
+      "serverOwnerControllerId": "testclient",
+      "joinerOwnerControllerId": "testclient",
+      "serverIsEnded": true,
+      "joinerIsEnded": false,
+      "ownerLocalArchiveId": 41050,
+      "ownerLocalIsEnded": true,
+      "ownerLocalOwnerControllerId": null,
+      "ownerLocalTypeLabel": "legacy-unowned",
+      "ownerBefore": {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11008,
+        "renown": 1187.4495,
+        "influence": 64,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 4,
+        "atWarWithGiver": "True"
+      },
+      "ownerAfter": {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1188.4495,
+        "influence": 65,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 10,
+        "atWarWithGiver": "True"
+      },
+      "screenshots": [
+        "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentSuccess-journal-A.png",
+        "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\TournamentSuccess-journal-B.png"
+      ]
+    },
+    {
+      "flow": "PendingJoin",
+      "behaviorStatus": "PASS",
+      "serverAndJoinerHistoryStatus": "PASS",
+      "strictAllEndpointOwnerTagStatus": "PARTIAL",
+      "issueId": "issue_1218",
+      "giver": "Hero_CharacterObject_2704",
+      "questId": null,
+      "serverArchiveId": 41045,
+      "joinerArchiveId": 41045,
+      "serverOwnerControllerId": "testclient",
+      "joinerOwnerControllerId": "testclient",
+      "serverIsEnded": true,
+      "joinerIsEnded": false,
+      "ownerLocalArchiveId": 41056,
+      "ownerLocalIsEnded": true,
+      "ownerLocalOwnerControllerId": null,
+      "ownerLocalTypeLabel": "legacy-unowned",
+      "ownerBefore": {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1191.4495,
+        "influence": 100,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 0,
+        "atWarWithGiver": "False"
+      },
+      "ownerAfter": {
+        "controller": "testclient",
+        "hero": "Hero_Created_4338",
+        "party": "MobileParty_Created_48503",
+        "clan": "Clan_Player12",
+        "gold": 11758,
+        "renown": 1198.4495,
+        "influence": 82,
+        "honorLevel": 0,
+        "canonicalServerHonorXp": "100",
+        "giverRelation": 6,
+        "atWarWithGiver": "False"
+      },
+      "screenshots": [
+        "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\PendingJoin-journal-A.png",
+        "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\PendingJoin-journal-B.png"
+      ]
+    }
+  ],
+  "readings": "readings.json",
+  "archives": "archives.json",
+  "screenshots": "captions.json",
+  "retainedSetupResponses": "retained-setup-responses.json",
+  "runtimeAttempts": 1,
+  "cycleFailures": 0,
+  "fixtureEdits": false,
+  "productSourceChanges": false,
+  "cleanup": {
+    "schemaVersion": 1,
+    "runToken": "issue3781-20261023T171247",
+    "startedUtc": "2026-10-23T17:55:10.6192497Z",
+    "completedUtc": "2026-10-23T17:55:20.4029853Z",
+    "initialProcessIds": [
+      39068,
+      43196,
+      61488,
+      65108
+    ],
+    "remainingProcessIds": [],
+    "stopAttempted": true,
+    "verifiedAbsent": true,
+    "inventoryAttempts": 2,
+    "inventoryErrors": [],
+    "stopErrors": [],
+    "gracefulShutdownAttempts": [
+      {
+        "processId": 39068,
+        "runToken": "issue3781-20261023T171247",
+        "requestWritten": true,
+        "identityVerified": true,
+        "error": null,
+        "startedUtc": "2026-10-23T17:55:11.6303326Z",
+        "completedUtc": "2026-10-23T17:55:11.7086868Z"
+      },
+      {
+        "processId": 43196,
+        "runToken": null,
+        "requestWritten": false,
+        "identityVerified": false,
+        "error": "Exception calling \"Connect\" with \"1\" argument(s): \"The operation has timed out.\"",
+        "startedUtc": "2026-10-23T17:55:11.7172643Z",
+        "completedUtc": "2026-10-23T17:55:13.2107782Z"
+      },
+      {
+        "processId": 61488,
+        "runToken": "issue3781-20261023T171247",
+        "requestWritten": true,
+        "identityVerified": true,
+        "error": null,
+        "startedUtc": "2026-10-23T17:55:13.2107782Z",
+        "completedUtc": "2026-10-23T17:55:13.2162860Z"
+      },
+      {
+        "processId": 65108,
+        "runToken": "issue3781-20261023T171247",
+        "requestWritten": true,
+        "identityVerified": true,
+        "error": null,
+        "startedUtc": "2026-10-23T17:55:13.2167881Z",
+        "completedUtc": "2026-10-23T17:55:13.2258539Z"
+      }
+    ],
+    "processTreeStopAttempts": [
+      {
+        "processId": 65108,
+        "exitCode": null,
+        "error": "ERROR: The process \"65108\" not found.",
+        "startedUtc": "2026-10-23T17:55:17.2602644Z",
+        "completedUtc": "2026-10-23T17:55:18.7323166Z"
+      }
+    ]
+  },
+  "ownedPids": "owned-pids-absent.json",
+  "bench": "bench-after-cleanup.txt",
+  "engineProfile": "crash-dialogs/engine-profile.json",
+  "crashVerdict": "crash-dialogs/launcher-crash-verdict.json",
+  "generatedUtc": "2026-10-23T18:04:27.135227+00:00",
+  "report": "REPORT.md",
+  "extendedDetail": "DETAILS.md",
+  "runtimeIdentity": {
+    "source": {
+      "source_root": "/home/pwisorlowska/worktrees/BannerlordCoop/3781-ladys-knight-out",
+      "head": "b57cac1124a4f04a634f56d164819a1055473cba",
+      "tree": "59747186e122f966fb96295a925d97207509fff0",
+      "base_head": "b57cac1124a4f04a634f56d164819a1055473cba",
+      "run_token": "issue3781-20261023T171247",
+      "dedicated_head": "bb76bea12d5aacd11f5c2868b72440ebd9a58bc9",
+      "dedicated_tree": "68d932b347bdc3e10ff20fbd92ca92f21dca03ae",
+      "ensure_sha": "b4c57ef5993441a4c5e2012f95928f6f22b2f295c17e177f848f77e7fdd9168c",
+      "run_sha": "fae33feb339d0954b56e58bcdf2f67dc3edab4d31420801f6d1ccf09f23c1c6a",
+      "inputs": "/home/pwisorlowska/.codex/runtime/issue-to-pr/local-dedicated-server",
+      "live_root": "/mnt/c/Users/Andrew/.codex-runtime/live-testing/BannerlordCoop"
+    },
+    "fixtureManifest": {
+      "fixture": {
+        "path": "artifacts/IssueToPr/ittest/IssueLiveTestKit.cs",
+        "sha256": "662e7f2a72924b72a74b036d8b15c09f0337b122b69b6d30f66e0614db248863"
+      },
+      "targets": {
+        "path": "artifacts/IssueToPr/ittest/IssueLiveTestKit.targets",
+        "sha256": "42e174a8b62d0285a164b850615b1194445adb096f011c2ffc228f87f456fdd7"
+      },
+      "source": {
+        "head": "b57cac1124a4f04a634f56d164819a1055473cba",
+        "tree": "59747186e122f966fb96295a925d97207509fff0"
+      },
+      "sourceRoot": "/home/pwisorlowska/worktrees/BannerlordCoop/3781-ladys-knight-out"
+    },
+    "fixtureManifestSha256": "3fbc476dcb9fc826b9522ca7533643cab319c4b827f940f73adfe3c502fb0027",
+    "modules": {
+      "server": {
+        "Common": "ae6da126-582f-46b5-9279-67af461de417",
+        "Coop.Core": "33c896b0-e283-48bd-9e90-909b7f646832",
+        "Coop.Steam": "e9e69ed4-434d-49f4-9baf-fb82d921bc2d",
+        "GameInterface": "5a92f6da-e76b-4eb2-bac2-b2a8e3909493",
+        "Missions": "4ad54c02-e011-4a38-9131-126bb2e98060"
+      },
+      "A": {
+        "Common": "ae6da126-582f-46b5-9279-67af461de417",
+        "Coop": "f5289df7-94df-45d5-a765-a9ecebbee04d",
+        "Coop.Core": "33c896b0-e283-48bd-9e90-909b7f646832",
+        "Coop.Steam": "e9e69ed4-434d-49f4-9baf-fb82d921bc2d",
+        "GameInterface": "5a92f6da-e76b-4eb2-bac2-b2a8e3909493",
+        "Missions": "4ad54c02-e011-4a38-9131-126bb2e98060"
+      },
+      "B": {
+        "Common": "ae6da126-582f-46b5-9279-67af461de417",
+        "Coop": "f5289df7-94df-45d5-a765-a9ecebbee04d",
+        "Coop.Core": "33c896b0-e283-48bd-9e90-909b7f646832",
+        "Coop.Steam": "e9e69ed4-434d-49f4-9baf-fb82d921bc2d",
+        "GameInterface": "5a92f6da-e76b-4eb2-bac2-b2a8e3909493",
+        "Missions": "4ad54c02-e011-4a38-9131-126bb2e98060"
+      }
+    },
+    "moduleFileSha256": {
+      "Common": "301ce0a15b04f8a36e351de3559fbacf4c26957b40635107921a08d4da0de724",
+      "Coop": "9d21bd2b21f282bb524f0a885d014e0405528f7e2a9b13a03313d46a8fada49b",
+      "Coop.Core": "1b84bdcfe15f1acddb08044f6d6a64cb4e5e07f521cdc4ae5d306aa1061769dd",
+      "Coop.Steam": "ab4bb3e993ff115709e01584ed7355bea817f6e4d277d538a718656865e8eac3",
+      "GameInterface": "a54d4ee158248b63a61535745f3703ba15f15dc4e1f724822d29df86e3291035",
+      "Missions": "b88d41e08b17b4fde47911227cf5a6139a376c94e0229fbbea2c22ee417b91c3"
+    },
+    "finalStatuses": {
+      "server": "final-status-server.json",
+      "A": "final-status-A.json",
+      "B": "final-status-B.json"
+    },
+    "processes": {
+      "serverEngine": 39068,
+      "serverLauncher": 43196,
+      "A": 65108,
+      "B": 61488,
+      "clientShell": 62428,
+      "clientLaunchHost": 52336
+    },
+    "gameVersion": "8C209EA08A500075BA005B09394206F5E32B632EC2FF97282CBC040BBAA8D2E3"
+  },
+  "screenshotCount": 40,
+  "ownerTagAssessment": {
+    "status": "PARTIAL",
+    "serverAndB": "All four new persisted server archives and their exact B transferred copies have OwnerControllerId=testclient. All four are ended on server and not ended on B.",
+    "A": "Four live local completed archives are not PlayerJournalLogEntry; fixture labels them legacy-unowned. No persisted OwnerControllerId is evidenced there.",
+    "assessmentOwner": "Parent assesses whether this is expected #4055 design; operator makes no product diagnosis or workaround.",
+    "rawReceipts": [
+      "final-journal-server.json",
+      "final-journal-A.json",
+      "final-journal-B.json",
+      "pending-joined-journal-B.json"
+    ],
+    "rawRows": {
+      "server": [
+        {
+          "archiveId": 41032,
+          "title": "Lady's Knight Out",
+          "giver": "lord_1_32",
+          "isEnded": true,
+          "ownerControllerId": "testclient",
+          "runtimeTypeOwnerLabel": "testclient",
+          "logCount": 1,
+          "text": "You have been accused of a crime, and <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> has declared that you are no longer her champion."
+        },
+        {
+          "archiveId": 41037,
+          "title": "Lady's Knight Out",
+          "giver": "lord_1_32",
+          "isEnded": true,
+          "ownerControllerId": "testclient",
+          "runtimeTypeOwnerLabel": "testclient",
+          "logCount": 1,
+          "text": "You have failed to reach round 2 in the tournament. <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> will certainly be disappointed."
+        },
+        {
+          "archiveId": 41040,
+          "title": "Lady's Knight Out",
+          "giver": "lord_1_32",
+          "isEnded": true,
+          "ownerControllerId": "testclient",
+          "runtimeTypeOwnerLabel": "testclient",
+          "logCount": 1,
+          "text": "You received a message from <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a>.\n\"Thank you for fighting so valiantly in my name. Please take these 750 denars with our gratitude.\""
+        },
+        {
+          "archiveId": 41045,
+          "title": "Lady's Knight Out",
+          "giver": "CharacterObject_2704",
+          "isEnded": true,
+          "ownerControllerId": "testclient",
+          "runtimeTypeOwnerLabel": "testclient",
+          "logCount": 2,
+          "text": "<a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> from Aserai, has told you about of the tournament at the <a style=\"Link.Settlement\" href=\"event:Settlement-town_ES1\"><b>Danustica</b></a>. She wants you to be her champion. She expects you to reach round 2.\nYou told <a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> that instead of her request, the next tournament held will be held in her honor."
+        }
+      ],
+      "A": [
+        {
+          "archiveId": 41040,
+          "title": "Lady's Knight Out",
+          "giver": "lord_1_32",
+          "isEnded": true,
+          "ownerControllerId": null,
+          "runtimeTypeOwnerLabel": "legacy-unowned",
+          "logCount": 2,
+          "text": "<a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> from Northern Empire, has asked you to be her champion in an upcoming tournament. She expects you to fight in her name and reach at least 2.\nYou told her that you will honor her name in a tournament.\nYou have been accused of a crime, and <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> has declared that you are no longer her champion."
+        },
+        {
+          "archiveId": 41046,
+          "title": "Lady's Knight Out",
+          "giver": "lord_1_32",
+          "isEnded": true,
+          "ownerControllerId": null,
+          "runtimeTypeOwnerLabel": "legacy-unowned",
+          "logCount": 2,
+          "text": "<a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> from Northern Empire, has asked you to be her champion in an upcoming tournament. She expects you to fight in her name and reach at least 2.\nYou told her that you will honor her name in a tournament.\nYou have failed to reach round 2 in the tournament. <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> will certainly be disappointed."
+        },
+        {
+          "archiveId": 41050,
+          "title": "Lady's Knight Out",
+          "giver": "lord_1_32",
+          "isEnded": true,
+          "ownerControllerId": null,
+          "runtimeTypeOwnerLabel": "legacy-unowned",
+          "logCount": 2,
+          "text": "<a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> from Northern Empire, has asked you to be her champion in an upcoming tournament. She expects you to fight in her name and reach at least 2.\nYou told her that you will honor her name in a tournament.\nYou received a message from <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a>.\n\"Thank you for fighting so valiantly in my name. Please take these 750 denars with our gratitude.\""
+        },
+        {
+          "archiveId": 41056,
+          "title": "Lady's Knight Out",
+          "giver": "CharacterObject_2704",
+          "isEnded": true,
+          "ownerControllerId": null,
+          "runtimeTypeOwnerLabel": "legacy-unowned",
+          "logCount": 2,
+          "text": "<a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> from Aserai, has told you about of the tournament at the <a style=\"Link.Settlement\" href=\"event:Settlement-town_ES1\"><b>Danustica</b></a>. She wants you to be her champion. She expects you to reach round 2.\nYou told <a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> that instead of her request, the next tournament held will be held in her honor."
+        }
+      ],
+      "B": [
+        {
+          "archiveId": 41032,
+          "title": "Lady's Knight Out",
+          "giver": "lord_1_32",
+          "isEnded": false,
+          "ownerControllerId": "testclient",
+          "runtimeTypeOwnerLabel": "testclient",
+          "logCount": 1,
+          "text": "You have been accused of a crime, and <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> has declared that you are no longer her champion."
+        },
+        {
+          "archiveId": 41037,
+          "title": "Lady's Knight Out",
+          "giver": "lord_1_32",
+          "isEnded": false,
+          "ownerControllerId": "testclient",
+          "runtimeTypeOwnerLabel": "testclient",
+          "logCount": 1,
+          "text": "You have failed to reach round 2 in the tournament. <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a> will certainly be disappointed."
+        },
+        {
+          "archiveId": 41040,
+          "title": "Lady's Knight Out",
+          "giver": "lord_1_32",
+          "isEnded": false,
+          "ownerControllerId": "testclient",
+          "runtimeTypeOwnerLabel": "testclient",
+          "logCount": 1,
+          "text": "You received a message from <a style=\"Link.Hero\" href=\"event:Hero-lord_1_32\"><b>Sora</b></a>.\n\"Thank you for fighting so valiantly in my name. Please take these 750 denars with our gratitude.\""
+        },
+        {
+          "archiveId": 41045,
+          "title": "Lady's Knight Out",
+          "giver": "CharacterObject_2704",
+          "isEnded": false,
+          "ownerControllerId": "testclient",
+          "runtimeTypeOwnerLabel": "testclient",
+          "logCount": 1,
+          "text": "<a style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2704\"><b>Nus</b></a> from Aserai, has told you about of the tournament at the <a style=\"Link.Settlement\" href=\"event:Settlement-town_ES1\"><b>Danustica</b></a>. She wants you to be her champion. She expects you to reach round 2."
+        }
+      ]
+    }
+  },
+  "additionalOwnerDisconnectRejoin": {
+    "status": "UNRUN",
+    "reason": "Requested after core cleanup/release. Next bench reservation was 3763, followed by supervisor explicit prohibition on reacquiring or launching.",
+    "scope": "No active A-owned Lady quest was disconnected. B owned no active Lady quest during its reconnect. Active-owner cancellation/no-resurrection is therefore not established.",
+    "frameworkPolicy": "Existing disconnect-cancels-active-quest policy unchanged; no quest preservation or shared Framework edit."
+  },
+  "supervisorConfirmation": {
+    "timeUtc": "2026-10-23T18:06Z",
+    "coreFlows": "Four gameplay flows, 40 screenshots, server/B history PASS and cleanup confirmed by supervisor.",
+    "bench": "Given to 3763; do not reacquire or launch.",
+    "sourceWaiver": "b57 up28 evidence stands under explicit waiver; conflict-only merge is parent-owned.",
+    "ci": {
+      "provenance": "User/supervisor reported, not independently audited by this operator",
+      "focusedPassed": 87,
+      "fullRelease": "480e7802",
+      "passed": 7113,
+      "failed": 0,
+      "skipped": 3,
+      "shardsPassed": 8,
+      "shardsTotal": 8
+    }
+  },
+  "questLearningsChanged": false,
+  "techDebtReview": "Parent-owned, report only",
+  "noFurtherLiveOperations": true,
+  "cleanupReceiptPaths": [
+    "cleanup-issue3781-20261023T171247/cleanup.json",
+    "local-down.log",
+    "owned-pids-absent.json",
+    "bench-after-cleanup.txt",
+    "crash-dialogs/engine-profile.json",
+    "crash-dialogs/launcher-crash-verdict.json"
+  ],
+  "receiptSha256": {
+    "cleanup-issue3781-20261023T171247/cleanup.json": "a4f067eaa1b6b63ad082d8c030b86cb0dadb313e94490f1fd591e980f86d39df",
+    "local-down.log": "2294cb9d910b886fbbf15f1c213c290df41230a3ee3839b17178357155ec5d0d",
+    "owned-pids-absent.json": "7167d37ae5c684602a11c90de3a65cbc024e9b01358cb717f2be8e735973aa61",
+    "bench-after-cleanup.txt": "f43b43766843cc7b70bfd17fc0c145ee0434bd08d704fe723a43aa0900d8adcc",
+    "crash-dialogs/engine-profile.json": "90ceac2475c1983ba55e896014545e01ff515f04d6b9f1059a4583050253b804",
+    "crash-dialogs/launcher-crash-verdict.json": "99a41b28825e5eee9ad357867e1f93e7549b8cc30756da51d472ca0cdb813011",
+    "REPORT.md": "b82e589ed5c411513e56b99889a438d31ab09f9a598dbb9fd8e4c8b72519a31e",
+    "DETAILS.md": "8476142eea904c8bd1fa8ad53b9e717c34f6d6e44a5ba8294d504346bd5ab507",
+    "runtime-identity.json": "7e2d8a14375842cd7725aad0bc857262370f6dd0618b3b7cbb6830d34db54189",
+    "readings.json": "9ddb39f2fd3dbe8dfed9b5dc6251ae877ad53c63a573749cd0f6c69deb18bfd2",
+    "archives.json": "48296f3f3bbe8589316f7159841f20098cec5340004d732b26f9e8a6e5307872",
+    "captions.json": "ef1c33c2006bb5a9c003f0a7fe7a0ecdfe8f7ac5802f87e10536f62a843313c1",
+    "retained-setup-responses.json": "aa6199190fa822cb8aed06bdcde2f2dea23753f0bc61b50b7f64e7e578b65dcf"
+  }
+}

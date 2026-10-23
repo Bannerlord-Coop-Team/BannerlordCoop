@@ -1,0 +1,48 @@
+{
+    "role":  "B",
+    "processId":  61488,
+    "runToken":  "issue3781-20261023T171247",
+    "checkpoint":  "baseline-native-journals",
+    "capture":  {
+                    "index":  1,
+                    "processId":  61488,
+                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28/baseline-native-journals-B.bmp",
+                    "exitCode":  0,
+                    "response":  {
+                                     "version":  1,
+                                     "id":  "1db5ed1d20e74881ab06c3fc165880ca",
+                                     "ok":  true,
+                                     "process":  {
+                                                     "pid":  61488,
+                                                     "role":  "client",
+                                                     "platformId":  "testclient2",
+                                                     "runToken":  "issue3781-20261023T171247",
+                                                     "processStartedUtc":  "2026-10-23T17:22:54.3249393Z"
+                                                 },
+                                     "result":  {
+                                                    "captureId":  "db96ae4990b44e4296540965a4a1628a",
+                                                    "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\baseline-native-journals-B.bmp",
+                                                    "captureRequested":  true,
+                                                    "captureRequestedUtc":  "2026-10-23T17:28:04.4068754Z",
+                                                    "captureRequestEngineFrame":  8100,
+                                                    "captureComplete":  true,
+                                                    "complete":  true,
+                                                    "completionCaptureId":  "db96ae4990b44e4296540965a4a1628a",
+                                                    "completionObservedUtc":  "2026-10-23T17:28:04.6258674Z",
+                                                    "length":  3686454,
+                                                    "lastWriteUtc":  "2026-10-23T17:28:04.4455939Z"
+                                                },
+                                     "error":  null,
+                                     "activeStateAtCaptureRequest":  "TaleWorlds.CampaignSystem.GameState.QuestsState",
+                                     "cameraReadiness":  null
+                                 },
+                    "initialAttempt":  null
+                },
+    "image":  {
+                  "sourceBmpPath":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\baseline-native-journals-B.bmp",
+                  "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up28\\baseline-native-journals-B.png",
+                  "width":  1280,
+                  "height":  960,
+                  "sha256":  "6f827018a17e84f9c0a444f1b9f487a0c59e732b998939b7b25f9eba1848cee2"
+              }
+}

@@ -1,0 +1,192 @@
+[
+  {
+    "source": "crime-postloot-menu.json",
+    "response": {
+      "version": 1,
+      "id": "3364d80d24764cca8057a2b61d12b763",
+      "ok": true,
+      "process": {
+        "pid": 65108,
+        "role": "client",
+        "platformId": "testclient",
+        "runToken": "issue3781-20261023T171247",
+        "processStartedUtc": "2026-10-23T17:22:54.3074319Z"
+      },
+      "result": {
+        "name": "coop.debug.ittest.run",
+        "arguments": [
+          "menu"
+        ],
+        "found": true,
+        "output": "No current game menu.",
+        "succeeded": false,
+        "errorCode": "ittest_failed",
+        "hasStructuredResult": false,
+        "structuredResult": null
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "crime-settled-menu.json",
+    "response": {
+      "version": 1,
+      "id": "9e01a926e6ef47b986b64fcb4e4ccb84",
+      "ok": true,
+      "process": {
+        "pid": 65108,
+        "role": "client",
+        "platformId": "testclient",
+        "runToken": "issue3781-20261023T171247",
+        "processStartedUtc": "2026-10-23T17:22:54.3074319Z"
+      },
+      "result": {
+        "name": "coop.debug.ittest.run",
+        "arguments": [
+          "menu"
+        ],
+        "found": true,
+        "output": "No current game menu.",
+        "succeeded": false,
+        "errorCode": "ittest_failed",
+        "hasStructuredResult": false,
+        "structuredResult": null
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "crime-talk-open.json",
+    "response": {
+      "version": 1,
+      "id": "41d6da103c9743adb0b10fe484929eb9",
+      "ok": true,
+      "process": {
+        "pid": 65108,
+        "role": "client",
+        "platformId": "testclient",
+        "runToken": "issue3781-20261023T171247",
+        "processStartedUtc": "2026-10-23T17:22:54.3074319Z"
+      },
+      "result": {
+        "name": "coop.debug.ittest.run",
+        "arguments": [
+          "talk",
+          "Hero_lord_1_32"
+        ],
+        "found": true,
+        "output": "A player encounter is already active.",
+        "succeeded": false,
+        "errorCode": "ittest_failed",
+        "hasStructuredResult": false,
+        "structuredResult": null
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "failure-talk.json",
+    "response": {
+      "version": 1,
+      "id": "2bb49c01746642a3bd0acd83684f3d7c",
+      "ok": true,
+      "process": {
+        "pid": 65108,
+        "role": "client",
+        "platformId": "testclient",
+        "runToken": "issue3781-20261023T171247",
+        "processStartedUtc": "2026-10-23T17:22:54.3074319Z"
+      },
+      "result": {
+        "name": "coop.debug.ittest.run",
+        "arguments": [
+          "talk",
+          "Hero_lord_1_32"
+        ],
+        "found": true,
+        "output": "A player encounter is already active.",
+        "succeeded": false,
+        "errorCode": "ittest_failed",
+        "hasStructuredResult": false,
+        "structuredResult": null
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "pending-disconnect-B.json",
+    "response": {
+      "version": 1,
+      "id": "fa515bb224a44675a1d500a3180a7bff",
+      "ok": false,
+      "process": {
+        "pid": 61488,
+        "role": "client",
+        "platformId": "testclient2",
+        "runToken": "issue3781-20261023T171247",
+        "processStartedUtc": "2026-10-23T17:22:54.3249393Z"
+      },
+      "result": null,
+      "error": {
+        "code": "method_not_found",
+        "message": "Unknown live-test method 'disconnect'.",
+        "outcomeUncertain": false
+      }
+    }
+  },
+  {
+    "source": "pending-normal-menu-after-close.json",
+    "response": {
+      "version": 1,
+      "id": "8bc5dff9bf4243b990b5a01f8350b9c0",
+      "ok": true,
+      "process": {
+        "pid": 65108,
+        "role": "client",
+        "platformId": "testclient",
+        "runToken": "issue3781-20261023T171247",
+        "processStartedUtc": "2026-10-23T17:22:54.3074319Z"
+      },
+      "result": {
+        "name": "coop.debug.ittest.run",
+        "arguments": [
+          "menu"
+        ],
+        "found": true,
+        "output": "No current game menu.",
+        "succeeded": false,
+        "errorCode": "ittest_failed",
+        "hasStructuredResult": false,
+        "structuredResult": null
+      },
+      "error": null
+    }
+  },
+  {
+    "source": "server-command-catalog.json",
+    "response": {
+      "version": 1,
+      "id": "ed466a903c094bf6b98e6299cecac170",
+      "ok": false,
+      "process": {
+        "pid": 39068,
+        "role": "server",
+        "platformId": null,
+        "runToken": "issue3781-20261023T171247",
+        "processStartedUtc": "0001-01-01T00:00:00"
+      },
+      "result": null,
+      "error": {
+        "code": "method_not_found",
+        "message": "Unknown live-test method 'command-catalog'.",
+        "outcomeUncertain": false
+      }
+    }
+  },
+  {
+    "source": "crime-town-ui-A-layers.json",
+    "request": "request-013.json",
+    "error": "No selectable layer MapMenu",
+    "recovery": "Re-inspected layers and used observed MapMenuView, same runtime."
+  }
+]
