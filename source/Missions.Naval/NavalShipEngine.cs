@@ -37,6 +37,9 @@ public class NavalShipEngine : INavalShipEngine
 
     private readonly ICoopShipSnapshotBuilder snapshotBuilder;
     private readonly IObjectManager objectManager;
+    // [Game thread] The last state each copy's weapon took from its authority; a copy's own State never follows it.
+    private readonly Dictionary<MissionObject, BattleShipWeaponState> replicatedWeaponStates =
+        new Dictionary<MissionObject, BattleShipWeaponState>();
 
     public NavalShipEngine(ICoopShipSnapshotBuilder snapshotBuilder, IObjectManager objectManager, INavalSteeredCopies steeredCopies)
     {
@@ -213,7 +216,7 @@ public class NavalShipEngine : INavalShipEngine
         var frame = ship.GlobalFrame;
         var condition = ReadCondition(ship);
         var weapon = ship.ShipSiegeWeapon;
-        int? ammo = weapon == null ? (int?)null : CarriedAmmo(weapon.AmmoCount, weapon.State == RangedSiegeWeapon.WeaponState.Idle);
+        int? ammo = weapon == null ? (int?)null : CarriedAmmo(weapon.AmmoCount, weapon.State, TakeReplicatedState(weapon));
 
         // Quest5's RemoveShipInternal: no rope or bridge may keep pointing at a removed hull, as in RemoveHull.
         NavalRopes.BreakConnections(ship);
@@ -241,6 +244,24 @@ public class NavalShipEngine : INavalShipEngine
     /// weapon caught mid-reload still comes back loaded with one bolt it didn't have.
     /// </summary>
     internal static int CarriedAmmo(int ammoCount, bool isLoaded) => isLoaded ? ammoCount : Math.Max(0, ammoCount - 1);
+
+    /// <summary>
+    /// The reserve a swap carries, read from the authority's last replicated state when the weapon was a copy here (its local
+    /// State never leaves Idle), otherwise from the weapon's own state.
+    /// </summary>
+    internal static int CarriedAmmo(int localAmmo, RangedSiegeWeapon.WeaponState localState, BattleShipWeaponState replicated) =>
+        replicated == null
+            ? CarriedAmmo(localAmmo, localState == RangedSiegeWeapon.WeaponState.Idle)
+            : CarriedAmmo(replicated.AmmoCount, replicated.WeaponState == (int)RangedSiegeWeapon.WeaponState.Idle);
+
+    // Takes the replicated state a weapon about to be replaced was following, or null for one this client simulated.
+    private BattleShipWeaponState TakeReplicatedState(MissionObject weapon)
+    {
+        if (!replicatedWeaponStates.TryGetValue(weapon, out var replicated)) return null;
+
+        replicatedWeaponStates.Remove(weapon);
+        return replicated;
+    }
 
     public void BoardHullAgents(MissionObject hull, IReadOnlyList<HullSwapAgent> agents)
     {
@@ -945,6 +966,7 @@ public class NavalShipEngine : INavalShipEngine
         // The HandleUserAiming prefix re-asserts the targets each tick, so vanilla's speed-limited approach turns the weapon.
         SiegeMissionAuthorityGate.SetRemoteAim(siegeWeapon.Id.Id, state.Direction, state.ReleaseAngle);
         siegeWeapon.SetAmmo(state.AmmoCount);
+        replicatedWeaponStates[weapon] = state;
         if (previous != null && previous.WeaponState == state.WeaponState) return;
 
         var weaponState = (RangedSiegeWeapon.WeaponState)state.WeaponState;
@@ -985,6 +1007,8 @@ public class NavalShipEngine : INavalShipEngine
 
     public void SetSimulatedWeapons(IReadOnlyCollection<MissionObject> own)
     {
+        // A weapon simulated here reads its own State again, so a swap must not carry an older authority's state.
+        foreach (var weapon in own) replicatedWeaponStates.Remove(weapon);
         // No host-wide default at sea: a ship weapon not claimed here belongs to its hull's owner.
         SiegeMissionAuthorityGate.IsLocalAuthority = false;
         SiegeMissionAuthorityGate.SetClaimedMachines(new HashSet<int>(own.Select(weapon => weapon.Id.Id)), new HashSet<int>());
@@ -993,6 +1017,7 @@ public class NavalShipEngine : INavalShipEngine
 
     public void ClearSimulatedWeapons()
     {
+        replicatedWeaponStates.Clear();
         SiegeMissionAuthorityGate.IsAuthorityKnown = false;
         SiegeMissionAuthorityGate.ResetClaimedMachines();
     }

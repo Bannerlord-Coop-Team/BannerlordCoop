@@ -213,6 +213,40 @@ public class NavalShipEngineTests
         Assert.Equal(expected, NavalShipEngine.CarriedAmmo(ammoCount, isLoaded));
     }
 
+    // A copy's weapon never leaves Idle locally, so a successor swapping it mid-reload must read the authority's replicated
+    // state (R48: authority LoadingAmmo ammo=29 while the copy read Idle ammo=28).
+    [Theory]
+    [InlineData(RangedSiegeWeapon.WeaponState.LoadingAmmo, 29, 28)]
+    [InlineData(RangedSiegeWeapon.WeaponState.Reloading, 18, 17)]
+    [InlineData(RangedSiegeWeapon.WeaponState.Idle, 18, 18)]
+    [InlineData(RangedSiegeWeapon.WeaponState.LoadingAmmo, 0, 0)]
+    public void CarriedAmmo_ReadsTheReplicatedStateOverTheCopysOwn(RangedSiegeWeapon.WeaponState replicatedState, int replicatedAmmo,
+        int expected)
+    {
+        var replicated = new BattleShipWeaponState(0f, 0f, (int)replicatedState, replicatedAmmo);
+
+        Assert.Equal(expected, NavalShipEngine.CarriedAmmo(replicatedAmmo, RangedSiegeWeapon.WeaponState.Idle, replicated));
+    }
+
+    // The replicated ammo wins over the copy's own count, which a replayed shot may have moved ahead of the authority's.
+    [Fact]
+    public void CarriedAmmo_ReadsTheReplicatedAmmoOverTheCopysOwn()
+    {
+        var replicated = new BattleShipWeaponState(0f, 0f, (int)RangedSiegeWeapon.WeaponState.LoadingAmmo, 29);
+
+        Assert.Equal(28, NavalShipEngine.CarriedAmmo(28, RangedSiegeWeapon.WeaponState.Idle, replicated));
+    }
+
+    // A weapon this client simulated has no replicated state, so its own State decides.
+    [Theory]
+    [InlineData(RangedSiegeWeapon.WeaponState.Idle, 22, 22)]
+    [InlineData(RangedSiegeWeapon.WeaponState.LoadingAmmo, 22, 21)]
+    public void CarriedAmmo_WithoutAReplicatedState_ReadsTheWeaponsOwn(RangedSiegeWeapon.WeaponState localState, int localAmmo,
+        int expected)
+    {
+        Assert.Equal(expected, NavalShipEngine.CarriedAmmo(localAmmo, localState, null));
+    }
+
     // NavalShipsLogic.RemoveShip and RemoveShipAux's bookkeeping, without the scene: find the assignment, clear it, mark removed.
     private static void VanillaRemoveShip(NavalShipsLogic shipsLogic, MissionShip ship)
     {
