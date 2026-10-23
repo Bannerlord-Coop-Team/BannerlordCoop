@@ -708,7 +708,9 @@ Knobs (`NavalScenarioResolver.Usage`):
 - `hull=id` hull type;
 - `spacing=m` boarding or ramming gap;
 - `ships=n` ships per player;
-- `delay=s` before the scripted step;
+- `delay=s` before the scripted step. The sink, disconnect and retreat steps count it from the end of that client's
+  deployment, which the scenario's own Ready press brings a few seconds after the mission opens, so give a weapon or a
+  fight time to happen with a larger delay. `late_join` counts it from staging;
 - `reconnect=s` for `migration`;
 - `who=host|nonhost` who disconnects;
 - `drop=hard|leave` for `migration`: `hard` (default) has the server drop the player's connection at once, the real

@@ -21,7 +21,8 @@ public interface INavalScenarioResolver
 public class NavalScenarioResolver : INavalScenarioResolver
 {
     internal const string Usage = "Usage: coop.debug.naval.scenario <preset> [hulls=n] [hull=id] [spacing=m] [ships=n] " +
-        "[delay=s] [reconnect=s] [who=host|nonhost] [drop=hard|leave] [town=id] [weapons=n] [ram=n] [reserve=n] [controllerId...]";
+        "[delay=s] [reconnect=s] [who=host|nonhost] [drop=hard|leave] [town=id] [weapons=n] [ram=n] [reserve=n] [controllerId...]; " +
+        "delay counts from this client's deployment end (sink, disconnect, retreat) or, for late_join, from staging";
 
     public bool TryResolve(IReadOnlyList<string> args, IReadOnlyList<string> connectedControllerIds,
         out NavalScenarioConfig config, out string error)
