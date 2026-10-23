@@ -15,6 +15,7 @@ using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.UI.Notifications;
 using GameInterface.Services.Issues.Quests.ArtisanOverpricedGoods;
 using HarmonyLib;
+using Helpers;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Conversation;
