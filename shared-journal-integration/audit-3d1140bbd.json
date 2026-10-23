@@ -1,0 +1,23 @@
+{
+  "head": "3d1140bbd01d588e18655734f96da083fbf86b43",
+  "tree": "e6c31dde1f707d2ff806abf32f449ef8cdf28f2d",
+  "genericFolderCount": 0,
+  "genericRefs": 0,
+  "categoryAttributeCount": 8,
+  "attributeOnlyDelta": [
+    "1\t0\tsource/GameInterface/Services/Issues/Quests/LadysKnightOut/Patches/LadysKnightOutBranchPatches.cs",
+    "3\t0\tsource/GameInterface/Services/Issues/Quests/LadysKnightOut/Patches/LadysKnightOutEventPatches.cs",
+    "1\t0\tsource/GameInterface/Services/Issues/Quests/LadysKnightOut/Patches/LadysKnightOutGenerationPatch.cs",
+    "1\t0\tsource/GameInterface/Services/Issues/Quests/LadysKnightOut/Patches/LadysKnightOutHonorPatches.cs",
+    "1\t0\tsource/GameInterface/Services/Issues/Quests/LadysKnightOut/Patches/LadysKnightOutJournalPatch.cs",
+    "1\t0\tsource/GameInterface/Services/Issues/Quests/LadysKnightOut/Patches/LadysKnightOutLordPatches.cs"
+  ],
+  "conversationFixRetained": true,
+  "socialTestMatchesDevelopment": true,
+  "liveHead": "b57cac1124a4f04a634f56d164819a1055473cba",
+  "liveWaiver": "Supervisor18:15Z merge+8attributes only",
+  "agentsLint": "FAIL0 WARN3, client-only receive paths",
+  "branchAudit": "missing0,24images",
+  "bodyCheck": "OK",
+  "contains9e85bfe3c": true
+}

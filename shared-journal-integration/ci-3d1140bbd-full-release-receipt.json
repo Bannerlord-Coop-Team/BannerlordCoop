@@ -1,0 +1,654 @@
+{
+  "schema": "ci-final.full-release.receipt.v1",
+  "jobId": "docker-ci-6c925df2849f48ef9674",
+  "runner": "HIVE",
+  "executionPlatform": "windows-native-v1",
+  "configuration": "Release",
+  "status": "passed",
+  "source": {
+    "head": "3d1140bbd01d588e18655734f96da083fbf86b43",
+    "tree": "e6c31dde1f707d2ff806abf32f449ef8cdf28f2d",
+    "archiveSha256": "22ed1a8d3bb6d254a6859fc92b3b721bdfc7cb03b1e088e0d0ce0de50a129fa3"
+  },
+  "ciScriptSha256": "7eddda58d6e9438811ce7ea98c904e8d217664b88492080999125d473d00f540",
+  "package": "/home/pwisorlowska/coop-live-orchestration/3781/ci-shared-journal-3d1140bbd-full-release",
+  "resultDirectory": "/home/pwisorlowska/coop-live-orchestration/3781/ci-shared-journal-3d1140bbd-full-release-result",
+  "startedUtc": "2026-10-23T18:29:24.922955+00:00",
+  "completedUtc": "2026-10-23T18:45:33.287579+00:00",
+  "identityVerified": true,
+  "manifestVerified": true,
+  "manifestFileCount": 309,
+  "newFullSubmissions": 1,
+  "reruns": 0,
+  "totals": {
+    "total": 7124,
+    "executed": 7121,
+    "passed": 7121,
+    "failed": 0,
+    "skipped": 3
+  },
+  "suites": {
+    "E2E.Tests": {
+      "total": 2993,
+      "executed": 2992,
+      "passed": 2992,
+      "failed": 0,
+      "skipped": 1
+    },
+    "Coop.CrashReporter.Tests": {
+      "total": 10,
+      "executed": 10,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    },
+    "Common.Tests": {
+      "total": 394,
+      "executed": 394,
+      "passed": 394,
+      "failed": 0,
+      "skipped": 0
+    },
+    "Coop.Tests": {
+      "total": 1374,
+      "executed": 1374,
+      "passed": 1374,
+      "failed": 0,
+      "skipped": 0
+    },
+    "GameInterface.Tests": {
+      "total": 2191,
+      "executed": 2191,
+      "passed": 2191,
+      "failed": 0,
+      "skipped": 0
+    },
+    "Coop.IntegrationTests": {
+      "total": 162,
+      "executed": 160,
+      "passed": 160,
+      "failed": 0,
+      "skipped": 2
+    }
+  },
+  "trx": [
+    {
+      "suite": "E2E.Tests",
+      "trx": "artifacts/e2e-0/aisha_HIVE_2026-10-23_13_31_55_net6.0.trx",
+      "rawCounters": {
+        "total": 313,
+        "executed": 313,
+        "passed": 313,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "total": 313,
+      "executed": 313,
+      "passed": 313,
+      "failed": 0,
+      "skipped": 0,
+      "shard": 0,
+      "timing": {
+        "startedUtc": "2026-10-23T18:31:32.856445+00:00",
+        "completedUtc": "2026-10-23T18:38:53.448229+00:00",
+        "workspace": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\0"
+      }
+    },
+    {
+      "suite": "E2E.Tests",
+      "trx": "artifacts/e2e-1/aisha_HIVE_2026-10-23_13_31_56_net6.0.trx",
+      "rawCounters": {
+        "total": 382,
+        "executed": 382,
+        "passed": 382,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "total": 382,
+      "executed": 382,
+      "passed": 382,
+      "failed": 0,
+      "skipped": 0,
+      "shard": 1,
+      "timing": {
+        "startedUtc": "2026-10-23T18:31:32.857766+00:00",
+        "completedUtc": "2026-10-23T18:38:08.046838+00:00",
+        "workspace": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\1"
+      }
+    },
+    {
+      "suite": "E2E.Tests",
+      "trx": "artifacts/e2e-2/aisha_HIVE_2026-10-23_13_31_56_net6.0.trx",
+      "rawCounters": {
+        "total": 352,
+        "executed": 352,
+        "passed": 352,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "total": 352,
+      "executed": 352,
+      "passed": 352,
+      "failed": 0,
+      "skipped": 0,
+      "shard": 2,
+      "timing": {
+        "startedUtc": "2026-10-23T18:31:32.857616+00:00",
+        "completedUtc": "2026-10-23T18:38:24.667082+00:00",
+        "workspace": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\2"
+      }
+    },
+    {
+      "suite": "E2E.Tests",
+      "trx": "artifacts/e2e-3/aisha_HIVE_2026-10-23_13_31_56_net6.0.trx",
+      "rawCounters": {
+        "total": 385,
+        "executed": 385,
+        "passed": 385,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "total": 385,
+      "executed": 385,
+      "passed": 385,
+      "failed": 0,
+      "skipped": 0,
+      "shard": 3,
+      "timing": {
+        "startedUtc": "2026-10-23T18:31:32.857847+00:00",
+        "completedUtc": "2026-10-23T18:38:18.933541+00:00",
+        "workspace": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\3"
+      }
+    },
+    {
+      "suite": "E2E.Tests",
+      "trx": "artifacts/e2e-4/aisha_HIVE_2026-10-23_13_39_14_net6.0.trx",
+      "rawCounters": {
+        "total": 345,
+        "executed": 345,
+        "passed": 345,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "total": 345,
+      "executed": 345,
+      "passed": 345,
+      "failed": 0,
+      "skipped": 0,
+      "shard": 4,
+      "timing": {
+        "startedUtc": "2026-10-23T18:38:53.450717+00:00",
+        "completedUtc": "2026-10-23T18:44:59.019999+00:00",
+        "workspace": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\0"
+      }
+    },
+    {
+      "suite": "E2E.Tests",
+      "trx": "artifacts/e2e-5/aisha_HIVE_2026-10-23_13_38_29_net6.0.trx",
+      "rawCounters": {
+        "total": 572,
+        "executed": 571,
+        "passed": 571,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "total": 572,
+      "executed": 571,
+      "passed": 571,
+      "failed": 0,
+      "skipped": 1,
+      "shard": 5,
+      "timing": {
+        "startedUtc": "2026-10-23T18:38:08.049571+00:00",
+        "completedUtc": "2026-10-23T18:44:30.634637+00:00",
+        "workspace": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\1"
+      }
+    },
+    {
+      "suite": "E2E.Tests",
+      "trx": "artifacts/e2e-6/aisha_HIVE_2026-10-23_13_38_45_net6.0.trx",
+      "rawCounters": {
+        "total": 321,
+        "executed": 321,
+        "passed": 321,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "total": 321,
+      "executed": 321,
+      "passed": 321,
+      "failed": 0,
+      "skipped": 0,
+      "shard": 6,
+      "timing": {
+        "startedUtc": "2026-10-23T18:38:24.669160+00:00",
+        "completedUtc": "2026-10-23T18:44:24.501479+00:00",
+        "workspace": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\2"
+      }
+    },
+    {
+      "suite": "E2E.Tests",
+      "trx": "artifacts/e2e-7/aisha_HIVE_2026-10-23_13_38_39_net6.0.trx",
+      "rawCounters": {
+        "total": 323,
+        "executed": 323,
+        "passed": 323,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "total": 323,
+      "executed": 323,
+      "passed": 323,
+      "failed": 0,
+      "skipped": 0,
+      "shard": 7,
+      "timing": {
+        "startedUtc": "2026-10-23T18:38:18.935715+00:00",
+        "completedUtc": "2026-10-23T18:44:53.932930+00:00",
+        "workspace": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\3"
+      }
+    },
+    {
+      "suite": "Coop.CrashReporter.Tests",
+      "trx": "artifacts/unit/aisha_HIVE_2026-10-23_13_30_36_net6.0.trx",
+      "rawCounters": {
+        "total": 10,
+        "executed": 10,
+        "passed": 10,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "total": 10,
+      "executed": 10,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "Common.Tests",
+      "trx": "artifacts/unit/aisha_HIVE_2026-10-23_13_30_36_net6.0[1].trx",
+      "rawCounters": {
+        "total": 394,
+        "executed": 394,
+        "passed": 394,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "total": 394,
+      "executed": 394,
+      "passed": 394,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "Coop.Tests",
+      "trx": "artifacts/unit/aisha_HIVE_2026-10-23_13_30_36_net6.0[2].trx",
+      "rawCounters": {
+        "total": 1374,
+        "executed": 1374,
+        "passed": 1374,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "total": 1374,
+      "executed": 1374,
+      "passed": 1374,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "GameInterface.Tests",
+      "trx": "artifacts/unit/aisha_HIVE_2026-10-23_13_30_36_net6.0[3].trx",
+      "rawCounters": {
+        "total": 2191,
+        "executed": 2191,
+        "passed": 2191,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "total": 2191,
+      "executed": 2191,
+      "passed": 2191,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "Coop.IntegrationTests",
+      "trx": "artifacts/unit/aisha_HIVE_2026-10-23_13_30_36_net6.0[4].trx",
+      "rawCounters": {
+        "total": 162,
+        "executed": 160,
+        "passed": 160,
+        "failed": 0,
+        "error": 0,
+        "timeout": 0,
+        "aborted": 0,
+        "inconclusive": 0,
+        "passedButRunAborted": 0,
+        "notRunnable": 0,
+        "notExecuted": 0,
+        "disconnected": 0,
+        "warning": 0,
+        "completed": 0,
+        "inProgress": 0,
+        "pending": 0
+      },
+      "total": 162,
+      "executed": 160,
+      "passed": 160,
+      "failed": 0,
+      "skipped": 2
+    }
+  ],
+  "skippedTests": [
+    {
+      "suite": "E2E.Tests",
+      "test": "E2E.Tests.Services.ItemRosters.ItemRosterSyncTests.Server_ItemRoster__count",
+      "reason": "_count sync is disabled in ItemRosterSync.cs",
+      "trx": "artifacts/e2e-5/aisha_HIVE_2026-10-23_13_38_29_net6.0.trx"
+    },
+    {
+      "suite": "Coop.IntegrationTests",
+      "test": "Coop.IntegrationTests.Template.TestTemplate.ServerReceivesTemplateEventMessage_PublishesTemplateCommandMessage_AllClients",
+      "reason": "Example Test",
+      "trx": "artifacts/unit/aisha_HIVE_2026-10-23_13_30_36_net6.0[4].trx"
+    },
+    {
+      "suite": "Coop.IntegrationTests",
+      "test": "Coop.IntegrationTests.Template.TestTemplate.ClientReceivesTemplateEventMessage_PublishesTemplateCommandMessage_AllClients",
+      "reason": "Example Test",
+      "trx": "artifacts/unit/aisha_HIVE_2026-10-23_13_30_36_net6.0[4].trx"
+    }
+  ],
+  "skippedCountMethod": "Actual NotExecuted UnitTestResult entries, not raw zero notExecuted counters.",
+  "shardsRequested": 8,
+  "shardsExecuted": 8,
+  "e2eParallel": 4,
+  "e2eTestIdsUnique": true,
+  "executionCommands": {
+    "e2e-3": {
+      "request": "artifacts/native-commands/2714d87cf8824bbbb482ee3e55d33127/request.json",
+      "outcome": "artifacts/native-commands/2714d87cf8824bbbb482ee3e55d33127/outcome.json",
+      "exitCode": 0,
+      "target": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\3\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll"
+    },
+    "unit": {
+      "request": "artifacts/native-commands/4defdf2f973146dfb65240d512df7481/request.json",
+      "outcome": "artifacts/native-commands/4defdf2f973146dfb65240d512df7481/outcome.json",
+      "exitCode": 0,
+      "target": "source/CoopUnitTests.slnf"
+    },
+    "e2e-2": {
+      "request": "artifacts/native-commands/539e901976ac4c21bc05b2bc970ab2f2/request.json",
+      "outcome": "artifacts/native-commands/539e901976ac4c21bc05b2bc970ab2f2/outcome.json",
+      "exitCode": 0,
+      "target": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\2\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll"
+    },
+    "e2e-7": {
+      "request": "artifacts/native-commands/5a5c7482e0314de99092886240ae0e35/request.json",
+      "outcome": "artifacts/native-commands/5a5c7482e0314de99092886240ae0e35/outcome.json",
+      "exitCode": 0,
+      "target": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\3\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll"
+    },
+    "e2e-4": {
+      "request": "artifacts/native-commands/63a1625701f24d4585345af0175f2cc8/request.json",
+      "outcome": "artifacts/native-commands/63a1625701f24d4585345af0175f2cc8/outcome.json",
+      "exitCode": 0,
+      "target": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\0\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll"
+    },
+    "e2e-1": {
+      "request": "artifacts/native-commands/9a07697f870647e383055fbfefcaf260/request.json",
+      "outcome": "artifacts/native-commands/9a07697f870647e383055fbfefcaf260/outcome.json",
+      "exitCode": 0,
+      "target": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\1\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll"
+    },
+    "e2e-5": {
+      "request": "artifacts/native-commands/9f8a4e2bc390438ea5ec1cf25089c833/request.json",
+      "outcome": "artifacts/native-commands/9f8a4e2bc390438ea5ec1cf25089c833/outcome.json",
+      "exitCode": 0,
+      "target": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\1\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll"
+    },
+    "e2e-6": {
+      "request": "artifacts/native-commands/c75f6b101a7a4feebd48a3ee976396e7/request.json",
+      "outcome": "artifacts/native-commands/c75f6b101a7a4feebd48a3ee976396e7/outcome.json",
+      "exitCode": 0,
+      "target": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\2\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll"
+    },
+    "e2e-0": {
+      "request": "artifacts/native-commands/d135a1aee7cf45289b55436883555a4e/request.json",
+      "outcome": "artifacts/native-commands/d135a1aee7cf45289b55436883555a4e/outcome.json",
+      "exitCode": 0,
+      "target": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-6c925df2849f48ef9674\\.native-e2e-slots\\0\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll"
+    }
+  },
+  "ladyRelease": {
+    "total": 49,
+    "passed": 49,
+    "shards": [
+      7
+    ]
+  },
+  "verificationPlan": {
+    "schemaVersion": "verification-plan-receipt.v1",
+    "scope": "selection-and-local-harness-handoff",
+    "includesTestEvidence": false,
+    "source": {
+      "head": "3d1140bbd01d588e18655734f96da083fbf86b43",
+      "syntheticTree": "e6c31dde1f707d2ff806abf32f449ef8cdf28f2d"
+    },
+    "authoritativeBase": "47aef141913407de823df67abe3e224a8faab9b0",
+    "changedPathsDigest": "234df005dbdd3894bd25e76820c6e8bec700fdc5e7cf2c44ef3124a9fce60352",
+    "planDigest": "df56e47eb7e49d0728ad845e21b2f8d2900b759ce57ae77c3002201d39d7e9fe",
+    "verdict": "blocked-external-runtime",
+    "requiredProfiles": [
+      "unit",
+      "deterministic-peer",
+      "process-peer",
+      "rendered-smoke",
+      "full-live"
+    ],
+    "harnessOwnedProfiles": [
+      "process-peer"
+    ],
+    "externalRuntimeProfiles": [
+      "rendered-smoke",
+      "full-live"
+    ]
+  },
+  "processPeer": {
+    "verdict": "passed",
+    "source": {
+      "head": "3d1140bbd01d588e18655734f96da083fbf86b43",
+      "tree": "e6c31dde1f707d2ff806abf32f449ef8cdf28f2d"
+    },
+    "scenarios": [
+      {
+        "scenario": "converge",
+        "passed": true,
+        "expectedOutcome": "convergence",
+        "exitCode": 0
+      },
+      {
+        "scenario": "reconnect",
+        "passed": true,
+        "expectedOutcome": "reconnect-generation",
+        "exitCode": 0
+      },
+      {
+        "scenario": "malformed",
+        "passed": true,
+        "expectedOutcome": "malformed-rejection",
+        "exitCode": 0
+      },
+      {
+        "scenario": "out-of-sequence",
+        "passed": true,
+        "expectedOutcome": "out-of-sequence-rejection",
+        "exitCode": 0
+      },
+      {
+        "scenario": "corrupt-acknowledgement",
+        "passed": true,
+        "expectedOutcome": "corrupt-ack-rejection",
+        "exitCode": 0
+      },
+      {
+        "scenario": "diverge",
+        "passed": true,
+        "expectedOutcome": "divergence-negative-control",
+        "exitCode": 5
+      },
+      {
+        "scenario": "timeout",
+        "passed": true,
+        "expectedOutcome": "deadline-cleanup-negative-control",
+        "exitCode": 6
+      }
+    ]
+  },
+  "cleanup": {
+    "schema": "native-ci-workspace-cleanup.v1",
+    "jobId": "docker-ci-6c925df2849f48ef9674",
+    "ownershipSha256": "80d027105e2b087d9d8fefc4f76139096d6783365991d734d1b9e6e9b7203e9e",
+    "gameReferenceDetached": true,
+    "e2eSlotsRemoved": true,
+    "retainedFailureWorkspace": null
+  },
+  "limits": [
+    "CI evidence only; no rendered smoke or full live run in this task.",
+    "Owner disconnect/rejoin checkpoint remains parent-owned.",
+    "Focused Debug evidence is a separate verified 89-test receipt."
+  ]
+}

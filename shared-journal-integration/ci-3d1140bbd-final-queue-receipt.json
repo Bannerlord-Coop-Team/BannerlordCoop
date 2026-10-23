@@ -1,0 +1,32 @@
+{
+  "generatedUtc": "2026-10-23T18:48:53Z",
+  "jobs": [
+    {
+      "jobId": "docker-ci-02d64c686c784a7dbc1d",
+      "state": "cancelled",
+      "result": null,
+      "runner": null,
+      "queuedUtc": "2026-10-23T18:02:39Z",
+      "startedUtc": null,
+      "finishedUtc": "2026-10-23T18:04:06Z"
+    },
+    {
+      "jobId": "docker-ci-4524a63b7deb41d78349",
+      "state": "finished",
+      "result": "passed",
+      "runner": "HIVE",
+      "queuedUtc": "2026-10-23T18:05:29Z",
+      "startedUtc": "2026-10-23T18:09:11Z",
+      "finishedUtc": "2026-10-23T18:12:19Z"
+    },
+    {
+      "jobId": "docker-ci-6c925df2849f48ef9674",
+      "state": "finished",
+      "result": "passed",
+      "runner": "HIVE",
+      "queuedUtc": "2026-10-23T18:13:16Z",
+      "startedUtc": "2026-10-23T18:29:26Z",
+      "finishedUtc": "2026-10-23T18:45:42Z"
+    }
+  ]
+}

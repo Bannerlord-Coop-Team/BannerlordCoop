@@ -1,0 +1,35 @@
+3833: Results File: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-6c925df2849f48ef9674\result\artifacts\unit\aisha_HIVE_2026-10-23_13_30_36_net6.0.trx
+3835: Passed!  - Failed:     0, Passed:    10, Skipped:     0, Total:    10, Duration: 779 ms - Coop.CrashReporter.Tests.dll (net6.0)
+3837: Results File: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-6c925df2849f48ef9674\result\artifacts\unit\aisha_HIVE_2026-10-23_13_30_36_net6.0[1].trx
+3839: Passed!  - Failed:     0, Passed:   394, Skipped:     0, Total:   394, Duration: 7 s - Common.Tests.dll (net6.0)
+3841: Results File: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-6c925df2849f48ef9674\result\artifacts\unit\aisha_HIVE_2026-10-23_13_30_36_net6.0[2].trx
+3843: Passed!  - Failed:     0, Passed:  1374, Skipped:     0, Total:  1374, Duration: 20 s - Coop.Tests.dll (net6.0)
+3845: Results File: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-6c925df2849f48ef9674\result\artifacts\unit\aisha_HIVE_2026-10-23_13_30_36_net6.0[3].trx
+3847: Passed!  - Failed:     0, Passed:  2191, Skipped:     0, Total:  2191, Duration: 36 s - GameInterface.Tests.dll (net6.0)
+3849: Results File: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-6c925df2849f48ef9674\result\artifacts\unit\aisha_HIVE_2026-10-23_13_30_36_net6.0[4].trx
+3851: Passed!  - Failed:     0, Passed:   160, Skipped:     2, Total:   162, Duration: 42 s - Coop.IntegrationTests.dll (net6.0)
+3973: running E2E shard 1/8 with 382 discovered test cases (~306s estimated)
+4374: Results File: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-6c925df2849f48ef9674\result\artifacts\e2e-1\aisha_HIVE_2026-10-23_13_31_56_net6.0.trx
+4375: E2E shard 1 completed in 394s
+4436: running E2E shard 3/8 with 385 discovered test cases (~306s estimated)
+4840: Results File: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-6c925df2849f48ef9674\result\artifacts\e2e-3\aisha_HIVE_2026-10-23_13_31_56_net6.0.trx
+4841: E2E shard 3 completed in 405s
+4902: running E2E shard 2/8 with 352 discovered test cases (~306s estimated)
+5273: Results File: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-6c925df2849f48ef9674\result\artifacts\e2e-2\aisha_HIVE_2026-10-23_13_31_56_net6.0.trx
+5274: E2E shard 2 completed in 411s
+5335: running E2E shard 0/8 with 313 discovered test cases (~306s estimated)
+5667: Results File: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-6c925df2849f48ef9674\result\artifacts\e2e-0\aisha_HIVE_2026-10-23_13_31_55_net6.0.trx
+5668: E2E shard 0 completed in 440s
+5729: running E2E shard 6/8 with 321 discovered test cases (~306s estimated)
+6069: Results File: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-6c925df2849f48ef9674\result\artifacts\e2e-6\aisha_HIVE_2026-10-23_13_38_45_net6.0.trx
+6070: E2E shard 6 completed in 360s
+6131: running E2E shard 5/8 with 572 discovered test cases (~306s estimated)
+6725: Results File: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-6c925df2849f48ef9674\result\artifacts\e2e-5\aisha_HIVE_2026-10-23_13_38_29_net6.0.trx
+6726: E2E shard 5 completed in 382s
+6787: running E2E shard 7/8 with 323 discovered test cases (~306s estimated)
+7129: Results File: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-6c925df2849f48ef9674\result\artifacts\e2e-7\aisha_HIVE_2026-10-23_13_38_39_net6.0.trx
+7130: E2E shard 7 completed in 394s
+7191: running E2E shard 4/8 with 345 discovered test cases (~306s estimated)
+7555: Results File: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-6c925df2849f48ef9674\result\artifacts\e2e-4\aisha_HIVE_2026-10-23_13_39_14_net6.0.trx
+7556: E2E shard 4 completed in 365s
+9083: CI docker passed; executionPlatform=windows-native-v1

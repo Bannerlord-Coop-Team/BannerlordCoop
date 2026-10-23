@@ -1,0 +1,19 @@
+{
+  "jobId": "docker-ci-6c925df2849f48ef9674",
+  "queue": {
+    "found": true,
+    "runner": null,
+    "transport": null,
+    "state": "queued",
+    "tracked": true,
+    "queuedAhead": 2,
+    "detail": ""
+  },
+  "archiveSha256": "22ed1a8d3bb6d254a6859fc92b3b721bdfc7cb03b1e088e0d0ce0de50a129fa3",
+  "head": "3d1140bbd01d588e18655734f96da083fbf86b43",
+  "shards": 8,
+  "newFullSubmissions": 1,
+  "package": "C:/Users/Andrew/CodexWindows/coop-live-orchestration/3781/ci-shared-journal-3d1140bbd-full-release",
+  "tree": "e6c31dde1f707d2ff806abf32f449ef8cdf28f2d",
+  "createdUtc": "2026-10-23T18:13:14.852141Z"
+}

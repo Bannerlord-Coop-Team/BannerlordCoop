@@ -1,0 +1,1 @@
+QUEUED docker-ci-6c925df2849f48ef9674 (.NET tests full suite at 3d1140bbd) for a dotnet runner. Next: remote.sh wait docker-ci-6c925df2849f48ef9674, then collect

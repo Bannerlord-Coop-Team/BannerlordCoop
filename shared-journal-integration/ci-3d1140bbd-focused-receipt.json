@@ -1,0 +1,112 @@
+{
+  "schema": "ci-final.focused.receipt.v1",
+  "jobId": "docker-ci-4524a63b7deb41d78349",
+  "runner": "HIVE",
+  "status": "passed",
+  "configuration": "Debug",
+  "source": {
+    "head": "3d1140bbd01d588e18655734f96da083fbf86b43",
+    "tree": "e6c31dde1f707d2ff806abf32f449ef8cdf28f2d",
+    "archiveSha256": "22ed1a8d3bb6d254a6859fc92b3b721bdfc7cb03b1e088e0d0ce0de50a129fa3"
+  },
+  "package": "/home/pwisorlowska/coop-live-orchestration/3781/ci-shared-journal-3d1140bbd-focused",
+  "resultDirectory": "/home/pwisorlowska/coop-live-orchestration/3781/ci-shared-journal-3d1140bbd-focused-result",
+  "startedUtc": "2026-10-23T18:09:10.266602+00:00",
+  "completedUtc": "2026-10-23T18:12:16.526736+00:00",
+  "identityVerified": true,
+  "manifestVerified": true,
+  "manifestFileCount": 111,
+  "debugSupplementAccepted": true,
+  "stage5EvidenceAccepted": false,
+  "totals": {
+    "total": 89,
+    "passed": 89,
+    "failed": 0,
+    "skipped": 0
+  },
+  "suites": [
+    {
+      "project": "source/Coop.Tests/Coop.Tests.csproj",
+      "trx": "debug-test-supplement/0.trx",
+      "total": 4,
+      "executed": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "classes": {
+        "Coop.Tests.Autofac.ContainerBuildTests": {
+          "discovered": 4,
+          "executed": 4,
+          "passed": 4
+        }
+      }
+    },
+    {
+      "project": "source/E2E.Tests/E2E.Tests.csproj",
+      "trx": "debug-test-supplement/1.trx",
+      "total": 68,
+      "executed": 68,
+      "passed": 68,
+      "failed": 0,
+      "skipped": 0,
+      "classes": {
+        "E2E.Tests.Services.HeroDevelopers.HeroSocialParameterCoopCommandTests": {
+          "discovered": 4,
+          "executed": 4,
+          "passed": 4
+        },
+        "E2E.Tests.Services.Heroes.HeroConversationDebugCommandTests": {
+          "discovered": 12,
+          "executed": 12,
+          "passed": 12
+        },
+        "E2E.Tests.Services.Issues.LadysKnightOutTests": {
+          "discovered": 49,
+          "executed": 49,
+          "passed": 49
+        },
+        "E2E.Tests.Services.UI.PlayerJournalHistoryTests": {
+          "discovered": 3,
+          "executed": 3,
+          "passed": 3
+        }
+      }
+    },
+    {
+      "project": "source/GameInterface.Tests/GameInterface.Tests.csproj",
+      "trx": "debug-test-supplement/2.trx",
+      "total": 17,
+      "executed": 17,
+      "passed": 17,
+      "failed": 0,
+      "skipped": 0,
+      "classes": {
+        "GameInterface.Tests.PatchTest": {
+          "discovered": 8,
+          "executed": 8,
+          "passed": 8
+        },
+        "GameInterface.Tests.Services.Issues.IssuesLayoutTests": {
+          "discovered": 4,
+          "executed": 4,
+          "passed": 4
+        },
+        "GameInterface.Tests.Services.UI.PlayerJournalHistoryTests": {
+          "discovered": 5,
+          "executed": 5,
+          "passed": 5
+        }
+      }
+    }
+  ],
+  "cleanup": {
+    "schema": "native-ci-workspace-cleanup.v1",
+    "jobId": "docker-ci-4524a63b7deb41d78349",
+    "ownershipSha256": "3d2255be12a55cbf35191476604b86e19c575a62d3cdbb6c4789af4e69587284",
+    "gameReferenceDetached": true,
+    "e2eSlotsRemoved": true,
+    "retainedFailureWorkspace": null
+  },
+  "fullRelease": "Authorized next, not yet submitted",
+  "priorB57EvidencePreserved": true
+}
