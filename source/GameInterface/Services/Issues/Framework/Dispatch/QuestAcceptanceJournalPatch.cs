@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Conversation;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class QuestAcceptanceJournalPatch
 {
