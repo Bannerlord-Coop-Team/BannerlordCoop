@@ -23,6 +23,8 @@ internal sealed class QuestScenario
     private readonly E2ETestEnvironment testEnvironment;
 
     public string NotableId { get; }
+    public string OwnerHeroId { get; }
+    public string OwnerPartyId { get; }
 
     public EnvironmentInstance Server => testEnvironment.Server;
     public EnvironmentInstance ClientA => testEnvironment.Clients.First();
@@ -34,7 +36,7 @@ internal sealed class QuestScenario
 
         NotableId = testEnvironment.CreateRegisteredObject<Hero>();
 
-        RegisterPlayer(ClientA, ControllerA);
+        (OwnerHeroId, OwnerPartyId) = RegisterPlayer(ClientA, ControllerA);
         RegisterPlayer(ClientB, ControllerB);
 
         foreach (var instance in new[] { Server, ClientA, ClientB })
@@ -96,7 +98,7 @@ internal sealed class QuestScenario
         return controllerId;
     }
 
-    private void RegisterPlayer(EnvironmentInstance client, string controllerId)
+    private (string HeroId, string PartyId) RegisterPlayer(EnvironmentInstance client, string controllerId)
     {
         var heroId = testEnvironment.CreateRegisteredObject<Hero>();
         var partyId = testEnvironment.CreateRegisteredObject<MobileParty>();
@@ -104,6 +106,7 @@ internal sealed class QuestScenario
         Server.Call(() => Assert.True(Server.Resolve<IPlayerManager>().AddPlayer(new Player(controllerId, heroId, partyId, "", ""))));
         testEnvironment.ConnectRegisteredPlayer(client, controllerId);
         client.Resolve<IControllerIdProvider>().SetControllerId(controllerId);
+        return (heroId, partyId);
     }
 
     private void AddIssue(EnvironmentInstance instance)
