@@ -9,6 +9,8 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Framework.Registries;
+using GameInterface.Services.UI.Notifications;
 using GameInterface.Services.Issues.Quests.ArtisanOverpricedGoods;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -114,6 +116,135 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     }
 
     public void Dispose() => environment.Dispose();
+
+    [Fact]
+    public void LordStart_UsesTheRequestingPlayersDifficulty()
+    {
+        ClientA.Call(() =>
+        {
+            using (new IssueDifficultyOverride(2f))
+                Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution();
+        });
+
+        Assert.Equal(2f, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>()).Difficulty);
+        foreach (var instance in Instances)
+            instance.Call(() => Assert.Equal(2f, Get<Hero>(instance, scenario.NotableId).Issue._issueDifficultyMultiplier));
+    }
+
+    [Fact]
+    public void LordStart_RejectsWhenTheTownChangedOwningClan()
+    {
+        Server.Call(() => Get<Town>(Server, townId).OwnerClan = Get<Clan>(Server, otherClanId));
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
+        Server.Call(() => Assert.True(Get<Hero>(Server, scenario.NotableId).Issue.IsOngoingWithoutQuest));
+    }
+
+    [Fact]
+    public void NoCounterOffer_MenuReplayRequestsTheServerAndDoesNotCompleteLocally()
+    {
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        // Exercise IssueBase's no-counteroffer menu branch on the owner; retain the real artisan's
+        // merchant on the server because its reward consequence changes that merchant's power.
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.CounterOfferHero = null);
+        using var rewards = new MethodCallRecorder(Priority.First,
+            AccessTools.Method(typeof(Issue), nameof(Issue.LordSolutionConsequenceWithRefuseCounterOffer)));
+
+        OnMapAfterConversation(ClientA, () =>
+        {
+            using (new AllowedThread())
+                CampaignEventDispatcher.Instance.BeforeGameMenuOpened(null);
+        });
+        environment.FlushCoalescer();
+
+        Assert.Equal(LordSolutionOperation.RefuseCounterOffer,
+            ClientA.NetworkSentMessages.GetMessages<RequestLordSolution>().Last().Operation);
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(1, rewards.CountFor(Server));
+        Assert.Equal(0, rewards.CountFor(ClientA));
+        Assert.Equal(0, rewards.CountFor(ClientB));
+        AssertFinished(2530, 10900);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LordCompletion_ArchivesOnlyTheOwnerIncludingTheDownloadedSave(bool counterOffer)
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        var ownerIssue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+        ClientA.Call(() =>
+        {
+            if (counterOffer) ownerIssue.CompleteIssueWithLordSolutionWithAcceptCounterOffer();
+            else ownerIssue.CompleteIssueWithLordSolutionWithRefuseCounterOffer();
+        });
+        environment.FlushCoalescer();
+
+        ClientA.Call(() =>
+        {
+            var entry = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                log => log.IsRelatedTo(ownerIssue)));
+            Assert.True(entry.IsEnded());
+            Assert.Equal(counterOffer, entry.IsEndedUnsuccessfully());
+        });
+        LogEntry[] history = null!;
+        Server.Call(() =>
+        {
+            history = Campaign.Current.LogEntryHistory.GameActionLogs.ToArray();
+            var entry = Assert.IsType<PlayerJournalLogEntry>(Assert.Single(history.OfType<JournalLogEntry>()));
+            Assert.Equal(QuestScenario.ControllerA, entry.OwnerControllerId);
+            Assert.True(entry.IsEnded());
+        });
+        ClientB.Call(() =>
+        {
+            Campaign.Current.LogEntryHistory._logs.Clear();
+            Campaign.Current.LogEntryHistory._logs.AddRange(history);
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsEnded()));
+        });
+    }
+
+    [Fact]
+    public void LordOwnershipSnapshot_NormalizesTheLoadedSolverFlag()
+    {
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        ClientB.Call(() => Get<Hero>(ClientB, scenario.NotableId).Issue.IsTriedToSolveBefore = true);
+        ClientB.SimulateMessage(Server.NetPeer, new NetworkIssueOwnershipSnapshot(new[]
+        {
+            new IssueOwnershipData(scenario.NotableId, QuestScenario.IssueId, QuestScenario.ControllerA),
+        }));
+        ClientB.Call(() => Assert.False(Get<Hero>(ClientB, scenario.NotableId).Issue.IsTriedToSolveBefore));
+    }
+
+    [Fact]
+    public void StaleDirectAccept_DoesNotReplaceAnAcceptedLordSolution()
+    {
+        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
+        ClientA.Call(() => Assert.True(Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithQuest()));
+
+        Assert.Empty(ClientA.NetworkSentMessages.GetMessages<RequestQuestSolutionAccept>());
+        ClientA.Call(() =>
+        {
+            var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+            Assert.True(issue.IsSolvingWithLordSolution);
+            Assert.Null(issue.IssueQuest);
+        });
+    }
+
+    [Fact]
+    public void RefusedDirectAccept_RestoresTheServersOriginalOfferDeadline()
+    {
+        CampaignTime due = default;
+        Server.Call(() => due = CampaignTime.DaysFromNow(7));
+        foreach (var instance in Instances)
+            instance.Call(() => Get<Hero>(instance, scenario.NotableId).Issue.IssueDueTime = due);
+        Server.Call(() => ((ArtisanPriceModel)Campaign.Current.Models.TradeItemPriceFactorModel).PriceIndex = 1f);
+        Accept();
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        ClientA.Call(() => Assert.Equal(due, Get<Hero>(ClientA, scenario.NotableId).Issue.IssueDueTime));
+    }
 
     [Fact]
     public void Acceptance_StartsOnlyTheOwnersQuestAndRetainsAnUnstartedServerCopy()
