@@ -9,7 +9,10 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using HarmonyLib;
+using Helpers;
 using LiteNetLib;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
@@ -27,6 +30,12 @@ public class ActiveIssueDismisserTests : IDisposable
 {
     private const string IssueId = "issue_dismiss";
     private const string ControllerId = "player-A";
+
+    // Synthetic heroes have no encyclopedia entries; journal callbacks and assertions still run.
+    private static readonly MethodBase[] JournalTextLinks =
+    {
+        AccessTools.Method(typeof(StringHelpers), nameof(StringHelpers.GetCharacterProperties)),
+    };
 
     private E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
@@ -104,12 +113,12 @@ public class ActiveIssueDismisserTests : IDisposable
 
     private void PublishServerStarted(EnvironmentInstance instance)
     {
-        instance.Call(() => instance.Resolve<IMessageBroker>().Publish(this, new AllGameObjectsRegistered()));
+        instance.Call(() => instance.Resolve<IMessageBroker>().Publish(this, new AllGameObjectsRegistered()), JournalTextLinks);
     }
 
     private void PublishDisconnected(EnvironmentInstance instance, EnvironmentInstance leaver)
     {
-        instance.Call(() => instance.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(leaver.NetPeer, default(DisconnectInfo))));
+        instance.Call(() => instance.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(leaver.NetPeer, default(DisconnectInfo))), JournalTextLinks);
     }
 
     [Theory]
@@ -297,7 +306,7 @@ public class ActiveIssueDismisserTests : IDisposable
             Assert.False(archive.IsEnded());
             Assert.DoesNotContain(issue.IssueQuest, Campaign.Current.QuestManager.Quests);
             Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer);
-        });
+        }, JournalTextLinks);
 
         // This checks the silent branch with retained ownership, not ownership restoration during startup.
         if (silent)
