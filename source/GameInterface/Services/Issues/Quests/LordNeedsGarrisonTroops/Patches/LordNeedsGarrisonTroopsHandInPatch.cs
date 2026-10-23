@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;

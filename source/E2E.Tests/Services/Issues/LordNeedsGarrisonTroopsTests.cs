@@ -1,4 +1,4 @@
-using Autofac;
+﻿using Autofac;
 using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
@@ -158,7 +158,7 @@ public class LordNeedsGarrisonTroopsTests : IDisposable
             quest._settlement = settlement;
             quest._requestedTroopType = troop;
             quest._requestedTroopAmount = 5;
-            AccessTools.Field(typeof(QuestBase), "_questGiver").SetValue(quest, Hero.MainHero);
+            quest.QuestGiver = Hero.MainHero;
             quest.QuestDueTime = CampaignTime.DaysFromNow(1f);
 
             var previousMainParty = Campaign.Current.MainParty;
