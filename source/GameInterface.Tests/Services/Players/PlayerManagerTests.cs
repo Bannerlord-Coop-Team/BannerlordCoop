@@ -454,6 +454,44 @@ public class PlayerManagerTests
         }
     }
 
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    public void IsSenderClanLeader_OnlyTrueForThePeerControllingTheClanLeader(bool inClan, bool isLeader, bool expected)
+    {
+        var playerManager = CreatePlayerManager(out var objectManager);
+        var clan = ObjectHelper.SkipConstructor<Clan>();
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        hero._clan = inClan ? clan : ObjectHelper.SkipConstructor<Clan>();
+        clan._leader = isLeader ? hero : ObjectHelper.SkipConstructor<Hero>();
+        objectManager.Setup(o => o.TryGetObject(HeroId, out hero)).Returns(true);
+        var peer = new TestNetwork().CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, peer);
+
+        try
+        {
+            Assert.Equal(expected, playerManager.IsSenderClanLeader(peer, clan));
+        }
+        finally
+        {
+            GetPlayerObjects().Remove(hero);
+        }
+    }
+
+    [Fact]
+    public void IsSenderClanLeader_UnknownSenderOrNoClan_IsFalse()
+    {
+        var playerManager = CreatePlayerManager(out _);
+        var clan = ObjectHelper.SkipConstructor<Clan>();
+
+        Assert.False(playerManager.IsSenderClanLeader(new TestNetwork().CreatePeer(), clan));
+        Assert.False(playerManager.IsSenderClanLeader(new object(), clan));
+        Assert.False(playerManager.IsSenderClanLeader(new TestNetwork().CreatePeer(), null));
+    }
+
     private static ConditionalWeakTable<object, ControlledObjectInfo> GetPlayerObjects() =>
         (ConditionalWeakTable<object, ControlledObjectInfo>)AccessTools
             .Field(typeof(PlayerManager), "PlayerObjects")
