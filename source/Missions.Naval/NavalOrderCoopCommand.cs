@@ -3,6 +3,8 @@ using Common.Commands;
 using NavalDLC.Missions;
 using NavalDLC.Missions.MissionLogics;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -52,10 +54,11 @@ public sealed class NavalOrderCoopCommand : ICoopCommand
         if (!orderController.IsFormationSelectable(formation))
             return Failed("The main agent's formation " + formation.FormationIndex + " can't be selected by the player.");
 
+        var previousSelection = orderController.SelectedFormations.ToList();
         orderController.ClearSelectedFormations();
         orderController.SelectFormation(formation);
         string thrown = Issue(orderController, orderType);
-        orderController.ClearSelectedFormations();
+        RestoreSelection(orderController, previousSelection);
 
         string report = Describe(mission, main, formation, orderType, thrown);
         return thrown == null ? new CoopCommandResult(true, report) : Failed(report);
@@ -74,6 +77,14 @@ public sealed class NavalOrderCoopCommand : ICoopCommand
 
     // A case-insensitive keyword match.
     private static bool IsWord(string value, string word) => string.Equals(value?.Trim(), word, StringComparison.OrdinalIgnoreCase);
+
+    // Puts back the formations the player had selected in the order UI, as far as they are still selectable.
+    private static void RestoreSelection(OrderController orderController, IEnumerable<Formation> previousSelection)
+    {
+        orderController.ClearSelectedFormations();
+        foreach (var formation in previousSelection.Where(orderController.IsFormationSelectable))
+            orderController.SelectFormation(formation);
+    }
 
     // Vanilla's follow-me reads the main agent's formation ship, which a swimmer may lack, so a throw is reported, not raised.
     private static string Issue(OrderController orderController, OrderType orderType)

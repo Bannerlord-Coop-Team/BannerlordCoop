@@ -70,7 +70,7 @@ public sealed class NavalShipFireCoopCommand : ICoopCommand
 
         var refusal = FireRefusal(weaponInfo.CurrentAuthority == controller.Session.OwnControllerId,
             SiegeMissionAuthorityGate.IsMachineSimulatedLocally(weapon.Id.Id), weapon.PilotAgent != null,
-            weapon.State == RangedSiegeWeapon.WeaponState.Idle, weaponInfo.CurrentAuthority);
+            weapon.State == RangedSiegeWeapon.WeaponState.Idle, weapon.CanShootAtPoint(point), weaponInfo.CurrentAuthority);
         if (refusal != null) return Failed("NAVAL_FIRE weapon=" + weaponShipId + " refused: " + refusal + "; " + checks);
         if (!SnapAim(weapon, point)) return Failed("NAVAL_FIRE weapon=" + weaponShipId + " refused: the target is out of the bolt's reach; " + checks);
 
@@ -95,13 +95,16 @@ public sealed class NavalShipFireCoopCommand : ICoopCommand
 
     /// <summary>
     /// Why this client can't shoot the weapon now, or null: only the client simulating the hull and its machine runs vanilla's
-    /// shot (copies have Shoot blocked), Shoot records the gunner as the shooter, and only a loaded weapon (Idle) shoots.
+    /// shot (copies have Shoot blocked), Shoot records the gunner as the shooter, only a loaded weapon (Idle) shoots, and a point
+    /// vanilla's CanShootAtPoint refuses would only get a clamped aim.
     /// </summary>
-    internal static string FireRefusal(bool ownsHull, bool simulatesMachine, bool hasGunner, bool isLoaded, string authority)
+    internal static string FireRefusal(bool ownsHull, bool simulatesMachine, bool hasGunner, bool isLoaded, bool canShootAtPoint,
+        string authority)
     {
         if (!ownsHull || !simulatesMachine) return "the weapon is simulated by " + authority + "; run the command there";
         if (!hasGunner) return "nobody mans the weapon";
         if (!isLoaded) return "the weapon is not loaded (not Idle)";
+        if (!canShootAtPoint) return "the target is outside the weapon's arc or elevation, or a friendly hull is in the line (CanShootAtPoint)";
         return null;
     }
 

@@ -44,16 +44,18 @@ public class NavalShipFireCoopCommandTests
     }
 
     // Copies have Shoot blocked, Shoot records the gunner as the shooter, and only a loaded (Idle) weapon shoots.
+    // R47 review: a point outside the arc is refused rather than shot at with a clamped aim.
     [Theory]
-    [InlineData(true, true, true, true, null)]
-    [InlineData(false, true, true, true, "simulated by host")]
-    [InlineData(true, false, true, true, "simulated by host")]
-    [InlineData(true, true, false, true, "nobody mans")]
-    [InlineData(true, true, true, false, "not loaded")]
-    public void FireRefusal_NeedsTheSimulatingClientAGunnerAndALoadedWeapon(bool ownsHull, bool simulatesMachine, bool hasGunner,
-        bool isLoaded, string expected)
+    [InlineData(true, true, true, true, true, null)]
+    [InlineData(false, true, true, true, true, "simulated by host")]
+    [InlineData(true, false, true, true, true, "simulated by host")]
+    [InlineData(true, true, false, true, true, "nobody mans")]
+    [InlineData(true, true, true, false, true, "not loaded")]
+    [InlineData(true, true, true, true, false, "CanShootAtPoint")]
+    public void FireRefusal_NeedsTheSimulatingClientAGunnerALoadedWeaponAndAShootablePoint(bool ownsHull, bool simulatesMachine,
+        bool hasGunner, bool isLoaded, bool canShootAtPoint, string expected)
     {
-        var refusal = NavalShipFireCoopCommand.FireRefusal(ownsHull, simulatesMachine, hasGunner, isLoaded, "host");
+        var refusal = NavalShipFireCoopCommand.FireRefusal(ownsHull, simulatesMachine, hasGunner, isLoaded, canShootAtPoint, "host");
 
         if (expected == null) Assert.Null(refusal);
         else Assert.Contains(expected, refusal);
