@@ -69,7 +69,7 @@ public class LateHullDeploymentPatchTests
     [InlineData(9, true, false)]
     public void NeedsTacticReapply_OnlyForUnitsWithEveryBehaviourWeightless(int units, bool anyWeighted, bool expected)
     {
-        Assert.Equal(expected, LateHullDeploymentPatch.NeedsTacticReapply(units, anyWeighted));
+        Assert.Equal(expected, NavalFormationTacticRefresh.NeedsTacticReapply(units, anyWeighted));
     }
 
     // A constructor-skipped hull carrying a ballista whose AI is already built.

@@ -24,7 +24,6 @@ namespace Missions.Naval;
 public class NavalWaterProbeLogic : MissionLogic
 {
     private static readonly ILogger Logger = LogManager.GetLogger<NavalWaterProbeLogic>();
-    private readonly NavalTickFailureCount fixedTickFailures = new NavalTickFailureCount();
 
     internal const string Tag = "NAVAL_WATER_PROBE ";
 
@@ -33,6 +32,7 @@ public class NavalWaterProbeLogic : MissionLogic
 
     private readonly IBattleSession session;
     private readonly INetworkShipRegistry registry;
+    private readonly INavalTickFailureLog fixedTickFailures;
 
     private NavalWaterProbeSettings settings;
     private string probeId;
@@ -44,10 +44,11 @@ public class NavalWaterProbeLogic : MissionLogic
     private long ticks;
     private long frames;
 
-    public NavalWaterProbeLogic(IBattleSession session, INetworkShipRegistry registry)
+    public NavalWaterProbeLogic(IBattleSession session, INetworkShipRegistry registry, INavalTickFailureLog fixedTickFailures)
     {
         this.session = session;
         this.registry = registry;
+        this.fixedTickFailures = fixedTickFailures;
     }
 
     public bool IsRunning => settings != null;
@@ -120,8 +121,7 @@ public class NavalWaterProbeLogic : MissionLogic
         }
         catch (Exception exception)
         {
-            long count = fixedTickFailures.Count(Mission);
-            if (NavalTickFailureCount.ShouldLog(count)) Logger.Error(exception, "[NavalProbe] Water sample on the fixed tick threw (failure {Count})", count);
+            fixedTickFailures.Report(exception, "Water sample on the fixed tick", Mission);
         }
     }
 

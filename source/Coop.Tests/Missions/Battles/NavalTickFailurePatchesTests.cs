@@ -9,6 +9,7 @@ using Xunit;
 namespace Coop.Tests.Missions.Battles;
 
 /// <summary>R48 L6: a throw in the async agent and team tick is logged and finished only inside a co-op naval battle.</summary>
+[Collection("Mission.Current")]
 public class NavalTickFailurePatchesTests
 {
     // In a co-op naval battle the tick completes and the throw is swallowed, so the game thread goes on.
@@ -16,6 +17,7 @@ public class NavalTickFailurePatchesTests
     public void Finalizer_InACoopNavalBattle_CompletesTheTickAndSwallowsTheThrow()
     {
         var mission = PendingMission();
+        bool wasActive = CoopNavalMissionScope.IsActive;
         CoopNavalMissionScope.IsActive = true;
         try
         {
@@ -24,7 +26,7 @@ public class NavalTickFailurePatchesTests
         }
         finally
         {
-            CoopNavalMissionScope.IsActive = false;
+            CoopNavalMissionScope.IsActive = wasActive;
         }
     }
 
@@ -50,27 +52,30 @@ public class NavalTickFailurePatchesTests
 
     // The count starts again in each mission.
     [Fact]
-    public void FailureCount_RestartsPerMission()
+    public void Report_CountsPerMission()
     {
-        var count = new NavalTickFailureCount();
+        var log = new NavalTickFailureLog();
         object first = new object(), second = new object();
 
-        Assert.Equal(1, count.Count(first));
-        Assert.Equal(2, count.Count(first));
-        Assert.Equal(1, count.Count(second));
+        Assert.Equal(1, log.Report(new InvalidOperationException(), "a test tick", first));
+        Assert.Equal(2, log.Report(new InvalidOperationException(), "a test tick", first));
+        Assert.Equal(1, log.Report(new InvalidOperationException(), "a test tick", second));
     }
 
+    // The first three, every power of ten, and otherwise one line per summary interval with the running count.
     [Theory]
-    [InlineData(1, true)]
-    [InlineData(3, true)]
-    [InlineData(4, false)]
-    [InlineData(10, true)]
-    [InlineData(11, false)]
-    [InlineData(100, true)]
-    [InlineData(200, false)]
-    public void ShouldLog_TheFirstThreeThenEveryPowerOfTen(long count, bool expected)
+    [InlineData(1, 0.0, true)]
+    [InlineData(3, 0.0, true)]
+    [InlineData(4, 0.5, false)]
+    [InlineData(10, 0.5, true)]
+    [InlineData(11, 0.5, false)]
+    [InlineData(100, 0.5, true)]
+    [InlineData(200, 0.5, false)]
+    [InlineData(257, 10.0, true)]
+    [InlineData(258, 9.9, false)]
+    public void ShouldLog_FirstThreePowersOfTenAndEveryTenSeconds(long count, double secondsSinceLastLine, bool expected)
     {
-        Assert.Equal(expected, NavalTickFailureCount.ShouldLog(count));
+        Assert.Equal(expected, NavalTickFailureLog.ShouldLog(count, secondsSinceLastLine));
     }
 
     private static Mission PendingMission()

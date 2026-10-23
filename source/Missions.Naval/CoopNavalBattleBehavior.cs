@@ -23,16 +23,18 @@ public class CoopNavalBattleBehavior : MissionLogic
     private readonly INavalBattleServices services;
     private readonly NavalShipsLogic shipsLogic;
     private readonly Action tickNpcFleet;
+    private readonly INavalTickFailureLog fixedTickFailures;
     private int lastAgentCount = -1;
     private bool retreated;
-    private readonly NavalTickFailureCount fixedTickFailures = new NavalTickFailureCount();
 
-    public CoopNavalBattleBehavior(INavalBattleServices services, INavalNpcFleetSpawner npcFleetSpawner, NavalShipsLogic shipsLogic)
+    public CoopNavalBattleBehavior(INavalBattleServices services, INavalNpcFleetSpawner npcFleetSpawner, NavalShipsLogic shipsLogic,
+        INavalTickFailureLog fixedTickFailures)
     {
         this.services = services;
         NpcFleetSpawner = npcFleetSpawner;
         tickNpcFleet = npcFleetSpawner.Tick;
         this.shipsLogic = shipsLogic;
+        this.fixedTickFailures = fixedTickFailures;
         // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached. It runs before
         // the battle controller leaves (NavalShipsLogic is an earlier behavior), so the last fates precede MissionLeft.
         shipsLogic.MissionEndEvent += services.OnMissionEnding;
@@ -70,6 +72,8 @@ public class CoopNavalBattleBehavior : MissionLogic
         // A snap teleports the hull and the agents on it, so it runs here rather than inside the fixed physics step.
         services.Engine.SnapCopies();
         services.Tick(dt, tickNpcFleet);
+        // After the services tick, whose arrivals and fleet fielding spawn the hulls this checks.
+        NavalFormationTacticRefresh.Apply();
         LogAgentCountDrop();
 #if DEBUG
         NavalImmortalCoopCommand.ApplyArmed();
@@ -94,9 +98,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         }
         catch (Exception exception)
         {
-            long count = fixedTickFailures.Count(Mission);
-            if (NavalTickFailureCount.ShouldLog(count))
-                Logger.Error(exception, "[NavalSync] Steering the copies on the fixed tick threw (failure {Count})", count);
+            fixedTickFailures.Report(exception, "Steering the copies on the fixed tick", Mission);
         }
     }
 
@@ -165,6 +167,7 @@ public class CoopNavalBattleBehavior : MissionLogic
 #endif
         // The static mirror's reset for a copy the engine never forgot; the engine's own entries die with the mission.
         NavalForeignHulls.Clear();
+        NavalFormationTacticRefresh.Clear();
         NavalShipDamageGate.Clear();
         NavalPlayerDeploymentSlot.Reset();
         base.OnEndMissionInternal();

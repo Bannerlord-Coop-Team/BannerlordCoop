@@ -2,6 +2,7 @@
 using HarmonyLib;
 using Serilog;
 using System;
+using System.Diagnostics;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
@@ -14,9 +15,8 @@ namespace Missions.Naval;
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class NavalAgentTickFailurePatch
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<NavalAgentTickFailurePatch>();
-
-    private static readonly NavalTickFailureCount Failures = new NavalTickFailureCount();
+    // Static as the patch is; it keeps the failing mission only weakly.
+    private static readonly INavalTickFailureLog Failures = new NavalTickFailureLog();
 
     // Logs the throw, finishes the tick and swallows it in a co-op naval battle; elsewhere vanilla's crash stands.
     [HarmonyFinalizer]
@@ -25,39 +25,63 @@ internal class NavalAgentTickFailurePatch
         if (__exception == null || !CoopNavalMissionScope.IsActive) return __exception;
 
         __instance.tickCompleted = true;
-        long count = Failures.Count(__instance);
-        if (NavalTickFailureCount.ShouldLog(count))
-            Logger.Error(__exception, "[NavalSync] Mission agent and team tick threw (failure {Count} this mission); finished the tick", count);
+        Failures.Report(__exception, "Mission agent and team tick (finished the tick)", __instance);
         return null;
     }
 }
 
-/// <summary>Counts a repeating tick failure per mission, and decides which failures are logged.</summary>
-internal class NavalTickFailureCount
+/// <summary>Logs a repeating tick failure without flooding the log, counting per mission.</summary>
+public interface INavalTickFailureLog
 {
-    private readonly object gate = new object();
-    private object mission;
-    private long count;
+    /// <summary>Counts a failure of <paramref name="what"/> in <paramref name="mission"/>, logs it when its turn comes, and returns the count.</summary>
+    long Report(Exception exception, string what, object mission);
+}
 
-    /// <summary>Counts one failure in <paramref name="currentMission"/>, starting again at 1 in a new mission.</summary>
-    public long Count(object currentMission)
+/// <inheritdoc cref="INavalTickFailureLog"/>
+public class NavalTickFailureLog : INavalTickFailureLog
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<NavalTickFailureLog>();
+
+    // A repeating failure still gets a line at most this often, with its running count.
+    internal const double SummarySeconds = 10;
+
+    private readonly object gate = new object();
+    private readonly WeakReference<object> mission = new WeakReference<object>(null);
+    private long count;
+    private long lastLineAt;
+
+    // Called from the async worker or a fixed tick, so the count and the last line's time are read and written under a lock.
+    public long Report(Exception exception, string what, object currentMission)
     {
+        long failures;
         lock (gate)
         {
-            if (!ReferenceEquals(mission, currentMission))
+            if (!mission.TryGetTarget(out var known) || !ReferenceEquals(known, currentMission))
             {
-                mission = currentMission;
+                mission.SetTarget(currentMission);
                 count = 0;
+                lastLineAt = 0;
             }
 
-            return ++count;
+            failures = ++count;
+            long now = Stopwatch.GetTimestamp();
+            double sinceLastLine = lastLineAt == 0 ? double.MaxValue : (double)(now - lastLineAt) / Stopwatch.Frequency;
+            if (!ShouldLog(failures, sinceLastLine)) return failures;
+
+            lastLineAt = now;
         }
+
+        Logger.Error(exception, "[NavalSync] {What} threw (failure {Count} this mission)", what, failures);
+        return failures;
     }
 
-    /// <summary>Whether a repeating tick failure is logged: the first three, then every power of ten.</summary>
-    public static bool ShouldLog(long count)
+    /// <summary>
+    /// Whether a repeating failure is logged: the first three, every power of ten, and otherwise once <see cref="SummarySeconds"/>
+    /// passed since the last line.
+    /// </summary>
+    internal static bool ShouldLog(long count, double secondsSinceLastLine)
     {
-        if (count <= 3) return true;
+        if (count <= 3 || secondsSinceLastLine >= SummarySeconds) return true;
 
         while (count % 10 == 0) count /= 10;
         return count == 1;

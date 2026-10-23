@@ -35,6 +35,9 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalCopyWeaponStates>()
             .As<INavalCopyWeaponStates>()
             .InstancePerDependency();
+        builder.RegisterType<NavalTickFailureLog>()
+            .As<INavalTickFailureLog>()
+            .InstancePerDependency();
         builder.RegisterType<NavalSteeredCopies>()
             .As<INavalSteeredCopies>()
             .InstancePerDependency();

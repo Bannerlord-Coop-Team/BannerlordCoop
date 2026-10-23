@@ -17,6 +17,7 @@ using NavalDLC.Missions.Handlers;
 using NavalDLC.Missions.MissionLogics;
 using SandBox.Missions.MissionLogics;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -52,6 +53,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly INavalShipCaptureEngine captureEngine;
     private readonly INavalBattleServicesFactory servicesFactory;
     private readonly IPlayerManager playerManager;
+    // A fresh failure log per behaviour, so each counts its own throws.
+    private readonly Func<INavalTickFailureLog> tickFailureLogs;
 #if DEBUG
     private readonly INavalScenarioState scenarioState;
     private readonly INavalDebugHulls debugHulls;
@@ -66,7 +69,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         INavalShipEngine shipEngine,
         INavalShipCaptureEngine captureEngine,
         INavalBattleServicesFactory servicesFactory,
-        IPlayerManager playerManager
+        IPlayerManager playerManager,
+        Func<INavalTickFailureLog> tickFailureLogs
 #if DEBUG
         , INavalScenarioState scenarioState,
         INavalDebugHulls debugHulls
@@ -78,6 +82,7 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         this.debugHulls = debugHulls;
 #endif
         this.playerManager = playerManager;
+        this.tickFailureLogs = tickFailureLogs;
         this.shipEngine = shipEngine;
         this.captureEngine = captureEngine;
         this.servicesFactory = servicesFactory;
@@ -204,7 +209,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var debugController = mission.GetMissionBehavior<CoopBattleController>();
         if (shipEngine is NavalShipEngine navalEngine)
             mission.AddMissionBehavior(new NavalCopyProbeLogic(debugController.MissionComponent.ShipRegistry, navalEngine.SteeredCopies));
-        mission.AddMissionBehavior(new NavalWaterProbeLogic(debugController.Session, debugController.MissionComponent.ShipRegistry));
+        mission.AddMissionBehavior(new NavalWaterProbeLogic(debugController.Session, debugController.MissionComponent.ShipRegistry,
+            tickFailureLogs()));
         AttachScenario(mission, mapEventId);
 #endif
         mission.SetPlayerCanTakeControlOfAnotherAgentWhenDead();
@@ -231,7 +237,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         var services = servicesFactory.Create(context, shipEngine, captureEngine);
         var npcFleetSpawner = new NavalNpcFleetSpawner(context.Session, services.ShipReplicator, context.MissionComponent.ShipRegistry,
             shipSnapshotBuilder, objectManager, playerManager, enemySide);
-        mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, npcFleetSpawner, mission.GetMissionBehavior<NavalShipsLogic>()));
+        mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, npcFleetSpawner, mission.GetMissionBehavior<NavalShipsLogic>(),
+            tickFailureLogs()));
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(context.Session, context.Deployment, context.ResultCommitter,
             npcFleetSpawner, services.ShipReplicator, services.MigrationReserveFielder));
     }
