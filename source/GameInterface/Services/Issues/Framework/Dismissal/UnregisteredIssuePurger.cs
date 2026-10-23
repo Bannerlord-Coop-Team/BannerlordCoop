@@ -21,12 +21,20 @@ internal class UnregisteredIssuePurger : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly IQuestTypeRegistry registry;
+    private readonly IQuestFeatureFlag questFeatureFlag;
+    private readonly IIssueDismisser issueDismisser;
 
     /// <summary>Subscribes the purge to campaign readiness.</summary>
-    public UnregisteredIssuePurger(IMessageBroker messageBroker, IQuestTypeRegistry registry)
+    public UnregisteredIssuePurger(
+        IMessageBroker messageBroker,
+        IQuestTypeRegistry registry,
+        IQuestFeatureFlag questFeatureFlag,
+        IIssueDismisser issueDismisser)
     {
         this.messageBroker = messageBroker;
         this.registry = registry;
+        this.questFeatureFlag = questFeatureFlag;
+        this.issueDismisser = issueDismisser;
 
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignReady);
     }
@@ -69,22 +77,43 @@ internal class UnregisteredIssuePurger : IHandler
             .ToList();
 
         var removed = 0;
+        var dismissed = 0;
 
         foreach (var issue in unregistered)
         {
-            if (!issue.IsOngoingWithoutQuest)
+            try
             {
+                if (issue.IsOngoingWithoutQuest)
+                {
+                    issue.IssueFinalized();
+                    removed++;
+                    continue;
+                }
+
+                // A save from a quests-enabled build can hold taken issues that nothing syncs once quests are off
+                if (!questFeatureFlag.IsEnabled)
+                {
+                    issueDismisser.Dismiss(issue);
+                    dismissed++;
+                    continue;
+                }
+
                 Logger.Warning(
                     "Keeping {issue} owned by {owner}, it is already being solved but its type is not registered",
                     issue.GetType().Name,
                     issue.IssueOwner?.StringId);
-                continue;
             }
-
-            issue.IssueFinalized();
-            removed++;
+            catch (Exception e)
+            {
+                Logger.Error(e, "Purging {issue} offered by {owner} failed", issue.GetType().Name, issue.IssueOwner?.StringId);
+            }
         }
 
         Logger.Information("Removed {removed} issues of unregistered types", removed);
+
+        if (dismissed > 0)
+        {
+            Logger.Information("Dismissed {dismissed} taken issues because quests are turned off", dismissed);
+        }
     }
 }
