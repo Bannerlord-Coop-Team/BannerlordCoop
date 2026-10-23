@@ -32,6 +32,7 @@ public class ScoutSettlementOwnerChangeTests : IDisposable
         targetIds = Enumerable.Range(0, 3).Select(_ => environment.CreateRegisteredObject<Settlement>()).ToArray();
         var townIds = Enumerable.Range(0, 3).Select(_ => environment.CreateRegisteredObject<Town>()).ToArray();
         clanId = environment.CreateRegisteredObject<Clan>();
+        var giverClanId = environment.CreateRegisteredObject<Clan>();
         var enemyClanId = environment.CreateRegisteredObject<Clan>();
         var kingdomId = environment.CreateRegisteredObject<Kingdom>();
         var enemyKingdomId = environment.CreateRegisteredObject<Kingdom>();
@@ -47,6 +48,7 @@ public class ScoutSettlementOwnerChangeTests : IDisposable
                     Campaign.Current.EncyclopediaManager ??= new EncyclopediaManager();
                     Campaign.Current.EncyclopediaManager.CreateEncyclopediaPages();
                     var clan = Get<Clan>(instance, clanId);
+                    var giverClan = Get<Clan>(instance, giverClanId);
                     var enemyClan = Get<Clan>(instance, enemyClanId);
                     var kingdom = Get<Kingdom>(instance, kingdomId);
                     var enemyKingdom = Get<Kingdom>(instance, enemyKingdomId);
@@ -55,11 +57,13 @@ public class ScoutSettlementOwnerChangeTests : IDisposable
                     clan.Name = new TextObject("Allied clan");
                     clan._kingdom = kingdom;
                     clan.Tier = 2;
+                    giverClan.Name = new TextObject("Commander's clan");
+                    giverClan._kingdom = kingdom;
                     enemyClan._kingdom = enemyKingdom;
                     var giver = Get<Hero>(instance, scenario.NotableId);
-                    giver.Clan = clan;
-                    clan._leader = giver;
-                    kingdom._rulingClan = clan;
+                    giver.Clan = giverClan;
+                    giverClan._leader = giver;
+                    kingdom._rulingClan = giverClan;
                     var owner = Get<Hero>(instance, scenario.OwnerHeroId);
                     owner.Clan = clan;
                     owner._partyBelongedTo = Get<MobileParty>(instance, scenario.OwnerPartyId);
