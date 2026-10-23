@@ -1,4 +1,5 @@
-﻿using Common.Util;
+﻿using Common;
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Heroes.Patches;
@@ -66,7 +67,59 @@ public class TimeoutJournalHistoryTests : IDisposable
         scenario.Server.Call(() =>
         {
             Assert.Contains(serverQuest.JournalEntries, log => log.LogText.ToString() == introduction);
+            Assert.DoesNotContain(serverQuest, Campaign.Current.QuestManager.Quests);
         });
+        scenario.ClientB.Call(() =>
+        {
+            Assert.Null(Object<Hero>(scenario.ClientB, scenario.NotableId).Issue.IssueQuest);
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId)));
+        });
+        var sent = Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>());
+        scenario.Server.Call(() =>
+        {
+            var log = Assert.Single(serverQuest.JournalEntries);
+            Assert.Equal(sent.Time, log.LogTime);
+            Assert.Equal(sent.TaskName.ToString(), log.TaskName.ToString());
+            Assert.Equal(sent.Type, log.Type);
+            Assert.Equal(sent.Progress, log.CurrentProgress);
+            Assert.Equal(sent.Range, log.Range);
+        });
+    }
+
+    [Fact]
+    public void RepeatedAndForeignAcceptanceLogsCannotChangeTheOwnersHistory()
+    {
+        Accept();
+        var sent = Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>());
+        scenario.Server.SimulateMessage(scenario.ClientA.NetPeer, sent);
+        scenario.Server.SimulateMessage(scenario.ClientB.NetPeer,
+            new RequestQuestAcceptanceJournal(scenario.NotableId, QuestScenario.IssueId, 1,
+                new JournalLog(CampaignTime.Zero, new TextObject("Other player's introduction"))));
+        scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
+            new RequestQuestAcceptanceJournal(scenario.NotableId, "previous_issue", 1,
+                new JournalLog(CampaignTime.Zero, new TextObject("Previous issue's introduction"))));
+        scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
+            new RequestQuestAcceptanceJournal(scenario.NotableId, QuestScenario.IssueId, 2,
+                new JournalLog(CampaignTime.Zero, new TextObject("Stage with a missing predecessor"))));
+        scenario.Server.Call(() => Assert.Equal(introduction, Assert.Single(serverQuest.JournalEntries).LogText.ToString()));
+    }
+
+    [Fact]
+    public void CapturesEveryAcceptanceStageButStopsBeforeLaterProgressLogs()
+    {
+        Accept(addSecondStage: true);
+        Assert.Equal(2, scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>().Count());
+        scenario.Server.Call(() => Assert.Equal(new[] { introduction, "Second acceptance stage" },
+            serverQuest.JournalEntries.Select(log => log.LogText.ToString())));
+        scenario.ClientA.Call(() =>
+        {
+            GameThread.Instance.Update(TimeSpan.Zero);
+            ownerQuest.AddLog(new TextObject("Later quest progress"));
+        });
+        environment.FlushCoalescer();
+        Assert.Equal(2, scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>().Count());
+        scenario.Server.Call(() => Assert.Equal(2, serverQuest.JournalEntries.Count));
     }
 
     [Fact]
@@ -128,7 +181,7 @@ public class TimeoutJournalHistoryTests : IDisposable
         Assert.Equal(IssueOutcome.QuestTimeOut, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
 
-    private void Accept()
+    private void Accept(bool addSecondStage = false)
     {
         scenario.ClientA.Call(() =>
         {
@@ -138,8 +191,21 @@ public class TimeoutJournalHistoryTests : IDisposable
                 var issue = Object<Hero>(scenario.ClientA, scenario.NotableId).Issue;
                 issue.StartIssueWithQuest();
                 ownerQuest = Assert.IsType<Quest>(issue.IssueQuest);
+            }
+        });
+        environment.FlushCoalescer();
+        Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestSolutionAccept>());
+        scenario.Server.Call(() => Assert.Empty(Object<Hero>(scenario.Server, scenario.NotableId).Issue.IssueQuest.JournalEntries));
+        // The quest's offer dialogue can run its consequence after the original accept request was already applied.
+        scenario.ClientA.Call(() =>
+        {
+            GameThread.Instance.Update(TimeSpan.Zero);
+            using (new MainHeroSubstitutionScope(Object<Hero>(scenario.ClientA, scenario.OwnerHeroId),
+                Object<MobileParty>(scenario.ClientA, scenario.OwnerPartyId)))
+            {
                 ownerQuest.OnQuestAccepted();
                 introduction = Assert.Single(ownerQuest.JournalEntries).LogText.ToString();
+                if (addSecondStage) ownerQuest.AddLog(new TextObject("Second acceptance stage"));
             }
         });
         environment.FlushCoalescer();
