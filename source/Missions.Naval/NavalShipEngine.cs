@@ -212,6 +212,7 @@ public class NavalShipEngine : INavalShipEngine
         var origin = ship.ShipOrigin;
         var frame = ship.GlobalFrame;
         var condition = ReadCondition(ship);
+        int? ammo = ship.ShipSiegeWeapon?.AmmoCount;
 
         // Quest5's RemoveShipInternal: no rope or bridge may keep pointing at a removed hull, as in RemoveHull.
         NavalRopes.BreakConnections(ship);
@@ -224,6 +225,8 @@ public class NavalShipEngine : INavalShipEngine
 
         // HP lives on the shared origin; fire, partial HP and sinking live on the hull, so a sinking hull keeps sinking.
         ApplyCondition(fresh, condition);
+        // A spawned weapon starts with its full load (RangedSiegeWeapon's init), so the bolts already shot stay spent.
+        if (ammo.HasValue) fresh.ShipSiegeWeapon?.SetAmmo(ammo.Value);
 
         // Removing one hull and adding one leaves the planner's agent count unchanged, so its k-d tree keeps the removed
         // hull and never sees the new one. Rebuild it the way vanilla does after changing ships mid-mission.
