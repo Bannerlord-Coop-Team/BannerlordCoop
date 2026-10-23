@@ -390,12 +390,27 @@ public class BattleShipReplicatorTests
         var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: true);
         harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, Peer, 1, HostEpoch, Condition(100f), 12));
 
-        harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, "third_peer", 1, HostEpoch, Condition(100f), 7));
+        harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, "third_peer", 1, HostEpoch + 1, Condition(100f), 7));
         int beforeMove = harness.Replicator.ReportedReserveOf(copy);
         harness.Replicator.TransferHostHulls("third_peer");
 
         Assert.Equal(12, beforeMove);
         Assert.Equal(7, harness.Replicator.ReportedReserveOf(copy));
+    }
+
+    // R48 round 4 review: the epoch this client joined at counts as applied, so a report of that epoch from a controller that
+    // isn't the hull's authority (a late joiner's view of a stale report, a returning old host) is dropped, not kept for later.
+    [Fact]
+    public void NotAuthorityReport_AtTheJoinEpoch_IsNotKeptForAHostChange()
+    {
+        var harness = new Harness(committed: false);
+        harness.Members.Add("third_peer");
+        var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: true);
+
+        harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, "third_peer", 1, HostEpoch, Condition(100f), 7));
+        harness.Replicator.TransferHostHulls("third_peer");
+
+        Assert.Equal(0, harness.Replicator.ReportedReserveOf(copy));
     }
 
     [Theory]

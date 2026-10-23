@@ -152,7 +152,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     private long recordsHeld;
     // The host AI hulls last migrated to, so an AI copy whose record was still waiting registers under it too.
     private string npcHullHost;
-    // The host epoch whose AI hull move this client applied last; a successor's report from a newer one is early here.
+    // The host epoch whose AI hull move this client applied last, or the one it joined at; a report from a newer one is early.
     private int appliedHostEpoch;
     private bool spawnRecordsSent;
     private float sendElapsed;
@@ -197,6 +197,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         this.stations = stations;
         this.captureEngine = captureEngine;
         this.arrivals = arrivals;
+        NoteJoinEpoch();
 
         messageBroker.Subscribe<ShipSpawnedInBattle>(Handle_ShipSpawned);
         messageBroker.Subscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
@@ -606,6 +607,13 @@ public class BattleShipReplicator : IBattleShipReplicator
     private bool IsEarlyHostCondition(NetworkShipInfo ship, NetworkShipCondition condition, string rejection) =>
         IsEarlyHostCondition(ship.FollowsBattleHost, rejection, condition.HostEpoch, appliedHostEpoch);
 
+    // The epoch this client joined the battle at, taken at the start or with the first hull records once a host is known, so a
+    // late joiner's or a returning old host's stale report isn't read as one that overtook a host change.
+    private void NoteJoinEpoch()
+    {
+        if (appliedHostEpoch == 0) appliedHostEpoch = session.HostEpoch;
+    }
+
     // Keeps the newest early report per hull.
     private void HoldEarlyHostCondition(NetworkShipCondition condition)
     {
@@ -690,6 +698,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     /// <summary>[Game thread] Queues other owners' hull records and spawns the copies that can spawn now.</summary>
     internal void AcceptSpawnRecords(IEnumerable<BattleShipSpawnData> records)
     {
+        NoteJoinEpoch();
         foreach (var record in records.Where(record => record != null))
         {
             // A player who left or disconnected takes its hulls; an AI hull still spawns, then moves to the host. A returner's
