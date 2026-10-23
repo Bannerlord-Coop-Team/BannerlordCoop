@@ -1,6 +1,7 @@
 # Porting co-op to Bannerlord v1.5.x
 
-This page records what changed between Bannerlord v1.4.8 and v1.5.4 and how co-op follows it on the
+This page records what changed between Bannerlord v1.4.8 and v1.5.5 (the branch was ported to v1.5.3,
+then v1.5.4, and builds unchanged on v1.5.5) and how co-op follows it on the
 `bannerlord-1.5.x` branch. `development` stays on v1.4.8. Use it to review the port, and as a
 checklist when porting other code that runs against the game, such as the dedicated server. The
 epic #3836 tracks the v1.5 work that remains.
@@ -211,21 +212,25 @@ The branch builds and tests against v1.5.5 with no code change (2026-10-21, Stea
     `FinalizeEventAux`, so that battle's parties stay attached to an event that never finished, and an
     AI encounter with such a party threw `NullReferenceException` in `PartyBase.set_MapEventSide`
     from `StartBattleAction` (seen twice on 2026-10-22, events `Created_139` and `Created_171`). A
-    save made after the fix has none. For an affected save, the server now runs a load repair at
-    `CampaignReady` (`MapEventLoadCleaner.RepairOrphanedMapEvents`) that releases the parties of
-    every half-finished event a party or settlement still links to, logging one Warning per event.
-    Checked on 2026-10-22 on a dedicated server with a copy of the damaged save: it released 7
+    save made after the fix has none.
+  - Load repair, for an affected save. At `CampaignReady` the server runs
+    `MapEventLoadCleaner.FinalizePlayerMapEvents`, then `RepairOrphanedMapEvents`, then enters the
+    running state (`InitialServerState`). The player pass handles each event in three stages: repair
+    the party-side links, finalize, then disband the army and release the parties. The orphan pass
+    releases the parties of every finalized event that a party or settlement still links to, logging
+    one Warning per event; an unlisted live event is only logged. A throw in a stage is logged as an
+    Error, and the remaining events, the other pass and server start still run, where one throw used
+    to exit the dedicated server (exit 3). The army disband and party release run even when the
+    finalize step throws, but not when the link repair throws.
+  - Both passes run before the server state that lets lifetime patches publish. Each therefore
+    records the campaign's parties first and, in a `finally`, publishes `InstanceDestroyed<MobileParty>`
+    for every one that left the campaign during the pass, including a party destroyed elsewhere by a
+    cascade (a ruler killed in the battle can destroy a kingdom's clans).
+  - Checked on 2026-10-22 on a dedicated server with a copy of the damaged save: it released 7
     events (`Created_97`, 139, 141, 149, 171, 187 and 201), unregistered the 7 parties vanilla
     destroyed while releasing them, then loaded, served and autosaved. Not yet checked: that no
-    `set_MapEventSide` exception follows once time runs, because the server keeps time stopped
-    until a client joins.
-  - Both load passes (the player map event pass and the orphan pass) run before the server state
-    that lets lifetime patches publish. Each pass therefore records the campaign's parties first and
-    unregisters every one that left the campaign during the pass, including a party destroyed
-    elsewhere by a cascade (a ruler killed in the battle can destroy a kingdom's clans). A throw while
-    one event is handled is logged as an Error, and the remaining events, the other pass and server
-    start still run. In the player pass, the army disband and party release run even when the
-    finalize throws.
+    `set_MapEventSide` exception follows once time runs. With no client connected the pulse line
+    reads `timeMode=Stop players=0`, so that check waits for a client.
   - Open (follow-ups): the player pass finalizes an unlisted live event without first restoring its
     unsaved state, so that finalize can throw; the orphan pass then releases the event only if
     vanilla had already set `WaitingRemoval`. A successful `FinalizeEvent` in the player pass
@@ -262,8 +267,8 @@ The branch builds and tests against v1.5.5 with no code change (2026-10-21, Stea
 The dedicated server is built from this repository's module plus its own host program, so the
 co-op logic it runs is already ported. The host program's port is on the `bannerlord-1.5.x` branch
 of `Bannerlord-Coop-Team/BannerlordCoop.DedicatedServer`, which tracks its status in
-`docs/bannerlord-1.5.x-port.md`; it compiles against v1.5.4 and has not booted yet. When porting
-host code, check first wherever it:
+`docs/bannerlord-1.5.x-port.md`. It builds against v1.5.5 and has booted to `SERVING` with clients
+joined (2026-10-21 and 22). When porting host code, check first wherever it:
 
 - creates or loads a campaign: `new Campaign(CampaignGameMode.Campaign, new AdvancedStartOptionsData())`;
 - lists or loads saves: `SaveLoadVM.LoadSavesAsync`, then `RefreshSaves`;
@@ -289,8 +294,9 @@ for every loaded module, and the game client never reads that folder, so a modul
 skeletons its action sets need there: a skeleton-only package with the cooked-package header and
 the items copied unchanged works (copying the module's whole client `.tpac` packages crashed native
 init). TAOM ships one (`taom_creature_skeletons.tpac`, 6 skeletons); on the same stage and save the
-`Monsters` load fell from 479,705 ms to 11 ms with no warnings, and the warnings came back without
-it. The staging copies the folder because its data-only exclude list does not name it.
+`Monsters` load fell from 479,705 ms to 11 ms with no warnings and the server reached `SERVING`;
+without it the warnings came back. The dedicated server repo's Windows staging script copies the
+folder because its data-only exclude list does not name it.
 
 Method that worked for this port: compile against v1.5.4; apply every Harmony patch the way
 `source/GameInterface.Tests/PatchTest.cs` does, so a missing target fails the run; diff the body of
@@ -300,16 +306,18 @@ clients.
 
 ## Verification
 
-- The whole solution builds against v1.5.4. Every Harmony patch class binds, except
+- The whole solution builds against v1.5.4, and against v1.5.5 with no code change (see "v1.5.5").
+  Every Harmony patch class binds, except
   `MobilePartyAIRobustnessPatches`, whose class-level `[HarmonyPatch]` is commented out on
   `development` too.
 - The bodies of all 2,336 game methods GameInterface patched at the port (`0d8dd2280`) were diffed
   from v1.4.8 to v1.5.3 and from v1.5.3 to v1.5.4, and the changes reviewed. The patch targets added
   since were written against v1.5.4.
-- Unit tests (4,103 passed, 14 skipped) and E2E tests (2,712, 5 of them skipped as on `development`)
-  pass in Release. On Windows, run E2E in 16 shards
+- Unit tests and E2E tests (5 E2E tests skipped, as on `development`) pass in Release; the counts
+  are in the v1.5.5 section above. On Windows, run E2E in 16 shards
   (`sh ../.github/scripts/run-e2e-shard.sh <n> 16` from `source`): with 8, a shard's test filter can
   exceed the command-line length limit.
 - v1.5.5: see the v1.5.5 section above.
-- Not done yet: a live session with a server and two clients, a dedicated server boot on v1.5.4 or v1.5.5, and
-  CI, whose build image still carries v1.4.8 game assemblies.
+- Not done yet: a live session with a listen-server host and two clients, and CI, whose build image
+  still carries v1.4.8 game assemblies. The dedicated server has booted and served clients on v1.5.5
+  (see "Porting the dedicated server").
