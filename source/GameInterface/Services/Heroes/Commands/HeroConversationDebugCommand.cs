@@ -46,7 +46,10 @@ internal class HeroConversationDebugCommand
             if (!TryGetHero(args[0], out var hero, out var error)) return Failed(error);
             if (Campaign.Current.ConversationManager.IsConversationInProgress)
                 return Failed("A conversation is already active.");
-            if (PlayerEncounter.Current != null) return Failed("A player encounter is already active.");
+            if (PlayerEncounter.Current != null && !IsVisitingHerosSettlement(hero))
+            {
+                return Failed("A player encounter is already active.");
+            }
 
             Campaign.Current.CurrentConversationContext = ConversationContext.Default;
             CampaignMapConversation.OpenConversation(
@@ -58,6 +61,75 @@ internal class HeroConversationDebugCommand
 
             return Succeeded(GetState(hero));
 
+        }
+
+        // A town menu talk, not a siege or battle that happens to be at the hero's settlement
+        private static bool IsVisitingHerosSettlement(Hero hero)
+        {
+            var settlement = hero.CurrentSettlement;
+            return settlement != null && PlayerEncounter.EncounterSettlement == settlement &&
+                PlayerEncounter.Battle == null && !settlement.IsUnderSiege;
+        }
+    }
+
+    public sealed class HeroConversationChooseCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.hero_conversation";
+
+        public string Name => "choose";
+
+        public string Description => "Lists the current line and options, or picks an option by index, or continues with 'continue'.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("option", "An option index or 'continue'. Omit to list.", isRequired: false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            var manager = Campaign.Current.ConversationManager;
+            if (!manager.IsConversationInProgress) return Failed("No conversation is active.");
+
+            if (args.Count > 0)
+            {
+                if (args[0] == "continue")
+                {
+                    // Vanilla ignores a continue while the player has a choice to make
+                    if (manager.CurOptions.Count > 1)
+                    {
+                        return Failed($"Pick one of the {manager.CurOptions.Count} options instead.");
+                    }
+
+                    manager.ContinueConversation();
+                }
+                else if (int.TryParse(args[0], out var index) && index >= 0 && index < manager.CurOptions.Count)
+                {
+                    if (!manager.CurOptions[index].IsClickable)
+                    {
+                        return Failed($"Option {index} is disabled.");
+                    }
+
+                    manager.DoOption(index);
+                }
+                else
+                {
+                    return Failed($"Unknown option '{args[0]}'.");
+                }
+            }
+
+            if (!manager.IsConversationInProgress) return Succeeded("CONVERSATION_ENDED");
+
+            var output = new System.Text.StringBuilder();
+            output.AppendLine($"LINE: {manager.CurrentSentenceText}");
+            for (var i = 0; i < manager.CurOptions.Count; i++)
+            {
+                var option = manager.CurOptions[i];
+                output.AppendLine($"{i}: [{option.Id}] {option.Text}{(option.IsClickable ? "" : " (disabled)")}");
+            }
+
+            return Succeeded(output.ToString());
         }
     }
 
