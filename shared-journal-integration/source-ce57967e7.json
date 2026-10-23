@@ -1,0 +1,15 @@
+{
+  "head": "ce57967e79ae9995bd7f8eea462f786082506ed7",
+  "tree": "93a104a9920f64d0209c678a0009cbf2b8f73e06",
+  "mergedDevelopment": "7e59432341d1a5ed215943bd19ee1e563d5951a3",
+  "journalMerge": "b16d3d16ae7dd7325944ab3ea79c763d0a7d4bb1",
+  "requiredAncestor": "9e85bfe3c",
+  "sharedHotfix": "364bae7cf",
+  "hotfixCherryPick": "ce57967e7",
+  "hotfixFilesIdentical": true,
+  "privateConstructorVariantIsAncestor": false,
+  "focusedJob": "docker-ci-f18b098635ef4c1a8719",
+  "fullReleaseJob": null,
+  "liveRun": null,
+  "lane": "pending supervisor assignment"
+}

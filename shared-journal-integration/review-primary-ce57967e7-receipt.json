@@ -1,0 +1,14 @@
+{
+  "reviewer": "cliproxyapi-codex / gpt-6.1-sol",
+  "reasoningEffort": "xhigh",
+  "serviceTier": "priority",
+  "reviewedHead": "ce57967e79ae9995bd7f8eea462f786082506ed7",
+  "reviewedTree": "93a104a9920f64d0209c678a0009cbf2b8f73e06",
+  "verdict": "CLEAN for delta source",
+  "readiness": "NOT ESTABLISHED",
+  "reportedPath": "review-muse-ce57967e7.md",
+  "preservedPath": "review-primary-ce57967e7-delivered.md",
+  "sha256": "01C892593145F420946DEF04763EBB76EA17FB3A2888560FAFFCAD91486A77B3",
+  "note": "Raw report filename and heading say Muse; native delegated task provenance identifies this as the Codex primary. Original bytes retained.",
+  "taskId": "node:delegated-task:command%3Amcp%3Af932c441-c149-4ccb-bbe6-dac6e4ba8adc%3Adelegate-task%3A3949-journal-final-primary-ce57967e7-r2"
+}

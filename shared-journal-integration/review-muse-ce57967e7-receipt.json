@@ -1,0 +1,13 @@
+{
+  "reviewer": "native muse / muse-spark-1.3",
+  "reasoningEffort": "max",
+  "reviewedHead": "ce57967e79ae9995bd7f8eea462f786082506ed7",
+  "reviewedTree": "93a104a9920f64d0209c678a0009cbf2b8f73e06",
+  "verdict": "CLEAN for delta source",
+  "readiness": "NOT ESTABLISHED",
+  "reportedPath": "review-primary-ce57967e7.md",
+  "preservedPath": "review-muse-ce57967e7-delivered.md",
+  "sha256": "a479fa797aa336cd4ba01f8d58b4a9566bb86fc6b0d391f936417701977f02e8",
+  "note": "Reviewer used primary filename; preserved original bytes under separate delivered-Muse filename before primary completion.",
+  "taskId": "node:delegated-task:command%3Amcp%3Af932c441-c149-4ccb-bbe6-dac6e4ba8adc%3Adelegate-task%3A3949-journal-final-muse-ce57967e7-r2"
+}
