@@ -16,6 +16,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.VillageNeedsToolsIssueBehavior.Vi
 namespace GameInterface.Services.Issues.Quests.VillageNeedsTools.Patches;
 
 /// <summary>Routes delivery to the server and keeps replay from applying personal penalties twice.</summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class VillageNeedsToolsOutcomePatches
 {
@@ -89,6 +90,7 @@ internal class VillageNeedsToolsOutcomePatches
         => SyncedWritesTranspiler(instructions);
 
     // The server's daily issue tick has no player context, but the timeout relation penalty is owner-scoped.
+    [HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
     [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut))]
     private static class TimeoutOwnerScopePatch
     {

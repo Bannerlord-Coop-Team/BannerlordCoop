@@ -14,6 +14,7 @@ namespace GameInterface.Services.Issues.Quests.VillageNeedsTools.Patches;
 /// The raid and coercion endings are decided by the server, which runs the quest's
 /// listeners as each owning player. The owner's client never runs them on its own copy.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class VillageNeedsToolsWorldEventPatches
 {

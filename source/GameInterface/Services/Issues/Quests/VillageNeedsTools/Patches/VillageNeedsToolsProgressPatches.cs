@@ -12,6 +12,7 @@ namespace GameInterface.Services.Issues.Quests.VillageNeedsTools.Patches;
 /// Trades are applied by the server, so vanilla's inventory exchange event never reaches the owner's
 /// quest. The owner's client recounts the tools whenever the server changes its party's items.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(ItemRoster))]
 internal class VillageNeedsToolsProgressPatches
 {
