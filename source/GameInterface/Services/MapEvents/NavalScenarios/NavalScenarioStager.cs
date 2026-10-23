@@ -102,6 +102,7 @@ public class NavalScenarioStager : INavalScenarioStager
         {
             TopUpShips(party.Party, config.ShipsPerPlayer, hull);
             TopUpTroops(party, config.TroopTemplatesPerPlayer);
+            TopUpReserve(party, config.ReserveTroops);
         }
         HealHeroes(players, log);
         log.Append(" players=").Append(string.Join(",", config.ControllerIds.Zip(players,
@@ -634,7 +635,11 @@ public class NavalScenarioStager : INavalScenarioStager
 
         int enemyShipsBefore = enemy.Ships.Count;
         SizeFleet(enemy.Party, config.EnemyHulls, hull);
+        TopUpReserve(enemy, config.ReserveTroops);
         log.Append($" enemy={enemy.StringId}(ships={enemyShipsBefore}->{enemy.Ships.Count},troops={enemy.MemberRoster.TotalManCount})");
+        if (config.ReserveTroops > 0)
+            log.Append($" reserve={config.ReserveTroops}(crewCapacity players={string.Join(",", players.Select(CrewCapacityOf))} " +
+                $"enemy={CrewCapacityOf(enemy)})");
         if (config.ArmedShipsPerParty > 0) log.Append(" armedEnemy=").Append(ArmShips(enemy.Party, config.ArmedShipsPerParty));
         if (config.RammedShipsPerParty > 0) log.Append(" rammedEnemy=").Append(FitRams(enemy.Party, config.RammedShipsPerParty));
 
@@ -852,7 +857,25 @@ public class NavalScenarioStager : INavalScenarioStager
         if (log.Length > 0) Logger.Warning("[NavalScenario] Troop top-up of {PartyId}: {Log}", party.StringId, log.ToString());
     }
 
+    // reserve=n: tops the regulars up past every ship's crew capacity, so at least n wait in reserve whatever ships deploy.
+    private void TopUpReserve(MobileParty party, int reserve)
+    {
+        if (reserve <= 0) return;
+
+        var log = new StringBuilder();
+        for (int i = ReserveTemplatesMissing(party.MemberRoster.TotalRegulars, CrewCapacityOf(party), reserve); i > 0; i--)
+            PartyCommands.AddTroopTemplate(party.MemberRoster, objectManager, log);
+        if (log.Length > 0) Logger.Warning("[NavalScenario] Reserve top-up of {PartyId}: {Log}", party.StringId, log.ToString());
+    }
+
+    // Every crew place on a party's ships, the most troops its hulls can take on deck and below.
+    private static int CrewCapacityOf(MobileParty party) => party.Ships.Sum(ship => ship.TotalCrewCapacity);
+
     internal static int ShipsMissing(int ships, int wanted) => Math.Max(0, wanted - ships);
+
+    /// <summary>How many add_troops templates bring <paramref name="regulars"/> to <paramref name="reserve"/> past <paramref name="crewCapacity"/>.</summary>
+    internal static int ReserveTemplatesMissing(int regulars, int crewCapacity, int reserve) =>
+        Math.Max(0, (crewCapacity + reserve - regulars + TroopsPerTemplate - 1) / TroopsPerTemplate);
 
     /// <summary>How many add_troops templates bring <paramref name="regulars"/> up to <paramref name="templates"/> templates' worth.</summary>
     internal static int TemplatesMissing(int regulars, int templates) =>

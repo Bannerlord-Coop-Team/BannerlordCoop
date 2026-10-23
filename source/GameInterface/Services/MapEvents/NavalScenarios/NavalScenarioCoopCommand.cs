@@ -29,7 +29,9 @@ public sealed class NavalScenarioCoopCommand : ICoopCommand
     public string Name => "scenario";
 
     public string Description => "Stages a naval battle test preset (" + NavalScenarioPresets.Names + ") for the connected players " +
-        "or the listed ones; knobs: hulls=n hull=id spacing=m ships=n delay=s reconnect=s who=host|nonhost town=id weapons=n ram=n.";
+        "or the listed ones; knobs: hulls=n hull=id spacing=m ships=n delay=s reconnect=s who=host|nonhost town=id weapons=n ram=n " +
+        "reserve=n. reserve=n gives each player, and the AI fleet of a start_naval preset, " +
+        "n regular troops beyond its ships' crew capacity, left in reserve to reinforce.";
 
     public CoopCommandSide Side => CoopCommandSide.Server;
 

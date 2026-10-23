@@ -21,7 +21,7 @@ public interface INavalScenarioResolver
 public class NavalScenarioResolver : INavalScenarioResolver
 {
     internal const string Usage = "Usage: coop.debug.naval.scenario <preset> [hulls=n] [hull=id] [spacing=m] [ships=n] " +
-        "[delay=s] [reconnect=s] [who=host|nonhost] [drop=hard|leave] [town=id] [weapons=n] [ram=n] [controllerId...]";
+        "[delay=s] [reconnect=s] [who=host|nonhost] [drop=hard|leave] [town=id] [weapons=n] [ram=n] [reserve=n] [controllerId...]";
 
     public bool TryResolve(IReadOnlyList<string> args, IReadOnlyList<string> connectedControllerIds,
         out NavalScenarioConfig config, out string error)
@@ -130,6 +130,11 @@ public class NavalScenarioResolver : INavalScenarioResolver
                 if (!TryParseInt(value, 0, NavalScenarioPresets.MaxShipsPerPlayer, out int rams))
                     return $"ram must be a whole number from 0 to {NavalScenarioPresets.MaxShipsPerPlayer}.";
                 config.RammedShipsPerParty = rams;
+                return null;
+            case "reserve":
+                if (!TryParseInt(value, 0, NavalScenarioPresets.MaxReserveTroops, out int reserve))
+                    return $"reserve must be a whole number from 0 to {NavalScenarioPresets.MaxReserveTroops}.";
+                config.ReserveTroops = reserve;
                 return null;
             case "who":
                 if (!config.DisconnectBattleHost) return $"{config.Preset} disconnects nobody, so it takes no who knob.";

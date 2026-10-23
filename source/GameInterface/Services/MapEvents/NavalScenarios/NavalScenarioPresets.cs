@@ -90,6 +90,9 @@ public static class NavalScenarioPresets
 
     public const int MaxEnemyHulls = 8;
 
+    /// <summary>The most troops reserve=n puts beyond a party's crew capacity.</summary>
+    public const int MaxReserveTroops = 200;
+
     public const float SinkingHullHitPointRatio = 0.05f;
 
     /// <summary>

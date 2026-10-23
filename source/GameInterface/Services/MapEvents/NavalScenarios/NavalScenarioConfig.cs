@@ -97,6 +97,13 @@ public sealed class NavalScenarioConfig
     [ProtoMember(25)]
     public int RammedShipsPerParty { get; set; }
 
+    /// <summary>
+    /// How many regular troops each player's party, and the AI fleet a start_naval preset fights, carries beyond its ships'
+    /// crew capacity, so they wait in reserve to reinforce; 0 leaves the troops as the preset tops them up.
+    /// </summary>
+    [ProtoMember(26)]
+    public int ReserveTroops { get; set; }
+
     public string InitiatorControllerId => ControllerIds.Length == 0 ? null : ControllerIds[0];
 
     /// <summary>The player who joins the running battle, or null.</summary>

@@ -34,6 +34,22 @@ public class NavalScenarioStagerTests
         Assert.Equal(expected, NavalScenarioStager.TemplatesMissing(regulars, templates));
     }
 
+    // R48: reserve=n leaves at least n regulars beyond every crew place, so the victim has troops to reinforce with.
+    [Theory]
+    [InlineData(33, 104, 10, 8)]
+    [InlineData(33, 104, 1, 7)]
+    [InlineData(114, 104, 10, 0)]
+    [InlineData(120, 104, 10, 0)]
+    [InlineData(0, 0, 5, 1)]
+    public void ReserveTemplatesMissing_AddsWholeTemplatesUntilTheReserveIsPastTheCrewCapacity(int regulars, int crewCapacity,
+        int reserve, int expected)
+    {
+        int templates = NavalScenarioStager.ReserveTemplatesMissing(regulars, crewCapacity, reserve);
+
+        Assert.Equal(expected, templates);
+        Assert.True(regulars + (templates * NavalScenarioStager.TroopsPerTemplate) >= crewCapacity + reserve);
+    }
+
     // Once the fleet is held in the player's conversation or a map event exists, neither engage nor the fallback may run.
     [Theory]
     [InlineData(false, false, false, false)]

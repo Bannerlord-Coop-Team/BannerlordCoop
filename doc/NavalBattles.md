@@ -721,6 +721,9 @@ Knobs (`NavalScenarioResolver.Usage`):
 - `ram=n` (0 to 4) fits `bow_ram_lvl1` on the first n ships without a ballista of every player and of the AI fleet
   (not the `encounter` or `blockade` enemy), swapping in an `empire_medium_ship` where a hull has no bow slot. `ramming`
   defaults to `ram=1`.
+- `reserve=n` (0 to 200) tops every player's regulars, and those of the AI fleet a start_naval preset fights (not the
+  `encounter` or `blockade` enemy), up to n past the crew capacity of all the party's ships, so at least n wait in reserve
+  to reinforce, for example after a capture's orphan is removed (`boarding reserve=20`, `duel reserve=20`).
 
 A scenario client whose Ready press throws (R42 crash 2's first symptom) logs the exception, fails the `ready` step with
 `deployment half-finished` and runs no further steps in that battle.
