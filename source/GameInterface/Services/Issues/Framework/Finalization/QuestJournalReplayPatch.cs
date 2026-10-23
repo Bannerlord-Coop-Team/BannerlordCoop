@@ -7,6 +7,7 @@ using TaleWorlds.Localization;
 namespace GameInterface.Services.Issues.Framework.Finalization;
 
 /// <summary>Vanilla completion callbacks can repeat a line already supplied by the server's snapshot.</summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.AddLog))]
 internal class QuestJournalReplayPatch
 {
