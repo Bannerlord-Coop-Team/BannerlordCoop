@@ -4,6 +4,7 @@ using GameInterface.Services.ItemRosters.Messages;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Coalescing;
 using Common.Util;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Inventory.Data;
@@ -36,23 +37,27 @@ internal class TradeHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
     private readonly IVillageHostileActionInterface villageHostileActionInterface;
+    private readonly ISendCoalescer sendCoalescer;
 
     public TradeHandler(
         IInventoryLogicInterface inventoryLogicInterface,
         IMessageBroker messageBroker,
         IObjectManager objectManager,
         INetwork network,
-        IVillageHostileActionInterface villageHostileActionInterface)
+        IVillageHostileActionInterface villageHostileActionInterface,
+        ISendCoalescer sendCoalescer = null)
     {
         this.inventoryLogicInterface = inventoryLogicInterface;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
         this.villageHostileActionInterface = villageHostileActionInterface;
+        this.sendCoalescer = sendCoalescer;
 
         messageBroker.Subscribe<TradeAttempted>(Handle_TradeAttempted);
         messageBroker.Subscribe<CompleteTrade>(Handle_CompleteTrade);
         messageBroker.Subscribe<UpdateEquipmentClients>(Handle_UpdateEquipmentClients);
+        messageBroker.Subscribe<NetworkTradeCompleted>(Handle_TradeCompleted);
     }
 
     public void Dispose()
@@ -60,6 +65,7 @@ internal class TradeHandler : IHandler
         messageBroker.Unsubscribe<TradeAttempted>(Handle_TradeAttempted);
         messageBroker.Unsubscribe<CompleteTrade>(Handle_CompleteTrade);
         messageBroker.Unsubscribe<UpdateEquipmentClients>(Handle_UpdateEquipmentClients);
+        messageBroker.Unsubscribe<NetworkTradeCompleted>(Handle_TradeCompleted);
     }
 
     private void Handle_TradeAttempted(MessagePayload<TradeAttempted> payload)
@@ -89,9 +95,11 @@ internal class TradeHandler : IHandler
 
         var boughtItems = ResolveTradeItemIds(what.BoughtItems);
         var soldItems = ResolveTradeItemIds(what.SoldItems);
+        (ItemRosterElementData, int)[] transactionSoldItems = null;
 
         if (what.CanGainXpFromDiscarding)
         {
+            transactionSoldItems = soldItems;
             soldItems = ResolveLeftLootIds(what.FromRoster);
         }
 
@@ -118,7 +126,8 @@ internal class TradeHandler : IHandler
             boughtItems,
             soldItems,
             what.ForceTransferId,
-            what.InitialPlayerRoster
+            what.InitialPlayerRoster,
+            transactionSoldItems
         );
 
         network.SendAll(message);
@@ -173,6 +182,7 @@ internal class TradeHandler : IHandler
             var fromItemRosterData = message.FromItemRosterData;
             var totalAmount = message.TotalAmount;
             var merchantGold = message.MerchantGold;
+            var purchasedItems = boughtItems;
 
             // Undo any purchases that are no longer present in the roster
             // When looting, taken items are treated as bought items
@@ -180,6 +190,7 @@ internal class TradeHandler : IHandler
             {
                 var heroEquipments = GetHeroTradeEquipments(message.CharacterIdEquipmentsData);
                 totalAmount = ReconcilePurchases(fromRoster, toItemRosterData, heroEquipments, boughtItems, totalAmount, out var keptItems);
+                purchasedItems = GetKeptPurchases(boughtItems, keptItems);
 
                 // Merchants are shared, the client's snapshot misses what other players traded since it was taken
                 if (message.IsTrading) fromItemRosterData = ApplyTradeToLiveStock(fromRoster, keptItems, soldItems);
@@ -215,7 +226,68 @@ internal class TradeHandler : IHandler
                 boughtItems,
                 soldItems
             );
+
+            var exchangedSoldItems = message.CanGainXpFromDiscarding ? ResolveTradeItems(message.TransactionSoldItems) : soldItems;
+            SendTradeCompleted(peer, toRoster, hero, purchasedItems, exchangedSoldItems, message.IsTrading);
         });
+    }
+
+    /// <summary>
+    /// Vanilla's done logic, which Coop's patch skips, raises the player inventory exchange event on the player's game.
+    /// The trader's roster and gold updates are sent first, so listeners that recount the roster see the trade.
+    /// </summary>
+    private void SendTradeCompleted(
+        NetPeer peer,
+        ItemRoster toRoster,
+        Hero hero,
+        List<(ItemRosterElement, int)> purchasedItems,
+        List<(ItemRosterElement, int)> soldItems,
+        bool isTrading)
+    {
+        if (peer == null) return;
+
+        if (sendCoalescer != null)
+        {
+            if (objectManager.TryGetHandle(toRoster, out var rosterHandle)) sendCoalescer.FlushInstance(rosterHandle, network);
+            if (objectManager.TryGetHandle(hero, out var heroHandle)) sendCoalescer.FlushInstance(heroHandle, network);
+        }
+
+        network.Send(peer, new NetworkTradeCompleted(
+            ResolveTradeItemIds(purchasedItems),
+            ResolveTradeItemIds(soldItems),
+            isTrading));
+    }
+
+    private void Handle_TradeCompleted(MessagePayload<NetworkTradeCompleted> payload)
+    {
+        var message = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            var purchasedItems = ResolveTradeItems(message.PurchasedItems);
+            var soldItems = ResolveTradeItems(message.SoldItems);
+
+            CampaignEventDispatcher.Instance.OnPlayerInventoryExchange(purchasedItems, soldItems, message.IsTrading);
+        });
+    }
+
+    // Each purchase at the quantity the merchant could still supply, with its share of the price
+    private static List<(ItemRosterElement, int)> GetKeptPurchases(
+        List<(ItemRosterElement, int)> boughtItems,
+        List<ItemRosterElement> keptItems)
+    {
+        var purchases = new List<(ItemRosterElement, int)>();
+
+        for (int i = 0; i < keptItems.Count; i++)
+        {
+            var (bought, price) = boughtItems[i];
+            var kept = keptItems[i];
+            if (kept.Amount <= 0) continue;
+
+            purchases.Add((kept, kept.Amount == bought.Amount ? price : (price * kept.Amount) / bought.Amount));
+        }
+
+        return purchases;
     }
 
     internal static ItemRosterElement[] RebaseInventoryData(
