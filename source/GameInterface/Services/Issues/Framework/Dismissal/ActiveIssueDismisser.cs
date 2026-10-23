@@ -151,11 +151,16 @@ internal class ActiveIssueDismisser : IHandler
 
         var quest = issue.IssueQuest;
         var journals = Campaign.Current.GetCampaignBehavior<JournalLogsCampaignBehavior>();
-        if (quest != null && journals != null && ownerResolver.TryResolveOwnerHero(issue, out var owner))
+        if (journals != null && ownerResolver.TryResolveOwnerHero(issue, out var owner))
         {
-            // IssueFinalized detaches the mirror without raising vanilla's journal completion callback.
+            // IssueFinalized detaches the issue without raising vanilla's journal completion callback.
             using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
-                journals.OnQuestCompleted(quest, QuestBase.QuestCompleteDetails.Cancel);
+            {
+                if (quest != null)
+                    journals.OnQuestCompleted(quest, QuestBase.QuestCompleteDetails.Cancel);
+                else if (issue.IsSolvingWithLordSolution)
+                    journals.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueCancel, owner);
+            }
         }
 
         issue.IssueFinalized();
