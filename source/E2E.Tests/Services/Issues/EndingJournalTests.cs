@@ -314,7 +314,7 @@ public class EndingJournalTests : IDisposable
         AssertSavedHistoryMatches(ownerQuest, serverQuest);
     }
 
-    // Only presentation is stubbed; roster events and hourly progress use the native quest bodies.
+    /// <summary>Stubs presentation while retaining native roster listeners and hourly progress.</summary>
     private sealed class ProgressGarrisonQuest : LordNeedsGarrisonTroopsIssueBehavior.LordNeedsGarrisonTroopsIssueQuest
     {
         public ProgressGarrisonQuest(string questId, Hero giver, Settlement settlement, CharacterObject troop)
