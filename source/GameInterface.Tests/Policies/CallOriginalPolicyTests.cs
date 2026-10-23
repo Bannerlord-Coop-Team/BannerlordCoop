@@ -18,10 +18,11 @@ public class CallOriginalPolicyTests
         bool hadPreviousContainer = ContainerProvider.TryGetContainer(out var previousContainer);
         try
         {
-            ContainerProvider.Clear();
-
-            Assert.True(CallOriginalPolicy.IsOriginalAllowed());
-            Assert.True(CallOriginalPolicy.IsOriginalAllowedForOwnershipGate());
+            using (ContainerProvider.UseContainerThreadSafe(null))
+            {
+                Assert.True(CallOriginalPolicy.IsOriginalAllowed());
+                Assert.True(CallOriginalPolicy.IsOriginalAllowedForOwnershipGate());
+            }
         }
         finally
         {
