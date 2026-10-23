@@ -1,0 +1,320 @@
+{
+  "outcome": "PASS_FOR_SCOPED_PUBLICATION",
+  "head": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
+  "tree": "5d81be457582f5ea3fb3539d435b86729052f06c",
+  "currentMainHead": "bd74a2d5323edd542faebc14b4b9802e6db81184",
+  "dependencyOwnHeadSnapshot": "3de45705a7ec72f6364eef301f66d8fb3c6b3d5c",
+  "runToken": "issue3783-20261023T082604",
+  "legacyWorkflowUntouched": true,
+  "parentVisualReview": "parent-visual-review.json",
+  "screenshots": [
+    {
+      "file": "shots/30-r4-offer-rd-testclient2-21176.png",
+      "sourceRelativePath": "screenshots/30-r4-offer-rd-testclient2-21176.png",
+      "sha256": "ca8d69bd73f330f3ce890ea72c7a8a7a779c037dd6481c510d21205c90a7bd48",
+      "bytes": 1707809,
+      "role": "owner B",
+      "phase": "pre-accept offer",
+      "caption": "Oragur visibly offers 5,400 gold and the player can choose 'I'll find them and put a stop to what they're doing.' Gold is 1,000. This is the offer before acceptance.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false
+    },
+    {
+      "file": "shots/40-r4-accepted-rd-testclient-69600.png",
+      "sourceRelativePath": "screenshots/40-r4-accepted-rd-testclient-69600.png",
+      "sha256": "41c0a1e717c9e56040eb8ea563b88093fffcc2e8543a51470540758279312ec8",
+      "bytes": 1877379,
+      "role": "observer A",
+      "phase": "pre-ending context",
+      "caption": "Observer A on the Quyaz map, gold 1,000. Pre-ending context only. Associated strict receipts establish B owns an active quest and A has no quest; those states are not visible in this image.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false
+    },
+    {
+      "file": "shots/40-r4-accepted-rd-testclient2-21176.png",
+      "sourceRelativePath": "screenshots/40-r4-accepted-rd-testclient2-21176.png",
+      "sha256": "7cc1a94af901aefa8bdf0a4d70a4000f11d9db3322a6d65e2431c3a9dfc2b48d",
+      "bytes": 2282763,
+      "role": "owner B",
+      "phase": "pre-ending context",
+      "caption": "Owner B in the Ortongard town menu, gold 1,000. Pre-ending context only. The accepted, active quest is receipt-backed; neither a quest nor its journal is visible here.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false
+    },
+    {
+      "file": "shots/owner-failed-Tuvul-ending-21176.png",
+      "sourceRelativePath": "screenshots/owner-failed-Tuvul-ending-21176.png",
+      "sha256": "9dcf196524084017652c9498050288f0111d472bf0bbfabd524d89b1d4f4d300",
+      "bytes": 1106740,
+      "role": "owner B",
+      "phase": "after ending",
+      "caption": "Owner B: Old Quests 3 and Tuvul's Revolt failed, with its opening and full battle-loss ending each once. The other seed row stays highlighted while the details show Tuvul.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false
+    },
+    {
+      "file": "shots/observer-no-Tuvul-entry-69600.png",
+      "sourceRelativePath": "screenshots/observer-no-Tuvul-entry-69600.png",
+      "sha256": "19708bc3cb20f55a56b335251a12d2459d9fc9a14aa2b6298ea4efe1f4fc29bb",
+      "bytes": 1088579,
+      "role": "observer A",
+      "phase": "after ending",
+      "caption": "Observer A: Active Quests 0, Old Quests 2, only existing Mitunis seed entries. No Tuvul entry. The specific journal lookup also returned no matching native entry.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false
+    }
+  ],
+  "files": [
+    {
+      "path": "CAPTIONS.md",
+      "bytes": 1530,
+      "sha256": "afd22800cb4763ab9fbae41c1f71e7fffd823994cc1ab4478ed22263a7604c34"
+    },
+    {
+      "path": "dependency-source-receipt.json",
+      "bytes": 693,
+      "sha256": "dcdfefbe6026f8a490c017baef09118cb8b3472f8797f4950e76adcd712f8d57"
+    },
+    {
+      "path": "evidence-checks.json",
+      "bytes": 687,
+      "sha256": "e7165c4743714e7d962ee043c7d491f32b12280bcf0ce7ac67e7a776f9356537"
+    },
+    {
+      "path": "evidence.html",
+      "bytes": 8361,
+      "sha256": "f075f94c0502fbad182bf9fd04e6ac1f8b5260f6eb4cf52064202a08745d5661"
+    },
+    {
+      "path": "evidence.md",
+      "bytes": 5923,
+      "sha256": "6018c62283d2bcd2b771a117e404e9b7e4670903f6dcefca3a5670cc03d44b05"
+    },
+    {
+      "path": "parent-visual-review.json",
+      "bytes": 3835,
+      "sha256": "8be56d548cadfd99f20e2acc680da86cd9c46869d5523610c006a827bd44dc35"
+    },
+    {
+      "path": "receipts/coverage-after-server.json",
+      "bytes": 890,
+      "sha256": "e30e5cbab93e3ec485da2e2e77e33ff9bf0b6d8ab4f38f5bb3a7a91d546ff1f2"
+    },
+    {
+      "path": "receipts/coverage-after-testclient.json",
+      "bytes": 941,
+      "sha256": "e4293a83a6c745eb379eecb9ccc70b626b4480a0271dc75597f76ac43f480e74"
+    },
+    {
+      "path": "receipts/coverage-after-testclient2.json",
+      "bytes": 942,
+      "sha256": "0d626dd81ea57e87ef67d9e531f1c8538048415b32fdc832fcae67fdc2435ca7"
+    },
+    {
+      "path": "receipts/coverage-baseline-server.json",
+      "bytes": 891,
+      "sha256": "d13f66782aca0780049a84bd915fe9125fcd4c505d72dbd62fd5b43976747d0f"
+    },
+    {
+      "path": "receipts/coverage-baseline-testclient.json",
+      "bytes": 942,
+      "sha256": "53483546c2f8f965dc98d7e60aaee48139b99aed3d7184fda51718e8aae32745"
+    },
+    {
+      "path": "receipts/coverage-baseline-testclient2.json",
+      "bytes": 943,
+      "sha256": "e0c261b36d12f7e7db62d9134e384a66d0f2ca7b48dc6dbe4b48ae920b0f8e30"
+    },
+    {
+      "path": "receipts/coverage-before-server.json",
+      "bytes": 886,
+      "sha256": "7a2c33af7a763bcfb78bc9d903323977c8306fd22271c5273612c10c855c7dbc"
+    },
+    {
+      "path": "receipts/coverage-before-testclient.json",
+      "bytes": 937,
+      "sha256": "168f55b34c5f38a40bca14deb9e28d691357c36a5253ede23fffbc4edf198662"
+    },
+    {
+      "path": "receipts/coverage-before-testclient2.json",
+      "bytes": 938,
+      "sha256": "77c778be43519b9218313c8769ee61afa235e92fd800a8434f9f0e0ce80a1d37"
+    },
+    {
+      "path": "receipts/coverage-final-server.json",
+      "bytes": 890,
+      "sha256": "33ffea1d61e6583e8737ceea66d156787d72bfb60c6da106e22642f265d77af0"
+    },
+    {
+      "path": "receipts/coverage-final-testclient.json",
+      "bytes": 941,
+      "sha256": "f31a0fc68ccd3eccd3e98efc4a1b73f53bccfedf8b3e88b437eb0332ea352531"
+    },
+    {
+      "path": "receipts/coverage-final-testclient2.json",
+      "bytes": 942,
+      "sha256": "c278f4043e9eabb31f5f10682bbe009ddb3df463a5cb20365df80d7981115648"
+    },
+    {
+      "path": "receipts/final-inventory.json",
+      "bytes": 226,
+      "sha256": "f606f2ea5af95c5c11de436683c776fb8805460ab389acde5b5fb8c92fc66492"
+    },
+    {
+      "path": "receipts/observer-journal-no-entry.json",
+      "bytes": 501,
+      "sha256": "808cd882c76e82f0ee218fcff479d0f6641f2359d566b048285d5e5397307ac6"
+    },
+    {
+      "path": "receipts/owner-journal-select-testclient2.json",
+      "bytes": 554,
+      "sha256": "d624a2ceb1dde8cbb2a28bfd294eb5fb2425f91fc9614eec6811468d46c4f6be"
+    },
+    {
+      "path": "receipts/rural-after-server.json",
+      "bytes": 652,
+      "sha256": "e10b7fb78a0d80fd70cd7ddae6f075f1f6d65ae2ac335b6b0d807f0f761425ff"
+    },
+    {
+      "path": "receipts/rural-after-testclient.json",
+      "bytes": 703,
+      "sha256": "983ff8fdf5c89874bf022de824edd844b06694169424d100658d422f84dbd941"
+    },
+    {
+      "path": "receipts/rural-after-testclient2.json",
+      "bytes": 704,
+      "sha256": "22696f875a2badc01b0047eed8d931da9a5f17d059af0046f581a1ae2c791f1d"
+    },
+    {
+      "path": "receipts/rural-before-server.json",
+      "bytes": 652,
+      "sha256": "098c02805690a96e4d8fb0f15f9d5eeccc99ea9ebfedb4e270cdd7ee6c3d7b57"
+    },
+    {
+      "path": "receipts/rural-before-testclient.json",
+      "bytes": 703,
+      "sha256": "8d98de6d047de7f99d74c7fe5743e6c93157c32630f8db833c8e71ffb807b435"
+    },
+    {
+      "path": "receipts/rural-before-testclient2.json",
+      "bytes": 704,
+      "sha256": "1170a0964de03a290182bd29d93ce0311bf8fa7470d18d869a38f5f43ae519b9"
+    },
+    {
+      "path": "receipts/rural-final-server.json",
+      "bytes": 652,
+      "sha256": "f93b0ee43a336e38f87f40d89b7294731c69c0d3c71388fc0ee831c09a74430c"
+    },
+    {
+      "path": "receipts/rural-final-testclient.json",
+      "bytes": 703,
+      "sha256": "051cee06d5216e8438b00ee04daaf28cc070fc4ed0318d07666c45ef8984feae"
+    },
+    {
+      "path": "receipts/rural-final-testclient2.json",
+      "bytes": 704,
+      "sha256": "968e9e751883f1d3d701f949fc7f23bea11a57e638221c67c87e5c6d9817fc07"
+    },
+    {
+      "path": "receipts/step-035.json",
+      "bytes": 716,
+      "sha256": "95b1fd3fa3a06c8d45eae842b63c4e43c341430ec1e59a2dfeaf2218bc1cfc28"
+    },
+    {
+      "path": "receipts/step-037-try1.json",
+      "bytes": 1997,
+      "sha256": "7855617899443f5bc529f5fa2ba6a3e15b8ce74d971ddcca0f8333ec1db3e9eb"
+    },
+    {
+      "path": "receipts/step-038-try1.json",
+      "bytes": 1522,
+      "sha256": "776ea1d079f1f3adee6c4676db9bb7b4d8921825fe532145f15b96303d32f894"
+    },
+    {
+      "path": "receipts/step-039-try1.json",
+      "bytes": 2075,
+      "sha256": "502d153c6f073c395dc56580ebf4794588a873061598c5bd85098878466fb890"
+    },
+    {
+      "path": "receipts/step-080-try1.json",
+      "bytes": 2430,
+      "sha256": "23d5eca9ff22cd8ef31d7457da9e02ecb8f0ec90d432bd812d5e2358fb73f6de"
+    },
+    {
+      "path": "receipts/step-081-try1.json",
+      "bytes": 1588,
+      "sha256": "21456ab2b3799940bcc9e747763e3982fc830abc51ddf94317f3c9534e7088a1"
+    },
+    {
+      "path": "receipts/step-082-try1.json",
+      "bytes": 2598,
+      "sha256": "d5b4165c0d0d734b6d79505ced0184ce95ce3ad6facdbc61786cdea23b94732f"
+    },
+    {
+      "path": "receipts/step-083.json",
+      "bytes": 776,
+      "sha256": "c732c38241ee3bc9f8453288a3bb0cf89363af6041bd5d1e27d0ddd8ef101844"
+    },
+    {
+      "path": "release-integrity.json",
+      "bytes": 2236,
+      "sha256": "9b4f1e36f8917dd4aac8ea33f711a609606d22183a392fc88a6698195c8d3f25"
+    },
+    {
+      "path": "screenshots.json",
+      "bytes": 2981,
+      "sha256": "ffd654073d449850423fde9a1fff9d837eedd017fd785725d03789739c6b84ba"
+    },
+    {
+      "path": "shots/30-r4-offer-rd-testclient2-21176.png",
+      "bytes": 1707809,
+      "sha256": "ca8d69bd73f330f3ce890ea72c7a8a7a779c037dd6481c510d21205c90a7bd48"
+    },
+    {
+      "path": "shots/40-r4-accepted-rd-testclient-69600.png",
+      "bytes": 1877379,
+      "sha256": "41c0a1e717c9e56040eb8ea563b88093fffcc2e8543a51470540758279312ec8"
+    },
+    {
+      "path": "shots/40-r4-accepted-rd-testclient2-21176.png",
+      "bytes": 2282763,
+      "sha256": "7cc1a94af901aefa8bdf0a4d70a4000f11d9db3322a6d65e2431c3a9dfc2b48d"
+    },
+    {
+      "path": "shots/observer-no-Tuvul-entry-69600.png",
+      "bytes": 1088579,
+      "sha256": "19708bc3cb20f55a56b335251a12d2459d9fc9a14aa2b6298ea4efe1f4fc29bb"
+    },
+    {
+      "path": "shots/owner-failed-Tuvul-ending-21176.png",
+      "bytes": 1106740,
+      "sha256": "9dcf196524084017652c9498050288f0111d472bf0bbfabd524d89b1d4f4d300"
+    },
+    {
+      "path": "source-equivalence.json",
+      "bytes": 662,
+      "sha256": "704c296f839749fce92a7095b1e75c4c634b89c44437ef42ab074787f5c4390b"
+    },
+    {
+      "path": "up22-REPORT.md",
+      "bytes": 10280,
+      "sha256": "4041f83a5909b2457d2832cd292fbce1b6c88a46d995bd6137091a09e8910fc8"
+    },
+    {
+      "path": "up23-EVIDENCE-MANIFEST.json",
+      "bytes": 45934,
+      "sha256": "4dafe090dc169502ba376fc2d2f537a626af9ac90def488ccb1008fb2379c16e"
+    },
+    {
+      "path": "up23-RESULT.json",
+      "bytes": 3947,
+      "sha256": "06aee77cefe45007feb9e3b9c288145a97afd12459c03e23d122e147b22ad285"
+    }
+  ],
+  "ready": false
+}

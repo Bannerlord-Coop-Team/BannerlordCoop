@@ -1,0 +1,13 @@
+{
+  "ownHeadSnapshot": "3de45705a7ec72f6364eef301f66d8fb3c6b3d5c",
+  "combinedTestedHead": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
+  "currentMainHead": "bd74a2d5323edd542faebc14b4b9802e6db81184",
+  "path": "source/GameInterface/Services/Issues/Framework/Finalization/FinalizationCoordinator.cs",
+  "blobs": {
+    "tested": "514754443a5aac668d1a24da1c39f3dabb14f329",
+    "currentMain": "514754443a5aac668d1a24da1c39f3dabb14f329",
+    "dependencyOwnSnapshot": "514754443a5aac668d1a24da1c39f3dabb14f329"
+  },
+  "sameCoordinatorBlob": true,
+  "limit": "No full Release or native live run at dependency own snapshot is claimed. New dependency tests await parent adoption and final Release."
+}

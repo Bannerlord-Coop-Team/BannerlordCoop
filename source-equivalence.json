@@ -1,0 +1,14 @@
+{
+  "blankLineDeletions": 2,
+  "freshReleaseAtNewHead": false,
+  "changedFiles": [
+    "source/E2E.Tests/Services/Issues/LesserNobleRevoltTests.cs",
+    "source/E2E.Tests/Services/Issues/ScoutEnemyGarrisonsTests.cs"
+  ],
+  "reuseLimit": "6e268 Release/live receipts retain tested identity; unchanged product blobs and whitespace-only tests permit scoped evidence reuse, not a new-head CI/live claim.",
+  "allOtherTrackedBlobsIdentical": true,
+  "nonWhitespaceDiff": false,
+  "testedHead": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
+  "newHead": "bd74a2d5323edd542faebc14b4b9802e6db81184",
+  "newTree": "311491b1b93a9b28a6edf83fc2dab4fdb5981cd6"
+}

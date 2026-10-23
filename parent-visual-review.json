@@ -1,0 +1,73 @@
+{
+  "head": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
+  "tree": "5d81be457582f5ea3fb3539d435b86729052f06c",
+  "reviewerThreadId": "mcp:4f1d3716-9837-4466-901e-19d4d125537d",
+  "accepted": true,
+  "scope": "Five selected original images with the exact observations below, plus user-confirmed up23 functional/data/cleanup result. No blanket before-journal acceptance.",
+  "authority": "Supervisor09:58 explicitly authorizes run-local publication, leaving legacy workflow1add revision44 untouched. Actual parent views are explicitly confirmed by the user.",
+  "journalBeforeAccepted": false,
+  "penaltyImageParentReviewed": false,
+  "images": [
+    {
+      "file": "shots/30-r4-offer-rd-testclient2-21176.png",
+      "sourceRelativePath": "screenshots/30-r4-offer-rd-testclient2-21176.png",
+      "sha256": "ca8d69bd73f330f3ce890ea72c7a8a7a779c037dd6481c510d21205c90a7bd48",
+      "bytes": 1707809,
+      "role": "owner B",
+      "phase": "pre-accept offer",
+      "caption": "Oragur visibly offers 5,400 gold and the player can choose 'I'll find them and put a stop to what they're doing.' Gold is 1,000. This is the offer before acceptance.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false
+    },
+    {
+      "file": "shots/40-r4-accepted-rd-testclient-69600.png",
+      "sourceRelativePath": "screenshots/40-r4-accepted-rd-testclient-69600.png",
+      "sha256": "41c0a1e717c9e56040eb8ea563b88093fffcc2e8543a51470540758279312ec8",
+      "bytes": 1877379,
+      "role": "observer A",
+      "phase": "pre-ending context",
+      "caption": "Observer A on the Quyaz map, gold 1,000. Pre-ending context only. Associated strict receipts establish B owns an active quest and A has no quest; those states are not visible in this image.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false
+    },
+    {
+      "file": "shots/40-r4-accepted-rd-testclient2-21176.png",
+      "sourceRelativePath": "screenshots/40-r4-accepted-rd-testclient2-21176.png",
+      "sha256": "7cc1a94af901aefa8bdf0a4d70a4000f11d9db3322a6d65e2431c3a9dfc2b48d",
+      "bytes": 2282763,
+      "role": "owner B",
+      "phase": "pre-ending context",
+      "caption": "Owner B in the Ortongard town menu, gold 1,000. Pre-ending context only. The accepted, active quest is receipt-backed; neither a quest nor its journal is visible here.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false
+    },
+    {
+      "file": "shots/owner-failed-Tuvul-ending-21176.png",
+      "sourceRelativePath": "screenshots/owner-failed-Tuvul-ending-21176.png",
+      "sha256": "9dcf196524084017652c9498050288f0111d472bf0bbfabd524d89b1d4f4d300",
+      "bytes": 1106740,
+      "role": "owner B",
+      "phase": "after ending",
+      "caption": "Owner B: Old Quests 3 and Tuvul's Revolt failed, with its opening and full battle-loss ending each once. The other seed row stays highlighted while the details show Tuvul.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false
+    },
+    {
+      "file": "shots/observer-no-Tuvul-entry-69600.png",
+      "sourceRelativePath": "screenshots/observer-no-Tuvul-entry-69600.png",
+      "sha256": "19708bc3cb20f55a56b335251a12d2459d9fc9a14aa2b6298ea4efe1f4fc29bb",
+      "bytes": 1088579,
+      "role": "observer A",
+      "phase": "after ending",
+      "caption": "Observer A: Active Quests 0, Old Quests 2, only existing Mitunis seed entries. No Tuvul entry. The specific journal lookup also returned no matching native entry.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false
+    }
+  ],
+  "manifestSha256": "4dafe090dc169502ba376fc2d2f537a626af9ac90def488ccb1008fb2379c16e"
+}

@@ -1,0 +1,20 @@
+{
+  "outcome": "PASS_FOR_SCOPED_PUBLICATION",
+  "checks": {
+    "all267Up23ManifestMembersMatch": true,
+    "sameTestedHeadTree": true,
+    "realAcceptanceAndOwnerActiveReceipt": true,
+    "observerHasNoQuestAtAcceptance": true,
+    "ownerEndingOnceReceipt": true,
+    "ownerGoldRelationHonorAndObserverIsolation": true,
+    "samePartyNativeDestructionAndWorldRegistryAbsence": true,
+    "nonemptyRuralSampleUnchangedOnAllPeers": true,
+    "cleanupVerifiedAbsentAndBenchReleased": true,
+    "exactlyFiveParentOpenedImages": true,
+    "noJournalBeforePixelClaim": true,
+    "penaltyImageNotParentApprovedOrSelected": true
+  },
+  "failed": [],
+  "ready": false,
+  "newReleaseRun": false
+}

@@ -1,0 +1,53 @@
+{
+  "jobId": "docker-ci-facfa60976e24ed39c5c",
+  "source": {
+    "head": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
+    "tree": "5d81be457582f5ea3fb3539d435b86729052f06c",
+    "origin": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
+    "status": "",
+    "verifiedUtc": "2026-10-23T06:53:56.062506+00:00"
+  },
+  "runnerBundleSha256": "0fb4bda63dd3183048dc523e55bb5469dfc2d1eff28a14dd184fa4806a202cc9",
+  "archiveSha256": "c212bd0c687a36339b5b7131c3d239f40baedd41b2b3a0be16579e88de8225fc",
+  "manifestSha256": "1fcd09c900d12b387a0edd295723fe93d731a09e403392a71235b8e0f2c9a290",
+  "resultSha256": "33bb99ca873431cced5ed2f37058e1d11adc67c906b6413186e084255739eb63",
+  "manifestFilesVerified": 309,
+  "queueJob": {
+    "jobId": "docker-ci-facfa60976e24ed39c5c",
+    "kind": "docker-ci",
+    "packageDir": "C:\\Users\\Andrew\\CodexWindows\\var\\garrett-1600\\3783\\corrected-timeout-full-release-20261023\\package-full-release",
+    "label": "#3783 6e2686383 full Release corrected timeout tuple",
+    "priority": 0,
+    "pinRunner": "HIVE",
+    "state": "finished",
+    "queuedUtc": "2026-10-23T06:21:46Z",
+    "runner": "HIVE",
+    "dispatchUtc": "2026-10-23T06:36:24Z",
+    "submittedUtc": "2026-10-23T06:36:29Z",
+    "detail": "{\"submitted\":true,\"jobId\":\"docker-ci-facfa60976e24ed39c5c\",\"remotePath\":\"\\\\\\\\hive.tail4317d7.ts.net\\\\CodexLiveTransport\\\\inbox\\\\docker-ci-facfa60976e24ed39c5c.ready\",\"runner\":\"HIVE\",\"submittedUtc\":\"2026-10-23T06:36:29.6631936Z\"}",
+    "startedUtc": "2026-10-23T06:36:34Z",
+    "result": "passed",
+    "finishedUtc": "2026-10-23T06:52:44Z"
+  },
+  "runnerFinal": {
+    "reachable": true,
+    "inbox": [],
+    "heartbeat": {
+      "writtenUtc": "2026-10-23T06:52:39.4660250Z",
+      "computerName": "HIVE",
+      "state": "ready",
+      "reason": "test-readiness-override",
+      "currentJob": null,
+      "currentJobPhase": null,
+      "currentJobStartedUtc": null,
+      "currentJobDeadlineUtc": null,
+      "pid": 33764,
+      "runnerBundleSha256": "0fb4bda63dd3183048dc523e55bb5469dfc2d1eff28a14dd184fa4806a202cc9",
+      "executionPlatform": "windows-native-v1"
+    },
+    "stale": false,
+    "ageSeconds": 5
+  },
+  "terminalTotalsAgree": true,
+  "allTrxAssembliesRelease": true
+}
