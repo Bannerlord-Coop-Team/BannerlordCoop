@@ -143,6 +143,44 @@ public class AcceptVisibilityTests : IDisposable
     }
 
     [Fact]
+    public void QuestSolution_AnotherOwnersTimeoutDoesNotEndTheFirstOwnersArchive()
+    {
+        var giverAId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var giverBId = TestEnvironment.CreateRegisteredObject<Hero>();
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverAId, out var giverA));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(giverBId, out var giverB));
+            QuestBase questA;
+            QuestBase questB;
+            using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(giverA, giverA.PartyBelongedTo))
+            {
+                questA = new UnstartedQuest("issue_owner_a_quest", giverA);
+            }
+            using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(giverB, giverB.PartyBelongedTo))
+            {
+                questB = new UnstartedQuest("issue_owner_b_quest", giverB);
+            }
+
+            var archiveB = new JournalLogEntry(questB.Title, giverB, null, false, questB);
+            var archiveA = new JournalLogEntry(questA.Title, giverA, null, false, questA);
+            LogEntry.AddLogEntry(archiveB);
+            LogEntry.AddLogEntry(archiveA);
+            // B has no issue, so the journal finds its archive by quest StringId and takes the newest match.
+            // A's archive is newest, so with null quest ids B's ending would close A's archive.
+            var journal = new TaleWorlds.CampaignSystem.CampaignBehaviors.JournalLogsCampaignBehavior();
+            using (new GameInterface.Services.Heroes.Patches.MainHeroSubstitutionScope(giverB, giverB.PartyBelongedTo))
+            {
+                journal.OnQuestCompleted(questB, QuestBase.QuestCompleteDetails.Fail);
+            }
+
+            Assert.Equal(QuestBase.QuestCompleteDetails.Invalid, archiveA._questCompletionDetail);
+            Assert.Equal(QuestBase.QuestCompleteDetails.Fail, archiveB._questCompletionDetail);
+            Assert.NotEqual(questA.StringId, questB.StringId);
+        });
+    }
+
+    [Fact]
     public void SendTroops_OnlyTheSenderGetsTheTroopsAndTheLogEntry()
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
@@ -319,6 +357,8 @@ public class AcceptVisibilityTests : IDisposable
             Assert.Null(notable.Issue);
             Assert.Null(otherIssue.IssueQuest);
             Assert.False(otherIssue.IsTriedToSolveBefore);
+            Assert.Empty(otherIssue.JournalEntries);
+            Assert.Null(Campaign.Current.LogEntryHistory.FindLastGameActionLog<JournalLogEntry>(entry => entry.IsRelatedTo(otherIssue)));
         });
 
         Assert.Empty(otherQuestCompletions);
