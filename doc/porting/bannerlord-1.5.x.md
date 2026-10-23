@@ -268,6 +268,19 @@ host code, check first wherever it:
   hosts to turn off) and leaves modules whose id starts with `DedicatedServer.` out of the module
   comparison.
 
+Open (seen 2026-10-22 hosting a mod with custom creatures, cause partly known): a staged server
+that carries a module's `ModuleData` but not its art has no skeleton for the action sets that module
+declares. The engine then falls back to an arbitrary loaded skeleton, so when `Game.LoadBasicFiles`
+reads the module's `Monsters` XML, each bone lookup fails against that skeleton (the log named
+`aserai_castle_gate_inner_l1_plank_skeleton`). Each failure prints
+`WARNING: could not find bone index for: <skeleton>::<bone>` with a stack dump and an "Always
+Ignore?" message box. On one boot, 150 of them took about 8 minutes before the campaign
+finished loading. A second boot of the same stage and save in `campaign` mode logged none, and the
+only difference found is timing: there the monsters loaded before the siege gate prefabs did. Not
+caused by co-op code. Options: give the server those skeletons in a package the dedicated server can
+load (copying the client `.tpac` packages crashed native init), or guard the bone lookup in the
+host so that a skeleton the server lacks returns no index without the native call.
+
 Method that worked for this port: compile against v1.5.4; apply every Harmony patch the way
 `source/GameInterface.Tests/PatchTest.cs` does, so a missing target fails the run; diff the body of
 every patched game method between the v1.4.8 and v1.5.4 decompiles and port the changes into any
