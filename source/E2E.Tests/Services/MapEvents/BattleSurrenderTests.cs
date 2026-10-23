@@ -114,43 +114,53 @@ public class BattleSurrenderTests : MapEventTestBase
     }
 
     /// <summary>
-    /// A surrender clicked while the encounter's map event has not reached the client yet cannot be sent, so it
-    /// must not latch the local pending state either; once the map event arrives the next click sends exactly
-    /// one request.
+    /// A surrender clicked before the server's battle has reached the client cannot be sent, so it must not
+    /// latch the local pending state either. Once the server's real battle party attach lands, the next click
+    /// sends exactly one request for that battle, even though the encounter never adopted it.
     /// </summary>
     [Fact]
-    public void RealSurrenderAction_BeforeMapEventArrives_DoesNotLatch_ThenSendsOnceItArrives()
+    public void RealSurrenderAction_BeforeServerBattleArrives_DoesNotLatch_ThenSendsOnceItArrives()
     {
-        var setup = SetupTwoOpposingPlayersInBattle();
-        var recipientClient = Clients.Last();
+        var ctx = CreateServerMapEvent();
+        var partyId = CreateServerParty();
+        var client = Clients.Last();
 
-        // The encounter is open but the server's map event has not been attached to it yet.
-        SetMockPlayerEncounter(recipientClient);
+        client.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
+            Campaign.Current.MainParty = party;
+        }, MapEventDisabledMethods);
+        SetMockPlayerEncounter(client);
 
-        recipientClient.Call(() =>
+        client.Call(() =>
         {
             var encounter = PlayerEncounter.Current;
-            Assert.Null(encounter._mapEvent);
+            Assert.Null(MobileParty.MainParty.MapEvent);
 
             InvokePatchedSurrender(encounter);
             Assert.False(encounter._playerSurrender, "a surrender that could not be sent must not latch");
-        }, BattleMenuSurrenderDisabledMethods());
+        }, WithoutNetworkDelivery());
 
-        Assert.Empty(recipientClient.NetworkSentMessages.GetMessages<NetworkPlayerSurrendered>());
+        Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkPlayerSurrendered>());
 
-        recipientClient.Call(() =>
+        JoinServerPartyToSide(ctx.MapEventId, partyId, BattleSideEnum.Defender);
+
+        client.Call(() =>
         {
             var encounter = PlayerEncounter.Current;
-            Assert.True(recipientClient.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out var mapEvent));
-            encounter._mapEvent = mapEvent;
+            Assert.NotNull(MobileParty.MainParty.MapEvent);
+            Assert.Null(encounter._mapEvent);
 
             InvokePatchedSurrender(encounter);
             Assert.True(encounter._playerSurrender);
-        }, BattleMenuSurrenderDisabledMethods());
 
-        var request = Assert.Single(recipientClient.NetworkSentMessages.GetMessages<NetworkPlayerSurrendered>());
-        Assert.Equal(setup.recipientPartyId, request.PlayerParty);
-        Assert.Equal(setup.ctx.MapEventId, request.MapEventId);
+            // A second click while the reply is in flight still sends nothing more.
+            InvokePatchedSurrender(encounter);
+        }, WithoutNetworkDelivery());
+
+        var request = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkPlayerSurrendered>());
+        Assert.Equal(partyId, request.PlayerParty);
+        Assert.Equal(ctx.MapEventId, request.MapEventId);
     }
 
     /// <summary>

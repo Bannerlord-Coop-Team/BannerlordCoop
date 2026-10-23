@@ -1,6 +1,9 @@
 ﻿using Common;
+using Common.Logging;
 using GameInterface.Policies;
+using GameInterface.Services.MapEvents.Initialization;
 using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -17,6 +20,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch]
 internal class RaidJoinEncounterConditionPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<RaidJoinEncounterConditionPatch>();
+
     private static IEnumerable<MethodBase> TargetMethods()
     {
         yield return AccessTools.Method(typeof(EncounterGameMenuBehavior), "game_menu_join_encounter_help_attackers_on_condition");
@@ -27,7 +32,10 @@ internal class RaidJoinEncounterConditionPatch
     private static void Postfix(MethodBase __originalMethod, MenuCallbackArgs args, ref bool __result)
     {
         // EncounteredBattle dereferences Current._encounteredParty, which is still null while the encounter is set up.
-        var mapEvent = PlayerEncounter.Current?._encounteredParty?.MapEvent;
+        if (PlayerEncounter.Current?._encounteredParty == null)
+            return;
+
+        var mapEvent = PlayerEncounter.EncounteredBattle;
         if (!mapEvent.IsActiveSlowVillageRaid())
             return;
 
@@ -42,11 +50,44 @@ internal class RaidJoinEncounterConditionPatch
         args.Tooltip = TextObject.GetEmpty();
     }
 
-    // Vanilla's join conditions read EncounteredBattle unguarded too; share the encounter menu finalizer so a
-    // refresh before the encounter is set up greys the option instead of throwing.
+    // Vanilla's join conditions dereference EncounteredBattle too. Only the null reference a refresh hits before the
+    // encounter is set up is turned into a greyed option; every other exception still surfaces.
     [HarmonyFinalizer]
     private static Exception Finalizer(MenuCallbackArgs args, MethodBase __originalMethod, ref bool __result, Exception __exception)
-        => BattleModeEncounterOptionsPatch.Finalizer(args, __originalMethod, ref __result, __exception);
+    {
+        if (__exception is not NullReferenceException || ModInformation.IsServer || IsEncounterSetUp())
+            return __exception;
+
+        __result = false;
+        if (args != null)
+        {
+            args.IsEnabled = false;
+            args.Tooltip = BattleModeEncounterOptionsPatch.BattleNotReadyTooltip;
+        }
+
+        Logger.Debug("Join option {Method} refreshed before the encounter was set up; greyed until it is",
+            __originalMethod?.Name ?? "<unknown>");
+        return null;
+    }
+
+    private static bool IsEncounterSetUp()
+    {
+        if (PlayerEncounter.Current?._encounteredParty == null)
+            return false;
+
+        MapEvent mapEvent;
+        try
+        {
+            mapEvent = PlayerEncounter.EncounteredBattle;
+        }
+        catch (NullReferenceException)
+        {
+            return false;
+        }
+
+        return mapEvent != null &&
+               (!ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier) || !barrier.IsPending(mapEvent));
+    }
 }
 
 [HarmonyPatch]

@@ -1,4 +1,5 @@
 using HarmonyLib;
+using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -36,9 +37,37 @@ public class EncounterJoinOptionTests : MapEventTestBase
 
             Assert.False(shown);
             Assert.False(args.IsEnabled);
-            Assert.NotNull(args.Tooltip);
+            Assert.Equal("Waiting for the server to set up the battle.", args.Tooltip?.ToString());
         }, MapEventDisabledMethods);
     }
+
+    /// <summary>The finalizer only absorbs the null reference of an encounter that is not set up yet; any other
+    /// failure in the join condition still surfaces.</summary>
+    [Fact]
+    public void JoinCondition_OtherExceptions_StillSurface()
+    {
+        var client = Clients.First();
+        var ctx = CreateServerMapEvent();
+        SetMockPlayerEncounter(client, ctx.AttackerPartyId, ctx.MapEventId);
+
+        var condition = AccessTools.Method(typeof(EncounterGameMenuBehavior), HelpAttackersCondition);
+        var harmony = new Harmony(nameof(JoinCondition_OtherExceptions_StillSurface));
+        harmony.Patch(condition, prefix: new HarmonyMethod(typeof(EncounterJoinOptionTests), nameof(ThrowUnrelated)) { priority = Priority.First });
+        try
+        {
+            client.Call(() =>
+            {
+                var error = Assert.Throws<TargetInvocationException>(() => InvokeJoinCondition(HelpAttackersCondition));
+                Assert.IsType<InvalidOperationException>(error.InnerException);
+            }, MapEventDisabledMethods);
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
+    }
+
+    private static bool ThrowUnrelated() => throw new InvalidOperationException("unrelated condition failure");
 
     [Theory]
     [InlineData(HelpAttackersCondition)]

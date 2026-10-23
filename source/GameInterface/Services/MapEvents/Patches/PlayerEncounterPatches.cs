@@ -275,7 +275,7 @@ internal class PlayerEncounterPatches
 
         __instance._playerSurrender = true;
 
-        var message = new PlayerSurrendered(__instance._mapEvent, MobileParty.MainParty);
+        var message = new PlayerSurrendered(GetSurrenderMapEvent(__instance), MobileParty.MainParty);
 
         MessageBroker.Instance.Publish(__instance, message);
 
@@ -283,12 +283,20 @@ internal class PlayerEncounterPatches
     }
 
     /// <summary>
-    /// The surrender request names the encounter's own map event, so it can only be sent once that event has
+    /// The map event a surrender asks the server to resolve: the encounter's own, or the main party's when the
+    /// encounter has not adopted it yet (vanilla's UpdateInternal and InitAux adopt MapEvent.PlayerMapEvent the
+    /// same way; <see cref="EncounterMenuConditionRefresher"/> reruns that init when the event lands late).
+    /// </summary>
+    internal static MapEvent GetSurrenderMapEvent(PlayerEncounter encounter)
+        => encounter?._mapEvent ?? MapEvent.PlayerMapEvent;
+
+    /// <summary>
+    /// The surrender request names <see cref="GetSurrenderMapEvent"/>, so it can only be sent once that event has
     /// reached this client and finished initializing.
     /// </summary>
     internal static bool IsSurrenderRequestReady(PlayerEncounter encounter)
     {
-        var mapEvent = encounter?._mapEvent;
+        var mapEvent = GetSurrenderMapEvent(encounter);
         if (mapEvent == null) return false;
 
         if (ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier) && barrier.IsPending(mapEvent))

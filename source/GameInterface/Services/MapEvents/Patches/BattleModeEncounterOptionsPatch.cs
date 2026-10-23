@@ -9,6 +9,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -40,7 +41,7 @@ internal class BattleModeEncounterOptionsPatch
     private static readonly TextObject MissionUnderwayTooltip = new("{=!}A battle is already underway.");
     private static readonly TextObject SimulationUnderwayTooltip = new("{=!}A battle simulation is already underway.");
     private static readonly TextObject EncounterUnavailableTooltip = new("{=!}The battle encounter is no longer available.");
-    private static readonly TextObject BattleNotReadyTooltip = new("{=!}Waiting for the server to set up the battle.");
+    internal static readonly TextObject BattleNotReadyTooltip = new("{=!}Waiting for the server to set up the battle.");
     private static readonly TextObject LowMoraleTooltip = new("{=xnRtINwH}Your men lack the courage to continue the battle without you. (Low Morale)");
     private static readonly TextObject WoundedTooltip = new("{=UL8za0AO}You are wounded.");
     private static readonly TextObject RaftTooltip = new("{=x9ePfpw5}You are on a raft, in desperate circumstances, and cannot fight");
@@ -70,8 +71,8 @@ internal class BattleModeEncounterOptionsPatch
     private const string SurrenderCondition = "game_menu_encounter_surrender_on_condition"; // Surrender.
     private const string AbandonArmyCondition = "game_menu_encounter_abandon_army_on_condition"; // Abandon army.
 
-    // The map event a pending surrender gate waits on, so repeated menu refreshes queue one commit callback.
-    private static MapEvent refreshQueuedFor;
+    // Map events a greyed Surrender already waits on, so repeated menu refreshes queue one commit callback each.
+    private static readonly ConditionalWeakTable<MapEvent, object> refreshQueued = new();
 
     static IEnumerable<MethodBase> TargetMethods()
     {
@@ -409,7 +410,7 @@ internal class BattleModeEncounterOptionsPatch
         {
             args.IsEnabled = false;
             args.Tooltip = BattleNotReadyTooltip;
-            RefreshMenuAfterCommit(encounter._mapEvent);
+            RefreshMenuAfterCommit(PlayerEncounterPatches.GetSurrenderMapEvent(encounter));
             return;
         }
 
@@ -430,15 +431,15 @@ internal class BattleModeEncounterOptionsPatch
     /// <summary>Re-evaluates the encounter menu once a still initializing map event commits on this client.</summary>
     private static void RefreshMenuAfterCommit(MapEvent mapEvent)
     {
-        if (mapEvent == null || ReferenceEquals(refreshQueuedFor, mapEvent)) return;
+        if (mapEvent == null || refreshQueued.TryGetValue(mapEvent, out _)) return;
         if (!ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier) || !barrier.IsPending(mapEvent))
             return;
         if (!ContainerProvider.TryResolve<IEncounterMenuConditionRefresher>(out var refresher)) return;
 
-        refreshQueuedFor = mapEvent;
+        refreshQueued.Add(mapEvent, barrier);
         barrier.RunAfterCommit(mapEvent, () =>
         {
-            refreshQueuedFor = null;
+            refreshQueued.Remove(mapEvent);
             refresher.RefreshForMapEvent(mapEvent);
         });
     }
@@ -467,7 +468,7 @@ internal class BattleModeEncounterOptionsPatch
     }
 
     [HarmonyFinalizer]
-    internal static Exception Finalizer(MenuCallbackArgs __0, MethodBase __originalMethod, ref bool __result, Exception __exception)
+    static Exception Finalizer(MenuCallbackArgs __0, MethodBase __originalMethod, ref bool __result, Exception __exception)
     {
         if (__exception == null) return null;
         if (ModInformation.IsServer) return __exception;
@@ -489,7 +490,7 @@ internal class BattleModeEncounterOptionsPatch
     }
 
     private static bool IsEncounterMenuRefresh()
-        => Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId is "encounter" or "join_encounter" ||
+        => Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId == "encounter" ||
            PlayerEncounter.Current != null ||
            MobileParty.MainParty?.MapEvent != null;
 
