@@ -630,6 +630,56 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         Assert.True(joiner.Ship(pirates[0]).IsOrphaned);
     }
 
+    // R48 L6: a non-host captor takes the last afloat AI hull while the other AI hull sank with its crew swimming. The prize's
+    // authority moves off the battle host, both clients apply the capture once and hold nothing while the mission ticks on, the
+    // host's tally reads the AI side out of action with its swimmers alive, and the host's result concludes the battle once.
+    [Fact]
+    public void NonHostCaptorTakesTheLastAfloatAiHull_WhileTheOtherCrewSwims_AndTheBattleConcludesOnce()
+    {
+        using var battle = StartServerBattle(atSea: true, out var concluded, "H", "C");
+        var (h, c) = (battle["H"], battle["C"]);
+        battle.FieldPlayerHull(h, new Vec3(0f, 0f, 0f), formationIndex: 0);
+        var captorHull = battle.FieldPlayerHull(c, new Vec3(40f, 0f, 0f), formationIndex: 0);
+        var pirates = Enumerable.Range(0, 2)
+            .Select(i => battle.FieldAiHull(h, BattleSideEnum.Defender, new Vec3(30f * i, 300f, 0f), formationIndex: i,
+                campaignShipId: $"Ship_pirate_{i}"))
+            .ToArray();
+        battle.CommitAll();
+        battle.TickAll(2);
+        c.Hit(pirates[0], 150f);
+        battle.TickAll(2);
+        h.Hull(pirates[1]).IsVacant = true;
+
+        c.ElapseCaptureTimer(pirates[1], captorHull);
+        battle.TickAll(30);
+
+        foreach (var peer in new[] { h, c })
+        {
+            Assert.Equal("C", peer.Ship(pirates[1]).CurrentAuthority);
+            Assert.True(peer.Ship(captorHull).IsOrphaned);
+            var applied = CaptureStats(peer)["applied"]!;
+            Assert.Equal(1L, (long)applied["capturesApplied"]!);
+            Assert.Empty(applied["heldConfirms"]!);
+            Assert.Empty(applied["heldRecords"]!);
+            Assert.Equal(1, peer.Ships.DepartedHulls(BattleSideEnum.Defender));
+            Assert.Equal(BattleShipCondition.Sunk, peer.Hull(pirates[0]).SinkingState);
+        }
+        Assert.True(h.Hull(pirates[1]).IsCopy);
+        Assert.False(c.Hull(pirates[1]).IsCopy);
+
+        var pirateSide = EndTally(h, BattleSideEnum.Defender, liveHumans: 9);
+        Assert.Equal(0, pirateSide.HullsAfloat);
+        Assert.True(pirateSide.IsOutOfAction);
+        Assert.False(pirateSide.IsDepleted);
+        Assert.Equal(0, concluded());
+
+        ResolveOnHost(h, BattleState.AttackerVictory);
+        c.Call(() => c.Controller.ResultCommitter.ReportAcceptedResult(), VictoryConclusionDisabledMethods());
+
+        Assert.Equal(1, concluded());
+        AssertMapEventRemoved(battle.MapEventId);
+    }
+
     // H, C and O each field a hull on formation 0 of the attacking team; H fields two AI hulls, each standing for a pirate ship.
     private NavalBattle StartCaptureBattle(out NavalPeer h, out NavalPeer c, out NavalPeer o, out Guid[] pirates,
         out Guid captorHull, out Guid hostHull, string? lateJoiner = null)
