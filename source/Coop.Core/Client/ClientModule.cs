@@ -10,6 +10,7 @@ using Coop.Core.Client.Services.Discord;
 using Coop.Core.Client.Services.Kingdoms;
 using Coop.Core.Client.Services.MobileParties;
 using Coop.Core.Client.Services.Session;
+using Coop.Core.Client.Services.SiegeEvents;
 using Coop.Core.Client.States;
 using Coop.Core.Common;
 using Coop.Core.Common.Configuration;
@@ -41,6 +42,7 @@ public class ClientModule : CommonModule
         base.Load(builder);
 
         builder.RegisterModule<MissionModule>();
+        builder.RegisterType<SiegeCasualtyDecoder>().As<ISiegeCasualtyDecoder>().InstancePerDependency();
         builder.RegisterType<VoiceSceneSource>().As<IVoiceSceneSource>().InstancePerDependency();
         builder.RegisterType<VoiceGameInput>().As<IVoiceGameInput>().InstancePerDependency();
         builder.RegisterType<VoiceWindowFocus>().As<IVoiceWindowFocus>().InstancePerDependency();

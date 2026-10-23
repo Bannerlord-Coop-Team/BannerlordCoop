@@ -79,7 +79,8 @@ public class LocationControllerWithdrawalStateTests
             Mock.Of<IBattleAgentBudget>(),
             Mock.Of<ILocationAgentSpawnBatchCodec>(),
             Mock.Of<ILocationAuthorityMigrator>(),
-            state);
+            state,
+            Mock.Of<ILocationNpcAuthorityState>());
 
         int previousGameThreadId = GameThread.Instance.GameThreadId;
         GameThread.Instance.MarkGameThread();

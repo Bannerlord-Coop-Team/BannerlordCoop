@@ -10,6 +10,7 @@ using TaleWorlds.GauntletUI.BaseTypes;
 using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade.GauntletUI;
 using TaleWorlds.MountAndBlade.View.Screens;
 using TaleWorlds.ScreenSystem;
 
@@ -30,7 +31,6 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
 
     private readonly ChatVM dataSource;
     private readonly Action refreshParticipants;
-    private readonly IChatVanillaLogGate vanillaLogGate;
     private GauntletLayer gauntletLayer;
     private GauntletMovieIdentifier movie;
     private EditableTextWidget inputWidget;
@@ -59,16 +59,13 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     public ChatOverlay(
         ChatVM dataSource,
         Action refreshParticipants,
-        bool playerChatEnabled,
-        IChatVanillaLogGate vanillaLogGate)
+        bool playerChatEnabled)
     {
         if (dataSource == null) throw new ArgumentNullException(nameof(dataSource));
         if (refreshParticipants == null) throw new ArgumentNullException(nameof(refreshParticipants));
-        if (vanillaLogGate == null) throw new ArgumentNullException(nameof(vanillaLogGate));
 
         this.dataSource = dataSource;
         this.refreshParticipants = refreshParticipants;
-        this.vanillaLogGate = vanillaLogGate;
         this.playerChatEnabled = playerChatEnabled;
         dataSource.SetPlayerChatEnabled(playerChatEnabled);
         dataSource.FeedScrolledToBottomRequested += OnFeedScrolledToBottomRequested;
@@ -183,6 +180,7 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
     public void Dispose()
     {
         dataSource.FeedScrolledToBottomRequested -= OnFeedScrolledToBottomRequested;
+        SetVanillaLogReplaced(false);
         if (!initialized) return;
 
         CloseInput();
@@ -276,12 +274,23 @@ internal sealed class ChatOverlay : GlobalLayer, IDisposable
             ScreenManager.SetSuspendLayer(gauntletLayer, !shouldShow);
         }
 
-        vanillaLogGate.SetReplacementVisible(shouldShow);
+        SetVanillaLogReplaced(shouldShow);
         // Menus/options sit under this global layer; drop mouse so their widgets stay clickable
         if (shouldShow && !dataSource.IsOpen)
             ApplyClosedFeedInputRestrictions();
 
         return shouldShow;
+    }
+
+    /// <summary>Hides the vanilla chat log and turns off its input while this overlay replaces it.</summary>
+    /// <remarks>Re-applied every tick because <c>shouldShow</c> flips on conversations/loading and other code can resume the layer; disabled vanilla still records messages.</remarks>
+    private static void SetVanillaLogReplaced(bool replaced)
+    {
+        var vanillaLog = GauntletChatLogView.Current;
+        if (vanillaLog == null) return;
+
+        ScreenManager.SetSuspendLayer(vanillaLog.Layer, replaced);
+        vanillaLog.SetEnabled(!replaced);
     }
 
     private void ApplyClosedFeedInputRestrictions()

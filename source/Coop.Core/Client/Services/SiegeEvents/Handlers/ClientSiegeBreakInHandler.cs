@@ -15,7 +15,6 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 
@@ -28,6 +27,7 @@ internal class ClientSiegeBreakInHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISiegeBreakOut breakOut;
+    private readonly ISiegeCasualtyDecoder casualtyDecoder;
     private const int MaxSupersededRequests = 8;
     private Pending pending;
     // Requests replaced before their reply came, so a late paid reply still tells the player what it cost.
@@ -49,12 +49,13 @@ internal class ClientSiegeBreakInHandler : IHandler
     }
 
     public ClientSiegeBreakInHandler(IMessageBroker messageBroker, INetwork network,
-        IObjectManager objectManager, ISiegeBreakOut breakOut)
+        IObjectManager objectManager, ISiegeBreakOut breakOut, ISiegeCasualtyDecoder casualtyDecoder)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.breakOut = breakOut;
+        this.casualtyDecoder = casualtyDecoder;
         messageBroker.Subscribe<BreakInAttempted>(HandleAttempt);
         messageBroker.Subscribe<NetworkBreakInResult>(HandleResult);
     }
@@ -118,25 +119,17 @@ internal class ClientSiegeBreakInHandler : IHandler
                 Logger.Warning("Server rejected break in request {RequestId}", result.RequestId);
                 return;
             }
-            // Protobuf sends an empty array as null, e.g. an army leader whose own party lost nobody.
-            var ids = result.CharacterIds ?? Array.Empty<uint>();
-            var counts = result.Counts ?? Array.Empty<int>();
             if (attempt == null || !attempt.IsCurrent())
             {
                 // The server already took the troops and the roster sync carries that, so say why nobody got in.
-                int lost = counts.Sum() + Math.Max(0, result.ArmyCasualties);
+                // Protobuf sends an empty array as null, e.g. an army leader whose own party lost nobody.
+                int lost = (result.Counts ?? Array.Empty<int>()).Sum() + Math.Max(0, result.ArmyCasualties);
                 Logger.Warning("Break in request {RequestId} was paid after the siege encounter changed", result.RequestId);
                 messageBroker.Publish(this, new SendInformationMessage(
                     $"The siege changed before your break in went through. {lost} troops were already lost getting there."));
                 return;
             }
-            if (ids.Length != counts.Length) return;
-            var casualties = TroopRoster.CreateDummyTroopRoster();
-            for (int index = 0; index < ids.Length; index++)
-            {
-                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(ids[index], out var character)) return;
-                casualties.AddToCounts(character, counts[index]);
-            }
+            if (!casualtyDecoder.TryDecode(result.CharacterIds, result.Counts, out var casualties)) return;
             breakOut.ShowBreakInDebrief(casualties, result.ArmyCasualties);
         }, context: nameof(NetworkBreakInResult));
     }

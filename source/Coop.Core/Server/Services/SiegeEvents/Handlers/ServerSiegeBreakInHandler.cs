@@ -2,10 +2,11 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Network.Coalescing;
+using Common.Network.Messages;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.Settlements;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.SiegeEvents;
@@ -30,24 +31,26 @@ internal class ServerSiegeBreakInHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly ISiegeBreakOut breakOut;
-    private readonly ISendCoalescer coalescer;
+    private readonly ISiegeSacrifice sacrifice;
     private readonly IBreakInReceipts receipts;
     private readonly ISettlementEncounterDistanceValidator distanceValidator;
 
     public ServerSiegeBreakInHandler(IMessageBroker messageBroker, INetwork network,
         IObjectManager objectManager, IPlayerManager playerManager, ISiegeBreakOut breakOut,
-        IBreakInReceipts receipts, ISettlementEncounterDistanceValidator distanceValidator,
-        ISendCoalescer coalescer = null)
+        ISiegeSacrifice sacrifice, IBreakInReceipts receipts, ISettlementEncounterDistanceValidator distanceValidator)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.breakOut = breakOut;
+        this.sacrifice = sacrifice;
         this.receipts = receipts;
         this.distanceValidator = distanceValidator;
-        this.coalescer = coalescer;
         messageBroker.Subscribe<NetworkRequestBreakIn>(Handle);
+        messageBroker.Subscribe<PartyEnterSettlementAttempted>(HandleEnter);
+        messageBroker.Subscribe<SettlementEncounterLeaveApplied>(HandleLeave);
+        messageBroker.Subscribe<PlayerDisconnected>(HandleDisconnect);
     }
 
     private void Handle(MessagePayload<NetworkRequestBreakIn> payload)
@@ -98,9 +101,8 @@ internal class ServerSiegeBreakInHandler : IHandler
         try
         {
             int losses = breakOut.GetBreakInCasualties(party, siege);
-            var paidReceipt = new BreakInReceipts.Receipt { Siege = siege, Result = rejected };
-            var paid = SiegeSacrifice.TryApply(objectManager, breakOut, network, coalescer, party, losses,
-                () => receipts.Set(party, paidReceipt));
+            var paidReceipt = new BreakInReceipts.Receipt { Siege = siege, Peer = peer, Result = rejected };
+            var paid = sacrifice.TryApply(party, losses, () => receipts.Set(party, paidReceipt));
             if (paid == null) return rejected;
             paidReceipt.Result = new NetworkBreakInResult(request.RequestId, true, paid.CharacterIds, paid.Counts, paid.ArmyCasualties);
             return paidReceipt.Result;
@@ -112,9 +114,32 @@ internal class ServerSiegeBreakInHandler : IHandler
         }
     }
 
+    // Same lifetime as the break out receipts, so a paid or failed break in never outlives the encounter it was for.
+    private void HandleEnter(MessagePayload<PartyEnterSettlementAttempted> payload)
+    {
+        var party = payload.What.MobileParty;
+        // Entering the paid siege is the continuation itself, which drops the receipt once the party is really inside.
+        if (receipts.TryGet(party, payload.What.Settlement?.SiegeEvent, out _)) return;
+        receipts.Remove(party);
+    }
+
+    private void HandleLeave(MessagePayload<SettlementEncounterLeaveApplied> payload)
+    {
+        receipts.Remove(payload.What.Party);
+    }
+
+    private void HandleDisconnect(MessagePayload<PlayerDisconnected> payload)
+    {
+        var peer = payload.What.PlayerId;
+        GameThread.RunSafe(() => receipts.RemoveAll(peer), context: nameof(PlayerDisconnected));
+    }
+
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkRequestBreakIn>(Handle);
+        messageBroker.Unsubscribe<PartyEnterSettlementAttempted>(HandleEnter);
+        messageBroker.Unsubscribe<SettlementEncounterLeaveApplied>(HandleLeave);
+        messageBroker.Unsubscribe<PlayerDisconnected>(HandleDisconnect);
         receipts.Clear();
     }
 }

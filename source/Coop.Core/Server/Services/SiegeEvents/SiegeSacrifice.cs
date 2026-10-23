@@ -13,24 +13,42 @@ namespace Coop.Core.Server.Services.SiegeEvents;
 /// <summary>
 /// The troop sacrifice that breaking in and breaking out both pay on the server, kept in one place so a fix reaches both.
 /// </summary>
-internal static class SiegeSacrifice
+public interface ISiegeSacrifice
 {
-    private static readonly ILogger Logger = LogManager.GetLogger(typeof(SiegeSacrifice));
+    /// <summary>
+    /// Takes <paramref name="losses"/> regulars from the party (and the army it leads) with patches live so the roster sync
+    /// carries them. <paramref name="markPaid"/> runs right before the first troop is taken, so a failure part way through
+    /// is never retried as a second sacrifice. Returns null, taking nothing, when the troops cannot be paid.
+    /// </summary>
+    SiegeSacrifice.Paid TryApply(MobileParty party, int losses, Action markPaid);
+}
 
-    internal sealed class Paid
+/// <inheritdoc cref="ISiegeSacrifice"/>
+public class SiegeSacrifice : ISiegeSacrifice
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<SiegeSacrifice>();
+    private readonly IObjectManager objectManager;
+    private readonly ISiegeBreakOut breakOut;
+    private readonly INetwork network;
+    private readonly ISendCoalescer coalescer;
+
+    public sealed class Paid
     {
         public uint[] CharacterIds;
         public int[] Counts;
         public int ArmyCasualties;
     }
 
-    /// <summary>
-    /// Takes <paramref name="losses"/> regulars from the party (and the army it leads) with patches live so the roster sync
-    /// carries them. <paramref name="markPaid"/> runs right before the first troop is taken, so a failure part way through
-    /// is never retried as a second sacrifice. Returns null, taking nothing, when the troops cannot be paid.
-    /// </summary>
-    public static Paid TryApply(IObjectManager objectManager, ISiegeBreakOut breakOut, INetwork network,
-        ISendCoalescer coalescer, MobileParty party, int losses, Action markPaid)
+    public SiegeSacrifice(IObjectManager objectManager, ISiegeBreakOut breakOut, INetwork network,
+        ISendCoalescer coalescer = null)
+    {
+        this.objectManager = objectManager;
+        this.breakOut = breakOut;
+        this.network = network;
+        this.coalescer = coalescer;
+    }
+
+    public Paid TryApply(MobileParty party, int losses, Action markPaid)
     {
         var parties = party.Army?.LeaderParty == party ? party.Army.Parties.ToArray() : new[] { party };
 
@@ -46,8 +64,10 @@ internal static class SiegeSacrifice
         {
             if (!objectManager.TryGetHandleWithLogging(member.MemberRoster, out _)) return null;
             foreach (var element in member.MemberRoster.GetTroopRoster())
-                if (element.Character.IsRegular && !objectManager.TryGetHandleWithLogging(element.Character, out _))
-                    return null;
+            {
+                if (!element.Character.IsRegular) continue;
+                if (!objectManager.TryGetHandleWithLogging(element.Character, out _)) return null;
+            }
         }
 
         markPaid();
@@ -60,8 +80,10 @@ internal static class SiegeSacrifice
             paid.Counts[index] = elements[index].Number;
         }
         foreach (var member in parties)
-            if (objectManager.TryGetHandle(member.MemberRoster, out var rosterId))
-                coalescer?.FlushInstance(rosterId, network);
+        {
+            if (!objectManager.TryGetHandle(member.MemberRoster, out var rosterId)) continue;
+            coalescer?.FlushInstance(rosterId, network);
+        }
         return paid;
     }
 }
