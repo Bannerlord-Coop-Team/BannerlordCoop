@@ -91,7 +91,8 @@ public class NavalSteeredCopies : INavalSteeredCopies
 {
     private static readonly ILogger Logger = LogManager.GetLogger<NavalSteeredCopies>();
 
-    private readonly Dictionary<MissionShip, SteeredCopy> copies = new Dictionary<MissionShip, SteeredCopy>();
+    // Copy on write: the fixed physics step enumerates it while a capture or a host change adds or drops a copy.
+    private volatile Dictionary<MissionShip, SteeredCopy> copies = new Dictionary<MissionShip, SteeredCopy>();
 #if DEBUG
     private readonly Stopwatch tickClock = new Stopwatch();
 
@@ -107,7 +108,7 @@ public class NavalSteeredCopies : INavalSteeredCopies
         if (copies.ContainsKey(ship)) return;
 
         var copy = new SteeredCopy(new CopySteering(Knobs));
-        copies.Add(ship, copy);
+        copies = new Dictionary<MissionShip, SteeredCopy>(copies) { [ship] = copy };
         NavalForeignHulls.Add(ship, copy);
     }
 
@@ -159,7 +160,12 @@ public class NavalSteeredCopies : INavalSteeredCopies
 
     public void Forget(MissionShip ship)
     {
-        if (copies.Remove(ship)) NavalForeignHulls.Remove(ship);
+        if (!copies.ContainsKey(ship)) return;
+
+        var remaining = new Dictionary<MissionShip, SteeredCopy>(copies);
+        remaining.Remove(ship);
+        copies = remaining;
+        NavalForeignHulls.Remove(ship);
     }
 
     /// <summary>"own", "steered" or "written": a copy is steered while its body simulates, otherwise its owner's frames are written.</summary>
