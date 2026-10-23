@@ -8,6 +8,10 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
+/// <summary>
+/// Only the server moves an issue to another hero, then announces it so clients can move theirs.
+/// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(IssueManager), nameof(IssueManager.ChangeIssueOwner))]
 internal class IssueManagerChangeIssueOwnerDispatchPatch
 {

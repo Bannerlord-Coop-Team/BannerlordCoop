@@ -20,7 +20,6 @@ public class IssueOwnerChangeSyncTests : IDisposable
     private readonly string newNotableId;
     private readonly string ownerSettlementId;
     private readonly string hideoutSettlementId;
-    private readonly string counterOfferHeroId;
     private readonly string issueId;
 
     private E2ETestEnvironment TestEnvironment { get; }
@@ -35,7 +34,6 @@ public class IssueOwnerChangeSyncTests : IDisposable
         newNotableId = TestEnvironment.CreateRegisteredObject<Hero>();
         ownerSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
         hideoutSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-        counterOfferHeroId = TestEnvironment.CreateRegisteredObject<Hero>();
 
         foreach (var instance in AllInstances)
         {
@@ -44,7 +42,6 @@ public class IssueOwnerChangeSyncTests : IDisposable
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(deadNotableId, out var deadNotable));
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(newNotableId, out var newNotable));
                 Assert.True(instance.ObjectManager.TryGetObject<Settlement>(ownerSettlementId, out var ownerSettlement));
-                Assert.True(instance.ObjectManager.TryGetObject<Hero>(counterOfferHeroId, out var counterOfferHero));
 
                 using (new AllowedThread())
                 {
@@ -52,14 +49,6 @@ public class IssueOwnerChangeSyncTests : IDisposable
                     deadNotable.Occupation = Occupation.GangLeader;
                     newNotable.StayingInSettlement = ownerSettlement;
                     newNotable.Occupation = Occupation.GangLeader;
-                    counterOfferHero.Occupation = Occupation.Merchant;
-
-                    if (instance == Server)
-                    {
-                        ownerSettlement.AddHeroWithoutParty(counterOfferHero);
-                        counterOfferHero.StayingInSettlement = ownerSettlement;
-                        counterOfferHero.ChangeState(Hero.CharacterStates.Active);
-                    }
                 }
             });
         }

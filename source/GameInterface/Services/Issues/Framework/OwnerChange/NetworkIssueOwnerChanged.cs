@@ -3,6 +3,9 @@ using ProtoBuf;
 
 namespace GameInterface.Services.Issues.Framework.OwnerChange;
 
+/// <summary>
+/// Sent by the server after it moved an issue to another hero, clients move their copy and ownership mirror to match.
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkIssueOwnerChanged : IServerToClientCommand
 {
