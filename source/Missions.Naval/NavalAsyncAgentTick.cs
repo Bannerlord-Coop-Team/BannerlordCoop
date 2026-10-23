@@ -34,7 +34,10 @@ public class NavalAsyncAgentTick : IAsyncAgentTick
     internal static bool IsTickRunning(bool inMissionTick, bool tickCompleted) => !inMissionTick && !tickCompleted;
 }
 
-/// <summary>Marks the Mission.OnTick window, inside which the async agent tick never runs.</summary>
+/// <summary>
+/// Marks the Mission.OnTick window, inside which the async agent tick never runs. Unscoped on purpose: the flag is only read
+/// in a co-op naval battle, and setting it in any other mission is harmless.
+/// </summary>
 [HarmonyPatch(typeof(Mission), nameof(Mission.OnTick))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class NavalMissionTickWindowPatch

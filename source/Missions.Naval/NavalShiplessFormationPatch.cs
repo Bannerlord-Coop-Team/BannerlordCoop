@@ -222,14 +222,95 @@ internal class SkirmishOrderWithoutTargetPatch
 }
 
 /// <summary>
+/// An engage order at a formation without a hull (the player charging L6's swimmers) would dereference the missing target in
+/// UpdateEngageOrder; in a co-op naval battle the order is not given.
+/// </summary>
+[HarmonyPatch(typeof(ShipOrder), nameof(ShipOrder.SetShipEngageOrder), new[] { typeof(MissionShip) })]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class EngageOrderWithoutTargetPatch
+{
+    // Skips the order for a missing target in a co-op battle.
+    [HarmonyPrefix]
+    internal static bool Prefix(MissionShip shipToEngage) => !CoopNavalMissionScope.IsActive || shipToEngage != null;
+}
+
+/// <summary>
+/// A follow order at a missing hull (follow-me while the main agent swims, so its formation ship is null) would dereference it
+/// in SetMovementTargetShip; in a co-op naval battle the order is not given.
+/// </summary>
+[HarmonyPatch(typeof(ShipOrder), nameof(ShipOrder.SetShipFollowOrder))]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class FollowOrderWithoutTargetPatch
+{
+    // Skips the order for a missing target in a co-op battle.
+    [HarmonyPrefix]
+    internal static bool Prefix(MissionShip shipToFollow) => !CoopNavalMissionScope.IsActive || shipToFollow != null;
+}
+
+/// <summary>
+/// Any player formation with live units is selectable, and a player whose hull was captured keeps one with no hull; the naval
+/// order setters then call ShipOrder on its null hull. In a co-op naval battle they run on the selection's formations with a
+/// hull only, and the full selection is restored after.
+/// </summary>
+[HarmonyPatch]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class ShiplessSelectedFormationOrdersPatch
+{
+    // The order setters that read every selected formation's hull unchecked.
+    internal static IEnumerable<MethodBase> TargetMethods() =>
+        new[] { "SetNavalEngageWithTargetFormation", "SetNavalSkirmishWithTargetFormation", "SetNavalStop", "SetNavalRetreat",
+            "SetNavalFollowOrder" }
+            .Select(name => AccessTools.DeclaredMethod(typeof(NavalOrderController), name));
+
+    // Takes the selected formations without a hull out of the selection for the order, keeping where each stood.
+    [HarmonyPrefix]
+    internal static void Prefix(OrderController __instance, out List<(int Index, Formation Formation)> __state)
+    {
+        __state = null;
+        var shipsLogic = NavalShiplessFormations.ShipsLogic;
+        if (!CoopNavalMissionScope.IsActive || shipsLogic == null) return;
+
+        __state = TakeShipless(__instance._selectedFormations, formation =>
+            NavalShiplessFormations.ShipOf(shipsLogic, formation, out bool known) != null || !known);
+    }
+
+    // Puts them back where they stood, whether the order returned or threw.
+    [HarmonyFinalizer]
+    internal static void Finalizer(OrderController __instance, List<(int Index, Formation Formation)> __state) =>
+        Restore(__instance._selectedFormations, __state);
+
+    /// <summary>Removes the formations <paramref name="hasShip"/> rejects, returning each with its index, in order.</summary>
+    internal static List<(int Index, Formation Formation)> TakeShipless(IList<Formation> selected, Func<Formation, bool> hasShip)
+    {
+        var taken = new List<(int, Formation)>();
+        for (int index = 0; index < selected.Count; index++)
+        {
+            if (!hasShip(selected[index])) taken.Add((index, selected[index]));
+        }
+
+        for (int i = taken.Count - 1; i >= 0; i--) selected.RemoveAt(taken[i].Item1);
+        return taken;
+    }
+
+    /// <summary>Inserts the taken formations back at their indices, lowest first.</summary>
+    internal static void Restore(IList<Formation> selected, List<(int Index, Formation Formation)> taken)
+    {
+        if (taken == null) return;
+
+        foreach (var (index, formation) in taken) selected.Insert(Math.Min(index, selected.Count), formation);
+    }
+}
+
+/// <summary>
 /// A cancelled ramming hands its ignored target back to its hull's AI controller, which a capture or a player at the helm can
-/// have replaced (a null or player controller, which the vanilla cast and call fail on); in a co-op battle it just stops.
+/// have replaced (a null or player controller, which the vanilla cast and call fail on); in a co-op battle that call is skipped.
 /// </summary>
 [HarmonyPatch(typeof(BehaviorNavalRamming), nameof(BehaviorNavalRamming.OnBehaviorCanceled))]
 [HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
 internal class RammingCancelWithoutAiControllerPatch
 {
-    // Clears the ramming state without the controller call when the hull has no AI controller.
+    // Stops the ramming as vanilla does, skipping only the controller call; the ignored target stays recorded, as in vanilla,
+    // so CalculateAndSetShipOrders still takes it off the list if the same AI controller comes back.
     [HarmonyPrefix]
     internal static bool Prefix(BehaviorNavalRamming __instance)
     {
@@ -237,7 +318,6 @@ internal class RammingCancelWithoutAiControllerPatch
         if (__instance._formationMainShip?.Controller is AIShipController) return true;
 
         __instance._isRammingActive = false;
-        __instance._ignoredShip = null;
         return false;
     }
 }

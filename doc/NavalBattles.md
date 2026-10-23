@@ -214,7 +214,10 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
   Ramming's weight and ramming and skirmish ship orders also read the closest enemy formation's hull unchecked, which
   L6's swimmers lack: `ShiplessFormationBehaviorWeightPatch` weighs ramming at 0 then, `ShiplessTargetShipOrdersPatch`
   skips both orders, `SkirmishOrderWithoutTargetPatch` skips a skirmish order at a missing hull (also the player's order
-  controller), and `RammingCancelWithoutAiControllerPatch` ends a ramming whose hull lost its AI controller.
+  controller), `EngageOrderWithoutTargetPatch` and `FollowOrderWithoutTargetPatch` do the same for engage (charging
+  swimmers) and follow (follow-me while swimming), `ShiplessSelectedFormationOrdersPatch` runs the naval order setters on the
+  selected formations with a hull only (a captured player's own formation has none), and
+  `RammingCancelWithoutAiControllerPatch` skips the controller call of a ramming whose hull lost its AI controller.
 - **One decider per place in the order.** Only a hull's current authority decides a capture of it. A player's hull, or a
   captured hull, changes authority only through captures, so a confirm for it must come from its current authority at that
   place. An AI hull's authority also moves with host changes, which aren't ordered against confirms, so its confirms are

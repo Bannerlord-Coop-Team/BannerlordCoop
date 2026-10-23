@@ -174,5 +174,68 @@ public class NavalShiplessFormationPatchTests
             CoopNavalMissionScope.IsActive = wasActive;
         }
     }
+
+    // R48 round 4 review: engage and follow orders at a missing hull are not given in a co-op battle; outside one vanilla runs.
+    [Fact]
+    public void EngageAndFollowOrderPrefixes_SkipAMissingTargetOnlyInACoopBattle()
+    {
+        bool wasActive = CoopNavalMissionScope.IsActive;
+        try
+        {
+            CoopNavalMissionScope.IsActive = true;
+            Assert.False(EngageOrderWithoutTargetPatch.Prefix(null!));
+            Assert.False(FollowOrderWithoutTargetPatch.Prefix(null!));
+            CoopNavalMissionScope.IsActive = false;
+            Assert.True(EngageOrderWithoutTargetPatch.Prefix(null!));
+            Assert.True(FollowOrderWithoutTargetPatch.Prefix(null!));
+        }
+        finally
+        {
+            CoopNavalMissionScope.IsActive = wasActive;
+        }
+    }
+
+    // The order setters run on the selected formations with a hull, and the full selection comes back in its order.
+    [Fact]
+    public void SelectedFormationsWithoutAHull_AreTakenOutForTheOrder_AndPutBackInPlace()
+    {
+        var formations = Enumerable.Range(0, 4)
+            .Select(_ => (TaleWorlds.MountAndBlade.Formation)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(
+                typeof(TaleWorlds.MountAndBlade.Formation)))
+            .ToArray();
+        var selected = formations.ToList();
+        var shipless = new[] { formations[0], formations[2] };
+
+        var taken = ShiplessSelectedFormationOrdersPatch.TakeShipless(selected, formation => !shipless.Contains(formation));
+        Assert.Equal(new[] { formations[1], formations[3] }, selected);
+
+        ShiplessSelectedFormationOrdersPatch.Restore(selected, taken);
+        Assert.Equal(formations, selected);
+        Assert.Equal(5, ShiplessSelectedFormationOrdersPatch.TargetMethods().Count(method => method != null));
+    }
+
+    // A cancelled ramming on a hull without an AI controller stops, keeping its ignored target as vanilla does.
+    [Fact]
+    public void RammingCancel_WithoutAnAiController_StopsAndKeepsTheIgnoredTarget()
+    {
+        var ramming = (BehaviorNavalRamming)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(
+            typeof(BehaviorNavalRamming));
+        var target = (NavalDLC.Missions.Objects.MissionShip)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(
+            typeof(NavalDLC.Missions.Objects.MissionShip));
+        ramming._ignoredShip = target;
+        ramming._isRammingActive = true;
+        bool wasActive = CoopNavalMissionScope.IsActive;
+        CoopNavalMissionScope.IsActive = true;
+        try
+        {
+            Assert.False(RammingCancelWithoutAiControllerPatch.Prefix(ramming));
+            Assert.False(ramming._isRammingActive);
+            Assert.Same(target, ramming._ignoredShip);
+        }
+        finally
+        {
+            CoopNavalMissionScope.IsActive = wasActive;
+        }
+    }
 }
 #endif
