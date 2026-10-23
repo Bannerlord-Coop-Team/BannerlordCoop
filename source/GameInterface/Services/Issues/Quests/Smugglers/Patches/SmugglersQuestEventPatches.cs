@@ -14,9 +14,9 @@ using Quest = TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior.SmugglersI
 namespace GameInterface.Services.Issues.Quests.Smugglers.Patches;
 
 /// <summary>
-/// The fight with the smugglers, the town owner change that cancels the quest and the smugglers' route are decided
+/// The fight with the smugglers and the smugglers' route are decided
 /// on the server, so its quest object runs these listeners as the owning player and the owner's client skips them.
-/// Wars and kingdom changes are relayed by the framework.
+/// Wars, kingdom changes and settlement owner changes are relayed by the framework.
 /// </summary>
 [HarmonyPatch]
 internal class SmugglersQuestEventPatches
