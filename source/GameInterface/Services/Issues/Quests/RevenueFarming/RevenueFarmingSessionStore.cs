@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.SaveSystem;
@@ -22,7 +21,6 @@ internal interface IRevenueFarmingSessionStore
     Quest FindOngoing(Hero playerHero);
     Quest LocalQuest { get; }
     bool IsLocal(Quest quest);
-    bool IsVisible(JournalLogEntry entry);
     void SyncData(IDataStore dataStore);
 }
 
@@ -40,12 +38,6 @@ internal sealed class RevenueFarmingSessionStore : IRevenueFarmingSessionStore
 
     public bool IsLocal(Quest quest) => Get(quest) is { } session &&
         session.ControllerId == controller.ControllerId;
-
-    public bool IsVisible(JournalLogEntry entry) =>
-        !string.IsNullOrEmpty(controller.ControllerId) && entry._relatedObjectIds != null &&
-        sessions.Any(session => session.ControllerId == controller.ControllerId &&
-            entry._relatedObjectIds.Any(id => id != null &&
-                (id == session.IssueId || id == session.Quest.StringId)));
 
     public RevenueFarmingSession Get(Quest quest) => sessions.FirstOrDefault(session => session.Quest == quest);
 

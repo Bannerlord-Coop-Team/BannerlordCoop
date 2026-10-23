@@ -8,7 +8,6 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade.GauntletUI;
@@ -16,19 +15,6 @@ using TaleWorlds.MountAndBlade.GauntletUI;
 namespace GameInterface.Services.Issues.Quests.RevenueFarming;
 
 using Quest = RevenueFarmingIssueBehavior.RevenueFarmingIssueQuest;
-
-[HarmonyPatch(typeof(JournalLogEntry), nameof(JournalLogEntry.IsEnded))]
-internal class RevenueFarmingHistoryPatch
-{
-    private static void Postfix(JournalLogEntry __instance, ref bool __result)
-    {
-        // Rejoin loads every player's history from the server's campaign save.
-        if (__result && ModInformation.IsClient && !CallOriginalPolicy.IsOriginalAllowed() &&
-            __instance.Title.GetID() == "zqrn2beP" &&
-            ContainerProvider.TryResolve<IRevenueFarmingSessionStore>(out var sessions))
-            __result = sessions.IsVisible(__instance);
-    }
-}
 
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithCancel))]
 internal class RevenueFarmingCancellationLogPatch

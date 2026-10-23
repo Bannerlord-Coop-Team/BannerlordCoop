@@ -48,12 +48,6 @@ internal class RevenueFarmingSavePatch
     }
 }
 
-[HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.OnIssueUpdated))]
-internal class RevenueFarmingIssueEffectsPatch
-{
-    private static bool Prefix(IssueBase issue) => issue is not RevenueFarmingIssueBehavior.RevenueFarmingIssue || ModInformation.IsServer;
-}
-
 [HarmonyPatch]
 internal class RevenueFarmingCallbackPatch
 {
