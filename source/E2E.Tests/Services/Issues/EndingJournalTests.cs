@@ -445,6 +445,7 @@ public class EndingJournalTests : IDisposable
         scenario.ClientA.Call(() =>
         {
             using var replay = new AllowedThread();
+            using var journalReplay = new QuestJournalReplay();
             quest.AddDiscreteLog(new TextObject("server progress"), new TextObject("Troops"), 0, 5).UpdateCurrentProgress(3);
         });
         Assert.Empty(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>());

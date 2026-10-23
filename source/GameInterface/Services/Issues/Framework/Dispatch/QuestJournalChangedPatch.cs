@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Messaging;
-using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.Finalization;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -14,7 +13,7 @@ internal class QuestJournalChangedPatch
     [HarmonyPostfix]
     private static void Postfix(QuestBase __0)
     {
-        if (ModInformation.IsClient && !CallOriginalPolicy.IsOriginalAllowed())
+        if (ModInformation.IsClient && !QuestJournalReplay.IsActive)
             MessageBroker.Instance.Publish(__0, new QuestJournalChanged(__0));
     }
 }

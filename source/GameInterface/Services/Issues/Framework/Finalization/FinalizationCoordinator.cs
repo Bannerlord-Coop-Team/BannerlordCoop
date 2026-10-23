@@ -208,6 +208,7 @@ internal class FinalizationCoordinator : IHandler
             if (!data.IsQuestJournal && (quest != null || issue.IsSolvingWithAlternative)) return;
 
             using (new AllowedThread())
+            using (new QuestJournalReplay())
             {
                 if (quest != null)
                 {
@@ -275,6 +276,7 @@ internal class FinalizationCoordinator : IHandler
 
             using (new AllowedThread())
             using (new QuestEndingReplay())
+            using (new QuestJournalReplay())
             {
                 Replay(issue, data.Outcome, isOwner);
             }
