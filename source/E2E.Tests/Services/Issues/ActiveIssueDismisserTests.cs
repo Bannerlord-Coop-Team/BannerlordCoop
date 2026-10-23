@@ -118,12 +118,21 @@ public class ActiveIssueDismisserTests : IDisposable
     public void ServerStart_DismissesAnIssueNobodyOwns(IssueBase.IssueState state)
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
-        AddIssue(Server, notableId, state);
+        var issue = AddIssue(Server, notableId, state);
+        JournalLogEntry archive = null!;
+        Server.Call(() =>
+        {
+            archive = new JournalLogEntry(new TextObject("Unattributed saved issue"), issue.IssueOwner, null, false, issue);
+            archive.Update(new TaleWorlds.Library.MBList<JournalLog>());
+            Campaign.Current.LogEntryHistory._logs.Add(archive);
+        });
 
         PublishServerStarted(Server);
 
         Assert.False(HasIssue(Server, notableId));
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        // Startup does not restore issue ownership, so dismissal cannot attribute this archive to a player.
+        Server.Call(() => Assert.False(archive.IsEnded()));
     }
 
     [Fact]
@@ -249,14 +258,17 @@ public class ActiveIssueDismisserTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Dismissal_EndsTheServerArchiveBeforeItIsDownloadedOnRejoin(bool serverStart)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void Dismissal_WithRetainedOwnerEndsTheServerArchive(bool silent, bool lordSolution)
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
         var ownerHeroId = RegisterPlayer(ControllerId);
         TestEnvironment.ConnectRegisteredPlayer(Client, ControllerId);
-        var issue = AddIssue(Server, notableId, IssueBase.IssueState.SolvingWithQuestSolution);
+        var issue = AddIssue(Server, notableId, lordSolution
+            ? IssueBase.IssueState.SolvingWithLordSolution : IssueBase.IssueState.SolvingWithQuestSolution);
         SetOwner(notableId, ControllerId);
         JournalLogEntry archive = null!;
         JournalLogEntry unrelated = null!;
@@ -267,10 +279,18 @@ public class ActiveIssueDismisserTests : IDisposable
             Campaign.Current.AddCampaignBehaviorManager(new CampaignBehaviorManager(new CampaignBehaviorBase[] { journals }));
             journals.RegisterEvents();
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
-            using (new AllowedThread())
-                issue.IssueQuest = new UnstartedQuest("quest_dismiss_archive", issue.IssueOwner);
+            if (!lordSolution)
+            {
+                using (new AllowedThread())
+                    issue.IssueQuest = new UnstartedQuest("quest_dismiss_archive", issue.IssueOwner);
+            }
             using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
-                issue.IssueQuest.AddLog(new TextObject("Follow the caravan"));
+            {
+                if (lordSolution)
+                    issue.AddLog(new JournalLog(CampaignTime.Zero, new TextObject("Follow the caravan")));
+                else
+                    issue.IssueQuest.AddLog(new TextObject("Follow the caravan"));
+            }
             archive = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(issue)));
             unrelated = new JournalLogEntry(new TextObject("Unrelated active quest"), null, null, false);
             Campaign.Current.LogEntryHistory._logs.Add(unrelated);
@@ -279,7 +299,8 @@ public class ActiveIssueDismisserTests : IDisposable
             Server.Resolve<IPlayerManager>().ClearPeer(Client.NetPeer);
         });
 
-        if (serverStart)
+        // This checks the silent branch with retained ownership, not ownership restoration during startup.
+        if (silent)
             PublishServerStarted(Server);
         else
             PublishDisconnected(Server, Client);
@@ -290,12 +311,15 @@ public class ActiveIssueDismisserTests : IDisposable
             Assert.Same(archive, ended);
             Assert.True(ended.IsEnded());
             Assert.True(ended.IsEndedUnsuccessfully());
-            Assert.Equal(QuestBase.QuestCompleteDetails.Cancel, ended._questCompletionDetail);
+            if (lordSolution)
+                Assert.Equal(IssueBase.IssueUpdateDetails.IssueCancel, ended._lastIssueStatus);
+            else
+                Assert.Equal(QuestBase.QuestCompleteDetails.Cancel, ended._questCompletionDetail);
             Assert.Equal("Follow the caravan", Assert.Single(ended.GetEntries()).LogText.ToString());
             Assert.False(unrelated.IsEnded());
             Assert.Null(issue.IssueOwner.Issue);
         });
-        if (serverStart)
+        if (silent)
             Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         else
             Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
