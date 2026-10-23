@@ -79,25 +79,25 @@ internal class UnregisteredIssuePurger : IHandler
         {
             try
             {
+                if (issue.IsOngoingWithoutQuest)
+                {
+                    issue.IssueFinalized();
+                    removed++;
+                    continue;
+                }
+
                 // A save from a quests-enabled build can hold taken issues that nothing syncs once quests are off
-                if (!issue.IsOngoingWithoutQuest && !questFeatureFlag.IsEnabled)
+                if (!questFeatureFlag.IsEnabled)
                 {
                     issueDismisser.Dismiss(issue);
                     dismissed++;
                     continue;
                 }
 
-                if (!issue.IsOngoingWithoutQuest)
-                {
-                    Logger.Warning(
-                        "Keeping {issue} owned by {owner}, it is already being solved but its type is not registered",
-                        issue.GetType().Name,
-                        issue.IssueOwner?.StringId);
-                    continue;
-                }
-
-                issue.IssueFinalized();
-                removed++;
+                Logger.Warning(
+                    "Keeping {issue} owned by {owner}, it is already being solved but its type is not registered",
+                    issue.GetType().Name,
+                    issue.IssueOwner?.StringId);
             }
             catch (Exception e)
             {
