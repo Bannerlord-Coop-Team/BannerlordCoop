@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.StartIssueWithQuest))]
 internal class StartIssueWithQuestDispatchPatch
 {
