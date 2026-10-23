@@ -2,6 +2,7 @@
 using HarmonyLib;
 using Missions.Naval;
 using NavalDLC.Missions;
+using NavalDLC.Missions.AI.Behaviors;
 using NavalDLC.Missions.AI.TeamAI;
 using NavalDLC.Missions.MissionLogics;
 using System;
@@ -95,6 +96,27 @@ public class NavalShiplessFormationPatchTests
             float weight = 7f;
             Assert.True(ShiplessFormationBehaviorWeightPatch.Prefix(null!, ref weight));
             Assert.Equal(7f, weight);
+        }
+        finally
+        {
+            CoopNavalMissionScope.IsActive = wasActive;
+        }
+    }
+
+    // R48 re-review: a behaviour whose cached hull is null (vanilla's refresh after a capture) weighs 0 in a co-op battle
+    // instead of dereferencing it.
+    [Fact]
+    public void BehaviorWeightPrefix_InACoopBattle_WithNoCachedHull_WeighsNothing()
+    {
+        var behavior = (BehaviorNavalRemoveConnection)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(
+            typeof(BehaviorNavalRemoveConnection));
+        bool wasActive = CoopNavalMissionScope.IsActive;
+        CoopNavalMissionScope.IsActive = true;
+        try
+        {
+            float weight = 5000f;
+            Assert.False(ShiplessFormationBehaviorWeightPatch.Prefix(behavior, ref weight));
+            Assert.Equal(0f, weight);
         }
         finally
         {

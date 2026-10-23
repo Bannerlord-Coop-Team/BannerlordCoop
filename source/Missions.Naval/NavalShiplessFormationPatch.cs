@@ -4,6 +4,7 @@ using NavalDLC.Missions;
 using NavalDLC.Missions.AI.Behaviors;
 using NavalDLC.Missions.AI.TeamAI;
 using NavalDLC.Missions.MissionLogics;
+using NavalDLC.Missions.Objects;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -119,22 +120,53 @@ internal class ShiplessFormationBehaviorWeightPatch
         new[] { typeof(BehaviorNavalRemoveConnection), typeof(BehaviorNavalRamming), typeof(BehaviorNavalSkirmish) }
             .Select(type => AccessTools.DeclaredMethod(type, "GetAiWeight"));
 
-    // Answers 0 for a formation without a hull in a co-op battle instead of dereferencing the missing hull.
+    // Answers 0 for a formation without a hull, or a behaviour with no cached hull, in a co-op battle; a behaviour whose
+    // cached hull is null while its formation has one again (a hull joined it) re-reads it, as vanilla's own refresh does.
     [HarmonyPrefix]
     internal static bool Prefix(BehaviorComponent __instance, ref float __result)
     {
-        if (!CoopNavalMissionScope.IsActive || HasShip(__instance.Formation)) return true;
+        if (!CoopNavalMissionScope.IsActive) return true;
 
-        __result = 0f;
+        var cached = MainShipOf(__instance);
+        var ship = ShipOf(__instance.Formation, out bool known);
+        if (known && ship == null) return Weightless(ref __result);
+        if (cached != null) return true;
+        return known ? SetMainShip(__instance, ship) : Weightless(ref __result);
+    }
+
+    // Answers 0 in place of the vanilla weight.
+    private static bool Weightless(ref float result)
+    {
+        result = 0f;
         return false;
     }
 
-    // Whether vanilla finds a hull for the formation; without the ships logic the vanilla weight runs.
-    private static bool HasShip(Formation formation)
+    // The formation's hull as vanilla finds it; unknown without the ships logic or a team.
+    private static MissionShip ShipOf(Formation formation, out bool known)
     {
         var shipsLogic = Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
-        if (shipsLogic == null || formation?.Team == null) return true;
+        known = shipsLogic != null && formation?.Team != null;
+        if (!known) return null;
 
-        return shipsLogic.GetShip(formation.Team.TeamSide, formation.FormationIndex, out _);
+        shipsLogic.GetShip(formation.Team.TeamSide, formation.FormationIndex, out var ship);
+        return ship;
+    }
+
+    /// <summary>The hull a patched behaviour cached for its formation, which vanilla's refresh leaves null after a capture.</summary>
+    internal static MissionShip MainShipOf(BehaviorComponent behavior) => behavior switch
+    {
+        BehaviorNavalRemoveConnection removeConnection => removeConnection._formationMainShip,
+        BehaviorNavalRamming ramming => ramming._formationMainShip,
+        BehaviorNavalSkirmish skirmish => skirmish._formationMainShip,
+        _ => null,
+    };
+
+    // Re-reads the formation's hull into a patched behaviour, then lets the vanilla weight run on it.
+    private static bool SetMainShip(BehaviorComponent behavior, MissionShip ship)
+    {
+        if (behavior is BehaviorNavalRemoveConnection removeConnection) removeConnection._formationMainShip = ship;
+        else if (behavior is BehaviorNavalRamming ramming) ramming._formationMainShip = ship;
+        else if (behavior is BehaviorNavalSkirmish skirmish) skirmish._formationMainShip = ship;
+        return true;
     }
 }
