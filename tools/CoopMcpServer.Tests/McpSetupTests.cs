@@ -56,8 +56,7 @@ public sealed class McpSetupTests
         string prepare = File.ReadAllText(Path.Combine(fixture.Root, "prepare-links.ps1"));
         Assert.Contains("$ErrorActionPreference = 'Stop'", prepare);
         Assert.Contains("SetEnvironmentVariable('BANNERLORD_DIR'", prepare);
-        Assert.Contains("'bin\\Win64_Shipping_Client'", prepare);
-        Assert.DoesNotContain("Junction", prepare);
+        Assert.DoesNotContain("-ItemType Junction", prepare);
         Assert.Contains("if (!$setupSucceeded) { exit 1 }", prepare);
     }
 

@@ -11,6 +11,8 @@ concurrency:
 
 env:
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+  # The CI image holds the game assemblies here; build and test steps resolve them through BANNERLORD_DIR.
+  BANNERLORD_DIR: /home/mb2
 
 # Use the event's merge commit in every job so scripts, sources, and build artifacts
 # match the workflow, even when the PR branch is behind development.
@@ -38,9 +40,6 @@ jobs:
 
     container:
       image: garrettluskey/bannerlordcoop:latest
-    # The CI image holds the game assemblies here; build and test steps resolve them through BANNERLORD_DIR.
-    env:
-      BANNERLORD_DIR: /home/mb2
 
     steps:
       - name: Checkout
@@ -79,9 +78,6 @@ jobs:
 
     container:
       image: garrettluskey/bannerlordcoop:latest
-    # The CI image holds the game assemblies here; build and test steps resolve them through BANNERLORD_DIR.
-    env:
-      BANNERLORD_DIR: /home/mb2
 
     steps:
       - name: Checkout
@@ -156,9 +152,6 @@ jobs:
 
     container:
       image: garrettluskey/bannerlordcoop:latest
-    # The CI image holds the game assemblies here; build and test steps resolve them through BANNERLORD_DIR.
-    env:
-      BANNERLORD_DIR: /home/mb2
 
     steps:
       - name: Checkout

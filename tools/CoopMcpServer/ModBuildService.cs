@@ -8,7 +8,7 @@ namespace CoopMcpServer;
 
 public interface IModBuildService
 {
-    Task BuildAsync(string repository, DeploymentSettings settings, string artifacts, CancellationToken cancellationToken, string configuration = "Release");
+    Task BuildAsync(string repository, LaunchProfile profile, string artifacts, CancellationToken cancellationToken, string configuration = "Release");
 }
 
 public sealed class ModBuildService : IModBuildService
@@ -16,14 +16,14 @@ public sealed class ModBuildService : IModBuildService
     private readonly IBuildProcessRunner runner;
     public ModBuildService(IBuildProcessRunner runner) { this.runner = runner; }
 
-    public async Task BuildAsync(string repository, DeploymentSettings settings, string artifacts, CancellationToken cancellationToken, string configuration = "Release")
+    public async Task BuildAsync(string repository, LaunchProfile profile, string artifacts, CancellationToken cancellationToken, string configuration = "Release")
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Deployment builds require Windows MSBuild.");
         var projects = new List<string> { "Coop" };
         if (File.Exists(Path.Combine(repository, "source", "Missions.Naval", "Missions.Naval.csproj"))) projects.Add("Missions.Naval");
         foreach (string project in projects)
         {
-            var info = CreateStartInfo(repository, settings.MsbuildPath, artifacts, project, configuration);
+            var info = CreateStartInfo(repository, profile.Deployment.MsbuildPath, profile.GameRoot(), artifacts, project, configuration);
             File.WriteAllText(Path.Combine(artifacts, project + "-command.json"), JsonSerializer.Serialize(new { info.FileName, Arguments = info.ArgumentList.ToArray(), info.WorkingDirectory }));
             await RunBuildAsync(info, artifacts, project, cancellationToken);
         }
@@ -32,7 +32,7 @@ public sealed class ModBuildService : IModBuildService
     internal Task RunBuildAsync(ProcessStartInfo info, string artifacts, string project, CancellationToken cancellationToken) =>
         runner.RunAsync(info, artifacts, project, cancellationToken);
 
-    public static ProcessStartInfo CreateStartInfo(string repository, string msbuild, string artifacts, string project, string configuration = "Release")
+    public static ProcessStartInfo CreateStartInfo(string repository, string msbuild, string gameRoot, string artifacts, string project, string configuration = "Release")
     {
         if (configuration != "Release" && configuration != "Debug") throw new ArgumentException("configuration must be Release or Debug.", nameof(configuration));
         if (project != "Coop" && project != "Missions.Naval") throw new ArgumentException("Unsupported deployment project.");
@@ -45,13 +45,16 @@ public sealed class ModBuildService : IModBuildService
         // Rebuild the optional plugin after shared references, without rebuilding those references again.
         foreach (string argument in new[] { Path.Combine(repository, "source", project, project + ".csproj"),
             "-t:Rebuild", "-restore", "-p:RestorePackagesConfig=true", "-nr:false", "-m:1", "-nologo",
-            "-p:Configuration=" + configuration, "-p:Platform=AnyCPU", "-p:ModName=", "-p:PreBuildEvent=", "-p:PostBuildEvent=",
+            "-p:Configuration=" + configuration, "-p:Platform=AnyCPU", "-p:BannerlordDir=" + EscapeProperty(WithTrailingSeparator(gameRoot)), "-p:ModName=", "-p:PreBuildEvent=", "-p:PostBuildEvent=",
             "-p:ModsRoot=" + EscapeProperty(scratch), "-p:ModDir=" + EscapeProperty(Path.Combine(scratch, "Coop")),
             "-p:ModBinDir=" + EscapeProperty(Path.Combine(scratch, "Coop", "bin")), "-p:ModPrefabDir=" + EscapeProperty(Path.Combine(scratch, "Coop", "prefabs")) })
             info.ArgumentList.Add(argument);
         if (project == "Missions.Naval") info.ArgumentList.Add("-p:BuildProjectReferences=false");
         return info;
     }
+
+    // Compile against the profile's install, not whatever BANNERLORD_DIR the server inherited; MSBuild expects a trailing slash.
+    private static string WithTrailingSeparator(string path) => Path.TrimEndingDirectorySeparator(path) + Path.DirectorySeparatorChar;
 
     private static string EscapeProperty(string value)
     {

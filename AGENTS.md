@@ -55,7 +55,7 @@ Run from the repo root on Windows. The build finds the local Bannerlord install 
 - `dotnet test source\Coop.sln -c Release` — xUnit tests where game runtime deps permit.
 - `MSBuild.exe source\Coop\Coop.csproj /p:Configuration=Debug /p:Platform=AnyCPU` — builds the mod and deploys it into `$BANNERLORD_DIR\Modules\Coop` through `Deploy.targets`.
 
-`DeployToGame` in `Deploy.targets` runs after every successful build of a project that imports it (`Coop.csproj`, `MissionTestMod.csproj`), including a full `Coop.sln` build, whenever it runs in the main checkout; linked worktrees don't deploy. Clearing `PostBuildEvent` doesn't stop it. For compile-only checks, pass an empty global `-p:ModName=`, which turns off `DeployToGame`.
+`DeployToGame` in `Deploy.targets` runs after every successful build of a project that imports it (`Coop.csproj`, `MissionTestMod.csproj`), including a full `Coop.sln` build, whenever it runs in the main checkout; linked worktrees skip it with a message unless built with `-p:DeployFromWorktree=true`. Clearing `PostBuildEvent` doesn't stop it. For compile-only checks, pass an empty global `-p:ModName=`, which turns off `DeployToGame`.
 
 CI builds Release and runs `source\CoopUnitTests.slnf` plus the E2E shards in `.github/workflows/pull_request.yml`. After touching Coop.Core or Autofac registrations, run all of `Coop.Tests` with `-c Release`. `--no-restore` fails on the first build in a fresh worktree, so restore once first.
 

@@ -33,6 +33,16 @@ function Save-GameDirectory([string] $gameDirectory)
     [Environment]::SetEnvironmentVariable('WSLENV', $updatedWslEnv, [System.EnvironmentVariableTarget]::User)
 }
 
+# Removes the old mb2 link from this checkout; rmdir without /s deletes only the link, never the game files behind it.
+function Remove-OldGameLink
+{
+    $link = Join-Path $PSScriptRoot 'mb2'
+    $item = Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+    if ($null -eq $item -or $item.LinkType -notin @('Junction', 'SymbolicLink')) { return }
+    cmd /c rmdir "$link"
+    Write-Output "*** Removed the old mb2 link, the game install is untouched ***" | Green
+}
+
 #ask for run the game
 $processes = @()
 While ($processes.Count -eq 0)
@@ -68,6 +78,7 @@ While ($key -eq 0)
 		}
 		#remember the game path for builds, tools and WSL
 		Save-GameDirectory $path
+		Remove-OldGameLink
 		$COOPLOGdir = $PSScriptRoot + "\COOP_LOG"
 		New-Item -ItemType "directory" -Path $COOPLOGdir -Force
 		[Environment]::SetEnvironmentVariable('COOP_LOG',$COOPLOGdir,[System.EnvironmentVariableTarget]::User)

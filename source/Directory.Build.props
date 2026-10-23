@@ -6,7 +6,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(BannerlordDir)' == ''">
     <!-- Bannerlord install root (holds bin\ and Modules\), from the BANNERLORD_DIR env var that
-         runmefirst.cmd sets. Pass -p:BannerlordDir=... to override. Game projects check it in Directory.Build.targets. -->
+         runmefirst.cmd sets. -p:BannerlordDir=... overrides it for the build only; GameInterface.Tests still reads
+         BANNERLORD_DIR at runtime. Game projects check it in Directory.Build.targets. -->
     <BannerlordDir>$([MSBuild]::EnsureTrailingSlash('$(BANNERLORD_DIR)'))</BannerlordDir>
   </PropertyGroup>
   <ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
