@@ -241,6 +241,7 @@ internal class HeroDeveloperCommands
                 "young_and_respectful" => DefaultPerks.Charm.YoungAndRespectful,
                 "good_natured" => DefaultPerks.Charm.GoodNatured,
                 "tribute" => DefaultPerks.Charm.Tribute,
+                "oratory" => DefaultPerks.Charm.Oratory,
                 _ => null,
             };
             if (trait == null && perk == null && name != "charm" && name != "female")
