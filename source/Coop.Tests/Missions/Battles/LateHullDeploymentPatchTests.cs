@@ -62,6 +62,16 @@ public class LateHullDeploymentPatchTests
         Assert.Same(fieldedAi, Assert.Single(refreshed));
     }
 
+    // R48 review: a hull joining a formation a capture left with units and no behaviour weight asks the tactic to re-apply.
+    [Theory]
+    [InlineData(9, false, true)]
+    [InlineData(0, false, false)]
+    [InlineData(9, true, false)]
+    public void NeedsTacticReapply_OnlyForUnitsWithEveryBehaviourWeightless(int units, bool anyWeighted, bool expected)
+    {
+        Assert.Equal(expected, LateHullDeploymentPatch.NeedsTacticReapply(units, anyWeighted));
+    }
+
     // A constructor-skipped hull carrying a ballista whose AI is already built.
     private static (MissionShip Hull, RangedSiegeWeaponAi Ai) ArmedHull()
     {

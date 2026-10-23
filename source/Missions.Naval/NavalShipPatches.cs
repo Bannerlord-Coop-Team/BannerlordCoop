@@ -62,7 +62,22 @@ internal class LateHullDeploymentPatch
         // The first unit's party feeds a crew perk; a fresh AI fleet or copy formation has no unit yet, so that perk is left out.
         __result.CrewSizeOnMainDeck = MissionGameModels.Current.MissionShipParametersModel
             .CalculateMainDeckCrewSize(__result.ShipOrigin, __result.Formation.GetFirstUnit());
+        ReapplyTacticForIdleFormation(__result.Formation);
     }
+
+    // A capture turns off the behaviours of a formation it leaves without a hull, and the tactic re-weights formations only when
+    // their count or order changes, which swimmers already in the formation hide; a hull joining it asks the tactic to re-apply.
+    private static void ReapplyTacticForIdleFormation(Formation formation)
+    {
+        if (formation?.AI == null) return;
+        if (!NeedsTacticReapply(formation.CountOfUnits, formation.AI._behaviors.Any(behavior => behavior.WeightFactor > 1E-07f))) return;
+
+        var tactic = formation.Team?.TeamAI?.CurrentTactic;
+        if (tactic != null) tactic.IsTacticReapplyNeeded = true;
+    }
+
+    /// <summary>Whether a hull joined a formation with units whose behaviours all weigh nothing, as a capture leaves them.</summary>
+    internal static bool NeedsTacticReapply(int units, bool anyBehaviorWeighted) => units > 0 && !anyBehaviorWeighted;
 
     /// <summary>Re-reads the targetable mission objects of every fielded hull's ballista but the new hull's (deployed above).</summary>
     internal static void RefreshShipWeaponTargets(IEnumerable<MissionShip> ships, MissionShip spawned)

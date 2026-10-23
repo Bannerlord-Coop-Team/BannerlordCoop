@@ -71,5 +71,35 @@ public class NavalShiplessFormationPatchTests
             harmony.UnpatchAll(harmony.Id);
         }
     }
+
+    // R48 review: the three naval behaviours whose weight reads the formation's hull unchecked are all patched.
+    [Fact]
+    public void BehaviorWeightPatch_TargetsTheThreeUncheckedWeights()
+    {
+        var targets = ShiplessFormationBehaviorWeightPatch.TargetMethods().ToArray();
+
+        Assert.Equal(3, targets.Length);
+        Assert.All(targets, method => Assert.NotNull(method));
+        Assert.Equal(new[] { "BehaviorNavalRamming", "BehaviorNavalRemoveConnection", "BehaviorNavalSkirmish" },
+            targets.Select(method => method.DeclaringType!.Name).OrderBy(name => name).ToArray());
+    }
+
+    // Outside a co-op naval battle vanilla's weight runs.
+    [Fact]
+    public void BehaviorWeightPrefix_OutsideACoopBattle_RunsVanilla()
+    {
+        bool wasActive = CoopNavalMissionScope.IsActive;
+        CoopNavalMissionScope.IsActive = false;
+        try
+        {
+            float weight = 7f;
+            Assert.True(ShiplessFormationBehaviorWeightPatch.Prefix(null!, ref weight));
+            Assert.Equal(7f, weight);
+        }
+        finally
+        {
+            CoopNavalMissionScope.IsActive = wasActive;
+        }
+    }
 }
 #endif

@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using HarmonyLib;
 using NavalDLC.Missions;
+using NavalDLC.Missions.AI.Behaviors;
 using NavalDLC.Missions.AI.TeamAI;
 using NavalDLC.Missions.MissionLogics;
 using Serilog;
@@ -9,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Naval;
 
@@ -101,5 +103,38 @@ internal class NavalShiplessFormationPatch
         var label = generator.DefineLabel();
         instruction.labels.Add(label);
         return label;
+    }
+}
+
+/// <summary>
+/// The naval behaviours that read their formation's hull in GetAiWeight weigh nothing while that formation has no hull, the
+/// state a capture, a sinking hull's departure or a removal can leave a formation with units in, in a co-op naval battle.
+/// </summary>
+[HarmonyPatch]
+[HarmonyPatchCategory(NavalMissionModule.PatchCategory)]
+internal class ShiplessFormationBehaviorWeightPatch
+{
+    // The behaviours whose weight dereferences the formation's hull (_formationMainShip) unchecked.
+    internal static IEnumerable<MethodBase> TargetMethods() =>
+        new[] { typeof(BehaviorNavalRemoveConnection), typeof(BehaviorNavalRamming), typeof(BehaviorNavalSkirmish) }
+            .Select(type => AccessTools.DeclaredMethod(type, "GetAiWeight"));
+
+    // Answers 0 for a formation without a hull in a co-op battle instead of dereferencing the missing hull.
+    [HarmonyPrefix]
+    internal static bool Prefix(BehaviorComponent __instance, ref float __result)
+    {
+        if (!CoopNavalMissionScope.IsActive || HasShip(__instance.Formation)) return true;
+
+        __result = 0f;
+        return false;
+    }
+
+    // Whether vanilla finds a hull for the formation; without the ships logic the vanilla weight runs.
+    private static bool HasShip(Formation formation)
+    {
+        var shipsLogic = Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
+        if (shipsLogic == null || formation?.Team == null) return true;
+
+        return shipsLogic.GetShip(formation.Team.TeamSide, formation.FormationIndex, out _);
     }
 }
