@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
@@ -48,6 +49,7 @@ internal sealed class LesserNobleRevoltPartyCreatedHandler : IHandler
                 return;
             }
 
+            using var replay = new AllowedThread();
             quest._lesserNobleParty = party;
             if (!quest.IsTracked(party))
             {

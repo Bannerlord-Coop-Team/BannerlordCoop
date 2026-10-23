@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
@@ -47,6 +48,7 @@ internal sealed class LesserNobleRevoltJournalUpdateHandler : IHandler
                 return;
             }
 
+            using var replay = new AllowedThread();
             if (!data.Notification)
             {
                 LesserNobleRevoltWorldEventService.ApplyClientSettlementProgress(quest, settlement, data.VisitCount);

@@ -182,7 +182,7 @@ internal class FinalizationCoordinator : IHandler
     {
         if (ModInformation.IsClient) return;
         var issue = payload.What.Issue;
-        if (issue.IsSolvingWithLordSolution ||
+        if (issue.IsSolvingWithLordSolution || issue.IsSolvingWithAlternative ||
             !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
             !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
             !playerManager.TryGetPeer(owner, out var peer)) return;
@@ -205,16 +205,29 @@ internal class FinalizationCoordinator : IHandler
             var quest = issue.IssueQuest;
             if (data.IsQuestJournal && (quest == null || !quest.IsOngoing ||
                 !Campaign.Current.QuestManager.Quests.Contains(quest))) return;
-            if (!data.IsQuestJournal && quest != null) return;
+            if (!data.IsQuestJournal && (quest != null || issue.IsSolvingWithAlternative)) return;
 
             using (new AllowedThread())
             {
-                var entries = quest?._journalEntries ?? issue._journalEntries;
-                entries.Clear();
-                foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
-                    entries.Add(log.ToJournalLog());
-                if (quest != null) CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, false);
-                else CampaignEventDispatcher.Instance.OnIssueLogAdded(issue, false);
+                if (quest != null)
+                {
+                    quest._journalEntries.Clear();
+                    foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
+                        quest._journalEntries.Add(log.ToJournalLog());
+                    CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, false);
+                }
+                else
+                {
+                    var existing = issue.JournalEntries.Where(log => log.LogText != null)
+                        .GroupBy(log => log.LogText.ToString()).ToDictionary(group => group.Key, group => group.Count());
+                    foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
+                    {
+                        if (log.Text == null) continue;
+                        var key = log.Text.ToString();
+                        if (existing.TryGetValue(key, out var count) && count > 0) existing[key] = count - 1;
+                        else issue.AddLog(log.ToJournalLog());
+                    }
+                }
             }
         }, context: nameof(FinalizationCoordinator));
     }
