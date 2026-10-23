@@ -490,7 +490,12 @@ public class SmugglersTests : IDisposable
                 Assert.True(instance.ObjectManager.TryGetObject<Hero>(issueOwnerId, out var giver));
                 Assert.Null(giver.Issue);
                 Assert.False(instance.Resolve<IIssueOwnershipRegistry>().TryGetOwner(issueOwnerId, IssueId, out _));
-                Assert.DoesNotContain(ownerQuest, Campaign.Current.QuestManager.Quests);
+                if (instance == Server)
+                    Assert.DoesNotContain(serverQuest, Campaign.Current.QuestManager.Quests);
+                else if (instance == ClientA)
+                    Assert.DoesNotContain(ownerQuest, Campaign.Current.QuestManager.Quests);
+                else
+                    Assert.DoesNotContain(Campaign.Current.QuestManager.Quests, quest => quest.StringId == ownerQuest.StringId);
             });
         }
     }
