@@ -95,7 +95,7 @@ public class SimilarCommitmentsTests : IDisposable
     }
 
     [Fact]
-    public void TheGate_PutsOtherPlayersIssuesBackWhenTheCheckThrows()
+    public void ThePatch_PutsOtherPlayersIssuesBackWhenTheCheckThrows()
     {
         preconditions.Throw(ClientB);
 

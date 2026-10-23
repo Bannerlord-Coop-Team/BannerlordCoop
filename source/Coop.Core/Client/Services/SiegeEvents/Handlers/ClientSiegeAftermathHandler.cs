@@ -6,6 +6,7 @@ using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.SiegeEvents.Interfaces;
 using GameInterface.Services.SiegeEvents.Messages;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -29,6 +30,7 @@ internal class ClientSiegeAftermathHandler : IHandler
         this.siegeEventInterface = siegeEventInterface;
         messageBroker.Subscribe<SiegeAftermathAttempted>(HandleAttempt);
         messageBroker.Subscribe<NetworkSiegeAftermathApplied>(HandleApplied);
+        messageBroker.Subscribe<NetworkSiegeAftermathDiscarded>(HandleDiscarded);
         messageBroker.Subscribe<NetworkPromptSiegeAftermathChoice>(HandleChoicePrompt);
     }
 
@@ -40,8 +42,10 @@ internal class ClientSiegeAftermathHandler : IHandler
         {
             if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.LeaderPartyId, out var leaderParty)) return;
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
+            // The clan only feeds the consequence text, so a miss keeps the client's own snapshot instead of dropping the menu.
+            objectManager.TryGetObject<Clan>(obj.PreviousOwnerClanId, out var previousOwnerClan);
 
-            siegeEventInterface.PromptLocalAftermathChoice(leaderParty, settlement);
+            siegeEventInterface.PromptLocalAftermathChoice(leaderParty, settlement, previousOwnerClan);
         });
     }
 
@@ -54,6 +58,19 @@ internal class ClientSiegeAftermathHandler : IHandler
             if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
 
             siegeEventInterface.SetLocalAftermathNarration(settlement, obj.AftermathType);
+        });
+    }
+
+    // Releases the leader's held choice for an aftermath the server dropped without applying.
+    private void HandleDiscarded(MessagePayload<NetworkSiegeAftermathDiscarded> payload)
+    {
+        var obj = payload.What;
+
+        GameThread.RunSafe(() =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<Settlement>(obj.SettlementId, out var settlement)) return;
+
+            siegeEventInterface.ReleaseLocalAftermathChoice(settlement);
         });
     }
 
@@ -72,6 +89,7 @@ internal class ClientSiegeAftermathHandler : IHandler
     {
         messageBroker.Unsubscribe<SiegeAftermathAttempted>(HandleAttempt);
         messageBroker.Unsubscribe<NetworkSiegeAftermathApplied>(HandleApplied);
+        messageBroker.Unsubscribe<NetworkSiegeAftermathDiscarded>(HandleDiscarded);
         messageBroker.Unsubscribe<NetworkPromptSiegeAftermathChoice>(HandleChoicePrompt);
     }
 }

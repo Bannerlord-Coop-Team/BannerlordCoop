@@ -17,18 +17,53 @@ namespace GameInterface.Services.SiegeEvents;
 
 public interface ISiegeBreakOut
 {
-    int GetRequiredCasualties(MobileParty party);
+    int GetRequiredCasualties(MobileParty party, bool isFromPort);
+    int GetBreakInCasualties(MobileParty party, SiegeEvent siege);
+    bool CanBreakOutFromPort(MobileParty party, Settlement settlement);
+    void SetBreakInPending(bool pending);
+    bool CanJoinDefenders(MobileParty party, Settlement settlement, bool alreadyEntered);
     TroopRoster ApplySacrifice(MobileParty party, int losses, out int armyCasualties);
-    void ShowDebrief(TroopRoster casualties, int armyCasualties);
+    void ShowDebrief(TroopRoster casualties, int armyCasualties, bool isFromPort);
+    void ShowBreakInDebrief(TroopRoster casualties, int armyCasualties);
     void Continue();
     void ProtectAfterLeave(MobileParty party, Settlement settlement);
 }
 
 public class SiegeBreakOut : ISiegeBreakOut
 {
-    public int GetRequiredCasualties(MobileParty party) => Math.Max(0,
+    public int GetRequiredCasualties(MobileParty party, bool isFromPort) => Math.Max(0,
         Campaign.Current.Models.TroopSacrificeModel.GetLostTroopCountForBreakingOutOfBesiegedSettlement(
-            party, party.CurrentSettlement.SiegeEvent, false).RoundedResultNumber);
+            party, party.CurrentSettlement.SiegeEvent, isFromPort).RoundedResultNumber);
+
+    public int GetBreakInCasualties(MobileParty party, SiegeEvent siege) => Math.Max(0,
+        Campaign.Current.Models.TroopSacrificeModel.GetLostTroopCountForBreakingInBesiegedSettlement(
+            party, siege).RoundedResultNumber);
+
+    // Same as vanilla menu_defender_siege_break_out_from_port_on_condition: a port, own ships, and the fleet anchored at this settlement.
+    public bool CanBreakOutFromPort(MobileParty party, Settlement settlement) =>
+        settlement.HasPort && party.Ships.Any() && party.Anchor != null && party.Anchor.IsAtSettlement(settlement);
+
+    // The server may already be paying the troops, so Reject stays locked until it answers or the session ends.
+    internal static bool IsBreakInPending { get; private set; }
+    public void SetBreakInPending(bool pending) => IsBreakInPending = pending;
+
+    public bool CanJoinDefenders(MobileParty party, Settlement settlement, bool alreadyEntered)
+    {
+        if (!party.IsActive) return false;
+        if (party.CurrentSettlement != null && !alreadyEntered) return false;
+        if (party.BesiegerCamp != null) return false;
+
+        var partyBase = party.Party;
+        var mapEventSide = partyBase.MapEventSide;
+        var validEnteredMapEvent = alreadyEntered &&
+            ReferenceEquals(party.MapEvent, settlement.Party?.MapEvent) &&
+            partyBase.Side == BattleSideEnum.Defender;
+        if (mapEventSide != null && !validEnteredMapEvent) return false;
+
+        var siegeEvent = settlement.SiegeEvent;
+        return siegeEvent != null &&
+            siegeEvent.CanPartyJoinSide(partyBase, BattleSideEnum.Defender);
+    }
 
     public TroopRoster ApplySacrifice(MobileParty party, int losses, out int armyCasualties)
     {
@@ -39,6 +74,8 @@ public class SiegeBreakOut : ISiegeBreakOut
         var parties = leadsArmy ? army.Parties.ToArray() : new[] { party };
         var model = Campaign.Current.Models.TroopSacrificeModel;
         int available = parties.Sum(member => member.MemberRoster.TotalRegulars);
+        // Vanilla's random pick never ends once the regulars run out.
+        losses = Math.Min(losses, available);
 
         // The server selects the sacrificed troops once; normal roster patches replicate the losses.
         for (int loss = 0; loss < losses; loss++)
@@ -99,13 +136,21 @@ public class SiegeBreakOut : ISiegeBreakOut
         return casualties;
     }
 
-    public void ShowDebrief(TroopRoster casualties, int armyCasualties)
+    public void ShowDebrief(TroopRoster casualties, int armyCasualties, bool isFromPort)
     {
         var behavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
         behavior._breakInOutCasualties = casualties;
         behavior._breakInOutArmyCasualties = armyCasualties;
-        behavior._isBreakingOutFromPort = false;
+        behavior._isBreakingOutFromPort = isFromPort;
         GameMenu.SwitchToMenu("break_out_debrief_menu");
+    }
+
+    public void ShowBreakInDebrief(TroopRoster casualties, int armyCasualties)
+    {
+        var behavior = Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>();
+        behavior._breakInOutCasualties = casualties;
+        behavior._breakInOutArmyCasualties = armyCasualties;
+        GameMenu.SwitchToMenu("break_in_debrief_menu");
     }
 
     public void ProtectAfterLeave(MobileParty party, Settlement settlement)

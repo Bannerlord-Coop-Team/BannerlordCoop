@@ -3,9 +3,6 @@ using Common;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Utils.Commands;
 
@@ -81,81 +78,6 @@ internal static class CommandHelpers
         }
 
         return true;
-    }
-
-    public static bool TryGetManagedObject<T>(
-        IObjectManager objectManager,
-        string id,
-        out T value,
-        out string error)
-        where T : class
-    {
-        value = null;
-        error = null;
-
-        if (objectManager == null)
-        {
-            error = "ObjectManager is null.";
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(id))
-        {
-            error = $"Object id for {typeof(T).Name} cannot be empty.";
-            return false;
-        }
-
-        if (objectManager.TryGetObject<T>(id, out value))
-            return true;
-
-        error = $"No {typeof(T).Name} found with id '{id}'.";
-        return false;
-    }
-
-    public static bool TryGetMbObject<T>(
-        string stringId,
-        out T value,
-        out string error)
-        where T : MBObjectBase
-    {
-        value = null;
-        error = null;
-
-        if (string.IsNullOrWhiteSpace(stringId))
-        {
-            error = $"String id for {typeof(T).Name} cannot be empty.";
-            return false;
-        }
-
-        value = MBObjectManager.Instance.GetObject<T>(stringId);
-
-        if (value != null)
-            return true;
-
-        error = $"No {typeof(T).Name} found with string id '{stringId}'.";
-        return false;
-    }
-
-    public static bool TryGetMobileParty(
-        string stringId,
-        out MobileParty mobileParty,
-        out string error)
-    {
-        mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(stringId);
-        if (mobileParty == null)
-        {
-            error = $"No {nameof(MobileParty)} found with string id '{stringId}'.";
-            return false;
-        }
-
-        if (mobileParty.Party != null)
-        {
-            error = null;
-            return true;
-        }
-
-        error = $"MobileParty '{mobileParty.StringId}' has no Party.";
-        return false;
     }
 
     public static string FormatException(string action, Exception ex)

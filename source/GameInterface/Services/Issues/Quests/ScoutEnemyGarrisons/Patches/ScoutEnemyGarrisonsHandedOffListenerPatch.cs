@@ -7,6 +7,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.ScoutEnemyGarrisonsIssueBehavior.
 
 namespace GameInterface.Services.Issues.Quests.ScoutEnemyGarrisons.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class ScoutEnemyGarrisonsHandedOffListenerPatch
 {

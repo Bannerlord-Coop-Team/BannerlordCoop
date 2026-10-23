@@ -1,6 +1,7 @@
 ﻿using Common.Commands;
 using Common;
 using GameInterface.Services.PartyVisuals.Patches;
+using GameInterface.Utils.Commands;
 using SandBox.View.Map.Managers;
 using System;
 using System.Collections.Generic;
@@ -99,6 +100,13 @@ internal class PartyVisualDebugCommands
 
     public sealed class StageOverLimitFixtureCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public StageOverLimitFixtureCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.party_visuals";
 
         public string Name => "stage_over_limit_fixture";
@@ -110,7 +118,7 @@ internal class PartyVisualDebugCommands
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
             new ExpectedArgs("target_eligible_party_count", "The target eligible party count.", true),
-            new ExpectedArgs("settlement_id", "The settlement id.", true),
+            new ExpectedArgs("settlement_id", "Settlement name or id; quote names with spaces.", true),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -127,9 +135,8 @@ internal class PartyVisualDebugCommands
             if (stagedParties.Count != 0 || GetLiveFixturePartyCount() != 0)
                 return Failed("The party-visual fixture is already staged.");
 
-            Settlement settlement = Settlement.All.FirstOrDefault(candidate => candidate.StringId == args[1]);
-            if (settlement == null)
-                return Failed($"Settlement '{args[1]}' was not found.");
+            if (!resolver.TryResolveSettlement(args[1], out var settlement, out var error))
+                return Failed(error);
 
             Clan looterClan = Clan.BanditFactions.FirstOrDefault(candidate => candidate.StringId == "looters");
             if (looterClan == null)

@@ -97,5 +97,7 @@
   <ItemGroup>
     <Publicize Include="TaleWorlds.CampaignSystem" />
     <Publicize Include="TaleWorlds.Library" />
+    <Publicize Include="TaleWorlds.Core:TaleWorlds.Core.Game.Current" />
+    <Publicize Include="TaleWorlds.Core:TaleWorlds.Core.Game.RandomGenerator" />
   </ItemGroup>
 </Project>

@@ -454,6 +454,39 @@ public class PlayerManagerTests
         }
     }
 
+    [Fact]
+    public void TryGetSenderHero_ResolvesTheHeroOfThePeerThatSentTheMessage()
+    {
+        var playerManager = CreatePlayerManager(out var objectManager);
+        var hero = ObjectHelper.SkipConstructor<Hero>();
+        objectManager.Setup(o => o.TryGetObject(HeroId, out hero)).Returns(true);
+        var peer = new TestNetwork().CreatePeer();
+
+        Assert.True(playerManager.AddPlayer(new Player(ControllerId, HeroId, string.Empty, string.Empty, string.Empty)));
+        playerManager.SetPeer(ControllerId, peer);
+
+        try
+        {
+            Assert.True(playerManager.TryGetSenderHero(peer, out var senderHero));
+            Assert.Same(hero, senderHero);
+        }
+        finally
+        {
+            GetPlayerObjects().Remove(hero);
+        }
+    }
+
+    [Fact]
+    public void TryGetSenderHero_UnknownSender_IsFalse()
+    {
+        var playerManager = CreatePlayerManager(out _);
+
+        Assert.False(playerManager.TryGetSenderHero(new TestNetwork().CreatePeer(), out var unknownPeerHero));
+        Assert.Null(unknownPeerHero);
+        Assert.False(playerManager.TryGetSenderHero(new object(), out var notAPeerHero));
+        Assert.Null(notAPeerHero);
+    }
+
     private static ConditionalWeakTable<object, ControlledObjectInfo> GetPlayerObjects() =>
         (ConditionalWeakTable<object, ControlledObjectInfo>)AccessTools
             .Field(typeof(PlayerManager), "PlayerObjects")
