@@ -71,6 +71,57 @@ public class AcceptanceJournalProgressTests : GangLeaderNeedsWeaponsAcceptScenar
         AssertSavedHistory(new[] { ownerLog });
     }
 
+    [Fact]
+    public void LaterProgressMirrorsWithoutRecapturingAcceptanceAndSurvivesSaveAndLoad()
+    {
+        var (ownerQuest, ownerLog) = AcceptCarriedWeapons(false);
+        var acceptance = Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>());
+        Assert.Equal(3, acceptance.Progress);
+        AssertMetadata(acceptance, ownerLog);
+        var mirrorCount = ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Count();
+        JournalLog[] expected = null!;
+        ClientA.Call(() =>
+        {
+            ownerLog.UpdateCurrentProgress(7);
+            ownerQuest.AddLog(new TextObject("Later progress before the next campaign tick"));
+            expected = ownerQuest.JournalEntries.ToArray();
+            Assert.Equal(2, expected.Length);
+            Assert.Equal(7, expected[0].CurrentProgress);
+            Assert.Equal("Later progress before the next campaign tick", expected[1].LogText.ToString());
+        });
+        TestEnvironment.FlushCoalescer();
+        Assert.Equal(acceptance, Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>()));
+        var mirrors = ClientA.NetworkSentMessages.GetMessages<RequestQuestJournal>().Skip(mirrorCount).ToArray();
+        Assert.Equal(2, mirrors.Length);
+        Assert.All(mirrors, mirror =>
+        {
+            Assert.Equal(FirstGiverId, mirror.IssueOwnerId);
+            Assert.Equal(FirstIssueId, mirror.IssueId);
+        });
+        AssertMetadata(expected[0], Assert.Single(mirrors[0].Entries).ToJournalLog());
+        AssertEntries(expected, mirrors[1].Entries.Select(entry => entry.ToJournalLog()));
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(FirstGiverId, out var giver));
+            AssertEntries(expected, giver.Issue.IssueQuest.JournalEntries);
+        });
+        ClientA.Call(() => ownerQuest.CompleteQuestWithCancel());
+        TestEnvironment.FlushCoalescer();
+        Assert.Equal(acceptance, Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>()));
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        ClientA.Call(() =>
+        {
+            var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+                (JournalLogEntry entry) => entry.IsRelatedTo(ownerQuest));
+            Assert.NotNull(archive);
+            Assert.True(archive.IsEnded());
+            AssertEntries(expected, archive.GetEntries());
+        });
+        ClientB.Call(() => Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+            entry => entry._relatedObjectIds.Contains(FirstIssueId))));
+        AssertSavedHistory(expected);
+    }
+
     private (Quest Quest, JournalLog Log) AcceptCarriedWeapons(bool endInsideCallback)
     {
         Quest ownerQuest = null!;
