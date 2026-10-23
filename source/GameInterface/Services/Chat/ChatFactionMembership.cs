@@ -27,7 +27,7 @@ public sealed class ChatFactionMembership : IChatFactionMembership
     public IFaction GetClan(Player player)
     {
         if (string.IsNullOrEmpty(player.HeroId)) return null;
-        if (!objectManager.TryGetObject<Hero>(player.HeroId, out var hero)) return null;
+        if (!objectManager.TryGetObjectWithLogging<Hero>(player.HeroId, out var hero)) return null;
         return hero.Clan;
     }
 
