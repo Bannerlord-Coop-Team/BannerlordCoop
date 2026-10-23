@@ -2,7 +2,13 @@
 using HarmonyLib;
 using Missions.Messages;
 using Missions.Naval;
+using Moq;
+using NavalDLC;
+using NavalDLC.Missions.MissionLogics;
+using NavalDLC.Missions.Objects;
 using System;
+using System.Runtime.CompilerServices;
+using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -91,6 +97,61 @@ public class NavalShipEngineTests
     public void IsHullCrew_NeedsTheHullsFormation_OrTrackingOnItsTeam(bool tracked, bool onHullsTeam, bool inFormation, bool expected)
     {
         Assert.Equal(expected, NavalShipEngine.IsHullCrew(tracked, onHullsTeam, inFormation));
+    }
+
+    // R47 bug A: vanilla's RemoveShip finds a hull only through its assignment and a capture's orphan holds none, so the orphan
+    // borrows the first free one and vanilla's own lookup then finds it there.
+    [Fact]
+    public void LendFreeAssignment_LetsVanillasLookupFindAnOrphan()
+    {
+        var shipsLogic = ShipsLogicWith(out var assignments);
+        var prize = CreateShip();
+        assignments[0, 0].SetMissionShip(prize);
+        var orphan = CreateShip();
+        Assert.False(shipsLogic.FindAssignmentOfShipOrigin(orphan.ShipOrigin, out _));
+
+        var lent = NavalShipEngine.LendFreeAssignment(assignments, orphan);
+
+        Assert.NotSame(assignments[0, 0], lent);
+        Assert.True(shipsLogic.FindAssignmentOfShipOrigin(orphan.ShipOrigin, out var found));
+        Assert.Same(lent, found);
+        Assert.Same(orphan, found.MissionShip);
+        Assert.Same(prize, assignments[0, 0].MissionShip);
+    }
+
+    // With every assignment taken nothing is lent, so the removal refuses instead of overwriting another hull's slot.
+    [Fact]
+    public void LendFreeAssignment_LendsNothingWhenEveryAssignmentIsTaken()
+    {
+        ShipsLogicWith(out var assignments);
+        foreach (var assignment in assignments)
+            assignment.SetMissionShip(CreateShip());
+
+        Assert.Null(NavalShipEngine.LendFreeAssignment(assignments, CreateShip()));
+    }
+
+    // A constructor-skipped NavalShipsLogic with vanilla's empty 3 x 11 assignment table.
+    private static NavalShipsLogic ShipsLogicWith(out ShipAssignment[,] assignments)
+    {
+        var shipsLogic = (NavalShipsLogic)RuntimeHelpers.GetUninitializedObject(typeof(NavalShipsLogic));
+        assignments = new ShipAssignment[3, 11];
+        for (int side = 0; side < 3; side++)
+        {
+            for (int index = 0; index < 11; index++)
+                assignments[side, index] = ShipAssignment.Create((TeamSideEnum)side, (FormationClass)index);
+        }
+
+        AccessTools.Field(typeof(NavalShipsLogic), "_shipAssignments").SetValue(shipsLogic, assignments);
+        return shipsLogic;
+    }
+
+    // A hull with its own origin and ship object, the two an assignment needs to count as holding it.
+    private static MissionShip CreateShip()
+    {
+        var ship = ShipTestHulls.Uninitialized<MissionShip>();
+        ship.ShipOrigin = new Mock<IShipOrigin>().Object;
+        ship._missionShipObject = (MissionShipObject)RuntimeHelpers.GetUninitializedObject(typeof(MissionShipObject));
+        return ship;
     }
 
     // WeakGameEntity.IsValid only compares the pointer with zero; nothing here dereferences it.

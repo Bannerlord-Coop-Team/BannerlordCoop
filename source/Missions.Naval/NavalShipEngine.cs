@@ -359,7 +359,60 @@ public class NavalShipEngine : INavalShipEngine
         // Quest5's RemoveShipInternal: no rope or bridge may keep pointing at a removed hull. A copy stays a copy until the
         // behavior's ShipRemovedEvent handler drops it, so the copy gates hold for the whole removal.
         NavalRopes.BreakConnections(ship);
+        if (!shipsLogic.FindAssignmentOfShipOrigin(ship.ShipOrigin, out var held))
+        {
+            RemoveUnassignedHull(shipsLogic, ship);
+            return;
+        }
+
+        // Vanilla removes whatever hull its assignment holds, so a stranger holding this hull's origin must not go in its place.
+        if (held.MissionShip != ship)
+        {
+            Logger.Error("[NavalSync] Hull {Index} was not removed: its ship origin is assigned to hull {Other}", ship.Index,
+                held.MissionShip?.Index);
+            return;
+        }
+
         shipsLogic.RemoveShip(ship);
+    }
+
+    // NavalShipsLogic.RemoveShip only acts through the assignment holding a hull, and a capture's orphan holds none (OnShipCaptured
+    // gave it to the prize), so the orphan borrows a free one and vanilla's RemoveShipAux removes it and clears the slot again.
+    private static void RemoveUnassignedHull(NavalShipsLogic shipsLogic, MissionShip ship)
+    {
+        var lent = LendFreeAssignment(shipsLogic._shipAssignments, ship);
+        if (lent == null)
+        {
+            Logger.Error("[NavalSync] Hull {Index} holds no ship assignment and none is free, so it was not removed", ship.Index);
+            return;
+        }
+
+        shipsLogic.RemoveShip(ship);
+        if (ship.IsRemoved)
+        {
+            Logger.Information("[NavalSync] Removed hull {Index}, which held no ship assignment, through a free one", ship.Index);
+            return;
+        }
+
+        lent.Clear();
+        Logger.Error("[NavalSync] Hull {Index} holds no ship assignment and vanilla's removal did not take it", ship.Index);
+    }
+
+    /// <summary>
+    /// Points the first free ship assignment (no origin, no hull) at <paramref name="ship"/>, so vanilla's removal finds the hull
+    /// through it; null when every assignment is taken.
+    /// </summary>
+    internal static NavalDLC.ShipAssignment LendFreeAssignment(NavalDLC.ShipAssignment[,] assignments, MissionShip ship)
+    {
+        foreach (var assignment in assignments)
+        {
+            if (assignment == null || assignment.IsSet || assignment.HasMissionShip) continue;
+
+            assignment.SetMissionShip(ship);
+            return assignment;
+        }
+
+        return null;
     }
 
     public MatrixFrame GetFrame(MissionObject hull) => ((MissionShip)hull).GlobalFrame;

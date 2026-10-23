@@ -420,6 +420,8 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
         CheckClearForRemoval(fake, "removed");
         fake.CrewActiveAtRemoval = CrewOf(fake).Count();
         fake.ParkingsBeforeRemoval = fake.Parkings;
+        // The live engine removes a hull that holds no ship assignment (a capture's orphan) through a lent free one.
+        fake.RemovedWithoutAssignment = fake.IsOrphaned;
         fake.IsRemoved = true;
     }
 
@@ -491,6 +493,9 @@ public sealed class FakeNavalShipEngine : INavalShipEngine, INavalShipCaptureEng
     {
         var fake = Of(hull);
         Assert.False(fake.IsCopy, $"{Describe(fake)} is a copy; only an owner's own hull is exempt from the removal invariant");
+        // NavalShipsLogic.RemoveShip acts only through the assignment holding the hull, and a capture's orphan holds none.
+        if (fake.IsOrphaned) return;
+
         fake.IsRemoved = true;
         fake.RemovedByVanillaForTest = true;
     }
@@ -656,6 +661,8 @@ public sealed class FakeHull
     public bool IsRemoved { get; set; }
     /// <summary>Removed by <see cref="FakeNavalShipEngine.VanillaOwnerRemoveShipForTest"/>, which the removal invariant exempts.</summary>
     public bool RemovedByVanillaForTest { get; set; }
+    /// <summary>Removed by the code under test while it held no ship assignment, as a capture's orphan holds none.</summary>
+    public bool RemovedWithoutAssignment { get; set; }
     /// <summary>How many of the hull's crew were still in the battle when it was removed.</summary>
     public int CrewActiveAtRemoval { get; set; }
     /// <summary>How many times <see cref="FakeNavalShipEngine.ParkHullAgents"/> parked the hull's agents.</summary>

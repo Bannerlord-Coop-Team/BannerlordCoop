@@ -337,7 +337,8 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
     }
 
     // (f) The captor disconnects: the prize and its orphan leave every client in one batch, and the captor's crew standing on
-    // the orphan is parked as aboard and withdrawn as the prize's crew.
+    // the orphan is parked as aboard and withdrawn as the prize's crew. R47 bug A: the orphan holds no ship assignment, so
+    // the engine removes it through a lent one rather than leave a teamless ghost hull in the scene.
     [Fact]
     public void CaptorDisconnects_ThePrizeAndOrphanLeaveEveryClient_WithItsCrewOnTheOrphanWithdrawn()
     {
@@ -346,6 +347,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         h.Hull(prize).IsVacant = true;
         c.ElapseCaptureTimer(prize, captorHull);
         var crewOnOrphan = StandCrewOnOrphan(new[] { h, o }, prize, captorHull);
+        var orphans = new[] { h, o }.ToDictionary(peer => peer, peer => peer.Hull(captorHull));
 
         battle.Disconnect(c);
         battle.TickAll(3);
@@ -354,31 +356,42 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         {
             Assert.False(peer.Has(prize));
             Assert.False(peer.Has(captorHull));
+            Assert.True(orphans[peer].IsRemoved, $"{peer.Id} kept the captor's orphan in its scene");
+            Assert.True(orphans[peer].RemovedWithoutAssignment);
             Assert.False(crewOnOrphan[peer].IsActive());
             Assert.Empty(peer.Engine.ParkedAgents);
             Assert.True(peer.Has(pirates[1]));
         }
     }
 
-    // (f) The captor leaves: its mission end announces the prize and the orphan one by one, and each removal keeps its deck clear.
-    [Fact]
-    public void CaptorLeaves_EachOwnHullIsAnnouncedAndRemoved_WithItsCrewOnTheOrphanMovedThenWithdrawn()
+    // (f, R47 bug A) The captor leaves or retreats: its mission end announces only the prize, since vanilla's removal never
+    // reaches the orphan (it holds no ship assignment); every other client still removes the orphan when the captor leaves,
+    // after its deck is cleared, so no teamless ghost hull stays in their scenes.
+    [Theory]
+    [InlineData(ShipRemovalReason.Leave)]
+    [InlineData(ShipRemovalReason.Retreat)]
+    public void CaptorLeaves_ThePrizeIsAnnounced_AndTheOrphanVanillaKeepsIsRemovedOnEveryOtherClient(ShipRemovalReason reason)
     {
         using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
         var prize = pirates[0];
         h.Hull(prize).IsVacant = true;
         c.ElapseCaptureTimer(prize, captorHull);
         var crewOnOrphan = StandCrewOnOrphan(new[] { h, o }, prize, captorHull);
+        var orphans = new[] { h, o }.ToDictionary(peer => peer, peer => peer.Hull(captorHull));
 
+        // NavalShipsLogic.OnEndMission fires BeforeShipRemovedEvent only for hulls its RemoveShip finds, so not the orphan.
         c.Call(() =>
         {
             foreach (var ship in c.Registry.Ships.Where(ship => ship.CurrentAuthority == "C").ToList())
             {
-                c.Ships.AnnounceRemoval(ship.Hull, ShipRemovalReason.Leave, missionEnding: true);
                 c.Engine.VanillaOwnerRemoveShipForTest(ship.Hull);
+                if (c.Engine.Of(ship.Hull).IsRemoved) c.Ships.AnnounceRemoval(ship.Hull, reason, missionEnding: true);
             }
         });
-        Assert.Equal(2, c.Network.NetworkSentMessages.GetMessages<NetworkShipRemoved>().Count());
+        Assert.Single(c.Network.NetworkSentMessages.GetMessages<NetworkShipRemoved>());
+        battle.TickAll(2);
+        Assert.All(new[] { h, o }, peer => Assert.False(orphans[peer].IsRemoved));
+
         battle.Leave(c);
         battle.TickAll(4);
 
@@ -386,8 +399,11 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         {
             Assert.False(peer.Has(prize));
             Assert.False(peer.Has(captorHull));
+            Assert.True(orphans[peer].IsRemoved, $"{peer.Id} kept the captor's orphan in its scene");
+            Assert.True(orphans[peer].RemovedWithoutAssignment);
             Assert.False(crewOnOrphan[peer].IsActive());
             Assert.Empty(peer.Engine.ParkedAgents);
+            Assert.True(peer.Has(pirates[1]));
         }
     }
 
