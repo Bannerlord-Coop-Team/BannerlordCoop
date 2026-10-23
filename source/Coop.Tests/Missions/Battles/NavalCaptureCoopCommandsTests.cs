@@ -17,6 +17,10 @@ public class NavalCaptureCoopCommandsTests
     [InlineData("status", "1d93", "2c11")]
     [InlineData("status", "force")]
     [InlineData("force", "1d93")]
+    [InlineData("1d93", "force", "force")]
+    [InlineData("1d93", "twice", "force")]
+    [InlineData("status", "force", "twice")]
+    [InlineData("1d93", "force", "twice", "twice")]
     public void Capture_WithBadArguments_ShowsTheUsage(params string[] args)
     {
         var result = new NavalCaptureCoopCommand().ProcessCommand(Args(args));
@@ -30,6 +34,7 @@ public class NavalCaptureCoopCommandsTests
     [InlineData("status", "1d93")]
     [InlineData("1d93", "force")]
     [InlineData("1d93", "FORCE")]
+    [InlineData("1d93", "force", "twice")]
     public void Capture_OutsideANavalBattle_Fails(params string[] args)
     {
         var result = new NavalCaptureCoopCommand().ProcessCommand(Args(args));
@@ -43,6 +48,7 @@ public class NavalCaptureCoopCommandsTests
     [InlineData(new[] { "1d93" }, NavalCaptureCoopCommand.CaptureMode.Helm, "1d93")]
     [InlineData(new[] { "status", "1d93" }, NavalCaptureCoopCommand.CaptureMode.Status, "1d93")]
     [InlineData(new[] { "1d93", "force" }, NavalCaptureCoopCommand.CaptureMode.Force, "1d93")]
+    [InlineData(new[] { "1d93", "force", "TWICE" }, NavalCaptureCoopCommand.CaptureMode.ForceTwice, "1d93")]
     public void Capture_ParsesEachForm(string[] args, NavalCaptureCoopCommand.CaptureMode mode, string prefix)
     {
         Assert.True(NavalCaptureCoopCommand.TryParse(Args(args), out var parsedMode, out var parsedPrefix));
@@ -50,14 +56,16 @@ public class NavalCaptureCoopCommandsTests
         Assert.Equal(prefix, parsedPrefix);
     }
 
+    // R47 L7: force twice takes a third argument, which the registry turns away unless it is declared.
     [Fact]
-    public void Capture_DeclaresAnOptionalSecondArgument_SoTheRegistryLetsStatusThrough()
+    public void Capture_DeclaresOptionalSecondAndThirdArguments_SoTheRegistryLetsStatusAndForceTwiceThrough()
     {
         var expected = new NavalCaptureCoopCommand().ExpectedArgs;
 
-        Assert.Equal(2, expected.Length);
+        Assert.Equal(3, expected.Length);
         Assert.True(expected[0].IsRequired);
         Assert.False(expected[1].IsRequired);
+        Assert.False(expected[2].IsRequired);
     }
 
     // R46 L3: an orphan has no team, so only the registry's orphan flag and authority make it this client's to take back.

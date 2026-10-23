@@ -14,16 +14,18 @@ namespace Missions.Naval;
 // coop.debug.naval.capture 1d93
 // coop.debug.naval.capture status 1d93
 // coop.debug.naval.capture 1d93 force
+// coop.debug.naval.capture 1d93 force twice
 /// <summary>
 /// DEBUG: puts this client's main agent at a hull's helm the way a player takes it, so vanilla's 3 s capture timer runs and
 /// its end goes to the hull's authority; <c>status</c> reports the gates, timer and request; <c>force</c> sends the request now.
 /// </summary>
 public sealed class NavalCaptureCoopCommand : ICoopCommand
 {
-    internal const string Usage = "Usage: coop.debug.naval.capture <shipId-prefix> [force] | status <shipId-prefix>";
+    internal const string Usage = "Usage: coop.debug.naval.capture <shipId-prefix> [force [twice]] | status <shipId-prefix>";
 
     private const string StatusWord = "status";
     private const string ForceWord = "force";
+    private const string TwiceWord = "twice";
 
     public string Prefix => "coop.debug.naval";
 
@@ -31,7 +33,8 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
 
     public string Description => "Moves the main agent to an enemy hull's (or its own orphan's) helm and starts using it, so vanilla's " +
         "capture timer runs; status reports the helm gates, the timer and the request to the hull's authority; force sends the " +
-        "request at once, past the local helm gates, so the authority's own refusal (NotVacant, Busy...) answers it.";
+        "request at once, past the local helm gates, so the authority's own refusal (NotVacant, Busy...) answers it; force twice " +
+        "forces two requests in the same frame, so the second meets the first one still waiting.";
 
     public CoopCommandSide Side => CoopCommandSide.Client;
 
@@ -39,6 +42,7 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
     {
         new ExpectedArgs("target", "The start of the hull's ship id, as coop.debug.naval.inspect lists it, or status.", true),
         new ExpectedArgs("option", "After a ship id: force, to send the request past the local helm gates. After status: the ship id.", false),
+        new ExpectedArgs("repeat", "After force: twice, to force a second request in the same frame, while the first still waits.", false),
     };
 
     // Starts the capture at, reports on, or forces a request for the one registered hull whose ship id starts with the prefix.
@@ -63,16 +67,18 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
         var gates = HelmGates.Read(naval.Engine, main, hull, IsOwnOrphan(info, controller.Session.OwnControllerId));
         if (mode == CaptureMode.Status) return Status(naval, info, gates);
         if (mode == CaptureMode.Force) return Force(naval, main, info);
+        if (mode == CaptureMode.ForceTwice) return ForceTwice(naval, main, info);
 
         return StartAtHelm(main, hull, info, gates);
     }
 
-    /// <summary>Reads <c>ship</c>, <c>ship force</c> or <c>status ship</c>; anything else is a usage error.</summary>
+    /// <summary>Reads <c>ship</c>, <c>ship force</c>, <c>ship force twice</c> or <c>status ship</c>; anything else is a usage error.</summary>
     internal static bool TryParse(ICoopCommandArgs args, out CaptureMode mode, out string prefix)
     {
         mode = CaptureMode.Helm;
         prefix = null;
-        if (args == null || args.Count < 1 || args.Count > 2) return false;
+        if (args == null || args.Count < 1 || args.Count > 3) return false;
+        if (args.Count == 3) return TryParseForceTwice(args, out mode, out prefix);
 
         bool status = IsWord(args[0], StatusWord);
         if (args.Count == 1)
@@ -84,6 +90,14 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
         mode = status ? CaptureMode.Status : CaptureMode.Force;
         prefix = status ? args[1] : args[0];
         return status ? !IsWord(args[1], ForceWord) : IsWord(args[1], ForceWord);
+    }
+
+    // The three-argument form: a ship id, force, twice.
+    private static bool TryParseForceTwice(ICoopCommandArgs args, out CaptureMode mode, out string prefix)
+    {
+        mode = CaptureMode.ForceTwice;
+        prefix = args[0];
+        return !IsWord(args[0], StatusWord) && IsWord(args[1], ForceWord) && IsWord(args[2], TwiceWord);
     }
 
     // A case-insensitive keyword match.
@@ -110,6 +124,16 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
         return new CoopCommandResult(true, "NAVAL_CAPTURE ship=" + info.ShipId + " forced past this copy's helm gates: " +
             ForceOutcome(replicator.PendingRequestAge(info.ShipId).HasValue, info.CurrentAuthority) +
             "; see coop.debug.naval.capture status " + info.ShipId + " and captureRejections in coop.debug.naval.inspect");
+    }
+
+    // R47 L7: two forced requests in one frame, so the second meets the first still waiting for the authority's answer, which
+    // two separate calls can't stage (the answer comes back between them).
+    private static CoopCommandResult ForceTwice(CoopNavalBattleBehavior naval, Agent main, NetworkShipInfo info)
+    {
+        var first = Force(naval, main, info);
+        var second = Force(naval, main, info);
+        string output = "NAVAL_CAPTURE_TWICE first: " + first.Output + " | second: " + second.Output;
+        return first.Succeeded ? new CoopCommandResult(true, output) : Failed(output);
     }
 
     /// <summary>What a forced request led to: a request waiting at the hull's authority, or a decision taken here at once.</summary>
@@ -152,6 +176,7 @@ public sealed class NavalCaptureCoopCommand : ICoopCommand
         Helm,
         Status,
         Force,
+        ForceTwice,
     }
 
     /// <summary>What vanilla's helm prompt and capture branch read for the main agent at a hull's helm (ShipControllerMachine.OnTick).</summary>
