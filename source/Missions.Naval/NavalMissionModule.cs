@@ -32,11 +32,11 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalShipCaptureEngine>()
             .As<INavalShipCaptureEngine>()
             .InstancePerDependency();
+        builder.RegisterType<NavalCopyWeaponStates>()
+            .As<INavalCopyWeaponStates>()
+            .InstancePerDependency();
         builder.RegisterType<NavalSteeredCopies>()
             .As<INavalSteeredCopies>()
-            .InstancePerDependency();
-        builder.RegisterType<NavalAgentTickGate>()
-            .As<INavalAgentTickGate>()
             .InstancePerDependency();
         // Registered after MissionModule's AgentFormationAssigner, so it is the one resolved.
         builder.RegisterType<NavalAgentFormationAssigner>()
