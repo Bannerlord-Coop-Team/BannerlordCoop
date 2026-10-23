@@ -8,6 +8,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.LordNeedsGarrisonTroopsIssueQuest
 
 namespace GameInterface.Services.Issues.Quests.LordNeedsGarrisonTroops.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.PlayerTransferredTroopsToGarrisonCommander))]
 internal class LordNeedsGarrisonTroopsHandInPatch
 {
