@@ -70,6 +70,9 @@ public class CoopNavalBattleBehavior : MissionLogic
         services.Engine.SnapCopies();
         services.Tick(dt, tickNpcFleet);
         LogAgentCountDrop();
+#if DEBUG
+        NavalImmortalCoopCommand.ApplyArmed();
+#endif
     }
 
     // Runs inside FinishMissionLoading, so the battle's water time is in place before the loading screen lifts.
@@ -147,6 +150,7 @@ public class CoopNavalBattleBehavior : MissionLogic
 #if DEBUG
         NavalHelmOverride.Clear();
         NavalContactProbe.Clear();
+        NavalImmortalCoopCommand.ClearArmed();
 #endif
         // The static mirror's reset for a copy the engine never forgot; the engine's own entries die with the mission.
         NavalForeignHulls.Clear();
