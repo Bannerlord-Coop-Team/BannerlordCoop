@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
 using Xunit.Abstractions;
 
@@ -91,5 +92,27 @@ public class QuestEndingReplayTests : IDisposable
 
             Assert.True(issue._areIssueEffectsResolved);
         });
+    }
+
+    [Fact]
+    public void TheServerEndsAStaleIssueWithoutAQuestAndEveryMachineClearsIt()
+    {
+        scenario.Server.Call(() =>
+        {
+            Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
+            notable.Issue.CompleteIssueWithStayAliveConditionsFailed();
+        });
+
+        var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.IssueStayAliveFailed, finalized.Outcome);
+
+        foreach (var instance in new[] { scenario.Server, scenario.ClientA, scenario.ClientB })
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(scenario.NotableId, out var notable));
+                Assert.Null(notable.Issue);
+            });
+        }
     }
 }

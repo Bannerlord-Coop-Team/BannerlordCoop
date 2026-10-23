@@ -43,9 +43,9 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
 7. UI bookkeeping the server runs for players leaks into the save a joiner downloads. The server skips quest
    pop-ups and unread markers (`Services/UI/Notifications/Patches/ServerQuest*Patches.cs`). For a new server path,
    check what reacts to `AddLog`, `OnIssueUpdated` and `OnQuestCompleted`.
-8. A client never ends a registered quest on its own under `AllowedThread`. A quest listener still fires inside a
-   replay (a war, an army's removal), and `OutcomeDispatcher.BeforeQuestOutcome` drops that ending unless
-   `Replay` is running (`Framework/Finalization/QuestEndingReplay.cs`). A listener outside `AllowedThread`, like a
+8. A client never ends a registered quest or issue on its own under `AllowedThread`. A listener still fires inside a
+   replay (a war, an army's removal, a settlement entry), and `OutcomeDispatcher.BeforeQuestOutcome` and
+   `BeforeIssueOutcome` drop that ending unless `Replay` is running (`Framework/Finalization/QuestEndingReplay.cs`). A listener outside `AllowedThread`, like a
    clan's kingdom change, still sends its ending to the server as a request.
 9. Endings the server sees (a war, a kingdom change, a capture, an army dispersal) are decided on the server.
    `Framework/Dispatch/QuestWorldEventRelayPatches.cs` postfixes `CampaignEventDispatcher.OnWarDeclared`,
