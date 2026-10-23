@@ -22,6 +22,9 @@ public interface IMapEventLoadCleaner
 {
     // Finalizes loaded player battles and releases every party still linked to a battle that already ended.
     void CleanUpLoadedMapEvents();
+
+    // Releases every party still linked to a battle that already ended. Also run live by coop.unstuck.
+    PartyBase[] ReleaseEndedMapEventLinks();
 }
 
 internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
@@ -109,8 +112,12 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
     // A save can hold parties still linked to a battle that already ended (finalized, or no longer
     // in the map event manager). Nothing ends that battle again, so the party never moves again and
     // the map shows an empty 0/0 battle. Covers AI parties too, not only player battles.
-    private void ReleaseEndedMapEventLinks()
+    public PartyBase[] ReleaseEndedMapEventLinks()
     {
+        if (Campaign.Current?.MapEventManager == null)
+            return Array.Empty<PartyBase>();
+
+        var releasedParties = new List<PartyBase>();
         var liveMapEvents = new HashSet<MapEvent>(Campaign.Current.MapEventManager.MapEvents);
         var parties = Campaign.Current.CampaignObjectManager.MobileParties
             .Where(mobileParty => mobileParty != null)
@@ -133,7 +140,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             var linkedParties = group.ToArray();
 
             logger.Warning(
-                "Releasing {PartyCount} parties from ended map event {MapEventId} after load",
+                "Releasing {PartyCount} parties from ended map event {MapEventId}",
                 linkedParties.Length,
                 mapEvent.StringId);
 
@@ -157,8 +164,12 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                 var mobileParty = party.MobileParty;
                 if (mobileParty != null && mobileParty.IsActive && !mobileParty.IsPlayerParty())
                     mobileParty.ResetNavigationToHold();
+
+                releasedParties.Add(party);
             }
         }
+
+        return releasedParties.ToArray();
     }
 
     // WaitingRemoval skips the component's OnBeforeFinalize and OnFinalize, the only calls that move

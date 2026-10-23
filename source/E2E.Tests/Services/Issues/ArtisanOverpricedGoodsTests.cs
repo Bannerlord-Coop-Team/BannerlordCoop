@@ -168,6 +168,8 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Accept();
         Stock(2);
         ClientA.Call(() => QuestHere(ClientA).DeliverItemsPartiallyOnConsequence());
+        Assert.Single(ClientA.InternalMessages.GetMessages<NetworkArtisanDeliveryProgress>());
+        Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkArtisanDeliveryProgress>());
         foreach (var instance in new[] { Server, ClientA })
             instance.Call(() => Assert.Equal(2, QuestHere(instance)._givenTradeGoods));
         ClientA.Call(() => Assert.Equal(2, QuestHere(ClientA)._playerStartsQuestLog.CurrentProgress));
