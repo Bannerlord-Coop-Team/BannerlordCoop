@@ -107,7 +107,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         }
         catch (Exception e)
         {
-            logger.Error(e, "Failed to finalize loaded player map event {MapEventId}", mapEvent.StringId);
+            logger.Error(e, "Failed to repair party links of loaded player map event {MapEventId}; skipping its finalize and party release", mapEvent.StringId);
             return;
         }
 
