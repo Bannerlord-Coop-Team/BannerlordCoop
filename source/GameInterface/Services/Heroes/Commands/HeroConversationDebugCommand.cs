@@ -3,6 +3,7 @@ using Common.Commands;
 using Common;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using System.Collections.Generic;
 using System.Globalization;
 using TaleWorlds.CampaignSystem;
@@ -27,6 +28,13 @@ internal class HeroConversationDebugCommand
 
     public sealed class HeroConversationOpenCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroConversationOpenCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero_conversation";
 
         public string Name => "open";
@@ -37,16 +45,19 @@ internal class HeroConversationDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered hero id to converse with."),
+            new ExpectedArgs("hero_id", "Hero name or id to converse with; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
         {
             if (ModInformation.IsServer) return Failed("Run coop.debug.hero_conversation.open on a client.");
-            if (!TryGetHero(args[0], out var hero, out var error)) return Failed(error);
+            if (!resolver.TryResolveHero(args[0], out var hero, out var error)) return Failed(error);
             if (Campaign.Current.ConversationManager.IsConversationInProgress)
                 return Failed("A conversation is already active.");
-            if (PlayerEncounter.Current != null) return Failed("A player encounter is already active.");
+            if (PlayerEncounter.Current != null && !IsVisitingHerosSettlement(hero))
+            {
+                return Failed("A player encounter is already active.");
+            }
 
             Campaign.Current.CurrentConversationContext = ConversationContext.Default;
             CampaignMapConversation.OpenConversation(
@@ -59,10 +70,86 @@ internal class HeroConversationDebugCommand
             return Succeeded(GetState(hero));
 
         }
+
+        // A town menu talk, not a siege or battle that happens to be at the hero's settlement
+        private static bool IsVisitingHerosSettlement(Hero hero)
+        {
+            var settlement = hero.CurrentSettlement;
+            return settlement != null && PlayerEncounter.EncounterSettlement == settlement &&
+                PlayerEncounter.Battle == null && !settlement.IsUnderSiege;
+        }
+    }
+
+    public sealed class HeroConversationChooseCoopCommand : ICoopCommand
+    {
+        public string Prefix => "coop.debug.hero_conversation";
+
+        public string Name => "choose";
+
+        public string Description => "Lists the current line and options, or picks an option by index, or continues with 'continue'.";
+
+        public CoopCommandSide Side => CoopCommandSide.Client;
+
+        public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
+        {
+            new ExpectedArgs("option", "An option index or 'continue'. Omit to list.", isRequired: false),
+        };
+
+        public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
+        {
+            var manager = Campaign.Current.ConversationManager;
+            if (!manager.IsConversationInProgress) return Failed("No conversation is active.");
+
+            if (args.Count > 0)
+            {
+                if (args[0] == "continue")
+                {
+                    // Vanilla ignores a continue while the player has a choice to make
+                    if (manager.CurOptions.Count > 1)
+                    {
+                        return Failed($"Pick one of the {manager.CurOptions.Count} options instead.");
+                    }
+
+                    manager.ContinueConversation();
+                }
+                else if (int.TryParse(args[0], out var index) && index >= 0 && index < manager.CurOptions.Count)
+                {
+                    if (!manager.CurOptions[index].IsClickable)
+                    {
+                        return Failed($"Option {index} is disabled.");
+                    }
+
+                    manager.DoOption(index);
+                }
+                else
+                {
+                    return Failed($"Unknown option '{args[0]}'.");
+                }
+            }
+
+            if (!manager.IsConversationInProgress) return Succeeded("CONVERSATION_ENDED");
+
+            var output = new System.Text.StringBuilder();
+            output.AppendLine($"LINE: {manager.CurrentSentenceText}");
+            for (var i = 0; i < manager.CurOptions.Count; i++)
+            {
+                var option = manager.CurOptions[i];
+                output.AppendLine($"{i}: [{option.Id}] {option.Text}{(option.IsClickable ? "" : " (disabled)")}");
+            }
+
+            return Succeeded(output.ToString());
+        }
     }
 
     public sealed class HeroConversationStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+
+        public HeroConversationStateCoopCommand(ICommandObjectResolver resolver)
+        {
+            this.resolver = resolver;
+        }
+
         public string Prefix => "coop.debug.hero_conversation";
 
         public string Name => "state";
@@ -73,7 +160,7 @@ internal class HeroConversationDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The optional registered hero id to compare with the active conversation.", false),
+            new ExpectedArgs("hero_id", "Optional hero name or id to compare with the active conversation; quote names with spaces.", false),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -83,7 +170,7 @@ internal class HeroConversationDebugCommand
             Hero hero;
             if (args.Count == 1)
             {
-                if (!TryGetHero(args[0], out hero, out var error)) return Failed(error);
+                if (!resolver.TryResolveHero(args[0], out hero, out var error)) return Failed(error);
             }
             else
             {
@@ -123,6 +210,15 @@ internal class HeroConversationDebugCommand
 
     public sealed class HeroConversationSetHasMetCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
+
+        public HeroConversationSetHasMetCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+        }
+
         public string Prefix => "coop.debug.hero_conversation";
 
         public string Name => "set_has_met";
@@ -133,7 +229,7 @@ internal class HeroConversationDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("hero_id", "The registered hero id."),
+            new ExpectedArgs("hero_id", "Hero name or id; quote names with spaces."),
             new ExpectedArgs("has_met", "True when the hero should be marked as met."),
         };
 
@@ -141,7 +237,9 @@ internal class HeroConversationDebugCommand
         {
             if (!bool.TryParse(args[1], out var hasMet))
                 return Failed($"Unable to parse {args[1]} as a boolean.");
-            if (!TryGetHero(args[0], out var hero, out var error)) return Failed(error);
+            if (!resolver.TryResolveHero(args[0], out var hero, out var error)) return Failed(error);
+            if (!objectManager.TryGetId(hero, out var heroId))
+                return Failed($"Hero '{hero.Name}' is not registered with the object manager.");
 
             if (hasMet)
                 hero.SetHasMet();
@@ -149,13 +247,22 @@ internal class HeroConversationDebugCommand
                 hero.HasMet = false;
 
             return Succeeded($"HERO_HAS_MET side={(ModInformation.IsServer ? "server" : "client")} " +
-                $"heroId={args[0]} hasMet={hero.HasMet}");
+                $"heroId={heroId} hasMet={hero.HasMet}");
 
         }
     }
 
     public sealed class HeroConversationMeetingStateCoopCommand : ICoopCommand
     {
+        private readonly ICommandObjectResolver resolver;
+        private readonly IObjectManager objectManager;
+
+        public HeroConversationMeetingStateCoopCommand(ICommandObjectResolver resolver, IObjectManager objectManager)
+        {
+            this.resolver = resolver;
+            this.objectManager = objectManager;
+        }
+
         public string Prefix => "coop.debug.hero_conversation";
 
         public string Name => "meeting_state";
@@ -166,8 +273,8 @@ internal class HeroConversationDebugCommand
 
         public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
         {
-            new ExpectedArgs("player_hero_id", "The registered player hero id."),
-            new ExpectedArgs("met_hero_id", "The registered met hero id."),
+            new ExpectedArgs("player_hero_id", "Player hero name or id; quote names with spaces."),
+            new ExpectedArgs("met_hero_id", "Met hero name or id; quote names with spaces."),
         };
 
         public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -176,34 +283,24 @@ internal class HeroConversationDebugCommand
             if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var sessionProvider))
                 return Failed($"Unable to get {nameof(ICoopSessionProvider)}");
 
+            if (!resolver.TryResolveHero(args[0], out var playerHero, out var error)) return Failed(error);
+            if (!resolver.TryResolveHero(args[1], out var metHero, out error)) return Failed(error);
+            if (!objectManager.TryGetId(playerHero, out var playerHeroId))
+                return Failed($"Hero '{playerHero.Name}' is not registered with the object manager.");
+            if (!objectManager.TryGetId(metHero, out var metHeroId))
+                return Failed($"Hero '{metHero.Name}' is not registered with the object manager.");
+
             long lastMeetingTicks = 0;
             var playerLastMeetingTimes = sessionProvider.CoopSession?.HeroMeetingData?.PlayerLastMeetingTimes;
             bool hasEntry = playerLastMeetingTimes != null &&
-                playerLastMeetingTimes.TryGetValue(args[0], out var meetingTimes) &&
+                playerLastMeetingTimes.TryGetValue(playerHeroId, out var meetingTimes) &&
                 meetingTimes != null &&
-                meetingTimes.TryGetValue(args[1], out lastMeetingTicks);
+                meetingTimes.TryGetValue(metHeroId, out lastMeetingTicks);
 
-            return Succeeded($"HERO_MEETING_DATA playerHeroId={args[0]} metHeroId={args[1]} " +
+            return Succeeded($"HERO_MEETING_DATA playerHeroId={playerHeroId} metHeroId={metHeroId} " +
                 $"hasEntry={hasEntry} lastMeetingTicks={(hasEntry ? lastMeetingTicks.ToString(CultureInfo.InvariantCulture) : "none")}");
 
         }
-    }
-
-    private static bool TryGetHero(string heroId, out Hero hero, out string error)
-    {
-        hero = null;
-        error = null;
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-        {
-            error = $"Unable to get {nameof(IObjectManager)}";
-            return false;
-        }
-        if (!objectManager.TryGetObject(heroId, out hero))
-        {
-            error = $"Unable to find hero with id: {heroId}";
-            return false;
-        }
-        return true;
     }
 
     private static string GetState(Hero hero)

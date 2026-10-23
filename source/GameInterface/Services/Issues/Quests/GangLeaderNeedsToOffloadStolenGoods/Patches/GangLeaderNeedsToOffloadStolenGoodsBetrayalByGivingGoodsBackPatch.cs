@@ -5,6 +5,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.GangLeaderNeedsToOffloadStolenGoo
 namespace GameInterface.Services.Issues.Quests.GangLeaderNeedsToOffloadStolenGoods.Patches;
 
 // Vanilla names this FailQuestByGivingBackTheGoods but it ends the quest with a betrayal
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.FailQuestByGivingBackTheGoods))]
 internal class GangLeaderNeedsToOffloadStolenGoodsBetrayalByGivingGoodsBackPatch
 {
