@@ -212,6 +212,16 @@ public class ServerSiegeBreakInHandlerTests : IDisposable
     }
 
     [Fact]
+    public void EnteringThePaidSiegeItself_LeavesTheReceiptForTheContinuation()
+    {
+        Send("first");
+
+        GameThread.Run(() => broker.Publish(this, new PartyEnterSettlementAttempted(settlement, party)), blocking: true);
+
+        Assert.True(receipts.IsPaid(party, siege));
+    }
+
+    [Fact]
     public void OtherPeerDisconnecting_KeepsThePaidReceipt()
     {
         Send("first");
@@ -253,7 +263,7 @@ public class ServerSiegeBreakInHandlerTests : IDisposable
         if (exit == nameof(PlayerDisconnected))
             broker.Publish(this, new PlayerDisconnected(peer, default));
         else if (exit == nameof(PartyEnterSettlementAttempted))
-            GameThread.Run(() => broker.Publish(this, new PartyEnterSettlementAttempted(settlement, party)), blocking: true);
+            GameThread.Run(() => broker.Publish(this, new PartyEnterSettlementAttempted(ObjectHelper.SkipConstructor<Settlement>(), party)), blocking: true);
         else
             GameThread.Run(() => broker.Publish(this, new SettlementEncounterLeaveApplied(party, settlement)), blocking: true);
         GameThread.Run(() => { }, blocking: true);

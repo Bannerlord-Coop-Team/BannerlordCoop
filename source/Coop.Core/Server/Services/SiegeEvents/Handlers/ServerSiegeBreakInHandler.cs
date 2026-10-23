@@ -110,7 +110,10 @@ internal class ServerSiegeBreakInHandler : IHandler
     // Same lifetime as the break out receipts, so a paid or failed break in never outlives the encounter it was for.
     private void HandleEnter(MessagePayload<PartyEnterSettlementAttempted> payload)
     {
-        receipts.Remove(payload.What.MobileParty);
+        var party = payload.What.MobileParty;
+        // Entering the paid siege is the continuation itself, which drops the receipt once the party is really inside.
+        if (receipts.TryGet(party, payload.What.Settlement?.SiegeEvent, out _)) return;
+        receipts.Remove(party);
     }
 
     private void HandleLeave(MessagePayload<SettlementEncounterLeaveApplied> payload)
