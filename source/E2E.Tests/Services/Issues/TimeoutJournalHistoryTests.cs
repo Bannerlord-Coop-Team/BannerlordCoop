@@ -9,6 +9,7 @@ using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encyclopedia;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.LogEntries;
@@ -205,9 +206,14 @@ public class TimeoutJournalHistoryTests : IDisposable
             using (new MainHeroSubstitutionScope(Object<Hero>(scenario.ClientA, scenario.OwnerHeroId),
                 Object<MobileParty>(scenario.ClientA, scenario.OwnerPartyId)))
             {
-                ownerQuest.OnQuestAccepted();
-                introduction = Assert.Single(ownerQuest.JournalEntries).LogText.ToString();
-                if (addSecondStage) ownerQuest.AddLog(new TextObject("Second acceptance stage"));
+                var sentence = new ConversationSentence("accept_horses", new TextObject("accept"), "start", "close_window",
+                    null, null, () =>
+                    {
+                        ownerQuest.OnQuestAccepted();
+                        introduction = Assert.Single(ownerQuest.JournalEntries).LogText.ToString();
+                        if (addSecondStage) ownerQuest.AddLog(new TextObject("Second acceptance stage"));
+                    });
+                sentence.RunConsequence(Game.Current);
             }
         });
         environment.FlushCoalescer();

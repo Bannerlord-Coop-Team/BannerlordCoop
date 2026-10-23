@@ -4,6 +4,7 @@ using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Conversation;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
@@ -18,11 +19,11 @@ internal class QuestAcceptanceJournalPatch
             MessageBroker.Instance.Publish(__instance, new QuestAcceptanceStarted(__instance));
     }
 
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnQuestLogAdded))]
+    [HarmonyPatch(typeof(ConversationSentence), nameof(ConversationSentence.RunConsequence))]
     [HarmonyPostfix]
-    private static void Postfix(QuestBase quest)
+    private static void Postfix(ConversationSentence __instance)
     {
         if (ModInformation.IsClient && !CallOriginalPolicy.IsOriginalAllowed())
-            MessageBroker.Instance.Publish(quest, new QuestAcceptanceJournalObserved(quest));
+            MessageBroker.Instance.Publish(__instance, new QuestAcceptanceFinished());
     }
 }

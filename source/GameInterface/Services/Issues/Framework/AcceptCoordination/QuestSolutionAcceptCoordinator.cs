@@ -14,6 +14,7 @@ using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
 
@@ -60,7 +61,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         this.acceptPreconditions = acceptPreconditions;
 
         messageBroker.Subscribe<QuestSolutionAcceptTriggered>(Handle_QuestSolutionAcceptTriggered);
-        messageBroker.Subscribe<QuestAcceptanceJournalObserved>(Handle_QuestAcceptanceJournalObserved);
+        messageBroker.Subscribe<QuestAcceptanceFinished>(Handle_QuestAcceptanceFinished);
         messageBroker.Subscribe<QuestAcceptanceStarted>(Handle_QuestAcceptanceStarted);
         messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
         messageBroker.Subscribe<RequestQuestAcceptanceJournal>(Handle_RequestQuestAcceptanceJournal);
@@ -72,7 +73,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<QuestSolutionAcceptTriggered>(Handle_QuestSolutionAcceptTriggered);
-        messageBroker.Unsubscribe<QuestAcceptanceJournalObserved>(Handle_QuestAcceptanceJournalObserved);
+        messageBroker.Unsubscribe<QuestAcceptanceFinished>(Handle_QuestAcceptanceFinished);
         messageBroker.Unsubscribe<QuestAcceptanceStarted>(Handle_QuestAcceptanceStarted);
         messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
         messageBroker.Unsubscribe<RequestQuestAcceptanceJournal>(Handle_RequestQuestAcceptanceJournal);
@@ -108,8 +109,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         var quest = issue.IssueQuest;
         if (quest == null) return;
 
-        for (var index = 0; index < quest.JournalEntries.Count; index++)
-            SendAcceptanceLog(issue, quest, index);
+        acceptingQuests.Add(quest);
     }
 
     private void Handle_QuestAcceptanceStarted(MessagePayload<QuestAcceptanceStarted> payload)
@@ -124,16 +124,25 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         acceptingQuests.Add(quest);
     }
 
-    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload) => acceptingQuests.Clear();
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload) => FlushAcceptanceJournals();
 
-    private void Handle_QuestAcceptanceJournalObserved(MessagePayload<QuestAcceptanceJournalObserved> payload)
+    private void Handle_QuestAcceptanceFinished(MessagePayload<QuestAcceptanceFinished> payload) => FlushAcceptanceJournals();
+
+    private void FlushAcceptanceJournals()
     {
-        var quest = payload.What.Quest;
-        if (ModInformation.IsServer || !acceptingQuests.Contains(quest)) return;
+        if (ModInformation.IsServer || acceptingQuests.Count == 0) return;
 
-        var issue = IssueManager.GetIssueOfQuest(quest);
-        if (issue != null && quest.JournalEntries.Count > 0)
-            SendAcceptanceLog(issue, quest, quest.JournalEntries.Count - 1);
+        var quests = acceptingQuests.ToArray();
+        acceptingQuests.Clear();
+        foreach (var quest in quests)
+        {
+            var issue = IssueManager.GetIssueOfQuest(quest);
+            if (issue == null) continue;
+
+            // The callback can update a discrete log after AddLog has announced it.
+            for (var index = 0; index < quest.JournalEntries.Count; index++)
+                SendAcceptanceLog(issue, quest, index);
+        }
     }
 
     private void SendAcceptanceLog(IssueBase issue, QuestBase quest, int index)
