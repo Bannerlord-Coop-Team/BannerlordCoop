@@ -39,12 +39,18 @@ public class AlternativeEndingJournalTests : IDisposable
 
     public void Dispose()
     {
-        lock (GameInstance.@lock)
+        try
         {
             environment.Dispose();
-            MBTextManager.TextContext._variables.Clear();
-            foreach (var variable in textVariables)
-                MBTextManager.TextContext._variables.Add(variable.Key, variable.Value);
+        }
+        finally
+        {
+            lock (GameInstance.@lock)
+            {
+                MBTextManager.TextContext._variables.Clear();
+                foreach (var variable in textVariables)
+                    MBTextManager.TextContext._variables.Add(variable.Key, variable.Value);
+            }
         }
     }
 
