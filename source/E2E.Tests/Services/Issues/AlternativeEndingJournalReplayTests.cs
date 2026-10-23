@@ -83,7 +83,8 @@ public class AlternativeEndingJournalReplayTests : IDisposable
     [Fact]
     public void AlternativeCompletion_PreservesProgressAndIgnoresLateDuplicateDelivery()
     {
-        scenario.Server.Call(() => issues[scenario.Server].AddLog(new JournalLog(CampaignTime.Now,
+        var logTime = new CampaignTime(123L);
+        scenario.Server.Call(() => issues[scenario.Server].AddLog(new JournalLog(logTime,
             new TextObject("Troops are returning."), new TextObject("Return days"), 3, 4)));
         EndOnServer(IssueBase.IssueUpdateDetails.SentTroopsFinishedQuest);
         var message = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>());
@@ -96,6 +97,7 @@ public class AlternativeEndingJournalReplayTests : IDisposable
             Assert.True(archive.IsEnded());
             Assert.Equal(2, archive.GetEntries().Count());
             var progress = archive.GetEntries().First();
+            Assert.Equal(logTime.NumTicks, progress.LogTime.NumTicks);
             Assert.Equal("Return days", progress.TaskName.ToString());
             Assert.Equal(3, progress.CurrentProgress);
             Assert.Equal(4, progress.Range);

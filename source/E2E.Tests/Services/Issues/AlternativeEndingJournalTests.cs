@@ -93,6 +93,10 @@ public class AlternativeEndingJournalTests : IDisposable
         }, JournalTextLinks);
         environment.FlushCoalescer();
 
+        var journal = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionJournal>());
+        Assert.Equal(IssueBase.IssueUpdateDetails.SentTroopsFailedQuest, journal.Ending);
+        Assert.Equal(QuestScenario.IssueId, journal.IssueId);
+        Assert.Equal(scenario.NotableId, journal.IssueOwnerId);
         var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
         Assert.Equal(IssueOutcome.AlternativeSolution, finalized.Outcome);
         Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
