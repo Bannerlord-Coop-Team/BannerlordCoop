@@ -18,6 +18,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.CreationCapture;
 using GameInterface.Services.Issues.Quests.LadysKnightOut;
 using GameInterface.Services.Players;
+using GameInterface.Services.UI.Notifications;
 using GameInterface.Services.Tournaments.Data;
 using GameInterface.Services.Tournaments.Messages;
 using GameInterface.Services.Villages.Interfaces;
@@ -1055,9 +1056,48 @@ public class LadysKnightOutTests : IDisposable
             Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsEnded()));
             Assert.Null(scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
         });
-        scenario.Server.Call(() => Assert.DoesNotContain(
-            Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsEnded()),
-            entry => entry.IsRelatedTo(issues[scenario.Server])));
+        scenario.Server.Call(() =>
+        {
+            var archive = Assert.IsType<PlayerJournalLogEntry>(Assert.Single(
+                Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                    entry => entry.IsRelatedTo(issues[scenario.Server]) && entry.IsEnded())));
+            Assert.Equal(QuestScenario.ControllerA, archive.OwnerControllerId);
+        });
+        scenario.ClientA.Call(() =>
+        {
+            Campaign.Current.LogEntryHistory._logs.Clear();
+            Campaign.Current.LogEntryHistory._logs.AddRange(saveHistory);
+            Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(issues[scenario.Server]) && entry.IsEnded()));
+        });
+    }
+
+    [Theory]
+    [InlineData(0, IssueOutcome.QuestFail)]
+    [InlineData(1, IssueOutcome.QuestFail)]
+    [InlineData(2, IssueOutcome.QuestSuccess)]
+    public void CompletedQuestHistoryIsVisibleOnlyToTheOwnerAfterJoining(int ending, IssueOutcome outcome)
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                var handle = instance.Resolve<TestNetworkRouter>().GetOrCreateFixtureHandle("lady_honor");
+                Assert.True(instance.ObjectManager.AddExisting("lady_honor", DefaultTraits.Honor, handle));
+            });
+        var quest = Accept(scenario.ClientA);
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+        scenario.Server.Call(() =>
+        {
+            if (ending == 0)
+                scenario.Server.Resolve<IOutcomeDispatcher>().RunAsOwners<Quest>(
+                    current => current.CriminalActionPerformedTowardsSettlement());
+            else
+                scenario.Server.Resolve<IMessageBroker>().Publish(this,
+                    new TournamentSessionUpdated(Snapshot(ending == 2 ? 1 : 0, true, ending == 2)));
+        });
+        QuestJournalHistoryAssertions.AssertLateJoinHistory(scenario.Server, scenario.ClientA, scenario.ClientB,
+            QuestScenario.IssueId, quest, outcome);
     }
 
     [Fact]
