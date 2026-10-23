@@ -61,6 +61,7 @@ public class JoinPeerTerminatorTests
             "UnknownReason", "You have been Disconnected");
     }
 
+    /// <summary>Connects a real client over loopback, runs <paramref name="disconnect"/> on the server peer and checks what the client reports.</summary>
     private static void RunDisconnect(Action<NetPeer> disconnect, string? expectedReason, string expectedMessage)
     {
         using var broker = new TestMessageBroker();
@@ -89,8 +90,8 @@ public class JoinPeerTerminatorTests
 
         try
         {
-            Assert.True(serverTransport.StartInManualMode(0));
-            Assert.True(clientTransport.StartInManualMode(0));
+            Assert.True(serverTransport.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
+            Assert.True(clientTransport.StartInManualMode(IPAddress.Loopback, IPAddress.IPv6Loopback, 0));
             clientTransport.Connect(IPAddress.Loopback.ToString(), serverTransport.LocalPort, "join-disconnect-test");
             PumpUntil(serverTransport, clientTransport, () =>
                 serverPeer != null && broker.GetMessagesFromType<NetworkConnected>().Any());

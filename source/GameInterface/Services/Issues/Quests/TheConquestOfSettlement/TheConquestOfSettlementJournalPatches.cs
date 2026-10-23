@@ -1,4 +1,4 @@
-using Common;
+﻿using Common;
 using GameInterface.Policies;
 using HarmonyLib;
 using SandBox.CampaignBehaviors;
@@ -7,13 +7,13 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
-using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 
 using Quest = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssueQuest;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestManager), nameof(QuestManager.Quests), MethodType.Getter)]
 internal static class TheConquestOfSettlementQuestListPatch
 {
@@ -27,6 +27,7 @@ internal static class TheConquestOfSettlementQuestListPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestManager), nameof(QuestManager.TrackedObjects), MethodType.Getter)]
 internal static class TheConquestOfSettlementTrackedPatch
 {
@@ -47,6 +48,7 @@ internal static class TheConquestOfSettlementTrackedPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.IsTrackEnabled), MethodType.Getter)]
 internal static class TheConquestOfSettlementTrackEnabledPatch
 {
@@ -59,6 +61,7 @@ internal static class TheConquestOfSettlementTrackEnabledPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.IsThereDiscussDialogFlow), MethodType.Getter)]
 internal static class TheConquestOfSettlementDiscussionPatch
 {
@@ -71,19 +74,7 @@ internal static class TheConquestOfSettlementDiscussionPatch
     }
 }
 
-[HarmonyPatch(typeof(JournalLogEntry), nameof(JournalLogEntry.IsEnded))]
-internal static class TheConquestOfSettlementHistoryPatch
-{
-    [HarmonyPostfix]
-    private static void Postfix(JournalLogEntry __instance, ref bool __result)
-    {
-        if (!__result || __instance.Title.GetID() != "mvzh0HVk" || ModInformation.IsServer ||
-            CallOriginalPolicy.IsOriginalAllowed() ||
-            !ContainerProvider.TryResolve<ITheConquestOfSettlementService>(out var service)) return;
-        __result = service.IsVisible(__instance);
-    }
-}
-
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal static class TheConquestOfSettlementNotificationPatches
 {

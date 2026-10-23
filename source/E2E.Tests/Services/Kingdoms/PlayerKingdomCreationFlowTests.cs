@@ -41,6 +41,7 @@ using GameInterface.Services.Players.Data;
 using GameInterface.Services.Stances.Messages;
 using GameInterface.Services.UI.Notifications.Messages;
 using GameInterface.Services.Villages.Interfaces;
+using GameInterface.Utils.Commands;
 using HarmonyLib;
 using SandBox.Conversation.MissionLogics;
 using SandBox.ViewModelCollection.Map.Tracker;
@@ -121,7 +122,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             var previousHero = ResolvedMainHeroContext.ResolvedMainHero;
             var previousParty = Campaign.Current.MainParty;
             var args = new CoopCommandArgsFactory();
-            var war = new KingdomDebugCommand.KingdomDeclareWarCoopCommand();
+            var war = new KingdomDebugCommand.KingdomDeclareWarCoopCommand(Server.Resolve<ICommandObjectResolver>());
             Assert.False(war.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId })).Succeeded);
             Assert.False(war.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId, "hostility", "none" })).Succeeded);
             Assert.False(kingdom.IsAtWarWith(enemyKingdom));
@@ -149,7 +150,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
                 Assert.Same(previousHero, ResolvedMainHeroContext.ResolvedMainHero);
                 Assert.Same(previousParty, Campaign.Current.MainParty);
 
-                var peace = new KingdomDebugCommand.KingdomMakePeaceCoopCommand();
+                var peace = new KingdomDebugCommand.KingdomMakePeaceCoopCommand(Server.Resolve<ICommandObjectResolver>());
                 Assert.False(peace.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId })).Succeeded);
                 Assert.True(kingdom.IsAtWarWith(enemyKingdom));
                 result = peace.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId, ControllerId }));
@@ -248,7 +249,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
             var previousHero = ResolvedMainHeroContext.ResolvedMainHero;
             var previousParty = Campaign.Current.MainParty;
-            var command = new ClanDebugCommands.ClanLeaveKingdomCoopCommand();
+            var command = new ClanDebugCommands.ClanLeaveKingdomCoopCommand(
+                Server.Resolve<ICommandObjectResolver>());
             var args = new CoopCommandArgsFactory();
             var missingActor = command.ProcessCommand(args.FromValues(new[] { player.ClanId, "rebellion" }));
             Assert.False(missingActor.Succeeded);
@@ -405,7 +407,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             output = ExecuteCommand(
-                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                new KingdomDebugCommand.KingdomCreateCoopCommand(Server.Resolve<ICommandObjectResolver>()),
                 player.HeroId,
                 KingdomName);
         });
@@ -443,7 +445,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client.Call(() =>
         {
             output = ExecuteCommand(
-                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                new KingdomDebugCommand.KingdomCreateCoopCommand(client.Resolve<ICommandObjectResolver>()),
                 player.HeroId,
                 KingdomName);
         });
@@ -475,7 +477,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             output = ExecuteCommand(
-                new KingdomDebugCommand.KingdomCreateCoopCommand(),
+                new KingdomDebugCommand.KingdomCreateCoopCommand(Server.Resolve<ICommandObjectResolver>()),
                 followerId,
                 KingdomName);
         });
@@ -498,7 +500,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             string result = ExecuteCommand(
-                new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(),
+                new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(Server.Resolve<ICommandObjectResolver>()),
                 ControllerId,
                 kingdomId);
 
@@ -543,7 +545,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
         Server.Call(() =>
         {
-            var joinResult = ExecuteCommand(new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(), ControllerId, kingdomId);
+            var joinResult = ExecuteCommand(new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(Server.Resolve<ICommandObjectResolver>()), ControllerId, kingdomId);
 
             Assert.Contains("Forced player", joinResult);
         });
@@ -551,7 +553,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.NetworkSentMessages.Clear();
         Server.Call(() =>
         {
-            var restoreResult = ExecuteCommand(new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(), ControllerId, "none");
+            var restoreResult = ExecuteCommand(new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(Server.Resolve<ICommandObjectResolver>()), ControllerId, "none");
 
             Assert.Contains("Restored player", restoreResult);
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
@@ -897,7 +899,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             string result = ExecuteCommand(
-                new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(),
+                new KingdomDebugCommand.KingdomForcePlayerJoinCoopCommand(Server.Resolve<ICommandObjectResolver>()),
                 ControllerId,
                 newKingdomId);
 
@@ -3435,7 +3437,7 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         client2.Call(() =>
         {
             output = ExecuteCommand(
-                new KingdomDebugCommand.KingdomDecisionsCoopCommand(),
+                new KingdomDebugCommand.KingdomDecisionsCoopCommand(client2.Resolve<ICommandObjectResolver>()),
                 kingdomId);
         });
 

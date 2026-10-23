@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class QuestWorldEventRelayPatches
 {
