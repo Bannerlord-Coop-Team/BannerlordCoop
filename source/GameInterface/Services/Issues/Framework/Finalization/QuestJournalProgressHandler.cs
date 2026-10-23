@@ -82,7 +82,8 @@ internal class QuestJournalProgressHandler : IHandler
             var entries = issue.IssueQuest.JournalEntries;
             if (data.Index < 0 || data.Index >= entries.Count) return;
             var log = entries[data.Index];
-            if (log.Type != data.Type || log.Range != data.Range) return;
+            if (log.Type != data.Type || log.Range != data.Range ||
+                log.LogText?.Value != data.TextValue || log.TaskName?.Value != data.TaskValue) return;
             log.UpdateCurrentProgress(data.Progress);
         }, context: nameof(QuestJournalProgressHandler));
     }

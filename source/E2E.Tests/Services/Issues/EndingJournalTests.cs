@@ -209,6 +209,10 @@ public class EndingJournalTests : IDisposable
         scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
             new RequestQuestJournalProgress(scenario.NotableId, QuestScenario.IssueId, 0,
                 new JournalLog(CampaignTime.Zero, Ending(), null, 99, 7)));
+        scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
+            new RequestQuestJournalProgress(scenario.NotableId, QuestScenario.IssueId, 0,
+                new JournalLog(CampaignTime.Zero, new TextObject("Different stage"),
+                    new TextObject("Troops"), 99, 5, LogType.Discreate)));
         scenario.Server.Call(() =>
         {
             Assert.Equal(4, serverProgress.CurrentProgress);

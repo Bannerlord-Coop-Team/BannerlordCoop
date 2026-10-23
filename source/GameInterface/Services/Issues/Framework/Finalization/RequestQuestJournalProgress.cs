@@ -15,6 +15,8 @@ public readonly struct RequestQuestJournalProgress : ICommand
     [ProtoMember(4)] public readonly int Progress;
     [ProtoMember(5)] public readonly int Range;
     [ProtoMember(6)] public readonly LogType Type;
+    [ProtoMember(7)] public readonly string TextValue;
+    [ProtoMember(8)] public readonly string TaskValue;
 
     public RequestQuestJournalProgress(string issueOwnerId, string issueId, int index, JournalLog log)
     {
@@ -24,5 +26,7 @@ public readonly struct RequestQuestJournalProgress : ICommand
         Progress = log.CurrentProgress;
         Range = log.Range;
         Type = log.Type;
+        TextValue = log.LogText?.Value;
+        TaskValue = log.TaskName?.Value;
     }
 }
