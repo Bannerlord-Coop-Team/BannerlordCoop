@@ -16,6 +16,7 @@ namespace GameInterface.Services.Issues.Quests.RevenueFarming;
 
 using Quest = RevenueFarmingIssueBehavior.RevenueFarmingIssueQuest;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithCancel))]
 internal class RevenueFarmingCancellationLogPatch
 {
@@ -27,6 +28,7 @@ internal class RevenueFarmingCancellationLogPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class RevenueFarmingDetachedDialoguePatch
 {
@@ -50,6 +52,7 @@ internal class RevenueFarmingDetachedDialoguePatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.RemoveTrackedObject))]
 internal class RevenueFarmingRemoveTrackingPatch
 {
@@ -58,6 +61,7 @@ internal class RevenueFarmingRemoveTrackingPatch
         => __instance is not Quest || __instance.IsTracked(trackedObject);
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.OnFinalize))]
 internal class RevenueFarmingFinalizationMenuPatch
 {
@@ -66,6 +70,7 @@ internal class RevenueFarmingFinalizationMenuPatch
         sessions.IsLocal(__instance);
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(GauntletQueryManager), nameof(GauntletQueryManager.OnLateTick))]
 internal class RevenueFarmingPaymentInquiryCleanupPatch
 {

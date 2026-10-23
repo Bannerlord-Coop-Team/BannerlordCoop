@@ -12,6 +12,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.RevenueFarmingIssueBehavior.Reven
 
 namespace GameInterface.Services.Issues.Quests.RevenueFarming;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class RevenueFarmingWorldEventPatches
 {

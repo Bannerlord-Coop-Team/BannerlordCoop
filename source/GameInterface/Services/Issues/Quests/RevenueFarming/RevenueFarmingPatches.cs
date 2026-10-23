@@ -21,12 +21,14 @@ namespace GameInterface.Services.Issues.Quests.RevenueFarming;
 
 using Quest = RevenueFarmingIssueBehavior.RevenueFarmingIssueQuest;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(RevenueFarmingIssueBehavior), nameof(RevenueFarmingIssueBehavior.OnCheckForIssue))]
 internal class RevenueFarmingOfferAuthorityPatch
 {
     private static bool Prefix() => ModInformation.IsServer;
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(RevenueFarmingIssueBehavior), nameof(RevenueFarmingIssueBehavior.Instance), MethodType.Getter)]
 internal class RevenueFarmingInstancePatch
 {
@@ -39,6 +41,7 @@ internal class RevenueFarmingInstancePatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(RevenueFarmingIssueBehavior), nameof(RevenueFarmingIssueBehavior.SyncData))]
 internal class RevenueFarmingSavePatch
 {
@@ -48,6 +51,7 @@ internal class RevenueFarmingSavePatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class RevenueFarmingCallbackPatch
 {
@@ -85,6 +89,7 @@ internal class RevenueFarmingCallbackPatch
     private static void Finalizer(RevenueFarmingExecutionScope __state) => __state?.Dispose();
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.FinalizeQuest))]
 internal class RevenueFarmingTerminalStatePatch
 {
@@ -100,6 +105,7 @@ internal class RevenueFarmingTerminalStatePatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.OnBeforeTimedOut))]
 internal class RevenueFarmingTimeoutPatch
 {
@@ -113,12 +119,14 @@ internal class RevenueFarmingTimeoutPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
 internal class RevenueFarmingTimeoutLogPatch
 {
     private static bool Prefix() => ModInformation.IsServer;
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.ShowQuestResolvePopUp))]
 internal class RevenueFarmingPaymentPromptPatch
 {
@@ -133,6 +141,7 @@ internal class RevenueFarmingPaymentPromptPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.OnPlayerDeserted))]
 internal class RevenueFarmingDesertionPatch
 {
@@ -144,6 +153,7 @@ internal class RevenueFarmingDesertionPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.QuestAcceptedConsequences))]
 internal class RevenueFarmingAcceptedPatch
 {
@@ -161,6 +171,7 @@ internal class RevenueFarmingAcceptedPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class RevenueFarmingPaymentActionPatch
 {
@@ -184,6 +195,7 @@ internal class RevenueFarmingPaymentActionPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class RevenueFarmingMenuActionPatch
 {
@@ -210,6 +222,7 @@ internal class RevenueFarmingMenuActionPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(RevenueFarmingIssueBehavior), nameof(RevenueFarmingIssueBehavior.AddVillageEventMenus))]
 internal class RevenueFarmingIncidentOptionsPatch
 {
@@ -230,6 +243,7 @@ internal class RevenueFarmingIncidentOptionsPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(RevenueFarmingIssueBehavior), nameof(RevenueFarmingIssueBehavior.collecting_menu_on_init))]
 internal class RevenueFarmingCollectionMenuPatch
 {
@@ -245,6 +259,7 @@ internal class RevenueFarmingCollectionMenuPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(GameMenu), nameof(GameMenu.SwitchToMenu))]
 internal class RevenueFarmingMenuCapturePatch
 {
@@ -261,6 +276,7 @@ internal class RevenueFarmingMenuCapturePatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish))]
 internal class RevenueFarmingEncounterCapturePatch
 {
@@ -274,6 +290,7 @@ internal class RevenueFarmingEncounterCapturePatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(MapEventHelper), nameof(MapEventHelper.OnConversationEnd))]
 internal class RevenueFarmingConversationEndPatch
 {
@@ -285,6 +302,7 @@ internal class RevenueFarmingConversationEndPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Campaign), nameof(Campaign.TimeControlMode), MethodType.Setter)]
 internal class RevenueFarmingTimeControlPatch
 {
@@ -292,6 +310,7 @@ internal class RevenueFarmingTimeControlPatch
     private static bool Prefix() => ModInformation.IsClient || RevenueFarmingExecutionScope.Current == null;
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Settlement), nameof(Settlement.CurrentSettlement), MethodType.Getter)]
 internal class RevenueFarmingSettlementPatch
 {
@@ -305,6 +324,7 @@ internal class RevenueFarmingSettlementPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithSuccess))]
 internal class RevenueFarmingSuccessGuardPatch
 {
@@ -320,6 +340,7 @@ internal class RevenueFarmingSuccessGuardPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class RevenueFarmingFinalizationScopePatch
 {
