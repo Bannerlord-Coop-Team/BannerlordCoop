@@ -19,6 +19,7 @@ namespace GameInterface.Services.Issues.Quests.Smugglers.Patches;
 /// on the server, so its quest object runs these listeners as the owning player and the owner's client skips them.
 /// Wars and kingdom changes are relayed by the framework.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class SmugglersQuestEventPatches
 {

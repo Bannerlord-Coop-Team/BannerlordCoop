@@ -1,9 +1,7 @@
 ﻿using Common.Commands;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
-using GameInterface;
 using GameInterface.Services.HeroDevelopers.Commands;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.Commands;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -31,7 +29,7 @@ public class HeroSocialParameterCoopCommandTests : IDisposable
 
         Server.Call(() =>
         {
-            var result = Execute(heroId, "oratory", "1", "0");
+            var result = Execute(Server, heroId, "oratory", "1", "0");
 
             Assert.True(result.Succeeded, result.Output);
             Assert.Contains("\"before\":0", result.Output);
@@ -48,9 +46,9 @@ public class HeroSocialParameterCoopCommandTests : IDisposable
 
         Server.Call(() =>
         {
-            Assert.True(Execute(heroId, "oratory", "1", "0").Succeeded);
+            Assert.True(Execute(Server, heroId, "oratory", "1", "0").Succeeded);
 
-            var result = Execute(heroId, "oratory");
+            var result = Execute(Server, heroId, "oratory");
 
             Assert.True(result.Succeeded, result.Output);
             Assert.Contains("\"before\":1", result.Output);
@@ -64,7 +62,7 @@ public class HeroSocialParameterCoopCommandTests : IDisposable
 
         Server.Call(() =>
         {
-            var result = Execute(heroId, "oratory", "1", "1");
+            var result = Execute(Server, heroId, "oratory", "1", "1");
 
             Assert.False(result.Succeeded);
             Assert.True(Server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
@@ -80,7 +78,7 @@ public class HeroSocialParameterCoopCommandTests : IDisposable
 
         client.Call(() =>
         {
-            var result = Execute(heroId, "oratory", "1", "0");
+            var result = Execute(client, heroId, "oratory", "1", "0");
 
             Assert.False(result.Succeeded);
             Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
@@ -88,11 +86,7 @@ public class HeroSocialParameterCoopCommandTests : IDisposable
         });
     }
 
-    private static CoopCommandResult Execute(params string[] args)
-    {
-        Assert.True(ContainerProvider.TryResolve<ICommandObjectResolver>(out var resolver));
-        Assert.True(ContainerProvider.TryResolve<IObjectManager>(out var objectManager));
-        return new HeroDeveloperCommands.HeroSocialParameterCoopCommand(resolver, objectManager)
+    private static CoopCommandResult Execute(EnvironmentInstance instance, params string[] args) =>
+        new HeroDeveloperCommands.HeroSocialParameterCoopCommand(instance.Resolve<ICommandObjectResolver>(), instance.ObjectManager)
             .ProcessCommand(new CoopCommandArgsFactory().FromValues(args));
-    }
 }

@@ -11,6 +11,8 @@ using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
 using GameInterface;
 using GameInterface.Policies;
+using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Tests.Services.Issues;
 using Missions;
 using Missions.Agents.Handlers;
 using Missions.Battles;
@@ -115,6 +117,8 @@ public class TestEnvironment
         {
             builder.RegisterModule<GameInterfaceModule>();
         }
+
+        builder.RegisterInstance(TestQuestFeatureFlag.On).As<IQuestFeatureFlag>();
 
         builder.RegisterInstance(networkOrchestrator).AsSelf().SingleInstance();
         builder.RegisterInstance(meshScheduler)

@@ -1,7 +1,9 @@
 ﻿using Autofac;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Conversation;
+using GameInterface.Services.Issues.Framework.Dismissal;
 using GameInterface.Services.Issues.Framework.Dispatch;
+using GameInterface.Services.Issues.Framework.Gating;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
@@ -20,6 +22,7 @@ internal class IssuesModule : Module
 
     protected override void Load(ContainerBuilder builder)
     {
+        builder.RegisterType<QuestFeatureFlag>().As<IQuestFeatureFlag>().InstancePerDependency();
         builder.RegisterType<QuestTypeRegistry>().As<IQuestTypeRegistry>().SingleInstance();
         builder.RegisterType<IssueResolver>().As<IIssueResolver>().SingleInstance();
         builder.RegisterType<IssueOwnerResolver>().As<IIssueOwnerResolver>().SingleInstance();
@@ -36,6 +39,7 @@ internal class IssuesModule : Module
             .As<ILesserNobleRevoltWorldEventService>()
             .SingleInstance();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
+        builder.RegisterType<IssueDismisser>().As<IIssueDismisser>().InstancePerDependency();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)
             .Where(IsQuestPiece)
