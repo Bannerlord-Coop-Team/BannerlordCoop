@@ -20,7 +20,6 @@ public sealed class ChatFactionMembership : IChatFactionMembership
 
     public ChatFactionMembership(IObjectManager objectManager)
     {
-        if (objectManager == null) throw new ArgumentNullException(nameof(objectManager));
         this.objectManager = objectManager;
     }
 
