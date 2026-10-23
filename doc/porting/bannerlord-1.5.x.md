@@ -230,7 +230,9 @@ The branch builds and tests against v1.5.5 with no code change (2026-10-21, Stea
     events (`Created_97`, 139, 141, 149, 171, 187 and 201), unregistered the 7 parties vanilla
     destroyed while releasing them, then loaded, served and autosaved. Not yet checked: that no
     `set_MapEventSide` exception follows once time runs. With no client connected the pulse line
-    reads `timeMode=Stop players=0`, so that check waits for a client.
+    reads `timeMode=Stop players=0`, so that check waits for a client. On 2026-10-23 a modded server
+    with one client ran 11 in-game days on a new campaign without that exception; time running on a
+    repaired damaged save is still unchecked.
   - Open (follow-ups): the player pass finalizes an unlisted live event without first restoring its
     unsaved state, so that finalize can throw; the orphan pass then releases the event only if
     vanilla had already set `WaitingRemoval`. A successful `FinalizeEvent` in the player pass
