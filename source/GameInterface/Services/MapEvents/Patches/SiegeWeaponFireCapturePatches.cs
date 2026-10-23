@@ -27,7 +27,8 @@ internal static class RangedSiegeWeaponShootPatch
     private static void Prefix(RangedSiegeWeapon __instance)
     {
         if (!BattleSpawnConfig.Enabled || !BattleSpawnGate.IsCoopBattleActive) return;
-        if (!SiegeMissionAuthorityGate.IsMachineSimulatedLocally(__instance.Id.Id)) return;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return;
+        if (!authority.IsMachineSimulatedLocally(__instance.Id.Id)) return;
 
         SiegeWeaponFireContext.Capturing = __instance;
     }

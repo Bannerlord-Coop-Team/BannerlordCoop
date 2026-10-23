@@ -60,7 +60,8 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
             prefix: new HarmonyMethod(typeof(MangonelLoadReplicationTests), nameof(HasUser)));
     }
 
-    private (SiegeMachineStateReplicator Sut, CoopAgentInfo Info, Mangonel Machine, Mock<IBattleNetwork> Network) Replica(
+    private (SiegeMachineStateReplicator Sut, CoopAgentInfo Info, Mangonel Machine, Mock<IBattleNetwork> Network,
+        SiegeMachineAuthorityRegistry Authority) Replica(
         string own, Guid? pickerId = null, string agentOwner = "loader")
     {
         var agent = New<Agent>();
@@ -87,15 +88,16 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         session.SetupGet(s => s.OwnControllerId).Returns(own);
         session.SetupGet(s => s.HostEpoch).Returns(3);
         var network = new Mock<IBattleNetwork>();
+        var authority = new SiegeMachineAuthorityRegistry();
         var sut = new SiegeMachineStateReplicator(network.Object, Mock.Of<IMessageBroker>(), session.Object,
-            registry.Object, new HostEpochPolicy());
+            registry.Object, new HostEpochPolicy(), authority);
         Field<Dictionary<int, UsableMachine>>(sut, "machinesById")[1496] = machine;
         Field<List<UsableMachine>>(sut, "machines").Add(machine);
         Field<Dictionary<int, string>>(sut, "claimedMachines")[1496] = "simulator";
         Field<Dictionary<int, int>>(sut, "authorityEpochs")[1496] = 3;
         Field<Dictionary<int, int>>(sut, "authorityRevisions")[1496] = 2;
         replicas.Add(sut);
-        return (sut, info, machine, network);
+        return (sut, info, machine, network, authority);
     }
 
     [Theory]
@@ -136,15 +138,13 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         harmony.CreateClassProcessor(typeof(MangonelAmmoConsumedPatch)).Patch();
         harmony.CreateClassProcessor(typeof(MangonelAmmoPickupPatch)).Patch();
 
-        bool oldHost = SiegeMissionAuthorityGate.IsLocalAuthority;
-        bool oldKnown = SiegeMissionAuthorityGate.IsAuthorityKnown;
+        replica.Authority.IsAuthorityKnown = authorityKnown;
+        replica.Authority.SetClaimedMachines(localSimulator
+            ? new HashSet<int> { replica.Machine.Id.Id } : new HashSet<int>(), new HashSet<int>());
+        using var container = new SiegeAuthorityContainerScope(replica.Authority);
         bool oldEnabled = BattleSpawnConfig.Enabled;
         BattleSpawnConfig.Enabled = true;
         BattleSpawnGate.BeginBattle("mangonel-former-simulator");
-        SiegeMissionAuthorityGate.IsLocalAuthority = false;
-        SiegeMissionAuthorityGate.IsAuthorityKnown = authorityKnown;
-        SiegeMissionAuthorityGate.SetClaimedMachines(localSimulator
-            ? new HashSet<int> { replica.Machine.Id.Id } : new HashSet<int>(), new HashSet<int>());
         nativeBaseTicks = 0;
         nativePickupConsumes = 0;
         try
@@ -164,9 +164,6 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         {
             BattleSpawnGate.EndBattle();
             BattleSpawnConfig.Enabled = oldEnabled;
-            SiegeMissionAuthorityGate.IsLocalAuthority = oldHost;
-            SiegeMissionAuthorityGate.IsAuthorityKnown = oldKnown;
-            SiegeMissionAuthorityGate.ResetClaimedMachines();
         }
     }
 
@@ -486,8 +483,8 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
     {
         var simulator = Replica("simulator");
         Use(simulator.Info.Agent, Point(simulator.Machine));
-        bool oldAuthority = SiegeMissionAuthorityGate.IsLocalAuthority;
-        SiegeMissionAuthorityGate.IsLocalAuthority = true;
+        simulator.Authority.IsLocalAuthority = true;
+        using var container = new SiegeAuthorityContainerScope(simulator.Authority);
         int completions = 0;
         Action<MessagePayload<MangonelAmmoConsumed>> receive = _ => completions++;
         MessageBroker.Instance.Subscribe(receive);
@@ -504,7 +501,6 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         finally
         {
             MessageBroker.Instance.Unsubscribe(receive);
-            SiegeMissionAuthorityGate.IsLocalAuthority = oldAuthority;
         }
     }
 
@@ -705,8 +701,8 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         CurrentActions[simulator.Info.Agent] = ActionIndex(staleBegin ? 11 : 12);
         simulator.Sut.ApplyMangonelLoad(new NetworkMangonelLoad("battle", Guid.NewGuid(), grantId, agentId,
             "loader", 7, 1496, 1487, "simulator", 3, 2, MangonelLoadPhase.Request, "loader"));
-        bool oldAuthority = SiegeMissionAuthorityGate.IsLocalAuthority;
-        SiegeMissionAuthorityGate.IsLocalAuthority = true;
+        simulator.Authority.IsLocalAuthority = true;
+        using var container = new SiegeAuthorityContainerScope(simulator.Authority);
         Action<MessagePayload<MangonelLoadTick>> receive = payload => NativeLoadTick(simulator.Sut, payload.What.Machine);
         MessageBroker.Instance.Subscribe(receive);
         try
@@ -741,7 +737,6 @@ public sealed partial class MangonelLoadReplicationTests : IDisposable
         finally
         {
             MessageBroker.Instance.Unsubscribe(receive);
-            SiegeMissionAuthorityGate.IsLocalAuthority = oldAuthority;
             changeActionOnUse = false;
         }
     }

@@ -19,8 +19,8 @@ namespace Coop.Tests.Missions.Battles;
 
 public sealed partial class MangonelLoadReplicationTests
 {
-    private (SiegeMachineStateReplicator Sut, CoopAgentInfo Info, Mangonel Machine, Mock<IBattleNetwork> Network)
-        SupplyReplica(string own, Guid? pickerId = null, string agentOwner = "loader")
+    private (SiegeMachineStateReplicator Sut, CoopAgentInfo Info, Mangonel Machine, Mock<IBattleNetwork> Network,
+        SiegeMachineAuthorityRegistry Authority) SupplyReplica(string own, Guid? pickerId = null, string agentOwner = "loader")
     {
         var replica = Replica(own, pickerId, agentOwner);
         var session = Mock.Get(Field<IBattleSession>(replica.Sut, "session"));
@@ -116,8 +116,8 @@ public sealed partial class MangonelLoadReplicationTests
         Assert.True(after.HasMangonelAmmo);
         Assert.Equal(0, after.MangonelAmmo);
         var apply = AccessTools.Method(typeof(SiegeMachineStateReplicator), "Apply");
-        apply.Invoke(null, new object[] { joiner.Machine, after });
-        apply.Invoke(null, new object[] { joiner.Machine, before });
+        apply.Invoke(null, new object[] { joiner.Machine, after, false });
+        apply.Invoke(null, new object[] { joiner.Machine, before, false });
         Assert.Equal(0, joiner.Machine.AmmoCount);
         Assert.True(PickupPoint(joiner.Machine).IsDeactivated);
     }

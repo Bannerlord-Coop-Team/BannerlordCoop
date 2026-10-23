@@ -11,6 +11,7 @@ using Coop.Core.Server.Services.Shutdown;
 using Coop.Core.Server.Services.Telemetry;
 using Coop.Tests.Mocks;
 using GameInterface;
+using GameInterface.Services.MapEvents;
 using GameInterface.Services.Missions;
 using GameInterface.Services.Voice;
 using Missions;
@@ -39,6 +40,8 @@ namespace Coop.Tests.Autofac
             Assert.NotNull(container.Resolve<global::GameInterface.Services.UI.CoopOptions.ICoopKeybindingPopupFactory>());
             Assert.NotNull(container.Resolve<IVoiceWindowFocus>());
             Assert.Equal("Not started", container.Resolve<IVoiceAudio>().Status);
+            // Missions writes siege authority and the GameInterface patches read it, so both must see one registry.
+            Assert.Same(container.Resolve<ISiegeMachineAuthorityRegistry>(), container.Resolve<ISiegeMachineAuthorityRegistry>());
 
             var logic = container.Resolve<ILogic>();
             Assert.NotNull(logic);

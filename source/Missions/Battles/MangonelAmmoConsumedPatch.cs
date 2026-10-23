@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Util;
+using GameInterface;
 using GameInterface.Services.MapEvents;
 using HarmonyLib;
 using TaleWorlds.Core;
@@ -33,8 +34,9 @@ public class MangonelAmmoConsumedPatch
     {
         __state = null;
         if (AllowedThread.IsThisThreadAllowed() ||
-            !SiegeMissionAuthorityGate.IsMachineSimulatedLocally(__instance.Id.Id) ||
             __instance.State != RangedSiegeWeapon.WeaponState.LoadingAmmo) return;
+        if (!ContainerProvider.TryResolve<ISiegeMachineAuthorityRegistry>(out var authority)) return;
+        if (!authority.IsMachineSimulatedLocally(__instance.Id.Id)) return;
         MessageBroker.Instance.Publish(__instance, new MangonelLoadTick(__instance));
         Agent user = __instance.LoadAmmoStandingPoint?.UserAgent;
         if (user != null && user.GetPrimaryWieldedItemIndex() == EquipmentIndex.ExtraWeaponSlot &&
