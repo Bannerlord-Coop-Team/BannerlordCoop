@@ -112,7 +112,22 @@ public class TimeoutJournalHistoryTests : IDisposable
     public void CapturesEveryAcceptanceStageButStopsBeforeLaterProgressLogs()
     {
         Accept(addSecondStage: true);
-        Assert.Equal(2, scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>().Count());
+        var captured = scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>().ToArray();
+        Assert.Equal(2, captured.Length);
+        scenario.ClientA.Call(() =>
+        {
+            for (var index = 0; index < captured.Length; index++)
+            {
+                Assert.Equal(scenario.NotableId, captured[index].IssueOwnerId);
+                Assert.Equal(QuestScenario.IssueId, captured[index].IssueId);
+                Assert.Equal(index, captured[index].Index);
+                Assert.Equal(Fields(new[] { ownerQuest.JournalEntries[index] }), Fields(new[]
+                {
+                    new JournalLog(captured[index].Time, captured[index].Text, captured[index].TaskName,
+                        captured[index].Progress, captured[index].Range, captured[index].Type),
+                }));
+            }
+        });
         scenario.Server.Call(() => Assert.Equal(new[] { introduction, "Second acceptance stage" },
             serverQuest.JournalEntries.Select(log => log.LogText.ToString())));
         Assert.Equal(0, scenario.ClientA.PendingGameThreadActionCount);
@@ -122,8 +137,7 @@ public class TimeoutJournalHistoryTests : IDisposable
             ownerQuest.AddLog(new TextObject("Later quest progress"));
         });
         environment.FlushCoalescer();
-        Assert.Equal(2, scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>().Count());
-        scenario.Server.Call(() => Assert.Equal(2, serverQuest.JournalEntries.Count));
+        Assert.Equal(captured, scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>());
     }
 
     [Fact]
@@ -282,6 +296,10 @@ public class TimeoutJournalHistoryTests : IDisposable
         entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId)));
 
     private static string[] Texts(JournalLogEntry entry) => entry.GetEntries().Select(log => log.LogText.ToString()).ToArray();
+
+    private static object[] Fields(IEnumerable<JournalLog> entries) => entries.Select(log => (object)(
+        log.LogTime.NumTicks, log.LogText?.ToString(), log.TaskName?.ToString(),
+        log.CurrentProgress, log.Range, log.Type)).ToArray();
 
     private static T Object<T>(EnvironmentInstance instance, string id) where T : class
     {
