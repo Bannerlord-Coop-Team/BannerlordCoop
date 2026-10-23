@@ -25,6 +25,7 @@ public class CoopNavalBattleBehavior : MissionLogic
     private readonly Action tickNpcFleet;
     private int lastAgentCount = -1;
     private bool retreated;
+    private readonly NavalTickFailureCount fixedTickFailures = new NavalTickFailureCount();
 
     public CoopNavalBattleBehavior(INavalBattleServices services, INavalNpcFleetSpawner npcFleetSpawner, NavalShipsLogic shipsLogic)
     {
@@ -82,11 +83,21 @@ public class CoopNavalBattleBehavior : MissionLogic
         services.WaterClock.Start();
     }
 
-    // Copies are steered with the physics step, so a velocity change lands on the body before it integrates.
+    // Copies are steered with the physics step, so a velocity change lands on the body before it integrates. The engine calls
+    // the fixed tick with no managed caller, so a throw here would crash the client; it is logged instead.
     public override void OnFixedMissionTick(float fixedDt)
     {
         base.OnFixedMissionTick(fixedDt);
-        services.Engine.TickCopies(fixedDt);
+        try
+        {
+            services.Engine.TickCopies(fixedDt);
+        }
+        catch (Exception exception)
+        {
+            long count = fixedTickFailures.Count(Mission);
+            if (NavalTickFailureCount.ShouldLog(count))
+                Logger.Error(exception, "[NavalSync] Steering the copies on the fixed tick threw (failure {Count})", count);
+        }
     }
 
     // Runs after DefaultNavalMissionLogic's deployment finish, so this is the hull set the battle starts with.

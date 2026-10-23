@@ -24,6 +24,7 @@ namespace Missions.Naval;
 public class NavalWaterProbeLogic : MissionLogic
 {
     private static readonly ILogger Logger = LogManager.GetLogger<NavalWaterProbeLogic>();
+    private readonly NavalTickFailureCount fixedTickFailures = new NavalTickFailureCount();
 
     internal const string Tag = "NAVAL_WATER_PROBE ";
 
@@ -106,11 +107,22 @@ public class NavalWaterProbeLogic : MissionLogic
         if (sinceFixedTick > FixedTickTimeoutSeconds) Sample(dt);
     }
 
+    // The engine calls the fixed tick with no managed caller, so a throwing sample is logged instead of crashing the client.
     public override void OnFixedMissionTick(float fixedDt)
     {
         base.OnFixedMissionTick(fixedDt);
         sinceFixedTick = 0f;
-        if (IsRunning) Sample(fixedDt);
+        if (!IsRunning) return;
+
+        try
+        {
+            Sample(fixedDt);
+        }
+        catch (Exception exception)
+        {
+            long count = fixedTickFailures.Count(Mission);
+            if (NavalTickFailureCount.ShouldLog(count)) Logger.Error(exception, "[NavalProbe] Water sample on the fixed tick threw (failure {Count})", count);
+        }
     }
 
     public override void OnEndMissionInternal()
