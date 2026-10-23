@@ -32,6 +32,8 @@ internal class CreateCraftedWeaponInternalPatch
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
+        if (!ContainerProvider.TryResolve<ISmithingVMsProvider>(out var smithingVMsProvider)) return true;
+
         // The unique client request id also gives the temporary item the string id needed to render the result.
         string clientRequestId = Guid.NewGuid().ToString("N");
         string nextCraftedItemId = $"{ClientVisualPrefix}{clientRequestId}";
@@ -45,7 +47,6 @@ internal class CreateCraftedWeaponInternalPatch
         }
         Crafting craftingLogic = (GameStateManager.Current.ActiveState as CraftingState).CraftingLogic;
 
-        ContainerProvider.TryResolve<ISmithingVMsProvider>(out var smithingVMsProvider);
         var activeCraftingOrder = smithingVMsProvider.GetActiveCraftingOrder();
 
         // Need to return the ItemObject for client's CraftingVM
