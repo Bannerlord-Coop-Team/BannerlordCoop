@@ -1,6 +1,6 @@
 ﻿using Common;
-using HarmonyLib;
 using Common.Util;
+using HarmonyLib;
 using Helpers;
 using System.Collections.Generic;
 using System.Reflection;
@@ -83,11 +83,8 @@ internal class ExtortionByDesertersServerMethodsPatch
 {
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.CreateDeserterParty));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.CreateDefenderParty));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.DestroyDeserterParty));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.DestroyDefenderParty));
-        yield return AccessTools.Method(typeof(Quest), nameof(Quest.ReleaseDeserterParty));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.HourlyTick));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.GameMenuOptionSelected));
         yield return AccessTools.Method(typeof(Quest), nameof(Quest.OnWarDeclared));
@@ -95,5 +92,5 @@ internal class ExtortionByDesertersServerMethodsPatch
     }
 
     [HarmonyPrefix]
-    private static bool Prefix() => ModInformation.IsServer;
+    internal static bool Prefix() => ModInformation.IsServer;
 }

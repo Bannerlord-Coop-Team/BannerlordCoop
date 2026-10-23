@@ -1,12 +1,15 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.AutoSync;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
+using GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using TaleWorlds.CampaignSystem.Issues;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
@@ -27,8 +30,17 @@ internal class ExtortionByDesertersSync : IHandler
     private readonly IPlayerManager players;
 
     public ExtortionByDesertersSync(IMessageBroker broker, INetwork network, IObjectManager objects,
-        IIssueResolver issues, IIssueOwnerResolver owners, IControllerIdProvider controller, IPlayerManager players)
+        IIssueResolver issues, IIssueOwnerResolver owners, IControllerIdProvider controller, IPlayerManager players,
+        IAutoSyncPatchCollector patchCollector)
     {
+        // Compile these callers after AutoSync so they cannot inline unpatched setters.
+        var prefix = AccessTools.Method(typeof(ExtortionByDesertersServerMethodsPatch), nameof(ExtortionByDesertersServerMethodsPatch.Prefix));
+        patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.CreateDeserterParty)), prefix);
+        patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.CreateDefenderParty)), prefix);
+        patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.ReleaseDeserterParty)), prefix);
+        patchCollector.AddPrefix(AccessTools.Method(typeof(Quest), nameof(Quest.ApplyQuestResult)),
+            AccessTools.Method(typeof(ExtortionByDesertersRewardPatches), nameof(ExtortionByDesertersRewardPatches.ApplyQuestResultPrefix)));
+
         this.broker = broker;
         this.network = network;
         this.objects = objects;

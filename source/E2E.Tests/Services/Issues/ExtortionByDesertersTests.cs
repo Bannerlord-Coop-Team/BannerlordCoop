@@ -4,13 +4,16 @@ using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.AutoSync;
 using GameInterface.CoopSessionData;
+using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.ExtortionByDeserters;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.Players;
 using GameInterface.Services.Heroes.Patches;
+using GameInterface.Utils.NetworkEvents;
 using HarmonyLib;
 using Helpers;
 using LiteNetLib;
@@ -543,6 +546,103 @@ public class ExtortionByDesertersTests : IDisposable
         });
         Assert.Equal(IssueOutcome.QuestSuccess, Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
         Assert.True(quest.IsFinalized);
+    }
+
+    [Theory]
+    [InlineData(0, 10, 0)]
+    [InlineData(1, 10, 25)]
+    [InlineData(2, 10, 100)]
+    [InlineData(3, -10, -50)]
+    public void NativeApplyQuestResult_ReplicatesTownRewardsToBothOriginalClients(
+        int choice, int securityChange, int prosperityChange)
+    {
+        var ownerQuest = Accept();
+        var serverQuest = (Quest)scenario.QuestOf(Server);
+        Town serverTown = null!;
+        uint handle = 0;
+        Server.Call(() =>
+        {
+            serverTown = Server.GetRegisteredObject<Town>(townComponentId);
+            serverTown.Security = 40;
+            serverTown.Prosperity = 200;
+            handle = Server.GetHandle(serverTown);
+        });
+        var originals = new Dictionary<EnvironmentInstance, Town>();
+        foreach (var client in environment.Clients)
+        {
+            client.Call(() =>
+            {
+                var town = client.GetRegisteredObject<Town>(townComponentId);
+                Assert.Equal(handle, client.GetHandle(town));
+                Assert.Equal(40, town.Security);
+                Assert.Equal(200, town.Prosperity);
+                originals.Add(client, town);
+            });
+            client.NetworkSentMessages.Clear();
+        }
+        Assert.Equal(2, originals.Count);
+        Server.NetworkSentMessages.Clear();
+
+        Owner.Call(() =>
+        {
+            using var replay = new AllowedThread();
+            ownerQuest.ApplyQuestResult(ResultOf(ownerQuest));
+            Assert.Equal(40, originals[Owner].Security);
+            Assert.Equal(200, originals[Owner].Prosperity);
+        });
+        Assert.Empty(Owner.NetworkSentMessages.GetMessages<GenericNetworkEvent<Town, byte[]>>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<GenericNetworkEvent<Town, byte[]>>());
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var owner));
+            using var ownerScope = new MainHeroSubstitutionScope(
+                Server.GetRegisteredObject<Hero>(owner.HeroId),
+                Server.GetRegisteredObject<MobileParty>(owner.MobilePartyId));
+            Assert.False(CallOriginalPolicy.IsOriginalAllowed());
+            serverQuest.ApplyQuestResult(ResultOf(serverQuest));
+            Assert.Same(serverTown, Server.GetRegisteredObject<Town>(townComponentId));
+            Assert.Equal(handle, Server.GetHandle(serverTown));
+            Assert.Equal(40 + securityChange, serverTown.Security);
+            Assert.Equal(200 + prosperityChange, serverTown.Prosperity);
+        });
+
+        var messages = Server.NetworkSentMessages.GetMessages<GenericNetworkEvent<Town, byte[]>>()
+            .Where(message => message.InstanceId == handle).ToArray();
+        output.WriteLine($"native reward choice={choice} town={townComponentId} handle={handle} server security={serverTown.Security} prosperity={serverTown.Prosperity}");
+        foreach (var message in messages)
+            output.WriteLine($"generated town message={message.GetType().Name} value={message.GetType().GetProperty("Value")!.GetValue(message)}");
+        foreach (var client in environment.Clients)
+        {
+            client.Call(() =>
+            {
+                var town = client.GetRegisteredObject<Town>(townComponentId);
+                output.WriteLine($"client town={townComponentId} handle={client.GetHandle(town)} security={town.Security} prosperity={town.Prosperity}");
+                Assert.Same(originals[client], town);
+                Assert.Equal(handle, client.GetHandle(town));
+                Assert.Equal(40 + securityChange, town.Security);
+                Assert.Equal(200 + prosperityChange, town.Prosperity);
+            });
+            Assert.Empty(client.NetworkSentMessages.GetMessages<GenericNetworkEvent<Town, byte[]>>());
+        }
+        var security = Assert.Single(messages.Where(message => message.GetType().Name == "Town_Security_SetNetworkMessage"));
+        Assert.Equal((float)(40 + securityChange), RawSerializer.Deserialize<float>(Assert.IsType<byte[]>(security.GetType().GetProperty("Value")!.GetValue(security))));
+        var prosperityMessages = messages.Where(message => message.GetType().Name == "Town__prosperity_SetNetworkMessage").ToArray();
+        if (prosperityChange == 0) Assert.Empty(prosperityMessages);
+        else
+        {
+            var prosperity = Assert.Single(prosperityMessages);
+            Assert.Equal((float)(200 + prosperityChange), RawSerializer.Deserialize<float>(Assert.IsType<byte[]>(prosperity.GetType().GetProperty("Value")!.GetValue(prosperity))));
+        }
+        Assert.Equal(prosperityChange == 0 ? 1 : 2, messages.Length);
+
+        Quest.ExtortionByDesertersQuestResult ResultOf(Quest quest) => choice switch
+        {
+            0 => quest._questResultSuccess1,
+            1 => quest._questResultSuccess2,
+            2 => quest._questResultSuccess3,
+            _ => quest._questResultFail1,
+        };
     }
 
     private static void ChooseReward(Quest quest, int choice)

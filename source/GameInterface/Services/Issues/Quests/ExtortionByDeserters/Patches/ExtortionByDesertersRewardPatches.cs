@@ -1,9 +1,9 @@
 ﻿using Common;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
-using System.Linq;
 using Quest = TaleWorlds.CampaignSystem.Issues.ExtortionByDesertersIssueBehavior.ExtortionByDesertersIssueQuest;
 
 namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
@@ -12,9 +12,7 @@ namespace GameInterface.Services.Issues.Quests.ExtortionByDeserters.Patches;
 [HarmonyPatch]
 internal class ExtortionByDesertersRewardPatches
 {
-    [HarmonyPatch(typeof(Quest), nameof(Quest.ApplyQuestResult))]
-    [HarmonyPrefix]
-    private static bool ApplyQuestResultPrefix() => ModInformation.IsServer;
+    internal static bool ApplyQuestResultPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.QuestCompletionDialogFlow), MethodType.Getter)]
     [HarmonyPostfix]
