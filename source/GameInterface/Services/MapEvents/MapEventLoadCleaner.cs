@@ -20,7 +20,11 @@ namespace GameInterface.Services.MapEvents;
 
 public interface IMapEventLoadCleaner
 {
-    void FinalizePlayerMapEvents();
+    // Finalizes loaded player battles and releases every party still linked to a battle that already ended.
+    void CleanUpLoadedMapEvents();
+
+    // Releases every party still linked to a battle that already ended. Also run live by coop.unstuck.
+    PartyBase[] ReleaseEndedMapEventLinks();
 }
 
 internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
@@ -45,7 +49,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         this.armyDisbander = armyDisbander;
     }
 
-    public void FinalizePlayerMapEvents()
+    public void CleanUpLoadedMapEvents()
     {
         if (Campaign.Current?.MapEventManager == null)
             return;
@@ -100,6 +104,93 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
 
                 mobileParty.ResetNavigationToHold();
             }
+        }
+
+        ReleaseEndedMapEventLinks();
+    }
+
+    // A save can hold parties still linked to a battle that already ended (finalized, or no longer
+    // in the map event manager). Nothing ends that battle again, so the party never moves again and
+    // the map shows an empty 0/0 battle. Covers AI parties too, not only player battles.
+    public PartyBase[] ReleaseEndedMapEventLinks()
+    {
+        if (Campaign.Current?.MapEventManager == null)
+            return Array.Empty<PartyBase>();
+
+        var releasedParties = new List<PartyBase>();
+        var liveMapEvents = new HashSet<MapEvent>(Campaign.Current.MapEventManager.MapEvents);
+        var parties = Campaign.Current.CampaignObjectManager.MobileParties
+            .Where(mobileParty => mobileParty != null)
+            .Select(mobileParty => mobileParty.Party)
+            .Concat(Settlement.All
+                .Where(settlement => settlement != null)
+                .Select(settlement => settlement.Party))
+            .Where(party => party != null)
+            .ToArray();
+
+        var endedMapEvents = parties
+            .Where(party => party.MapEventSide?.MapEvent != null)
+            .GroupBy(party => party.MapEventSide.MapEvent)
+            .Where(group => group.Key.IsFinalized || !liveMapEvents.Contains(group.Key))
+            .ToArray();
+
+        foreach (var group in endedMapEvents)
+        {
+            var mapEvent = group.Key;
+            var linkedParties = group.ToArray();
+
+            logger.Warning(
+                "Releasing {PartyCount} parties from ended map event {MapEventId}",
+                linkedParties.Length,
+                mapEvent.StringId);
+
+            // The battle already ended, so mark it finalized before detaching. Removing the last
+            // party then cannot run FinalizeEvent again and replay its results.
+            if (!mapEvent.IsFinalized)
+            {
+                ResetVillageState(mapEvent);
+                mapEvent.State = MapEventState.WaitingRemoval;
+            }
+
+            RepairPartySideLinks(mapEvent);
+            DetachFromFinalizedEvent(mapEvent);
+
+            foreach (var party in linkedParties)
+            {
+                // A link the event's sides never listed has no membership left to remove.
+                if (ReferenceEquals(party.MapEventSide?.MapEvent, mapEvent))
+                    party._mapEventSide = null;
+
+                var mobileParty = party.MobileParty;
+                if (mobileParty != null && mobileParty.IsActive && !mobileParty.IsPlayerParty())
+                    mobileParty.ResetNavigationToHold();
+
+                releasedParties.Add(party);
+            }
+        }
+
+        return releasedParties.ToArray();
+    }
+
+    // WaitingRemoval skips the component's OnBeforeFinalize and OnFinalize, the only calls that move
+    // the village off the state its OnInitialize set (raid in OnBeforeFinalize, force supplies and
+    // force volunteers in OnFinalize). Apply only that village state change, not the completed events.
+    private static void ResetVillageState(MapEvent mapEvent)
+    {
+        var settlement = mapEvent.MapEventSettlement;
+        var villageState = settlement?.Village?.VillageState;
+
+        if (mapEvent.IsRaid && villageState == Village.VillageStates.BeingRaided)
+        {
+            if (settlement.SettlementHitPoints <= 1E-05f)
+                ChangeVillageStateAction.ApplyBySettingToLooted(settlement, mapEvent.AttackerSide?.LeaderParty?.MobileParty);
+            else
+                ChangeVillageStateAction.ApplyBySettingToNormal(settlement);
+        }
+        else if ((mapEvent.IsForcingSupplies && villageState == Village.VillageStates.ForcedForSupplies) ||
+            (mapEvent.IsForcingVolunteers && villageState == Village.VillageStates.ForcedForVolunteers))
+        {
+            ChangeVillageStateAction.ApplyBySettingToNormal(settlement);
         }
     }
 
@@ -189,7 +280,7 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         if (repairedLinks > 0 || removedEntries > 0)
         {
             logger.Warning(
-                "Repaired {RepairedLinkCount} party-side links and removed {RemovedEntryCount} stale or duplicate participants from loaded player map event {MapEventId} before finalization",
+                "Repaired {RepairedLinkCount} party-side links and removed {RemovedEntryCount} stale or duplicate participants from loaded map event {MapEventId} before finalization",
                 repairedLinks,
                 removedEntries,
                 mapEvent.StringId);
@@ -212,6 +303,13 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
             "Detaching {PartyCount} parties from half-finalized loaded player map event {MapEventId}",
             mapEvent.InvolvedParties.Count(),
             mapEvent.StringId);
+        DetachFromFinalizedEvent(mapEvent);
+    }
+
+    // Empties the sides of an event that is already finalized and retires its network object,
+    // without running FinalizeEvent (and its battle results) again.
+    private void DetachFromFinalizedEvent(MapEvent mapEvent)
+    {
         mapEvent.AttackerSide?.HandleMapEventEnd();
         mapEvent.DefenderSide?.HandleMapEventEnd();
         messageBroker.Publish(mapEvent, new MapEventFinalized(mapEvent));

@@ -5,6 +5,7 @@ using GameInterface.Services.Issues.Framework.Dispatch;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
+using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 using System;
 
@@ -30,6 +31,9 @@ internal class IssuesModule : Module
         builder.Register(context => context.Resolve<LordSolutionCoordinator>()).As<ILordSolutionCoordinator>();
         builder.RegisterType<TheConquestOfSettlementService>()
             .As<ITheConquestOfSettlementService>()
+            .SingleInstance();
+        builder.RegisterType<LesserNobleRevoltWorldEventService>()
+            .As<ILesserNobleRevoltWorldEventService>()
             .SingleInstance();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
 
