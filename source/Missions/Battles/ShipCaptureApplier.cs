@@ -28,7 +28,7 @@ public interface IShipCaptureApplier : IDisposable
     /// <summary>[Game thread] Raised once a capture applied here, with the prize's ship id and its captor.</summary>
     event Action<Guid, string> CaptureApplied;
 
-    /// <summary>[Mission tick] Applies the confirms and records that arrived, and the held ones whose hulls are ready now.</summary>
+    /// <summary>[Mission tick] Applies the held confirms and records whose hulls are ready now; arrived ones apply from the arrivals queue.</summary>
     void Tick(float dt);
 
     /// <summary>[Game thread] Applied, held, dropped and conflicting captures (diagnostics).</summary>
@@ -56,12 +56,10 @@ public class ShipCaptureApplier : IShipCaptureApplier
     private readonly INavalShipCaptureEngine captureEngine;
     private readonly IBattleShipReplicator ships;
     private readonly INavalHullAuthority hullAuthority;
+    private readonly IBattleShipArrivals arrivals;
 
     // [Game thread] Confirms waiting for a hull this client hasn't registered yet, for a swap, or for an earlier capture.
     private readonly List<NetworkShipCaptured> heldConfirms = new List<NetworkShipCaptured>();
-    // [Game thread] Confirms and records that arrived since the last tick, applied from it in arrival order: the async agent and
-    // team tick runs while the game-thread queue drains, and a capture rewrites what it reads (R48 L6).
-    private readonly Queue<Action> arrived = new Queue<Action>();
     // [Game thread] Records of missed captures waiting for a hull swap here to finish.
     private readonly List<BattleShipSpawnData> heldRecords = new List<BattleShipSpawnData>();
     // [Game thread] The capture applied at each place in each hull's order, to tell a late repeat from a conflict.
@@ -77,7 +75,8 @@ public class ShipCaptureApplier : IShipCaptureApplier
     private bool disposed;
 
     public ShipCaptureApplier(IBattleNetwork network, INetwork relayNetwork, IMessageBroker messageBroker, BattleContext context,
-        INavalShipEngine engine, INavalShipCaptureEngine captureEngine, IBattleShipReplicator ships, INavalHullAuthority hullAuthority)
+        INavalShipEngine engine, INavalShipCaptureEngine captureEngine, IBattleShipReplicator ships, INavalHullAuthority hullAuthority,
+        IBattleShipArrivals arrivals)
     {
         this.network = network;
         this.relayNetwork = relayNetwork;
@@ -89,6 +88,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
         this.captureEngine = captureEngine;
         this.ships = ships;
         this.hullAuthority = hullAuthority;
+        this.arrivals = arrivals;
 
         messageBroker.Subscribe<NetworkShipCaptured>(Handle_NetworkShipCaptured);
         // Subscribed after the ship replicator's, so a record that spawns a hull is spawned before it is read here.
@@ -105,7 +105,6 @@ public class ShipCaptureApplier : IShipCaptureApplier
         messageBroker.Unsubscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
         heldConfirms.Clear();
         heldRecords.Clear();
-        arrived.Clear();
         blockedSwaps.Clear();
     }
 
@@ -118,7 +117,6 @@ public class ShipCaptureApplier : IShipCaptureApplier
         elapsed += Math.Max(0f, dt);
         RetryHeldConfirms();
         RetryHeldRecords();
-        ApplyArrived();
     }
 
     // The confirm goes out first, so peers take the capture through it, not through the records a captor's apply sends. The
@@ -147,10 +145,10 @@ public class ShipCaptureApplier : IShipCaptureApplier
     }
 
     /// <summary>[Game thread] Queues an arrived confirm for the next tick.</summary>
-    internal void QueueConfirm(NetworkShipCaptured confirm) => arrived.Enqueue(() => AcceptConfirm(confirm));
+    internal void QueueConfirm(NetworkShipCaptured confirm) => arrivals.Enqueue(() => AcceptConfirm(confirm), "capture confirm");
 
     /// <summary>[Game thread] Queues arrived spawn records for the next tick.</summary>
-    internal void QueueRecords(IEnumerable<BattleShipSpawnData> records) => arrived.Enqueue(() => AcceptRecords(records));
+    internal void QueueRecords(IEnumerable<BattleShipSpawnData> records) => arrivals.Enqueue(() => AcceptRecords(records), "capture records");
 
     /// <summary>[Game thread] Applies a confirm in its hulls' capture order, holds it until they are ready, or drops it with the reason.</summary>
     internal void AcceptConfirm(NetworkShipCaptured confirm)
@@ -444,23 +442,6 @@ public class ShipCaptureApplier : IShipCaptureApplier
         }
     }
 
-    // In arrival order, each guarded as its game-thread marshal was, so one bad message can't stop the tick.
-    private void ApplyArrived()
-    {
-        while (arrived.Count > 0)
-        {
-            var apply = arrived.Dequeue();
-            try
-            {
-                apply();
-            }
-            catch (Exception exception)
-            {
-                Logger.Error(exception, "[NavalSync] Applying an arrived capture confirm or record failed");
-            }
-        }
-    }
-
     // In arrival order; a confirm waits until both hulls registered and earlier captures applied, or a hull is gone.
     private void RetryHeldConfirms()
     {
@@ -501,6 +482,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
         lastDrop,
         heldConfirms = heldConfirms.Select(confirm => confirm.ShipId).ToArray(),
         heldRecords = heldRecords.Select(record => record.ShipId).ToArray(),
+        arrivalsWaiting = arrivals.Count,
     };
 
     private enum ConfirmOutcome

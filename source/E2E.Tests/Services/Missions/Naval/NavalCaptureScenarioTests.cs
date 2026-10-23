@@ -253,7 +253,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         var requestOfO = o.Network.NetworkSentMessages.GetMessages<NetworkShipCaptureRequest>().Single();
         h.Call(() => h.Instance.SimulateMessage(c.Network.NetPeer, requestOfC));
         h.Call(() => h.Instance.SimulateMessage(o.Network.NetPeer, requestOfO));
-        battle.SettleCaptures();
+        battle.SettleArrivals();
 
         Assert.Single(h.Network.NetworkSentMessages.GetMessages<NetworkShipCaptured>());
         var refusal = Assert.Single(h.Network.NetworkSentMessages.GetMessages<NetworkShipCaptureRejected>());
@@ -327,11 +327,11 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
 
         battle.MigrateHost(h, "O");
         o.Call(() => o.Instance.SimulateMessage(h.Network.NetPeer, confirm));
-        o.TickCaptures();
+        o.TickArrivals();
         bool appliedMidSwap = o.Ship(prize).CaptorControllerId != null;
         battle.TickAll(4);
         c.Call(() => c.Instance.SimulateMessage(h.Network.NetPeer, confirm));
-        c.TickCaptures();
+        c.TickArrivals();
 
         Assert.False(appliedMidSwap);
         foreach (var peer in new[] { c, o })
@@ -589,7 +589,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         var confirm = b.Network.NetworkSentMessages.GetMessages<NetworkShipCaptured>().Single();
         a.Network.RouteMessages = false;
         a.Call(() => a.Instance.SimulateMessage(b.Network.NetPeer, confirm));
-        a.TickCaptures();
+        a.TickArrivals();
         a.Network.RouteMessages = true;
         var records = a.Network.NetworkSentMessages.GetMessages<NetworkSpawnBattleShips>().Last();
         battle.Disconnect(b);
@@ -599,7 +599,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         o.Call(() => o.Instance.SimulateMessage(a.Network.NetPeer, records));
         battle.TickAll(2);
         o.Call(() => o.Instance.SimulateMessage(b.Network.NetPeer, confirm));
-        o.TickCaptures();
+        o.TickArrivals();
 
         Assert.Equal("A", o.Ship(hullB).CurrentAuthority);
         Assert.Equal("A", o.Ship(hullB).CaptorControllerId);
@@ -684,6 +684,33 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
 
         Assert.Equal(1, concluded());
         AssertMapEventRemoved(battle.MapEventId);
+    }
+
+    // R48 re-review: hull traffic and captures apply from one arrivals queue in arrival order, so a confirm that arrived before
+    // the captor's removal of its orphan in the same frame applies first instead of being dropped as captor_hull_gone.
+    [Fact]
+    public void ConfirmThenOrphanRemoval_InOneFrame_ApplyInArrivalOrder()
+    {
+        using var battle = StartCaptureBattle(out var h, out var c, out var o, out var pirates, out var captorHull, out _);
+        var prize = pirates[0];
+        h.Hull(prize).IsVacant = true;
+        h.Network.RouteMessages = false;
+        c.ElapseCaptureTimer(prize, captorHull);
+        var confirm = h.Network.NetworkSentMessages.GetMessages<NetworkShipCaptured>().Single();
+        h.Network.RouteMessages = true;
+
+        o.Call(() => o.Instance.SimulateMessage(h.Network.NetPeer, confirm));
+        o.Call(() => o.Instance.SimulateMessage(c.Network.NetPeer,
+            new NetworkShipRemoved(captorHull, "C", ShipRemovalReason.Leave, false)));
+        Assert.Equal("H", o.Ship(prize).CurrentAuthority);
+        o.TickArrivals();
+        o.Tick();
+        o.Tick();
+
+        Assert.Equal("C", o.Ship(prize).CaptorControllerId);
+        Assert.Equal("C", o.Ship(prize).CurrentAuthority);
+        Assert.Equal(0L, (long)CaptureStats(o)["applied"]!["confirmsDropped"]!);
+        Assert.False(o.Has(captorHull));
     }
 
     // H, C and O each field a hull on formation 0 of the attacking team; H fields two AI hulls, each standing for a pirate ship.

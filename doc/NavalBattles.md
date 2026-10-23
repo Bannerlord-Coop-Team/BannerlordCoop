@@ -165,7 +165,8 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
    capture itself and broadcasts `NetworkShipCaptured`, or sends `NetworkShipCaptureRejected` to the captor alone.
 4. Every client applies `NetworkShipCaptured` in one step of its naval services tick (`OnMissionTick`), never from the
    game-thread queue: the queue drains while the engine's async agent and team tick runs, which reads the assignments and
-   formations a capture rewrites (R48 L6). Arrived requests, confirms and records are queued for that tick in arrival order.
+   formations a capture rewrites (R48 L6). Capture requests, confirms and records share one arrivals queue (`IBattleShipArrivals`) with
+   hull spawn records, removals, departures, entries and host changes, applied first in that tick in arrival order.
    The authority moves in place
    (`IBattleShipReplicator.TransferHull(..., inPlace: true)`: sample and condition order restart, the captor adopts its copy
    with `INavalShipEngine.AdoptHull`, the old authority turns its hull into a copy with `ReleaseHull`; no hull is removed or
@@ -204,7 +205,8 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
   engine resets the behaviour weights of the prize's former formation once it has no hull, so the formation AI picks none;
   `ShiplessFormationBehaviorWeightPatch` weighs `BehaviorNavalRemoveConnection`, `BehaviorNavalRamming` and
   `BehaviorNavalSkirmish` at 0 for any formation without a hull in a co-op battle; a hull spawned into a formation with
-  units and no weighted behaviour asks the team's tactic to re-apply (its count/order checks miss that case); and
+  units and no weighted behaviour gets, from the mission tick, fresh same-side ship lists and a tactic re-apply (its
+  count and order checks miss that case); and
   `NavalAgentTickFailurePatch` logs a throw in the async agent and team tick, finishes the tick and swallows it.
 - **One decider per place in the order.** Only a hull's current authority decides a capture of it. A player's hull, or a
   captured hull, changes authority only through captures, so a confirm for it must come from its current authority at that

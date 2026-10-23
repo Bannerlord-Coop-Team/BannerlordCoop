@@ -1890,6 +1890,8 @@ public class BattleShipReplicatorTests
         public List<MissionObject> LiveHulls { get; } = new List<MissionObject>();
         public Guid OwnShipId { get; } = Guid.NewGuid();
         public BattleShipReplicator Replicator { get; }
+        // Applies at once: these tests drive the replicator alone, without the naval services tick that applies arrivals.
+        public IBattleShipArrivals Arrivals { get; } = new ImmediateArrivals();
 
         public Harness(bool committed, bool resultHeld = false)
         {
@@ -1933,7 +1935,7 @@ public class BattleShipReplicatorTests
             Replicator = new BattleShipReplicator(Network.Object, Broker, context, engine.Object, TeamResolver.Object,
                 Mock.Of<IObjectManager>(), new NavalHullAuthority(session.Object, component.Object, engine.Object, context.TroopWithdrawal),
                 new BattleShipConditionStream(Network.Object, session.Object, engine.Object, epochs, members.Object), Stations.Object,
-                Mock.Of<INavalShipCaptureEngine>());
+                Mock.Of<INavalShipCaptureEngine>(), Arrivals);
         }
 
         // A foreign record resolves a team and spawns one live copy hull.
@@ -1953,5 +1955,20 @@ public class BattleShipReplicatorTests
                 });
             return copy;
         }
+    }
+
+    /// <summary>Applies each arrival as it comes, as these tests drive the replicator without the services tick.</summary>
+    private sealed class ImmediateArrivals : IBattleShipArrivals
+    {
+        public int Count => 0;
+
+        // Runs the arrival where the queue would have held it.
+        public void Enqueue(Action apply, string context) => apply();
+
+        // Nothing waits.
+        public void ApplyAll() { }
+
+        // Nothing waits.
+        public void Clear() { }
     }
 }

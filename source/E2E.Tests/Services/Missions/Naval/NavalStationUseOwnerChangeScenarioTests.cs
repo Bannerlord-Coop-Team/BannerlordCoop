@@ -40,6 +40,7 @@ public class NavalStationUseOwnerChangeScenarioTests : NavalBattleTestEnvironmen
 
         battle.MigrateHost(a, "B");
         b.Ticks(3);
+        c.TickArrivals();
         Assert.True(b.Agents.TryGetAgentInfo(crewId, out var adopted));
         Assert.Equal("B", adopted.CurrentAuthority);
         Assert.True(c.Agents.TryGetAgentInfo(crewId, out var observed));

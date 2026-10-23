@@ -71,6 +71,7 @@ public class NavalCrewBeforeHullScenarioTests : NavalBattleTestEnvironment
         b.Engine.FailingForeignSpawns = 0;
         a.Commit();
         a.Tick();
+        b.TickArrivals();
         b.TickController();
 
         Assert.True(b.Has(pirate));

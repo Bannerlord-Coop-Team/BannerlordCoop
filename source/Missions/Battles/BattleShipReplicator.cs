@@ -132,6 +132,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly IAgentStationUseReplicator stations;
     private readonly IBattlePartyWithdrawal partyWithdrawal;
     private readonly INavalShipCaptureEngine captureEngine;
+    private readonly IBattleShipArrivals arrivals;
 
     private readonly Dictionary<Guid, ShipStream> streams = new Dictionary<Guid, ShipStream>();
     private readonly Dictionary<BattleSideEnum, int> departedHulls = new Dictionary<BattleSideEnum, int>();
@@ -171,7 +172,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         INavalHullAuthority hullAuthority,
         IBattleShipConditionStream conditions,
         IAgentStationUseReplicator stations,
-        INavalShipCaptureEngine captureEngine)
+        INavalShipCaptureEngine captureEngine,
+        IBattleShipArrivals arrivals)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -189,6 +191,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         this.conditions = conditions;
         this.stations = stations;
         this.captureEngine = captureEngine;
+        this.arrivals = arrivals;
 
         messageBroker.Subscribe<ShipSpawnedInBattle>(Handle_ShipSpawned);
         messageBroker.Subscribe<NetworkSpawnBattleShips>(Handle_NetworkSpawnBattleShips);
@@ -252,7 +255,9 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (migrated.MapEventId != session.InstanceId) return;
         if (!BattleAuthorityMigrator.AppliesHostMigration(resultCommitter, session.IsNaval)) return;
 
-        GameThread.RunSafe(() => TransferHostHulls(migrated.NewHostControllerId ?? session.OwnControllerId),
+        // Queued for the tick, behind the hull traffic that arrived first: a release boards agents and changes controllers.
+        string newHost = migrated.NewHostControllerId ?? session.OwnControllerId;
+        GameThread.RunSafe(() => arrivals.Enqueue(() => TransferHostHulls(newHost), nameof(Handle_BattleHostMigrated)),
             context: nameof(Handle_BattleHostMigrated));
     }
 
@@ -406,7 +411,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
-            AcceptRemoval(removal);
+            arrivals.Enqueue(() => AcceptRemoval(removal), nameof(Handle_NetworkShipRemoved));
         }, context: nameof(Handle_NetworkShipRemoved));
     }
 
@@ -639,7 +644,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     private void Handle_NetworkSpawnBattleShips(MessagePayload<NetworkSpawnBattleShips> payload)
     {
         var records = payload.What.Ships ?? Array.Empty<BattleShipSpawnData>();
-        GameThread.RunSafe(() => AcceptSpawnRecords(records), context: nameof(Handle_NetworkSpawnBattleShips));
+        GameThread.RunSafe(() => arrivals.Enqueue(() => AcceptSpawnRecords(records), nameof(Handle_NetworkSpawnBattleShips)),
+            context: nameof(Handle_NetworkSpawnBattleShips));
     }
 
     /// <summary>[Game thread] Queues other owners' hull records and spawns the copies that can spawn now.</summary>
@@ -976,14 +982,20 @@ public class BattleShipReplicator : IBattleShipReplicator
         {
             // Read here, as the migrator does, so it comes before the successor's host assignment applied on this thread.
             bool wasHost = session.IsHostController(left.ControllerId);
-            departedOwners.Add(left.ControllerId);
-            ForgetReportedReserveOf(left.ControllerId);
-            if (Mission.Current == null) return;
-
-            // At sea the hull removal takes the leaver's crew, so its party is withdrawn only once the hulls are gone.
-            RemoveHullsOf(left.ControllerId);
-            pendingWithdrawals[left.ControllerId] = wasHost;
+            arrivals.Enqueue(() => AcceptPeerLeft(left.ControllerId, wasHost), nameof(Handle_MissionPeerLeft));
         }, context: nameof(Handle_MissionPeerLeft));
+    }
+
+    // [Mission tick] The leaver's hulls go and its party withdraws once they are gone; nothing of it spawns again here.
+    private void AcceptPeerLeft(string controllerId, bool wasHost)
+    {
+        departedOwners.Add(controllerId);
+        ForgetReportedReserveOf(controllerId);
+        if (Mission.Current == null) return;
+
+        // At sea the hull removal takes the leaver's crew, so its party is withdrawn only once the hulls are gone.
+        RemoveHullsOf(controllerId);
+        pendingWithdrawals[controllerId] = wasHost;
     }
 
     private bool IsDepartureOfThisBattle(string controllerId, string instanceId) =>
@@ -1038,17 +1050,21 @@ public class BattleShipReplicator : IBattleShipReplicator
         var entered = payload.What;
         if (entered.InstanceId != null && entered.InstanceId != session.InstanceId) return;
 
-        GameThread.RunSafe(() =>
-        {
-            departedOwners.Remove(entered.ControllerId);
-            pendingWithdrawals.Remove(entered.ControllerId);
-            if (!spawnRecordsSent || session.IsOwn(entered.ControllerId)) return;
+        GameThread.RunSafe(() => arrivals.Enqueue(() => AcceptPeerEntered(entered.ControllerId), nameof(Handle_PeerEntered)),
+            context: nameof(Handle_PeerEntered));
+    }
 
-            SendSpawnRecords(entered.ControllerId);
-            // A hull's condition and reserve only go out on change, so the entrant gets the last ones too.
-            foreach (var ship in Registry.Ships.Where(IsOwnHull))
-                conditions.SendLastTo(entered.ControllerId, ship);
-        }, context: nameof(Handle_PeerEntered));
+    // [Mission tick] A returner may spawn hulls again and gets this client's records, conditions and reserves.
+    private void AcceptPeerEntered(string controllerId)
+    {
+        departedOwners.Remove(controllerId);
+        pendingWithdrawals.Remove(controllerId);
+        if (!spawnRecordsSent || session.IsOwn(controllerId)) return;
+
+        SendSpawnRecords(controllerId);
+        // A hull's condition and reserve only go out on change, so the entrant gets the last ones too.
+        foreach (var ship in Registry.Ships.Where(IsOwnHull))
+            conditions.SendLastTo(controllerId, ship);
     }
 
     private bool IsOwnHull(NetworkShipInfo ship) => ship.CurrentAuthority == session.OwnControllerId;

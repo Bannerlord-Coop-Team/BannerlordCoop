@@ -26,6 +26,9 @@ public interface INavalBattleServices : IDisposable
     /// <summary>Applies the captures the hulls' authorities confirm, on this client's tick.</summary>
     IShipCaptureApplier CaptureApplier { get; }
 
+    /// <summary>The hull and capture traffic that arrived since the last tick, applied first in the next one.</summary>
+    IBattleShipArrivals Arrivals { get; }
+
     IAgentStationUseReplicator StationUseReplicator { get; }
 
     INavalDeckPoses DeckPoses { get; }
@@ -43,7 +46,8 @@ public interface INavalBattleServices : IDisposable
     IBattleWaterClock WaterClock { get; }
 
     /// <summary>
-    /// [Game thread] Ticks the water clock, the hull stream, its captures and fate reports, the deck, station and weapon streams, then
+    /// [Game thread] Applies the arrived hull and capture traffic, then ticks the water clock, the hull stream, its captures and
+    /// fate reports, the deck, station and weapon streams, then
     /// <paramref name="beforeMigrationReserve"/>, then the migration reserve, so AI hulls fielded in between take recovered
     /// reserve in the same tick.
     /// </summary>
@@ -83,18 +87,19 @@ public class NavalBattleServices : INavalBattleServices
         session = context.Session;
         Engine = shipEngine;
         hullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, shipEngine, context.TroopWithdrawal);
+        Arrivals = new BattleShipArrivals();
         var conditions = new BattleShipConditionStream(network, context.Session, shipEngine, context.HostEpochPolicy,
             context.MissionContext);
         // A hull leaving with its owner releases the seats on it first, so the stations exist before the hulls.
         StationUseReplicator = new AgentStationUseReplicator(network, messageBroker, context.Session, context.MissionComponent,
             shipEngine, context.Deployment, context.MissionContext);
         ShipReplicator = new BattleShipReplicator(network, messageBroker, context, shipEngine, teamResolver, objectManager,
-            hullAuthority, conditions, StationUseReplicator, captureEngine);
+            hullAuthority, conditions, StationUseReplicator, captureEngine, Arrivals);
         // After the ship replicator, so a spawn record reaches the applier only once the hull it brings spawned.
         captureApplier = new ShipCaptureApplier(network, relayNetwork, messageBroker, context, shipEngine, captureEngine, ShipReplicator,
-            hullAuthority);
+            hullAuthority, Arrivals);
         ShipCaptureReplicator = new BattleShipCaptureReplicator(network, messageBroker, context, shipEngine, captureEngine,
-            hullAuthority, captureApplier);
+            hullAuthority, captureApplier, Arrivals);
 #if DEBUG
         captureApplier.CaptureApplied += OnCaptureApplied;
 #endif
@@ -120,6 +125,8 @@ public class NavalBattleServices : INavalBattleServices
 
     public IShipCaptureApplier CaptureApplier => captureApplier;
 
+    public IBattleShipArrivals Arrivals { get; }
+
     public IAgentStationUseReplicator StationUseReplicator { get; }
 
     public INavalDeckPoses DeckPoses { get; }
@@ -139,6 +146,7 @@ public class NavalBattleServices : INavalBattleServices
 #if DEBUG
         captureWatch.NoteTick();
 #endif
+        Arrivals.ApplyAll();
         WaterClock.Tick(dt);
         ShipReplicator.Tick(dt);
         captureApplier.Tick(dt);
@@ -194,6 +202,7 @@ public class NavalBattleServices : INavalBattleServices
         captureApplier.Dispose();
         ShipReplicator.Dispose();
         hullAuthority.Dispose();
+        Arrivals.Clear();
     }
 }
 

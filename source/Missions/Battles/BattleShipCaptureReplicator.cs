@@ -19,7 +19,7 @@ namespace Missions.Battles;
 /// </summary>
 public interface IBattleShipCaptureReplicator : IDisposable
 {
-    /// <summary>[Mission tick] Notices a promotion to battle host, decides the requests queued since the last tick and expires requests no authority answered.</summary>
+    /// <summary>[Mission tick] Notices a promotion to battle host and expires requests no authority answered.</summary>
     void Tick(float dt);
 
     /// <summary>[Game thread] Request and refusal counters, pending requests and the applier's state (diagnostics).</summary>
@@ -52,13 +52,11 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
     private readonly INavalShipCaptureEngine captureEngine;
     private readonly INavalHullAuthority hullAuthority;
     private readonly IShipCaptureApplier applier;
+    private readonly IBattleShipArrivals arrivals;
 
     // [Game thread] This client's requests waiting for the authority, by prize ship id, with when each went out and the own
     // hull whose formation would take the prize.
     private readonly Dictionary<Guid, PendingRequest> pendingRequests = new Dictionary<Guid, PendingRequest>();
-    // [Game thread] Requests to decide on the next tick, in arrival order: a decision applies the capture, which rewrites what the
-    // async agent and team tick reads, and that tick runs while the game-thread queue drains (R48 L6).
-    private readonly List<NetworkShipCaptureRequest> queuedRequests = new List<NetworkShipCaptureRequest>();
     private readonly Dictionary<ShipCaptureRefusal, long> refusals = new Dictionary<ShipCaptureRefusal, long>();
     private float elapsed;
     private int seenEpoch;
@@ -67,7 +65,8 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
     private bool disposed;
 
     public BattleShipCaptureReplicator(IBattleNetwork network, IMessageBroker messageBroker, BattleContext context, INavalShipEngine engine,
-        INavalShipCaptureEngine captureEngine, INavalHullAuthority hullAuthority, IShipCaptureApplier applier)
+        INavalShipCaptureEngine captureEngine, INavalHullAuthority hullAuthority, IShipCaptureApplier applier,
+        IBattleShipArrivals arrivals)
     {
         this.network = network;
         this.messageBroker = messageBroker;
@@ -78,6 +77,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         this.captureEngine = captureEngine;
         this.hullAuthority = hullAuthority;
         this.applier = applier;
+        this.arrivals = arrivals;
 
         messageBroker.Subscribe<ShipCaptureTimerElapsed>(Handle_ShipCaptureTimerElapsed);
         messageBroker.Subscribe<NetworkShipCaptureRequest>(Handle_NetworkShipCaptureRequest);
@@ -94,7 +94,6 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         messageBroker.Unsubscribe<NetworkShipCaptureRejected>(Handle_NetworkShipCaptureRejected);
         applier.CaptureApplied -= OnCaptureApplied;
         pendingRequests.Clear();
-        queuedRequests.Clear();
     }
 
     private INetworkShipRegistry Registry => missionComponent.ShipRegistry;
@@ -105,7 +104,6 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
 
         elapsed += Math.Max(0f, dt);
         NoticePromotion();
-        DecideQueuedRequests();
         ExpirePendingRequests();
     }
 
@@ -165,7 +163,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
     }
 
     /// <summary>[Game thread] Queues a request to decide on the next tick.</summary>
-    internal void QueueRequest(NetworkShipCaptureRequest request) => queuedRequests.Add(request);
+    internal void QueueRequest(NetworkShipCaptureRequest request) => arrivals.Enqueue(() => AcceptRequest(request), "capture request");
 
     /// <summary>[Game thread] Decides a request sent to this client; a hull it doesn't simulate (any more) is refused as such.</summary>
     internal void AcceptRequest(NetworkShipCaptureRequest request)
@@ -276,26 +274,6 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
         if (pendingRequests.Remove(prizeId) && !session.IsOwn(captor)) TellPlayer(ShipCaptureRefusal.AlreadyCaptured);
     }
 
-    // In arrival order; each is guarded as its game-thread marshal was, so one bad request can't stop the tick.
-    private void DecideQueuedRequests()
-    {
-        if (queuedRequests.Count == 0) return;
-
-        var requests = queuedRequests.ToArray();
-        queuedRequests.Clear();
-        foreach (var request in requests)
-        {
-            try
-            {
-                AcceptRequest(request);
-            }
-            catch (Exception exception)
-            {
-                Logger.Error(exception, "[NavalSync] Deciding the capture request for hull {ShipId} failed", request.ShipId);
-            }
-        }
-    }
-
     // Nobody answered: the authority left before it decided, so the player can try again at the successor.
     private void ExpirePendingRequests()
     {
@@ -376,6 +354,7 @@ public class BattleShipCaptureReplicator : IBattleShipCaptureReplicator
             captorShipId = entry.Value.CaptorShipId,
             waitedSeconds = elapsed - entry.Value.SentAt,
         }).ToArray(),
+        arrivalsWaiting = arrivals.Count,
         applied = applier.Inspect(),
     };
 }

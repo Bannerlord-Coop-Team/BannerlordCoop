@@ -596,7 +596,7 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
         return new BattleShipReplicator(Mock.Of<IBattleNetwork>(), broker, context, engine, teams, objectManager,
             new NavalHullAuthority(session, missionComponent, engine, context.TroopWithdrawal),
             new BattleShipConditionStream(Mock.Of<IBattleNetwork>(), session, engine, epochs, members.Object),
-            Mock.Of<IAgentStationUseReplicator>(), Mock.Of<INavalShipCaptureEngine>());
+            Mock.Of<IAgentStationUseReplicator>(), Mock.Of<INavalShipCaptureEngine>(), new ImmediateShipArrivals());
     }
 
     [Fact]
@@ -664,5 +664,20 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             Assert.True(mirror.IsActive);
             Assert.Null(mirror.Formation);
         });
+    }
+
+    /// <summary>Applies each arrival at once: these tests drive the replicator alone, without the naval services tick.</summary>
+    private sealed class ImmediateShipArrivals : IBattleShipArrivals
+    {
+        public int Count => 0;
+
+        // Runs the arrival where the queue would have held it.
+        public void Enqueue(Action apply, string context) => apply();
+
+        // Nothing waits.
+        public void ApplyAll() { }
+
+        // Nothing waits.
+        public void Clear() { }
     }
 }

@@ -212,7 +212,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             // The server introduces an entrant and every member to each other.
             foreach (var other in Peers)
                 other.Members.Enter(id);
-            peer.SettleMesh = SettleCaptures;
+            peer.SettleMesh = SettleArrivals;
             peers[id] = peer;
             return peer;
         }
@@ -273,17 +273,19 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             foreach (var peer in Peers)
                 peer.Instance.Call(() => peer.Broker.Publish(peer,
                     new NetworkBattleHostAssigned(MapEventId, HostId, Successors, HostEpoch)));
+            // The AI hulls move from the tick, as every client applies hull traffic (R48 L6); settled here so tests read the result.
+            SettleArrivals();
         }
 
         /// <summary>
-        /// Runs only the capture steps of every client's tick, three rounds, so a request, its decision and the confirm all land
-        /// (captures apply from the mission tick, R48 L6) without advancing anything else.
+        /// Applies every client's arrivals and runs the capture steps of its tick, three rounds, so hull traffic and a capture's
+        /// request, decision and confirm all land (they apply from the mission tick, R48 L6) without advancing anything else.
         /// </summary>
-        public void SettleCaptures()
+        public void SettleArrivals()
         {
             for (int round = 0; round < 3; round++)
                 foreach (var peer in Peers)
-                    peer.TickCaptures();
+                    peer.TickArrivals();
         }
 
         /// <summary>Advances every client on the mesh by <paramref name="ticks"/> mission ticks.</summary>
@@ -292,6 +294,8 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             for (int tick = 0; tick < ticks; tick++)
                 foreach (var peer in Peers)
                     peer.Tick(dt);
+            // What the last round sent applies as each client's next tick starts, so tests read it as they did before.
+            ApplyArrivals();
         }
 
         /// <summary>Finishes every client's deployment, which announces its hulls at the next tick.</summary>
@@ -306,7 +310,22 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
 
         public Guid FieldAiHull(NavalPeer host, BattleSideEnum side, Vec3 position, int? formationIndex = null,
             string? campaignShipId = null) =>
-            host.FieldAiHull(side, position, PirateMapEventPartyId, formationIndex, campaignShipId);
+            FieldAndApply(() => host.FieldAiHull(side, position, PirateMapEventPartyId, formationIndex, campaignShipId));
+
+        // An AI hull's record goes out as it is fielded; peers apply it at once, as their next tick starts.
+        private Guid FieldAndApply(Func<Guid> field)
+        {
+            var shipId = field();
+            ApplyArrivals();
+            return shipId;
+        }
+
+        /// <summary>Applies every client's arrived hull and capture traffic, as each client's next tick starts.</summary>
+        public void ApplyArrivals()
+        {
+            foreach (var peer in Peers)
+                peer.Call(() => peer.Services.Arrivals.ApplyAll());
+        }
 
         /// <summary>
         /// Tears the battle down after a last removal invariant check on every client, which fails the scenario. Skipped once a
@@ -459,9 +478,10 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             Engine.AssertRemovalInvariant();
         });
 
-        /// <summary>The capture steps of the services tick alone, without advancing their clocks.</summary>
-        public void TickCaptures() => Call(() =>
+        /// <summary>The arrivals (hull and capture traffic) and capture steps of the services tick alone, without advancing clocks.</summary>
+        public void TickArrivals() => Call(() =>
         {
+            Services.Arrivals.ApplyAll();
             Applier.Tick(0f);
             Captures.Tick(0f);
         });
