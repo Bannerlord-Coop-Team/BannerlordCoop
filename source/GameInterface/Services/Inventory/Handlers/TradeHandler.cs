@@ -301,7 +301,7 @@ internal class TradeHandler : IHandler
             var kept = keptItems[i];
             if (kept.Amount <= 0) continue;
 
-            purchases.Add((kept, kept.Amount == bought.Amount ? price : (price * kept.Amount) / bought.Amount));
+            purchases.Add((kept, price - GetRefund(price, bought.Amount - kept.Amount, bought.Amount)));
         }
 
         return purchases;
@@ -487,7 +487,7 @@ internal class TradeHandler : IHandler
                     shortfall - removed, element.Item?.StringId);
             }
 
-            if (removed > 0) totalAmount -= (boughtItem.Item2 * removed) / amount;
+            totalAmount -= GetRefund(boughtItem.Item2, removed, amount);
 
             var kept = boughtItem.Item1;
             kept.Amount = amount - removed;
@@ -495,6 +495,14 @@ internal class TradeHandler : IHandler
         }
 
         return totalAmount;
+    }
+
+    // The prorated price of the purchased quantity taken back, shared by the gold charge and the exchange event so both agree
+    private static int GetRefund(int price, int removed, int amount)
+    {
+        if (removed <= 0 || amount <= 0) return 0;
+
+        return (int)((long)price * removed / amount);
     }
 
     /// <summary>

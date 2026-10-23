@@ -137,6 +137,24 @@ public class InventoryExchangeEventTests : IDisposable
     }
 
     [Fact]
+    public void PartialPurchaseWithAnUnevenPrice_ReportsTheSamePriceTheServerCharged()
+    {
+        var exchanges = RecordExchanges();
+
+        // Only 2 grain left, so 1 of the 3 bought for 10 is taken back and the refund rounds down to 3
+        Server.Call(() => Server.GetRegisteredObject<ItemRoster>(merchantRosterId).AddToCounts(DefaultItems.Grain, -8));
+
+        TradeOnTrader(isTrading: true, boughtGrain: 3, grainPrice: 10);
+
+        // The trader gets 30 for the hides less 10 for the grain, plus the 3 refunded
+        Server.Call(() => Assert.Equal(1023, Server.GetRegisteredObject<MobileParty>(partyId).LeaderHero.Gold));
+
+        var exchange = Assert.Single(exchanges[Trader]);
+        AssertSingleItem(exchange.Purchased, "grain", 2, 7);
+        Assert.Equal(2, exchange.GrainInMainParty);
+    }
+
+    [Fact]
     public void LootScreen_ReportsTheItemsPutBackNotTheLootLeftBehind()
     {
         var exchanges = RecordExchanges();
@@ -174,7 +192,7 @@ public class InventoryExchangeEventTests : IDisposable
 
     // Commits the trader's screen the way the done logic patch does: the screen's rosters are sent, then put back as they
     // were. Without trading the merchant's stock stands in for a loot pile the trader takes grain from and puts hides on.
-    private void TradeOnTrader(bool isTrading)
+    private void TradeOnTrader(bool isTrading, int boughtGrain = BoughtGrain, int grainPrice = GrainPrice)
     {
         Trader.Call(() =>
         {
@@ -183,7 +201,7 @@ public class InventoryExchangeEventTests : IDisposable
             var town = Trader.GetRegisteredObject<Town>(townId);
             var initialPartyRoster = party.ItemRoster.ToArray();
 
-            var bought = new List<(ItemRosterElement, int)> { (new ItemRosterElement(DefaultItems.Grain, BoughtGrain), GrainPrice) };
+            var bought = new List<(ItemRosterElement, int)> { (new ItemRosterElement(DefaultItems.Grain, boughtGrain), grainPrice) };
             var sold = new List<(ItemRosterElement, int)> { (new ItemRosterElement(DefaultItems.Hides, SoldHides), HidesPrice) };
 
             using (new AllowedThread())
@@ -198,7 +216,7 @@ public class InventoryExchangeEventTests : IDisposable
                     isTrading ? InventoryScreenHelper.InventoryMode.Trade : InventoryScreenHelper.InventoryMode.Loot,
                     party.LeaderHero,
                     party.LeaderHero.CharacterObject,
-                    isTrading ? GrainPrice - HidesPrice : 0,
+                    isTrading ? grainPrice - HidesPrice : 0,
                     isTrading ? town.Gold : 0,
                     party,
                     currentMobileParty: null,
