@@ -398,6 +398,28 @@ public class BattleShipReplicatorTests
         Assert.Equal(7, harness.Replicator.ReportedReserveOf(copy));
     }
 
+    // R48 round 5 review: a host change lands in the session at once but moves the hulls from the queue; records arriving in
+    // between don't take its epoch as the join epoch, so the successor's report at it is still kept and applied with the move.
+    [Fact]
+    public void JoinEpoch_IsNotTakenWhileAHostChangeIsQueued_SoTheSuccessorsReportApplies()
+    {
+        var harness = new Harness(committed: false, startEpoch: 0, queuedArrivals: true);
+        harness.Members.Add("third_peer");
+        var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: true);
+
+        harness.SessionEpoch = 2;
+        harness.Broker.Publish(this, new BattleHostMigrated(Instance, Peer, "third_peer", 2));
+        GameThread.Run(() => { }, blocking: true);
+        harness.Replicator.AcceptSpawnRecords(Array.Empty<BattleShipSpawnData>());
+        harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, "third_peer", 1, 2, Condition(100f), 7));
+        int beforeMove = harness.Replicator.ReportedReserveOf(copy);
+        harness.Arrivals.ApplyAll();
+
+        Assert.Equal(0, beforeMove);
+        Assert.Equal("third_peer", ship.CurrentAuthority);
+        Assert.Equal(7, harness.Replicator.ReportedReserveOf(copy));
+    }
+
     // R48 round 4 review: the epoch this client joined at counts as applied, so a report of that epoch from a controller that
     // isn't the hull's authority (a late joiner's view of a stale report, a returning old host) is dropped, not kept for later.
     [Fact]
@@ -1934,11 +1956,15 @@ public class BattleShipReplicatorTests
         public List<MissionObject> LiveHulls { get; } = new List<MissionObject>();
         public Guid OwnShipId { get; } = Guid.NewGuid();
         public BattleShipReplicator Replicator { get; }
-        // Applies at once: these tests drive the replicator alone, without the naval services tick that applies arrivals.
-        public IBattleShipArrivals Arrivals { get; } = new ImmediateShipArrivals();
+        // Applies at once unless a test queues them: these tests drive the replicator alone, without the services tick.
+        public IBattleShipArrivals Arrivals { get; }
+        /// <summary>The host epoch the session reads; a test moves it as a host change lands.</summary>
+        public int SessionEpoch { get; set; } = HostEpoch;
 
-        public Harness(bool committed, bool resultHeld = false)
+        public Harness(bool committed, bool resultHeld = false, int startEpoch = HostEpoch, bool queuedArrivals = false)
         {
+            SessionEpoch = startEpoch;
+            Arrivals = queuedArrivals ? new BattleShipArrivals() : new ImmediateShipArrivals();
             var hull = OwnHull;
             Registry.TryRegister(new NetworkShipInfo(OwnShipId, Own, "MapEventParty_1", false, hull, null));
 
@@ -1948,7 +1974,7 @@ public class BattleShipReplicatorTests
 
             var session = Session;
             session.SetupGet(s => s.OwnControllerId).Returns(Own);
-            session.SetupGet(s => s.HostEpoch).Returns(HostEpoch);
+            session.SetupGet(s => s.HostEpoch).Returns(() => SessionEpoch);
             session.SetupGet(s => s.InstanceId).Returns(Instance);
             session.Setup(s => s.IsOwn(It.IsAny<string>())).Returns((string id) => id == Own);
             session.SetupGet(s => s.IsNaval).Returns(true);

@@ -154,6 +154,8 @@ public class BattleShipReplicator : IBattleShipReplicator
     private string npcHullHost;
     // The host epoch whose AI hull move this client applied last, or the one it joined at; a report from a newer one is early.
     private int appliedHostEpoch;
+    // [Game thread] Host changes whose hull move waits in the arrivals queue; the session already reads their epoch.
+    private int queuedHostChanges;
     private bool spawnRecordsSent;
     private float sendElapsed;
     private float elapsed;
@@ -263,15 +265,27 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         // Queued for the tick, behind the hull traffic that arrived first: a release boards agents and changes controllers.
         string newHost = migrated.NewHostControllerId ?? session.OwnControllerId;
-        GameThread.RunSafe(() => arrivals.Enqueue(() => TransferHostHulls(newHost), nameof(Handle_BattleHostMigrated)),
-            context: nameof(Handle_BattleHostMigrated));
+        // The epoch the session reads now is the change's; the move applies later, so it carries it.
+        int epoch = migrated.Epoch > 0 ? migrated.Epoch : session.HostEpoch;
+        GameThread.RunSafe(() =>
+        {
+            queuedHostChanges++;
+            arrivals.Enqueue(() => ApplyQueuedHostChange(newHost, epoch), nameof(Handle_BattleHostMigrated));
+        }, context: nameof(Handle_BattleHostMigrated));
+    }
+
+    // [Mission tick] The queued hull move of a host change, at the epoch the change carried.
+    private void ApplyQueuedHostChange(string newHost, int epoch)
+    {
+        queuedHostChanges--;
+        TransferHostHulls(newHost, epoch);
     }
 
     /// <summary>[Game thread] Moves every AI hull to <paramref name="newHost"/>, and flips local simulation where ours changed.</summary>
-    internal int TransferHostHulls(string newHost)
+    internal int TransferHostHulls(string newHost, int epoch = 0)
     {
         npcHullHost = newHost;
-        appliedHostEpoch = session.HostEpoch;
+        appliedHostEpoch = epoch > 0 ? epoch : session.HostEpoch;
         int transferred = 0;
         foreach (var ship in Registry.Ships)
         {
@@ -607,11 +621,11 @@ public class BattleShipReplicator : IBattleShipReplicator
     private bool IsEarlyHostCondition(NetworkShipInfo ship, NetworkShipCondition condition, string rejection) =>
         IsEarlyHostCondition(ship.FollowsBattleHost, rejection, condition.HostEpoch, appliedHostEpoch);
 
-    // The epoch this client joined the battle at, taken at the start or with the first hull records once a host is known, so a
-    // late joiner's or a returning old host's stale report isn't read as one that overtook a host change.
+    // The epoch this client joined the battle at, taken at the start or with the first hull records once a host is known and no
+    // host change is queued (the session already reads a queued change's epoch), so a stale report isn't read as an early one.
     private void NoteJoinEpoch()
     {
-        if (appliedHostEpoch == 0) appliedHostEpoch = session.HostEpoch;
+        if (appliedHostEpoch == 0 && queuedHostChanges == 0) appliedHostEpoch = session.HostEpoch;
     }
 
     // Keeps the newest early report per hull.

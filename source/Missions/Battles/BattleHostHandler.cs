@@ -1304,7 +1304,8 @@ internal class BattleHostHandler : IHandler
             messageBroker.Publish(this, new BattleHostMigrated(
                 message.MapEventId,
                 previousHost,
-                message.HostControllerId));
+                message.HostControllerId,
+                message.Epoch));
 
             if (isLocalHost)
                 Logger.Information("[BattleHost] Became host of {MapEventId} via migration from {Old}", message.MapEventId, previousHost);
