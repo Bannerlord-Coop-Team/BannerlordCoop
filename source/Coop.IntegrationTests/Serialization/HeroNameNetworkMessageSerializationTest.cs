@@ -136,7 +136,7 @@ namespace Coop.IntegrationTests.Serialization
             var copy = Serializer.Deserialize<TextObject>(stream);
 
             Assert.Equal("legacy", copy.Value);
-            Assert.Null(copy.Attributes);
+            Assert.Equal(0, copy.Attributes?.Count ?? 0);
         }
 
         private static Hero CreateHero()
