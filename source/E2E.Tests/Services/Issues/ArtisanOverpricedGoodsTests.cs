@@ -247,6 +247,33 @@ public class ArtisanOverpricedGoodsTests : IDisposable
     }
 
     [Fact]
+    public void LordAcceptance_RemovesALosingOptimisticQuestBeforeItsRejectionArrives()
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
+        foreach (var instance in Instances)
+            instance.Call(() => SetupPlayer(instance, scenario.OtherHeroId, scenario.OtherPartyId, clanId));
+        var router = Server.Resolve<TestNetworkRouter>();
+        router.PauseLink(ClientA.NetPeer, Server.NetPeer);
+        Accept();
+        var strayQuest = scenario.QuestOf(ClientA);
+        ClientB.Call(() => Get<Hero>(ClientB, scenario.NotableId).Issue.StartIssueWithLordSolution());
+
+        ClientA.Call(() =>
+        {
+            var issue = Get<Hero>(ClientA, scenario.NotableId).Issue;
+            Assert.True(issue.IsSolvingWithLordSolution);
+            Assert.Null(issue.IssueQuest);
+            Assert.True(strayQuest.IsFinalized);
+            Assert.DoesNotContain(strayQuest, Campaign.Current.QuestManager.Quests);
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(log => log.IsRelatedTo(issue)));
+        });
+        router.ResumeLink(ClientA.NetPeer, Server.NetPeer);
+        environment.FlushCoalescer();
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAcceptRejected>());
+        Assert.Equal(QuestScenario.ControllerB, scenario.OwnerOnServer());
+    }
+
+    [Fact]
     public void Acceptance_StartsOnlyTheOwnersQuestAndRetainsAnUnstartedServerCopy()
     {
         Accept();
