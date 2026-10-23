@@ -1,9 +1,11 @@
 ﻿using Common.Messaging;
+using Common.Logging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils;
 using Missions.Agents.Handlers;
 using Missions.Messages;
+using Serilog;
 using System;
 using TaleWorlds.MountAndBlade;
 
@@ -69,21 +71,25 @@ public interface INavalBattleServices : IDisposable
 /// <inheritdoc cref="INavalBattleServices"/>
 public class NavalBattleServices : INavalBattleServices
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<NavalBattleServices>();
+
     private readonly INavalHullAuthority hullAuthority;
     private readonly IShipCaptureApplier captureApplier;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
+    private readonly IAsyncAgentTick asyncAgentTick;
 #if DEBUG
     private readonly IShipCaptureWatch captureWatch = new ShipCaptureWatch();
 #endif
 
     public NavalBattleServices(IBattleNetwork network, INetwork relayNetwork, IMessageBroker messageBroker,
         IBattleTeamResolver teamResolver, IObjectManager objectManager, BattleContext context, INavalShipEngine shipEngine,
-        INavalShipCaptureEngine captureEngine, IWaterClock waterClock)
+        INavalShipCaptureEngine captureEngine, IWaterClock waterClock, IAsyncAgentTick asyncAgentTick)
     {
         // These services exist only in a naval mission and open with it.
         context.Session.MarkNaval();
         this.messageBroker = messageBroker;
+        this.asyncAgentTick = asyncAgentTick;
         session = context.Session;
         Engine = shipEngine;
         hullAuthority = new NavalHullAuthority(context.Session, context.MissionComponent, shipEngine, context.TroopWithdrawal);
@@ -165,8 +171,10 @@ public class NavalBattleServices : INavalBattleServices
         ShipReplicator.AnnounceRemoval(hull, reason, missionEnding);
     }
 
+    // Applies what arrived first, so a capture confirmed this frame still reports its capture and fates before the result.
     public void OnMissionEnding()
     {
+        ApplyArrivalsNow();
         ShipReplicator.SendFinalRopes();
         FateReporter.Flush();
     }
@@ -177,7 +185,23 @@ public class NavalBattleServices : INavalBattleServices
     {
         if (payload.What.InstanceId != session.InstanceId) return;
 
+        ApplyArrivalsNow();
         FateReporter.Flush();
+    }
+
+    // Applies what arrived ahead of a result report or the mission end. Outside the mission tick (a result reported from the
+    // queue drain or the leave screen) the async agent tick may be running; then nothing waits, and the arrivals stay for the
+    // next mission tick, which a continuing mission still runs.
+    private void ApplyArrivalsNow()
+    {
+        if (Arrivals.Count == 0) return;
+        if (asyncAgentTick.IsRunning)
+        {
+            Logger.Debug("[NavalSync] {Count} arrival(s) wait for the next tick: the async agent tick runs", Arrivals.Count);
+            return;
+        }
+
+        Arrivals.ApplyAll();
     }
 
 #if DEBUG
@@ -209,7 +233,8 @@ public class NavalBattleServices : INavalBattleServices
 /// <summary>Builds the <see cref="INavalBattleServices"/> of one naval battle on its controller's context.</summary>
 public interface INavalBattleServicesFactory
 {
-    INavalBattleServices Create(BattleContext context, INavalShipEngine shipEngine, INavalShipCaptureEngine captureEngine);
+    INavalBattleServices Create(BattleContext context, INavalShipEngine shipEngine, INavalShipCaptureEngine captureEngine,
+        IAsyncAgentTick asyncAgentTick);
 }
 
 /// <inheritdoc cref="INavalBattleServicesFactory"/>
@@ -233,11 +258,12 @@ public class NavalBattleServicesFactory : INavalBattleServicesFactory
         this.waterClock = waterClock;
     }
 
-    public INavalBattleServices Create(BattleContext context, INavalShipEngine shipEngine, INavalShipCaptureEngine captureEngine)
+    public INavalBattleServices Create(BattleContext context, INavalShipEngine shipEngine, INavalShipCaptureEngine captureEngine,
+        IAsyncAgentTick asyncAgentTick)
     {
         // Installed on first use: only a client opening a naval battle gets here, and the patch refuses any server anyway.
         waterClock.TryInstall();
         return new NavalBattleServices(network, relayNetwork, messageBroker, teamResolver, objectManager, context, shipEngine,
-            captureEngine, waterClock);
+            captureEngine, waterClock, asyncAgentTick);
     }
 }

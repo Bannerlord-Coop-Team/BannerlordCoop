@@ -24,17 +24,20 @@ public class CoopNavalBattleBehavior : MissionLogic
     private readonly NavalShipsLogic shipsLogic;
     private readonly Action tickNpcFleet;
     private readonly INavalTickFailureLog fixedTickFailures;
+    private readonly INavalFormationTacticRefresh tacticRefresh;
     private int lastAgentCount = -1;
     private bool retreated;
 
     public CoopNavalBattleBehavior(INavalBattleServices services, INavalNpcFleetSpawner npcFleetSpawner, NavalShipsLogic shipsLogic,
-        INavalTickFailureLog fixedTickFailures)
+        INavalTickFailureLog fixedTickFailures, INavalFormationTacticRefresh tacticRefresh)
     {
         this.services = services;
         NpcFleetSpawner = npcFleetSpawner;
         tickNpcFleet = npcFleetSpawner.Tick;
         this.shipsLogic = shipsLogic;
         this.fixedTickFailures = fixedTickFailures;
+        this.tacticRefresh = tacticRefresh;
+        NavalFormationTacticRefresh.Active = tacticRefresh;
         // Fires in NavalShipsLogic.OnEndMission before it removes every hull, so the ropes are still attached. It runs before
         // the battle controller leaves (NavalShipsLogic is an earlier behavior), so the last fates precede MissionLeft.
         shipsLogic.MissionEndEvent += services.OnMissionEnding;
@@ -73,7 +76,7 @@ public class CoopNavalBattleBehavior : MissionLogic
         services.Engine.SnapCopies();
         services.Tick(dt, tickNpcFleet);
         // After the services tick, whose arrivals and fleet fielding spawn the hulls this checks.
-        NavalFormationTacticRefresh.Apply();
+        tacticRefresh.Apply();
         LogAgentCountDrop();
 #if DEBUG
         NavalImmortalCoopCommand.ApplyArmed();
@@ -167,7 +170,8 @@ public class CoopNavalBattleBehavior : MissionLogic
 #endif
         // The static mirror's reset for a copy the engine never forgot; the engine's own entries die with the mission.
         NavalForeignHulls.Clear();
-        NavalFormationTacticRefresh.Clear();
+        tacticRefresh.Clear();
+        if (NavalFormationTacticRefresh.Active == tacticRefresh) NavalFormationTacticRefresh.Active = null;
         NavalShipDamageGate.Clear();
         NavalPlayerDeploymentSlot.Reset();
         base.OnEndMissionInternal();

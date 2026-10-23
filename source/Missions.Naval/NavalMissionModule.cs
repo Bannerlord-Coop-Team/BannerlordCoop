@@ -38,6 +38,12 @@ public class NavalMissionModule : Module
         builder.RegisterType<NavalTickFailureLog>()
             .As<INavalTickFailureLog>()
             .InstancePerDependency();
+        builder.RegisterType<NavalAsyncAgentTick>()
+            .As<IAsyncAgentTick>()
+            .InstancePerDependency();
+        builder.RegisterType<NavalFormationTacticRefresh>()
+            .As<INavalFormationTacticRefresh>()
+            .InstancePerDependency();
         builder.RegisterType<NavalSteeredCopies>()
             .As<INavalSteeredCopies>()
             .InstancePerDependency();

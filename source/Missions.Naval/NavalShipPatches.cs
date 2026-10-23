@@ -63,7 +63,7 @@ internal class LateHullDeploymentPatch
         __result.CrewSizeOnMainDeck = MissionGameModels.Current.MissionShipParametersModel
             .CalculateMainDeckCrewSize(__result.ShipOrigin, __result.Formation.GetFirstUnit());
         // Checked from the mission tick, not here: the async team tick may be reordering this formation's behaviours.
-        NavalFormationTacticRefresh.Note(__result.Formation);
+        NavalFormationTacticRefresh.Active?.Note(__result.Formation);
     }
 
     /// <summary>Re-reads the targetable mission objects of every fielded hull's ballista but the new hull's (deployed above).</summary>

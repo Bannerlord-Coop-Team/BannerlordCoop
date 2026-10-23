@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.Players;
 using GameInterface.Services.Ships.Data;
@@ -323,6 +324,36 @@ public class NavalShipFateScenarioTests : NavalBattleTestEnvironment
     }
 
     // The host A fields the AI party's hull for the ship; B captures it with its own hull, which the host confirms.
+    // R48 re-review: a confirm still waiting in the captor's arrivals when its result report goes out is applied first, so the
+    // captor tells the server of the capture ahead of its result, and the prize's fate follows the captor.
+    [Fact]
+    public void ConfirmStillQueuedAtTheCaptorsResultReport_IsAppliedFirst_AndReportedAheadOfTheResult()
+    {
+        using var battle = StartServerBattle(atSea: true, out var a, out var b, out _);
+        var shipId = GiveShip(AddAiParty(battle));
+        var prize = battle.FieldAiHull(a, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f), formationIndex: 0, campaignShipId: shipId);
+        var captorHull = battle.FieldPlayerHull(b, new Vec3(0f, 0f, 0f), formationIndex: 0);
+        battle.CommitAll();
+        battle.TickAll();
+        a.Hull(prize).IsVacant = true;
+        b.SettleMesh = null;
+
+        b.ElapseCaptureTimer(prize, captorHull);
+        a.TickArrivals();
+        Assert.Null(b.Ship(prize).CaptorControllerId);
+        b.Call(() =>
+        {
+            b.Controller.ResultCommitter.AcceptResolvedState(BattleState.AttackerVictory);
+            b.Controller.ResultCommitter.ReportAcceptedResult();
+        }, VictoryConclusionDisabledMethods());
+
+        Assert.Equal("B", b.Ship(prize).CaptorControllerId);
+        var sent = b.Instance.NetworkSentMessages.Messages.ToList();
+        int captureAt = sent.FindIndex(message => message is NetworkBattleShipCaptured);
+        int resultAt = sent.FindIndex(message => message is NetworkBattleResultReady);
+        Assert.True(captureAt >= 0 && resultAt > captureAt, $"capture report at {captureAt}, result at {resultAt}");
+    }
+
     private static Guid CaptureAiHull(NavalBattle battle, NavalPeer host, NavalPeer captor, string shipId)
     {
         var prize = battle.FieldAiHull(host, BattleSideEnum.Defender, new Vec3(0f, 300f, 0f), formationIndex: 0, campaignShipId: shipId);

@@ -166,7 +166,10 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
 4. Every client applies `NetworkShipCaptured` in one step of its naval services tick (`OnMissionTick`), never from the
    game-thread queue: the queue drains while the engine's async agent and team tick runs, which reads the assignments and
    formations a capture rewrites (R48 L6). Capture requests, confirms and records share one arrivals queue (`IBattleShipArrivals`) with
-   hull spawn records, removals, departures, entries and host changes, applied first in that tick in arrival order.
+   hull spawn records, removals, departures, entries, host changes and hull conditions, applied first in that tick in
+   arrival order. An AI hull's condition from its successor that overtook the host change is kept until the change moves
+   the hull to it. A result report or the mission end applies what waits first, unless the async agent tick runs (then it
+   stays for the next tick). A sample for a hull whose record still waits is dropped; the owner streams at 20 Hz.
    The authority moves in place
    (`IBattleShipReplicator.TransferHull(..., inPlace: true)`: sample and condition order restart, the captor adopts its copy
    with `INavalShipEngine.AdoptHull`, the old authority turns its hull into a copy with `ReleaseHull`; no hull is removed or
@@ -208,6 +211,10 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
   units and no weighted behaviour gets, from the mission tick, fresh same-side ship lists and a tactic re-apply (its
   count and order checks miss that case); and
   `NavalAgentTickFailurePatch` logs a throw in the async agent and team tick, finishes the tick and swallows it.
+  Ramming's weight and ramming and skirmish ship orders also read the closest enemy formation's hull unchecked, which
+  L6's swimmers lack: `ShiplessFormationBehaviorWeightPatch` weighs ramming at 0 then, `ShiplessTargetShipOrdersPatch`
+  skips both orders, `SkirmishOrderWithoutTargetPatch` skips a skirmish order at a missing hull (also the player's order
+  controller), and `RammingCancelWithoutAiControllerPatch` ends a ramming whose hull lost its AI controller.
 - **One decider per place in the order.** Only a hull's current authority decides a capture of it. A player's hull, or a
   captured hull, changes authority only through captures, so a confirm for it must come from its current authority at that
   place. An AI hull's authority also moves with host changes, which aren't ordered against confirms, so its confirms are

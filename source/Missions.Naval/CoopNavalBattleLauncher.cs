@@ -55,6 +55,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private readonly IPlayerManager playerManager;
     // A fresh failure log per behaviour, so each counts its own throws.
     private readonly Func<INavalTickFailureLog> tickFailureLogs;
+    private readonly IAsyncAgentTick asyncAgentTick;
+    private readonly INavalFormationTacticRefresh tacticRefresh;
 #if DEBUG
     private readonly INavalScenarioState scenarioState;
     private readonly INavalDebugHulls debugHulls;
@@ -70,7 +72,9 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
         INavalShipCaptureEngine captureEngine,
         INavalBattleServicesFactory servicesFactory,
         IPlayerManager playerManager,
-        Func<INavalTickFailureLog> tickFailureLogs
+        Func<INavalTickFailureLog> tickFailureLogs,
+        IAsyncAgentTick asyncAgentTick,
+        INavalFormationTacticRefresh tacticRefresh
 #if DEBUG
         , INavalScenarioState scenarioState,
         INavalDebugHulls debugHulls
@@ -83,6 +87,8 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
 #endif
         this.playerManager = playerManager;
         this.tickFailureLogs = tickFailureLogs;
+        this.asyncAgentTick = asyncAgentTick;
+        this.tacticRefresh = tacticRefresh;
         this.shipEngine = shipEngine;
         this.captureEngine = captureEngine;
         this.servicesFactory = servicesFactory;
@@ -234,11 +240,11 @@ public class CoopNavalBattleLauncher : ICoopNavalBattleLauncher
     private void AttachNavalServices(Mission mission, BattleSideEnum enemySide)
     {
         var context = mission.GetMissionBehavior<CoopBattleController>().Context;
-        var services = servicesFactory.Create(context, shipEngine, captureEngine);
+        var services = servicesFactory.Create(context, shipEngine, captureEngine, asyncAgentTick);
         var npcFleetSpawner = new NavalNpcFleetSpawner(context.Session, services.ShipReplicator, context.MissionComponent.ShipRegistry,
             shipSnapshotBuilder, objectManager, playerManager, enemySide);
         mission.AddMissionBehavior(new CoopNavalBattleBehavior(services, npcFleetSpawner, mission.GetMissionBehavior<NavalShipsLogic>(),
-            tickFailureLogs()));
+            tickFailureLogs(), tacticRefresh));
         mission.AddMissionBehavior(new CoopNavalBattleEndLogic(context.Session, context.Deployment, context.ResultCommitter,
             npcFleetSpawner, services.ShipReplicator, services.MigrationReserveFielder));
     }

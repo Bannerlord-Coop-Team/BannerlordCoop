@@ -479,8 +479,9 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             Formation noFormation = null!;
             engine.Setup(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out noFormation))
                 .Returns((MissionObject)null!);
+            var arrivals = new BattleShipArrivals();
             using var replicator = CreateShipReplicator(broker, session.Object, deployment.Object, missionComponent, engine.Object,
-                teams.Object, client.ObjectManager);
+                teams.Object, client.ObjectManager, arrivals);
             using var spawner = new PuppetSpawner(
                 broker,
                 client.ObjectManager,
@@ -499,6 +500,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                     NetworkBattleShipSample.FromFrame(TaleWorlds.Library.MatrixFrame.Identity), "northern_light_ship", null, null, null, null,
                     100f, 50f, 1, ""),
             }));
+            // The services tick applies arrived records first; these tests drive the replicator alone.
+            arrivals.ApplyAll();
             var record = new BattleAgentSpawnData(
                 agentId, characterId, default, BattleSideEnum.Defender, 100f, "host", mapEventPartyId, 1,
                 new Equipment(), new BodyProperties(), new MissionEquipmentData(new()), shipId: shipId);
@@ -557,8 +560,9 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             Formation noFormation = null!;
             engine.Setup(e => e.SpawnForeignHull(It.IsAny<BattleShipSpawnData>(), It.IsAny<Team>(), out noFormation))
                 .Returns(copy);
+            var arrivals = new BattleShipArrivals();
             using var replicator = CreateShipReplicator(broker, session.Object, deployment.Object, missionComponent, engine.Object,
-                teams.Object, client.ObjectManager);
+                teams.Object, client.ObjectManager, arrivals);
 
             broker.Publish(this, new NetworkSpawnBattleShips(new[]
             {
@@ -566,6 +570,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
                     NetworkBattleShipSample.FromFrame(TaleWorlds.Library.MatrixFrame.Identity), "northern_light_ship", null, null, null, null,
                     100f, 50f, 1, ""),
             }));
+            // The services tick applies arrived records first; these tests drive the replicator alone.
+            arrivals.ApplyAll();
             for (int tick = 0; tick < BattleShipReplicator.ForeignHullSpawnAttempts + 1; tick++)
                 replicator.Tick(BattleShipReplicator.ForeignHullRetrySeconds + 0.1f);
 
@@ -585,7 +591,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
 
     private static BattleShipReplicator CreateShipReplicator(IMessageBroker broker, IBattleSession session,
         IBattleDeploymentCoordinator deployment, ICoopMissionComponent missionComponent, INavalShipEngine engine,
-        IBattleTeamResolver teams, GameInterface.Services.ObjectManager.IObjectManager objectManager)
+        IBattleTeamResolver teams, GameInterface.Services.ObjectManager.IObjectManager objectManager,
+        IBattleShipArrivals arrivals)
     {
         var epochs = new HostEpochPolicy();
         var members = new Mock<IMissionContext>();
@@ -596,7 +603,8 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
         return new BattleShipReplicator(Mock.Of<IBattleNetwork>(), broker, context, engine, teams, objectManager,
             new NavalHullAuthority(session, missionComponent, engine, context.TroopWithdrawal),
             new BattleShipConditionStream(Mock.Of<IBattleNetwork>(), session, engine, epochs, members.Object),
-            Mock.Of<IAgentStationUseReplicator>(), Mock.Of<INavalShipCaptureEngine>(), new ImmediateShipArrivals());
+            Mock.Of<IAgentStationUseReplicator>(), Mock.Of<INavalShipCaptureEngine>(),
+            arrivals);
     }
 
     [Fact]
@@ -664,20 +672,5 @@ public class BattlePuppetTeamOwnershipTests : MissionTestEnvironment
             Assert.True(mirror.IsActive);
             Assert.Null(mirror.Formation);
         });
-    }
-
-    /// <summary>Applies each arrival at once: these tests drive the replicator alone, without the naval services tick.</summary>
-    private sealed class ImmediateShipArrivals : IBattleShipArrivals
-    {
-        public int Count => 0;
-
-        // Runs the arrival where the queue would have held it.
-        public void Enqueue(Action apply, string context) => apply();
-
-        // Nothing waits.
-        public void ApplyAll() { }
-
-        // Nothing waits.
-        public void Clear() { }
     }
 }
