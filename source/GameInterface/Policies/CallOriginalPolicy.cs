@@ -1,15 +1,14 @@
-﻿using Common.Logging;
-using Common.Util;
-using Serilog;
+﻿using Common.Util;
 using System;
 using System.Threading;
 
 namespace GameInterface.Policies;
 
+/// <summary>
+/// Decides whether a patched vanilla method runs on this side, from allow scopes and the session's <see cref="ISyncPolicy"/>.
+/// </summary>
 public class CallOriginalPolicy
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<CallOriginalPolicy>();
-
     private static int _allThreadsAllowedCount;
 
     [ThreadStatic]
@@ -21,6 +20,9 @@ public class CallOriginalPolicy
     internal static bool AreOriginalsAllowedForCurrentOperation =>
         _currentOperationAllowedCount > 0;
 
+    /// <summary>
+    /// Returns true when the original should run. Outside a session there is no policy to resolve, so originals run.
+    /// </summary>
     public static bool IsOriginalAllowed()
     {
         // While using an allowed thread or operation, allow original call
@@ -28,27 +30,21 @@ public class CallOriginalPolicy
             AreOriginalsAllowedOnAllThreads ||
             AreOriginalsAllowedForCurrentOperation) return true;
 
-        if (ContainerProvider.TryResolve<ISyncPolicy>(out var syncPolicy) == false)
-        {
-            Logger.Error("Unable to resolve {name}", nameof(ISyncPolicy));
-            return true;
-        }
+        // ContainerProvider already logs a missing registration once per scope, so logging here floods every patched call
+        if (!ContainerProvider.TryResolve<ISyncPolicy>(out var syncPolicy)) return true;
 
-        if (syncPolicy.AllowOriginal()) return true;
-
-        return false;
+        return syncPolicy.AllowOriginal();
     }
 
+    /// <summary>
+    /// Like <see cref="IsOriginalAllowed"/> but ignores <see cref="AllowedThread"/>, so ownership gates still apply on the receive path.
+    /// </summary>
     public static bool IsOriginalAllowedForOwnershipGate()
     {
         if (AreOriginalsAllowedOnAllThreads ||
             AreOriginalsAllowedForCurrentOperation) return true;
 
-        if (ContainerProvider.TryResolve<ISyncPolicy>(out var syncPolicy) == false)
-        {
-            Logger.Error("Unable to resolve {name}", nameof(ISyncPolicy));
-            return true;
-        }
+        if (!ContainerProvider.TryResolve<ISyncPolicy>(out var syncPolicy)) return true;
 
         return syncPolicy.AllowOriginal();
     }
