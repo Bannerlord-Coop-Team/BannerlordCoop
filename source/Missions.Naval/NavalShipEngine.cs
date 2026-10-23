@@ -212,7 +212,8 @@ public class NavalShipEngine : INavalShipEngine
         var origin = ship.ShipOrigin;
         var frame = ship.GlobalFrame;
         var condition = ReadCondition(ship);
-        int? ammo = ship.ShipSiegeWeapon?.AmmoCount;
+        var weapon = ship.ShipSiegeWeapon;
+        int? ammo = weapon == null ? (int?)null : CarriedAmmo(weapon.AmmoCount, weapon.State == RangedSiegeWeapon.WeaponState.Idle);
 
         // Quest5's RemoveShipInternal: no rope or bridge may keep pointing at a removed hull, as in RemoveHull.
         NavalRopes.BreakConnections(ship);
@@ -225,7 +226,7 @@ public class NavalShipEngine : INavalShipEngine
 
         // HP lives on the shared origin; fire, partial HP and sinking live on the hull, so a sinking hull keeps sinking.
         ApplyCondition(fresh, condition);
-        // A spawned weapon starts with its full load (RangedSiegeWeapon's init), so the bolts already shot stay spent.
+        // A spawned weapon starts loaded with its full reserve (RangedSiegeWeapon.OnInit), so the bolts already shot stay spent.
         if (ammo.HasValue) fresh.ShipSiegeWeapon?.SetAmmo(ammo.Value);
 
         // Removing one hull and adding one leaves the planner's agent count unchanged, so its k-d tree keeps the removed
@@ -233,6 +234,13 @@ public class NavalShipEngine : INavalShipEngine
         mission.GetMissionBehavior<NavalTrajectoryPlanningLogic>()?.ForceReinitialize();
         return fresh;
     }
+
+    /// <summary>
+    /// The reserve a fresh, loaded weapon takes over: AmmoCount leaves out the loaded bolt and a reload only spends its bolt as it
+    /// ends (Ballista's ConsumeAmmo on Idle), so a weapon caught mid-reload gives one bolt to the fresh weapon's load. An empty
+    /// weapon caught mid-reload still comes back loaded with one bolt it didn't have.
+    /// </summary>
+    internal static int CarriedAmmo(int ammoCount, bool isLoaded) => isLoaded ? ammoCount : Math.Max(0, ammoCount - 1);
 
     public void BoardHullAgents(MissionObject hull, IReadOnlyList<HullSwapAgent> agents)
     {
@@ -362,43 +370,65 @@ public class NavalShipEngine : INavalShipEngine
         // Quest5's RemoveShipInternal: no rope or bridge may keep pointing at a removed hull. A copy stays a copy until the
         // behavior's ShipRemovedEvent handler drops it, so the copy gates hold for the whole removal.
         NavalRopes.BreakConnections(ship);
-        if (!shipsLogic.FindAssignmentOfShipOrigin(ship.ShipOrigin, out var held))
+        switch (RemovalPathOf(shipsLogic, ship))
         {
-            RemoveUnassignedHull(shipsLogic, ship);
-            return;
+            case HullRemovalPath.Assigned:
+                shipsLogic.RemoveShip(ship);
+                return;
+            case HullRemovalPath.Unassigned:
+                RemoveUnassignedHull(shipsLogic, ship);
+                return;
+            default:
+                // Vanilla removes whatever hull holds the origin's assignment, so that stranger must not go in this hull's place.
+                Logger.Error("[NavalSync] Hull {Index} was not removed: its ship origin is assigned to another hull", ship.Index);
+                return;
         }
+    }
 
-        // Vanilla removes whatever hull its assignment holds, so a stranger holding this hull's origin must not go in its place.
-        if (held.MissionShip != ship)
-        {
-            Logger.Error("[NavalSync] Hull {Index} was not removed: its ship origin is assigned to hull {Other}", ship.Index,
-                held.MissionShip?.Index);
-            return;
-        }
+    /// <summary>
+    /// How vanilla's removal can take a hull: through the assignment holding it, through a lent one when none holds its origin
+    /// (a capture's orphan), or not at all when another hull holds its origin, which vanilla would remove instead.
+    /// </summary>
+    internal static HullRemovalPath RemovalPathOf(NavalShipsLogic shipsLogic, MissionShip ship)
+    {
+        if (!shipsLogic.FindAssignmentOfShipOrigin(ship.ShipOrigin, out var held)) return HullRemovalPath.Unassigned;
 
-        shipsLogic.RemoveShip(ship);
+        return held.MissionShip == ship ? HullRemovalPath.Assigned : HullRemovalPath.OriginHeldByAnotherHull;
     }
 
     // NavalShipsLogic.RemoveShip only acts through the assignment holding a hull, and a capture's orphan holds none (OnShipCaptured
-    // gave it to the prize), so the orphan borrows a free one and vanilla's RemoveShipAux removes it and clears the slot again.
+    // gave it to the prize), so the orphan borrows a free one for vanilla's RemoveShipAux.
     private static void RemoveUnassignedHull(NavalShipsLogic shipsLogic, MissionShip ship)
     {
-        var lent = LendFreeAssignment(shipsLogic._shipAssignments, ship);
-        if (lent == null)
-        {
-            Logger.Error("[NavalSync] Hull {Index} holds no ship assignment and none is free, so it was not removed", ship.Index);
-            return;
-        }
-
-        shipsLogic.RemoveShip(ship);
-        if (ship.IsRemoved)
-        {
+        var outcome = RemoveThroughLentAssignment(shipsLogic._shipAssignments, ship, shipsLogic.RemoveShip);
+        if (outcome == LentRemoval.Removed)
             Logger.Information("[NavalSync] Removed hull {Index}, which held no ship assignment, through a free one", ship.Index);
-            return;
+        else if (outcome == LentRemoval.NoFreeAssignment)
+            Logger.Error("[NavalSync] Hull {Index} holds no ship assignment and none is free, so it was not removed", ship.Index);
+        else
+            Logger.Error("[NavalSync] Hull {Index} holds no ship assignment and vanilla's removal did not take it", ship.Index);
+    }
+
+    /// <summary>
+    /// Lends <paramref name="ship"/> a free assignment, runs vanilla's removal through it, and frees the slot again however the
+    /// removal ended (RemoveShipAux clears it, a throwing removal handler would not), so the slot never keeps the hull.
+    /// </summary>
+    internal static LentRemoval RemoveThroughLentAssignment(NavalDLC.ShipAssignment[,] assignments, MissionShip ship,
+        Action<MissionShip> removeShip)
+    {
+        var lent = LendFreeAssignment(assignments, ship);
+        if (lent == null) return LentRemoval.NoFreeAssignment;
+
+        try
+        {
+            removeShip(ship);
+        }
+        finally
+        {
+            if (lent.MissionShip == ship) lent.Clear();
         }
 
-        lent.Clear();
-        Logger.Error("[NavalSync] Hull {Index} holds no ship assignment and vanilla's removal did not take it", ship.Index);
+        return ship.IsRemoved ? LentRemoval.Removed : LentRemoval.NotRemoved;
     }
 
     /// <summary>
@@ -409,7 +439,7 @@ public class NavalShipEngine : INavalShipEngine
     {
         foreach (var assignment in assignments)
         {
-            if (assignment == null || assignment.IsSet || assignment.HasMissionShip) continue;
+            if (assignment == null || assignment.ShipOrigin != null || assignment.MissionShip != null) continue;
 
             assignment.SetMissionShip(ship);
             return assignment;
@@ -980,4 +1010,25 @@ public class NavalShipEngine : INavalShipEngine
 
         return null;
     }
+}
+
+/// <summary>How vanilla's removal can take a hull (<see cref="NavalShipEngine.RemovalPathOf"/>).</summary>
+internal enum HullRemovalPath
+{
+    /// <summary>An assignment holds the hull, so vanilla's RemoveShip finds it.</summary>
+    Assigned,
+
+    /// <summary>No assignment holds the hull's origin (a capture's orphan), so it borrows a free one.</summary>
+    Unassigned,
+
+    /// <summary>Another hull's assignment holds the same origin, so vanilla would remove that hull instead.</summary>
+    OriginHeldByAnotherHull,
+}
+
+/// <summary>What a removal through a lent assignment did (<see cref="NavalShipEngine.RemoveThroughLentAssignment"/>).</summary>
+internal enum LentRemoval
+{
+    Removed,
+    NoFreeAssignment,
+    NotRemoved,
 }
