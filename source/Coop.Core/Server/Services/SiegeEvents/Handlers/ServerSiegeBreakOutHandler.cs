@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Network.Coalescing;
 using Coop.Core.Client.Services.SiegeEvents.Messages;
 using Coop.Core.Server.Services.SiegeEvents.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -28,7 +27,7 @@ internal class ServerSiegeBreakOutHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IPlayerManager playerManager;
     private readonly ISiegeBreakOut breakOut;
-    private readonly ISendCoalescer coalescer;
+    private readonly ISiegeSacrifice sacrifice;
     private readonly Dictionary<MobileParty, Receipt> receipts = new();
 
     private sealed class Receipt
@@ -40,14 +39,14 @@ internal class ServerSiegeBreakOutHandler : IHandler
 
     public ServerSiegeBreakOutHandler(IMessageBroker messageBroker, INetwork network,
         IObjectManager objectManager, IPlayerManager playerManager, ISiegeBreakOut breakOut,
-        ISendCoalescer coalescer = null)
+        ISiegeSacrifice sacrifice)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.playerManager = playerManager;
         this.breakOut = breakOut;
-        this.coalescer = coalescer;
+        this.sacrifice = sacrifice;
         messageBroker.Subscribe<NetworkRequestBreakOut>(Handle);
         messageBroker.Subscribe<PartyEnterSettlementAttempted>(HandleEnter);
         messageBroker.Subscribe<SettlementEncounterLeaveApplied>(HandleLeave);
@@ -84,8 +83,7 @@ internal class ServerSiegeBreakOutHandler : IHandler
                     {
                         int losses = breakOut.GetRequiredCasualties(party, request.IsFromPort);
                         var paidReceipt = new Receipt { Siege = siege, IsFromPort = request.IsFromPort, Result = result };
-                        var paid = SiegeSacrifice.TryApply(objectManager, breakOut, network, coalescer, party, losses,
-                            () => receipts[party] = paidReceipt);
+                        var paid = sacrifice.TryApply(party, losses, () => receipts[party] = paidReceipt);
                         if (paid != null)
                         {
                             result = new NetworkBreakOutResult(request.RequestId, true, paid.CharacterIds, paid.Counts, paid.ArmyCasualties);
