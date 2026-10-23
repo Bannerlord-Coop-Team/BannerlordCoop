@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem.Issues;
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
 /// <summary>Delegates giver death and cancellation retries to the session service.</summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class IssueGiverDeathDispatchPatches
 {

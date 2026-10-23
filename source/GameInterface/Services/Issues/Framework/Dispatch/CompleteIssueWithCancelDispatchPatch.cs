@@ -8,6 +8,7 @@ using TaleWorlds.Localization;
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
 /// <summary>Announces registered issue cancellation and returns troops only on the server.</summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithCancel))]
 internal class CompleteIssueWithCancelDispatchPatch
 {
