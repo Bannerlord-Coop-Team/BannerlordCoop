@@ -53,6 +53,22 @@ namespace Coop.IntegrationTests.Serialization
             Assert.Equal(42, attributes["AGE"]);
         }
 
+        [Fact]
+        public void NetworkChangeHeroName_RoundTrips_FloatAttributesIncludingNestedValues()
+        {
+            var name = new TextObject("{=!}{REWARD_GOLD} {NESTED}");
+            name.SetTextVariable("REWARD_GOLD", 2500f);
+            name.SetTextVariable("NESTED", new TextObject("{=!}{ZERO} {FRACTION}")
+                .SetTextVariable("ZERO", 0f).SetTextVariable("FRACTION", -1.25f));
+
+            var copy = RoundTrip(new NetworkChangeHeroName(new HeroChangeNameData(CreateHero(), name, null)));
+
+            Assert.Equal(2500f, Assert.IsType<float>(copy.Data.FullName.Attributes["REWARD_GOLD"]));
+            var nested = Assert.IsType<TextObject>(copy.Data.FullName.Attributes["NESTED"]);
+            Assert.Equal(0f, Assert.IsType<float>(nested.Attributes["ZERO"]));
+            Assert.Equal(-1.25f, Assert.IsType<float>(nested.Attributes["FRACTION"]));
+        }
+
         private static Hero CreateHero()
         {
             var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
