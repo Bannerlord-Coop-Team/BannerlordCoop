@@ -207,12 +207,26 @@ The branch builds and tests against v1.5.5 with no code change (2026-10-21, Stea
     written by an affected server load again once the fix is deployed on both sides. Checked live on
     2026-10-22: a server save hit by 7 throws logged "Dropped 7 battle wreckages saved without an id",
     loaded, and a client that had crashed on it rejoined.
-  - Open: the repair does not undo the rest of the damage. A throw skipped the end of
-    `FinalizeEventAux`, so that battle's parties stay attached to an event that never finished. After
-    the repair, an AI encounter with such a party throws `NullReferenceException` in
-    `PartyBase.set_MapEventSide` from `StartBattleAction` (seen twice on 2026-10-22, events
-    `Created_139` and `Created_171`). A save made after the fix has none; an affected save needs a
-    load repair that detaches parties from unfinished events.
+  - The wreckage repair does not undo the rest of the damage. A throw skipped the end of
+    `FinalizeEventAux`, so that battle's parties stay attached to an event that never finished, and an
+    AI encounter with such a party threw `NullReferenceException` in `PartyBase.set_MapEventSide`
+    from `StartBattleAction` (seen twice on 2026-10-22, events `Created_139` and `Created_171`). A
+    save made after the fix has none. For an affected save, the server now runs a load repair at
+    `CampaignReady` (`MapEventLoadCleaner.RepairOrphanedMapEvents`) that releases the parties of
+    every half-finished event a party or settlement still links to, logging one Warning per event.
+    Live check on a damaged save owed.
+  - Both load passes (the player map event pass and the orphan pass) run before the server state
+    that lets lifetime patches publish. Each pass therefore records the campaign's parties first and
+    unregisters every one that left the campaign during the pass, including a party destroyed
+    elsewhere by a cascade (a ruler killed in the battle can destroy a kingdom's clans). A throw while
+    one event is handled is logged as an Error, and the remaining events, the other pass and server
+    start still run. In the player pass, the army disband and party release run even when the
+    finalize throws.
+  - Open (follow-ups): the player pass finalizes an unlisted live event without first restoring its
+    unsaved state, so that finalize can throw; the orphan pass then releases the event only if
+    vanilla had already set `WaitingRemoval`. A successful `FinalizeEvent` in the player pass
+    publishes neither `MapEventFinalized` nor `InstanceDestroyed<MapEvent>`, because the sync policy
+    still allows originals at that point.
   - A wreckage already in a hosted save (for example from a single-player v1.5 campaign) no longer
     expires, because the server no longer registers the hourly tick. Clients still draw it and can
     click it, which opens a menu clients never registered (existing client path; in-game check owed).

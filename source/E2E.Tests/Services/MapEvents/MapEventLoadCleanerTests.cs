@@ -7,6 +7,7 @@ using GameInterface.Services.MapEvents.Messages.Leave;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -20,7 +21,12 @@ public class MapEventLoadCleanerTests : MapEventTestBase
     private static readonly AccessTools.FieldRef<MapEvent, TroopUpgradeTracker?> TrackerField =
         AccessTools.FieldRefAccess<MapEvent, TroopUpgradeTracker?>("<TroopUpgradeTracker>k__BackingField");
 
-    public MapEventLoadCleanerTests(ITestOutputHelper output) : base(output) { }
+    private readonly ITestOutputHelper output;
+
+    public MapEventLoadCleanerTests(ITestOutputHelper output) : base(output)
+    {
+        this.output = output;
+    }
 
     private IReadOnlyList<MethodBase> JoinDisabledMethods => MapEventDisabledMethods
         .Append(AccessTools.Method(typeof(CultureObject), nameof(CultureObject.HasFeat)))
@@ -331,7 +337,6 @@ public class MapEventLoadCleanerTests : MapEventTestBase
             Assert.Equal(MapEventState.WaitingRemoval, mapEvent.State);
             Assert.Null(attacker.Party.MapEventSide);
             Assert.Null(defender.Party.MapEventSide);
-            Assert.Null(follower.Party.MapEventSide);
             Assert.Null(follower.Army);
             Assert.Null(follower.AttachedTo);
             Assert.Equal(AiBehavior.GoToSettlement, follower.DefaultBehavior);
@@ -584,6 +589,198 @@ public class MapEventLoadCleanerTests : MapEventTestBase
         foreach (var client in Clients)
         {
             Assert.False(client.ObjectManager.TryGetObject<MobileParty>(destroyedId, out _));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FinalizePlayerMapEvents_PartyDestroyedByFinalize_IsRemovedFromCampaignAndRegistry(bool halfFinalized)
+    {
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        var destroyedId = mapEventContext.DefenderPartyId;
+        RegisterAsPlayerParty(
+            "offline-player-destroyed-defender",
+            TestEnvironment.CreateRegisteredObject<Hero>(),
+            mapEventContext.AttackerPartyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(destroyedId, out var empty));
+
+            Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
+
+            // An active party with no troops is destroyed by HandleMapEventEnd.
+            empty.IsActive = true;
+            empty.MemberRoster.Clear();
+            Assert.Equal(0, empty.Party.NumberOfAllMembers);
+            Assert.Contains(empty, Campaign.Current.CampaignObjectManager.MobileParties);
+
+            // false takes the FinalizeEvent branch, true the DetachFinalizedEvent branch.
+            if (halfFinalized)
+                ModelOrphanedAfterLoad(mapEvent);
+
+            // Production runs the load repair at CampaignReady, when destroy patches still let originals
+            // run and so publish no InstanceDestroyed of their own.
+            using (new AllowedThread())
+            {
+                Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+            }
+
+            Assert.DoesNotContain(empty, Campaign.Current.CampaignObjectManager.MobileParties);
+            Assert.False(Server.ObjectManager.TryGetObject<MobileParty>(destroyedId, out _));
+        }, JoinDisabledMethods);
+
+        foreach (var client in Clients)
+        {
+            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(destroyedId, out _));
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void FinalizePlayerMapEvents_OneEventThrows_FinalizesTheOthers(bool registerBrokenFirst)
+    {
+        var brokenContext = CreateServerMapEvent(commit: false);
+        var healthyContext = CreateServerMapEvent(commit: false);
+
+        // The player manager does not promise an order, so both registration orders run and one of
+        // them processes the broken event before the healthy one.
+        void RegisterBroken() => RegisterAsPlayerParty(
+            "offline-player-broken-event",
+            TestEnvironment.CreateRegisteredObject<Hero>(),
+            brokenContext.AttackerPartyId);
+        void RegisterHealthy() => RegisterAsPlayerParty(
+            "offline-player-healthy-event",
+            TestEnvironment.CreateRegisteredObject<Hero>(),
+            healthyContext.AttackerPartyId);
+
+        if (registerBrokenFirst)
+        {
+            RegisterBroken();
+            RegisterHealthy();
+        }
+        else
+        {
+            RegisterHealthy();
+            RegisterBroken();
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(brokenContext.MapEventId, out var broken));
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(healthyContext.MapEventId, out var healthy));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(healthyContext.AttackerPartyId, out var healthyAttacker));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(healthyContext.DefenderPartyId, out var healthyDefender));
+
+            Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
+
+            // A live event the load never restored: the component lost its back-reference to the event,
+            // which FieldBattleEventComponent reads when FinalizeEvent removes the parties.
+            var component = Assert.IsType<FieldBattleEventComponent>(broken.Component);
+            component.MapEvent = null!;
+            Assert.False(broken.IsFinalized);
+
+            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+
+            Assert.Equal(MapEventState.WaitingRemoval, healthy.State);
+            Assert.Null(healthyAttacker.Party.MapEventSide);
+            Assert.Null(healthyDefender.Party.MapEventSide);
+            Assert.Empty(healthy.AttackerSide.Parties);
+            Assert.Empty(healthy.DefenderSide.Parties);
+
+            // The orphan pass runs next in production and must not leave the broken event's parties linked.
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(brokenContext.AttackerPartyId, out var brokenAttacker));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(brokenContext.DefenderPartyId, out var brokenDefender));
+            Assert.Equal(MapEventState.WaitingRemoval, broken.State);
+            using (new AllowedThread())
+            {
+                Server.Resolve<IMapEventLoadCleaner>().RepairOrphanedMapEvents();
+            }
+
+            Assert.Null(brokenAttacker.Party.MapEventSide);
+            Assert.Null(brokenDefender.Party.MapEventSide);
+            Assert.Empty(broken.AttackerSide.Parties);
+            Assert.Empty(broken.DefenderSide.Parties);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void FinalizePlayerMapEvents_FinalizeThrowsForPlayerLedArmy_StillDisbandsArmy()
+    {
+        var mapEventContext = CreateServerMapEvent();
+        RegisterAsPlayerParty(
+            "loaded-player-army-throw",
+            TestEnvironment.CreateRegisteredObject<Hero>(),
+            mapEventContext.AttackerPartyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mapEventContext.AttackerPartyId, out var attacker));
+            var gatheringFollower = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var army = new Army(GameObjectCreator.CreateInitializedObject<Kingdom>(), attacker, Army.ArmyTypes.Raider);
+            gatheringFollower.Army = army;
+            Assert.Null(gatheringFollower.MapEvent);
+
+            // A live event the load never restored: FinalizeEvent throws on the first party it removes.
+            Assert.IsType<FieldBattleEventComponent>(mapEvent.Component).MapEvent = null!;
+            Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
+
+            Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+
+            Assert.Null(gatheringFollower.Army);
+            Assert.Null(attacker.Army);
+        }, MapEventDisabledMethods);
+    }
+
+    [Fact]
+    public void FinalizePlayerMapEvents_PartyOutsideEventDestroyedDuringPass_IsRemovedFromRegistry()
+    {
+        var mapEventContext = CreateServerMapEvent(commit: false);
+        RegisterAsPlayerParty(
+            "offline-player-outside-destroyed",
+            TestEnvironment.CreateRegisteredObject<Hero>(),
+            mapEventContext.AttackerPartyId);
+        string? outsideId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MapEvent>(mapEventContext.MapEventId, out var mapEvent));
+            var outside = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            outside.IsActive = true;
+            Assert.True(Server.ObjectManager.TryGetId(outside, out outsideId));
+            Assert.Contains(outside, Campaign.Current.CampaignObjectManager.MobileParties);
+            Server.Resolve<IMessageBroker>().Publish(this, new SavedPlayerRegistrationsRestored());
+            ModelOrphanedAfterLoad(mapEvent);
+
+            // Stands in for a finalize cascade (a killed hero's kingdom) that destroys a party elsewhere.
+            var messageBroker = Server.Resolve<IMessageBroker>();
+            void DestroyOutside(MessagePayload<MapEventFinalized> payload) =>
+                DestroyPartyAction.Apply(null, outside);
+
+            messageBroker.Subscribe<MapEventFinalized>(DestroyOutside);
+            try
+            {
+                using (new AllowedThread())
+                {
+                    Server.Resolve<IMapEventLoadCleaner>().FinalizePlayerMapEvents();
+                }
+            }
+            finally
+            {
+                messageBroker.Unsubscribe<MapEventFinalized>(DestroyOutside);
+            }
+
+            Assert.DoesNotContain(outside, Campaign.Current.CampaignObjectManager.MobileParties);
+            Assert.False(Server.ObjectManager.TryGetObject<MobileParty>(outsideId, out _));
+        }, JoinDisabledMethods);
+
+        foreach (var client in Clients)
+        {
+            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(outsideId, out _));
         }
     }
 

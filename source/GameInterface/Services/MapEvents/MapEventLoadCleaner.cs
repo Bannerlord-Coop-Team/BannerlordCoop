@@ -58,9 +58,27 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         if (Campaign.Current?.MapEventManager == null)
             return;
 
-        var loadedPlayerMapEvents = GetLoadedPlayerMapEvents();
+        var partiesBefore = Campaign.Current.CampaignObjectManager.MobileParties.ToArray();
+        try
+        {
+            foreach (var mapEvent in GetLoadedPlayerMapEvents())
+            {
+                FinalizePlayerMapEvent(mapEvent);
+            }
+        }
+        finally
+        {
+            PublishDestroyedParties(partiesBefore);
+        }
+    }
 
-        foreach (var mapEvent in loadedPlayerMapEvents)
+    private void FinalizePlayerMapEvent(MapEvent mapEvent)
+    {
+        MobileParty[] involvedMobileParties;
+        Army[] playerLedArmies;
+        MobileParty[] releasedArmyParties;
+
+        try
         {
             var (repairedLinks, removedEntries) = RepairPartySideLinks(mapEvent);
             if (repairedLinks > 0 || removedEntries > 0)
@@ -72,50 +90,78 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                     mapEvent.StringId);
             }
 
-            var involvedMobileParties = mapEvent.InvolvedParties
+            involvedMobileParties = mapEvent.InvolvedParties
                 .Where(party => party.IsMobile && party.MobileParty.IsActive)
                 .Select(party => party.MobileParty)
                 .ToArray();
-            var playerLedArmies = involvedMobileParties
+            playerLedArmies = involvedMobileParties
                 .Select(mobileParty => mobileParty.Army)
                 .Where(army => army != null && army.LeaderParty.IsPlayerParty())
                 .Distinct()
                 .ToArray();
-            var releasedArmyParties = playerLedArmies
+            releasedArmyParties = playerLedArmies
                 .SelectMany(army => army.Parties)
                 .Where(mobileParty => mobileParty.IsActive && !mobileParty.IsPlayerParty())
                 .Distinct()
                 .ToArray();
+        }
+        catch (Exception e)
+        {
+            logger.Error(e, "Failed to finalize loaded player map event {MapEventId}", mapEvent.StringId);
+            return;
+        }
 
+        try
+        {
             FinalizeOrRepairEvent(mapEvent);
+        }
+        catch (Exception e)
+        {
+            logger.Error(e, "Failed to finalize loaded player map event {MapEventId}", mapEvent.StringId);
+        }
 
-            foreach (var army in playerLedArmies)
+        try
+        {
+            ReleaseParties(mapEvent, involvedMobileParties, playerLedArmies, releasedArmyParties);
+        }
+        catch (Exception e)
+        {
+            logger.Error(e, "Failed to release parties of loaded player map event {MapEventId}", mapEvent.StringId);
+        }
+    }
+
+    private void ReleaseParties(
+        MapEvent mapEvent,
+        MobileParty[] involvedMobileParties,
+        Army[] playerLedArmies,
+        MobileParty[] releasedArmyParties)
+    {
+        foreach (var army in playerLedArmies)
+        {
+            logger.Information(
+                "Dispersing loaded player-led army {ArmyName} released from map event {MapEventId}",
+                army.Name,
+                mapEvent.StringId);
+            armyDisbander.Disband(army, Army.ArmyDispersionReason.Unknown);
+        }
+
+        foreach (var mobileParty in involvedMobileParties.Concat(releasedArmyParties).Distinct())
+        {
+            if (!mobileParty.IsActive || mobileParty.IsPlayerParty())
+                continue;
+
+            if (releasedArmyParties.Contains(mobileParty) &&
+                TrySetReleasedPartySettlementObjective(mobileParty, out var settlement))
             {
                 logger.Information(
-                    "Dispersing loaded player-led army {ArmyName} released from map event {MapEventId}",
-                    army.Name,
+                    "Sending released army party {PartyId} to {SettlementId} after finalizing map event {MapEventId}",
+                    mobileParty.StringId,
+                    settlement.StringId,
                     mapEvent.StringId);
-                armyDisbander.Disband(army, Army.ArmyDispersionReason.Unknown);
+                continue;
             }
 
-            foreach (var mobileParty in involvedMobileParties.Concat(releasedArmyParties).Distinct())
-            {
-                if (!mobileParty.IsActive || mobileParty.IsPlayerParty())
-                    continue;
-
-                if (releasedArmyParties.Contains(mobileParty) &&
-                    TrySetReleasedPartySettlementObjective(mobileParty, out var settlement))
-                {
-                    logger.Information(
-                        "Sending released army party {PartyId} to {SettlementId} after finalizing map event {MapEventId}",
-                        mobileParty.StringId,
-                        settlement.StringId,
-                        mapEvent.StringId);
-                    continue;
-                }
-
-                mobileParty.ResetNavigationToHold();
-            }
+            mobileParty.ResetNavigationToHold();
         }
     }
 
@@ -124,31 +170,39 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         if (Campaign.Current?.MapEventManager == null)
             return;
 
-        var listed = new HashSet<MapEvent>(Campaign.Current.MapEventManager.MapEvents);
-        var parties = Campaign.Current.CampaignObjectManager.MobileParties
-            .Select(mobileParty => mobileParty.Party)
-            .Concat(Settlement.All.Select(settlement => settlement.Party))
-            .ToList();
-        var orphaned = orphanedMapEventFinder.Find(parties, listed);
-
-        foreach (var mapEvent in orphaned.Finalized)
+        var partiesBefore = Campaign.Current.CampaignObjectManager.MobileParties.ToArray();
+        try
         {
-            try
+            var listed = new HashSet<MapEvent>(Campaign.Current.MapEventManager.MapEvents);
+            var parties = Campaign.Current.CampaignObjectManager.MobileParties
+                .Select(mobileParty => mobileParty.Party)
+                .Concat(Settlement.All.Select(settlement => settlement.Party))
+                .ToList();
+            var orphaned = orphanedMapEventFinder.Find(parties, listed);
+
+            foreach (var mapEvent in orphaned.Finalized)
             {
-                RepairOrphanedMapEvent(mapEvent, orphaned.LinkedParties(mapEvent));
+                try
+                {
+                    RepairOrphanedMapEvent(mapEvent, orphaned.LinkedParties(mapEvent));
+                }
+                catch (Exception e)
+                {
+                    logger.Error(e, "Failed to repair orphaned map event {MapEventId}", mapEvent.StringId);
+                }
             }
-            catch (Exception e)
+
+            foreach (var mapEvent in orphaned.UnlistedLive)
             {
-                logger.Error(e, "Failed to repair orphaned map event {MapEventId}", mapEvent.StringId);
+                logger.Warning(
+                    "Map event {MapEventId} is referenced by {PartyCount} parties but is neither listed by the map event manager nor finalized, leaving it as is",
+                    mapEvent.StringId,
+                    orphaned.LinkedParties(mapEvent).Count);
             }
         }
-
-        foreach (var mapEvent in orphaned.UnlistedLive)
+        finally
         {
-            logger.Warning(
-                "Map event {MapEventId} is referenced by {PartyCount} parties but is neither listed by the map event manager nor finalized, leaving it as is",
-                mapEvent.StringId,
-                orphaned.LinkedParties(mapEvent).Count);
+            PublishDestroyedParties(partiesBefore);
         }
     }
 
@@ -178,7 +232,6 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         // A party that now belongs to another live event was not released from this one.
         var released = candidates.Where(party => party._mapEventSide == null).ToArray();
         var releasedMobileParties = released.Where(party => party.IsMobile).Select(party => party.MobileParty).ToArray();
-        PublishDestroyedParties(releasedMobileParties);
 
         foreach (var mobileParty in releasedMobileParties)
         {
@@ -212,17 +265,18 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
         }
     }
 
-    // The repair runs before the server state that lets lifetime patches publish, so a party that
-    // DestroyPartyAction removed during the detach is never unregistered otherwise.
-    private void PublishDestroyedParties(IEnumerable<MobileParty> releasedParties)
+    // The load repairs run before the server state that lets lifetime patches publish, so a party that
+    // vanilla destroyed during a pass (a participant or a cascade elsewhere) is never unregistered
+    // otherwise. This reconciles every party that left the campaign during the pass.
+    private void PublishDestroyedParties(IEnumerable<MobileParty> partiesBeforePass)
     {
-        var campaignParties = Campaign.Current.CampaignObjectManager.MobileParties;
-        foreach (var party in releasedParties)
+        var campaignParties = new HashSet<MobileParty>(Campaign.Current.CampaignObjectManager.MobileParties);
+        foreach (var party in partiesBeforePass)
         {
             if (campaignParties.Contains(party) || !objectManager.Contains(party))
                 continue;
 
-            logger.Warning("Unregistering party {PartyId} destroyed while releasing an orphaned map event", party.StringId);
+            logger.Warning("Unregistering party {PartyId} removed from the campaign during a load repair pass", party.StringId);
             messageBroker.Publish(party, new InstanceDestroyed<MobileParty>(party));
         }
     }
