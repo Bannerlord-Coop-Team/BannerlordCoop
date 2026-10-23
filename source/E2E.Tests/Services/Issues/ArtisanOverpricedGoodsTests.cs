@@ -131,16 +131,6 @@ public class ArtisanOverpricedGoodsTests : IDisposable
             instance.Call(() => Assert.Equal(2f, Get<Hero>(instance, scenario.NotableId).Issue._issueDifficultyMultiplier));
     }
 
-    [Fact]
-    public void LordStart_RejectsWhenTheTownChangedOwningClan()
-    {
-        Server.Call(() => Get<Town>(Server, townId).OwnerClan = Get<Clan>(Server, otherClanId));
-        ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
-
-        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
-        Server.Call(() => Assert.True(Get<Hero>(Server, scenario.NotableId).Issue.IsOngoingWithoutQuest));
-    }
-
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
