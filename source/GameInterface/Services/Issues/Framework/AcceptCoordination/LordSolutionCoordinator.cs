@@ -71,9 +71,7 @@ internal class LordSolutionCoordinator : ILordSolutionCoordinator, IHandler
         if (ModInformation.IsServer) return true;
         if (operation == LordSolutionOperation.Start && CallOriginalPolicy.IsOriginalAllowed()) return true;
         // A menu replay may reach a no-counteroffer ending, but it must still ask the server to pay it.
-        if (operation != LordSolutionOperation.Start &&
-            (pendingDecisions.Contains(issue) || !objects.TryGetId(issue.IssueOwner, out var ownerId) ||
-                !ownership.TryGetOwner(ownerId, issue.StringId, out var owner) || owner != controller.ControllerId)) return false;
+        if (operation != LordSolutionOperation.Start && pendingDecisions.Contains(issue)) return false;
         if (objects.TryGetIdWithLogging(issue.IssueOwner, out var giverId))
         {
             // Vanilla decides when the merchant conversation ends, then reopens the menu before the server replies.
