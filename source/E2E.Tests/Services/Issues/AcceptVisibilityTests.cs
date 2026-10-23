@@ -1,4 +1,5 @@
-﻿using Common.Util;
+﻿using Common.Network;
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using Coop.Core.Server.Connections.Messages;
@@ -251,16 +252,44 @@ public class AcceptVisibilityTests : IDisposable
     public void SendTroops_TheSnapshotReplacesAnOwnerTheClientRememberedFromBefore()
     {
         var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
-        AddIssue(Other, notableId);
+        var otherIssue = AddIssue(Other, notableId);
         ServerKnowsTheOwner(notableId);
         Other.Call(() => Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, "stale-player")));
 
+        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
         Server.SimulateMessage(this, new PlayerCampaignEntered(Other.NetPeer));
+        Other.PumpGameThread();
 
         Other.Call(() =>
         {
             Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out var ownerControllerId));
             Assert.Equal(OwnerControllerId, ownerControllerId);
+            Assert.Equal(IssueBase.IssueState.Ongoing, otherIssue._issueState);
+        });
+    }
+
+    [Fact]
+    public void ASnapshotForADifferentIssueKeepsTheNewIssueOwnerAfterQueuedFinalization()
+    {
+        var notableId = TestEnvironment.CreateRegisteredObject<Hero>();
+        Other.Call(() => Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TrySetOwner(notableId, IssueId, "stale-player")));
+        Server.Resolve<TestNetworkRouter>().ReceiveContext = TestNetworkReceiveContext.PollerThread;
+
+        Server.Call(() => Server.Resolve<INetwork>().Send(Other.NetPeer,
+            new NetworkIssueOwnershipSnapshot(new[]
+            {
+                new IssueOwnershipData(notableId, "new_issue", OwnerControllerId),
+            })));
+
+        Assert.True(Other.PendingGameThreadActionCount > 0);
+        Other.Call(() => Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, "new_issue", out _)));
+
+        Other.PumpGameThread();
+
+        Other.Call(() =>
+        {
+            Assert.True(Other.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, "new_issue", out var controllerId));
+            Assert.Equal(OwnerControllerId, controllerId);
         });
     }
 

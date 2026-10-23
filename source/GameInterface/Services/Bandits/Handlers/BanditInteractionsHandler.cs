@@ -287,6 +287,7 @@ internal class BanditInteractionsHandler : IHandler
             {
                 if (!objectManager.TryGetObjectWithLogging<MobileParty>(partyId, out var mobileParty)) return;
 
+                messageBroker.Publish(this, new BanditPartyRecruitedByPlayer(mobileParty, mainParty));
                 CampaignEventDispatcher.Instance.OnBanditPartyRecruited(mobileParty);
                 DestroyPartyAction.Apply(mainParty.Party, mobileParty);
             }
