@@ -9,6 +9,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
+using GameInterface.Services.UI.Notifications;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -34,6 +35,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IIssueConversationTracker conversationTracker;
     private readonly IIssueAcceptPreconditions acceptPreconditions;
+    private readonly IQuestJournalOwnerResolver journal;
 
     public QuestSolutionAcceptCoordinator(
         IMessageBroker messageBroker,
@@ -44,7 +46,8 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         IPlayerManager playerManager,
         IControllerIdProvider controllerIdProvider,
         IIssueConversationTracker conversationTracker,
-        IIssueAcceptPreconditions acceptPreconditions)
+        IIssueAcceptPreconditions acceptPreconditions,
+        IQuestJournalOwnerResolver journal)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -55,6 +58,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         this.controllerIdProvider = controllerIdProvider;
         this.conversationTracker = conversationTracker;
         this.acceptPreconditions = acceptPreconditions;
+        this.journal = journal;
 
         messageBroker.Subscribe<QuestSolutionAcceptTriggered>(Handle_QuestSolutionAcceptTriggered);
         messageBroker.Subscribe<RequestQuestSolutionAccept>(Handle_RequestQuestSolutionAccept);
@@ -164,7 +168,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
     }
 
     // Undoes a half-finished accept on the server, so the refused client's reopened offer can still be taken
-    private static void OfferAgain(IssueBase issue, CampaignTime dueTime)
+    private void OfferAgain(IssueBase issue, CampaignTime dueTime)
     {
         try
         {
@@ -187,6 +191,10 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         catch (Exception e)
         {
             Logger.Error(e, "Offering {issue} again after a failed accept failed", issue.StringId);
+        }
+        finally
+        {
+            journal.DiscardArchive(issue);
         }
     }
 

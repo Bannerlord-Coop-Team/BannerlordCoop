@@ -2,8 +2,6 @@
 using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Localization;
@@ -17,10 +15,6 @@ internal class ArtisanOverpricedGoodsAuthorityPatches
     [HarmonyPatch(typeof(Issue), nameof(Issue.AlternativeSolutionStartConsequence))]
     [HarmonyPrefix]
     private static bool FundingPrefix() => ModInformation.IsServer;
-
-    [HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.OnIssueUpdated))]
-    [HarmonyPrefix]
-    private static bool IssueRewardsPrefix(IssueBase issue) => !(issue is Issue) || ModInformation.IsServer;
 
     [HarmonyPatch(typeof(Issue), nameof(Issue.LordSolutionCondition))]
     [HarmonyPrefix]

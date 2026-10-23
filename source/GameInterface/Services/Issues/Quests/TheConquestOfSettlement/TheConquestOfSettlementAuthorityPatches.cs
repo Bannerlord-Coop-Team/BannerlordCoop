@@ -8,13 +8,11 @@ using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 
-using Issue = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssue;
 using Quest = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssueQuest;
 
 [HarmonyPatch]
@@ -79,19 +77,6 @@ internal static class TheConquestOfSettlementWarInitiatorPatch
 
         __result = TheConquestOfSettlementEventPatches.TriggeringHero != null &&
             TheConquestOfSettlementEventPatches.TriggeringHero == Hero.MainHero;
-    }
-}
-
-[HarmonyPatch(typeof(IssuesCampaignBehavior), nameof(IssuesCampaignBehavior.OnIssueUpdated))]
-internal static class TheConquestOfSettlementRewardPatch
-{
-    [HarmonyPrefix]
-    private static void Prefix(IssueBase issue, ref Hero issueSolver)
-    {
-        if (issue is Issue && ModInformation.IsClient && !CallOriginalPolicy.IsOriginalAllowedForOwnershipGate())
-        {
-            issueSolver = null;
-        }
     }
 }
 

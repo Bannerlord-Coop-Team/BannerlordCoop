@@ -7,6 +7,7 @@ using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
+using GameInterface.Utils.Commands;
 using System;
 using System.Text;
 using TaleWorlds.CampaignSystem;
@@ -24,6 +25,7 @@ internal sealed class ScoutEnemyGarrisonsSetupCoopCommand : ICoopCommand
     private const int RequiredScouting = 30;
 
     private readonly IObjectManager objectManager;
+    private readonly ICommandObjectResolver resolver;
     private readonly IPlayerManager playerManager;
     private readonly IKingdomMembershipState kingdomMembershipState;
     private readonly IMessageBroker messageBroker;
@@ -32,6 +34,7 @@ internal sealed class ScoutEnemyGarrisonsSetupCoopCommand : ICoopCommand
 
     public ScoutEnemyGarrisonsSetupCoopCommand(
         IObjectManager objectManager,
+        ICommandObjectResolver resolver,
         IPlayerManager playerManager,
         IKingdomMembershipState kingdomMembershipState,
         IMessageBroker messageBroker,
@@ -39,6 +42,7 @@ internal sealed class ScoutEnemyGarrisonsSetupCoopCommand : ICoopCommand
         ScoutEnemyGarrisonsCreationCaptureStrategy creationStrategy)
     {
         this.objectManager = objectManager;
+        this.resolver = resolver;
         this.playerManager = playerManager;
         this.kingdomMembershipState = kingdomMembershipState;
         this.messageBroker = messageBroker;
@@ -56,7 +60,7 @@ internal sealed class ScoutEnemyGarrisonsSetupCoopCommand : ICoopCommand
 
     public IExpectedArgs[] ExpectedArgs { get; } = {
         new ExpectedArgs("controller_id", "The controller id of the player who will take the quest, see coop.debug.players.list."),
-        new ExpectedArgs("hero_id", "The lord who offers the issue, Rhagaea (lord_1_14) by default.", isRequired: false),
+        new ExpectedArgs("hero_id", "Name or id of the lord who offers the issue, Rhagaea (lord_1_14) by default; quote names with spaces.", isRequired: false),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -79,12 +83,12 @@ internal sealed class ScoutEnemyGarrisonsSetupCoopCommand : ICoopCommand
         }
 
         var lordId = args.Count > 1 ? args[1] : RhagaeaId;
-        if (!objectManager.TryGetObject<Hero>(lordId, out var lord))
+        if (!resolver.TryResolveHero(lordId, out var lord, out var error))
         {
-            return Failed($"Hero '{lordId}' not found");
+            return Failed(error);
         }
 
-        if (!TryCheckLord(lord, out var kingdom, out var error))
+        if (!TryCheckLord(lord, out var kingdom, out error))
         {
             return Failed(error);
         }

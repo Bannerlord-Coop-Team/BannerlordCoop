@@ -83,6 +83,13 @@ public interface IPlayerManager
     bool IsSenderControllingHero(object sender, string heroId);
 
     /// <summary>
+    /// Checks whether a message sender is the peer controlling the leader of the given clan, logging
+    /// a warning when it isn't, so a handler can ignore a clan edit from a player who does not lead it.
+    /// Reads campaign state, so call it on the game thread.
+    /// </summary>
+    bool IsSenderClanLeader(object sender, Clan clan);
+
+    /// <summary>
     /// Checks whether the given player has a connected peer.
     /// </summary>
     bool IsConnected(Player player);
@@ -396,6 +403,16 @@ public class PlayerManager : IPlayerManager
         if (sender is NetPeer peer && TryGetPlayer(peer, out var player) && player.HeroId == heroId) return true;
 
         logger.Warning("Ignoring a request for hero {HeroId} from a peer that does not control it", heroId);
+        return false;
+    }
+
+    public bool IsSenderClanLeader(object sender, Clan clan)
+    {
+        if (clan != null && sender is NetPeer peer && TryGetPlayer(peer, out var player) &&
+            objectManager.TryGetObject<Hero>(player.HeroId, out var hero) &&
+            hero.Clan == clan && clan.Leader == hero) return true;
+
+        logger.Warning("Ignoring a request for clan {ClanId} from a peer that does not lead it", clan?.StringId);
         return false;
     }
 
