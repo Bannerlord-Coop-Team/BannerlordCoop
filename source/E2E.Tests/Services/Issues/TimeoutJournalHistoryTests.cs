@@ -137,7 +137,7 @@ public class TimeoutJournalHistoryTests : IDisposable
             output.WriteLine("Death receivers: {0}", string.Join(", ", CampaignEventDispatcher.Instance._eventReceivers.Select(receiver => receiver.GetType().FullName)));
             var changeState = AccessTools.Method(typeof(Hero), nameof(Hero.ChangeState));
             var bootstrap = Assert.Single(Harmony.GetPatchInfo(changeState).Prefixes, patch => patch.owner == "Coop.Testing");
-            var harmony = new Harmony("real-issue-giver-death-test");
+            var harmony = new Harmony(bootstrap.owner);
             harmony.Unpatch(changeState, bootstrap.PatchMethod);
             try
             {
@@ -146,7 +146,12 @@ public class TimeoutJournalHistoryTests : IDisposable
             }
             finally
             {
-                harmony.Patch(changeState, prefix: new HarmonyMethod(bootstrap.PatchMethod) { priority = bootstrap.priority });
+                harmony.Patch(changeState, prefix: new HarmonyMethod(bootstrap.PatchMethod)
+                {
+                    priority = bootstrap.priority,
+                    before = bootstrap.before,
+                    after = bootstrap.after,
+                });
             }
             Assert.False(giver.IsAlive);
             Assert.Null(giver.Issue);
