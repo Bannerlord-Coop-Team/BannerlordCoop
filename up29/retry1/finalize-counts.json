@@ -1,0 +1,114 @@
+{
+    "issueId":  "issue_1228",
+    "giverId":  "Hero_CharacterObject_2705",
+    "phases":  {
+                   "preaccept":  {
+                                     "server":  {
+                                                    "observed":  0,
+                                                    "raw":  "finalizeWatch=true observed=0 received=0\n",
+                                                    "receipt":  "preaccept-count-server.json",
+                                                    "received":  0
+                                                },
+                                     "A":  {
+                                               "observed":  0,
+                                               "raw":  "finalizeWatch=true observed=0 received=0\n",
+                                               "receipt":  "preaccept-count-A.json",
+                                               "received":  0
+                                           },
+                                     "B":  {
+                                               "observed":  0,
+                                               "raw":  "finalizeWatch=true observed=0 received=0\n",
+                                               "receipt":  "preaccept-count-B.json",
+                                               "received":  0
+                                           }
+                                 },
+                   "accepted":  {
+                                    "server":  {
+                                                   "observed":  0,
+                                                   "raw":  "finalizeWatch=true observed=0 received=0\n",
+                                                   "receipt":  "accepted-count-server.json",
+                                                   "received":  0
+                                               },
+                                    "A":  {
+                                              "observed":  0,
+                                              "raw":  "finalizeWatch=true observed=0 received=0\n",
+                                              "receipt":  "accepted-count-A.json",
+                                              "received":  0
+                                          },
+                                    "B":  {
+                                              "observed":  0,
+                                              "raw":  "finalizeWatch=true observed=0 received=0\n",
+                                              "receipt":  "accepted-count-B.json",
+                                              "received":  0
+                                          }
+                                },
+                   "offline":  {
+                                   "server":  {
+                                                  "observed":  1,
+                                                  "raw":  "finalizeWatch=true observed=1 received=0\nissue_1228|observed|CharacterObject_2705|QuestCancel",
+                                                  "receipt":  "offline-count-server.json",
+                                                  "received":  0
+                                              },
+                                   "A":  {
+                                             "observed":  null,
+                                             "error":  {
+                                                           "code":  "session_not_ready",
+                                                           "message":  "The co-op session command dispatcher is not available yet.",
+                                                           "outcomeUncertain":  false
+                                                       },
+                                             "receipt":  "offline-count-A.json",
+                                             "received":  null
+                                         },
+                                   "B":  {
+                                             "observed":  0,
+                                             "raw":  "finalizeWatch=true observed=0 received=1\nissue_1228|received|Hero_CharacterObject_2705|QuestCancel",
+                                             "receipt":  "offline-count-B.json",
+                                             "received":  1
+                                         }
+                               },
+                   "rejoined":  {
+                                    "server":  {
+                                                   "observed":  1,
+                                                   "raw":  "finalizeWatch=true observed=1 received=0\nissue_1228|observed|CharacterObject_2705|QuestCancel",
+                                                   "receipt":  "rejoined-count-server.json",
+                                                   "received":  0
+                                               },
+                                    "A":  {
+                                              "observed":  0,
+                                              "raw":  "finalizeWatch=true observed=0 received=0\n",
+                                              "receipt":  "rejoined-count-A.json",
+                                              "received":  0
+                                          },
+                                    "B":  {
+                                              "observed":  0,
+                                              "raw":  "finalizeWatch=true observed=0 received=1\nissue_1228|received|Hero_CharacterObject_2705|QuestCancel",
+                                              "receipt":  "rejoined-count-B.json",
+                                              "received":  1
+                                          }
+                                },
+                   "final":  {
+                                 "server":  {
+                                                "observed":  1,
+                                                "raw":  "finalizeWatch=true observed=1 received=0\nissue_1228|observed|CharacterObject_2705|QuestCancel",
+                                                "receipt":  "final-count-server.json",
+                                                "received":  0
+                                            },
+                                 "A":  {
+                                           "observed":  0,
+                                           "raw":  "finalizeWatch=true observed=0 received=0\n",
+                                           "receipt":  "final-count-A.json",
+                                           "received":  0
+                                       },
+                                 "B":  {
+                                           "observed":  0,
+                                           "raw":  "finalizeWatch=true observed=0 received=1\nissue_1228|received|Hero_CharacterObject_2705|QuestCancel",
+                                           "receipt":  "final-count-B.json",
+                                           "received":  1
+                                       }
+                             }
+               },
+    "serverExactlyOneQuestCancel":  true,
+    "BExactlyOneQuestCancel":  true,
+    "AReceivedActual":  0,
+    "AAdjudication":  "A remained observed=0 received=0 after same-process rejoin. Offline read returned session_not_ready. No re-arm, replay, fabricated event, or extra ending. All-three-received=1 is NOT proven."
+}

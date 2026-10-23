@@ -1,0 +1,26 @@
+{
+    "version":  1,
+    "id":  "62df1aca030b464286e7584571c6c0c0",
+    "ok":  true,
+    "process":  {
+                    "pid":  67600,
+                    "role":  "client",
+                    "platformId":  "testclient2",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2393161Z"
+                },
+    "result":  {
+                   "name":  "coop.debug.ittest.run",
+                   "arguments":  [
+                                     "finalize_watch",
+                                     "issue_1228"
+                                 ],
+                   "found":  true,
+                   "output":  "finalizeWatch=true observed=0 received=0\n",
+                   "succeeded":  true,
+                   "errorCode":  null,
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

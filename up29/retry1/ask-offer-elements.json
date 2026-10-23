@@ -1,0 +1,3202 @@
+[
+    {
+        "reference":  "e0",
+        "widget":  {
+                       "parent":  -1,
+                       "childIndex":  0,
+                       "id":  "Root",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  870.748291,
+                       "height":  653.061218,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e1",
+        "widget":  {
+                       "parent":  0,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  1280,
+                       "height":  960.000061,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e2",
+        "widget":  {
+                       "parent":  1,
+                       "childIndex":  0,
+                       "id":  "MapConversationParent",
+                       "type":  "MapConversation__TaleWorlds_CampaignSystem_ViewModelCollection_Map_MapConversation_MapConversationVM",
+                       "text":  "14.3k",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  1280,
+                       "height":  960.000061,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e3",
+        "widget":  {
+                       "parent":  2,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  1280,
+                       "height":  960.000061,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e4",
+        "widget":  {
+                       "parent":  2,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  1280,
+                       "height":  960.000061,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e5",
+        "widget":  {
+                       "parent":  4,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "MapConversationTableauWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  false,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  1280,
+                       "height":  960.000061,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e6",
+        "widget":  {
+                       "parent":  2,
+                       "childIndex":  2,
+                       "id":  "ConversationParent",
+                       "type":  "MapConversation__TaleWorlds_CampaignSystem_ViewModelCollection_Map_MapConversation_MapConversationVM_Dependency_1_SPConversation",
+                       "text":  "14.3k",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  1280,
+                       "height":  960.000061,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e7",
+        "widget":  {
+                       "parent":  6,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "NavigationScopeTargeter",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e8",
+        "widget":  {
+                       "parent":  6,
+                       "childIndex":  1,
+                       "id":  "ContinueButton",
+                       "type":  "ButtonWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  false,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  1280,
+                       "height":  960.000061,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+                                       "click"
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e9",
+        "widget":  {
+                       "parent":  8,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "BrushWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  false,
+                       "hitTestable":  false,
+                       "x":  801.088501,
+                       "y":  890.612305,
+                       "width":  308.843536,
+                       "height":  54.4217682,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e10",
+        "widget":  {
+                       "parent":  9,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "RichTextWidget",
+                       "text":  "Click to continue",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  false,
+                       "hitTestable":  false,
+                       "x":  801.088501,
+                       "y":  890.612305,
+                       "width":  308.843536,
+                       "height":  54.4217682,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e11",
+        "widget":  {
+                       "parent":  6,
+                       "childIndex":  2,
+                       "id":  null,
+                       "type":  "BrushWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1133.74146,
+                       "y":  3.40136051,
+                       "width":  136.054413,
+                       "height":  54.4217682,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e12",
+        "widget":  {
+                       "parent":  11,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "ListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1183.33337,
+                       "y":  20.4081612,
+                       "width":  55.850338,
+                       "height":  20.4081631,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e13",
+        "widget":  {
+                       "parent":  12,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "TextWidget",
+                       "text":  "14.3k",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1183.33337,
+                       "y":  22.1122417,
+                       "width":  30,
+                       "height":  17,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e14",
+        "widget":  {
+                       "parent":  12,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1216.73474,
+                       "y":  20.4081612,
+                       "width":  22.4489784,
+                       "height":  20.4081631,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e15",
+        "widget":  {
+                       "parent":  11,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "HintWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1133.74146,
+                       "y":  3.40136051,
+                       "width":  136.054413,
+                       "height":  54.4217682,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e16",
+        "widget":  {
+                       "parent":  6,
+                       "childIndex":  3,
+                       "id":  null,
+                       "type":  "ListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e17",
+        "widget":  {
+                       "parent":  16,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e18",
+        "widget":  {
+                       "parent":  17,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "GridWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e19",
+        "widget":  {
+                       "parent":  16,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "MapConversation__TaleWorlds_CampaignSystem_ViewModelCollection_Map_MapConversation_MapConversationVM_Dependency_6_SPConversation",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e20",
+        "widget":  {
+                       "parent":  19,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e21",
+        "widget":  {
+                       "parent":  19,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "ImageIdentifierWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e22",
+        "widget":  {
+                       "parent":  19,
+                       "childIndex":  2,
+                       "id":  null,
+                       "type":  "TextWidget",
+                       "text":  "0",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e23",
+        "widget":  {
+                       "parent":  19,
+                       "childIndex":  3,
+                       "id":  null,
+                       "type":  "HintWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  false,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e24",
+        "widget":  {
+                       "parent":  19,
+                       "childIndex":  4,
+                       "id":  null,
+                       "type":  "ListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e25",
+        "widget":  {
+                       "parent":  16,
+                       "childIndex":  2,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e26",
+        "widget":  {
+                       "parent":  25,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "MapConversation__TaleWorlds_CampaignSystem_ViewModelCollection_Map_MapConversation_MapConversationVM_Dependency_7_PowerLevelComp",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e27",
+        "widget":  {
+                       "parent":  26,
+                       "childIndex":  0,
+                       "id":  "PowerListPanel",
+                       "type":  "ListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e28",
+        "widget":  {
+                       "parent":  27,
+                       "childIndex":  0,
+                       "id":  "AttackerSideInitialPowerLevel",
+                       "type":  "BrushWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e29",
+        "widget":  {
+                       "parent":  28,
+                       "childIndex":  0,
+                       "id":  "AttackerPowerListPanel",
+                       "type":  "ListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e30",
+        "widget":  {
+                       "parent":  29,
+                       "childIndex":  0,
+                       "id":  "AttackerSideEmptyPowerLevel",
+                       "type":  "BrushWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e31",
+        "widget":  {
+                       "parent":  29,
+                       "childIndex":  1,
+                       "id":  "AttackerSidePowerLevel",
+                       "type":  "BrushWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e32",
+        "widget":  {
+                       "parent":  31,
+                       "childIndex":  0,
+                       "id":  "AttackerSidePowerLevelHighlight",
+                       "type":  "BrushWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e33",
+        "widget":  {
+                       "parent":  27,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e34",
+        "widget":  {
+                       "parent":  27,
+                       "childIndex":  2,
+                       "id":  "DefenderSideInitialPowerLevel",
+                       "type":  "BrushWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e35",
+        "widget":  {
+                       "parent":  34,
+                       "childIndex":  0,
+                       "id":  "DefenderPowerListPanel",
+                       "type":  "ListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e36",
+        "widget":  {
+                       "parent":  35,
+                       "childIndex":  0,
+                       "id":  "DefenderSidePowerLevel",
+                       "type":  "BrushWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e37",
+        "widget":  {
+                       "parent":  36,
+                       "childIndex":  0,
+                       "id":  "DefenderSidePowerLevelHighlight",
+                       "type":  "BrushWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e38",
+        "widget":  {
+                       "parent":  35,
+                       "childIndex":  1,
+                       "id":  "DefenderSideEmptyPowerLevel",
+                       "type":  "BrushWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e39",
+        "widget":  {
+                       "parent":  26,
+                       "childIndex":  1,
+                       "id":  "CenterSeperatorWidget",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e40",
+        "widget":  {
+                       "parent":  26,
+                       "childIndex":  2,
+                       "id":  null,
+                       "type":  "HintWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e41",
+        "widget":  {
+                       "parent":  16,
+                       "childIndex":  3,
+                       "id":  null,
+                       "type":  "MapConversation__TaleWorlds_CampaignSystem_ViewModelCollection_Map_MapConversation_MapConversationVM_Dependency_6_SPConversation",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e42",
+        "widget":  {
+                       "parent":  41,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e43",
+        "widget":  {
+                       "parent":  41,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "ImageIdentifierWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e44",
+        "widget":  {
+                       "parent":  41,
+                       "childIndex":  2,
+                       "id":  null,
+                       "type":  "TextWidget",
+                       "text":  "0",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e45",
+        "widget":  {
+                       "parent":  41,
+                       "childIndex":  3,
+                       "id":  null,
+                       "type":  "HintWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  false,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e46",
+        "widget":  {
+                       "parent":  41,
+                       "childIndex":  4,
+                       "id":  null,
+                       "type":  "ListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e47",
+        "widget":  {
+                       "parent":  16,
+                       "childIndex":  4,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e48",
+        "widget":  {
+                       "parent":  47,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "GridWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  0,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e49",
+        "widget":  {
+                       "parent":  6,
+                       "childIndex":  4,
+                       "id":  "VerticalContainer",
+                       "type":  "ListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  815.782349,
+                       "width":  1280,
+                       "height":  144.217682,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e50",
+        "widget":  {
+                       "parent":  49,
+                       "childIndex":  0,
+                       "id":  "BottomPanelsContainer",
+                       "type":  "ListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  815.782349,
+                       "width":  1280,
+                       "height":  130.612244,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e51",
+        "widget":  {
+                       "parent":  50,
+                       "childIndex":  0,
+                       "id":  "DialogueContainer",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  815.782349,
+                       "width":  633.197266,
+                       "height":  130.612244,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e52",
+        "widget":  {
+                       "parent":  51,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  143.401367,
+                       "y":  815.782349,
+                       "width":  489.795898,
+                       "height":  130.612244,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e53",
+        "widget":  {
+                       "parent":  52,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "RichTextWidget",
+                       "text":  "I know your name... Let\u0027s see if you\u0027re worth what we\u0027re paying for you.",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  197.823135,
+                       "y":  862.088501,
+                       "width":  418.36731,
+                       "height":  38,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e54",
+        "widget":  {
+                       "parent":  52,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "DimensionSyncWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  143.401367,
+                       "y":  815.782349,
+                       "width":  0,
+                       "height":  88.0136108,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e55",
+        "widget":  {
+                       "parent":  50,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "NavigationScopeTargeter",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  0,
+                       "y":  815.782349,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e56",
+        "widget":  {
+                       "parent":  50,
+                       "childIndex":  2,
+                       "id":  "AnswerListContainer",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  837.081665,
+                       "width":  633.197266,
+                       "height":  88.0136108,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e57",
+        "widget":  {
+                       "parent":  56,
+                       "childIndex":  0,
+                       "id":  "AnswerList",
+                       "type":  "NavigatableListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  837.081665,
+                       "width":  633.197266,
+                       "height":  88.0136108,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e58",
+        "widget":  {
+                       "parent":  57,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "MapConversation__TaleWorlds_CampaignSystem_ViewModelCollection_Map_MapConversation_MapConversationVM_Dependency_4_ItemTemplate",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  837.081665,
+                       "width":  633.197266,
+                       "height":  28.2040825,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e59",
+        "widget":  {
+                       "parent":  58,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "NavigationTargetSwitcher",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  837.081665,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e60",
+        "widget":  {
+                       "parent":  58,
+                       "childIndex":  1,
+                       "id":  "OptionButtonParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  837.081665,
+                       "width":  510.204071,
+                       "height":  28.2040825,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e61",
+        "widget":  {
+                       "parent":  60,
+                       "childIndex":  0,
+                       "id":  "OptionButton",
+                       "type":  "ButtonWidget",
+                       "text":  "I heard you may need some help with a problem?",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  true,
+                       "x":  646.802734,
+                       "y":  837.081665,
+                       "width":  510.204071,
+                       "height":  28.2040825,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+                                       "click"
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e62",
+        "widget":  {
+                       "parent":  61,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "ConversationItemImageWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  838.782349,
+                       "width":  510.204071,
+                       "height":  24.802721,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e63",
+        "widget":  {
+                       "parent":  62,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "RichTextWidget",
+                       "text":  "I heard you may need some help with a problem?",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  667.210876,
+                       "y":  842.183716,
+                       "width":  489.795898,
+                       "height":  18,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e64",
+        "widget":  {
+                       "parent":  62,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "ImageWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  636.598633,
+                       "y":  844.380981,
+                       "width":  26.5306129,
+                       "height":  13.605442,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e65",
+        "widget":  {
+                       "parent":  61,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "HintWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  837.081665,
+                       "width":  81.6326523,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e66",
+        "widget":  {
+                       "parent":  60,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "HintWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  837.081665,
+                       "width":  81.6326523,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e67",
+        "widget":  {
+                       "parent":  58,
+                       "childIndex":  2,
+                       "id":  null,
+                       "type":  "PersuasionResultChanceContainerListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e68",
+        "widget":  {
+                       "parent":  67,
+                       "childIndex":  0,
+                       "id":  "CritFailParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e69",
+        "widget":  {
+                       "parent":  68,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "PersuasionChanceVisualListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  44.2176857,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e70",
+        "widget":  {
+                       "parent":  69,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1171.2926,
+                       "y":  851.183716,
+                       "width":  22.4489784,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e71",
+        "widget":  {
+                       "parent":  69,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "TextWidget",
+                       "text":  "",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1182.51709,
+                       "y":  872.952393,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e72",
+        "widget":  {
+                       "parent":  67,
+                       "childIndex":  1,
+                       "id":  "FailParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e73",
+        "widget":  {
+                       "parent":  72,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "PersuasionChanceVisualListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  44.2176857,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e74",
+        "widget":  {
+                       "parent":  73,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1171.2926,
+                       "y":  851.183716,
+                       "width":  22.4489784,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e75",
+        "widget":  {
+                       "parent":  73,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "TextWidget",
+                       "text":  "",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1182.51709,
+                       "y":  872.952393,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e76",
+        "widget":  {
+                       "parent":  67,
+                       "childIndex":  2,
+                       "id":  "SuccessParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e77",
+        "widget":  {
+                       "parent":  76,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "PersuasionChanceVisualListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  44.2176857,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e78",
+        "widget":  {
+                       "parent":  77,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1171.2926,
+                       "y":  851.183716,
+                       "width":  22.4489784,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e79",
+        "widget":  {
+                       "parent":  77,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "TextWidget",
+                       "text":  "",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1182.51709,
+                       "y":  872.952393,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e80",
+        "widget":  {
+                       "parent":  67,
+                       "childIndex":  3,
+                       "id":  "CritSuccessParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e81",
+        "widget":  {
+                       "parent":  80,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "PersuasionChanceVisualListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  44.2176857,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e82",
+        "widget":  {
+                       "parent":  81,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1171.2926,
+                       "y":  851.183716,
+                       "width":  22.4489784,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e83",
+        "widget":  {
+                       "parent":  81,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "TextWidget",
+                       "text":  "",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1182.51709,
+                       "y":  872.952393,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e84",
+        "widget":  {
+                       "parent":  67,
+                       "childIndex":  4,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e85",
+        "widget":  {
+                       "parent":  84,
+                       "childIndex":  0,
+                       "id":  "BlockingParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e86",
+        "widget":  {
+                       "parent":  85,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "HintWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e87",
+        "widget":  {
+                       "parent":  67,
+                       "childIndex":  5,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e88",
+        "widget":  {
+                       "parent":  87,
+                       "childIndex":  0,
+                       "id":  "ProgressingParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e89",
+        "widget":  {
+                       "parent":  88,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "HintWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  851.183716,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e90",
+        "widget":  {
+                       "parent":  57,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "MapConversation__TaleWorlds_CampaignSystem_ViewModelCollection_Map_MapConversation_MapConversationVM_Dependency_4_ItemTemplate",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  865.285767,
+                       "width":  633.197266,
+                       "height":  28.2040825,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e91",
+        "widget":  {
+                       "parent":  90,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "NavigationTargetSwitcher",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  865.285767,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e92",
+        "widget":  {
+                       "parent":  90,
+                       "childIndex":  1,
+                       "id":  "OptionButtonParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  865.285767,
+                       "width":  510.204071,
+                       "height":  28.2040825,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e93",
+        "widget":  {
+                       "parent":  92,
+                       "childIndex":  0,
+                       "id":  "OptionButton",
+                       "type":  "ButtonWidget",
+                       "text":  "There is something I\u0027d like to discuss.",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  true,
+                       "x":  646.802734,
+                       "y":  865.285767,
+                       "width":  510.204071,
+                       "height":  28.2040825,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+                                       "click"
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e94",
+        "widget":  {
+                       "parent":  93,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "ConversationItemImageWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  866.98645,
+                       "width":  510.204071,
+                       "height":  24.802721,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e95",
+        "widget":  {
+                       "parent":  94,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "RichTextWidget",
+                       "text":  "There is something I\u0027d like to discuss.",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  667.210876,
+                       "y":  870.387817,
+                       "width":  489.795898,
+                       "height":  18,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e96",
+        "widget":  {
+                       "parent":  94,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "ImageWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  636.598633,
+                       "y":  872.585083,
+                       "width":  26.5306129,
+                       "height":  13.605442,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e97",
+        "widget":  {
+                       "parent":  93,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "HintWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  865.285767,
+                       "width":  81.6326523,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e98",
+        "widget":  {
+                       "parent":  92,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "HintWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  865.285767,
+                       "width":  81.6326523,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e99",
+        "widget":  {
+                       "parent":  90,
+                       "childIndex":  2,
+                       "id":  null,
+                       "type":  "PersuasionResultChanceContainerListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e100",
+        "widget":  {
+                       "parent":  99,
+                       "childIndex":  0,
+                       "id":  "CritFailParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e101",
+        "widget":  {
+                       "parent":  100,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "PersuasionChanceVisualListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  44.2176857,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e102",
+        "widget":  {
+                       "parent":  101,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1171.2926,
+                       "y":  879.387817,
+                       "width":  22.4489784,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e103",
+        "widget":  {
+                       "parent":  101,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "TextWidget",
+                       "text":  "",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1182.51709,
+                       "y":  901.156494,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e104",
+        "widget":  {
+                       "parent":  99,
+                       "childIndex":  1,
+                       "id":  "FailParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e105",
+        "widget":  {
+                       "parent":  104,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "PersuasionChanceVisualListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  44.2176857,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e106",
+        "widget":  {
+                       "parent":  105,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1171.2926,
+                       "y":  879.387817,
+                       "width":  22.4489784,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e107",
+        "widget":  {
+                       "parent":  105,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "TextWidget",
+                       "text":  "",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1182.51709,
+                       "y":  901.156494,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e108",
+        "widget":  {
+                       "parent":  99,
+                       "childIndex":  2,
+                       "id":  "SuccessParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e109",
+        "widget":  {
+                       "parent":  108,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "PersuasionChanceVisualListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  44.2176857,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e110",
+        "widget":  {
+                       "parent":  109,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1171.2926,
+                       "y":  879.387817,
+                       "width":  22.4489784,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e111",
+        "widget":  {
+                       "parent":  109,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "TextWidget",
+                       "text":  "",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1182.51709,
+                       "y":  901.156494,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e112",
+        "widget":  {
+                       "parent":  99,
+                       "childIndex":  3,
+                       "id":  "CritSuccessParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e113",
+        "widget":  {
+                       "parent":  112,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "PersuasionChanceVisualListPanel",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  44.2176857,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e114",
+        "widget":  {
+                       "parent":  113,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1171.2926,
+                       "y":  879.387817,
+                       "width":  22.4489784,
+                       "height":  21.7687073,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e115",
+        "widget":  {
+                       "parent":  113,
+                       "childIndex":  1,
+                       "id":  null,
+                       "type":  "TextWidget",
+                       "text":  "",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1182.51709,
+                       "y":  901.156494,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e116",
+        "widget":  {
+                       "parent":  99,
+                       "childIndex":  4,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e117",
+        "widget":  {
+                       "parent":  116,
+                       "childIndex":  0,
+                       "id":  "BlockingParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e118",
+        "widget":  {
+                       "parent":  117,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "HintWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e119",
+        "widget":  {
+                       "parent":  99,
+                       "childIndex":  5,
+                       "id":  null,
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e120",
+        "widget":  {
+                       "parent":  119,
+                       "childIndex":  0,
+                       "id":  "ProgressingParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e121",
+        "widget":  {
+                       "parent":  120,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "HintWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  1160.4082,
+                       "y":  879.387817,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e122",
+        "widget":  {
+                       "parent":  57,
+                       "childIndex":  2,
+                       "id":  null,
+                       "type":  "MapConversation__TaleWorlds_CampaignSystem_ViewModelCollection_Map_MapConversation_MapConversationVM_Dependency_4_ItemTemplate",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  893.489807,
+                       "width":  633.197266,
+                       "height":  28.2040825,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e123",
+        "widget":  {
+                       "parent":  122,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "NavigationTargetSwitcher",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  false,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  893.489807,
+                       "width":  0,
+                       "height":  0,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e124",
+        "widget":  {
+                       "parent":  122,
+                       "childIndex":  1,
+                       "id":  "OptionButtonParent",
+                       "type":  "Widget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  893.489807,
+                       "width":  510.204071,
+                       "height":  28.2040825,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e125",
+        "widget":  {
+                       "parent":  124,
+                       "childIndex":  0,
+                       "id":  "OptionButton",
+                       "type":  "ButtonWidget",
+                       "text":  "I must leave now.",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  true,
+                       "x":  646.802734,
+                       "y":  893.489807,
+                       "width":  510.204071,
+                       "height":  28.2040825,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+                                       "click"
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e126",
+        "widget":  {
+                       "parent":  125,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "ConversationItemImageWidget",
+                       "text":  null,
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  646.802734,
+                       "y":  895.190491,
+                       "width":  510.204071,
+                       "height":  24.802721,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    },
+    {
+        "reference":  "e127",
+        "widget":  {
+                       "parent":  126,
+                       "childIndex":  0,
+                       "id":  null,
+                       "type":  "RichTextWidget",
+                       "text":  "I must leave now.",
+                       "value":  null,
+                       "redacted":  false,
+                       "visible":  true,
+                       "enabled":  true,
+                       "hitTestable":  false,
+                       "x":  667.210876,
+                       "y":  898.591858,
+                       "width":  489.795898,
+                       "height":  18,
+                       "minimum":  null,
+                       "maximum":  null,
+                       "step":  null,
+                       "actions":  [
+
+                                   ]
+                   }
+    }
+]

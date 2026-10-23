@@ -1,0 +1,20 @@
+[
+    {
+        "error":  "session_not_ready: The co-op session command dispatcher is not available yet.",
+        "command":  "coop.debug.ittest.run finalize_watch issue_1228 on A while InitialState",
+        "disposition":  "Read-only diagnostic unavailable during teardown. Preserved. Installed reconnect succeeded; actual A counts0/0 after rejoin.",
+        "receipt":  "offline-count-A.json"
+    },
+    {
+        "error":  "A player encounter is already active.",
+        "command":  "coop.debug.ittest.run talk Hero_CharacterObject_2705 after rejoin",
+        "disposition":  "Freshly inspected village menu, clicked actual Leave, then successful native Darya dialogue. No journal row or shared tool repair.",
+        "receipt":  "rejoined-talk-Darya.json"
+    },
+    {
+        "error":  "ParserError MissingEndCurlyBrace at line10",
+        "command":  "Own finalize.ps1 report writer after cleanup",
+        "disposition":  "Corrected own report-writer foreach closing brace after bench release; no runtime or live evidence affected.",
+        "receipt":  "report-writer-failure.txt"
+    }
+]

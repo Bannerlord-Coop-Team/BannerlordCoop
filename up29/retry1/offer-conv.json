@@ -1,0 +1,25 @@
+{
+    "version":  1,
+    "id":  "279a85cc68b546cca832f8579c618526",
+    "ok":  true,
+    "process":  {
+                    "pid":  54164,
+                    "role":  "client",
+                    "platformId":  "testclient",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2225903Z"
+                },
+    "result":  {
+                   "name":  "coop.debug.ittest.run",
+                   "arguments":  [
+                                     "conv"
+                                 ],
+                   "found":  true,
+                   "output":  "inProgress=True hero=Hero_CharacterObject_2705 \u0027Darya\u0027\r\nnpc: If you follow tournaments in this region, you\u0027ll know that I am a great devotee. I attend as many as I can - I love the spectacle, the tension... Despite this, I\u0027ve never had a champion fight in my name, which is quite the fashion these days. Would you consider being my champion, Penton of the fen Calrain? I\u0027m sure you could win glory for both of us.\r\n  [0] I can\u0027t promise to win, my lady. {issue_explanation_player_response_pre_quest_solution}\r\n",
+                   "succeeded":  true,
+                   "errorCode":  null,
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

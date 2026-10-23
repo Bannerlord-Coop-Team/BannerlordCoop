@@ -1,0 +1,40 @@
+{
+    "version":  1,
+    "id":  "4b02f6b2ba7442569c19f9523a1b137d",
+    "ok":  true,
+    "process":  {
+                    "pid":  54164,
+                    "role":  "client",
+                    "platformId":  "testclient",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2225903Z"
+                },
+    "result":  {
+                   "captureId":  "7e97581af1fb42cbacc1ff887e1edbee",
+                   "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up29\\retry1\\rejoined-no-stale-discussion-A.bmp",
+                   "captureRequested":  true,
+                   "captureRequestedUtc":  "2026-10-23T20:10:33.0122058Z",
+                   "captureRequestEngineFrame":  44972,
+                   "captureComplete":  true,
+                   "complete":  true,
+                   "completionCaptureId":  "7e97581af1fb42cbacc1ff887e1edbee",
+                   "completionObservedUtc":  "2026-10-23T20:10:33.2308222Z",
+                   "length":  3686454,
+                   "lastWriteUtc":  "2026-10-23T20:10:33.0455258Z"
+               },
+    "error":  null,
+    "activeStateAtCaptureRequest":  "TaleWorlds.CampaignSystem.GameState.MapState",
+    "cameraReadiness":  {
+                            "process":  {
+                                            "pid":  54164,
+                                            "role":  "client",
+                                            "platformId":  "testclient",
+                                            "runToken":  "issue3781-20261023T193531",
+                                            "processStartedUtc":  "2026-10-23T19:44:32.2225903Z"
+                                        },
+                            "stableSamples":  3,
+                            "observedUtc":  "2026-10-23T20:10:32.9810099Z",
+                            "camera":  "locked=True animation=False fastMove=False",
+                            "map":  "menuView=False pendingMenuView=False encounterOverlay=False cameraFollowParty=Created_48503 cameraMode=FollowParty followTargetReached=True animation=False fastMove=False loading=False"
+                        }
+}

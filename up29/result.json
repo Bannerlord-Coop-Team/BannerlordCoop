@@ -1,0 +1,443 @@
+{
+    "status":  "BLOCKED",
+    "benchStatus":  "DONE-bench",
+    "requiredFlow":  "owner-disconnect-rejoin",
+    "flowCompleted":  false,
+    "source":  {
+                   "head":  "3d1140bbd01d588e18655734f96da083fbf86b43",
+                   "tree":  "e6c31dde1f707d2ff806abf32f449ef8cdf28f2d",
+                   "runToken":  "issue3781-20261023T185354",
+                   "fixtureManifest":  {
+                                           "fixture":  {
+                                                           "path":  "artifacts/IssueToPr/ittest/IssueLiveTestKit.cs",
+                                                           "sha256":  "95b291a4666240c08fc0b5d56aba151650bf19c1686de43d4f748fc34006ebd4"
+                                                       },
+                                           "targets":  {
+                                                           "path":  "artifacts/IssueToPr/ittest/IssueLiveTestKit.targets",
+                                                           "sha256":  "42e174a8b62d0285a164b850615b1194445adb096f011c2ffc228f87f456fdd7"
+                                                       },
+                                           "source":  {
+                                                          "head":  "3d1140bbd01d588e18655734f96da083fbf86b43",
+                                                          "tree":  "e6c31dde1f707d2ff806abf32f449ef8cdf28f2d"
+                                                      },
+                                           "sourceRoot":  "/home/pwisorlowska/worktrees/BannerlordCoop/3781-ladys-knight-out"
+                                       },
+                   "fixtureManifestSha256":  "32a2fb3b62c1307f78c1842e9b5e848fd2c2c23c64fb967eb09f8097f2951bfe",
+                   "kitRevision":  "3781-rejoin-r1",
+                   "loadedAssemblies":  {
+                                            "server":  [
+                                                           {
+                                                               "name":  "Common",
+                                                               "version":  "1.0.0.0",
+                                                               "mvid":  "890f5f1d-0627-46ce-a246-f27d15f1fb91",
+                                                               "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Common.dll"
+                                                           },
+                                                           {
+                                                               "name":  "Coop.Core",
+                                                               "version":  "1.0.0.0",
+                                                               "mvid":  "f5a9af25-1450-4aaf-afcc-a16a0ee070ba",
+                                                               "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Coop.Core.dll"
+                                                           },
+                                                           {
+                                                               "name":  "Coop.Steam",
+                                                               "version":  "1.0.0.0",
+                                                               "mvid":  "de0cd721-c31d-46fc-aedf-787d9904b6a7",
+                                                               "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Coop.Steam.dll"
+                                                           },
+                                                           {
+                                                               "name":  "GameInterface",
+                                                               "version":  "1.0.0.0",
+                                                               "mvid":  "251d00df-4692-4d1e-8f83-b77c77dcc6c8",
+                                                               "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\GameInterface.dll"
+                                                           },
+                                                           {
+                                                               "name":  "Missions",
+                                                               "version":  "1.0.0.0",
+                                                               "mvid":  "76b7587c-7685-4855-8fe5-9d00be824877",
+                                                               "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Missions.dll"
+                                                           }
+                                                       ],
+                                            "A":  [
+                                                      {
+                                                          "name":  "Common",
+                                                          "version":  "1.0.0.0",
+                                                          "mvid":  "890f5f1d-0627-46ce-a246-f27d15f1fb91",
+                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Common.dll"
+                                                      },
+                                                      {
+                                                          "name":  "Coop",
+                                                          "version":  "1.0.0.0",
+                                                          "mvid":  "f5289df7-94df-45d5-a765-a9ecebbee04d",
+                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.dll"
+                                                      },
+                                                      {
+                                                          "name":  "Coop.Core",
+                                                          "version":  "1.0.0.0",
+                                                          "mvid":  "f5a9af25-1450-4aaf-afcc-a16a0ee070ba",
+                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.Core.dll"
+                                                      },
+                                                      {
+                                                          "name":  "Coop.Steam",
+                                                          "version":  "1.0.0.0",
+                                                          "mvid":  "de0cd721-c31d-46fc-aedf-787d9904b6a7",
+                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.Steam.dll"
+                                                      },
+                                                      {
+                                                          "name":  "GameInterface",
+                                                          "version":  "1.0.0.0",
+                                                          "mvid":  "251d00df-4692-4d1e-8f83-b77c77dcc6c8",
+                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\GameInterface.dll"
+                                                      },
+                                                      {
+                                                          "name":  "Missions",
+                                                          "version":  "1.0.0.0",
+                                                          "mvid":  "76b7587c-7685-4855-8fe5-9d00be824877",
+                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Missions.dll"
+                                                      }
+                                                  ],
+                                            "B":  [
+                                                      {
+                                                          "name":  "Common",
+                                                          "version":  "1.0.0.0",
+                                                          "mvid":  "890f5f1d-0627-46ce-a246-f27d15f1fb91",
+                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Common.dll"
+                                                      },
+                                                      {
+                                                          "name":  "Coop",
+                                                          "version":  "1.0.0.0",
+                                                          "mvid":  "f5289df7-94df-45d5-a765-a9ecebbee04d",
+                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.dll"
+                                                      },
+                                                      {
+                                                          "name":  "Coop.Core",
+                                                          "version":  "1.0.0.0",
+                                                          "mvid":  "f5a9af25-1450-4aaf-afcc-a16a0ee070ba",
+                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.Core.dll"
+                                                      },
+                                                      {
+                                                          "name":  "Coop.Steam",
+                                                          "version":  "1.0.0.0",
+                                                          "mvid":  "de0cd721-c31d-46fc-aedf-787d9904b6a7",
+                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.Steam.dll"
+                                                      },
+                                                      {
+                                                          "name":  "GameInterface",
+                                                          "version":  "1.0.0.0",
+                                                          "mvid":  "251d00df-4692-4d1e-8f83-b77c77dcc6c8",
+                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\GameInterface.dll"
+                                                      },
+                                                      {
+                                                          "name":  "Missions",
+                                                          "version":  "1.0.0.0",
+                                                          "mvid":  "76b7587c-7685-4855-8fe5-9d00be824877",
+                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Missions.dll"
+                                                      }
+                                                  ]
+                                        },
+                   "model":  {
+                                 "serviceTier":  "default",
+                                 "provider":  "cliproxyapi-codex",
+                                 "reasoningEffort":  "high",
+                                 "model":  "gpt-6.1-sol"
+                             },
+                   "sourceUnchangedAndCleanAfterRun":  true
+               },
+    "identities":  {
+                       "giverId":  "Hero_CharacterObject_2704",
+                       "serverWrapper":  48472,
+                       "server":  38312,
+                       "B":  76232,
+                       "ownerControllerId":  "testclient",
+                       "bystanderControllerId":  "testclient2",
+                       "giverName":  "Nus",
+                       "questId":  "issue_1227_quest",
+                       "issueId":  "issue_1227",
+                       "unacceptedUnusedSoraIssue":  "issue_1226",
+                       "A":  53824
+                   },
+    "checks":  {
+                   "postRejoinRewardsStable":  "NOT_RUN",
+                   "pairedPostRejoinNativeJournals":  "NOT_RUN",
+                   "serverQuestCancelOnce":  "NOT_RUN",
+                   "noResurrection":  "NOT_RUN",
+                   "realOfferAcceptance":  "Observed",
+                   "disconnect":  "NOT_RUN",
+                   "ownerOneActiveBystanderNone":  "Observed",
+                   "freshAcceptanceNativeDetail":  "BLOCKED",
+                   "bystanderQuestCancelOnce":  "NOT_RUN",
+                   "runtimeReadiness":  "Observed",
+                   "sameProcessReconnect":  "NOT_RUN"
+               },
+    "blocker":  {
+                    "error":  "No clickable ancestor",
+                    "command":  "bash /home/pwisorlowska/coop-live-orchestration/3781/up29/op.sh -Mode Click -Target A -Label select-active-Lady-A -Layer QuestScreen -Match \"^Lady.s Knight Out$\"",
+                    "name":  "active-journal-row",
+                    "disposition":  "Terminal shared native-UI capability blocker. Exact observed active-row title e36, parent e33, row e32 have no click action. No foreground input or shared repair attempted; cleanup immediately followed.",
+                    "receipt":  "select-active-Lady-A-inspect-0.json"
+                },
+    "setupFailures":  [
+                          {
+                              "error":  "/usr/bin/bash: line 1: /home/pwisorlowska/coop-live-orchestration/3781/up29/cycle.log: No such file or directory",
+                              "name":  "output-directory",
+                              "disposition":  "Corrected by creating own output directory before cycle; cycle had not executed.",
+                              "receipt":  "setup-failure-01.txt"
+                          },
+                          {
+                              "error":  "Need a free noncombatant lady with no party and no issue. Placement is setup before offer creation.",
+                              "command":  "coop.debug.ittest.run place_lady Hero_lord_1_32 town_ES2",
+                              "name":  "Sora-placement",
+                              "disposition":  "Retained. Initial batch did not stop on this returned unsuccessful command and created unaccepted Sora issue_1226 in Danustica. This issue was never accepted or used as the oracle. Own ops script was corrected to stop on result.succeeded=false. Eligible Nus used for the real flow.",
+                              "receipt":  "place-Sora.json"
+                          },
+                          {
+                              "error":  "A player encounter is already active.",
+                              "command":  "coop.debug.ittest.run talk Hero_CharacterObject_2704",
+                              "name":  "existing-encounter",
+                              "disposition":  "Inspected actual A village menu and used its real Leave choice, then opened Nus conversation successfully.",
+                              "receipt":  "talk-Nus.json"
+                          },
+                          {
+                              "error":  "Missing selectable layer MapMenu",
+                              "command":  "ops.ps1 -Mode Inspect -Target B -Layer MapMenu",
+                              "name":  "incorrect-layer-name",
+                              "disposition":  "Retained actual layer list, used MapMenuView on both clients successfully.",
+                              "receipt":  "B-current-choices-layers.json"
+                          },
+                          {
+                              "error":  "No native journal entry matches Lady.s Knight Out",
+                              "command":  "coop.debug.ittest.run journal_select Lady.s Knight Out",
+                              "name":  "literal-title-filter",
+                              "disposition":  "Corrected literal substring to Lady; selector succeeded but selected an older same-title entry.",
+                              "receipt":  "accept-journal-select-A.json"
+                          },
+                          {
+                              "error":  "stale_reference: Widget hierarchy changed; inspect again.",
+                              "command":  "ops.ps1 -Mode Inspect -Target A -Layer QuestScreen",
+                              "name":  "journal-inspect-stale",
+                              "disposition":  "One freshly inspected retry also stale. Own action runner then inspected the observed active-row page and attempted only its declared action.",
+                              "receipt":  "accepted-journal-inspect-A-inspect-128.json"
+                          },
+                          {
+                              "error":  "No clickable ancestor",
+                              "command":  "bash /home/pwisorlowska/coop-live-orchestration/3781/up29/op.sh -Mode Click -Target A -Label select-active-Lady-A -Layer QuestScreen -Match \"^Lady.s Knight Out$\"",
+                              "name":  "active-journal-row",
+                              "disposition":  "Terminal shared native-UI capability blocker. Exact observed active-row title e36, parent e33, row e32 have no click action. No foreground input or shared repair attempted; cleanup immediately followed.",
+                              "receipt":  "select-active-Lady-A-inspect-0.json"
+                          }
+                      ],
+    "finalizeCounts":  {
+                           "issueId":  "issue_1227",
+                           "giverId":  "Hero_CharacterObject_2704",
+                           "phase":  "preaccept",
+                           "server":  "finalizeWatch=true observed=0 received=0\n",
+                           "A":  "finalizeWatch=true observed=0 received=0\n",
+                           "B":  "finalizeWatch=true observed=0 received=0\n",
+                           "offline":  null,
+                           "afterRejoin":  null,
+                           "acceptanceObserversArmedBeforeAcceptance":  true,
+                           "diagnostic":  "Each endpoint observed=0 received=0 before acceptance. No offline or rejoin count was read; required QuestCancel once is NOT established. Cleanup is not used as a scenario outcome."
+                       },
+    "screenshots":  [
+                        {
+                            "caption":  "A has Active Quests (1), corroborated by issue_1227_quest and Nus in accepted-A.json. The selected detail panel is an OLD Sora entry, not this acceptance. This is diagnostic evidence only, not a fresh acceptance journal detail capture.",
+                            "path":  "accepted-native-A.png",
+                            "captureReceipt":  "accepted-native-A-image.json",
+                            "role":  "A",
+                            "sha256":  "804c87d21afe660552734d76852ea7e4105a33611cca86ea4400071b450c00a2",
+                            "pid":  53824,
+                            "visuallyReviewed":  true
+                        },
+                        {
+                            "caption":  "B has Active Quests (0) and retains an old Sora journal entry. B did not accept issue_1227 and has no started Lady quest.",
+                            "path":  "accepted-native-B.png",
+                            "captureReceipt":  "accepted-native-B-image.json",
+                            "role":  "B",
+                            "sha256":  "1dae8f38072a181c69515544feaefcbbef0947127793a6068a2a31ede774604b",
+                            "pid":  76232,
+                            "visuallyReviewed":  true
+                        }
+                    ],
+    "cleanup":  {
+                    "schemaVersion":  1,
+                    "runToken":  "issue3781-20261023T185354",
+                    "startedUtc":  "2026-10-23T19:27:17.1583910Z",
+                    "completedUtc":  "2026-10-23T19:27:43.9132219Z",
+                    "initialProcessIds":  [
+                                              38312,
+                                              48472,
+                                              53824,
+                                              76232
+                                          ],
+                    "remainingProcessIds":  [
+
+                                            ],
+                    "stopAttempted":  true,
+                    "verifiedAbsent":  true,
+                    "inventoryAttempts":  4,
+                    "inventoryErrors":  [
+
+                                        ],
+                    "stopErrors":  [
+
+                                   ],
+                    "gracefulShutdownAttempts":  [
+                                                     {
+                                                         "processId":  38312,
+                                                         "runToken":  "issue3781-20261023T185354",
+                                                         "requestWritten":  true,
+                                                         "identityVerified":  true,
+                                                         "error":  null,
+                                                         "startedUtc":  "2026-10-23T19:27:18.6270144Z",
+                                                         "completedUtc":  "2026-10-23T19:27:18.7625876Z"
+                                                     },
+                                                     {
+                                                         "processId":  48472,
+                                                         "runToken":  null,
+                                                         "requestWritten":  false,
+                                                         "identityVerified":  false,
+                                                         "error":  "Exception calling \"Connect\" with \"1\" argument(s): \"The operation has timed out.\"",
+                                                         "startedUtc":  "2026-10-23T19:27:18.7823696Z",
+                                                         "completedUtc":  "2026-10-23T19:27:20.2859664Z"
+                                                     },
+                                                     {
+                                                         "processId":  53824,
+                                                         "runToken":  "issue3781-20261023T185354",
+                                                         "requestWritten":  true,
+                                                         "identityVerified":  true,
+                                                         "error":  null,
+                                                         "startedUtc":  "2026-10-23T19:27:20.2869751Z",
+                                                         "completedUtc":  "2026-10-23T19:27:20.3536920Z"
+                                                     },
+                                                     {
+                                                         "processId":  76232,
+                                                         "runToken":  "issue3781-20261023T185354",
+                                                         "requestWritten":  true,
+                                                         "identityVerified":  true,
+                                                         "error":  null,
+                                                         "startedUtc":  "2026-10-23T19:27:20.3547005Z",
+                                                         "completedUtc":  "2026-10-23T19:27:20.4073116Z"
+                                                     }
+                                                 ],
+                    "processTreeStopAttempts":  [
+                                                    {
+                                                        "processId":  53824,
+                                                        "exitCode":  0,
+                                                        "error":  null,
+                                                        "startedUtc":  "2026-10-23T19:27:24.6847369Z",
+                                                        "completedUtc":  "2026-10-23T19:27:26.0210664Z"
+                                                    },
+                                                    {
+                                                        "processId":  76232,
+                                                        "exitCode":  null,
+                                                        "error":  "ERROR: The process with PID 76232 (child process of PID 70556) could not be terminated.",
+                                                        "startedUtc":  "2026-10-23T19:27:26.0225729Z",
+                                                        "completedUtc":  "2026-10-23T19:27:27.1379640Z"
+                                                    },
+                                                    {
+                                                        "processId":  53824,
+                                                        "exitCode":  null,
+                                                        "error":  "ERROR: The process with PID 53824 (child process of PID 70556) could not be terminated.",
+                                                        "startedUtc":  "2026-10-23T19:27:33.7480011Z",
+                                                        "completedUtc":  "2026-10-23T19:27:34.9371284Z"
+                                                    },
+                                                    {
+                                                        "processId":  76232,
+                                                        "exitCode":  null,
+                                                        "error":  "ERROR: The process with PID 76232 (child process of PID 70556) could not be terminated.",
+                                                        "startedUtc":  "2026-10-23T19:27:34.9371284Z",
+                                                        "completedUtc":  "2026-10-23T19:27:36.0823975Z"
+                                                    }
+                                                ]
+                },
+    "independentPids":  {
+                            "value":  [
+                                          {
+                                              "pid":  38312,
+                                              "absent":  true,
+                                              "name":  null
+                                          },
+                                          {
+                                              "pid":  48472,
+                                              "absent":  true,
+                                              "name":  null
+                                          },
+                                          {
+                                              "pid":  53824,
+                                              "absent":  true,
+                                              "name":  null
+                                          },
+                                          {
+                                              "pid":  76232,
+                                              "absent":  true,
+                                              "name":  null
+                                          },
+                                          {
+                                              "pid":  64920,
+                                              "absent":  true,
+                                              "name":  null
+                                          },
+                                          {
+                                              "pid":  70556,
+                                              "absent":  true,
+                                              "name":  null
+                                          }
+                                      ],
+                            "Count":  6
+                        },
+    "benchAfterCleanup":  "free\nprocesses: \n",
+    "engineProfile":  {
+                          "schemaVersion":  1,
+                          "runToken":  "issue3781-20261023T185354",
+                          "profile":  "visual",
+                          "state":  "restored",
+                          "engineConfigPath":  "C:\\Users\\Andrew\\Documents\\Mount and Blade II Bannerlord\\Configs\\engine_config.txt",
+                          "leasePath":  "C:\\Users\\Andrew\\Documents\\Mount and Blade II Bannerlord\\Configs\\engine_config.txt.codex-live-test.lock",
+                          "appliedUtc":  "2026-10-23T19:04:18.6911600Z",
+                          "originalSha256":  "25b77bf42de7396970f8511b29e790903efb33713541a65217777d89a8451ad3",
+                          "appliedSha256":  "25b77bf42de7396970f8511b29e790903efb33713541a65217777d89a8451ad3",
+                          "settings":  {
+                                           "max_framerate":  30,
+                                           "display_width":  1280,
+                                           "display_height":  960
+                                       },
+                          "restoredUtc":  "2026-10-23T19:27:44.8769675Z",
+                          "restoredSha256":  "25b77bf42de7396970f8511b29e790903efb33713541a65217777d89a8451ad3",
+                          "exactOriginalRestored":  true
+                      },
+    "launcherVerdict":  {
+                            "schemaVersion":  "live-test-launcher-host-receipt.v1",
+                            "capability":  "machine-owned-launch-host-v1",
+                            "computerName":  "AO-ALIENWARE",
+                            "launcherProcessId":  70556,
+                            "runToken":  "issue3781-20261023T185354",
+                            "completedUtc":  "2026-10-23T19:27:44.7604246Z",
+                            "exitCode":  0,
+                            "crashDialogs":  0,
+                            "crashCloseFailures":  0,
+                            "crashEvidence":  [
+
+                                              ],
+                            "launchBinding":  {
+                                                  "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up29\\crash-dialogs\\launcher-launch-binding.json",
+                                                  "sha256":  "f38f0d73cb40b838a5777f7cf533c0257bc0a100c252977cec4bf104adcdf77a",
+                                                  "bindingId":  "00530bb59140438789e3024f61efb087",
+                                                  "launchedUtc":  "2026-10-23T19:04:18.7694973Z",
+                                                  "launchedProcesses":  [
+                                                                            {
+                                                                                "role":  "client",
+                                                                                "platformId":  "testclient",
+                                                                                "processId":  53824,
+                                                                                "processStartUtc":  "2026-10-23T19:04:18.7424052Z"
+                                                                            },
+                                                                            {
+                                                                                "role":  "client",
+                                                                                "platformId":  "testclient2",
+                                                                                "processId":  76232,
+                                                                                "processStartUtc":  "2026-10-23T19:04:18.7594686Z"
+                                                                            }
+                                                                        ]
+                                              }
+                        },
+    "report":  "REPORT.md",
+    "generatedUtc":  "2026-10-23T19:31:10.2060025Z"
+}

@@ -1,0 +1,28 @@
+{
+    "version":  1,
+    "id":  "6c24df6cc0d3408caee10468a3854e0d",
+    "ok":  true,
+    "process":  {
+                    "pid":  67600,
+                    "role":  "client",
+                    "platformId":  "testclient2",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2393161Z"
+                },
+    "result":  {
+                   "captureId":  "142ec20fc29848dd9942bbbece6a51ad",
+                   "path":  "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\up29\\retry1\\accepted-native-full-page-B.bmp",
+                   "captureRequested":  true,
+                   "captureRequestedUtc":  "2026-10-23T19:51:10.4855084Z",
+                   "captureRequestEngineFrame":  10950,
+                   "captureComplete":  true,
+                   "complete":  true,
+                   "completionCaptureId":  "142ec20fc29848dd9942bbbece6a51ad",
+                   "completionObservedUtc":  "2026-10-23T19:51:10.7375009Z",
+                   "length":  3686454,
+                   "lastWriteUtc":  "2026-10-23T19:51:10.5212806Z"
+               },
+    "error":  null,
+    "activeStateAtCaptureRequest":  "TaleWorlds.CampaignSystem.GameState.QuestsState",
+    "cameraReadiness":  null
+}

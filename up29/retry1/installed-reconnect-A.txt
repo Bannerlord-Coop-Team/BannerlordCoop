@@ -1,0 +1,2 @@
+[coop.debug.connection.reconnect ]
+Client co-op session restarted after teardown.

@@ -1,0 +1,25 @@
+{
+    "version":  1,
+    "id":  "d744a4284913409dbfdee54db9bb1503",
+    "ok":  true,
+    "process":  {
+                    "pid":  54164,
+                    "role":  "client",
+                    "platformId":  "testclient",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2225903Z"
+                },
+    "result":  {
+                   "name":  "coop.debug.ittest.run",
+                   "arguments":  [
+                                     "quests"
+                                 ],
+                   "found":  true,
+                   "output":  "startedLadyQuests=1\r\ngiver=Hero_CharacterObject_2705 quest=issue_1228_quest ongoing=True goal=2\r\nquestLog: \u003ca style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2705\"\u003e\u003cb\u003eDarya\u003c/b\u003e\u003c/a\u003e from Aserai, has asked you to be her champion in an upcoming tournament. She expects you to fight in her name and reach at least 2.\nYou told her that you will honor her name in a tournament.\r\n",
+                   "succeeded":  true,
+                   "errorCode":  null,
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

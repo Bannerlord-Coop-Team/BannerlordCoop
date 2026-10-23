@@ -1,0 +1,31 @@
+{
+    "version":  1,
+    "id":  "fddc711caab0470299b66b12c1f0f1f7",
+    "ok":  true,
+    "process":  {
+                    "pid":  40000,
+                    "role":  "server",
+                    "platformId":  null,
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "0001-01-01T00:00:00"
+                },
+    "result":  {
+                   "name":  "coop.debug.players.party_state",
+                   "arguments":  [
+                                     "testclient2"
+                                 ],
+                   "found":  true,
+                   "output":  "controller=testclient2|party=Created_43628|connected=True|active=True|mapEvent=none|visual=False\nLIVE_TEST_JSON={\"controllerId\":\"testclient2\",\"partyId\":\"MobileParty_Created_43628\",\"partyStringId\":\"Created_43628\",\"connected\":true,\"active\":true,\"mapEvent\":\"none\",\"visual\":false}",
+                   "hasStructuredResult":  true,
+                   "structuredResult":  {
+                                            "controllerId":  "testclient2",
+                                            "partyId":  "MobileParty_Created_43628",
+                                            "partyStringId":  "Created_43628",
+                                            "connected":  true,
+                                            "active":  true,
+                                            "mapEvent":  "none",
+                                            "visual":  false
+                                        }
+               },
+    "error":  null
+}

@@ -1,0 +1,10 @@
+giver=Hero_CharacterObject_2705 name='Darya' liveIssue=LadysKnightOutIssue id=issue_1228 state=Ongoing owner=- tried=False difficulty=0.1 stayAlive=True security=40 town=town_ES2 townOwner=Clan_clan_empire_south_1 dueTicks=79226543177336 lordCost=18 currentQuestAttached=False
+observedIssueId=issue_1228 issueLogs=0 retained=False
+observedQuest=none
+
+side=client kit=3781-rejoin-r2 sourceHead=3d1140bbd01d588e18655734f96da083fbf86b43
+controller=testclient hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=14308 renown=1191.449 influence=100 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=0 atWarWithGiver=False
+controller=testclient2 hero=Hero_Created_4193 name='Atilon' party=MobileParty_Created_43628 clan=Clan_Player gold=10000 renown=547.8492 influence=1.5 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=-14 atWarWithGiver=True
+controller=LOCAL_MAIN_HERO hero=Hero_Created_4338 name='Penton of the fen Calrain' party=MobileParty_Created_48503 clan=Clan_Player12 gold=14308 renown=1191.449 influence=100 honorLevel=0 canonicalServerHonorXp=unavailable giverRelation=0 atWarWithGiver=False
+localHonorXp=0
+

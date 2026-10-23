@@ -1,0 +1,350 @@
+{
+    "version":  1,
+    "id":  "f1cec3788cd94ff090767d51db7de8a8",
+    "ok":  true,
+    "process":  {
+                    "pid":  54164,
+                    "role":  "client",
+                    "platformId":  "testclient",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2225903Z"
+                },
+    "result":  {
+                   "snapshot":  "1b6b84c307ba4b6da1e7a448782dc65a",
+                   "screen":  "MapScreen",
+                   "total":  141,
+                   "nextOffset":  141,
+                   "truncated":  false,
+                   "layer":  "f15fe6bc4bb74d24aa3c1ca42ed85071",
+                   "scopeComplete":  true,
+                   "domainWidgets":  149,
+                   "elements":  [
+                                    {
+                                        "reference":  "e128",
+                                        "widget":  {
+                                                       "parent":  127,
+                                                       "childIndex":  0,
+                                                       "id":  "ProgressClipWidget",
+                                                       "type":  "ListPanel",
+                                                       "text":  null,
+                                                       "value":  null,
+                                                       "redacted":  false,
+                                                       "visible":  false,
+                                                       "enabled":  true,
+                                                       "hitTestable":  false,
+                                                       "x":  0,
+                                                       "y":  815.782349,
+                                                       "width":  0,
+                                                       "height":  0,
+                                                       "minimum":  null,
+                                                       "maximum":  null,
+                                                       "step":  null,
+                                                       "actions":  [
+
+                                                                   ]
+                                                   }
+                                    },
+                                    {
+                                        "reference":  "e129",
+                                        "widget":  {
+                                                       "parent":  124,
+                                                       "childIndex":  2,
+                                                       "id":  null,
+                                                       "type":  "DimensionSyncWidget",
+                                                       "text":  null,
+                                                       "value":  null,
+                                                       "redacted":  false,
+                                                       "visible":  false,
+                                                       "enabled":  true,
+                                                       "hitTestable":  false,
+                                                       "x":  0,
+                                                       "y":  815.782349,
+                                                       "width":  0,
+                                                       "height":  0,
+                                                       "minimum":  null,
+                                                       "maximum":  null,
+                                                       "step":  null,
+                                                       "actions":  [
+
+                                                                   ]
+                                                   }
+                                    },
+                                    {
+                                        "reference":  "e130",
+                                        "widget":  {
+                                                       "parent":  129,
+                                                       "childIndex":  0,
+                                                       "id":  null,
+                                                       "type":  "HintWidget",
+                                                       "text":  null,
+                                                       "value":  null,
+                                                       "redacted":  false,
+                                                       "visible":  false,
+                                                       "enabled":  true,
+                                                       "hitTestable":  false,
+                                                       "x":  0,
+                                                       "y":  815.782349,
+                                                       "width":  0,
+                                                       "height":  0,
+                                                       "minimum":  null,
+                                                       "maximum":  null,
+                                                       "step":  null,
+                                                       "actions":  [
+
+                                                                   ]
+                                                   }
+                                    },
+                                    {
+                                        "reference":  "e131",
+                                        "widget":  {
+                                                       "parent":  122,
+                                                       "childIndex":  1,
+                                                       "id":  null,
+                                                       "type":  "Widget",
+                                                       "text":  null,
+                                                       "value":  null,
+                                                       "redacted":  false,
+                                                       "visible":  false,
+                                                       "enabled":  true,
+                                                       "hitTestable":  false,
+                                                       "x":  0,
+                                                       "y":  815.782349,
+                                                       "width":  0,
+                                                       "height":  0,
+                                                       "minimum":  null,
+                                                       "maximum":  null,
+                                                       "step":  null,
+                                                       "actions":  [
+
+                                                                   ]
+                                                   }
+                                    },
+                                    {
+                                        "reference":  "e132",
+                                        "widget":  {
+                                                       "parent":  6,
+                                                       "childIndex":  5,
+                                                       "id":  null,
+                                                       "type":  "DimensionSyncWidget",
+                                                       "text":  null,
+                                                       "value":  null,
+                                                       "redacted":  false,
+                                                       "visible":  true,
+                                                       "enabled":  true,
+                                                       "hitTestable":  false,
+                                                       "x":  170.612274,
+                                                       "y":  791.972839,
+                                                       "width":  462.585022,
+                                                       "height":  168.027206,
+                                                       "minimum":  null,
+                                                       "maximum":  null,
+                                                       "step":  null,
+                                                       "actions":  [
+
+                                                                   ]
+                                                   }
+                                    },
+                                    {
+                                        "reference":  "e133",
+                                        "widget":  {
+                                                       "parent":  132,
+                                                       "childIndex":  0,
+                                                       "id":  null,
+                                                       "type":  "ListPanel",
+                                                       "text":  null,
+                                                       "value":  null,
+                                                       "redacted":  false,
+                                                       "visible":  true,
+                                                       "enabled":  true,
+                                                       "hitTestable":  false,
+                                                       "x":  170.612274,
+                                                       "y":  791.972839,
+                                                       "width":  462.585022,
+                                                       "height":  47.6190491,
+                                                       "minimum":  null,
+                                                       "maximum":  null,
+                                                       "step":  null,
+                                                       "actions":  [
+
+                                                                   ]
+                                                   }
+                                    },
+                                    {
+                                        "reference":  "e134",
+                                        "widget":  {
+                                                       "parent":  133,
+                                                       "childIndex":  0,
+                                                       "id":  null,
+                                                       "type":  "NavigationScopeTargeter",
+                                                       "text":  null,
+                                                       "value":  null,
+                                                       "redacted":  false,
+                                                       "visible":  false,
+                                                       "enabled":  true,
+                                                       "hitTestable":  false,
+                                                       "x":  170.612274,
+                                                       "y":  791.972839,
+                                                       "width":  0,
+                                                       "height":  0,
+                                                       "minimum":  null,
+                                                       "maximum":  null,
+                                                       "step":  null,
+                                                       "actions":  [
+
+                                                                   ]
+                                                   }
+                                    },
+                                    {
+                                        "reference":  "e135",
+                                        "widget":  {
+                                                       "parent":  133,
+                                                       "childIndex":  1,
+                                                       "id":  "CharacterNameContainer",
+                                                       "type":  "Widget",
+                                                       "text":  null,
+                                                       "value":  null,
+                                                       "redacted":  false,
+                                                       "visible":  true,
+                                                       "enabled":  true,
+                                                       "hitTestable":  false,
+                                                       "x":  201.224518,
+                                                       "y":  791.972839,
+                                                       "width":  431.972778,
+                                                       "height":  47.6190491,
+                                                       "minimum":  null,
+                                                       "maximum":  null,
+                                                       "step":  null,
+                                                       "actions":  [
+
+                                                                   ]
+                                                   }
+                                    },
+                                    {
+                                        "reference":  "e136",
+                                        "widget":  {
+                                                       "parent":  135,
+                                                       "childIndex":  0,
+                                                       "id":  "CharacterNameIdParent",
+                                                       "type":  "ButtonWidget",
+                                                       "text":  "Darya",
+                                                       "value":  null,
+                                                       "redacted":  false,
+                                                       "visible":  true,
+                                                       "enabled":  true,
+                                                       "hitTestable":  true,
+                                                       "x":  201.224518,
+                                                       "y":  791.972839,
+                                                       "width":  73.8095245,
+                                                       "height":  47.6190491,
+                                                       "minimum":  null,
+                                                       "maximum":  null,
+                                                       "step":  null,
+                                                       "actions":  [
+                                                                       "click"
+                                                                   ]
+                                                   }
+                                    },
+                                    {
+                                        "reference":  "e137",
+                                        "widget":  {
+                                                       "parent":  136,
+                                                       "childIndex":  0,
+                                                       "id":  null,
+                                                       "type":  "TextWidget",
+                                                       "text":  "Darya",
+                                                       "value":  null,
+                                                       "redacted":  false,
+                                                       "visible":  true,
+                                                       "enabled":  true,
+                                                       "hitTestable":  false,
+                                                       "x":  218.231323,
+                                                       "y":  791.972839,
+                                                       "width":  50,
+                                                       "height":  47.6190491,
+                                                       "minimum":  null,
+                                                       "maximum":  null,
+                                                       "step":  null,
+                                                       "actions":  [
+
+                                                                   ]
+                                                   }
+                                    },
+                                    {
+                                        "reference":  "e138",
+                                        "widget":  {
+                                                       "parent":  133,
+                                                       "childIndex":  2,
+                                                       "id":  null,
+                                                       "type":  "Widget",
+                                                       "text":  null,
+                                                       "value":  null,
+                                                       "redacted":  false,
+                                                       "visible":  true,
+                                                       "enabled":  true,
+                                                       "hitTestable":  false,
+                                                       "x":  184.217712,
+                                                       "y":  800.476257,
+                                                       "width":  30.6122437,
+                                                       "height":  30.6122437,
+                                                       "minimum":  null,
+                                                       "maximum":  null,
+                                                       "step":  null,
+                                                       "actions":  [
+
+                                                                   ]
+                                                   }
+                                    },
+                                    {
+                                        "reference":  "e139",
+                                        "widget":  {
+                                                       "parent":  138,
+                                                       "childIndex":  0,
+                                                       "id":  "ConversedHeroBanner",
+                                                       "type":  "ImageIdentifierWidget",
+                                                       "text":  null,
+                                                       "value":  null,
+                                                       "redacted":  false,
+                                                       "visible":  true,
+                                                       "enabled":  true,
+                                                       "hitTestable":  false,
+                                                       "x":  187.61908,
+                                                       "y":  803.877625,
+                                                       "width":  23.1292496,
+                                                       "height":  23.1292496,
+                                                       "minimum":  null,
+                                                       "maximum":  null,
+                                                       "step":  null,
+                                                       "actions":  [
+
+                                                                   ]
+                                                   }
+                                    },
+                                    {
+                                        "reference":  "e140",
+                                        "widget":  {
+                                                       "parent":  138,
+                                                       "childIndex":  1,
+                                                       "id":  null,
+                                                       "type":  "HintWidget",
+                                                       "text":  null,
+                                                       "value":  null,
+                                                       "redacted":  false,
+                                                       "visible":  true,
+                                                       "enabled":  true,
+                                                       "hitTestable":  false,
+                                                       "x":  184.217712,
+                                                       "y":  800.476257,
+                                                       "width":  30.6122437,
+                                                       "height":  30.6122437,
+                                                       "minimum":  null,
+                                                       "maximum":  null,
+                                                       "step":  null,
+                                                       "actions":  [
+
+                                                                   ]
+                                                   }
+                                    }
+                                ]
+               },
+    "error":  null
+}

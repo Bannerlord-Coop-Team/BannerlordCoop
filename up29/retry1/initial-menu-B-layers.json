@@ -1,0 +1,251 @@
+{
+    "version":  1,
+    "id":  "15ab2ca1cbe6413ab4e60cecc62df5bc",
+    "ok":  true,
+    "process":  {
+                    "pid":  67600,
+                    "role":  "client",
+                    "platformId":  "testclient2",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2393161Z"
+                },
+    "result":  {
+                   "screen":  "MapScreen",
+                   "truncated":  false,
+                   "maximumLayers":  128,
+                   "layers":  [
+                                  {
+                                      "layer":  null,
+                                      "name":  "SceneLayer",
+                                      "type":  "SceneLayer",
+                                      "stackIndex":  0,
+                                      "active":  true,
+                                      "visible":  false,
+                                      "rootCount":  0,
+                                      "selectable":  false,
+                                      "inputMask":  7
+                                  },
+                                  {
+                                      "layer":  "02007137efc94b7aa14cff95f83aa74c",
+                                      "name":  "MapNameplateLayer",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  1,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  4,
+                                      "selectable":  true,
+                                      "inputMask":  5
+                                  },
+                                  {
+                                      "layer":  "b16f056ffc134f77ac9da590c30f4484",
+                                      "name":  "MapNotification",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  2,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  true,
+                                      "inputMask":  7
+                                  },
+                                  {
+                                      "layer":  "61b7e14129d14f7ca81b8ed062c48a61",
+                                      "name":  "MapMenuView",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  3,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  true,
+                                      "inputMask":  7
+                                  },
+                                  {
+                                      "layer":  null,
+                                      "name":  "CoopVoiceSpeakers",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  4,
+                                      "active":  false,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  false,
+                                      "inputMask":  0
+                                  },
+                                  {
+                                      "layer":  "da4ab56063d649edbeba771e7e388c23",
+                                      "name":  "CoopBugReport",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  5,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  true,
+                                      "inputMask":  3
+                                  },
+                                  {
+                                      "layer":  "c110a0ecb9164626adb913470968ec8d",
+                                      "name":  "CoopPlayerList",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  6,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  true,
+                                      "inputMask":  0
+                                  },
+                                  {
+                                      "layer":  "af1351eff31d42f6bf555ca69a174418",
+                                      "name":  "CoopChat",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  7,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  true,
+                                      "inputMask":  0
+                                  },
+                                  {
+                                      "layer":  "3419dfc50f1f4ee890057af056316879",
+                                      "name":  "MapMenuOverlay",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  8,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  true,
+                                      "inputMask":  7
+                                  },
+                                  {
+                                      "layer":  "5b12e0f2f98f43ed933a743b0daa6d2d",
+                                      "name":  "MapBar",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  9,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  true,
+                                      "inputMask":  7
+                                  },
+                                  {
+                                      "layer":  "d7eb3e110938420ebd213e11ab4f482c",
+                                      "name":  "MapReadyBlocker",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  10,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  true,
+                                      "inputMask":  0
+                                  },
+                                  {
+                                      "layer":  "42dea7331d9f42d9862b7232c28f86b9",
+                                      "name":  "MapSave",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  11,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  true,
+                                      "inputMask":  0
+                                  },
+                                  {
+                                      "layer":  null,
+                                      "name":  "MainMenuGameVersion",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  12,
+                                      "active":  false,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  false,
+                                      "inputMask":  0
+                                  },
+                                  {
+                                      "layer":  null,
+                                      "name":  "ChatLog",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  13,
+                                      "active":  false,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  false,
+                                      "inputMask":  0
+                                  },
+                                  {
+                                      "layer":  "71ae63d5596e4d9a8fe3a3eb2060abe1",
+                                      "name":  "GameNotification",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  14,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  true,
+                                      "inputMask":  3
+                                  },
+                                  {
+                                      "layer":  null,
+                                      "name":  "QueryManager",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  15,
+                                      "active":  false,
+                                      "visible":  true,
+                                      "rootCount":  0,
+                                      "selectable":  false,
+                                      "inputMask":  0
+                                  },
+                                  {
+                                      "layer":  null,
+                                      "name":  "SceneNotification",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  16,
+                                      "active":  false,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  false,
+                                      "inputMask":  0
+                                  },
+                                  {
+                                      "layer":  "31d8dd1dc88b4e3f93068ee77ca5d382",
+                                      "name":  "CameraFade",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  17,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  true,
+                                      "inputMask":  0
+                                  },
+                                  {
+                                      "layer":  "7a6afd33f6c54fdbad80b393de1a29ed",
+                                      "name":  "Tooltip",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  18,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  0,
+                                      "selectable":  true,
+                                      "inputMask":  0
+                                  },
+                                  {
+                                      "layer":  "b025062d6a8b484a8b2a22544b063b27",
+                                      "name":  "GamepadCusor",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  19,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  true,
+                                      "inputMask":  0
+                                  },
+                                  {
+                                      "layer":  "b93d3f15e3e743688b4c5896ccacc21d",
+                                      "name":  "LoadingWindow",
+                                      "type":  "GauntletLayer",
+                                      "stackIndex":  20,
+                                      "active":  true,
+                                      "visible":  true,
+                                      "rootCount":  1,
+                                      "selectable":  true,
+                                      "inputMask":  0
+                                  }
+                              ]
+               },
+    "error":  null
+}

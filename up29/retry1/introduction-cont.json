@@ -1,0 +1,25 @@
+{
+    "version":  1,
+    "id":  "e36347e3bd3b44d5a6a317e228d90f22",
+    "ok":  true,
+    "process":  {
+                    "pid":  54164,
+                    "role":  "client",
+                    "platformId":  "testclient",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2225903Z"
+                },
+    "result":  {
+                   "name":  "coop.debug.ittest.run",
+                   "arguments":  [
+                                     "cont"
+                                 ],
+                   "found":  true,
+                   "output":  "inProgress=True hero=Hero_CharacterObject_2705 \u0027Darya\u0027\r\nnpc: I know your name... Let\u0027s see if you\u0027re worth what we\u0027re paying for you.\r\n  [0] I heard you may need some help with a problem? {hero_give_issue}\r\n  [1] There is something I\u0027d like to discuss. {main_option_discussions_3}\r\n  [2] I must leave now. {player_is_leaving_neutral_or_friendly}\r\n",
+                   "succeeded":  true,
+                   "errorCode":  null,
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

@@ -1,0 +1,23 @@
+{
+    "version":  1,
+    "id":  "96af4c9d129945dc98c2a34e8639eccd",
+    "ok":  true,
+    "process":  {
+                    "pid":  40000,
+                    "role":  "server",
+                    "platformId":  null,
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "0001-01-01T00:00:00"
+                },
+    "result":  {
+                   "name":  "coop.debug.ittest.run",
+                   "arguments":  [
+                                     "quests"
+                                 ],
+                   "found":  true,
+                   "output":  "startedLadyQuests=0\r\n",
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

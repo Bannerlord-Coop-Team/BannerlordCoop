@@ -1,0 +1,1 @@
+Post-cleanup own report writer initial invocation failed at finalize.ps1:10 with ParserError MissingEndCurlyBrace. Corrected missing foreach closing brace. No runtime affected, no new test/compile/launch.

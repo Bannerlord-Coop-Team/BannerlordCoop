@@ -1,0 +1,25 @@
+{
+    "version":  1,
+    "id":  "de5ac775369d4d60a84cd0726a01d218",
+    "ok":  true,
+    "process":  {
+                    "pid":  40000,
+                    "role":  "server",
+                    "platformId":  null,
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "0001-01-01T00:00:00"
+                },
+    "result":  {
+                   "name":  "coop.debug.ittest.run",
+                   "arguments":  [
+                                     "pick_lady",
+                                     "R",
+                                     "Nus"
+                                 ],
+                   "found":  true,
+                   "output":  "LABEL @R giver=Hero_CharacterObject_2705 name=\u0027Darya\u0027 character=CharacterObject_2705 requested=Nus matchedRequest=False town=- clan=Clan_clan_aserai_2 candidates=211",
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

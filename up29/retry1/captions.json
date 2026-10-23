@@ -1,0 +1,56 @@
+[
+    {
+        "captureReceipt":  "accepted-native-full-page-A-image.json",
+        "path":  "accepted-native-full-page-A.png",
+        "phase":  "accepted",
+        "role":  "A",
+        "sha256":  "24de7c5ce7469f3832b253cec51cc758ec6e5246a77acbff6206ea3c63c195e1",
+        "caption":  "Fresh real acceptance: A Active Quests (1), Lady\u0027s Knight Out naming Darya with 30 days. Raw accepted-A.json identifies issue_1228_quest and owner testclient. Old Quests (54) remain visible. No row-selection command was used.",
+        "visuallyReviewed":  true
+    },
+    {
+        "captureReceipt":  "accepted-native-full-page-B-image.json",
+        "path":  "accepted-native-full-page-B.png",
+        "phase":  "accepted",
+        "role":  "B",
+        "sha256":  "e8cd6e8ab0ec89f81c137f347de785c77b7d149676d773cf5962d44dc57e22d9",
+        "caption":  "B remains Active Quests (0), Old Quests (46). Selected old detail is pre-existing archive34210, not the fresh Darya quest.",
+        "visuallyReviewed":  true
+    },
+    {
+        "captureReceipt":  "owner-disconnected-mainmenu-A-image.json",
+        "path":  "owner-disconnected-mainmenu-A.png",
+        "phase":  "disconnected",
+        "role":  "A",
+        "sha256":  "8de35cf22820fb51ac0ad29c628822b0508e35882edeec1a4a6c105442ffa1ac",
+        "caption":  "Same A process54164 at the native main menu after installed disconnect.ps1. Raw disconnected-discover.json confirms InitialState, campaignLoaded=false, coopRunning=false before reconnect; server roster shows only B.",
+        "visuallyReviewed":  true
+    },
+    {
+        "captureReceipt":  "rejoined-native-full-page-A-image.json",
+        "path":  "rejoined-native-full-page-A.png",
+        "phase":  "rejoined",
+        "role":  "A",
+        "sha256":  "e1803d421b5eeee9ec30c90d9f62cd618b47448f756f9499c64cc2335a4cb6bd",
+        "caption":  "After installed reconnect.ps1 on same A process54164: Active Quests (0), Old Quests (54). Darya active quest cleared. Selected legacy archive34210 is unrelated, not a new cancellation ending. Raw server/A archive41055 is owner=testclient, IsEnded=false, logs0; it is not shown as an active quest.",
+        "visuallyReviewed":  true
+    },
+    {
+        "captureReceipt":  "rejoined-native-full-page-B-image.json",
+        "path":  "rejoined-native-full-page-B.png",
+        "phase":  "rejoined",
+        "role":  "B",
+        "sha256":  "db916b000eecaf41882cb5ed346adaa0cf20ff863afc4fcbf32576ff6ddc266b",
+        "caption":  "B after A rejoin: Active Quests (0), Old Quests (46), unchanged old legacy detail. B stayed connected and received exactly one QuestCancel for issue_1228.",
+        "visuallyReviewed":  true
+    },
+    {
+        "captureReceipt":  "rejoined-no-stale-discussion-A-image.json",
+        "path":  "rejoined-no-stale-discussion-A.png",
+        "phase":  "rejoined",
+        "role":  "A",
+        "sha256":  "5d6d85f9b0eb98cda0b0dc190bebdea06da9c264d1a08b89b478844604cc5453",
+        "caption":  "Darya discussion after rejoin offers general discussion and leave only. No active-quest discussion or new offer; exact old issue remains detached.",
+        "visuallyReviewed":  true
+    }
+]

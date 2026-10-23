@@ -1,0 +1,24 @@
+LIVE_BUILD_DEBUG_FIXTURE_IDENTITY=d282bd59d1c3c5f072bde22097ae69a38357f1f0aed9a30148108ff1f805a072
+Using split .NET toolchain for 20 projects: SDK host 10.0.300 for target major 10; full MSBuild 17.14.40 with SDK 9.0.314
+LIVE_BUILD_TOOLCHAIN_ID=49ac3a6c372cf002db71082d8895b10436a43caa127c0e1436a13e1a880160ae
+{"ok":true,"dialogs":[]}
+{"ok":true,"steamRunning":true,"steamStarted":false,"steamSessionReady":true,"serverSave":"","requiredUdpPort":0,"existingLiveProcesses":[],"checkedUtc":"2026-10-23T19:43:31.5988082Z"}
+LIVE_BUILD_CACHE_STATUS=verified
+LIVE_BUILD_TREE=e6c31dde1f707d2ff806abf32f449ef8cdf28f2d
+LIVE_BUILD_CACHE_IDENTITY=76f0d1e998d9caccdf3d4599ff62c28d4e3897abc670ce62df22786d1497f313
+LIVE_BUILD_CACHE_BUNDLE=ce1b1004daae85ad02474f17885bcd48d6c0022e60610b1351c1c49753cd5fbd
+LIVE_BUILD_CACHE_PATH=/var/tmp/bannerlordcoop-live-build-cache/identities/76f0d1e998d9caccdf3d4599ff62c28d4e3897abc670ce62df22786d1497f313.env
+Restored verified DebugAutoConnect deployment for tree e6c31dde1f707d2ff806abf32f449ef8cdf28f2d
+Prepared deployed module metadata: id=Coop dll=Coop.dll class=Coop.CoopMod
+NO_FOCUS_SHADER_CACHE status=matched reset=false runToken=issue3781-20261023T193531
+LIVE_TEST_ENGINE_PROFILE_APPLIED runToken=issue3781-20261023T193531 profile=visual fps=30 width=1280 height=960 receipt=C:\Users\Andrew\CodexWindows\coop-live-orchestration\3781\up29\retry1\crash-dialogs\engine-profile.json
+NO_FOCUS_PRIVATE_DESKTOP_CREATED runToken=issue3781-20261023T193531 desktop=BannerlordCoop.LiveTest.issue3781-20261023T193531
+NO_FOCUS_STARTED role=client platform=testclient pid=54164
+NO_FOCUS_STARTED role=client platform=testclient2 pid=67600
+NO_FOCUS_LAUNCH_BOUND runToken=issue3781-20261023T193531 bindingId=1aa55c38cbc640968b85bf8c6bc32575 sha256=53ce3f4013cd0190c56b9c3b78ef40518df132fc1b4fa788d019e14e8439d40c path=C:\Users\Andrew\CodexWindows\coop-live-orchestration\3781\up29\retry1\crash-dialogs\launcher-launch-binding.json
+NO_FOCUS_GUARD_STARTED runToken=issue3781-20261023T193531 pollMilliseconds=50
+NO_FOCUS_WINDOW pid=54164 hwnd=17108828
+NO_FOCUS_WINDOW pid=67600 hwnd=14356860
+NO_FOCUS_GUARD_STOPPED activations=0 restoreFailures=0 windows=2 cursorReleases=0 crashDialogs=0 crashCloseFailures=0 crashEvidence= crashVerdict=C:\Users\Andrew\CodexWindows\coop-live-orchestration\3781\up29\retry1\crash-dialogs\launcher-crash-verdict.json
+LIVE_TEST_ENGINE_PROFILE_RESTORED runToken=issue3781-20261023T193531 profile=visual receipt=C:\Users\Andrew\CodexWindows\coop-live-orchestration\3781\up29\retry1\crash-dialogs\engine-profile.json
+NO_FOCUS_PRIVATE_DESKTOP_CLOSED runToken=issue3781-20261023T193531 desktop=BannerlordCoop.LiveTest.issue3781-20261023T193531

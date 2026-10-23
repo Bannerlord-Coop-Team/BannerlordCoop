@@ -1,0 +1,17 @@
+14:40:07.075  ========================================================
+14:40:07.075    Bannerlord Coop  —  Dedicated Server
+14:40:07.076      save : saveauto1.sav   (server-config.json)
+14:40:07.076      port : UDP 4200 — coop clients connect here   (engine custom server: 7210/EU)
+14:40:07.076      pass : none ("password" in server-config.json)
+14:40:07.076      data : C:\Users\Andrew\.codex-runtime\live-testing\BannerlordCoop.DedicatedServer-live-main\.stage-win\server-data
+14:40:07.076      conf : C:\Users\Andrew\.codex-runtime\live-testing\BannerlordCoop.DedicatedServer-live-main\.stage-win\server-data\server-config.json
+14:40:07.076      log  : C:\Users\Andrew\.codex-runtime\live-testing\BannerlordCoop.DedicatedServer-live-main\.stage-win\server-data\logs\coop-server-20261023-144007.log
+14:40:07.076      .net : bundled (no system .NET required)
+14:40:07.076  ========================================================
+14:40:07.076  
+14:40:07.076  Starting the native engine. The campaign takes ~30-60s to load and prints a
+14:40:07.076  lot of engine diagnostics along the way — that is normal, not an error. The
+14:40:07.076  server is READY when you see:  [DedicatedServer] SERVING
+14:40:07.076  Type 'help' + Enter for server commands. Press Ctrl+C to stop.
+14:40:07.076  
+15:12:42.415  [BannerlordCoopServer] engine exited with code 0

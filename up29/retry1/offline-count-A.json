@@ -1,0 +1,18 @@
+{
+    "version":  1,
+    "id":  "e6058511d7734b3498b86be961b8251b",
+    "ok":  false,
+    "process":  {
+                    "pid":  54164,
+                    "role":  "client",
+                    "platformId":  "testclient",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2225903Z"
+                },
+    "result":  null,
+    "error":  {
+                  "code":  "session_not_ready",
+                  "message":  "The co-op session command dispatcher is not available yet.",
+                  "outcomeUncertain":  false
+              }
+}

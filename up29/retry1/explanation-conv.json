@@ -1,0 +1,25 @@
+{
+    "version":  1,
+    "id":  "662540bc1abd414caffab0bf990e59cb",
+    "ok":  true,
+    "process":  {
+                    "pid":  54164,
+                    "role":  "client",
+                    "platformId":  "testclient",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2225903Z"
+                },
+    "result":  {
+                   "name":  "coop.debug.ittest.run",
+                   "arguments":  [
+                                     "conv"
+                                 ],
+                   "found":  true,
+                   "output":  "inProgress=True hero=Hero_CharacterObject_2705 \u0027Darya\u0027\r\nnpc: Just participate in a future tournament in this realm, and say you dedicate your victories to me. If you can advance to reach round 2, I\u0027m sure that will do us both honor.\r\n  [0] Then I will enter the tournament and reach round 2 my lady. {issue_offer_player_accept_quest}\r\n  [1] Sorry. I can\u0027t do that right now. {issue_offer_player_response_reject}\r\n",
+                   "succeeded":  true,
+                   "errorCode":  null,
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

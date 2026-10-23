@@ -1,0 +1,25 @@
+{
+    "version":  1,
+    "id":  "1e086f167133415aa82ef8d8ed20a18f",
+    "ok":  true,
+    "process":  {
+                    "pid":  40000,
+                    "role":  "server",
+                    "platformId":  null,
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "0001-01-01T00:00:00"
+                },
+    "result":  {
+                   "name":  "coop.debug.ittest.run",
+                   "arguments":  [
+                                     "place_lady",
+                                     "Hero_CharacterObject_2705",
+                                     "town_ES2"
+                                 ],
+                   "found":  true,
+                   "output":  "SETUP giver=Hero_CharacterObject_2705 name=\u0027Darya\u0027 settlement=town_ES2; no offer or quest created.",
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

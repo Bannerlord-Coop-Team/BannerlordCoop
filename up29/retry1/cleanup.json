@@ -1,0 +1,65 @@
+{
+    "schemaVersion":  1,
+    "runToken":  "issue3781-20261023T193531",
+    "startedUtc":  "2026-10-23T20:12:40.9119235Z",
+    "completedUtc":  "2026-10-23T20:12:46.5959685Z",
+    "initialProcessIds":  [
+                              40000,
+                              54164,
+                              67600,
+                              71636
+                          ],
+    "remainingProcessIds":  [
+
+                            ],
+    "stopAttempted":  true,
+    "verifiedAbsent":  true,
+    "inventoryAttempts":  2,
+    "inventoryErrors":  [
+
+                        ],
+    "stopErrors":  [
+
+                   ],
+    "gracefulShutdownAttempts":  [
+                                     {
+                                         "processId":  40000,
+                                         "runToken":  "issue3781-20261023T193531",
+                                         "requestWritten":  true,
+                                         "identityVerified":  true,
+                                         "error":  null,
+                                         "startedUtc":  "2026-10-23T20:12:41.7747560Z",
+                                         "completedUtc":  "2026-10-23T20:12:41.8390264Z"
+                                     },
+                                     {
+                                         "processId":  54164,
+                                         "runToken":  "issue3781-20261023T193531",
+                                         "requestWritten":  true,
+                                         "identityVerified":  true,
+                                         "error":  null,
+                                         "startedUtc":  "2026-10-23T20:12:41.8470363Z",
+                                         "completedUtc":  "2026-10-23T20:12:41.8520443Z"
+                                     },
+                                     {
+                                         "processId":  67600,
+                                         "runToken":  "issue3781-20261023T193531",
+                                         "requestWritten":  true,
+                                         "identityVerified":  true,
+                                         "error":  null,
+                                         "startedUtc":  "2026-10-23T20:12:41.8520443Z",
+                                         "completedUtc":  "2026-10-23T20:12:41.8550441Z"
+                                     },
+                                     {
+                                         "processId":  71636,
+                                         "runToken":  null,
+                                         "requestWritten":  false,
+                                         "identityVerified":  false,
+                                         "error":  "Exception calling \"Connect\" with \"1\" argument(s): \"The operation has timed out.\"",
+                                         "startedUtc":  "2026-10-23T20:12:41.8550441Z",
+                                         "completedUtc":  "2026-10-23T20:12:43.3541975Z"
+                                     }
+                                 ],
+    "processTreeStopAttempts":  [
+
+                                ]
+}

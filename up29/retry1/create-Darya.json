@@ -1,0 +1,24 @@
+{
+    "version":  1,
+    "id":  "2c59841fcf3547c3b48dfbeaf9de860b",
+    "ok":  true,
+    "process":  {
+                    "pid":  40000,
+                    "role":  "server",
+                    "platformId":  null,
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "0001-01-01T00:00:00"
+                },
+    "result":  {
+                   "name":  "coop.debug.ittest.run",
+                   "arguments":  [
+                                     "create",
+                                     "Hero_CharacterObject_2705"
+                                 ],
+                   "found":  true,
+                   "output":  "SETUP unaccepted offer only.\ngiver=Hero_CharacterObject_2705 name=\u0027Darya\u0027 liveIssue=LadysKnightOutIssue id=issue_1228 state=Ongoing owner=- tried=False difficulty=0.1 stayAlive=True security=40 town=town_ES2 townOwner=Clan_clan_empire_south_1 dueTicks=79226543177336 lordCost=18 currentQuestAttached=False\r\nobservedIssueId=issue_1228 issueLogs=0 retained=False\r\nobservedQuest=none\r\n",
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

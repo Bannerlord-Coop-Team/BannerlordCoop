@@ -1,0 +1,26 @@
+{
+    "version":  1,
+    "id":  "561eeb44338a426c97a5a411d984723c",
+    "ok":  true,
+    "process":  {
+                    "pid":  53824,
+                    "role":  "client",
+                    "platformId":  "testclient",
+                    "runToken":  "issue3781-20261023T185354",
+                    "processStartedUtc":  "2026-10-23T19:04:18.7424052Z"
+                },
+    "result":  {
+                   "name":  "coop.debug.ittest.run",
+                   "arguments":  [
+                                     "journal_select",
+                                     "Lady"
+                                 ],
+                   "found":  true,
+                   "output":  "Native journal selected \u0027Lady\u0027s Knight Out\u0027; stages=1; active=1 old=54. Inspect the text before capture.",
+                   "succeeded":  true,
+                   "errorCode":  null,
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

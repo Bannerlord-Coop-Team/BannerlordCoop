@@ -1,0 +1,25 @@
+{
+    "version":  1,
+    "id":  "d92196ad95cf4213aca79b51e31a393b",
+    "ok":  true,
+    "process":  {
+                    "pid":  67600,
+                    "role":  "client",
+                    "platformId":  "testclient2",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2393161Z"
+                },
+    "result":  {
+                   "name":  "coop.debug.ittest.run",
+                   "arguments":  [
+                                     "journal_open"
+                                 ],
+                   "found":  true,
+                   "output":  "Opened the native journal; wait for QuestsState, then journal_select \u003ctitle\u003e before capturing.",
+                   "succeeded":  true,
+                   "errorCode":  null,
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

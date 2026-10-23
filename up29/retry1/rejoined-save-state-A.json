@@ -1,0 +1,25 @@
+{
+    "version":  1,
+    "id":  "540e02a662324acea9f52d832ee9c36e",
+    "ok":  true,
+    "process":  {
+                    "pid":  54164,
+                    "role":  "client",
+                    "platformId":  "testclient",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2225903Z"
+                },
+    "result":  {
+                   "name":  "coop.debug.save.state",
+                   "arguments":  [
+
+                                 ],
+                   "found":  true,
+                   "output":  "saveHandler=ready|isSaving=False",
+                   "succeeded":  true,
+                   "errorCode":  null,
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

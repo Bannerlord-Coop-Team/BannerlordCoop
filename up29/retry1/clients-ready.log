@@ -1,0 +1,5 @@
+{"version":1,"id":"f891eefa230843cc9f4ed8d5503517ea","ok":true,"process":{"pid":54164,"role":"client","platformId":"testclient","runToken":"issue3781-20261023T193531","processStartedUtc":"2026-10-23T19:44:32.2225903Z"},"result":{"attempted":true,"started":true},"error":null}
+{"version":1,"id":"a89f51faf1944110840b099854de75f2","ok":true,"process":{"pid":67600,"role":"client","platformId":"testclient2","runToken":"issue3781-20261023T193531","processStartedUtc":"2026-10-23T19:44:32.2393161Z"},"result":{"attempted":true,"started":true},"error":null}
+40000 server  state=MapState menu= campaign=True readyCampaign=True players=2 roster=testclient:True,testclient2:True mission=False
+54164 client testclient state=MapState menu=village campaign=True readyCampaign=True players=2 roster=: mission=False
+67600 client testclient2 state=MapState menu=town campaign=True readyCampaign=True players=2 roster=: mission=False

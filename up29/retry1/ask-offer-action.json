@@ -1,0 +1,17 @@
+{
+    "version":  1,
+    "id":  "d276096366ab40e6974a2e33875d1966",
+    "ok":  true,
+    "process":  {
+                    "pid":  54164,
+                    "role":  "client",
+                    "platformId":  "testclient",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2225903Z"
+                },
+    "result":  {
+                   "dispatched":  true,
+                   "inspectAgain":  true
+               },
+    "error":  null
+}

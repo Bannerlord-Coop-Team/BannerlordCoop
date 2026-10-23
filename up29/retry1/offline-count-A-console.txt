@@ -1,0 +1,9 @@
+{"code":"session_not_ready","message":"The co-op session command dispatcher is not available 
+yet.","outcomeUncertain":false}
+At C:\Users\Andrew\CodexWindows\coop-live-orchestration\3781\up29\retry1\ops.ps1:21 char:109
++ ... ve '' $r;if(!$r.ok){throw ($r.error|ConvertTo-Json -Compress)};$r.res ...
++                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: ({"code":"sessio...certain":false}:String) [], RuntimeException
+    + FullyQualifiedErrorId : {"code":"session_not_ready","message":"The co-op session command dispatcher is not avail 
+   able yet.","outcomeUncertain":false}
+ 

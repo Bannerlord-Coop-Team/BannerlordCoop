@@ -1,0 +1,26 @@
+{
+    "version":  1,
+    "id":  "b1f22f7a8c1a421583257babdc864a88",
+    "ok":  true,
+    "process":  {
+                    "pid":  54164,
+                    "role":  "client",
+                    "platformId":  "testclient",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2225903Z"
+                },
+    "result":  {
+                   "name":  "coop.debug.ittest.run",
+                   "arguments":  [
+                                     "cont_until_closed",
+                                     "8"
+                                 ],
+                   "found":  true,
+                   "output":  "inProgress=True\nline=It is exciting to think a warrior of your caliber will be my champion. I have every reason to believe you\u0027ll reach round 2.\ninProgress=False",
+                   "succeeded":  true,
+                   "errorCode":  null,
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

@@ -1,0 +1,225 @@
+{
+    "runToken":  "issue3781-20261023T193531",
+    "expectedServerHead":  "bb76bea12d5aacd11f5c2868b72440ebd9a58bc9",
+    "expectedServerTree":  "68d932b347bdc3e10ff20fbd92ca92f21dca03ae",
+    "expectedCoopHead":  "3d1140bbd01d588e18655734f96da083fbf86b43",
+    "expectedCoopTree":  "e6c31dde1f707d2ff806abf32f449ef8cdf28f2d",
+    "expectedEnsureScriptSha256":  "b4c57ef5993441a4c5e2012f95928f6f22b2f295c17e177f848f77e7fdd9168c",
+    "expectedRunWindowsScriptSha256":  "fae33feb339d0954b56e58bcdf2f67dc3edab4d31420801f6d1ccf09f23c1c6a",
+    "archive":  {
+                    "path":  "C:\\Users\\Andrew\\CodexWindows\\.codex\\runtime\\issue-to-pr\\local-dedicated-server\\archives\\BannerlordCoop-DedicatedServer-BuildInputs-v1.4.8.7z",
+                    "bytes":  4359411412,
+                    "sha256":  "f26aeb1915ecda4971da281925437f29ea07699853c386571887d81db5ed3752"
+                },
+    "extractedInputs":  {
+                            "dedicatedServerEngine":  "C:\\Users\\Andrew\\CodexWindows\\.codex\\runtime\\issue-to-pr\\local-dedicated-server\\extracted\\BuildInputs\\DedicatedServer\\bin\\Win64_Shipping_Server\\TaleWorlds.Starter.DotNetCore.dll",
+                            "matchingClientCampaignSystem":  "C:\\Users\\Andrew\\CodexWindows\\.codex\\runtime\\issue-to-pr\\local-dedicated-server\\extracted\\BuildInputs\\Game\\bin\\Win64_Shipping_Client\\TaleWorlds.CampaignSystem.dll",
+                            "mainMap":  "C:\\Users\\Andrew\\CodexWindows\\.codex\\runtime\\issue-to-pr\\local-dedicated-server\\extracted\\BuildInputs\\ModuleAssets\\SceneObj\\Main_map",
+                            "dedicatedAssetPackages":  "C:\\Users\\Andrew\\CodexWindows\\.codex\\runtime\\issue-to-pr\\local-dedicated-server\\extracted\\BuildInputs\\ModuleAssets\\DsAssetPackages"
+                        },
+    "stagedInputs":  {
+                         "launcher":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\BannerlordCoopServer.exe",
+                         "dedicatedServerEngine":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\bin\\Win64_Shipping_Server\\TaleWorlds.Starter.DotNetCore.dll",
+                         "matchingClientCampaignSystem":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\bin\\Win64_Shipping_Server\\TaleWorlds.CampaignSystem.dll",
+                         "mainMap":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\DedicatedServer.Windows\\SceneObj\\Main_map",
+                         "dedicatedAssetPackages":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\DedicatedServer.Windows\\DsAssetPackages",
+                         "nativeAssetPackages":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Native\\DsAssetPackages"
+                     },
+    "buildStamp":  {
+                       "serverBranch":  "main",
+                       "serverHead":  "bb76bea12d5aacd11f5c2868b72440ebd9a58bc9",
+                       "serverRef":  "bb76bea12d5aacd11f5c2868b72440ebd9a58bc9",
+                       "serverTree":  "68d932b347bdc3e10ff20fbd92ca92f21dca03ae",
+                       "coopHead":  "3d1140bbd01d588e18655734f96da083fbf86b43",
+                       "coopTree":  "e6c31dde1f707d2ff806abf32f449ef8cdf28f2d",
+                       "selectedEnsureScriptSha256":  "b4c57ef5993441a4c5e2012f95928f6f22b2f295c17e177f848f77e7fdd9168c",
+                       "selectedRunWindowsScriptSha256":  "fae33feb339d0954b56e58bcdf2f67dc3edab4d31420801f6d1ccf09f23c1c6a",
+                       "stagedRuntimeFingerprint":  "BannerlordCoopServer.exe:273FCF9B10E268190AD9B6BCE8961DC990D2ABE39750367376669E710717B518|engine\\Modules\\DedicatedServer.Windows\\bin\\Win64_Shipping_Server\\DedicatedServer.Windows.dll:939E603474885FCFC4EE17631068009FEDABC3CFE1A597B9D278CEFDD4F17FEE|engine\\Modules\\DedicatedServer.Windows\\bin\\Win64_Shipping_Server\\DedicatedServer.Core.dll:1F16312D554A935B90AC9FB7B3E52B7753408EE42CE255319BC08615EA9C981C|engine\\bin\\Win64_Shipping_Server\\DedicatedServer.Core.dll:1F16312D554A935B90AC9FB7B3E52B7753408EE42CE255319BC08615EA9C981C|engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Common.dll:CA9A5E7A9736A60A1B58EE2F37F9159E9EA9A7C15E2432B3B9498F5A2ECA52EB|engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Coop.Core.dll:F185882782A5F71D9CB3BF4837329852ADC83131DEFF7BA5BD6985EBA6712C3C|engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\GameInterface.dll:1FFCE23D0642D46D997564F8583FB45AC4A6044E458BBC95B92F867EAD8B389E|engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Missions.dll:F32129EAFB6D46F206B8F0809FC144308D08E89258AEF6B5F6D8FBC666376E2A|engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Coop.dll:9D21BD2B21F282BB524F0A885D014E0405528F7E2A9B13A03313D46A8FADA49B|engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Coop.Steam.dll:803CC3FC46DF189C9AF81151FA0750336893ECBD82F5A0E2130148554E66CEAE",
+                       "coopFingerprint":  "SubModule.xml:E9E79D8C944E2A2927866D9AFC80BAC539292A08B56BE99A93FDA47C942312E1|0Harmony.dll:7B9E756306FA3D7620E02A857C8927A6AB04973F9BD8A77D3866700A6DEAC55C|Autofac.dll:747EE8605301B8BD4284CF16B7B8AB900356B7DD01F70800E08D2FF0286BBC12|Common.dll:CA9A5E7A9736A60A1B58EE2F37F9159E9EA9A7C15E2432B3B9498F5A2ECA52EB|Concentus.dll:9A16C901FBF32DECCFB9560CDC86C467E0B209F77D5B2ED43803EF13ABABE771|Coop.Core.dll:F185882782A5F71D9CB3BF4837329852ADC83131DEFF7BA5BD6985EBA6712C3C|Coop.dll:9D21BD2B21F282BB524F0A885D014E0405528F7E2A9B13A03313D46A8FADA49B|Coop.Steam.dll:803CC3FC46DF189C9AF81151FA0750336893ECBD82F5A0E2130148554E66CEAE|DiscordRPC.dll:B3DCCC78588BCFFB6CDC574B1B3FBE37AF32A4F1D69ADCB4B0CBC81F354BD4B2|Fmod5Sharp.dll:6BAB8B35D560D8F1A1D3BB6511AEC483D1E278AAC4D6EEB68380191BC6544449|GameInterface.dll:1FFCE23D0642D46D997564F8583FB45AC4A6044E458BBC95B92F867EAD8B389E|K4os.Compression.LZ4.dll:864B0A485DF3231D3CB6DB994E927D553AAAECA7838E1194A680EB614D2246EB|LiteNetLib.dll:911F9E61F83E06C6E30258D99F52124F24C394C322D4685C5A3F4D752D9ADDB2|Microsoft.Bcl.AsyncInterfaces.dll:0B6F9B5EF96CF05FBE679787615FE7DD7E213E888A2802589DC8BCD0CDF30D64|Microsoft.CodeAnalysis.CSharp.dll:F821A111A5BB6404A1000884BD52BCF911A47F3449AE3A793BDC8F632451F04D|Microsoft.CodeAnalysis.CSharp.resources.dll:DCBB6B3B71E7AD8C1F1232052708BD5A28567748251BF562096359EFF21C8A42|Microsoft.CodeAnalysis.dll:539FFF67D8D9B51F7447B6A6976CC308900523E9E73FF10992D61C1457BFFD0E|Microsoft.CodeAnalysis.resources.dll:137C87BB824DF0D0264E573BA4B384B6D0D8891E481E5C60E8A28DB15E1403AD|Microsoft.Win32.Registry.dll:7AA3A699FA9A35E6857BA9CFD1F382E3BDFE3EB382D58B43E3282E1BD6F80AA6|Missions.dll:F32129EAFB6D46F206B8F0809FC144308D08E89258AEF6B5F6D8FBC666376E2A|Mono.Cecil.dll:C41BDB9FFD3C5F6E17D2382C1012D73703E035E3F1100245FDD4E08C8DC6EB5B|Mono.Cecil.Mdb.dll:570A437DEA0271D1D5C8B7D6A408B0B2635BDB0E8B8D5051878F3E7FCA087F89|Mono.Cecil.Pdb.dll:50A1A1A79DC86FCFB8B51249B5325A10DD93D193C52999CF6775D25030A4E606|Mono.Cecil.Rocks.dll:842E09959084EDA733AAB1A5354D7AF79E29594F4D8B91C8792103E5C755ED9B|MonoMod.Backports.dll:6DB3486EB3BFC458C770D61A1391569000CD871DCC7160FB3DA2CBFE8D98601A|MonoMod.Core.dll:806BA58CB4C3022056428E15388162301186499BFAE69929A7506B6E1C02757E|MonoMod.Iced.dll:4C956ADC43E35A9388A2BEC58DD82C3A1C6910F735F08D2DDCEAB83AAE990E7C|MonoMod.ILHelpers.dll:20DF341949B81662E09787E42B66AC3FEA601D4CF4B717294F2D72A80860E4EC|MonoMod.RuntimeDetour.dll:88F08654CBC823EB51DAC4FAC81BEE13F750443A1CFADA4B8575BAD7535A10BF|MonoMod.Utils.dll:0F2C42C98A7251947FCD7A09B834F4D08EB75C897CA5F25F074E272F01817B94|NAudio.Core.dll:FCF493FC47A2F478A65303886B975FBDBF714CBB1F2D79F7FCE97E4BB16B01A8|NAudio.WinMM.dll:749A01EBBB5EDD8B1A03C5263B04DE6ACADECF52E4CC84D7412BC6E93F180958|Newtonsoft.Json.dll:8C1DD5C184B4E2E7EAD06971FF3EBCB46783BE972292D1DEB1061744369B4D80|OggVorbisEncoder.dll:99983BB3704039661C7ECCD4583F1C39AAE8282D40ADAB5EE72BBB812F357A7D|protobuf-net.Core.dll:C785CD15E1B4C45235671AD5C5C1CBB35783A2FEDC9350AA37DD5D1A22B3FDBF|protobuf-net.dll:D47568CB1FF7AD152E6BAB5F964E7F8A0B6C4B67572F366142E1D87053AF4DAF|SandBox.dll:587C6E94C425745C1478F632F3B66226FF8298666CB27E8E6D9A62488DF5956A|SandBox.GauntletUI.dll:69F2A87C3C3883D04ECE46200C5CDDF39C188F0EE7C20E26C47FCF64C0F97ED3|SandBox.View.dll:C7360E71DA06799A0CB6C00C4A0CFAB5877621197BA25101433AC28654D169E2|SandBox.ViewModelCollection.dll:8C4B2CA448A3BC8789A6F8D7B4427E7A9832A31C45DD79E9034173535EBAEBF4|Scriban.dll:BD058C8CFD7318191B5D674881F1F259107B6DA55A9C49A2864C93F8F60CA148|Serilog.dll:BD48CF4D42118F07969DEB1FE547589B1E7068608BB2123C410EA28ED3E2A3EC|Serilog.Enrichers.Process.dll:6D357F790E1D9D2795E4C5A9D76A49CD7EA72FF19366B0B388B8B2EBC7553C0F|Serilog.Sinks.Debug.dll:A5646E3B194448BFE6587B3F21282F2A2470683CB36E514B1C5F6D6E0BA3F2B2|Serilog.Sinks.File.dll:C99B64A24EACF45EB14D904A1294FD6E6DC46C0FFE61C53EA7B9C58F54CDB0E3|Serilog.Sinks.Seq.dll:6D176ACF75292D0F10B6FD1620F004745E3EC34C08346B4FA2F1FD8D6D88C204|System.Buffers.dll:3AF1E07305BED0ABE0CF32D9854E0A7F5F470216ADEE1B87D02350BE09D31B35|System.Collections.Immutable.dll:B2A9DB24B51EE1D87B40CF2BB6465186CA4360D27B6A30439F9C03947D592A21|System.Diagnostics.DiagnosticSource.dll:E286563A0932E5E294A6DB9397ED3F2413C6B3C592CD62213EBAD641F92C46A0|System.IO.Pipelines.dll:693915AAFC21FBE83E7CFBA136D79E15616D6A8A7347AEF47C957F35DE94382F|System.Management.dll:EF8891CE8C8B6AAAEB333C32E37462DF9E339BA4DDE16C46993BB0BAF70D8FA1|System.Memory.dll:B8FE216AFF0F6D162F8EEFE7BE1712162B7D8199E20CE2E70FFAC36C7CE20A4C|System.Numerics.Vectors.dll:22C84BE385FE8BA6D0E0138952748F28D781FCE36078B5A7AED91A6104BCD99B|System.Reflection.Metadata.dll:55EF768FFA305DE58E38E15420669258B16F420618EB1F702BDDB30E5C797961|System.Runtime.CompilerServices.Unsafe.dll:2D6F419D641682D8EFC4A40E850D2E85DE519D6823B93DAF2AEEE63206D4E32D|System.Security.AccessControl.dll:92A0CB02750ED3F97BAD1F49E1C1554B785BF226BB3B07A44B660584A5ABD18A|System.Security.Principal.Windows.dll:680D6D767CD2EB0537069E0DC6A13FA7F52A35547C8AC8FF45FA4580B9826143|System.Text.Encoding.CodePages.dll:EAF68151619943AB2DC46247F2D22A29DE0EA3805A56DE0C32B75AF12F89E74C|System.Text.Encodings.Web.dll:594AE31577B5D6478587184E46B50342FD77C4C570F7B1D14FD6AB3868282A76|System.Text.Json.dll:302D4F3E25E8297C25F6FAA2AD704AA529B688DA58A62AD4C6E3FFF49D8240AB|System.Threading.Channels.dll:D95CE845DEC7A394B8261F6BCF7FD3B28FC5D43D27004496FB3B69E2ABC1AE3B|System.Threading.Tasks.Extensions.dll:692C324C02A922F890AAF5948C54EC9758F5AB7019B8E8AB169C106DDD3231F4|System.ValueTuple.dll:E905D102585B22C6DF04F219AF5CBDBFA7BC165979E9788B62DF6DCC165E10F4|TaleWorlds.AchievementSystem.dll:4C167E2DDA9FB32599367A64CEA3C76CB7EFBE46A0F4BDF0DFBC552EDF87FAAD|TaleWorlds.ActivitySystem.dll:F8DC540A77856B1E451530D92D68CD4BBB99AD7EE23E59FB16D33EBAA4F1643C|TaleWorlds.CampaignSystem.dll:1F8E33E2ED73E6EC653D7629180AFB70649DDC6E5BD1657A802A264EFDA1C3AE|TaleWorlds.CampaignSystem.ViewModelCollection.dll:5D817A46456D07B5E4382A870795FD9F8D6F11B4707A91D8A8B5D5CD50E762A5|TaleWorlds.Core.dll:3E5CECE8CA42FAF3FDDE27632519ED2A6F86D1EC6D1A742867729F00001689BF|TaleWorlds.Core.ViewModelCollection.dll:5A48A04FF42B1B448FB8DEF314608A402FD4F872174C3A4CD858D5E866F44B23|TaleWorlds.Diamond.AccessProvider.Test.dll:CC003F82C0B5CA9C4F1BEBDDFF7E3850E9D1B47B34C31FC077919C0722D956FD|TaleWorlds.Diamond.dll:618B953F31A7663C61B92276750915CCD33268550EEDE271792C57DC76899F92|TaleWorlds.DotNet.dll:A002A6F094B01912306814F3979C8A249ABCFC05A874DCC3352B26F23DFEF080|TaleWorlds.Engine.dll:BFD5DB82D92F75EF15A5EB9A9F0C9391412566933193122DB1684019ED704D68|TaleWorlds.Engine.GauntletUI.dll:8F96A2C31F04F294194F4C59867935D80008723758350997404710B220E290CF|TaleWorlds.GauntletUI.Data.dll:FCD480210708F45850EE794CF59EC139C0E6AEF77669C7370914D3B038C97D8C|TaleWorlds.GauntletUI.dll:3FE02171A2A8B455C0922689A24669AE91ABE7914895B21F269897197433DB1E|TaleWorlds.GauntletUI.ExtraWidgets.dll:8CA50050F4F67F7506588B26C16C7CBCE83D9165A1E5DB70EFB4320422AC235E|TaleWorlds.GauntletUI.PrefabSystem.dll:78422B519733EF27DDC4ADE743381A286E51975997511C83A77055B634E015ED|TaleWorlds.InputSystem.dll:9551E6FDAF8F003E6DA24E8399AD6A5A5CEF38A724E1F5B889E2399954572D95|TaleWorlds.Library.dll:AB4FF23E94A6F4B6F293D0CB4333CAE731A0499063FE4A8B6C6A3770DE32C4E5|TaleWorlds.LinQuick.dll:30CACD070F5CAE7BA5AD512BE596F7C38BDD78AAB750D028000471C4003D586B|TaleWorlds.Localization.dll:D75A5C89C26A09E587FAB55C182B2962BB36708B4766A922BDF1F46A28212628|TaleWorlds.ModuleManager.dll:4BF89CC201611B22E158B1C319A20AA0F98FAFD925CCEF1227168B079F25BCC7|TaleWorlds.MountAndBlade.Diamond.dll:227D17643BB8C11DDFFDB8C19C44E1123CC0F034814E45C66D9C6D29ED0F6CC1|TaleWorlds.MountAndBlade.dll:19387F31557FF840D14F378F6BBDF1D58FCFF406AB9FF2294DFBB3E49A50B87E|TaleWorlds.MountAndBlade.GauntletUI.dll:75B070E0B1347C3F6C7E4526EDC5370BBA18B4D4B4747C115669E23477AD44E2|TaleWorlds.MountAndBlade.GauntletUI.Widgets.dll:3828067E5BC61521D399BB237CAC6488C7C999B045C2436E86906E1232BD9DBE|TaleWorlds.MountAndBlade.Helpers.dll:52A3C2E1A4EF8A9F16663D95DC1B6D6E7AF465F3D0F6ED52DAD6AFB4498E570A|TaleWorlds.MountAndBlade.View.dll:FFAAC5ED867CD299F8C14F58FFEE64F86E50D8B197DB5F966759524C3E574BA1|TaleWorlds.MountAndBlade.ViewModelCollection.dll:C7052D125863B9DBC898F6F95762F1B7754F25133A5BC3AAF3B87E8E85FD7ACB|TaleWorlds.Network.dll:C5EE52E8128A2048870283533F1F71AEFFC3008E8849AF90363068A283D60805|TaleWorlds.ObjectSystem.dll:D76E1D883A6D9A4EFE6F9F3B4D14DA41A414C7B587F7280705255DC99ABD9977|TaleWorlds.PlatformService.dll:206F8A494004EE1032B9F4FDD56515B541C93E94FE5C55F9438D053FA997FD67|TaleWorlds.PlayerServices.dll:BDCCF750B4C7C3A143084F26E684D4CC28B156DBA2E45DBDA270E4804CEB1990|TaleWorlds.PSAI.dll:12C46E43EE741C341F1619223CC5CCCD43222AB74C5305FAB3EBA41740C05E4D|TaleWorlds.SaveSystem.dll:AEE0F88D156BA286CF85624F91E2CEE4E2A4DA3AE2689A603F33ED247B28AAC7|TaleWorlds.ScreenSystem.dll:3217B3BFB9BE850D73C8E42B5FF081E1D559F192331E4FF2913CC2182B577DFF|TaleWorlds.ServiceDiscovery.Client.dll:AADAB2637322F4821F82B9F50CC89FE69EE42830654D83B42BE3243231D41DE3|TaleWorlds.TwoDimension.dll:228A7534D395D5337887A438EFDC9DF533A1AFD46D888AF9FEFAED5A4705998E",
+                       "gameVersion":  "8C209EA08A500075BA005B09394206F5E32B632EC2FF97282CBC040BBAA8D2E3",
+                       "runnerSha256":  "84F4C7DAF2FA6C50952CD5F8586B687ADFDD1948D2E81CCFB7F4D4309A7CF0D4",
+                       "builtUtc":  "2026-10-23T19:39:23.8788053Z"
+                   },
+    "pidState":  {
+                     "pid":  71636,
+                     "runToken":  "issue3781-20261023T193531",
+                     "startedUtc":  "2026-10-23T19:40:06.3640613Z",
+                     "serverHead":  "bb76bea12d5aacd11f5c2868b72440ebd9a58bc9",
+                     "serverData":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\server-data",
+                     "standardOutputPath":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\server-data\\logs\\issue3781-20261023T193531.stdout.log",
+                     "standardErrorPath":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\server-data\\logs\\issue3781-20261023T193531.stderr.log"
+                 },
+    "launcherProcess":  {
+                            "pid":  71636,
+                            "executablePath":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\BannerlordCoopServer.exe",
+                            "startedUtc":  "2026-10-23T19:40:06.3640613Z"
+                        },
+    "endpointRelationship":  "descendant-of-tracked-launcher",
+    "endpointDiscovery":  "token-scoped-cim-and-pipe",
+    "registeredEndpoint":  null,
+    "readinessEndpoint":  {
+                              "version":  1,
+                              "id":  "a5a22c69340a4f63a455e56dac784014",
+                              "ok":  true,
+                              "process":  {
+                                              "pid":  40000,
+                                              "role":  "server",
+                                              "platformId":  null,
+                                              "runToken":  "issue3781-20261023T193531",
+                                              "processStartedUtc":  "0001-01-01T00:00:00"
+                                          },
+                              "result":  {
+                                             "protocolVersion":  1,
+                                             "pid":  40000,
+                                             "role":  "server",
+                                             "platformId":  null,
+                                             "runToken":  "issue3781-20261023T193531",
+                                             "buildVersion":  "0.1.7+3d1140bbd01d588e18655734f96da083fbf86b43",
+                                             "assemblyMvid":  null,
+                                             "loadedAssemblies":  [
+                                                                      {
+                                                                          "name":  "Common",
+                                                                          "version":  "1.0.0.0",
+                                                                          "mvid":  "890f5f1d-0627-46ce-a246-f27d15f1fb91",
+                                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Common.dll"
+                                                                      },
+                                                                      {
+                                                                          "name":  "Coop.Core",
+                                                                          "version":  "1.0.0.0",
+                                                                          "mvid":  "f5a9af25-1450-4aaf-afcc-a16a0ee070ba",
+                                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Coop.Core.dll"
+                                                                      },
+                                                                      {
+                                                                          "name":  "Coop.Steam",
+                                                                          "version":  "1.0.0.0",
+                                                                          "mvid":  "de0cd721-c31d-46fc-aedf-787d9904b6a7",
+                                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Coop.Steam.dll"
+                                                                      },
+                                                                      {
+                                                                          "name":  "GameInterface",
+                                                                          "version":  "1.0.0.0",
+                                                                          "mvid":  "31802a2f-685a-44c9-bb5e-829feec9df67",
+                                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\GameInterface.dll"
+                                                                      },
+                                                                      {
+                                                                          "name":  "Missions",
+                                                                          "version":  "1.0.0.0",
+                                                                          "mvid":  "76b7587c-7685-4855-8fe5-9d00be824877",
+                                                                          "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Missions.dll"
+                                                                      }
+                                                                  ],
+                                             "dedicatedServerAssemblies":  [
+                                                                               {
+                                                                                   "name":  "DedicatedServer.Core",
+                                                                                   "version":  "1.0.0.0",
+                                                                                   "mvid":  "839732fa-67a6-4fe6-ad0b-bce9a8decea0",
+                                                                                   "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\bin\\Win64_Shipping_Server\\DedicatedServer.Core.dll"
+                                                                               },
+                                                                               {
+                                                                                   "name":  "DedicatedServer.Windows",
+                                                                                   "version":  "0.0.0.0",
+                                                                                   "mvid":  "7f6a8ea4-3849-4fa9-91af-858afe7f2ce6",
+                                                                                   "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\DedicatedServer.Windows\\bin\\Win64_Shipping_Server\\DedicatedServer.Windows.dll"
+                                                                               },
+                                                                               {
+                                                                                   "name":  "TaleWorlds.Starter.DotNetCore",
+                                                                                   "version":  "1.0.0.0",
+                                                                                   "mvid":  "32337b48-89dc-4214-9ea7-7dad95fdc13d",
+                                                                                   "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\bin\\Win64_Shipping_Server\\TaleWorlds.Starter.DotNetCore.dll"
+                                                                               }
+                                                                           ],
+                                             "processStartedUtc":  "2026-10-23T19:40:07.0859994Z",
+                                             "logPath":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\server-data\\logs\\coop-server-20261023-144007.log",
+                                             "gameThreadInitialized":  true,
+                                             "gameThreadQueueDepth":  0,
+                                             "commandRegistryReady":  true,
+                                             "activeState":  "TaleWorlds.CampaignSystem.GameState.MapState",
+                                             "topScreen":  null,
+                                             "activeMenu":  null,
+                                             "campaignLoaded":  true,
+                                             "missionActive":  false,
+                                             "coopRunning":  true,
+                                             "coopState":  "Coop.Core.Server.States.ServerRunningState",
+                                             "registeredPlayers":  2,
+                                             "serving":  true,
+                                             "joinPort":  4200,
+                                             "connectionRoster":  [
+
+                                                                  ],
+                                             "moduleValidation":  {
+                                                                      "coopBuildVersion":  "0.1.7+3d1140bbd01d588e18655734f96da083fbf86b43",
+                                                                      "modules":  [
+                                                                                      {
+                                                                                          "id":  "Native",
+                                                                                          "isOfficial":  true,
+                                                                                          "isDlc":  false,
+                                                                                          "version":  {
+                                                                                                          "applicationVersionType":  3,
+                                                                                                          "major":  1,
+                                                                                                          "minor":  4,
+                                                                                                          "revision":  8,
+                                                                                                          "changeSet":  118999
+                                                                                                      }
+                                                                                      },
+                                                                                      {
+                                                                                          "id":  "SandBoxCore",
+                                                                                          "isOfficial":  true,
+                                                                                          "isDlc":  false,
+                                                                                          "version":  {
+                                                                                                          "applicationVersionType":  3,
+                                                                                                          "major":  1,
+                                                                                                          "minor":  4,
+                                                                                                          "revision":  8,
+                                                                                                          "changeSet":  118999
+                                                                                                      }
+                                                                                      },
+                                                                                      {
+                                                                                          "id":  "Sandbox",
+                                                                                          "isOfficial":  true,
+                                                                                          "isDlc":  false,
+                                                                                          "version":  {
+                                                                                                          "applicationVersionType":  3,
+                                                                                                          "major":  1,
+                                                                                                          "minor":  4,
+                                                                                                          "revision":  8,
+                                                                                                          "changeSet":  118999
+                                                                                                      }
+                                                                                      },
+                                                                                      {
+                                                                                          "id":  "Coop",
+                                                                                          "isOfficial":  false,
+                                                                                          "isDlc":  false,
+                                                                                          "version":  {
+                                                                                                          "applicationVersionType":  3,
+                                                                                                          "major":  0,
+                                                                                                          "minor":  1,
+                                                                                                          "revision":  7,
+                                                                                                          "changeSet":  0
+                                                                                                      }
+                                                                                      },
+                                                                                      {
+                                                                                          "id":  "DedicatedServer.Windows",
+                                                                                          "isOfficial":  false,
+                                                                                          "isDlc":  false,
+                                                                                          "version":  {
+                                                                                                          "applicationVersionType":  3,
+                                                                                                          "major":  1,
+                                                                                                          "minor":  4,
+                                                                                                          "revision":  8,
+                                                                                                          "changeSet":  0
+                                                                                                      }
+                                                                                      }
+                                                                                  ]
+                                                                  },
+                                             "readyForCampaignTests":  true,
+                                             "readyForMissionTests":  true
+                                         },
+                              "error":  null
+                          },
+    "serverPlayerState":  {
+                              "legacyRegisteredPlayerCount":  2,
+                              "explicitConnectedPlayerCount":  null,
+                              "explicitConnectedControllerIds":  null
+                          },
+    "completedUtc":  "2026-10-23T19:43:15.5417040Z"
+}

@@ -1,0 +1,222 @@
+{
+    "version":  1,
+    "id":  "f1a56f11112e4db29b501f7b05cafc08",
+    "ok":  true,
+    "process":  null,
+    "result":  {
+                   "endpoints":  [
+                                     {
+                                         "version":  1,
+                                         "id":  "2e9d3e9e0629403781d29fc574c1eacd",
+                                         "ok":  true,
+                                         "process":  {
+                                                         "pid":  40000,
+                                                         "role":  "server",
+                                                         "platformId":  null,
+                                                         "runToken":  "issue3781-20261023T193531",
+                                                         "processStartedUtc":  "0001-01-01T00:00:00"
+                                                     },
+                                         "result":  {
+                                                        "protocolVersion":  1,
+                                                        "pid":  40000,
+                                                        "role":  "server",
+                                                        "platformId":  null,
+                                                        "runToken":  "issue3781-20261023T193531",
+                                                        "buildVersion":  "0.1.7+3d1140bbd01d588e18655734f96da083fbf86b43",
+                                                        "assemblyMvid":  null,
+                                                        "loadedAssemblies":  [
+                                                                                 {
+                                                                                     "name":  "Common",
+                                                                                     "version":  "1.0.0.0",
+                                                                                     "mvid":  "890f5f1d-0627-46ce-a246-f27d15f1fb91",
+                                                                                     "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Common.dll"
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "Coop.Core",
+                                                                                     "version":  "1.0.0.0",
+                                                                                     "mvid":  "f5a9af25-1450-4aaf-afcc-a16a0ee070ba",
+                                                                                     "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Coop.Core.dll"
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "Coop.Steam",
+                                                                                     "version":  "1.0.0.0",
+                                                                                     "mvid":  "de0cd721-c31d-46fc-aedf-787d9904b6a7",
+                                                                                     "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Coop.Steam.dll"
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "GameInterface",
+                                                                                     "version":  "1.0.0.0",
+                                                                                     "mvid":  "31802a2f-685a-44c9-bb5e-829feec9df67",
+                                                                                     "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\GameInterface.dll"
+                                                                                 },
+                                                                                 {
+                                                                                     "name":  "Missions",
+                                                                                     "version":  "1.0.0.0",
+                                                                                     "mvid":  "76b7587c-7685-4855-8fe5-9d00be824877",
+                                                                                     "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Missions.dll"
+                                                                                 }
+                                                                             ],
+                                                        "dedicatedServerAssemblies":  [
+                                                                                          {
+                                                                                              "name":  "DedicatedServer.Core",
+                                                                                              "version":  "1.0.0.0",
+                                                                                              "mvid":  "839732fa-67a6-4fe6-ad0b-bce9a8decea0",
+                                                                                              "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\bin\\Win64_Shipping_Server\\DedicatedServer.Core.dll"
+                                                                                          },
+                                                                                          {
+                                                                                              "name":  "DedicatedServer.Windows",
+                                                                                              "version":  "0.0.0.0",
+                                                                                              "mvid":  "7f6a8ea4-3849-4fa9-91af-858afe7f2ce6",
+                                                                                              "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\DedicatedServer.Windows\\bin\\Win64_Shipping_Server\\DedicatedServer.Windows.dll"
+                                                                                          },
+                                                                                          {
+                                                                                              "name":  "TaleWorlds.Starter.DotNetCore",
+                                                                                              "version":  "1.0.0.0",
+                                                                                              "mvid":  "32337b48-89dc-4214-9ea7-7dad95fdc13d",
+                                                                                              "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\bin\\Win64_Shipping_Server\\TaleWorlds.Starter.DotNetCore.dll"
+                                                                                          }
+                                                                                      ],
+                                                        "processStartedUtc":  "2026-10-23T19:40:07.0859994Z",
+                                                        "logPath":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\server-data\\logs\\coop-server-20261023-144007.log",
+                                                        "gameThreadInitialized":  true,
+                                                        "gameThreadQueueDepth":  0,
+                                                        "commandRegistryReady":  true,
+                                                        "activeState":  "TaleWorlds.CampaignSystem.GameState.MapState",
+                                                        "topScreen":  null,
+                                                        "activeMenu":  null,
+                                                        "campaignLoaded":  true,
+                                                        "missionActive":  false,
+                                                        "coopRunning":  true,
+                                                        "coopState":  "Coop.Core.Server.States.ServerRunningState",
+                                                        "registeredPlayers":  2,
+                                                        "serving":  true,
+                                                        "joinPort":  4200,
+                                                        "connectionRoster":  [
+
+                                                                             ],
+                                                        "moduleValidation":  {
+                                                                                 "coopBuildVersion":  "0.1.7+3d1140bbd01d588e18655734f96da083fbf86b43",
+                                                                                 "modules":  [
+                                                                                                 {
+                                                                                                     "id":  "Native",
+                                                                                                     "isOfficial":  true,
+                                                                                                     "isDlc":  false,
+                                                                                                     "version":  {
+                                                                                                                     "applicationVersionType":  3,
+                                                                                                                     "major":  1,
+                                                                                                                     "minor":  4,
+                                                                                                                     "revision":  8,
+                                                                                                                     "changeSet":  118999
+                                                                                                                 }
+                                                                                                 },
+                                                                                                 {
+                                                                                                     "id":  "SandBoxCore",
+                                                                                                     "isOfficial":  true,
+                                                                                                     "isDlc":  false,
+                                                                                                     "version":  {
+                                                                                                                     "applicationVersionType":  3,
+                                                                                                                     "major":  1,
+                                                                                                                     "minor":  4,
+                                                                                                                     "revision":  8,
+                                                                                                                     "changeSet":  118999
+                                                                                                                 }
+                                                                                                 },
+                                                                                                 {
+                                                                                                     "id":  "Sandbox",
+                                                                                                     "isOfficial":  true,
+                                                                                                     "isDlc":  false,
+                                                                                                     "version":  {
+                                                                                                                     "applicationVersionType":  3,
+                                                                                                                     "major":  1,
+                                                                                                                     "minor":  4,
+                                                                                                                     "revision":  8,
+                                                                                                                     "changeSet":  118999
+                                                                                                                 }
+                                                                                                 },
+                                                                                                 {
+                                                                                                     "id":  "Coop",
+                                                                                                     "isOfficial":  false,
+                                                                                                     "isDlc":  false,
+                                                                                                     "version":  {
+                                                                                                                     "applicationVersionType":  3,
+                                                                                                                     "major":  0,
+                                                                                                                     "minor":  1,
+                                                                                                                     "revision":  7,
+                                                                                                                     "changeSet":  0
+                                                                                                                 }
+                                                                                                 },
+                                                                                                 {
+                                                                                                     "id":  "DedicatedServer.Windows",
+                                                                                                     "isOfficial":  false,
+                                                                                                     "isDlc":  false,
+                                                                                                     "version":  {
+                                                                                                                     "applicationVersionType":  3,
+                                                                                                                     "major":  1,
+                                                                                                                     "minor":  4,
+                                                                                                                     "revision":  8,
+                                                                                                                     "changeSet":  0
+                                                                                                                 }
+                                                                                                 }
+                                                                                             ]
+                                                                             },
+                                                        "readyForCampaignTests":  true,
+                                                        "readyForMissionTests":  true
+                                                    },
+                                         "error":  null
+                                     }
+                                 ],
+                   "unavailable":  [
+                                       {
+                                           "pid":  54164,
+                                           "message":  "Timed out connecting to pid 54164 after 750 ms.",
+                                           "timedOut":  true
+                                       },
+                                       {
+                                           "pid":  67600,
+                                           "message":  "Timed out connecting to pid 67600 after 750 ms.",
+                                           "timedOut":  true
+                                       }
+                                   ],
+                   "progress":  {
+                                    "startedUtc":  "2026-10-23T19:44:49.9873616Z",
+                                    "observedUtc":  "2026-10-23T19:44:52.5597598Z",
+                                    "timeoutMilliseconds":  5000,
+                                    "endpointRecords":  {
+                                                            "startedUtc":  "2026-10-23T19:44:49.9888677Z",
+                                                            "observedUtc":  "2026-10-23T19:44:50.0387749Z",
+                                                            "elapsedMilliseconds":  50,
+                                                            "count":  0
+                                                        },
+                                    "cim":  {
+                                                "startedUtc":  "2026-10-23T19:44:50.0451641Z",
+                                                "observedUtc":  "2026-10-23T19:44:50.8906883Z",
+                                                "timeoutMilliseconds":  5000,
+                                                "operationTimeoutSeconds":  5,
+                                                "completed":  true,
+                                                "timedOut":  false,
+                                                "stopped":  false,
+                                                "drained":  true,
+                                                "elapsedMilliseconds":  846,
+                                                "error":  null
+                                            },
+                                    "status":  {
+                                                   "mode":  "serial",
+                                                   "startedUtc":  "2026-10-23T19:44:50.9129101Z",
+                                                   "observedUtc":  "2026-10-23T19:44:52.5502532Z",
+                                                   "timeoutMilliseconds":  2250,
+                                                   "requestedCount":  3,
+                                                   "completedCount":  1,
+                                                   "timedOutPids":  [
+                                                                        54164,
+                                                                        67600
+                                                                    ],
+                                                   "drained":  true,
+                                                   "drainedCount":  3,
+                                                   "elapsedMilliseconds":  1640
+                                               },
+                                    "processCount":  3,
+                                    "elapsedMilliseconds":  2573
+                                }
+               },
+    "error":  null
+}

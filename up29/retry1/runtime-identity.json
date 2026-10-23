@@ -1,0 +1,143 @@
+{
+    "head":  "3d1140bbd01d588e18655734f96da083fbf86b43",
+    "tree":  "e6c31dde1f707d2ff806abf32f449ef8cdf28f2d",
+    "token":  "issue3781-20261023T193531",
+    "fixtureRevision":  "3781-rejoin-r2",
+    "fixtureManifest":  {
+                            "fixture":  {
+                                            "path":  "artifacts/IssueToPr/ittest/IssueLiveTestKit.cs",
+                                            "sha256":  "176ac1592ff2312e9c00c4425850cdcfa3e71cb460c4558b5ad75f199053efee"
+                                        },
+                            "targets":  {
+                                            "path":  "artifacts/IssueToPr/ittest/IssueLiveTestKit.targets",
+                                            "sha256":  "42e174a8b62d0285a164b850615b1194445adb096f011c2ffc228f87f456fdd7"
+                                        },
+                            "source":  {
+                                           "head":  "3d1140bbd01d588e18655734f96da083fbf86b43",
+                                           "tree":  "e6c31dde1f707d2ff806abf32f449ef8cdf28f2d"
+                                       },
+                            "sourceRoot":  "/home/pwisorlowska/worktrees/BannerlordCoop/3781-ladys-knight-out"
+                        },
+    "fixtureManifestSha256":  "579743f72c062b927cc8ba1eebba1141703f3165fd72abb27dff6245b4433353",
+    "model":  {
+                  "serviceTier":  "default",
+                  "provider":  "cliproxyapi-codex",
+                  "reasoningEffort":  "high",
+                  "model":  "gpt-6.1-sol"
+              },
+    "endpoints":  {
+                      "server":  40000,
+                      "A":  54164,
+                      "B":  67600
+                  },
+    "loadedAssemblies":  {
+                             "server":  [
+                                            {
+                                                "mvid":  "890f5f1d-0627-46ce-a246-f27d15f1fb91",
+                                                "sha256":  "ca9a5e7a9736a60a1b58ee2f37f9159e9ea9a7c15e2432b3b9498f5a2eca52eb",
+                                                "name":  "Common",
+                                                "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Common.dll"
+                                            },
+                                            {
+                                                "mvid":  "f5a9af25-1450-4aaf-afcc-a16a0ee070ba",
+                                                "sha256":  "f185882782a5f71d9cb3bf4837329852adc83131deff7ba5bd6985eba6712c3c",
+                                                "name":  "Coop.Core",
+                                                "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Coop.Core.dll"
+                                            },
+                                            {
+                                                "mvid":  "de0cd721-c31d-46fc-aedf-787d9904b6a7",
+                                                "sha256":  "803cc3fc46df189c9af81151fa0750336893ecbd82f5a0e2130148554e66ceae",
+                                                "name":  "Coop.Steam",
+                                                "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Coop.Steam.dll"
+                                            },
+                                            {
+                                                "mvid":  "31802a2f-685a-44c9-bb5e-829feec9df67",
+                                                "sha256":  "1ffce23d0642d46d997564f8583fb45ac4a6044e458bbc95b92f867ead8b389e",
+                                                "name":  "GameInterface",
+                                                "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\GameInterface.dll"
+                                            },
+                                            {
+                                                "mvid":  "76b7587c-7685-4855-8fe5-9d00be824877",
+                                                "sha256":  "f32129eafb6d46f206b8f0809fc144308d08e89258aef6b5f6d8fbc666376e2a",
+                                                "name":  "Missions",
+                                                "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop.DedicatedServer-live-main\\.stage-win\\engine\\Modules\\Coop\\bin\\Win64_Shipping_Server\\Missions.dll"
+                                            }
+                                        ],
+                             "A":  [
+                                       {
+                                           "mvid":  "890f5f1d-0627-46ce-a246-f27d15f1fb91",
+                                           "sha256":  "ca9a5e7a9736a60a1b58ee2f37f9159e9ea9a7c15e2432b3b9498f5a2eca52eb",
+                                           "name":  "Common",
+                                           "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Common.dll"
+                                       },
+                                       {
+                                           "mvid":  "f5289df7-94df-45d5-a765-a9ecebbee04d",
+                                           "sha256":  "9d21bd2b21f282bb524f0a885d014e0405528f7e2a9b13a03313d46a8fada49b",
+                                           "name":  "Coop",
+                                           "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.dll"
+                                       },
+                                       {
+                                           "mvid":  "f5a9af25-1450-4aaf-afcc-a16a0ee070ba",
+                                           "sha256":  "f185882782a5f71d9cb3bf4837329852adc83131deff7ba5bd6985eba6712c3c",
+                                           "name":  "Coop.Core",
+                                           "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.Core.dll"
+                                       },
+                                       {
+                                           "mvid":  "de0cd721-c31d-46fc-aedf-787d9904b6a7",
+                                           "sha256":  "803cc3fc46df189c9af81151fa0750336893ecbd82f5a0e2130148554e66ceae",
+                                           "name":  "Coop.Steam",
+                                           "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.Steam.dll"
+                                       },
+                                       {
+                                           "mvid":  "31802a2f-685a-44c9-bb5e-829feec9df67",
+                                           "sha256":  "1ffce23d0642d46d997564f8583fb45ac4a6044e458bbc95b92f867ead8b389e",
+                                           "name":  "GameInterface",
+                                           "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\GameInterface.dll"
+                                       },
+                                       {
+                                           "mvid":  "76b7587c-7685-4855-8fe5-9d00be824877",
+                                           "sha256":  "f32129eafb6d46f206b8f0809fc144308d08e89258aef6b5f6d8fbc666376e2a",
+                                           "name":  "Missions",
+                                           "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Missions.dll"
+                                       }
+                                   ],
+                             "B":  [
+                                       {
+                                           "mvid":  "890f5f1d-0627-46ce-a246-f27d15f1fb91",
+                                           "sha256":  "ca9a5e7a9736a60a1b58ee2f37f9159e9ea9a7c15e2432b3b9498f5a2eca52eb",
+                                           "name":  "Common",
+                                           "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Common.dll"
+                                       },
+                                       {
+                                           "mvid":  "f5289df7-94df-45d5-a765-a9ecebbee04d",
+                                           "sha256":  "9d21bd2b21f282bb524f0a885d014e0405528f7e2a9b13a03313d46a8fada49b",
+                                           "name":  "Coop",
+                                           "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.dll"
+                                       },
+                                       {
+                                           "mvid":  "f5a9af25-1450-4aaf-afcc-a16a0ee070ba",
+                                           "sha256":  "f185882782a5f71d9cb3bf4837329852adc83131deff7ba5bd6985eba6712c3c",
+                                           "name":  "Coop.Core",
+                                           "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.Core.dll"
+                                       },
+                                       {
+                                           "mvid":  "de0cd721-c31d-46fc-aedf-787d9904b6a7",
+                                           "sha256":  "803cc3fc46df189c9af81151fa0750336893ecbd82f5a0e2130148554e66ceae",
+                                           "name":  "Coop.Steam",
+                                           "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Coop.Steam.dll"
+                                       },
+                                       {
+                                           "mvid":  "31802a2f-685a-44c9-bb5e-829feec9df67",
+                                           "sha256":  "1ffce23d0642d46d997564f8583fb45ac4a6044e458bbc95b92f867ead8b389e",
+                                           "name":  "GameInterface",
+                                           "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\GameInterface.dll"
+                                       },
+                                       {
+                                           "mvid":  "76b7587c-7685-4855-8fe5-9d00be824877",
+                                           "sha256":  "f32129eafb6d46f206b8f0809fc144308d08e89258aef6b5f6d8fbc666376e2a",
+                                           "name":  "Missions",
+                                           "location":  "C:\\Users\\Andrew\\.codex-runtime\\live-testing\\BannerlordCoop\\mb2\\Modules\\Coop\\bin\\Win64_Shipping_Client\\Missions.dll"
+                                       }
+                                   ]
+                         }
+}

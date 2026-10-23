@@ -1,0 +1,25 @@
+{
+    "version":  1,
+    "id":  "29603f09a85f4bd6967f3b9e4ad34e45",
+    "ok":  true,
+    "process":  {
+                    "pid":  54164,
+                    "role":  "client",
+                    "platformId":  "testclient",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2225903Z"
+                },
+    "result":  {
+                   "name":  "coop.debug.ittest.run",
+                   "arguments":  [
+                                     "conv"
+                                 ],
+                   "found":  true,
+                   "output":  "inProgress=True hero=Hero_CharacterObject_2705 \u0027Darya\u0027\r\nnpc: I am \u003ca style=\"Link.Hero\" href=\"event:Hero-CharacterObject_2705\"\u003e\u003cb\u003eDarya\u003c/b\u003e\u003c/a\u003e, of the \u003ca style=\"Link.Clan\" href=\"event:Faction-clan_aserai_2\"\u003e\u003cb\u003eBanu Sarran\u003c/b\u003e\u003c/a\u003e, a clan of the Aserai. \r\n",
+                   "succeeded":  true,
+                   "errorCode":  null,
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

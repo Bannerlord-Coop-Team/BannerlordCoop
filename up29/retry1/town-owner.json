@@ -1,0 +1,28 @@
+{
+    "version":  1,
+    "id":  "4e866ef7c68745ad91fbce918ac36dc6",
+    "ok":  true,
+    "process":  {
+                    "pid":  40000,
+                    "role":  "server",
+                    "platformId":  null,
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "0001-01-01T00:00:00"
+                },
+    "result":  {
+                   "name":  "coop.debug.settlements.owner_state",
+                   "arguments":  [
+                                     "town_ES2"
+                                 ],
+                   "found":  true,
+                   "output":  "SERVER settlement=town_ES2 ownerClan=clan_empire_south_1 ownerLeader=lord_1_14\r\nLIVE_TEST_JSON={\"role\":\"SERVER\",\"settlement\":\"town_ES2\",\"ownerClan\":\"clan_empire_south_1\",\"ownerLeader\":\"lord_1_14\"}",
+                   "hasStructuredResult":  true,
+                   "structuredResult":  {
+                                            "role":  "SERVER",
+                                            "settlement":  "town_ES2",
+                                            "ownerClan":  "clan_empire_south_1",
+                                            "ownerLeader":  "lord_1_14"
+                                        }
+               },
+    "error":  null
+}

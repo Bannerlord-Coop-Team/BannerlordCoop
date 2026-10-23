@@ -1,0 +1,26 @@
+{
+    "version":  1,
+    "id":  "b93d2b1cf1ca498693af4b159940b32a",
+    "ok":  true,
+    "process":  {
+                    "pid":  54164,
+                    "role":  "client",
+                    "platformId":  "testclient",
+                    "runToken":  "issue3781-20261023T193531",
+                    "processStartedUtc":  "2026-10-23T19:44:32.2225903Z"
+                },
+    "result":  {
+                   "name":  "coop.debug.ittest.run",
+                   "arguments":  [
+                                     "talk",
+                                     "Hero_CharacterObject_2705"
+                                 ],
+                   "found":  true,
+                   "output":  "inProgress=True hero=Hero_CharacterObject_2705 \u0027Darya\u0027\r\nnpc: Well now, stranger. Peace to you. What is your name?\r\n  [0] I am Penton of the fen Calrain. And who are you? {lord_meet_player_response1}\r\n  [1] My name is Penton of the fen Calrain, madam. May I ask your name? {lord_meet_player_response2}\r\n  [2] They know me as Penton of the fen Calrain. Mark it down, you shall be hearing of me a lot. {lord_meet_player_response3}\r\n",
+                   "succeeded":  true,
+                   "errorCode":  null,
+                   "hasStructuredResult":  false,
+                   "structuredResult":  null
+               },
+    "error":  null
+}

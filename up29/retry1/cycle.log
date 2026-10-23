@@ -1,0 +1,17 @@
+fixture_manifest=/home/pwisorlowska/coop-live-orchestration/3781/up29/retry1/fixture-stage/manifest.json
+fixture_sha=579743f72c062b927cc8ba1eebba1141703f3165fd72abb27dff6245b4433353
+fixture_inputs=/home/pwisorlowska/coop-live-orchestration/3781/up29/retry1/fixture-stage
+== rotate 19:35:31
+   ok
+== build 19:36:52
+   ok
+== dedicated-prepare 19:38:27
+   ok
+== build-cache 19:39:26
+   ok
+== dedicated-start 19:39:45
+   ok
+== dedicated-readiness 19:40:09
+   ok
+LOCAL_UP_DONE token=issue3781-20261023T193531 head=3d1140bbd01d588e18655734f96da083fbf86b43 tree=e6c31dde1f707d2ff806abf32f449ef8cdf28f2d
+CLIENTS_LAUNCHING pid=49052

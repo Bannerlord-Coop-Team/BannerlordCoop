@@ -1,0 +1,3 @@
+# up29/retry1 accepted offline counter disposition
+Supervisor20:25Z explicitly accepted A received0 as correct: A was offline when server cancelled issue_1228, then loaded a fresh server campaign on reconnect. Functional proof is serverobserved1QuestCancel + Breceived1NetworkIssueFinalized + ApostrejoinActive0/noresurrection, with stable rewards and Bunaffected. No received packet is invented. Raw operator report/counters remain unchanged.
+Archive41055 classification is tracked separately pending the requested cross-quest test; no READY claim yet.
