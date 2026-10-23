@@ -652,7 +652,7 @@ public class LadysKnightOutTests : IDisposable
             });
             router.ResumeLink(scenario.Server.NetPeer, scenario.ClientA.NetPeer);
             router.RunUntilIdle();
-            scenario.ClientA.SimulateMessage(this, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>()));
+            Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
             var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
             Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
             Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
