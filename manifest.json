@@ -1,12 +1,14 @@
 {
-  "outcome": "PASS_FOR_SCOPED_PUBLICATION",
-  "head": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
-  "tree": "5d81be457582f5ea3fb3539d435b86729052f06c",
+  "outcome": "PASS_FOR_AUTHORIZED_RUN_LOCAL_PUBLICATION",
+  "head": "bd74a2d5323edd542faebc14b4b9802e6db81184",
+  "tree": "311491b1b93a9b28a6edf83fc2dab4fdb5981cd6",
   "currentMainHead": "bd74a2d5323edd542faebc14b4b9802e6db81184",
-  "dependencyOwnHeadSnapshot": "3de45705a7ec72f6364eef301f66d8fb3c6b3d5c",
-  "runToken": "issue3783-20261023T082604",
-  "legacyWorkflowUntouched": true,
-  "parentVisualReview": "parent-visual-review.json",
+  "earlierR4Head": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
+  "dependencyOwnHead": "78dc159175e19491a7825fcc8f6348ffcc24f32a",
+  "runTokens": [
+    "issue3783-20261023T082604",
+    "issue3783-20261023T114021"
+  ],
   "screenshots": [
     {
       "file": "shots/30-r4-offer-rd-testclient2-21176.png",
@@ -18,7 +20,9 @@
       "caption": "Oragur visibly offers 5,400 gold and the player can choose 'I'll find them and put a stop to what they're doing.' Gold is 1,000. This is the offer before acceptance.",
       "parentOpened": true,
       "parentApprovedForThisCaption": true,
-      "journalBeforeProof": false
+      "journalBeforeProof": false,
+      "testedHead": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
+      "runToken": "issue3783-20261023T082604"
     },
     {
       "file": "shots/40-r4-accepted-rd-testclient-69600.png",
@@ -30,7 +34,9 @@
       "caption": "Observer A on the Quyaz map, gold 1,000. Pre-ending context only. Associated strict receipts establish B owns an active quest and A has no quest; those states are not visible in this image.",
       "parentOpened": true,
       "parentApprovedForThisCaption": true,
-      "journalBeforeProof": false
+      "journalBeforeProof": false,
+      "testedHead": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
+      "runToken": "issue3783-20261023T082604"
     },
     {
       "file": "shots/40-r4-accepted-rd-testclient2-21176.png",
@@ -42,7 +48,9 @@
       "caption": "Owner B in the Ortongard town menu, gold 1,000. Pre-ending context only. The accepted, active quest is receipt-backed; neither a quest nor its journal is visible here.",
       "parentOpened": true,
       "parentApprovedForThisCaption": true,
-      "journalBeforeProof": false
+      "journalBeforeProof": false,
+      "testedHead": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
+      "runToken": "issue3783-20261023T082604"
     },
     {
       "file": "shots/owner-failed-Tuvul-ending-21176.png",
@@ -51,10 +59,12 @@
       "bytes": 1106740,
       "role": "owner B",
       "phase": "after ending",
-      "caption": "Owner B: Old Quests 3 and Tuvul's Revolt failed, with its opening and full battle-loss ending each once. The other seed row stays highlighted while the details show Tuvul.",
+      "caption": "FailureByBattle (R4): Owner B: Old Quests 3 and Tuvul's Revolt failed, with its opening and full battle-loss ending each once. The other seed row stays highlighted while the details show Tuvul.",
       "parentOpened": true,
       "parentApprovedForThisCaption": true,
-      "journalBeforeProof": false
+      "journalBeforeProof": false,
+      "testedHead": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
+      "runToken": "issue3783-20261023T082604"
     },
     {
       "file": "shots/observer-no-Tuvul-entry-69600.png",
@@ -63,42 +73,155 @@
       "bytes": 1088579,
       "role": "observer A",
       "phase": "after ending",
-      "caption": "Observer A: Active Quests 0, Old Quests 2, only existing Mitunis seed entries. No Tuvul entry. The specific journal lookup also returned no matching native entry.",
+      "caption": "FailureByBattle (R4): Observer A: Active Quests 0, Old Quests 2, only existing Mitunis seed entries. No Tuvul entry. The specific journal lookup also returned no matching native entry.",
       "parentOpened": true,
       "parentApprovedForThisCaption": true,
-      "journalBeforeProof": false
+      "journalBeforeProof": false,
+      "testedHead": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
+      "runToken": "issue3783-20261023T082604"
+    },
+    {
+      "file": "shots/ra-SuccessByAgreement-journal-testclient2-50816.png",
+      "sourceRelativePath": "screenshots/ra-SuccessByAgreement-journal-testclient2-50816.png",
+      "sha256": "810ba6e482e89ac03f97a2543e3163ab0847f0a2a252ddaf51a4a810db4e50e0",
+      "bytes": 1098322,
+      "role": "owner B",
+      "phase": "after ending",
+      "caption": "SuccessByAgreement: owner B: Old Quests 3, Tuvul's Revolt succeeded; opening and persuaded-disband ending with 5,400 gold each once.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false,
+      "testedHead": "bd74a2d5323edd542faebc14b4b9802e6db81184",
+      "runToken": "issue3783-20261023T114021",
+      "capturedUtc": "2026-10-23T11:56:31.2302890Z",
+      "clientPid": 50816
+    },
+    {
+      "file": "shots/ra-SuccessByAgreement-journal-testclient-56212.png",
+      "sourceRelativePath": "screenshots/ra-SuccessByAgreement-journal-testclient-56212.png",
+      "sha256": "a58362e17616ee90d17d7b026081aaa5b5b1cba2480e8b8bf5dbaf2a35a6067e",
+      "bytes": 1063690,
+      "role": "observer A",
+      "phase": "after ending",
+      "caption": "SuccessByAgreement: observer A: Active Quests 0, Old Quests 2, only seed entries; no matching revolt entry.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false,
+      "testedHead": "bd74a2d5323edd542faebc14b4b9802e6db81184",
+      "runToken": "issue3783-20261023T114021",
+      "capturedUtc": "2026-10-23T11:56:39.9236450Z",
+      "clientPid": 56212
+    },
+    {
+      "file": "shots/rc-SuccessByBattle-journal-testclient2-50816.png",
+      "sourceRelativePath": "screenshots/rc-SuccessByBattle-journal-testclient2-50816.png",
+      "sha256": "3f5bfa91b8e605384abc64ef442d87dac5892d9cfd96b190e915cdd69b36cbd5",
+      "bytes": 1181713,
+      "role": "owner B",
+      "phase": "after ending",
+      "caption": "SuccessByBattle: owner B: Old Quests 4, Olorun's Revolt succeeded; opening and defeated ending with 5,250 gold each once. Prior Tuvul success remains.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false,
+      "testedHead": "bd74a2d5323edd542faebc14b4b9802e6db81184",
+      "runToken": "issue3783-20261023T114021",
+      "capturedUtc": "2026-10-23T12:03:45.5780734Z",
+      "clientPid": 50816
+    },
+    {
+      "file": "shots/rc-SuccessByBattle-journal-testclient-56212.png",
+      "sourceRelativePath": "screenshots/rc-SuccessByBattle-journal-testclient-56212.png",
+      "sha256": "a5308795b09890f2879699a8e8071787bbfab4dd826b703b4b8b52c6521d5426",
+      "bytes": 1058599,
+      "role": "observer A",
+      "phase": "after ending",
+      "caption": "SuccessByBattle: observer A: Active Quests 0, Old Quests 2, only seed entries; no matching revolt entry.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false,
+      "testedHead": "bd74a2d5323edd542faebc14b4b9802e6db81184",
+      "runToken": "issue3783-20261023T114021",
+      "capturedUtc": "2026-10-23T12:03:56.3687089Z",
+      "clientPid": 56212
+    },
+    {
+      "file": "shots/rb-FailureByRelease-journal-testclient2-50816.png",
+      "sourceRelativePath": "screenshots/rb-FailureByRelease-journal-testclient2-50816.png",
+      "sha256": "7b1cc8107bdaae6e7b33f60b6f6fb3e9dd47d7e20a5a2fe3f6895b512f53a280",
+      "bytes": 1143352,
+      "role": "owner B",
+      "phase": "after ending",
+      "caption": "FailureByRelease: owner B: Old Quests 5, Huskur's Revolt failed; opening and convinced-let-gather-support ending each once. Both earlier successes remain.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false,
+      "testedHead": "bd74a2d5323edd542faebc14b4b9802e6db81184",
+      "runToken": "issue3783-20261023T114021",
+      "capturedUtc": "2026-10-23T12:08:15.7940632Z",
+      "clientPid": 50816
+    },
+    {
+      "file": "shots/rb-FailureByRelease-journal-testclient-56212.png",
+      "sourceRelativePath": "screenshots/rb-FailureByRelease-journal-testclient-56212.png",
+      "sha256": "0fcad0b17a793ff9a6566786e827630e724257eb3c1a432a37fb798bbc0bff29",
+      "bytes": 1057923,
+      "role": "observer A",
+      "phase": "after ending",
+      "caption": "FailureByRelease: observer A: Active Quests 0, Old Quests 2, only seed entries; no matching revolt entry.",
+      "parentOpened": true,
+      "parentApprovedForThisCaption": true,
+      "journalBeforeProof": false,
+      "testedHead": "bd74a2d5323edd542faebc14b4b9802e6db81184",
+      "runToken": "issue3783-20261023T114021",
+      "capturedUtc": "2026-10-23T12:08:26.7943083Z",
+      "clientPid": 56212
     }
   ],
   "files": [
     {
+      "path": "bd74-coverage-audit.json",
+      "bytes": 6350,
+      "sha256": "c37f86a901b86e7004eb21ef5ab01d5d93cdeb61d82b6a891b513da29039001c"
+    },
+    {
+      "path": "bd74-final-integrity.json",
+      "bytes": 1725,
+      "sha256": "a25f6a4b12d8d087c83929748972bfb93b76452629deac370bc1d02da52fa865"
+    },
+    {
+      "path": "bd74-FULL-RELEASE-RESULT.md",
+      "bytes": 5526,
+      "sha256": "8b419d31c8531c02f120ef683382f3e15b4733e90c47299e483d4b6436b99afd"
+    },
+    {
       "path": "CAPTIONS.md",
-      "bytes": 1530,
-      "sha256": "afd22800cb4763ab9fbae41c1f71e7fffd823994cc1ab4478ed22263a7604c34"
+      "bytes": 3842,
+      "sha256": "d27353d190b0080482f1561e88f64a3954c2acf74ff5c41243f9c57af0cc88a1"
     },
     {
       "path": "dependency-source-receipt.json",
-      "bytes": 693,
-      "sha256": "dcdfefbe6026f8a490c017baef09118cb8b3472f8797f4950e76adcd712f8d57"
+      "bytes": 9122,
+      "sha256": "57a3f655a068d13ab5d659349fe89a91f45865960dfc3e94488214a175c629c9"
     },
     {
       "path": "evidence-checks.json",
-      "bytes": 687,
-      "sha256": "e7165c4743714e7d962ee043c7d491f32b12280bcf0ce7ac67e7a776f9356537"
+      "bytes": 597,
+      "sha256": "dccc95f13817ed2e622e0f34037a2c2f7d8ccf82aa6c957952e1aa785e86ef54"
     },
     {
       "path": "evidence.html",
-      "bytes": 8361,
-      "sha256": "f075f94c0502fbad182bf9fd04e6ac1f8b5260f6eb4cf52064202a08745d5661"
+      "bytes": 13489,
+      "sha256": "f407cee8f625e39c7f58855c69e420f339760052daacc2b42e5a1aaaa47f01eb"
     },
     {
       "path": "evidence.md",
-      "bytes": 5923,
-      "sha256": "6018c62283d2bcd2b771a117e404e9b7e4670903f6dcefca3a5670cc03d44b05"
+      "bytes": 8770,
+      "sha256": "bdfdbd095140e0bff8c1e9201ffb29def01069a3833d3f43d141198263cbe6ae"
     },
     {
       "path": "parent-visual-review.json",
-      "bytes": 3835,
-      "sha256": "8be56d548cadfd99f20e2acc680da86cd9c46869d5523610c006a827bd44dc35"
+      "bytes": 9246,
+      "sha256": "1df51db8dbe44e4c81571fda2d52153d19d3acbba0fee0aa0920b008a4555e61"
     },
     {
       "path": "receipts/coverage-after-server.json",
@@ -267,8 +390,8 @@
     },
     {
       "path": "screenshots.json",
-      "bytes": 2981,
-      "sha256": "ffd654073d449850423fde9a1fff9d837eedd017fd785725d03789739c6b84ba"
+      "bytes": 8255,
+      "sha256": "9d0a363c8bb1de44be0744a503b99827543e06234bb362ea46abf28ee7444729"
     },
     {
       "path": "shots/30-r4-offer-rd-testclient2-21176.png",
@@ -296,6 +419,36 @@
       "sha256": "9dcf196524084017652c9498050288f0111d472bf0bbfabd524d89b1d4f4d300"
     },
     {
+      "path": "shots/ra-SuccessByAgreement-journal-testclient-56212.png",
+      "bytes": 1063690,
+      "sha256": "a58362e17616ee90d17d7b026081aaa5b5b1cba2480e8b8bf5dbaf2a35a6067e"
+    },
+    {
+      "path": "shots/ra-SuccessByAgreement-journal-testclient2-50816.png",
+      "bytes": 1098322,
+      "sha256": "810ba6e482e89ac03f97a2543e3163ab0847f0a2a252ddaf51a4a810db4e50e0"
+    },
+    {
+      "path": "shots/rb-FailureByRelease-journal-testclient-56212.png",
+      "bytes": 1057923,
+      "sha256": "0fcad0b17a793ff9a6566786e827630e724257eb3c1a432a37fb798bbc0bff29"
+    },
+    {
+      "path": "shots/rb-FailureByRelease-journal-testclient2-50816.png",
+      "bytes": 1143352,
+      "sha256": "7b1cc8107bdaae6e7b33f60b6f6fb3e9dd47d7e20a5a2fe3f6895b512f53a280"
+    },
+    {
+      "path": "shots/rc-SuccessByBattle-journal-testclient-56212.png",
+      "bytes": 1058599,
+      "sha256": "a5308795b09890f2879699a8e8071787bbfab4dd826b703b4b8b52c6521d5426"
+    },
+    {
+      "path": "shots/rc-SuccessByBattle-journal-testclient2-50816.png",
+      "bytes": 1181713,
+      "sha256": "3f5bfa91b8e605384abc64ef442d87dac5892d9cfd96b190e915cdd69b36cbd5"
+    },
+    {
       "path": "source-equivalence.json",
       "bytes": 662,
       "sha256": "704c296f839749fce92a7095b1e75c4c634b89c44437ef42ab074787f5c4390b"
@@ -314,7 +467,2333 @@
       "path": "up23-RESULT.json",
       "bytes": 3947,
       "sha256": "06aee77cefe45007feb9e3b9c288145a97afd12459c03e23d122e147b22ad285"
+    },
+    {
+      "path": "up24-audit.py",
+      "bytes": 7921,
+      "sha256": "c963cc0a769c0501730e0238fcf93af4be8ce9c9440b5702a3a1e3078043817a"
+    },
+    {
+      "path": "up24-config-seed-final.json",
+      "bytes": 1613,
+      "sha256": "91a8ccd2d68a8837c70baedef90916f4f5b987d8ef61e6aff8b60c876a3b632b"
+    },
+    {
+      "path": "up24-dependency-18-product-blobs.json",
+      "bytes": 8431,
+      "sha256": "5e483fc1d79a04773c3b0ca9191029e17159030053ef37a5cad9e95540b5c72f"
+    },
+    {
+      "path": "up24-EVIDENCE-MANIFEST.json",
+      "bytes": 130063,
+      "sha256": "97fa26e6ad0e94c4f8b9b6dd8abbe3952d8f694857294ba481862504827d9e94"
+    },
+    {
+      "path": "up24-EVIDENCE-MANIFEST.sha256",
+      "bytes": 89,
+      "sha256": "59bbd4b794fd206f0f392f11bf8ec45ba83e6792c6c0a8a0bc7f6227acef2d17"
+    },
+    {
+      "path": "up24-final-inventory.json",
+      "bytes": 266,
+      "sha256": "7688e492f774b829571d5ab9d4eb368e33af112d74cb9aa4784c9d86009b16d8"
+    },
+    {
+      "path": "up24-loaded-dll-hashes.json",
+      "bytes": 8286,
+      "sha256": "706072edce1fabe4ee637980999655cabb3a6d4103e902079277108ae659b688"
+    },
+    {
+      "path": "up24-numeric-before-after.json",
+      "bytes": 11034,
+      "sha256": "df74bbfb4919d1c31b60955ec07f826ec046396641468a0f5314020a70dea67c"
+    },
+    {
+      "path": "up24-receipts/cleanup-issue3783-20261023T114021/cleanup.json",
+      "bytes": 3263,
+      "sha256": "badbdeec3d658bda537014f3c5d5bf8092dccb7ad8fbac8833d54f540920013f"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-015.json",
+      "bytes": 1339,
+      "sha256": "451211d958001758b2da51c63e758326ddaa4136d3171ddad14eb416de5f4b0e"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-016-try1.json",
+      "bytes": 1347,
+      "sha256": "650b3b0d1e8c354661590fc92ac71c2a5dc20ab60cfe6f0b9822a0279dff88f7"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-017-try1.json",
+      "bytes": 1348,
+      "sha256": "43195cf1fa6c9cd9fe0502ee487e878907d66207c99787a52f611f0bc8be7155"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-018-try1.json",
+      "bytes": 1435,
+      "sha256": "2a9411717d2658e2b55cde3e75f88fc9ba5b97ff10e13d585e37fe37bfcc29d2"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-019.json",
+      "bytes": 423,
+      "sha256": "2c12d96ba3b234068c79f1bbd71524298973c6bd8f505cca10d03262fd7549a2"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-020-try1.json",
+      "bytes": 412,
+      "sha256": "ba4f0bcdff2386664f57b0c669b63a94ca765529f759e133723ac745dce9fff3"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-021-try1.json",
+      "bytes": 457,
+      "sha256": "987d5913eaf8029a76d7dc20da23500e76f5aeacb9a38efe6652fc9ad39903b5"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-022.json",
+      "bytes": 436,
+      "sha256": "8d8eda7e04260dd566198605fba15aeef4b70ffd1afd874005fab31b7dc5ac92"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-023-try1.json",
+      "bytes": 459,
+      "sha256": "955b5d190a859b6058626d98dc469f5cf2a5af2f07d8f4b4a931add88668ac9a"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-024.json",
+      "bytes": 430,
+      "sha256": "4070ec59298e5a4a570a3c3becae61d3a094d4f0c277478030a8cad720c0ce27"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-025-try1.json",
+      "bytes": 846,
+      "sha256": "4532ee568c22faa703cac3e1e07c79ab890630aaa5fae22542702ccf08c3fc1a"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-025-try2.json",
+      "bytes": 909,
+      "sha256": "9a6e816b7fbb6b1c12a15aa2089ac4296bfeaec191dccc02d4762ad11ab69688"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-025-try3.json",
+      "bytes": 1487,
+      "sha256": "459261073d1ecffc38db4ab7d16033a98d8d40751eb40135e1df199fae705458"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-025-try4.json",
+      "bytes": 745,
+      "sha256": "81467b74f3745e2b16d68e7478be62f498fbc2ea1ee75473877453adee02588e"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-025-try5.json",
+      "bytes": 1252,
+      "sha256": "84a7190ddbf452d17776928da22e26dd3b171347253a650143f81801bbcd9e29"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-025-try6.json",
+      "bytes": 1273,
+      "sha256": "43026342f7329731a971e75d3aeb9f3bea0cd71defe28ece6e13b30f389aee31"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-026.json",
+      "bytes": 1251,
+      "sha256": "bb57944c6638de9b0b9afc5d87ca46b2be56ff61bfc339ac90c86811fe42749f"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-028.json",
+      "bytes": 379,
+      "sha256": "313f3ce9d88105d9d4f0eecd483f62ad3b0b0b5b3dacce96fd5415075fd525c3"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-029.json",
+      "bytes": 430,
+      "sha256": "c7b993e4187876469df1ad49e80f589b21af1885cf01663b28cf51f3dd7acefe"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-030.json",
+      "bytes": 431,
+      "sha256": "e6a9969a8ee5ae63a87c92991001d552c685e287afc0da8202556d2c73abeb15"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-031-try1.json",
+      "bytes": 1251,
+      "sha256": "5f1c99c8b7a42b907271f12623ca1ff13ea0ef517dec54b09557c86fc969c91f"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-032.json",
+      "bytes": 716,
+      "sha256": "05dc269388ae3f6d360e0f16c5b5a14a0e667f827eef530a216cdec57bdbf1d4"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-033-try1.json",
+      "bytes": 638,
+      "sha256": "c33f375f3370d4dcad10c5aa392b716667b5d28b28e3e4be7902e8bec623e195"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-033-try2.json",
+      "bytes": 426,
+      "sha256": "4af82c90363a9ae13858196e0bbfc9c354806df8a9480af63b7cc74eb8057948"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-034-try1.json",
+      "bytes": 1997,
+      "sha256": "9367e7d6ae8de0c46b00e4db025f40e69c23068e0da42fc4fb508a794363bfd6"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-035-try1.json",
+      "bytes": 1522,
+      "sha256": "05c47ee45403baaa70b60b441408a37fe36cf1db283d7ae010970b1ffd5cffc6"
+    },
+    {
+      "path": "up24-receipts/ra-accept-step-036-try1.json",
+      "bytes": 2075,
+      "sha256": "49132b2481a3a35d2f9a6f2e3f33097b7fd9807e2682fa6a18d41d1a60ab7225"
+    },
+    {
+      "path": "up24-receipts/ra-accepted-identity-server.json",
+      "bytes": 1814,
+      "sha256": "b93f7607ed2294abc4ab4e6d3556ac3f5f9f5b31bd6672730df693cef499aae4"
+    },
+    {
+      "path": "up24-receipts/ra-accepted-identity-testclient.json",
+      "bytes": 1388,
+      "sha256": "ec91981362ff1455951cf46093e347d534fde5f87763a23c23d2dc43c62b311c"
+    },
+    {
+      "path": "up24-receipts/ra-accepted-identity-testclient2.json",
+      "bytes": 1905,
+      "sha256": "66804979ff4899d16378ca4d4501a8656e0957b910fa8b3ed8de6e6af27f32b4"
+    },
+    {
+      "path": "up24-receipts/ra-after-counters-server.json",
+      "bytes": 890,
+      "sha256": "f8d4ecb2a6fdc1975351409d51eaf426f8c1472e739a1c57c89669fc6423db72"
+    },
+    {
+      "path": "up24-receipts/ra-after-counters-testclient.json",
+      "bytes": 941,
+      "sha256": "5fc73e00db28bad96e60bdeb507237e37a7bffb61f016970cb8dc9c5bf42c92f"
+    },
+    {
+      "path": "up24-receipts/ra-after-counters-testclient2.json",
+      "bytes": 942,
+      "sha256": "5e66d524ed2bd33288d15db69a6e78389d42e17f3f8fc248c66812af20469e57"
+    },
+    {
+      "path": "up24-receipts/ra-after-persuasion-state-server.json",
+      "bytes": 1960,
+      "sha256": "f235cd2f60452e19f5d0071bc8305a87232d57dabe2bf53870d1d36642d081d9"
+    },
+    {
+      "path": "up24-receipts/ra-after-players-server.json",
+      "bytes": 778,
+      "sha256": "0237bc1ea42447ef185522991441fc855cf08ac051077a8e684b16cb80a46952"
+    },
+    {
+      "path": "up24-receipts/ra-after-players-testclient.json",
+      "bytes": 829,
+      "sha256": "13ef174e0b033ad87f2616c6882438b7c1d75fb424dbeff7e5830ecd07654092"
+    },
+    {
+      "path": "up24-receipts/ra-after-players-testclient2.json",
+      "bytes": 830,
+      "sha256": "3ffa98e5738db8ee5b4791e645e6aff134d93227229821d10fdc98fb61c3df0f"
+    },
+    {
+      "path": "up24-receipts/ra-after-relations-server.json",
+      "bytes": 7281,
+      "sha256": "82191d1900de134683507c98cd97fd34974b7035e4123c14c1294bf14f2d7e6a"
+    },
+    {
+      "path": "up24-receipts/ra-after-relations-testclient.json",
+      "bytes": 7332,
+      "sha256": "29408df312f968999389af50b636b4fa5bde73ef0567935148182e9741877b3d"
+    },
+    {
+      "path": "up24-receipts/ra-after-relations-testclient2.json",
+      "bytes": 7333,
+      "sha256": "bcb00d87f98a77e9ac145e60430798a85070350d73a925ac24975ba054f9d337"
+    },
+    {
+      "path": "up24-receipts/ra-after-rural-server.json",
+      "bytes": 652,
+      "sha256": "6e1f7c1971ac93b15a2bbf0ba4f5b3b1e6825af04c351f5f8524eaf24258f71b"
+    },
+    {
+      "path": "up24-receipts/ra-after-rural-testclient.json",
+      "bytes": 703,
+      "sha256": "2f31a387f2b76eb8a51a25b13b7c5cb4951567835f112bd59b2efcf4e5b68351"
+    },
+    {
+      "path": "up24-receipts/ra-after-rural-testclient2.json",
+      "bytes": 704,
+      "sha256": "6a9d5c571095142c764e6f199a15600c338825f342105a6ec2e42d2b61ea65a0"
+    },
+    {
+      "path": "up24-receipts/ra-after-state-server.json",
+      "bytes": 1960,
+      "sha256": "abf43490d36bd2913befd1e97d72d37e43296760b9b5b5033ef2360f5f9b4a5c"
+    },
+    {
+      "path": "up24-receipts/ra-after-state-testclient.json",
+      "bytes": 1365,
+      "sha256": "ad64fa2b3960706a9c5fdefae7ad99c72a8583e0badfb43f9b0da6244fe0ee30"
+    },
+    {
+      "path": "up24-receipts/ra-after-state-testclient2.json",
+      "bytes": 2047,
+      "sha256": "ff92a10de72628a4b41692186f4a2ff6954a52d9493e9e805588e7b6ae86b588"
+    },
+    {
+      "path": "up24-receipts/ra-after-traits-server.json",
+      "bytes": 886,
+      "sha256": "c62c7a06b6b4cb36131277873fac18796a47ef2eb4205712c5cd9a9142e90542"
+    },
+    {
+      "path": "up24-receipts/ra-after-traits-testclient.json",
+      "bytes": 946,
+      "sha256": "43da4e4ca2d6232969fd9d626d474915e1b3bf9d539307c33d4d3d6977684b59"
+    },
+    {
+      "path": "up24-receipts/ra-after-traits-testclient2.json",
+      "bytes": 980,
+      "sha256": "a347291c38e34615c5a0a2c85aa05bf0a72801f0c9940e4abeb4966a285a9cf7"
+    },
+    {
+      "path": "up24-receipts/ra-agreement-try1-server.json",
+      "bytes": 2333,
+      "sha256": "5d6642f007e364fe2cd4d0d658f9e5965cf54aa6ec1b0bbde64d49875de01f64"
+    },
+    {
+      "path": "up24-receipts/ra-agreement-try1-testclient.json",
+      "bytes": 1503,
+      "sha256": "08b8c71da2f32dd4fe43edaf96062f9bf03d87c27199e2491ec043715dd3246b"
+    },
+    {
+      "path": "up24-receipts/ra-agreement-try1-testclient2.json",
+      "bytes": 2506,
+      "sha256": "d2bea84813a809746e2d5dbc7a8062dfadea07b7f5258333541d8f09ce1d1838"
+    },
+    {
+      "path": "up24-receipts/ra-arm-server.json",
+      "bytes": 891,
+      "sha256": "9e5efe93b436ae170f282c332f33cb3313b11714889b04af109a2e98518593cf"
+    },
+    {
+      "path": "up24-receipts/ra-arm-testclient.json",
+      "bytes": 942,
+      "sha256": "0db00fe12f10c387874671c3b4d2632599038957639419d5ce68157cde4a4c09"
+    },
+    {
+      "path": "up24-receipts/ra-arm-testclient2.json",
+      "bytes": 943,
+      "sha256": "55ee9c0f851b3ad1cb5c3cbc1f2043960906dfac97cfb7dd549c6559f4092a1d"
+    },
+    {
+      "path": "up24-receipts/ra-before-before-journals-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "d3f535099adceecdaf28021a65f0ce696be2b102b9de600866003ed36ed7cfb8"
+    },
+    {
+      "path": "up24-receipts/ra-before-before-journals-conv-testclient2.json",
+      "bytes": 561,
+      "sha256": "b612a59a3c1cfccb78f9d7989358c2ad607cdab3133702caba4f150f7dd50ffd"
+    },
+    {
+      "path": "up24-receipts/ra-before-before-journals-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "757fd4eecbf4342cdd00da8c1fd928313d6c456237f2b33c984c92bbb392ab10"
+    },
+    {
+      "path": "up24-receipts/ra-before-before-journals-encounter-testclient2.json",
+      "bytes": 559,
+      "sha256": "1eadd9c8f40c484899f6d5c3a7aea8ce3305f912b2dcef38a7e9505ced2e9c60"
+    },
+    {
+      "path": "up24-receipts/ra-before-before-journals-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "5619488ea77c51776ff5a2bad5cab7c66498688ae52476d14da1f769fb37d089"
+    },
+    {
+      "path": "up24-receipts/ra-before-before-journals-status-testclient2.json",
+      "bytes": 2775,
+      "sha256": "3597d8d5fb36e7fe3613e83a8ceb10272245686639840d32c4113aae24c69f58"
+    },
+    {
+      "path": "up24-receipts/ra-before-close-correct-command-testclient2.json",
+      "bytes": 430,
+      "sha256": "125a5d4f794893da95eb5633a5ad7c15d2b840b98f4ffb1c6618e4222164b9e6"
+    },
+    {
+      "path": "up24-receipts/ra-before-closed-both-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "686d198004a99f9db897a4790c52d76dca643cfaa0c4e7267820b5ff90a09a98"
+    },
+    {
+      "path": "up24-receipts/ra-before-closed-both-conv-testclient2.json",
+      "bytes": 561,
+      "sha256": "1234ebd76c4fb8e6b0d4980187b93b79001e6f683dfff5e59a6cdd70c56bb386"
+    },
+    {
+      "path": "up24-receipts/ra-before-closed-both-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "6b1ea60f680180bba022654122a17955726b312504cdbfba88f7dae43c4b7bd9"
+    },
+    {
+      "path": "up24-receipts/ra-before-closed-both-encounter-testclient2.json",
+      "bytes": 559,
+      "sha256": "15029af1717a92a59370813755749d8672a52213e1e2007e2ef7a29616cd3dcb"
+    },
+    {
+      "path": "up24-receipts/ra-before-closed-both-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "febc9564c83877b02b637ae98ad9cf5e94b5b048a5ef3b610d0d265c2ca96d21"
+    },
+    {
+      "path": "up24-receipts/ra-before-closed-both-status-testclient2.json",
+      "bytes": 2775,
+      "sha256": "d0ae0cd1d551e786118eb102fe16d145d13ff557389695d0ac0f57473c32e0bb"
+    },
+    {
+      "path": "up24-receipts/ra-before-counters-server.json",
+      "bytes": 886,
+      "sha256": "74023de48a87d9551b63e05a2d02cfd4b0dbc14c1caa14f69827c1cc4c162194"
+    },
+    {
+      "path": "up24-receipts/ra-before-counters-testclient.json",
+      "bytes": 937,
+      "sha256": "e3810193634bbf10c04eb19b6489995795e6b666bd6720c71880da8bdcfc5254"
+    },
+    {
+      "path": "up24-receipts/ra-before-counters-testclient2.json",
+      "bytes": 938,
+      "sha256": "ea918fd44adcb7ac20e9f0297988066f921e229332a1107aac7160e7f9b1b56c"
+    },
+    {
+      "path": "up24-receipts/ra-before-final-closed-both-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "eb72c6a7dd53e2a797431f0eb41171b3700684e5d598b3af76e2ea3efa658028"
+    },
+    {
+      "path": "up24-receipts/ra-before-final-closed-both-conv-testclient2.json",
+      "bytes": 561,
+      "sha256": "18014259dd40cc971b5ee5b3261cbcdda1ad8ee89ccdc5f10e3d788cca6513d4"
+    },
+    {
+      "path": "up24-receipts/ra-before-final-closed-both-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "7abd05422830840aa1d84b95ecec69049c5a9a494edf4cbe43e21311fca814ca"
+    },
+    {
+      "path": "up24-receipts/ra-before-final-closed-both-encounter-testclient2.json",
+      "bytes": 559,
+      "sha256": "c3e32f515bf618cddab1d4fb47f2a2d95e603a6d063df2954276716713dadd00"
+    },
+    {
+      "path": "up24-receipts/ra-before-final-closed-both-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "9a4650607c129c78f5833d0d6fa0bd95c5547cfd7ac26995f299f63b576173c8"
+    },
+    {
+      "path": "up24-receipts/ra-before-final-closed-both-status-testclient2.json",
+      "bytes": 2775,
+      "sha256": "5fd5ac46dbe58a5751be90c9ec3a7035d544d0e9942684b4bff113a77c084449"
+    },
+    {
+      "path": "up24-receipts/ra-before-journal-open-testclient2.json",
+      "bytes": 519,
+      "sha256": "239fbcfe3d2a8ce2970a86f07ba22192f2d45d33bf6808235bdd59a0fd6bbf3c"
+    },
+    {
+      "path": "up24-receipts/ra-before-journal-pop-testclient2.json",
+      "bytes": 362,
+      "sha256": "e7b29bbf3dd3b9f33ee34a5f76ab4605a2b52f66c446308bdad5104436147fc4"
+    },
+    {
+      "path": "up24-receipts/ra-before-journal-select-testclient2.json",
+      "bytes": 554,
+      "sha256": "34df6921c7df221bee4820f54b0fca62ddd0b4df8faf4d1586e573091c4d9488"
+    },
+    {
+      "path": "up24-receipts/ra-before-observer-close-testclient.json",
+      "bytes": 429,
+      "sha256": "f9d7a4ed8f01f7e0075d5f4bb9fde82dc27bce8188d909627b9a24923702a217"
+    },
+    {
+      "path": "up24-receipts/ra-before-observer-no-entry.json",
+      "bytes": 501,
+      "sha256": "7434b24facf3888e1d7ba6b99d0cef20530facebba78d81ab3612e3f7707d1e0"
+    },
+    {
+      "path": "up24-receipts/ra-before-observer-open-testclient.json",
+      "bytes": 518,
+      "sha256": "556d8b5e59954ebe43d28f8750c1e8d213979764d83c9d075d877ea1128dc2bf"
+    },
+    {
+      "path": "up24-receipts/ra-before-players-server.json",
+      "bytes": 778,
+      "sha256": "88c02d9b2a13b6cedc1723257120a8d3b8c7d2c8da582319f348f710874779b5"
+    },
+    {
+      "path": "up24-receipts/ra-before-players-testclient.json",
+      "bytes": 829,
+      "sha256": "bbfe8a37b986ca845ca0a7e58054dd4d75d5b87042ef1a3e6c7d29676d8fec18"
+    },
+    {
+      "path": "up24-receipts/ra-before-players-testclient2.json",
+      "bytes": 830,
+      "sha256": "4db99a98400b5035026462f52664c13eadc522305d22dbba392af82054df4b64"
+    },
+    {
+      "path": "up24-receipts/ra-before-relations-server.json",
+      "bytes": 7281,
+      "sha256": "400daa494978e1b2d8ea47e0d03a338e27dde131a691ee15869776cff2a6d012"
+    },
+    {
+      "path": "up24-receipts/ra-before-relations-testclient.json",
+      "bytes": 7332,
+      "sha256": "8e85f738e0b7afc1e8cd923b5f4b8332bde7fd49793bfe52326d99c8f8934ef9"
+    },
+    {
+      "path": "up24-receipts/ra-before-relations-testclient2.json",
+      "bytes": 7333,
+      "sha256": "746b447238d6b13d9835ca19ddb624ee068dbac87074b56a06e72002875c16cf"
+    },
+    {
+      "path": "up24-receipts/ra-before-rural-server.json",
+      "bytes": 652,
+      "sha256": "a4b5253f14b5945e77bb038eaab756aa59e860d8dcb3f51ed76eca46e07ebdb2"
+    },
+    {
+      "path": "up24-receipts/ra-before-rural-testclient.json",
+      "bytes": 703,
+      "sha256": "a4d78e4d0f28ea3bf9c3143a1ebc7488d22e7ce321f31380945374853cc2b1ab"
+    },
+    {
+      "path": "up24-receipts/ra-before-rural-testclient2.json",
+      "bytes": 704,
+      "sha256": "4c77be8efe1ebea6b517df9be34245de5be54ffc6ea2711759644949ebdb8250"
+    },
+    {
+      "path": "up24-receipts/ra-before-state-server.json",
+      "bytes": 1813,
+      "sha256": "7230bfa8451067959e07f51371018aa6ef08125046ceec3037d3a95fa0c70801"
+    },
+    {
+      "path": "up24-receipts/ra-before-state-testclient.json",
+      "bytes": 1387,
+      "sha256": "3208ad932e5ae482c698617aea757bf288018c108cdce101eeb328f37c5d9cc3"
+    },
+    {
+      "path": "up24-receipts/ra-before-state-testclient2.json",
+      "bytes": 1903,
+      "sha256": "ff5834831c85ca78970e52a1b62f93103f9d90d767d26dda0d9a0d0666280ed3"
+    },
+    {
+      "path": "up24-receipts/ra-before-traits-server.json",
+      "bytes": 894,
+      "sha256": "02b6276b6b570f51f9cfc84f81ee3068e18ed1e9586d831a93094822c67df9b0"
+    },
+    {
+      "path": "up24-receipts/ra-before-traits-testclient.json",
+      "bytes": 946,
+      "sha256": "1c33b4cd0de097eba6b1d9ec6e1c35788b05cc15baa7be0a7c16f90d9c7f2ea9"
+    },
+    {
+      "path": "up24-receipts/ra-before-traits-testclient2.json",
+      "bytes": 947,
+      "sha256": "5d8c59c84dbd356bb188fbc88e817d33ea4e42c1b5d89b957b512083b11c7dee"
+    },
+    {
+      "path": "up24-receipts/ra-counters-stopped-server.json",
+      "bytes": 893,
+      "sha256": "16ab3100f6b141296765cd5ee56b15e373fae758b0a75638bdfb49ccb372cfd4"
+    },
+    {
+      "path": "up24-receipts/ra-counters-stopped-testclient.json",
+      "bytes": 944,
+      "sha256": "9e876b33aad4df7a48df03870f64bc4ecc7d8ce7b45658f430c68a2a08b9496e"
+    },
+    {
+      "path": "up24-receipts/ra-counters-stopped-testclient2.json",
+      "bytes": 945,
+      "sha256": "4545b1b4a1646b993f7d9ce800088a0ead77c00433d00203a425ad6d2ac9c041"
+    },
+    {
+      "path": "up24-receipts/ra-engage-try1-testclient2.json",
+      "bytes": 444,
+      "sha256": "5aba4ff93663b2bb8cb46fd0892099c8535ccefcb65951ed6bd6f337ca46adfc"
+    },
+    {
+      "path": "up24-receipts/ra-final-baseline-server.json",
+      "bytes": 379,
+      "sha256": "837b62bc1de92eb021b09dcb90d31f9bf388963d7826e3c4cc9546377ef24058"
+    },
+    {
+      "path": "up24-receipts/ra-final-baseline-testclient.json",
+      "bytes": 430,
+      "sha256": "ae210c904537f19f1682a80f50b668da619662ebfd88197acc7cf0f92cda97d2"
+    },
+    {
+      "path": "up24-receipts/ra-final-baseline-testclient2.json",
+      "bytes": 431,
+      "sha256": "ae791760e496573e2413e835535a9c9f884c3b9a95b70a769e74a7b071b0365b"
+    },
+    {
+      "path": "up24-receipts/ra-first-talk-options-testclient2.json",
+      "bytes": 999,
+      "sha256": "0e62ae8427277f2b17e73af9b079097acf82f33d5ddbe602c1b589b82b0786c2"
+    },
+    {
+      "path": "up24-receipts/ra-greeting-try1-testclient2.json",
+      "bytes": 999,
+      "sha256": "032959d14e98f77cd5b1b715261030848a68db33faedb9cd8ff050a2936e8d54"
+    },
+    {
+      "path": "up24-receipts/ra-greeting-try2-testclient2.json",
+      "bytes": 1013,
+      "sha256": "10653c558996bb57e4013c4ef208bcbf226236408da2bcabed57596717999cb8"
+    },
+    {
+      "path": "up24-receipts/ra-leave-giver-testclient2.json",
+      "bytes": 423,
+      "sha256": "150ac38f152894824a43cbc259ea6f1450b4358793a85147f67045a7ec58bb56"
+    },
+    {
+      "path": "up24-receipts/ra-persuasion-actual-choices-testclient2.json",
+      "bytes": 2111,
+      "sha256": "e0064fba49802ef47834b31860c394585efb20e022d4528ed353b1d1ee878c8b"
+    },
+    {
+      "path": "up24-receipts/ra-persuasion-enter-testclient2.json",
+      "bytes": 494,
+      "sha256": "ff8f67b2af20999e95a7b08f0c4ca54934c96b12c00097a3f0033ab901e4fb8f"
+    },
+    {
+      "path": "up24-receipts/ra-persuasion-frame-1-testclient2.json",
+      "bytes": 595,
+      "sha256": "e57bc7e88c492a6bdabcdbec650912d6be1cef47d9629d84ed2100340d1d2da5"
+    },
+    {
+      "path": "up24-receipts/ra-persuasion-frame-2-testclient2.json",
+      "bytes": 596,
+      "sha256": "267dc29a8ecf2e98eae6f61adc3ae3595537e3da57baf2aab01ca0b245859e15"
+    },
+    {
+      "path": "up24-receipts/ra-persuasion-frame-3-testclient2.json",
+      "bytes": 426,
+      "sha256": "7af964585a5c06bc0dfb032a137e763d96b8fe12afda60d8e65026a629ab9329"
+    },
+    {
+      "path": "up24-receipts/ra-persuasion-fresh-testclient2.json",
+      "bytes": 461,
+      "sha256": "6691d3f0e5670ef1db4b43dd1751f287fe327c93831010be2729c4fee4cef41f"
+    },
+    {
+      "path": "up24-receipts/ra-place-try1-server.json",
+      "bytes": 1886,
+      "sha256": "d2f1c16c1f2fc02e98a770cb3d190b2f1494125b04fa1ce9ca4388c36f8e0a3d"
+    },
+    {
+      "path": "up24-receipts/ra-preoffer-conv-testclient.json",
+      "bytes": 456,
+      "sha256": "72a64a1205f6d73f9e4c79f65e5d12fcf3a676040300f318784d65f095f6cbaa"
+    },
+    {
+      "path": "up24-receipts/ra-preoffer-conv-testclient2.json",
+      "bytes": 457,
+      "sha256": "df93b52bf096663638998d251a7ccd658a7c79a21bb599945b1dabb2d2dcf282"
+    },
+    {
+      "path": "up24-receipts/ra-preoffer-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "1eafce44aab74cb02ef979ded45cb37026d309a90487297224c5e024265ddc4a"
+    },
+    {
+      "path": "up24-receipts/ra-preoffer-encounter-testclient2.json",
+      "bytes": 559,
+      "sha256": "01eab1188a429ae909e8b6549c9a89549d3d85fa0a77d6cdeada664d3b9873a8"
+    },
+    {
+      "path": "up24-receipts/ra-preoffer-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "bfa70a3ad1e218db2d0df0e4cb86e0e6d89510719462fec6aa6b00c1a706b30e"
+    },
+    {
+      "path": "up24-receipts/ra-preoffer-status-testclient2.json",
+      "bytes": 2775,
+      "sha256": "b2b87b8edb153f09bffef86bf46f5f6a83d1ee86638ec6a7aa75f11501db2e9c"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-before-journals-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "d069e9e801e476f5ccab435f06364fe0bc173a2593a8800b0ca5e1525ad4d40b"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-before-journals-conv-testclient2.json",
+      "bytes": 561,
+      "sha256": "9208525ac940ec1083997e697ef1081d2204bafc301102cab987cf2f04afba70"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-before-journals-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "56055f9d1562e172ce372f311fbe32bec4cbf742d1cad960b3dbb4e73c4f0a3d"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-before-journals-encounter-testclient2.json",
+      "bytes": 557,
+      "sha256": "7155aa0fea90805805e064ffb2f40f9c98d8b8c6e77241f094f9f13f2e22e1cc"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-before-journals-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "6af23df2ed693db1544f9912f250503760b70347e741f869adb16797caa9a2f4"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-before-journals-status-testclient2.json",
+      "bytes": 2773,
+      "sha256": "05e8a0f04ab87786079d2bb8370553834afcddf830237258550d6e38b4bbf001"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-closed-testclient-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "a068e554c27523582e286eb0cc90d3850284168ea51cdea299f3fff6efa1cf26"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-closed-testclient-conv-testclient2.json",
+      "bytes": 561,
+      "sha256": "6a463419888acd18f596a5403f8994a0c20c40d4dbaf35243be000b57f757bc0"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-closed-testclient-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "409339f5848afb5d7c2e1d258ed1645c01fe25378fc6ff13e313d3cf30d00497"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-closed-testclient-encounter-testclient2.json",
+      "bytes": 557,
+      "sha256": "d7f604d9bdd45055a558b90a13056da3def06c15e6beb54841c46ffbfbaf12d8"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-closed-testclient-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "317e60bf141479bfecfb675bf24f97b77577baffc6ca503695377eec41a80233"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-closed-testclient-status-testclient2.json",
+      "bytes": 2773,
+      "sha256": "12a645512f9f87552d26ee221eb5e12ac9741330080f0d5c94f06baf14ba90d7"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-closed-testclient2-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "3101ca5fe2591b0b5006238578f737aeb46e78d13fcf3d5792ab5c174a88c35a"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-closed-testclient2-conv-testclient2.json",
+      "bytes": 561,
+      "sha256": "4331cacfefb000b7273ca83a960accbf6d730e758e919d126a5099e091c2ac41"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-closed-testclient2-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "c966a9a225b52d3580166f87b0964fdb1e96732b82d6b655cf17976627fb43f7"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-closed-testclient2-encounter-testclient2.json",
+      "bytes": 557,
+      "sha256": "6c92cbbf30546c6aad93d82157a7242c98277d7b343151dfb8ce42984106694a"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-closed-testclient2-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "7ddeb8d78a0215bd8fec0fa7f31cd48096fbe0669b768230219ce3b5bd7680ec"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-closed-testclient2-status-testclient2.json",
+      "bytes": 2773,
+      "sha256": "c5db8c63994b558e21ce01c75dd1b2fb0897779acfffb8448f0e0adb3308516a"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-no-matching-entry-testclient.json",
+      "bytes": 501,
+      "sha256": "60e6cacd7d820b5aa5fce2572ba60b236be0c2b5accec275e10ce3012a76a411"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-open-testclient.json",
+      "bytes": 518,
+      "sha256": "059ea699d13d3288d8c4a7b62b298d655ed7d41186c88d1086a2c4814638da56"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-open-testclient2.json",
+      "bytes": 519,
+      "sha256": "42ed97d9c10f3d00c31c46d3874faadba605e65b75e398bab13b2571a9e7991c"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-pop-testclient.json",
+      "bytes": 429,
+      "sha256": "9486f840b36e8a092f5af6141d44468223857f5297202b9356265a9bcbbec404"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-pop-testclient2.json",
+      "bytes": 430,
+      "sha256": "a49006304dbe12549d2f42dfc7d3be7098d86a81c9d6d263f75fd714f8b0caa0"
+    },
+    {
+      "path": "up24-receipts/ra-SuccessByAgreement-journal-select-testclient2.json",
+      "bytes": 554,
+      "sha256": "10d270fdecec2ac8e69f0ea0146f049939554fbc6efa947843b022905060d58e"
+    },
+    {
+      "path": "up24-receipts/ra-troop-setup-server.json",
+      "bytes": 407,
+      "sha256": "0dd92a8c380cc4fca941cd4767fb6fa8eb8de0f27c7d2d4903c46cee8f3ce3c4"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-015.json",
+      "bytes": 1338,
+      "sha256": "f38ed7d160b8df6d5d6d13ef962aaba753a1d53f8d152dd881db6fb6c5613859"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-016-try1.json",
+      "bytes": 1346,
+      "sha256": "e2182182275bd4e3676bb80493e704357149878df2d6fce68d17a3fa7d7bf2b4"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-017-try1.json",
+      "bytes": 1347,
+      "sha256": "beac2155835ace372c863f54ad75b95736d2afeeaa55c485e84acea58102f431"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-018-try1.json",
+      "bytes": 1437,
+      "sha256": "d4aef86931c3e486fb4fabdfd29e5b9e53302c5cb0d1b24fcf58101c72a0e974"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-019.json",
+      "bytes": 416,
+      "sha256": "f58158d1cccdc77a25a600b9897e35b12cc5324172b81ec8bddc9a5fed8f42b1"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-020-try1.json",
+      "bytes": 412,
+      "sha256": "39f6b7a56fe5699f4402db03dce74b237bf1c638d1b4b0a4301b8adc0a0f15ea"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-021-try1.json",
+      "bytes": 457,
+      "sha256": "584e19a85c255acc1eefffdac6c2e0e4fa13a57d3095b9a72c7b830f41c642bf"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-022.json",
+      "bytes": 436,
+      "sha256": "736b4e2e74dba51493868e1f832f5936741df8e53ee42db1951ddf6870285f9c"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-023-try1.json",
+      "bytes": 459,
+      "sha256": "26af410bd254445d8d27c26018c3e34cb0159b2c577dcf5b555250b50c99ff4c"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-024.json",
+      "bytes": 429,
+      "sha256": "0b163af23ee2f2b35b61e9e56be805cb2dccccedf1202f62ab8140c598c65b62"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-025-try1.json",
+      "bytes": 844,
+      "sha256": "69b0b5fb173edba87eaa040385d175e3c19aaa683b50b68672cf384d5fa933ca"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-025-try2.json",
+      "bytes": 908,
+      "sha256": "6dae598b79c4de08989e33ea75e149da637edad62fd6bf477dc6ef6831db20a9"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-025-try3.json",
+      "bytes": 1487,
+      "sha256": "ade7e18441884beee2837249be1e8f1c05a2bc7ae44cfeba23c09938468d6847"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-025-try4.json",
+      "bytes": 744,
+      "sha256": "02f645346fbf693b835e0e9136bfd1b98739ebe9efcd3e95a8e3baff59e8f05b"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-025-try5.json",
+      "bytes": 1251,
+      "sha256": "a9b3f1632b89832fffbb844930a122d8bb8c4075e68a4c9a801f6d10be0f102f"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-025-try6.json",
+      "bytes": 1272,
+      "sha256": "e52b76e7ea8086be57185738cd0c46fa7ddc54973728fa013ab6416c3fab765c"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-026.json",
+      "bytes": 1250,
+      "sha256": "28557fbb265a60b4458b181451e3f49faba3ace4d2e09d7bbe5df5079db06db3"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-028.json",
+      "bytes": 379,
+      "sha256": "48ff99a26cbe26a373ac0551027f1155f52db049b464b7c0241eca68ca5b7cd4"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-029.json",
+      "bytes": 430,
+      "sha256": "386d20c2fbb3adaf1945cd7dbb3a24a02fb14c7e63f104be6f6b8eb5c1ec1aeb"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-030.json",
+      "bytes": 431,
+      "sha256": "db4ca1d6ef8e5d91ccfc2b0f072e1ab76503c82b42890bab25b10cf5f62ffa8a"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-031-try1.json",
+      "bytes": 1250,
+      "sha256": "a438d59de0d03866af3559750d1bc0e183267ff51df1b843172dc5932d87faf6"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-032.json",
+      "bytes": 716,
+      "sha256": "47a5c0a641750298a7f2a4404136065134646b6d8da04b464c261ba333cc33f3"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-033-try1.json",
+      "bytes": 639,
+      "sha256": "1853fcde8809448a8278d0a91f267740349f1801b5de70a98f2a559c672a429f"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-033-try2.json",
+      "bytes": 426,
+      "sha256": "69b58236f86f8b54e33674c8f1a2764bdb51df44f99e32b291f52902841b1fac"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-034-try1.json",
+      "bytes": 1994,
+      "sha256": "0bfb528c644dc28769f1845bb6643ac57418dc4f3335e416c1d70fe9b98e5f45"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-035-try1.json",
+      "bytes": 1521,
+      "sha256": "b803cbe5f5c5bd1236062296920469abef15d102bed5d5491f1379679305ede8"
+    },
+    {
+      "path": "up24-receipts/rb-accept-step-036-try1.json",
+      "bytes": 2069,
+      "sha256": "6b0ea804118076bda3c553cb6481741617accc2888663ca2c3216c47a8b2dda8"
+    },
+    {
+      "path": "up24-receipts/rb-accepted-identity-server.json",
+      "bytes": 1809,
+      "sha256": "f75ebb00ee92d4d846f8f7495974e127b619ce2a6d557bad04b2fc64beeae6b5"
+    },
+    {
+      "path": "up24-receipts/rb-accepted-identity-testclient.json",
+      "bytes": 1387,
+      "sha256": "08a57074442804ec531ba97be42adbb09b1ccfeaff9ade2c190bc06f483762a3"
+    },
+    {
+      "path": "up24-receipts/rb-accepted-identity-testclient2.json",
+      "bytes": 1899,
+      "sha256": "2e9c51c3ad1c4b6c38fcb71638bd2d82c943d148e8e9c42d7d5f7cdecaed82ab"
+    },
+    {
+      "path": "up24-receipts/rb-after-counters-server.json",
+      "bytes": 889,
+      "sha256": "4607a16811db4e7e9a54f94998be49c7efe9f9e57c524f26d9dceff4bf9274a1"
+    },
+    {
+      "path": "up24-receipts/rb-after-counters-testclient.json",
+      "bytes": 940,
+      "sha256": "7267898c866416e37c34c2dd2abf8a4a41b3b119847b07798c535d79e69991d4"
+    },
+    {
+      "path": "up24-receipts/rb-after-counters-testclient2.json",
+      "bytes": 941,
+      "sha256": "9a50a8a7ad15294898486e8ef19be29246b8f09ba8362ce40fa7f183c582f9b2"
+    },
+    {
+      "path": "up24-receipts/rb-after-players-server.json",
+      "bytes": 787,
+      "sha256": "7efe47d8fea914e7d8c6e6f7eda0024ad5d19bd760005265907bf3226df0ec63"
+    },
+    {
+      "path": "up24-receipts/rb-after-players-testclient.json",
+      "bytes": 839,
+      "sha256": "1f46636d78015a231d9549e3b350adea3cae71577ab5f640109c7e3c2e91bf26"
+    },
+    {
+      "path": "up24-receipts/rb-after-players-testclient2.json",
+      "bytes": 840,
+      "sha256": "540c660721ed0f290f3b74977b3c9411c4a220d0aaf786eb0948d2dba649eff4"
+    },
+    {
+      "path": "up24-receipts/rb-after-relations-server.json",
+      "bytes": 6007,
+      "sha256": "d88e8c02223cdd144235357d8e6ee6dc6a9e75c52d8da1c485b60571c9c657cf"
+    },
+    {
+      "path": "up24-receipts/rb-after-relations-testclient.json",
+      "bytes": 6058,
+      "sha256": "3bd4060e832f4a94d549311d89885a897d49df407ec08d10776b1a6ea3b0fb94"
+    },
+    {
+      "path": "up24-receipts/rb-after-relations-testclient2.json",
+      "bytes": 6059,
+      "sha256": "44795ee01501bf11ad4d37e3dbd52b446579876a8a338b64541c87cfc63ab08b"
+    },
+    {
+      "path": "up24-receipts/rb-after-rural-server.json",
+      "bytes": 643,
+      "sha256": "0bb933ed310c4fe042b60172b97a7508d87c80c8447540dcb0ec84a3fea81af9"
+    },
+    {
+      "path": "up24-receipts/rb-after-rural-testclient.json",
+      "bytes": 694,
+      "sha256": "74570a83a6de558c02aaf66c56a59abddb2790a9aa2450af72ee836c2d069f31"
+    },
+    {
+      "path": "up24-receipts/rb-after-rural-testclient2.json",
+      "bytes": 695,
+      "sha256": "e0023600ad121d2547371aceeda1f6fe4c357dd651a483a7c9aa9dfb40a6a585"
+    },
+    {
+      "path": "up24-receipts/rb-after-state-server.json",
+      "bytes": 1997,
+      "sha256": "3cf2fb24c9d01cf6dc9084d0086c524714ee2b3536c427be2cdce3c165750cf0"
+    },
+    {
+      "path": "up24-receipts/rb-after-state-testclient.json",
+      "bytes": 1394,
+      "sha256": "816c60532d18cbc5fc8239c182cbe57f7f43749801cf602322faa1668da9b552"
+    },
+    {
+      "path": "up24-receipts/rb-after-state-testclient2.json",
+      "bytes": 2088,
+      "sha256": "3386edffe5ff5c5948c24dc6643b00416f926d17a2d4ecb59530467e77dc33fb"
+    },
+    {
+      "path": "up24-receipts/rb-after-traits-server.json",
+      "bytes": 885,
+      "sha256": "14f6af2b012f84c281bb1cf6e2c21fcd39de233c701fd952ecbb50298bab95e2"
+    },
+    {
+      "path": "up24-receipts/rb-after-traits-testclient.json",
+      "bytes": 946,
+      "sha256": "cb938c72cdfb950353601ea7d0ef2d26586c49e7cd4add961cae5d7b13525670"
+    },
+    {
+      "path": "up24-receipts/rb-after-traits-testclient2.json",
+      "bytes": 1013,
+      "sha256": "5290d8afb1079bdce4c8c69971918ad37bc4e051c1492c04dc9f17b61eb9a1f5"
+    },
+    {
+      "path": "up24-receipts/rb-arm-server.json",
+      "bytes": 890,
+      "sha256": "99c6da18d965383d2382fc402b49d3fc7886755e8e4f003175bca964149ef4bb"
+    },
+    {
+      "path": "up24-receipts/rb-arm-testclient.json",
+      "bytes": 941,
+      "sha256": "9d134ed5d46aaf600517de1b63b6c52ac69c5ab3c0b58e6d0346e154e155bcb1"
+    },
+    {
+      "path": "up24-receipts/rb-arm-testclient2.json",
+      "bytes": 942,
+      "sha256": "d93eab3ba9efc49ec26fc391ea8046ee92c6e948a3d4c13e078d11dbfb5a76ee"
+    },
+    {
+      "path": "up24-receipts/rb-before-before-journals-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "232f7b26845864a00493c57743ff9a02cccfa082ae82ccb2a3925a9e2865983d"
+    },
+    {
+      "path": "up24-receipts/rb-before-before-journals-conv-testclient2.json",
+      "bytes": 562,
+      "sha256": "12271c63f575ec64beb2a8ae9196b3340bfe130818c04fae40c906c0c2561469"
+    },
+    {
+      "path": "up24-receipts/rb-before-before-journals-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "02e772f8d35c0d3622ea0765c9b73040aeaa9a0023ffea8d3cdb5e660f3d635c"
+    },
+    {
+      "path": "up24-receipts/rb-before-before-journals-encounter-testclient2.json",
+      "bytes": 559,
+      "sha256": "6b2c6e2d1f949daffcd3e1ba4a7ef620a306eecbeeb1d0e925c85d940ac3121a"
+    },
+    {
+      "path": "up24-receipts/rb-before-before-journals-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "1e0cf7160826f92e41c12810ca6365e7ceabcbde956cefee1dc8f7181bc974db"
+    },
+    {
+      "path": "up24-receipts/rb-before-before-journals-status-testclient2.json",
+      "bytes": 2775,
+      "sha256": "6f6c8c3a754c489aab416fca23f297e4fe8524f831d8cb68f91c989fcecc9fb5"
+    },
+    {
+      "path": "up24-receipts/rb-before-counters-server.json",
+      "bytes": 885,
+      "sha256": "cdcb5fa252a0fd1580c85d913b91c28b4d9d83f676adb7660c070f89a0919f37"
+    },
+    {
+      "path": "up24-receipts/rb-before-counters-testclient.json",
+      "bytes": 936,
+      "sha256": "034832e7ba6033c9b2085c4fffbc3e5ef123fc1a0a33cb6eddedb508915555eb"
+    },
+    {
+      "path": "up24-receipts/rb-before-counters-testclient2.json",
+      "bytes": 937,
+      "sha256": "fb03810257fdb2f10e332a5099aa7a5ab69e7cb866c5e2f694352e2443a95478"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-closed-testclient-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "b246b8e4e9b899888705f4f206df2cdbe6c8d24dd2bb334188f5b982d81403b6"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-closed-testclient-conv-testclient2.json",
+      "bytes": 562,
+      "sha256": "961143704398a05b4c3954fe55c6f458d0f9f499119746f57ea387dbf2072a6e"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-closed-testclient-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "d6300db2613dfc529e788bca0883888f60f8962420c7a06fa719afe8c9c3dd30"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-closed-testclient-encounter-testclient2.json",
+      "bytes": 559,
+      "sha256": "404b4c246e7bb17cad963c9ead4715320a0c004618ed598e2fcd14c593e45ed0"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-closed-testclient-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "6f0675f26eb9586d1325f832f533adb38b5424e9352b3ea3d7c586468d039e04"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-closed-testclient-status-testclient2.json",
+      "bytes": 2775,
+      "sha256": "50a3e691e9714e37ae85f11e15262c128cee3a44e71f0121b7862aa0d6044ceb"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-closed-testclient2-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "ff96baa89979f8310c34aaaf2e3632d085908f778f95fe34527ae51c0931a0ae"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-closed-testclient2-conv-testclient2.json",
+      "bytes": 562,
+      "sha256": "d25f43f5dab540ca93b577c26f367377bf76eb26c350eb3864d75c51a1476771"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-closed-testclient2-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "6ebed51aba7f0e4edca01b472891a86b5ca91e04f47668149a7a585b7bc2f05d"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-closed-testclient2-encounter-testclient2.json",
+      "bytes": 559,
+      "sha256": "2c13619b0703a99d4d944e45ae3a5cb44d8781a7bcbeee216ea7898f056c10ac"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-closed-testclient2-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "b38692e71621854ed011f742be86b972dc25edc28a706e533c8b8deb3ca75c18"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-closed-testclient2-status-testclient2.json",
+      "bytes": 2775,
+      "sha256": "304a5dac1df32deeb6d80d70802c93c32cafbe9ab4e07a57a6f937bf55f41575"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-fresh-first-page-testclient.json",
+      "bytes": 37163,
+      "sha256": "f6f398cac2bf9aee7626be253752f3c569cd4f81090f8d067aa838768aafef5a"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-fresh-first-page-testclient2.json",
+      "bytes": 40522,
+      "sha256": "ef1ea5907930e54b6db44d8cf6a22ffa8850e24a17092fcc410f639c237aa425"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-layers-testclient.json",
+      "bytes": 2891,
+      "sha256": "790aa591b42a9db4bce63e407250cd342deb2e13dc70ee5a4f8be0737baf893b"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-layers-testclient2.json",
+      "bytes": 2892,
+      "sha256": "1d91b104e3d401a217fd270aa69f5298cad9361636580c79582f3d7b549e1e5c"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-no-matching-entry-testclient.json",
+      "bytes": 503,
+      "sha256": "91f4bc809b0571dffbb9ade87d729c0ec09dea174cba7d21975cdd07c290cf8d"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-open-testclient.json",
+      "bytes": 518,
+      "sha256": "b0fb32194c5e7e08753cbac1e5b4e9ebd6342ee490ea028c88ebb805c7f6fa34"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-open-testclient2.json",
+      "bytes": 519,
+      "sha256": "b3abdfaa42721e1a6ac4099362152475501808c9df5e6abf4dd5ac1c2c732422"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-pop-testclient.json",
+      "bytes": 429,
+      "sha256": "831b8b6b3d63b7193ebeb24bf41752e1acdcd00fe67977c53ae4b5bc064e876f"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-pop-testclient2.json",
+      "bytes": 430,
+      "sha256": "2e1e5acc556abfffc2f06023597c92053d78a0e99e2e645781dc0ab131097f9c"
+    },
+    {
+      "path": "up24-receipts/rb-before-journal-select-testclient2.json",
+      "bytes": 556,
+      "sha256": "a60df10d22e8f53d208c8ac47510a066c053361021d8574ce28498f15e35a4f8"
+    },
+    {
+      "path": "up24-receipts/rb-before-players-server.json",
+      "bytes": 787,
+      "sha256": "2ae50c52730663aa0330875fda0bf6ab2c42c7b55e4811fc15d04a2e191ea93f"
+    },
+    {
+      "path": "up24-receipts/rb-before-players-testclient.json",
+      "bytes": 839,
+      "sha256": "ca00d192719addf7960277c22f3f0384c89f4c276bc50dcc68cb7c63a64be6ac"
+    },
+    {
+      "path": "up24-receipts/rb-before-players-testclient2.json",
+      "bytes": 840,
+      "sha256": "4b9ed0052f88fca64c75746b00a68426dc4b55ca86bb332a8e78c86a69711caa"
+    },
+    {
+      "path": "up24-receipts/rb-before-relations-server.json",
+      "bytes": 6007,
+      "sha256": "a38888c0725d1d6ea342b981d8db1801eaf6b6ca7aa50d4fbf43b6b36d207eb5"
+    },
+    {
+      "path": "up24-receipts/rb-before-relations-testclient.json",
+      "bytes": 6058,
+      "sha256": "f2f2fccc930fdbb8e0c7ae66ef69d8faa4c445df85bc38789bbe0ba8cb0bbe92"
+    },
+    {
+      "path": "up24-receipts/rb-before-relations-testclient2.json",
+      "bytes": 6059,
+      "sha256": "b8baf4cab4be4ccde57565167887ab64f8dd910dcd05e10c8404f407956aff9a"
+    },
+    {
+      "path": "up24-receipts/rb-before-rural-server.json",
+      "bytes": 643,
+      "sha256": "7e738022ac54e1ecff79837b6ae14fae45d650f8f238cc0753c3057d4e57a892"
+    },
+    {
+      "path": "up24-receipts/rb-before-rural-testclient.json",
+      "bytes": 694,
+      "sha256": "bef9b48dddb5aded2f70116dbcc22353b4498921bacc7f2c0e7ad95c23a1b899"
+    },
+    {
+      "path": "up24-receipts/rb-before-rural-testclient2.json",
+      "bytes": 695,
+      "sha256": "64300cefad75c7a43484b7f829464e93705d83cc6fc0dc55dbd0ee193ddc03a6"
+    },
+    {
+      "path": "up24-receipts/rb-before-state-server.json",
+      "bytes": 1807,
+      "sha256": "ea99e19998e87f3581d392d9d101bed61282b9e3a829bf05bdaec7944cd5ed22"
+    },
+    {
+      "path": "up24-receipts/rb-before-state-testclient.json",
+      "bytes": 1386,
+      "sha256": "f33532c383c960f5abad89afc6daf5cac7c1e76acad3e9bc136a9a36f0d16093"
+    },
+    {
+      "path": "up24-receipts/rb-before-state-testclient2.json",
+      "bytes": 1897,
+      "sha256": "1391460b13a1e04b6de98ca559168c63a9eb784b6fb8cea943cc0658f14d9008"
+    },
+    {
+      "path": "up24-receipts/rb-before-traits-server.json",
+      "bytes": 885,
+      "sha256": "6b7b57dd0838c3260c7c2e869804cc81dd520d1d32dc9331ad557e3d021cf1ec"
+    },
+    {
+      "path": "up24-receipts/rb-before-traits-testclient.json",
+      "bytes": 946,
+      "sha256": "543e0d76e12af0262324841d7d3cc992f65e7a20f1279cb10b72b766101a7534"
+    },
+    {
+      "path": "up24-receipts/rb-before-traits-testclient2.json",
+      "bytes": 1013,
+      "sha256": "7873b46957e4568435ca5590ff2824cc754aad0f4f1ff615a75677a247a802b9"
+    },
+    {
+      "path": "up24-receipts/rb-counters-stopped-server.json",
+      "bytes": 892,
+      "sha256": "c70a1ff45031f4d4f0c61bc2ba72e905a5467a2fdd2e3757a0065ea0d705f904"
+    },
+    {
+      "path": "up24-receipts/rb-counters-stopped-testclient.json",
+      "bytes": 943,
+      "sha256": "b6e64bf56f2a460c1d80c815aea1a2152950921c4ddb7a6c0706312c39c8e28e"
+    },
+    {
+      "path": "up24-receipts/rb-counters-stopped-testclient2.json",
+      "bytes": 944,
+      "sha256": "8f4ffd28cd817734a526c7b7092ddbdeab0dcf373f199574ce799f91ad726fd9"
+    },
+    {
+      "path": "up24-receipts/rb-engage-try1-testclient2.json",
+      "bytes": 444,
+      "sha256": "26b60b89c91f59d8c3a546cf6c4e11469d6dcffc3225cee7b2a1c19f88fc45e6"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-before-journals-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "66c855db16e6804dc5ae585d2721af75989c9c2964911665877a5957b1eb48e9"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-before-journals-conv-testclient2.json",
+      "bytes": 562,
+      "sha256": "1d167e8e4ffae6919f379b4c7b638cfeb15f9cf7e089a3062dd45156edd4c8ae"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-before-journals-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "9a76339e93726273431b2cc9629ee0dc99f99e8847665d83694c7a5b7dac615b"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-before-journals-encounter-testclient2.json",
+      "bytes": 557,
+      "sha256": "d5c3aecb046fb8aa263574d665d29ab694fd5fac1a6c6cccb6443b581fc9509f"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-before-journals-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "7f027cec9ae9dd6c41dfa28d6e673ed1f9a26b4ee25c4489771869d99cc51aa8"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-before-journals-status-testclient2.json",
+      "bytes": 2773,
+      "sha256": "324bcb812cc8a759d08841bb61115f4b48ccab96ebc4def2deb1b40d63b05ccd"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-closed-testclient-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "e9970bca95f6c6e27e56cc462b41da1c0b90eb360af217329990c8b57a640cf3"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-closed-testclient-conv-testclient2.json",
+      "bytes": 562,
+      "sha256": "78b0738cf8604279295b7a5253176f8e6969e950f7ba93bc05e3c50455cecdb7"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-closed-testclient-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "07d4ba91c3128d1f424374483d82070b3d48bf50f69d966ee096a774256d9e14"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-closed-testclient-encounter-testclient2.json",
+      "bytes": 557,
+      "sha256": "ddfbacca46472a686266aedf52ea9095b9503a5b7bc91ac50cc8da8e883fec63"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-closed-testclient-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "0984b3affbdb1339a7cdc88a92bd120fc453b280433b3c163dc7b9b08d1be3c5"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-closed-testclient-status-testclient2.json",
+      "bytes": 2773,
+      "sha256": "bf2d3a39e22b2bb0742cc537170360ef0c4299b7722c49d8bb1e95a9ef63aef2"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-closed-testclient2-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "01c76f0376153c563d744ce5703da18f51ff68e94edd872454cc8b69fbb5fccc"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-closed-testclient2-conv-testclient2.json",
+      "bytes": 562,
+      "sha256": "93981d8e6423124149a8667a4b114ed0d5546bf92df3ba305d7eb990b7d74ac3"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-closed-testclient2-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "8df4d1d7cff5d6cb0da330615c33e6a00f1ce2289c01f7673841036690c8a100"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-closed-testclient2-encounter-testclient2.json",
+      "bytes": 557,
+      "sha256": "b81a969464ba203e7bdb397262272fe03ebf730eaaea87dba84fe50276914478"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-closed-testclient2-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "ddc950019f8d4abac846628a95b0001a92a3ba4afde204bf3c4ee185e9bc8df8"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-closed-testclient2-status-testclient2.json",
+      "bytes": 2773,
+      "sha256": "bcc2e7282e888712ea942a3a28b0076ab57cb3f71acf991053e7ee63214ac2db"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-fresh-first-page-testclient.json",
+      "bytes": 37163,
+      "sha256": "2aee2230b400ca5622b748b2eec66addab85ca4d64eda155881bb3973d98258a"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-fresh-first-page-testclient2.json",
+      "bytes": 40545,
+      "sha256": "e2a5ee759e1936ea06883a515121dfd5f15f04414cd679b60df59269c9085ee7"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-layers-testclient.json",
+      "bytes": 2891,
+      "sha256": "e6bdadbdc721a95d86df90f82544a69ed1324827e9de2d7becf163c6c2dfa490"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-layers-testclient2.json",
+      "bytes": 2892,
+      "sha256": "00fa891494b7ec759062ff7ede945539b1a4dba94955d3d3b887f49525b2e500"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-no-matching-entry-testclient.json",
+      "bytes": 503,
+      "sha256": "bbc287a90713a197ea59629717ff3be2858c6fa5a1707d9dadd08cc83ced6b7b"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-open-testclient.json",
+      "bytes": 518,
+      "sha256": "bac094623a5d9ba49af23d3ecb4a72977a94fcc2ad9a26a7ae6bd7b9acd157c4"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-open-testclient2.json",
+      "bytes": 519,
+      "sha256": "90f12a51b7403300cbd56c9fe8797bfe89dcfc40ed1e5c8ff401a3ee59277f60"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-pop-testclient.json",
+      "bytes": 429,
+      "sha256": "e2e196e5913af07269fad595275f38f32c88b9bc6ab662c04038775a85aff348"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-pop-testclient2.json",
+      "bytes": 430,
+      "sha256": "ad0ac2b6e4c0668b332bc7c00da4867ec3d8ee1c475bbdf3460e70b29fe79b6b"
+    },
+    {
+      "path": "up24-receipts/rb-FailureByRelease-journal-select-testclient2.json",
+      "bytes": 556,
+      "sha256": "1725acfc3e97fb8f97bc54e9b6c00d71a0912d9eaf1fc4ee345483968f1ce9f0"
+    },
+    {
+      "path": "up24-receipts/rb-final-baseline-server.json",
+      "bytes": 379,
+      "sha256": "e4c5bb977be6e3dac296d30d5e3315875a815683c513c5c604acf650e0061064"
+    },
+    {
+      "path": "up24-receipts/rb-final-baseline-testclient.json",
+      "bytes": 430,
+      "sha256": "5160c83b28cc1a29530a5b43a6253fda3b4b7e64ba8b72a10d28210f2b18f254"
+    },
+    {
+      "path": "up24-receipts/rb-final-baseline-testclient2.json",
+      "bytes": 431,
+      "sha256": "fa0cf4be64a8f08d12cde4cf5cc22c80f4e62389a2f9eb51b127226aead8e6b7"
+    },
+    {
+      "path": "up24-receipts/rb-first-talk-options-testclient2.json",
+      "bytes": 1000,
+      "sha256": "4174cdd3a63bdb967f479dfed959479bb0f5e4166c117daad018d1a18f08b8b9"
+    },
+    {
+      "path": "up24-receipts/rb-greeting-try1-testclient2.json",
+      "bytes": 1000,
+      "sha256": "138c6e2bd550e9bac81dcaee49ae92089a4b15ca033dd1d0b524f112b3905e8b"
+    },
+    {
+      "path": "up24-receipts/rb-greeting-try2-testclient2.json",
+      "bytes": 1014,
+      "sha256": "94ccacce8a9c827642d38732202dbe7d0b4bb3ccc899a82994a84c99428566c2"
+    },
+    {
+      "path": "up24-receipts/rb-leave-giver-testclient2.json",
+      "bytes": 423,
+      "sha256": "e76bcb992de1265476f7223b2daaff596d1b64360abec5b6616b727786b5ae84"
+    },
+    {
+      "path": "up24-receipts/rb-place-try1-server.json",
+      "bytes": 1881,
+      "sha256": "2acae768cf117b0cf496e1c5ad0c1a833da11f6b10b2b7a7a6abda72b066166f"
+    },
+    {
+      "path": "up24-receipts/rb-preoffer-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "deb1df6f604f779f31f6957f7738486feb78b6a3e97faf9d92fb406e1a05e0fb"
+    },
+    {
+      "path": "up24-receipts/rb-preoffer-conv-testclient2.json",
+      "bytes": 562,
+      "sha256": "f5d63971d35700c8aa06c57be39afe98b955e852276fd08ff6dc0db1e1a5e136"
+    },
+    {
+      "path": "up24-receipts/rb-preoffer-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "f0f3af90d6ac6d12c314682c9157e81c754d92f23091141195ed9c0f5a5514a1"
+    },
+    {
+      "path": "up24-receipts/rb-preoffer-encounter-testclient2.json",
+      "bytes": 557,
+      "sha256": "3de8ce425c2935089aa50fcd3df9e4a0ee646725ab2219dbe9b6dbed48942d05"
+    },
+    {
+      "path": "up24-receipts/rb-preoffer-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "5643b334005ffdeb0fbc819fd5a9f38b5a8138460f643d5e3d84d6199c04d902"
+    },
+    {
+      "path": "up24-receipts/rb-preoffer-status-testclient2.json",
+      "bytes": 2773,
+      "sha256": "7935f189a1ae61c6ce7f157df557502e8920f49f80af8257e442c175cd4e5e07"
+    },
+    {
+      "path": "up24-receipts/rb-progress-server.json",
+      "bytes": 1848,
+      "sha256": "cf007eb3120a44a6cfd340df408d2798374d98e1c0ef17b2e6fd6b93b0277230"
+    },
+    {
+      "path": "up24-receipts/rb-real-release-dialogue-testclient2.json",
+      "bytes": 570,
+      "sha256": "e689e640da789ae4fc4cb2a2021c9750b37d09c5732df69a39766cd3c040511d"
+    },
+    {
+      "path": "up24-receipts/rb-release-closed-try1-testclient2.json",
+      "bytes": 522,
+      "sha256": "4a5300ce19cbbb6579f55fb438720ddcee088a4038fa0ff3607a48342412d14f"
+    },
+    {
+      "path": "up24-receipts/rb-release-closed-try2-testclient2.json",
+      "bytes": 426,
+      "sha256": "c680c9fdf1737748565e86e63c50dce534c95d5d6caf5a4d569a077a2e7fe910"
+    },
+    {
+      "path": "up24-receipts/rb-release-encounter-closed-try1-testclient2.json",
+      "bytes": 557,
+      "sha256": "56a2270de55c979de3f7f05d636f5def0b8820c8f0effbe9bf00a1985f3a5318"
+    },
+    {
+      "path": "up24-receipts/rb-released-try1-server.json",
+      "bytes": 2393,
+      "sha256": "a89022f86bb640a3f760897035544dd19761e1a50fde386e1252ded7165a5868"
+    },
+    {
+      "path": "up24-receipts/rb-released-try1-testclient.json",
+      "bytes": 1528,
+      "sha256": "6fced07f907bdb803c703e446c1e08609d35896d7a88238ce08097eef377f2f0"
+    },
+    {
+      "path": "up24-receipts/rb-released-try1-testclient2.json",
+      "bytes": 2553,
+      "sha256": "6290d32c3058b5094b61f73a9e8da5bb87d758b8a8c5b9454d1e6b9c45136322"
+    },
+    {
+      "path": "up24-receipts/rb-select-real-notable-server.json",
+      "bytes": 6007,
+      "sha256": "bd3fd01f8a92b8f91ebb8799b5d4588baad790baf47d6cdffa7a7c01d61d67c7"
+    },
+    {
+      "path": "up24-receipts/rb-troop-setup-server.json",
+      "bytes": 407,
+      "sha256": "c9def618e7f8f59019dae56cf7a3fd16054ee9b748d2c7944a9156ef49913b6d"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-015.json",
+      "bytes": 1339,
+      "sha256": "e7d31960d79e056cd86376414a4b437719bfdb085659574af77ab505b2d12429"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-016-try1.json",
+      "bytes": 1346,
+      "sha256": "8f8909962ff677fd9009bf2f1582842a03c5c44b2d1db189c5c8238791121014"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-017-try1.json",
+      "bytes": 1347,
+      "sha256": "39420da46d2fcc1132ab0a0b415d1890f2544c34b2e4b7427e01aff1ce6a278d"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-018-try1.json",
+      "bytes": 1440,
+      "sha256": "5c3fdbf39e2c867a7e7e68d1ffe20b0809165e287be73c11dc2d7e2f2f695a49"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-019.json",
+      "bytes": 416,
+      "sha256": "879c913d455ea46ebd4efbfda02cec5c5c5b5587b369760f81ba8d5622c2f891"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-020-try1.json",
+      "bytes": 412,
+      "sha256": "f7b2cc9110c3df8d187fe3152f22a35863e91466b38f19292ecd753ed6246992"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-021-try1.json",
+      "bytes": 457,
+      "sha256": "c3410f2ea8d4c47e50c50753ef1c70c9efb2b76f041fe1eade0750a86e48edde"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-022.json",
+      "bytes": 436,
+      "sha256": "aef70f9b69c1e49593368aea2e1208659faa26d4f7fdccf88a6ba4f25ed0d0c7"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-023-try1.json",
+      "bytes": 459,
+      "sha256": "cbba38e13fd34465353ee00703d391d320fc99617e8719c58c373959294b6b36"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-024.json",
+      "bytes": 429,
+      "sha256": "b3b6f9f5ee02f86a167e12999779a004006cba667c70a564ea880837d55828a5"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-025-try1.json",
+      "bytes": 980,
+      "sha256": "e41b18110b61ab259073d8230cea7acdbac106ff3eb3cf38ae115df96663b9c8"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-025-try2.json",
+      "bytes": 908,
+      "sha256": "48c492f27ea0939802f5ca34e94ddd053d19277a650f3826f213797bb45137f2"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-025-try3.json",
+      "bytes": 1487,
+      "sha256": "7423e9daebf342d16deda1af2f6b99777362a409ad3293060d93eef4c8309341"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-025-try4.json",
+      "bytes": 744,
+      "sha256": "4695e6ad994e598aeb330613013426935fe34e8a7db7a958661e3c9ad6595e5e"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-025-try5.json",
+      "bytes": 1251,
+      "sha256": "b66359f44c74a2fea3fdebc187f84552fa57ad348f564ccc7da6c0b81aa053a1"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-025-try6.json",
+      "bytes": 1272,
+      "sha256": "9e038b48c4fe816d0ac5fba2a6a1a2757879f2cb5532b5ae5be79ce219abebb9"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-026.json",
+      "bytes": 1250,
+      "sha256": "19e9b9ee13712df81d5e312ce591a1049a65cc9b58d62c78c9ec225b7409e1c1"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-028.json",
+      "bytes": 379,
+      "sha256": "9c80d902cafb80923970f05547805634401132a1caded19987e1cefa558e438d"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-029.json",
+      "bytes": 430,
+      "sha256": "adcf053b9de488a0242cc130635428547b8b091d34c284f60a5c0c271af30277"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-030.json",
+      "bytes": 431,
+      "sha256": "1ae4433e8cfa06d4d4233849496c3f5e39847bb4f850004fdd6a9813b7a8f451"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-031-try1.json",
+      "bytes": 1250,
+      "sha256": "061dcd0e1a1439b4520686e3c44c08c5e47eddbaef5be4f21b636c0984f50d2d"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-032.json",
+      "bytes": 716,
+      "sha256": "cf337ce9083b9bd2bb33b8653829a3591185a2ca6529b66af85d3ae8e02949f2"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-033-try1.json",
+      "bytes": 639,
+      "sha256": "f757613939a41d2e172260b4ddd69a5a43c6b5b078c96c80dbac7212ca75f428"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-033-try2.json",
+      "bytes": 426,
+      "sha256": "eb485158296623330fddb4b03d7a202144992ef61e5b07a55cc79a44796151b7"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-034-try1.json",
+      "bytes": 2003,
+      "sha256": "0e4205b95b9a974c41396eb5a9eaf6d33b3bbd8e213375c5f71eb33a87138334"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-035-try1.json",
+      "bytes": 1521,
+      "sha256": "1ee0230b98b46e2e589be75e5efcd25e4ae74b0d3985f4870cef4a34b780ce95"
+    },
+    {
+      "path": "up24-receipts/rc-accept-step-036-try1.json",
+      "bytes": 2075,
+      "sha256": "4948a088503458e7b45b07a3f3c1321149286ac72c858a9579e0d6e0690ab1e9"
+    },
+    {
+      "path": "up24-receipts/rc-accepted-identity-server.json",
+      "bytes": 1816,
+      "sha256": "d634801b4fcdf8bdfb3fe851a4dbe09cc6366c92f7d8ec11b243d454d34a4d35"
+    },
+    {
+      "path": "up24-receipts/rc-accepted-identity-testclient.json",
+      "bytes": 1387,
+      "sha256": "08639f3328408c004019d428d2aa8a8400c2d52fd92d4200a46001d26656443c"
+    },
+    {
+      "path": "up24-receipts/rc-accepted-identity-testclient2.json",
+      "bytes": 1905,
+      "sha256": "ca579ecbe346ef09e18ce59c4188e6c8f58d3fd6b90c267161509d96322e106e"
+    },
+    {
+      "path": "up24-receipts/rc-after-counters-server.json",
+      "bytes": 889,
+      "sha256": "dece7cffbcfc5d628353543169d578e8bdb72a059369b22a36efc34320766a0d"
+    },
+    {
+      "path": "up24-receipts/rc-after-counters-testclient.json",
+      "bytes": 940,
+      "sha256": "cd658e672e0a2f5e3eae8b8e692ae36dbbc682293e02968d117986c4676d34c1"
+    },
+    {
+      "path": "up24-receipts/rc-after-counters-testclient2.json",
+      "bytes": 941,
+      "sha256": "00b0b5f5f0a58b080cced2c83e8a56747d507307042a97e7b02971dbbd0724bf"
+    },
+    {
+      "path": "up24-receipts/rc-after-Done-encounter-testclient2.json",
+      "bytes": 576,
+      "sha256": "f4d7385e62db7500f3cf49db085befddc6515ae8c4f14a7c92975d308e8d1e91"
+    },
+    {
+      "path": "up24-receipts/rc-after-Done-menu-testclient2.json",
+      "bytes": 1168,
+      "sha256": "9e615f84365462eeae0b933d27a082964e74186635549304280213a00fff318e"
+    },
+    {
+      "path": "up24-receipts/rc-after-Done-status-testclient2.json",
+      "bytes": 2802,
+      "sha256": "5f72dbead5778504827afc5c4d3508debdd18a6b1670f549c84ef081e7872b6b"
+    },
+    {
+      "path": "up24-receipts/rc-after-players-server.json",
+      "bytes": 787,
+      "sha256": "738b6549ff314c8fa08955b64077e5c7d5dd41de1305e0612dcf9ed6c19143a4"
+    },
+    {
+      "path": "up24-receipts/rc-after-players-testclient.json",
+      "bytes": 839,
+      "sha256": "8d48fb4bffb775a6452289a38811526deff44746e252aecbed32a4d21e7a2569"
+    },
+    {
+      "path": "up24-receipts/rc-after-players-testclient2.json",
+      "bytes": 840,
+      "sha256": "b982f2ac3334dd45ca0cec82fdd9221ec25c4ead907ef636a1359a5b9b3b99fa"
+    },
+    {
+      "path": "up24-receipts/rc-after-relations-server.json",
+      "bytes": 7297,
+      "sha256": "90e54ecf4910ee607705276d5731711f60d9929a889e24d42e088af8c6784715"
+    },
+    {
+      "path": "up24-receipts/rc-after-relations-testclient.json",
+      "bytes": 7348,
+      "sha256": "054212dec89fcc59cebb05b05db37af787ce5d3b48223ad1d104894af78d4fe1"
+    },
+    {
+      "path": "up24-receipts/rc-after-relations-testclient2.json",
+      "bytes": 7349,
+      "sha256": "d6d5c97a0ee85cddc4db3684b069e2fec622a7809cf16cf0bd46a9a4c56d14ed"
+    },
+    {
+      "path": "up24-receipts/rc-after-rural-server.json",
+      "bytes": 644,
+      "sha256": "3adc5923baac90097f80b36b1c2fb8ad9fef281e81d9202f45d04ce70f8427f7"
+    },
+    {
+      "path": "up24-receipts/rc-after-rural-testclient.json",
+      "bytes": 695,
+      "sha256": "16b67c89bdd884fad66684c53471b67e96f3049499e78151ca7e453453886a2e"
+    },
+    {
+      "path": "up24-receipts/rc-after-rural-testclient2.json",
+      "bytes": 696,
+      "sha256": "4f48eba1e2ab416e6d27ee623cfaf3989300b26eaaa059c192d20fb562592a9e"
+    },
+    {
+      "path": "up24-receipts/rc-after-simulation-encounter-testclient2.json",
+      "bytes": 565,
+      "sha256": "07d6a5a31c66f60cc3643604f770b09977a12415b75d10c49c477ec2aa5e487a"
+    },
+    {
+      "path": "up24-receipts/rc-after-simulation-testclient2.json",
+      "bytes": 2773,
+      "sha256": "1dedea3dd2b24a9e3cdc720faa17d721f28cae338ec7efb061f3d706b3094d73"
+    },
+    {
+      "path": "up24-receipts/rc-after-state-server.json",
+      "bytes": 2087,
+      "sha256": "535a1cc56b4fd3535df5bf10f6be993e1aba98d599517b16a4e8a6ed78e7a7a2"
+    },
+    {
+      "path": "up24-receipts/rc-after-state-testclient.json",
+      "bytes": 1400,
+      "sha256": "30940aaeb22d77815cf96414b2296ac4991dfc746c6a7b8f2b5d0f422b7be185"
+    },
+    {
+      "path": "up24-receipts/rc-after-state-testclient2.json",
+      "bytes": 2177,
+      "sha256": "da85a61323b6170a6ce271ed0640815750ffed4262167fb614c6f6d609c45b6b"
+    },
+    {
+      "path": "up24-receipts/rc-after-traits-server.json",
+      "bytes": 885,
+      "sha256": "66ca02331f1ada2b6134e9c30705ebd5860b849d23ebc10c4a61a78e037aabf6"
+    },
+    {
+      "path": "up24-receipts/rc-after-traits-testclient.json",
+      "bytes": 946,
+      "sha256": "0ab6b13d2b2c0898c09085b3efa9812e7c7e1b07f137b779e068107ba08e2a4d"
+    },
+    {
+      "path": "up24-receipts/rc-after-traits-testclient2.json",
+      "bytes": 1013,
+      "sha256": "2e2d98f7914e8331bd1f2728c90866f90adfc2f30b2b65b76f6b72830b56fc3c"
+    },
+    {
+      "path": "up24-receipts/rc-arm-server.json",
+      "bytes": 890,
+      "sha256": "49fae05101f9c323ba1cfa8e4a1a68a003947e6ce4b5549b4f6c4e5a6006d49c"
+    },
+    {
+      "path": "up24-receipts/rc-arm-testclient.json",
+      "bytes": 941,
+      "sha256": "872a5abce408bfa7c5e40024fe7d95c62aceb2a08067a65c0856fdb1559dec80"
+    },
+    {
+      "path": "up24-receipts/rc-arm-testclient2.json",
+      "bytes": 942,
+      "sha256": "3e94a417f455b6363aa4dac36339fbf4b3c8219eef59de2e93100d2ec5fdbf17"
+    },
+    {
+      "path": "up24-receipts/rc-before-before-journals-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "8ea3ba344cf3eee6793cc649058ba3cf22eb718bcb6ade2bccd11e8a385c5073"
+    },
+    {
+      "path": "up24-receipts/rc-before-before-journals-conv-testclient2.json",
+      "bytes": 561,
+      "sha256": "e2c3de5fb7d23c6b3ea4993d8eb6c57d0499173aa8d22a793de8dc40184bbed1"
+    },
+    {
+      "path": "up24-receipts/rc-before-before-journals-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "d4059000f9824d4ad03c35f0fc8c09fb88cacc5db892b0572878e93d27eb21e6"
+    },
+    {
+      "path": "up24-receipts/rc-before-before-journals-encounter-testclient2.json",
+      "bytes": 559,
+      "sha256": "1f099606a2d4621f19707db1b052c4dbdbb28c6acc6b47961896554b525e973e"
+    },
+    {
+      "path": "up24-receipts/rc-before-before-journals-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "a76a841363ded277d2a296607ecf0ffd795913c7213fc9e5810be629ede4e68a"
+    },
+    {
+      "path": "up24-receipts/rc-before-before-journals-status-testclient2.json",
+      "bytes": 2775,
+      "sha256": "8c33eac1d60393f0a144e3c1fd3f0dc0b46e28b630cea3f31c360fc7e3244b74"
+    },
+    {
+      "path": "up24-receipts/rc-before-closed-both-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "e4a32d9c4712a207ae660d0b2c59688c5de4f6cdffb09b2943ad3ae70fedecc5"
+    },
+    {
+      "path": "up24-receipts/rc-before-closed-both-conv-testclient2.json",
+      "bytes": 561,
+      "sha256": "20459d80913fd656179c297c64e4beb92c93d9dfcaa39bcb3d1eeb3df8811979"
+    },
+    {
+      "path": "up24-receipts/rc-before-closed-both-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "fe99abadf5b174e5a50f8e4c95f6d451a7c3d250b5d3bbf40693c93565688d3c"
+    },
+    {
+      "path": "up24-receipts/rc-before-closed-both-encounter-testclient2.json",
+      "bytes": 559,
+      "sha256": "d0586b493ca3e7e10e5d4148d4131b8c49ee448dc9b9afeff968e73bcd3da349"
+    },
+    {
+      "path": "up24-receipts/rc-before-closed-both-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "928b8b2797e9544bbd8518d55a60840d3d85da8717747ab854eb54542e3c15a6"
+    },
+    {
+      "path": "up24-receipts/rc-before-closed-both-status-testclient2.json",
+      "bytes": 2775,
+      "sha256": "232c4aae6e998d2f2616740af893f8898e6c23fe26acdef612afa46be8fa570b"
+    },
+    {
+      "path": "up24-receipts/rc-before-counters-server.json",
+      "bytes": 885,
+      "sha256": "5e06185a76234947c4fe0ee0b3578720401c82fa7b1af3966d0d6ddeb2322ba9"
+    },
+    {
+      "path": "up24-receipts/rc-before-counters-testclient.json",
+      "bytes": 936,
+      "sha256": "f6c07d483395b2d355dd25828d14d16afc80fd2cc82cf731fef31cc7a37a01d9"
+    },
+    {
+      "path": "up24-receipts/rc-before-counters-testclient2.json",
+      "bytes": 937,
+      "sha256": "973a0ebed3d360ae03c778267187ebcd6e30e362ec52c6a42cd9fc55846f257d"
+    },
+    {
+      "path": "up24-receipts/rc-before-journal-first-page-fresh.json",
+      "bytes": 40428,
+      "sha256": "1f8ecd5e155211eddc42c0e2cd3e747ba01363876fa3849cccf2bd6184ec74fd"
+    },
+    {
+      "path": "up24-receipts/rc-before-journal-layers-fresh.json",
+      "bytes": 2892,
+      "sha256": "85212a92cb5d1f6ebd8c368b1678b0e611592f07c0a025eace83106827da3a4f"
+    },
+    {
+      "path": "up24-receipts/rc-before-journal-open-testclient2.json",
+      "bytes": 519,
+      "sha256": "40a32a7c830b0f413c3c34fff1957a956447e401c6e115c66694eb7c85290418"
+    },
+    {
+      "path": "up24-receipts/rc-before-journal-select-testclient2.json",
+      "bytes": 556,
+      "sha256": "db047705149ceda470e14391fff786910f146ee390960bfbaa7dbda056dac41c"
+    },
+    {
+      "path": "up24-receipts/rc-before-owner-pop-testclient2.json",
+      "bytes": 430,
+      "sha256": "b1921399f216b9d7325e2a86d816bd3b8b912442e593d24e82e11dc33d3b16dc"
+    },
+    {
+      "path": "up24-receipts/rc-before-players-server.json",
+      "bytes": 778,
+      "sha256": "f6e4a42c5b490546b44dabeb28347274e0fd47b2e8e4366610b3c3cbd99b4e27"
+    },
+    {
+      "path": "up24-receipts/rc-before-players-testclient.json",
+      "bytes": 829,
+      "sha256": "2230100e0c8000ce5eb6804b8d6565e028eb4c6f37cabb99fcda69b6116718c0"
+    },
+    {
+      "path": "up24-receipts/rc-before-players-testclient2.json",
+      "bytes": 830,
+      "sha256": "bda8b372d17d3565d55ff10b064bdaaf8ef6e300d65026ccbc97cb8ee5033f55"
+    },
+    {
+      "path": "up24-receipts/rc-before-relations-server.json",
+      "bytes": 7281,
+      "sha256": "9b121553067bb9ecb8e97a7dd1e89fb534bcb1c841fcf761f6835cbfa3737a07"
+    },
+    {
+      "path": "up24-receipts/rc-before-relations-testclient.json",
+      "bytes": 7332,
+      "sha256": "42a6f5cfc3340562f5a28ca12cbfcc4880eb4e2fab194a8f9d93e74359f2cab5"
+    },
+    {
+      "path": "up24-receipts/rc-before-relations-testclient2.json",
+      "bytes": 7333,
+      "sha256": "531d9de66fbc5adf8538e272c19a2dff78540309269230db3178877f5bacfaf1"
+    },
+    {
+      "path": "up24-receipts/rc-before-rural-server.json",
+      "bytes": 643,
+      "sha256": "d6c524a36c5eb275ef45d4473e1b179293909c0608db71e706240635d2a1c7dd"
+    },
+    {
+      "path": "up24-receipts/rc-before-rural-testclient.json",
+      "bytes": 694,
+      "sha256": "bd6df116a8693ab68ba43e96847c09998bcd8a3263f9a469f9b5af3ab9beef2e"
+    },
+    {
+      "path": "up24-receipts/rc-before-rural-testclient2.json",
+      "bytes": 695,
+      "sha256": "d9fdfdf918db2ae9e7965a7a18dea0d9918a2cfc01e8a88d7d983d7d866a40d3"
+    },
+    {
+      "path": "up24-receipts/rc-before-state-server.json",
+      "bytes": 1814,
+      "sha256": "534c0cc4cd1aafb68636186ed207f9cb74f13c867c162cd1156cf2002dc41bc6"
+    },
+    {
+      "path": "up24-receipts/rc-before-state-testclient.json",
+      "bytes": 1386,
+      "sha256": "0661455e089c83f2bf2cf640ff60b3cea8f20be6185648e9ab3783cda6211e2d"
+    },
+    {
+      "path": "up24-receipts/rc-before-state-testclient2.json",
+      "bytes": 1903,
+      "sha256": "acc07c68d723d57dc6e967cda0b642c3960e47d475863b9d7fbfb06420ac5ee2"
+    },
+    {
+      "path": "up24-receipts/rc-before-traits-server.json",
+      "bytes": 886,
+      "sha256": "127e28deac74e3a9c66ffca147c3b3cc0599c6ea71d2386dc5e92bac27786ec1"
+    },
+    {
+      "path": "up24-receipts/rc-before-traits-testclient.json",
+      "bytes": 946,
+      "sha256": "33a5fc353f28275095dbedfb14fe64ebab19ac9aa3b55bb3ec3cb8467e1730df"
+    },
+    {
+      "path": "up24-receipts/rc-before-traits-testclient2.json",
+      "bytes": 980,
+      "sha256": "41efae1c491f5c344d50bae36502a570e46881df105fbc8f3d63d14e70796683"
+    },
+    {
+      "path": "up24-receipts/rc-counters-stopped-server.json",
+      "bytes": 892,
+      "sha256": "0e911c843eb50a5c95cff6c958193a483e92fb700b988cc655689e3c267db962"
+    },
+    {
+      "path": "up24-receipts/rc-counters-stopped-testclient.json",
+      "bytes": 943,
+      "sha256": "edae7acc5d609bbf4feedec6298e27b3ef92bd33ca36f1115852a87c429771f4"
+    },
+    {
+      "path": "up24-receipts/rc-counters-stopped-testclient2.json",
+      "bytes": 944,
+      "sha256": "7e40eba9693467822785f7d100c2bfff286667e58f754cd32f5c6bc7d1ae9b1c"
+    },
+    {
+      "path": "up24-receipts/rc-encounter-ready-try1-testclient2.json",
+      "bytes": 566,
+      "sha256": "c65d722dcf1b5f11c593e0367f2dafe89b12a8ec27acdd895b32ae1d5bbd62e7"
+    },
+    {
+      "path": "up24-receipts/rc-engage-try1-testclient2.json",
+      "bytes": 444,
+      "sha256": "23bb35e7c32110afc405a87816d42801e14c22be8fab06a8d7ee4c841ea2012d"
+    },
+    {
+      "path": "up24-receipts/rc-fight-choice-try1-testclient2.json",
+      "bytes": 729,
+      "sha256": "af2cd8d932a8fb2f9fc8b3e8b11ca9a542d8defad403592ea675d70614f92601"
+    },
+    {
+      "path": "up24-receipts/rc-fight-close-try1-testclient2.json",
+      "bytes": 483,
+      "sha256": "d07ffc7ca917b1d1035a47d8cdab545e24f14016c5e0559f8ee85554d3db4ef4"
+    },
+    {
+      "path": "up24-receipts/rc-fight-close-try2-testclient2.json",
+      "bytes": 426,
+      "sha256": "e899fb834f1940208c4770dc37782daf0736d63b9ba7e9d89ebd0af2d83a759a"
+    },
+    {
+      "path": "up24-receipts/rc-fight-testclient2.json",
+      "bytes": 514,
+      "sha256": "82a4a947b7c71bf4fccdb551b7b415e4c7bcd5e2b795778fb422b92c81b29842"
+    },
+    {
+      "path": "up24-receipts/rc-final-baseline-server.json",
+      "bytes": 379,
+      "sha256": "6b08bbcdf3ad1fb8ce2ef175e2e9b6093362d9e8e81e7b6222116a68e239ef9b"
+    },
+    {
+      "path": "up24-receipts/rc-final-baseline-testclient.json",
+      "bytes": 430,
+      "sha256": "91b5038b8d78349eff2283817d0ab7319cfa8b00e15cad67ad93de7d110763fe"
+    },
+    {
+      "path": "up24-receipts/rc-final-baseline-testclient2.json",
+      "bytes": 431,
+      "sha256": "b19a3e9cf34698f969236746ce0e398c37405aaa0b76973492f5be26fe7397cd"
+    },
+    {
+      "path": "up24-receipts/rc-first-talk-options-testclient2.json",
+      "bytes": 996,
+      "sha256": "1472bd588a36df2323e2b65da65ab9dfd9aba3c390866cfea3aeeaeccfdbf01f"
+    },
+    {
+      "path": "up24-receipts/rc-greeting-try1-testclient2.json",
+      "bytes": 996,
+      "sha256": "5278ebff48cb51e94473a6480f27598149782bc4f4d10b891c1413d66246b190"
+    },
+    {
+      "path": "up24-receipts/rc-greeting-try2-testclient2.json",
+      "bytes": 1010,
+      "sha256": "9f6f17617e147df62be17240bdbc6c5ffefcb10d9af253d73c07bfe5e456b0cc"
+    },
+    {
+      "path": "up24-receipts/rc-leave-giver-testclient2.json",
+      "bytes": 423,
+      "sha256": "35f97d3d7a29170bd0d5237e6e3ede591bd85082f639b6b556a13263175d230e"
+    },
+    {
+      "path": "up24-receipts/rc-native-loot-Done-testclient2.json",
+      "bytes": 461,
+      "sha256": "c1c6ad6e00acae9c9023ac2aad811e8a6b2b7f711a725349a47befaa67359470"
+    },
+    {
+      "path": "up24-receipts/rc-native-send-troops-testclient2.json",
+      "bytes": 504,
+      "sha256": "63fc2b6ce21040e5c9ec0fc8da4700fbdfc3177a19ba82b588569b1cbc5d7645"
+    },
+    {
+      "path": "up24-receipts/rc-native-simulation-Done-testclient2.json",
+      "bytes": 544,
+      "sha256": "b81efc04bfcba4f092d76009a85e3bb4366304e196253859e201bfe88fbbeb70"
+    },
+    {
+      "path": "up24-receipts/rc-place-try1-server.json",
+      "bytes": 1888,
+      "sha256": "5aae3b224767800bd172a1fd6378f3fabcb84d75ce26dfd99697e6a7f3265b03"
+    },
+    {
+      "path": "up24-receipts/rc-post-loot-encounter-testclient2.json",
+      "bytes": 557,
+      "sha256": "2c21908f2a074214819aa02f21891d14c8e45af9c116879560d383a3d35f4729"
+    },
+    {
+      "path": "up24-receipts/rc-post-loot-state-server.json",
+      "bytes": 2087,
+      "sha256": "96c926c0df4d4a0ae0f9e95f23e27604a5e09b0c80148b9f36ed5eb49b42d5a1"
+    },
+    {
+      "path": "up24-receipts/rc-post-loot-status-testclient2.json",
+      "bytes": 2773,
+      "sha256": "3c9a622305ea3978b88eb617d9e7ccc5318cf9ddd1fb3444c1c013e13fb1edef"
+    },
+    {
+      "path": "up24-receipts/rc-preoffer-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "f9dc6c8c0cb5f5387d2eeaff9fea9e1328169115b925621fc0cbcb3f51334450"
+    },
+    {
+      "path": "up24-receipts/rc-preoffer-conv-testclient2.json",
+      "bytes": 561,
+      "sha256": "bd3c1bbd6d8aba0bb9ae77389bf15d069a3895624368f9734a6cc4bb47b62b09"
+    },
+    {
+      "path": "up24-receipts/rc-preoffer-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "393223bcd88df196797358075aea9ce6ce1e806d3f6d6bd284eb31082a5f15b9"
+    },
+    {
+      "path": "up24-receipts/rc-preoffer-encounter-testclient2.json",
+      "bytes": 557,
+      "sha256": "84c684d71381650ffaef3513661174a22433c4410745ea902f4bc5aac93b88b3"
+    },
+    {
+      "path": "up24-receipts/rc-preoffer-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "d4efb3ed95d07474d901bdc037a91f6bb455ab5bcdd8e1a5b50ecc50adca5120"
+    },
+    {
+      "path": "up24-receipts/rc-preoffer-status-testclient2.json",
+      "bytes": 2773,
+      "sha256": "fb34a294ec00c38127e580f1605012882698a41e83917f2f2db75bc9573c221b"
+    },
+    {
+      "path": "up24-receipts/rc-progress-server.json",
+      "bytes": 1855,
+      "sha256": "bbf9579e2d9d705c398726bab13026b62f3e938b579cd046c4ca01bbaf12a68a"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-before-journals-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "a621ac04822ede86eb422cf4c5e066482cbc5c0893b8c121e667a44a510e7798"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-before-journals-conv-testclient2.json",
+      "bytes": 562,
+      "sha256": "22df1d148295f5c9a3286289e0b7970d9db5e29b655212a888b41ca4926ea0df"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-before-journals-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "2bd830d3b790ed101d184b94857c7aa85bb22d4d25c7ae795163eb4af242c919"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-before-journals-encounter-testclient2.json",
+      "bytes": 557,
+      "sha256": "91e5e231e15a9a07d11e928af2981cbc2aa9868f76dce7c5fe36832010b366f3"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-before-journals-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "0f0961e36d69e9e1908147d427f7a048670de3735bc1b79fd6ff62ba1b2792e4"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-before-journals-status-testclient2.json",
+      "bytes": 2773,
+      "sha256": "b714f28a26d74f007796c445edcfa7e20bca55469e29880e34b66b6d217d171b"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-closed-testclient-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "5a5a0082d4118e6dd3b47abe859405b6db889c4e0b87b7864f3959ae27fe64b6"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-closed-testclient-conv-testclient2.json",
+      "bytes": 562,
+      "sha256": "179a88d4c5b0a802de487f574e8a86dd56556fa72b941af44bd8ca6d7a052ba2"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-closed-testclient-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "61217813fd8b0b2a5e8aa927726e4eae61098acf1566d2d2953917560898b13e"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-closed-testclient-encounter-testclient2.json",
+      "bytes": 557,
+      "sha256": "9bc80e337d94d93c58dd3c086553dea6f1e3db4545779c1982eb87c2f12ff32d"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-closed-testclient-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "867acc6d16d3b60ae32cf3d1053816dee5b6af708da431b1fe3183858bbca8dc"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-closed-testclient-status-testclient2.json",
+      "bytes": 2773,
+      "sha256": "64ae8291c3a9637b367bef6a671e8b469fc531c50c5e523e5a57b7194a0cacf7"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-closed-testclient2-conv-testclient.json",
+      "bytes": 561,
+      "sha256": "b791fba6de0422cc070bd1dff50ca86adf2a577a503563d95982b5b70ac37a0c"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-closed-testclient2-conv-testclient2.json",
+      "bytes": 562,
+      "sha256": "afd69838ed81ff1176575be4a3a19c903c67f0b3eec630b997c66a2271c33a3d"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-closed-testclient2-encounter-testclient.json",
+      "bytes": 556,
+      "sha256": "9fabd01330214be58b9fc7c446740f04adcb7e2535bfc8322ca6ece6fffbff95"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-closed-testclient2-encounter-testclient2.json",
+      "bytes": 557,
+      "sha256": "61faa2ba380309a2c84d044ab67b97bd02ffa27c1570b7adcf9c3775f63b1852"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-closed-testclient2-status-testclient.json",
+      "bytes": 2765,
+      "sha256": "f1ec85a701658bfe0e1e80a34108dc062fcc2c5a9b2bcd3bca48743c187d4d80"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-closed-testclient2-status-testclient2.json",
+      "bytes": 2773,
+      "sha256": "def2d9de27b4d2841f72884fc2f75f3222371d3d0abe95d8da92f2c3acf7ead7"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-fresh-first-page-testclient.json",
+      "bytes": 37162,
+      "sha256": "1a9a979210fdbef04eeba20f2f1c67e46c82e2df1e85d0531664b27ca535c1c2"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-fresh-first-page-testclient2.json",
+      "bytes": 40766,
+      "sha256": "87bb0be0115ef43bc67179ce7e374ca2ebca65b2ec256a4ad87d4efa7a534d99"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-layers-testclient.json",
+      "bytes": 2891,
+      "sha256": "8dd625ad1a7e73f3f330a703c0da79f1c829bba3c012f33d4b51814022e7fa9c"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-layers-testclient2.json",
+      "bytes": 2892,
+      "sha256": "82ba4a20a57a6a12278777a244324a0e1e93a96c22045eea94046253d2f981be"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-no-matching-entry-testclient.json",
+      "bytes": 503,
+      "sha256": "d1a23862fe06045071dbf7ce6431752ef46cbc3ed4351d38774eaba1996ad02f"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-open-testclient.json",
+      "bytes": 518,
+      "sha256": "36c35cdfcd370ada5eef28b216ec10b0e9af4662c2b754701b40ca73a7cbaf59"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-open-testclient2.json",
+      "bytes": 519,
+      "sha256": "f64ea75396ab38081bc5d821cfef61b60248604faa712101bf4f501227fc33c3"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-pop-testclient.json",
+      "bytes": 429,
+      "sha256": "2d5d85efa2018c1e399623bcbc0664d48b847268f06c3f7911a08a3e8c4bbe01"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-pop-testclient2.json",
+      "bytes": 430,
+      "sha256": "9e95b564e1681bf3128937e522fdf87047ff467fc95bdcfe9cc783ab72ade58e"
+    },
+    {
+      "path": "up24-receipts/rc-SuccessByBattle-journal-select-testclient2.json",
+      "bytes": 556,
+      "sha256": "20385aeb3138e5fede79d19fbe1b2956b94eb4bf93f473da2ccc045704495c9b"
+    },
+    {
+      "path": "up24-receipts/rc-threat-testclient2.json",
+      "bytes": 763,
+      "sha256": "b093bd969119ff587594fb4d7f74e67c8cbbbc364dc36cd036d53f26dcedb77e"
+    },
+    {
+      "path": "up24-receipts/rc-troop-setup-server.json",
+      "bytes": 407,
+      "sha256": "c75c2eea96df7cdd87bb86c22dc6159a2ba5b55e4e3e00581f5b2f265dce12e8"
+    },
+    {
+      "path": "up24-receipts/rc-won-try1-server.json",
+      "bytes": 2544,
+      "sha256": "8b8d1886eb5c21186bae8e8a1219ed27c6fd434df8ebaaed3bf7d6d283acfe8f"
+    },
+    {
+      "path": "up24-receipts/rc-won-try1-testclient.json",
+      "bytes": 1526,
+      "sha256": "b0763121c88d120f2b1d23f53d3f039fae1590a944c83c9dd9ad678de714b609"
+    },
+    {
+      "path": "up24-receipts/rc-won-try1-testclient2.json",
+      "bytes": 2719,
+      "sha256": "1cc481e54febd0e7d15e36a1a259f5c07004f415fdc5bcb7df52056336dd4964"
+    },
+    {
+      "path": "up24-REPORT.md",
+      "bytes": 14124,
+      "sha256": "b9bb2024e19ed8c19f997160e0f1938b0bde354797692b5f0987711701fa7c5c"
+    },
+    {
+      "path": "up24-RESULT.json",
+      "bytes": 33840,
+      "sha256": "1c428ccc81b0788fa29e23444cf919598ba84630282684c76b2765ec14accbb7"
     }
   ],
-  "ready": false
+  "legacyWorkflowUntouched": true,
+  "parentVisualReview": "parent-visual-review.json"
 }

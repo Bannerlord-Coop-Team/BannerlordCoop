@@ -1,0 +1,951 @@
+{
+  "status": "DONE",
+  "head": "bd74a2d5323edd542faebc14b4b9802e6db81184",
+  "tree": "311491b1b93a9b28a6edf83fc2dab4fdb5981cd6",
+  "runToken": "issue3783-20261023T114021",
+  "roles": {
+    "serverEngine": 60368,
+    "serverWrapper": 71700,
+    "AObserver": 56212,
+    "BOwner": 50816
+  },
+  "branches": [
+    {
+      "branch": "SuccessByAgreement",
+      "slot": "ra",
+      "status": "DONE",
+      "title": "Tuvul's Revolt",
+      "owner": "B/testclient2",
+      "observer": "A/testclient",
+      "ownerDelta": {
+        "player": "testclient2",
+        "goldDelta": "5400",
+        "renownDelta": "1",
+        "honor": "0(0)",
+        "honorXp": "-10",
+        "honorXpDelta": "-10",
+        "giverRelationDelta": "8",
+        "notables": "[]",
+        "prisoner": "False",
+        "heldBy": "none",
+        "declaredWorldGiverDelta": "0",
+        "giverStored": "8/0"
+      },
+      "observerDelta": {
+        "player": "testclient",
+        "goldDelta": "0",
+        "renownDelta": "0",
+        "honor": "0(0)",
+        "honorXp": "0",
+        "honorXpDelta": "0",
+        "giverRelationDelta": "0",
+        "notables": "[]",
+        "prisoner": "False",
+        "heldBy": "none",
+        "declaredWorldGiverDelta": "0",
+        "giverStored": "0/0"
+      },
+      "nativeJournal": "Native journal selected 'Tuvul's Revolt'; stages=2; active=0 old=3. Inspect the text before capture.",
+      "peers": {
+        "server": {
+          "identity": {
+            "issue": "issue_170",
+            "giver": "Hero_lord_6_15",
+            "party": "MobileParty_Created_1913",
+            "handle": "42707"
+          },
+          "counters": {
+            "sent.NetworkApplyDestroyParty": 1,
+            "sent.NetworkDestroyInstance": 1,
+            "sent.NetworkIssueFinalized": 1,
+            "sent.NetworkOwnerBattleEnded": 0,
+            "received.NetworkApplyDestroyParty": 0,
+            "received.NetworkDestroyInstance": 0,
+            "received.NetworkIssueFinalized": 0,
+            "received.NetworkOwnerBattleEnded": 0,
+            "local.DestroyPartyApplied": 1,
+            "local.InstanceDestroyed": 1,
+            "native.MobilePartyDestroyed": 1
+          },
+          "ruralSample": "RURAL_SAMPLE hero=Hero_CharacterObject_2275 stringId=CharacterObject_2275 name=Mitunis of Tubilis occupation=RuralNotable village=castle_village_A1_1 villageName=Tubilis",
+          "ruralBefore": {
+            "testclient": 0,
+            "testclient2": 0
+          },
+          "ruralAfter": {
+            "testclient": 0,
+            "testclient2": 0
+          }
+        },
+        "testclient": {
+          "identity": {
+            "issue": "issue_170",
+            "giver": "Hero_lord_6_15",
+            "party": "MobileParty_Created_1913",
+            "handle": "42707"
+          },
+          "counters": {
+            "sent.NetworkApplyDestroyParty": 0,
+            "sent.NetworkDestroyInstance": 0,
+            "sent.NetworkIssueFinalized": 0,
+            "sent.NetworkOwnerBattleEnded": 0,
+            "received.NetworkApplyDestroyParty": 1,
+            "received.NetworkDestroyInstance": 1,
+            "received.NetworkIssueFinalized": 1,
+            "received.NetworkOwnerBattleEnded": 0,
+            "local.DestroyPartyApplied": 0,
+            "local.InstanceDestroyed": 0,
+            "native.MobilePartyDestroyed": 1
+          },
+          "ruralSample": "RURAL_SAMPLE hero=Hero_CharacterObject_2275 stringId=CharacterObject_2275 name=Mitunis of Tubilis occupation=RuralNotable village=castle_village_A1_1 villageName=Tubilis",
+          "ruralBefore": {
+            "testclient": 0,
+            "testclient2": 0
+          },
+          "ruralAfter": {
+            "testclient": 0,
+            "testclient2": 0
+          }
+        },
+        "testclient2": {
+          "identity": {
+            "issue": "issue_170",
+            "giver": "Hero_lord_6_15",
+            "party": "MobileParty_Created_1913",
+            "handle": "42707"
+          },
+          "counters": {
+            "sent.NetworkApplyDestroyParty": 0,
+            "sent.NetworkDestroyInstance": 0,
+            "sent.NetworkIssueFinalized": 0,
+            "sent.NetworkOwnerBattleEnded": 0,
+            "received.NetworkApplyDestroyParty": 1,
+            "received.NetworkDestroyInstance": 1,
+            "received.NetworkIssueFinalized": 1,
+            "received.NetworkOwnerBattleEnded": 0,
+            "local.DestroyPartyApplied": 0,
+            "local.InstanceDestroyed": 0,
+            "native.MobilePartyDestroyed": 1
+          },
+          "ruralSample": "RURAL_SAMPLE hero=Hero_CharacterObject_2275 stringId=CharacterObject_2275 name=Mitunis of Tubilis occupation=RuralNotable village=castle_village_A1_1 villageName=Tubilis",
+          "ruralBefore": {
+            "testclient": 0,
+            "testclient2": 0
+          },
+          "ruralAfter": {
+            "testclient": 0,
+            "testclient2": 0
+          }
+        }
+      }
+    },
+    {
+      "branch": "SuccessByBattle",
+      "slot": "rc",
+      "status": "DONE",
+      "title": "Olorun's Revolt",
+      "owner": "B/testclient2",
+      "observer": "A/testclient",
+      "ownerDelta": {
+        "player": "testclient2",
+        "goldDelta": "5250",
+        "renownDelta": "5.047",
+        "honor": "0(0)",
+        "honorXp": "20",
+        "honorXpDelta": "30",
+        "giverRelationDelta": "9",
+        "notables": "[village_K4_4:-2,village_K4_4:-2]",
+        "prisoner": "False",
+        "heldBy": "none",
+        "declaredWorldGiverDelta": "0",
+        "giverStored": "17/8"
+      },
+      "observerDelta": {
+        "player": "testclient",
+        "goldDelta": "0",
+        "renownDelta": "0",
+        "honor": "0(0)",
+        "honorXp": "0",
+        "honorXpDelta": "0",
+        "giverRelationDelta": "0",
+        "notables": "[]",
+        "prisoner": "False",
+        "heldBy": "none",
+        "declaredWorldGiverDelta": "0",
+        "giverStored": "0/0"
+      },
+      "nativeJournal": "Native journal selected 'Olorun's Revolt'; stages=2; active=0 old=4. Inspect the text before capture.",
+      "peers": {
+        "server": {
+          "identity": {
+            "issue": "issue_171",
+            "giver": "Hero_lord_6_5",
+            "party": "MobileParty_Created_1915",
+            "handle": "42737"
+          },
+          "counters": {
+            "sent.NetworkApplyDestroyParty": 1,
+            "sent.NetworkDestroyInstance": 1,
+            "sent.NetworkIssueFinalized": 1,
+            "sent.NetworkOwnerBattleEnded": 1,
+            "received.NetworkApplyDestroyParty": 0,
+            "received.NetworkDestroyInstance": 0,
+            "received.NetworkIssueFinalized": 0,
+            "received.NetworkOwnerBattleEnded": 0,
+            "local.DestroyPartyApplied": 1,
+            "local.InstanceDestroyed": 1,
+            "native.MobilePartyDestroyed": 1
+          },
+          "ruralSample": "RURAL_SAMPLE hero=Hero_CharacterObject_2669 stringId=CharacterObject_2669 name=Kazam of Urunjan occupation=RuralNotable village=village_K4_4 villageName=Urunjan",
+          "ruralBefore": {
+            "testclient": 0,
+            "testclient2": 0
+          },
+          "ruralAfter": {
+            "testclient": 0,
+            "testclient2": -2
+          }
+        },
+        "testclient": {
+          "identity": {
+            "issue": "issue_171",
+            "giver": "Hero_lord_6_5",
+            "party": "MobileParty_Created_1915",
+            "handle": "42737"
+          },
+          "counters": {
+            "sent.NetworkApplyDestroyParty": 0,
+            "sent.NetworkDestroyInstance": 0,
+            "sent.NetworkIssueFinalized": 0,
+            "sent.NetworkOwnerBattleEnded": 0,
+            "received.NetworkApplyDestroyParty": 1,
+            "received.NetworkDestroyInstance": 1,
+            "received.NetworkIssueFinalized": 1,
+            "received.NetworkOwnerBattleEnded": 0,
+            "local.DestroyPartyApplied": 0,
+            "local.InstanceDestroyed": 0,
+            "native.MobilePartyDestroyed": 1
+          },
+          "ruralSample": "RURAL_SAMPLE hero=Hero_CharacterObject_2669 stringId=CharacterObject_2669 name=Kazam of Urunjan occupation=RuralNotable village=village_K4_4 villageName=Urunjan",
+          "ruralBefore": {
+            "testclient": 0,
+            "testclient2": 0
+          },
+          "ruralAfter": {
+            "testclient": 0,
+            "testclient2": -2
+          }
+        },
+        "testclient2": {
+          "identity": {
+            "issue": "issue_171",
+            "giver": "Hero_lord_6_5",
+            "party": "MobileParty_Created_1915",
+            "handle": "42737"
+          },
+          "counters": {
+            "sent.NetworkApplyDestroyParty": 0,
+            "sent.NetworkDestroyInstance": 0,
+            "sent.NetworkIssueFinalized": 0,
+            "sent.NetworkOwnerBattleEnded": 0,
+            "received.NetworkApplyDestroyParty": 1,
+            "received.NetworkDestroyInstance": 1,
+            "received.NetworkIssueFinalized": 1,
+            "received.NetworkOwnerBattleEnded": 1,
+            "local.DestroyPartyApplied": 0,
+            "local.InstanceDestroyed": 0,
+            "native.MobilePartyDestroyed": 1
+          },
+          "ruralSample": "RURAL_SAMPLE hero=Hero_CharacterObject_2669 stringId=CharacterObject_2669 name=Kazam of Urunjan occupation=RuralNotable village=village_K4_4 villageName=Urunjan",
+          "ruralBefore": {
+            "testclient": 0,
+            "testclient2": 0
+          },
+          "ruralAfter": {
+            "testclient": 0,
+            "testclient2": -2
+          }
+        }
+      }
+    },
+    {
+      "branch": "FailureByRelease",
+      "slot": "rb",
+      "status": "DONE",
+      "title": "Huskur's Revolt",
+      "owner": "B/testclient2",
+      "observer": "A/testclient",
+      "ownerDelta": {
+        "player": "testclient2",
+        "goldDelta": "0",
+        "renownDelta": "0",
+        "honor": "0(0)",
+        "honorXp": "20",
+        "honorXpDelta": "0",
+        "giverRelationDelta": "-5",
+        "notables": "[village_K2_2:+1,village_K2_2:+1]",
+        "prisoner": "False",
+        "heldBy": "none",
+        "declaredWorldGiverDelta": "0",
+        "giverStored": "-5/0"
+      },
+      "observerDelta": {
+        "player": "testclient",
+        "goldDelta": "0",
+        "renownDelta": "0",
+        "honor": "0(0)",
+        "honorXp": "0",
+        "honorXpDelta": "0",
+        "giverRelationDelta": "0",
+        "notables": "[]",
+        "prisoner": "False",
+        "heldBy": "none",
+        "declaredWorldGiverDelta": "0",
+        "giverStored": "0/0"
+      },
+      "nativeJournal": "Native journal selected 'Huskur's Revolt'; stages=2; active=0 old=5. Inspect the text before capture.",
+      "peers": {
+        "server": {
+          "identity": {
+            "issue": "issue_172",
+            "giver": "Hero_lord_6_6",
+            "party": "MobileParty_Created_1917",
+            "handle": "42777"
+          },
+          "counters": {
+            "sent.NetworkApplyDestroyParty": 1,
+            "sent.NetworkDestroyInstance": 1,
+            "sent.NetworkIssueFinalized": 1,
+            "sent.NetworkOwnerBattleEnded": 0,
+            "received.NetworkApplyDestroyParty": 0,
+            "received.NetworkDestroyInstance": 0,
+            "received.NetworkIssueFinalized": 0,
+            "received.NetworkOwnerBattleEnded": 0,
+            "local.DestroyPartyApplied": 1,
+            "local.InstanceDestroyed": 1,
+            "native.MobilePartyDestroyed": 1
+          },
+          "ruralSample": "RURAL_SAMPLE hero=Hero_CharacterObject_2642 stringId=CharacterObject_2642 name=Chaghan of Tismil occupation=RuralNotable village=village_K2_2 villageName=Tismil",
+          "ruralBefore": {
+            "testclient": 0,
+            "testclient2": 0
+          },
+          "ruralAfter": {
+            "testclient": 0,
+            "testclient2": 1
+          }
+        },
+        "testclient": {
+          "identity": {
+            "issue": "issue_172",
+            "giver": "Hero_lord_6_6",
+            "party": "MobileParty_Created_1917",
+            "handle": "42777"
+          },
+          "counters": {
+            "sent.NetworkApplyDestroyParty": 0,
+            "sent.NetworkDestroyInstance": 0,
+            "sent.NetworkIssueFinalized": 0,
+            "sent.NetworkOwnerBattleEnded": 0,
+            "received.NetworkApplyDestroyParty": 1,
+            "received.NetworkDestroyInstance": 1,
+            "received.NetworkIssueFinalized": 1,
+            "received.NetworkOwnerBattleEnded": 0,
+            "local.DestroyPartyApplied": 0,
+            "local.InstanceDestroyed": 0,
+            "native.MobilePartyDestroyed": 1
+          },
+          "ruralSample": "RURAL_SAMPLE hero=Hero_CharacterObject_2642 stringId=CharacterObject_2642 name=Chaghan of Tismil occupation=RuralNotable village=village_K2_2 villageName=Tismil",
+          "ruralBefore": {
+            "testclient": 0,
+            "testclient2": 0
+          },
+          "ruralAfter": {
+            "testclient": 0,
+            "testclient2": 1
+          }
+        },
+        "testclient2": {
+          "identity": {
+            "issue": "issue_172",
+            "giver": "Hero_lord_6_6",
+            "party": "MobileParty_Created_1917",
+            "handle": "42777"
+          },
+          "counters": {
+            "sent.NetworkApplyDestroyParty": 0,
+            "sent.NetworkDestroyInstance": 0,
+            "sent.NetworkIssueFinalized": 0,
+            "sent.NetworkOwnerBattleEnded": 0,
+            "received.NetworkApplyDestroyParty": 1,
+            "received.NetworkDestroyInstance": 1,
+            "received.NetworkIssueFinalized": 1,
+            "received.NetworkOwnerBattleEnded": 0,
+            "local.DestroyPartyApplied": 0,
+            "local.InstanceDestroyed": 0,
+            "native.MobilePartyDestroyed": 1
+          },
+          "ruralSample": "RURAL_SAMPLE hero=Hero_CharacterObject_2642 stringId=CharacterObject_2642 name=Chaghan of Tismil occupation=RuralNotable village=village_K2_2 villageName=Tismil",
+          "ruralBefore": {
+            "testclient": 0,
+            "testclient2": 0
+          },
+          "ruralAfter": {
+            "testclient": 0,
+            "testclient2": 1
+          }
+        }
+      }
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "screenshots/27-r4-offer-rd-testclient2-50816.png",
+      "sha256": "0172376a5c92907702bd966f6b4a0a61fb81e32ac0e831b63382f0862b533974",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/27-rb-r4-offer-rd-testclient2-50816.png",
+      "sha256": "6ea7eadc51dee4c3da7971dbd81571715a536499549668f153c9c1bcff0581cc",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": "2026-10-23T12:04:36.8781465Z",
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/27-rc-r4-offer-rd-testclient2-50816.png",
+      "sha256": "0466e1d5f8c6ec7e1b6887576b98c8ed541644a888aa13201d705ec5e6f555f8",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/37-r4-accepted-rd-testclient-56212.png",
+      "sha256": "aaac2a050a14ee39ed91633961d56f543cb202ada240712062a17b8c8186ccde",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/37-r4-accepted-rd-testclient2-50816.png",
+      "sha256": "14c1a8ee465bbee661ea0d5d0d58afe43057dfc4ce23bbfd7ca58a5c7ade6d19",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/37-rb-r4-accepted-rd-testclient-56212.png",
+      "sha256": "6d8c33c86cc22d10bc38cd00d50e44592eb23f556cd2f8c2c8c862ab2d144c40",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": "2026-10-23T12:04:44.6562767Z",
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/37-rb-r4-accepted-rd-testclient2-50816.png",
+      "sha256": "66bb3eb6744d6d6cdfc18db572de0fdd8d2be64c1f28f0c66558f0db63b16f83",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": "2026-10-23T12:04:46.1167696Z",
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/37-rc-r4-accepted-rd-testclient-56212.png",
+      "sha256": "a40d90aaddc202255cdcda26539f30325a732715675ac721d6d692c985f143ee",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/37-rc-r4-accepted-rd-testclient2-50816.png",
+      "sha256": "e780ff7b0dd622be0ef4eaeaa6966fd5657f15444648d6425da902bb6226b4be",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/baseline-both-testclient-56212.png",
+      "sha256": "a5d9d4eb248bddac275b594cca7f997bb172b2ea828099f67f67e2e4ed61fb15",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/baseline-both-testclient2-50816.png",
+      "sha256": "eaa94f3b208b659cf091a43d6f1f12a20317ea8a5fc8575691f7276e3ffa021c",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/final-both-map-testclient-56212.png",
+      "sha256": "4dd0e19e10b3bae408368ce13b5c26f12f719f67b858d0a9c9943276c0ed937d",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": "2026-10-23T12:09:10.3351562Z",
+      "caption": null,
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/final-both-map-testclient2-50816.png",
+      "sha256": "21cf652871b5c0dc836454b524a04de84420221c4c903a65f3a6b6a73e7c46ef",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": "2026-10-23T12:09:12.0429421Z",
+      "caption": null,
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/ra-SuccessByAgreement-journal-testclient-56212.png",
+      "sha256": "a58362e17616ee90d17d7b026081aaa5b5b1cba2480e8b8bf5dbaf2a35a6067e",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": "2026-10-23T11:56:39.9236450Z",
+      "caption": "SuccessByAgreement: observer A has no matching Tuvul's Revolt entry, active=0 and only its two seed old quests.",
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/ra-SuccessByAgreement-journal-testclient2-50816.png",
+      "sha256": "810ba6e482e89ac03f97a2543e3163ab0847f0a2a252ddaf51a4a810db4e50e0",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": "2026-10-23T11:56:31.2302890Z",
+      "caption": "SuccessByAgreement: B's native Old Quests entry for Tuvul's Revolt, opening and full ending once. Quest reward is shown once.",
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/ra-before-journal-observer-56212.png",
+      "sha256": "fdce6f42cb05a6fe33a04dc008676b38c2a3e6630ab4f5b5d4f2169dec8ee205",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/ra-before-journal-testclient2-50816.png",
+      "sha256": "f6a4dda18532ece7a4f546cf2de7438ac56761bb91167e9dcc867f74faf82bbd",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/ra-first-talk-testclient-56212.png",
+      "sha256": "dada27723d11709fe725ed89b06c654b950d8930fc3f3cd19cddfc562f062c6d",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/ra-first-talk-testclient2-50816.png",
+      "sha256": "d4d732dc4d831e341c115d9f267549607afabbdc0a5bbcb665c6c0bc214631f7",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/ra-persuasion-final-testclient-56212.png",
+      "sha256": "0db7f533b7363159bb3c08053b01d92c8fae35cab9705af48b21dd58ee00053b",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/ra-persuasion-final-testclient2-50816.png",
+      "sha256": "86364313aa5b0b36d37a9fcef9e0c2013e5150b485eb2246f31668f90adafe1b",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/ra-persuasion-result-testclient-56212.png",
+      "sha256": "6e5a9164b80b9df6a48bc516b3f319d01d95c09f8bef65eaba04aae32dc59570",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/ra-persuasion-result-testclient2-50816.png",
+      "sha256": "e7e99edc8abfb2d67bf1b984c1e109066d389205e8adcadde45046d29e8722ec",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/rb-FailureByRelease-journal-testclient-56212.png",
+      "sha256": "0fcad0b17a793ff9a6566786e827630e724257eb3c1a432a37fb798bbc0bff29",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": "2026-10-23T12:08:26.7943083Z",
+      "caption": "FailureByRelease: observer A has no matching Huskur's Revolt entry, active=0 and only its two seed old quests.",
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/rb-FailureByRelease-journal-testclient2-50816.png",
+      "sha256": "7b1cc8107bdaae6e7b33f60b6f6fb3e9dd47d7e20a5a2fe3f6895b512f53a280",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": "2026-10-23T12:08:15.7940632Z",
+      "caption": "FailureByRelease: B's native Old Quests entry for Huskur's Revolt, opening and full ending once. Failed by the actual release dialogue, no quest reward.",
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/rb-before-journal-testclient-56212.png",
+      "sha256": "b288d6e49c9087e2c2bc65b6e8435e88668a2de3c9722d19fb0a5d46b1a0fc27",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": "2026-10-23T12:05:42.6677275Z",
+      "caption": null,
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/rb-before-journal-testclient2-50816.png",
+      "sha256": "14efbb5818e6dc66afa0201f9d0f8ef18f38632c8fc9f25eaf61be8fc3e16fc5",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": "2026-10-23T12:05:31.4099462Z",
+      "caption": null,
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/rb-first-talk-testclient-56212.png",
+      "sha256": "14e1688672d0a51544bcdc3664994953bd1b2d1c62a804acb734a983264f26ab",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": "2026-10-23T12:06:10.8342331Z",
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/rb-first-talk-testclient2-50816.png",
+      "sha256": "df0b768de35ee1fc8e935cba362b13ecc27756af088e043430e72e516e14ff96",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": "2026-10-23T12:06:12.5273813Z",
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/rb-release-immediate-testclient-56212.png",
+      "sha256": "4b1328dfef3c2e8ae8495b0ab4bd7a03e55881c0a5783fa5521afa4547f8069d",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": "2026-10-23T12:07:28.4136468Z",
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/rb-release-immediate-testclient2-50816.png",
+      "sha256": "4626bd26a5b29decabd962387bc7fe685878c6dc88a6ad1f8174a2a5c30ea7af",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": "2026-10-23T12:07:30.7733920Z",
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/rc-SuccessByBattle-journal-testclient-56212.png",
+      "sha256": "a5308795b09890f2879699a8e8071787bbfab4dd826b703b4b8b52c6521d5426",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": "2026-10-23T12:03:56.3687089Z",
+      "caption": "SuccessByBattle: observer A has no matching Olorun's Revolt entry, active=0 and only its two seed old quests.",
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/rc-SuccessByBattle-journal-testclient2-50816.png",
+      "sha256": "3f5bfa91b8e605384abc64ef442d87dac5892d9cfd96b190e915cdd69b36cbd5",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": "2026-10-23T12:03:45.5780734Z",
+      "caption": "SuccessByBattle: B's native Old Quests entry for Olorun's Revolt, opening and full ending once. Quest reward is shown once.",
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/rc-after-native-Done-testclient-56212.png",
+      "sha256": "03e6661ffed43396280e63ec592d9a643fe82c10b7834e30cffa69043c978877",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/rc-after-native-Done-testclient2-50816.png",
+      "sha256": "c0dba96c0a77876712680947821ba9900b3d12b513ce1b4131928fe6cb0b5c10",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/rc-before-journal-owner-50816.png",
+      "sha256": "7ffe30a279bcd3faeffa38add03554e285500ab662d51795148d2551f43fc9f8",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": true
+    },
+    {
+      "path": "screenshots/rc-encounter-menu-testclient-56212.png",
+      "sha256": "2d319c1f6280f6e9fad6be1c68559f088d30b32467f1988b12e2252c451d0d82",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": "2026-10-23T12:01:43.2328600Z",
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/rc-encounter-menu-testclient2-50816.png",
+      "sha256": "b8ce732d80a05ac541d56a717dd184164091d3606942c1b6576ad6c159134109",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": "2026-10-23T12:01:44.7269889Z",
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/rc-first-talk-testclient-56212.png",
+      "sha256": "1a68bbf06f2b5ffa5827dc3217a838173c3de1acbb0a384eba06c14ff04f372b",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/rc-first-talk-testclient2-50816.png",
+      "sha256": "b4c4056a8f918234b3339af089364d93dd63bf063415e6bc0dd64f1e6558f78c",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/rc-native-simulation-testclient-56212.png",
+      "sha256": "28ccf728a7a476e226c3e47398f2bd57cfd66f1a39fe85ed081589e386823c25",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": "2026-10-23T12:01:56.0075109Z",
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/rc-native-simulation-testclient2-50816.png",
+      "sha256": "35da5967cd2f3a8532939475964ade399626b1ad19463f0ab59838738f5f1b7e",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": "2026-10-23T12:01:57.4855167Z",
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/rc-outcome-immediate-testclient-56212.png",
+      "sha256": "674ef3c96eb6e72d199aa1bc9962e15b2dffdb8ba46d0cc1c7c8fb1046bcf4a2",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 56212,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    },
+    {
+      "path": "screenshots/rc-outcome-immediate-testclient2-50816.png",
+      "sha256": "39b9f99fb530ae46ff7547fe10f40822b53f021ae5746373e81d68056fe76ab7",
+      "width": 1280,
+      "height": 960,
+      "runToken": "issue3783-20261023T114021",
+      "clientPid": 50816,
+      "capturedUtc": null,
+      "caption": null,
+      "visuallyInspected": false
+    }
+  ],
+  "cleanup": {
+    "schemaVersion": 1,
+    "runToken": "issue3783-20261023T114021",
+    "startedUtc": "2026-10-23T12:09:39.8181840Z",
+    "completedUtc": "2026-10-23T12:09:44.8920862Z",
+    "initialProcessIds": [
+      50816,
+      56212,
+      60368,
+      71700
+    ],
+    "remainingProcessIds": [],
+    "stopAttempted": true,
+    "verifiedAbsent": true,
+    "inventoryAttempts": 2,
+    "inventoryErrors": [],
+    "stopErrors": [],
+    "gracefulShutdownAttempts": [
+      {
+        "processId": 50816,
+        "runToken": "issue3783-20261023T114021",
+        "requestWritten": true,
+        "identityVerified": true,
+        "error": null,
+        "startedUtc": "2026-10-23T12:09:40.5324768Z",
+        "completedUtc": "2026-10-23T12:09:40.6114070Z"
+      },
+      {
+        "processId": 56212,
+        "runToken": "issue3783-20261023T114021",
+        "requestWritten": true,
+        "identityVerified": true,
+        "error": null,
+        "startedUtc": "2026-10-23T12:09:40.6195190Z",
+        "completedUtc": "2026-10-23T12:09:40.6278613Z"
+      },
+      {
+        "processId": 60368,
+        "runToken": "issue3783-20261023T114021",
+        "requestWritten": true,
+        "identityVerified": true,
+        "error": null,
+        "startedUtc": "2026-10-23T12:09:40.6278613Z",
+        "completedUtc": "2026-10-23T12:09:40.6343974Z"
+      },
+      {
+        "processId": 71700,
+        "runToken": null,
+        "requestWritten": false,
+        "identityVerified": false,
+        "error": "Exception calling \"Connect\" with \"1\" argument(s): \"The operation has timed out.\"",
+        "startedUtc": "2026-10-23T12:09:40.6353974Z",
+        "completedUtc": "2026-10-23T12:09:42.1337373Z"
+      }
+    ],
+    "processTreeStopAttempts": []
+  },
+  "caveats": [
+    "Battle total renown includes native battle rewards; strict current kit checks >=3 quest branch minimum, observed total 5.047.",
+    "Counter observations are logical transport sends/broker receives and native destruction callbacks, not datagram counts.",
+    "Paged journal text reads could go stale; final captures use successful fresh first-page inspections plus visually inspected full PNGs.",
+    "No clean-log claim; retained runtime logs contain managed diagnostics.",
+    "No new R4, CI, PR promotion or source mutation was performed."
+  ]
+}

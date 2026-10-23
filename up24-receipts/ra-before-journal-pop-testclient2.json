@@ -1,0 +1,1 @@
+{"version":1,"id":"cd4e311073e94bd78620b816f554e4af","ok":false,"process":{"pid":50816,"role":"client","platformId":"testclient2","runToken":"issue3783-20261023T114021","processStartedUtc":"2026-10-23T11:46:26.6135296Z"},"result":null,"error":{"code":"command_not_found","message":"Could not find the command coop.debug.game.pop_state","outcomeUncertain":false}}

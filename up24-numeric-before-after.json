@@ -1,0 +1,218 @@
+[
+  {
+    "slot": "ra",
+    "endpoint": "server",
+    "phase": "before",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "ra",
+    "endpoint": "server",
+    "phase": "before",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "ra",
+    "endpoint": "server",
+    "phase": "after",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "ra",
+    "endpoint": "server",
+    "phase": "after",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=60 gold=6400 renown=1 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "ra",
+    "endpoint": "testclient",
+    "phase": "before",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "ra",
+    "endpoint": "testclient",
+    "phase": "before",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "ra",
+    "endpoint": "testclient",
+    "phase": "after",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "ra",
+    "endpoint": "testclient",
+    "phase": "after",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=60 gold=6400 renown=1 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "ra",
+    "endpoint": "testclient2",
+    "phase": "before",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "ra",
+    "endpoint": "testclient2",
+    "phase": "before",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "ra",
+    "endpoint": "testclient2",
+    "phase": "after",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "ra",
+    "endpoint": "testclient2",
+    "phase": "after",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=60 gold=6400 renown=1 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rc",
+    "endpoint": "server",
+    "phase": "before",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rc",
+    "endpoint": "server",
+    "phase": "before",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=60 gold=6400 renown=1 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rc",
+    "endpoint": "server",
+    "phase": "after",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rc",
+    "endpoint": "server",
+    "phase": "after",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=59 gold=11650 renown=6.0472302 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rc",
+    "endpoint": "testclient",
+    "phase": "before",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rc",
+    "endpoint": "testclient",
+    "phase": "before",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=60 gold=6400 renown=1 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rc",
+    "endpoint": "testclient",
+    "phase": "after",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rc",
+    "endpoint": "testclient",
+    "phase": "after",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=59 gold=11650 renown=6.04723024 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rc",
+    "endpoint": "testclient2",
+    "phase": "before",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rc",
+    "endpoint": "testclient2",
+    "phase": "before",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=60 gold=6400 renown=1 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rc",
+    "endpoint": "testclient2",
+    "phase": "after",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rc",
+    "endpoint": "testclient2",
+    "phase": "after",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=59 gold=11650 renown=6.04723024 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rb",
+    "endpoint": "server",
+    "phase": "before",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rb",
+    "endpoint": "server",
+    "phase": "before",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=59 gold=11650 renown=6.0472302 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rb",
+    "endpoint": "server",
+    "phase": "after",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rb",
+    "endpoint": "server",
+    "phase": "after",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=59 gold=11650 renown=6.0472302 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rb",
+    "endpoint": "testclient",
+    "phase": "before",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rb",
+    "endpoint": "testclient",
+    "phase": "before",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=59 gold=11650 renown=6.04723024 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rb",
+    "endpoint": "testclient",
+    "phase": "after",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rb",
+    "endpoint": "testclient",
+    "phase": "after",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=59 gold=11650 renown=6.04723024 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rb",
+    "endpoint": "testclient2",
+    "phase": "before",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rb",
+    "endpoint": "testclient2",
+    "phase": "before",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=59 gold=11650 renown=6.04723024 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rb",
+    "endpoint": "testclient2",
+    "phase": "after",
+    "line": "player=testclient hero=Hero_Player name=RandomPlayer party=MobileParty_Player clan=Clan_Player kingdom=Kingdom_khuzait ruler=False healthy=60 gold=1000 renown=0 honor=0 prisoner=False settlement=none"
+  },
+  {
+    "slot": "rb",
+    "endpoint": "testclient2",
+    "phase": "after",
+    "line": "player=testclient2 hero=Hero_Player2863 name=RandomPlayer party=MobileParty_Player1238 clan=Clan_Player12 kingdom=Kingdom_khuzait ruler=False healthy=59 gold=11650 renown=6.04723024 honor=0 prisoner=False settlement=none"
+  }
+]

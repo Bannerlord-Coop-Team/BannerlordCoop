@@ -1,0 +1,36 @@
+{
+  "jobId": "docker-ci-5ac79ce07653451c8953",
+  "source": {
+    "head": "bd74a2d5323edd542faebc14b4b9802e6db81184",
+    "tree": "311491b1b93a9b28a6edf83fc2dab4fdb5981cd6",
+    "origin": "bd74a2d5323edd542faebc14b4b9802e6db81184",
+    "status": "",
+    "verifiedUtc": "2026-10-23T10:40:02.572374+00:00"
+  },
+  "runnerBundleSha256": "0fb4bda63dd3183048dc523e55bb5469dfc2d1eff28a14dd184fa4806a202cc9",
+  "archiveSha256": "4221b0529a1247b592b9908c41fd7e87167bdd117d5a34819b4265dc92b60815",
+  "manifestSha256": "cb12f827ae4f0870ced8ece764a8ba1cc02c9a8661355eb46987fcb8951f7443",
+  "resultSha256": "fcf6e1e6c8f9d3821a87823113c2c6f48c054fe2aa8a70bcf4be3bd044f03c1e",
+  "manifestFilesVerified": 309,
+  "queueJob": {
+    "jobId": "docker-ci-5ac79ce07653451c8953",
+    "kind": "docker-ci",
+    "packageDir": "C:\\Users\\Andrew\\CodexWindows\\var\\garrett-1600\\3783\\final-bd74-full-release-20261023\\package-full-release",
+    "label": "#3958 bd74a2d53 final reviewed full Release",
+    "priority": 0,
+    "pinRunner": "HIVE",
+    "state": "finished",
+    "queuedUtc": "2026-10-23T10:19:22Z",
+    "runner": "HIVE",
+    "dispatchUtc": "2026-10-23T10:20:52Z",
+    "submittedUtc": "2026-10-23T10:20:57Z",
+    "detail": "{\"submitted\":true,\"jobId\":\"docker-ci-5ac79ce07653451c8953\",\"remotePath\":\"\\\\\\\\hive.tail4317d7.ts.net\\\\CodexLiveTransport\\\\inbox\\\\docker-ci-5ac79ce07653451c8953.ready\",\"runner\":\"HIVE\",\"submittedUtc\":\"2026-10-23T10:20:57.8891664Z\"}",
+    "startedUtc": "2026-10-23T10:21:02Z",
+    "result": "passed",
+    "finishedUtc": "2026-10-23T10:37:23Z"
+  },
+  "terminalTotalsAgree": true,
+  "allTrxAssembliesRelease": true,
+  "legacyPipelineUnchanged": true,
+  "onlyOneMatchingQueueSubmission": true
+}

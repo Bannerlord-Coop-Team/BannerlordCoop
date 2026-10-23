@@ -1,0 +1,32 @@
+[
+  {
+    "path": "C:/Users/Andrew/.codex-runtime/live-testing/BannerlordCoop.DedicatedServer-live-main/.stage-win/server-data/server-config.json",
+    "before": "908602ead51ac190708dc2f78782dd3b1a3cb6ebb4ceb078136ffd314de874ce",
+    "after": "908602ead51ac190708dc2f78782dd3b1a3cb6ebb4ceb078136ffd314de874ce",
+    "equal": true
+  },
+  {
+    "path": "C:/Users/Andrew/.codex-runtime/live-testing/BannerlordCoop.DedicatedServer-live-main/.stage-win/server-data/Game Saves/saveauto1.sav",
+    "before": "9f72695c5cb5385eca996f010231ab4b8ffd8784458414c42b8c7a104e1c0e4b",
+    "after": "9f72695c5cb5385eca996f010231ab4b8ffd8784458414c42b8c7a104e1c0e4b",
+    "equal": true
+  },
+  {
+    "path": "C:/Users/Andrew/.codex-runtime/live-testing/BannerlordCoop.DedicatedServer-live-main/.stage-win/server-data/Game Saves/saveauto1.json",
+    "before": "186a5b22a30162e02144f88f4f4a803e0f5a11e5766d6789f1097b19c3d84652",
+    "after": "186a5b22a30162e02144f88f4f4a803e0f5a11e5766d6789f1097b19c3d84652",
+    "equal": true
+  },
+  {
+    "path": "C:/Users/Andrew/CodexWindows/coop-live-orchestration/remote/saves/saveauto1.sav",
+    "before": "78784b6e6b98757e3b761d8c65e702c1c771bb01dd043d3033cfdf385758fd84",
+    "after": "78784b6e6b98757e3b761d8c65e702c1c771bb01dd043d3033cfdf385758fd84",
+    "equal": true
+  },
+  {
+    "path": "C:/Users/Andrew/CodexWindows/coop-live-orchestration/remote/saves/saveauto1.json",
+    "before": "6bdc7df74f5a5eaa2da057ebb203d63c7b4baa8a0e88d573c9ca0dceae694b7c",
+    "after": "6bdc7df74f5a5eaa2da057ebb203d63c7b4baa8a0e88d573c9ca0dceae694b7c",
+    "equal": true
+  }
+]

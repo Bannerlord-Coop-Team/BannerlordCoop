@@ -1,0 +1,1 @@
+{"version":1,"id":"dec4b56cd4414c1a95d42b668d21b78d","ok":true,"process":{"pid":60368,"role":"server","platformId":null,"runToken":"issue3783-20261023T114021","processStartedUtc":"0001-01-01T00:00:00"},"result":{"name":"coop.debug.ittest.run","arguments":["checkpoint","rb"],"found":true,"output":"CHECKPOINT rb","hasStructuredResult":false,"structuredResult":null},"error":null}

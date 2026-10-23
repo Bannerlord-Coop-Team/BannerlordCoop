@@ -1,13 +1,118 @@
 {
-  "ownHeadSnapshot": "3de45705a7ec72f6364eef301f66d8fb3c6b3d5c",
-  "combinedTestedHead": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
-  "currentMainHead": "bd74a2d5323edd542faebc14b4b9802e6db81184",
-  "path": "source/GameInterface/Services/Issues/Framework/Finalization/FinalizationCoordinator.cs",
-  "blobs": {
-    "tested": "514754443a5aac668d1a24da1c39f3dabb14f329",
-    "currentMain": "514754443a5aac668d1a24da1c39f3dabb14f329",
-    "dependencyOwnSnapshot": "514754443a5aac668d1a24da1c39f3dabb14f329"
-  },
-  "sameCoordinatorBlob": true,
-  "limit": "No full Release or native live run at dependency own snapshot is claimed. New dependency tests await parent adoption and final Release."
+  "dependencyOwnHead": "78dc159175e19491a7825fcc8f6348ffcc24f32a",
+  "combinedTestedHead": "bd74a2d5323edd542faebc14b4b9802e6db81184",
+  "earlierR4TestedHead": "6e268638332dc9c89111b04aea9640b67f6e8ec6",
+  "productionPaths": [
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithBetrayalDispatchPatch.cs",
+      "dependencyTreeEntry": "100644 blob 89e2be9eaa69c52341b896fa87723efe2380b6db\tsource/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithBetrayalDispatchPatch.cs",
+      "testedTreeEntry": "100644 blob 89e2be9eaa69c52341b896fa87723efe2380b6db\tsource/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithBetrayalDispatchPatch.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithCancelDispatchPatch.cs",
+      "dependencyTreeEntry": "100644 blob a4825ec2a42f553d5dc4b09683726f4a21c2224d\tsource/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithCancelDispatchPatch.cs",
+      "testedTreeEntry": "100644 blob a4825ec2a42f553d5dc4b09683726f4a21c2224d\tsource/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithCancelDispatchPatch.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithFailDispatchPatch.cs",
+      "dependencyTreeEntry": "100644 blob 556438eb0409b9d20d32096412667be5c07742b1\tsource/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithFailDispatchPatch.cs",
+      "testedTreeEntry": "100644 blob 556438eb0409b9d20d32096412667be5c07742b1\tsource/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithFailDispatchPatch.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithSuccessDispatchPatch.cs",
+      "dependencyTreeEntry": "100644 blob 7584b4cfe423a204b7517b5be6a213dd2a236669\tsource/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithSuccessDispatchPatch.cs",
+      "testedTreeEntry": "100644 blob 7584b4cfe423a204b7517b5be6a213dd2a236669\tsource/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithSuccessDispatchPatch.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithTimeOutDispatchPatch.cs",
+      "dependencyTreeEntry": "100644 blob 43112d45c224955ec9931588d050e923e0e3eb9f\tsource/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithTimeOutDispatchPatch.cs",
+      "testedTreeEntry": "100644 blob 43112d45c224955ec9931588d050e923e0e3eb9f\tsource/GameInterface/Services/Issues/Framework/Dispatch/CompleteQuestWithTimeOutDispatchPatch.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Dispatch/IssueFinalizedJournalPatch.cs",
+      "dependencyTreeEntry": "100644 blob e14218d4f55003c83ea7473aa465277782fb376e\tsource/GameInterface/Services/Issues/Framework/Dispatch/IssueFinalizedJournalPatch.cs",
+      "testedTreeEntry": "100644 blob e14218d4f55003c83ea7473aa465277782fb376e\tsource/GameInterface/Services/Issues/Framework/Dispatch/IssueFinalizedJournalPatch.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Dispatch/OutcomeDispatcher.cs",
+      "dependencyTreeEntry": "100644 blob caf0e45883b36b53e49bfb44611a626eae4d9423\tsource/GameInterface/Services/Issues/Framework/Dispatch/OutcomeDispatcher.cs",
+      "testedTreeEntry": "100644 blob caf0e45883b36b53e49bfb44611a626eae4d9423\tsource/GameInterface/Services/Issues/Framework/Dispatch/OutcomeDispatcher.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Dispatch/QuestCompletedDispatchPatch.cs",
+      "dependencyTreeEntry": "100644 blob 076bf81a6af90f2b714658f676a782ac4c29c1c6\tsource/GameInterface/Services/Issues/Framework/Dispatch/QuestCompletedDispatchPatch.cs",
+      "testedTreeEntry": "100644 blob 076bf81a6af90f2b714658f676a782ac4c29c1c6\tsource/GameInterface/Services/Issues/Framework/Dispatch/QuestCompletedDispatchPatch.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Finalization/FinalizationCoordinator.cs",
+      "dependencyTreeEntry": "100644 blob 514754443a5aac668d1a24da1c39f3dabb14f329\tsource/GameInterface/Services/Issues/Framework/Finalization/FinalizationCoordinator.cs",
+      "testedTreeEntry": "100644 blob 514754443a5aac668d1a24da1c39f3dabb14f329\tsource/GameInterface/Services/Issues/Framework/Finalization/FinalizationCoordinator.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Finalization/IssueJournalObserved.cs",
+      "dependencyTreeEntry": "100644 blob 06da77594e8e97bfdf3f44931f6a92561341bd5c\tsource/GameInterface/Services/Issues/Framework/Finalization/IssueJournalObserved.cs",
+      "testedTreeEntry": "100644 blob 06da77594e8e97bfdf3f44931f6a92561341bd5c\tsource/GameInterface/Services/Issues/Framework/Finalization/IssueJournalObserved.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Finalization/NetworkIssueJournal.cs",
+      "dependencyTreeEntry": "100644 blob 3a4f968dc9aeaeea1cda228d401404ea4273c620\tsource/GameInterface/Services/Issues/Framework/Finalization/NetworkIssueJournal.cs",
+      "testedTreeEntry": "100644 blob 3a4f968dc9aeaeea1cda228d401404ea4273c620\tsource/GameInterface/Services/Issues/Framework/Finalization/NetworkIssueJournal.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Finalization/QuestJournalReplayPatch.cs",
+      "dependencyTreeEntry": "100644 blob a035f8be5006d90d79107825da16e39cbcc77dca\tsource/GameInterface/Services/Issues/Framework/Finalization/QuestJournalReplayPatch.cs",
+      "testedTreeEntry": "100644 blob a035f8be5006d90d79107825da16e39cbcc77dca\tsource/GameInterface/Services/Issues/Framework/Finalization/QuestJournalReplayPatch.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Finalization/QuestOutcomeRequested.cs",
+      "dependencyTreeEntry": "100644 blob c2b54a0c499f418f4899aa733716a5c01a1f88f3\tsource/GameInterface/Services/Issues/Framework/Finalization/QuestOutcomeRequested.cs",
+      "testedTreeEntry": "100644 blob c2b54a0c499f418f4899aa733716a5c01a1f88f3\tsource/GameInterface/Services/Issues/Framework/Finalization/QuestOutcomeRequested.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Finalization/RequestQuestOutcome.cs",
+      "dependencyTreeEntry": "100644 blob 3a574494f6a2bc3b3c4dfb3eb24ffd0831fc2ec0\tsource/GameInterface/Services/Issues/Framework/Finalization/RequestQuestOutcome.cs",
+      "testedTreeEntry": "100644 blob 3a574494f6a2bc3b3c4dfb3eb24ffd0831fc2ec0\tsource/GameInterface/Services/Issues/Framework/Finalization/RequestQuestOutcome.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Framework/Interface/IOutcomeDispatcher.cs",
+      "dependencyTreeEntry": "100644 blob ccd8bf78eda2666ec6212e0f163a4377a9c538cc\tsource/GameInterface/Services/Issues/Framework/Interface/IOutcomeDispatcher.cs",
+      "testedTreeEntry": "100644 blob ccd8bf78eda2666ec6212e0f163a4377a9c538cc\tsource/GameInterface/Services/Issues/Framework/Interface/IOutcomeDispatcher.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Quests/ArtisanOverpricedGoods/ArtisanJournalHandler.cs",
+      "dependencyTreeEntry": "",
+      "testedTreeEntry": "",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Quests/ArtisanOverpricedGoods/Patches/ArtisanOverpricedGoodsBranchPatches.cs",
+      "dependencyTreeEntry": "100644 blob ecde61e4744691140f7b6a9fc61778da801a03a8\tsource/GameInterface/Services/Issues/Quests/ArtisanOverpricedGoods/Patches/ArtisanOverpricedGoodsBranchPatches.cs",
+      "testedTreeEntry": "100644 blob ecde61e4744691140f7b6a9fc61778da801a03a8\tsource/GameInterface/Services/Issues/Quests/ArtisanOverpricedGoods/Patches/ArtisanOverpricedGoodsBranchPatches.cs",
+      "equal": true
+    },
+    {
+      "path": "source/GameInterface/Services/Issues/Quests/ScoutEnemyGarrisons/Patches/ScoutEnemyGarrisonsBranchPatches.cs",
+      "dependencyTreeEntry": "100644 blob ac322fa44032c8d07129b7e91f5d8c02c8d326cb\tsource/GameInterface/Services/Issues/Quests/ScoutEnemyGarrisons/Patches/ScoutEnemyGarrisonsBranchPatches.cs",
+      "testedTreeEntry": "100644 blob ac322fa44032c8d07129b7e91f5d8c02c8d326cb\tsource/GameInterface/Services/Issues/Quests/ScoutEnemyGarrisons/Patches/ScoutEnemyGarrisonsBranchPatches.cs",
+      "equal": true
+    }
+  ],
+  "all18ProductionPathsEqual": true,
+  "completeFrameworkTreeEqual": true,
+  "limit": "Combined live at bd74 and R4 at 6e268 are not native live runs at dependency own SHA. Separate own-head Release is retained in the live PR body."
 }

@@ -1,0 +1,178 @@
+{
+  "suites": {
+    "LesserNobleRevoltTests": {
+      "total": 26,
+      "passed": 26,
+      "failed": 0,
+      "skipped": 0
+    },
+    "EndingJournalTests": {
+      "total": 13,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    },
+    "NestedQuestEndingTests": {
+      "total": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    "ScoutEnemyGarrisonsTests": {
+      "total": 15,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    },
+    "ArtisanOverpricedGoodsTests": {
+      "total": 31,
+      "passed": 31,
+      "failed": 0,
+      "skipped": 0
+    },
+    "VillageNeedsCraftingMaterialsTests": {
+      "total": 18,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "namedRegressions": {
+    "lnrOwnerTimeout": [
+      {
+        "name": "E2E.Tests.Services.Issues.LesserNobleRevoltTests.OwnersHourlyTick_DispatchesTheTimeoutToTheServerOnce",
+        "outcome": "Passed",
+        "report": "artifacts/e2e-2/aisha_HIVE_2026-10-23_05_23_14_net6.0.trx"
+      }
+    ],
+    "lnrTimeoutJournal": [
+      {
+        "name": "E2E.Tests.Services.Issues.LesserNobleRevoltTests.ServerEnding_AddsItsJournalLineOnceToTheOwnersJournalOnly(ending: TimedOut, outcome: QuestTimeOut, payments: 0, traitChanges: 1)",
+        "outcome": "Passed",
+        "report": "artifacts/e2e-2/aisha_HIVE_2026-10-23_05_23_14_net6.0.trx"
+      }
+    ],
+    "craftingOwnerTimeout": [
+      {
+        "name": "E2E.Tests.Services.Issues.VillageNeedsCraftingMaterialsTests.OwnersTimeout_RunsTheFailConsequencesOnTheServerOnly",
+        "outcome": "Passed",
+        "report": "artifacts/e2e-4/aisha_HIVE_2026-10-23_05_29_33_net6.0.trx"
+      }
+    ],
+    "neutralCancellation": [
+      {
+        "name": "E2E.Tests.Services.Issues.LesserNobleRevoltTests.AnotherPlayersVictoryWithoutTheOwner_CancelsWithoutQuestRewards(checkOwnerJournal: True)",
+        "outcome": "Passed",
+        "report": "artifacts/e2e-2/aisha_HIVE_2026-10-23_05_23_14_net6.0.trx"
+      },
+      {
+        "name": "E2E.Tests.Services.Issues.LesserNobleRevoltTests.OwnerBattleEnded_ForAnotherPlayerOrAnEndedIssue_LeavesTheQuestAlone",
+        "outcome": "Passed",
+        "report": "artifacts/e2e-2/aisha_HIVE_2026-10-23_05_23_14_net6.0.trx"
+      },
+      {
+        "name": "E2E.Tests.Services.Issues.LesserNobleRevoltTests.AnotherPlayersVictoryWithoutTheOwner_CancelsWithoutQuestRewards(checkOwnerJournal: False)",
+        "outcome": "Passed",
+        "report": "artifacts/e2e-2/aisha_HIVE_2026-10-23_05_23_14_net6.0.trx"
+      }
+    ]
+  },
+  "shards": {
+    "0": [
+      {
+        "path": "artifacts/e2e-0/aisha_HIVE_2026-10-23_05_23_31_net6.0.trx",
+        "assembly": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-5ac79ce07653451c8953\\.native-e2e-slots\\0\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll",
+        "total": 287,
+        "passed": 287,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "1": [
+      {
+        "path": "artifacts/e2e-1/aisha_HIVE_2026-10-23_05_23_30_net6.0.trx",
+        "assembly": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-5ac79ce07653451c8953\\.native-e2e-slots\\1\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll",
+        "total": 316,
+        "passed": 316,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "2": [
+      {
+        "path": "artifacts/e2e-2/aisha_HIVE_2026-10-23_05_23_14_net6.0.trx",
+        "assembly": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-5ac79ce07653451c8953\\.native-e2e-slots\\2\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll",
+        "total": 337,
+        "passed": 337,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "3": [
+      {
+        "path": "artifacts/e2e-3/aisha_HIVE_2026-10-23_05_23_14_net6.0.trx",
+        "assembly": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-5ac79ce07653451c8953\\.native-e2e-slots\\3\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll",
+        "total": 590,
+        "passed": 589,
+        "failed": 0,
+        "skipped": 1
+      }
+    ],
+    "4": [
+      {
+        "path": "artifacts/e2e-4/aisha_HIVE_2026-10-23_05_29_33_net6.0.trx",
+        "assembly": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-5ac79ce07653451c8953\\.native-e2e-slots\\0\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll",
+        "total": 343,
+        "passed": 343,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "5": [
+      {
+        "path": "artifacts/e2e-5/aisha_HIVE_2026-10-23_05_29_05_net6.0.trx",
+        "assembly": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-5ac79ce07653451c8953\\.native-e2e-slots\\1\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll",
+        "total": 334,
+        "passed": 334,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "6": [
+      {
+        "path": "artifacts/e2e-6/aisha_HIVE_2026-10-23_05_29_32_net6.0.trx",
+        "assembly": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-5ac79ce07653451c8953\\.native-e2e-slots\\2\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll",
+        "total": 355,
+        "passed": 355,
+        "failed": 0,
+        "skipped": 0
+      }
+    ],
+    "7": [
+      {
+        "path": "artifacts/e2e-7/aisha_HIVE_2026-10-23_05_29_48_net6.0.trx",
+        "assembly": "C:\\ProgramData\\CodexLiveRunner\\jobs\\source\\docker-ci-5ac79ce07653451c8953\\.native-e2e-slots\\3\\source\\E2E.Tests\\bin\\Release\\net6.0\\E2E.Tests.dll",
+        "total": 310,
+        "passed": 310,
+        "failed": 0,
+        "skipped": 0
+      }
+    ]
+  },
+  "failed": [],
+  "skipped": [
+    {
+      "name": "E2E.Tests.Services.ItemRosters.ItemRosterSyncTests.Server_ItemRoster__count",
+      "report": "artifacts/e2e-3/aisha_HIVE_2026-10-23_05_23_14_net6.0.trx"
+    },
+    {
+      "name": "Coop.IntegrationTests.Template.TestTemplate.ClientReceivesTemplateEventMessage_PublishesTemplateCommandMessage_AllClients",
+      "report": "artifacts/unit/aisha_HIVE_2026-10-23_05_22_05_net6.0[4].trx"
+    },
+    {
+      "name": "Coop.IntegrationTests.Template.TestTemplate.ServerReceivesTemplateEventMessage_PublishesTemplateCommandMessage_AllClients",
+      "report": "artifacts/unit/aisha_HIVE_2026-10-23_05_22_05_net6.0[4].trx"
+    }
+  ],
+  "runnerBundleSha256": "0fb4bda63dd3183048dc523e55bb5469dfc2d1eff28a14dd184fa4806a202cc9"
+}

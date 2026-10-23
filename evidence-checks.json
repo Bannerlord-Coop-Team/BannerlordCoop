@@ -1,20 +1,18 @@
 {
-  "outcome": "PASS_FOR_SCOPED_PUBLICATION",
+  "outcome": "PASS_FOR_AUTHORIZED_RUN_LOCAL_PUBLICATION",
   "checks": {
-    "all267Up23ManifestMembersMatch": true,
-    "sameTestedHeadTree": true,
-    "realAcceptanceAndOwnerActiveReceipt": true,
-    "observerHasNoQuestAtAcceptance": true,
-    "ownerEndingOnceReceipt": true,
-    "ownerGoldRelationHonorAndObserverIsolation": true,
-    "samePartyNativeDestructionAndWorldRegistryAbsence": true,
-    "nonemptyRuralSampleUnchangedOnAllPeers": true,
-    "cleanupVerifiedAbsentAndBenchReleased": true,
-    "exactlyFiveParentOpenedImages": true,
-    "noJournalBeforePixelClaim": true,
-    "penaltyImageNotParentApprovedOrSelected": true
+    "all677Up24ManifestMembersVerified": true,
+    "nineStrictPeerChecks": true,
+    "nineCounterSetsAndRuralSamples": true,
+    "sixUp24ParentOpenedJournals": true,
+    "fiveUp23ParentOpenedImagesPreserved": true,
+    "observerUnchanged": true,
+    "nativeDestructionOnceAndRegistryAbsence": true,
+    "cleanupAndConfigRestored": true,
+    "dependency18ProductionPathsEqual": true,
+    "legacyPipelineUnchanged": true,
+    "sourceCleanAtBd74": true
   },
   "failed": [],
-  "ready": false,
-  "newReleaseRun": false
+  "newCiOrLivePerformed": false
 }
