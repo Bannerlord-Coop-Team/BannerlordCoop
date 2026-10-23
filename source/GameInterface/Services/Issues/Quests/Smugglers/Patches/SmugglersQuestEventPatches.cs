@@ -8,7 +8,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using Quest = TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior.SmugglersIssueQuest;
 
@@ -133,19 +132,6 @@ internal class SmugglersQuestEventPatches
     private static bool ContainsParty(MapEvent mapEvent, PartyBase party)
     {
         return mapEvent?._sides?.Any(side => side?.Parties?.Any(mapEventParty => mapEventParty?.Party == party) == true) == true;
-    }
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementOwnerChanged))]
-    [HarmonyPostfix]
-    private static void OnSettlementOwnerChangedPostfix(
-        Settlement settlement,
-        bool openToClaim,
-        Hero newOwner,
-        Hero oldOwner,
-        Hero capturerHero,
-        ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
-    {
-        RunAsOwners(quest => quest.OnSettlementOwnerChanged(settlement, openToClaim, newOwner, oldOwner, capturerHero, detail));
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.HourlyTickParty))]
