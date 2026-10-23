@@ -157,8 +157,6 @@ public class ArtisanOverpricedGoodsTests : IDisposable
                 Get<Clan>(Server, clanId).Influence = 0;
             });
         environment.FlushCoalescer();
-        using var rewards = new MethodCallRecorder(Priority.First,
-            AccessTools.Method(typeof(Issue), nameof(Issue.LordSolutionConsequenceWithRefuseCounterOffer)));
         // The framework sees a no-counteroffer issue; the actual artisan reward still needs its merchant.
         var harmony = new Harmony($"no-counteroffer-rewards.{Guid.NewGuid():N}");
         harmony.Patch(AccessTools.Method(typeof(Issue), nameof(Issue.LordSolutionConsequenceWithRefuseCounterOffer)),
@@ -177,13 +175,11 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         }
         environment.FlushCoalescer();
 
-        Assert.Equal(LordSolutionOperation.RefuseCounterOffer,
-            ClientA.NetworkSentMessages.GetMessages<RequestLordSolution>().Last().Operation);
+        Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestLordSolution>(),
+            request => request.Operation == LordSolutionOperation.RefuseCounterOffer);
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.Equal(1, rewards.CountFor(Server));
-        Assert.Equal(0, rewards.CountFor(ClientA));
-        Assert.Equal(0, rewards.CountFor(ClientB));
         AssertFinished(2530, 10900);
+        AssertEffects(210, 90, 5, -10);
     }
 
     private static void RestoreRewardMerchant(Issue __instance)
