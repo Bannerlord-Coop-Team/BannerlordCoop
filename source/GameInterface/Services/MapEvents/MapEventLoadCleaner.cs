@@ -164,7 +164,16 @@ internal sealed class MapEventLoadCleaner : IMapEventLoadCleaner
                     mobileParty.ResetNavigationToHold();
 
                 releasedParties.Add(party);
-                onReleased(party);
+
+                // A failed broadcast must not leave the rest of the parties linked to the ended battle.
+                try
+                {
+                    onReleased(party);
+                }
+                catch (Exception ex)
+                {
+                    logger.Warning(ex, "Could not report released party {PartyId} from ended map event {MapEventId}", party.Id, mapEvent.StringId);
+                }
             }
         }
 
