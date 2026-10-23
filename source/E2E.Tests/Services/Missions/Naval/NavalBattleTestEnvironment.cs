@@ -212,6 +212,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             // The server introduces an entrant and every member to each other.
             foreach (var other in Peers)
                 other.Members.Enter(id);
+            peer.SettleMesh = SettleCaptures;
             peers[id] = peer;
             return peer;
         }
@@ -272,6 +273,17 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             foreach (var peer in Peers)
                 peer.Instance.Call(() => peer.Broker.Publish(peer,
                     new NetworkBattleHostAssigned(MapEventId, HostId, Successors, HostEpoch)));
+        }
+
+        /// <summary>
+        /// Runs only the capture steps of every client's tick, three rounds, so a request, its decision and the confirm all land
+        /// (captures apply from the mission tick, R48 L6) without advancing anything else.
+        /// </summary>
+        public void SettleCaptures()
+        {
+            for (int round = 0; round < 3; round++)
+                foreach (var peer in Peers)
+                    peer.TickCaptures();
         }
 
         /// <summary>Advances every client on the mesh by <paramref name="ticks"/> mission ticks.</summary>
@@ -423,6 +435,9 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         public INavalBattleServices Services { get; }
         public IBattleShipReplicator Ships => Services.ShipReplicator;
         public IBattleShipCaptureReplicator Captures => Services.ShipCaptureReplicator;
+        public IShipCaptureApplier Applier => Services.CaptureApplier;
+        /// <summary>The battle's capture settling, which <see cref="ElapseCaptureTimer"/> runs after the timer.</summary>
+        public Action? SettleMesh { get; set; }
         public IAgentStationUseReplicator Stations => Services.StationUseReplicator;
         public IBattleShipDamageRouter Damage => Services.ShipDamageRouter;
         public IBattleShipWeaponReplicator Weapons => Services.ShipWeaponReplicator;
@@ -442,6 +457,13 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
         {
             Services.Tick(dt);
             Engine.AssertRemovalInvariant();
+        });
+
+        /// <summary>The capture steps of the services tick alone, without advancing their clocks.</summary>
+        public void TickCaptures() => Call(() =>
+        {
+            Applier.Tick(0f);
+            Captures.Tick(0f);
         });
 
         public void Ticks(int count)
@@ -605,6 +627,7 @@ public abstract class NavalBattleTestEnvironment : MissionTestEnvironment
             var prizeHull = Ship(prize).Hull;
             Engine.PlaceAgent(main, prizeHull, Ship(ownHull).Hull);
             Call(() => Broker.Publish(this, new ShipCaptureTimerElapsed(prizeHull, main)));
+            SettleMesh?.Invoke();
         }
 
         /// <summary>The ship damage patch's event for a hit this client decided on its local hull.</summary>

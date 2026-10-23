@@ -163,7 +163,10 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
    hull must be an enemy's (or the captor's own orphan), not leaving or mid-swap (`Busy`), not a storyline hull, not
    sinking, and vacant by vanilla's rule, read fresh (its 5 s cached formation query is invalidated first). It applies the
    capture itself and broadcasts `NetworkShipCaptured`, or sends `NetworkShipCaptureRejected` to the captor alone.
-4. Every client applies `NetworkShipCaptured` in one game-thread step: the authority moves in place
+4. Every client applies `NetworkShipCaptured` in one step of its naval services tick (`OnMissionTick`), never from the
+   game-thread queue: the queue drains while the engine's async agent and team tick runs, which reads the assignments and
+   formations a capture rewrites (R48 L6). Arrived requests, confirms and records are queued for that tick in arrival order.
+   The authority moves in place
    (`IBattleShipReplicator.TransferHull(..., inPlace: true)`: sample and condition order restart, the captor adopts its copy
    with `INavalShipEngine.AdoptHull`, the old authority turns its hull into a copy with `ReleaseHull`; no hull is removed or
    replaced), then vanilla's swap runs on the local hulls (`ApplyCapture`, copies keep no controller), the registry records
@@ -196,7 +199,13 @@ Co-op runs vanilla's timer on the captor's view and lets the hull's current auth
   `OnBehaviorActivatedAux`; `BehaviorNavalRemoveConnection` ctor and `:38-99`; `BehaviorNavalRamming.GetAiWeight:107`;
   `BehaviorNavalSkirmish.GetAiWeight:80`; `BehaviorNavalDefendInLine.TickOccasionally:336` and the in-line neighbour lookups;
   `NavalOrderController` order setters; the deployment controllers' filters). A formation left without a ship by a capture
-  reaches the behaviour ones; whether each dereferences the null hull is unverified.
+  reaches the behaviour ones, the likely R48 L6 cause (code evidence, not a stack): `BehaviorNavalRemoveConnection.GetAiWeight`
+  dereferences the null hull on the async team tick, freezing the game thread (`WaitTickCompletion`) and crashing the client. The capture
+  engine resets the behaviour weights of the prize's former formation once it has no hull, so the formation AI picks none;
+  `ShiplessFormationBehaviorWeightPatch` weighs `BehaviorNavalRemoveConnection`, `BehaviorNavalRamming` and
+  `BehaviorNavalSkirmish` at 0 for any formation without a hull in a co-op battle; a hull spawned into a formation with
+  units and no weighted behaviour asks the team's tactic to re-apply (its count/order checks miss that case); and
+  `NavalAgentTickFailurePatch` logs a throw in the async agent and team tick, finishes the tick and swallows it.
 - **One decider per place in the order.** Only a hull's current authority decides a capture of it. A player's hull, or a
   captured hull, changes authority only through captures, so a confirm for it must come from its current authority at that
   place. An AI hull's authority also moves with host changes, which aren't ordered against confirms, so its confirms are
@@ -723,9 +732,9 @@ Knobs (`NavalScenarioResolver.Usage`):
 - `ram=n` (0 to 4) fits `bow_ram_lvl1` on the first n ships without a ballista of every player and of the AI fleet
   (not the `encounter` or `blockade` enemy), swapping in an `empire_medium_ship` where a hull has no bow slot. `ramming`
   defaults to `ram=1`.
-- `reserve=n` (0 to 200) tops every player's regulars, and those of the AI fleet a start_naval preset fights (not the
-  `encounter` or `blockade` enemy), up to n past the crew capacity of all the party's ships, so at least n wait in reserve
-  to reinforce, for example after a capture's orphan is removed (`boarding reserve=20`, `duel reserve=20`).
+- `reserve=n` (0 to 200) tops every player's healthy troops (wounded don't count), and those of the AI fleet a start_naval
+  preset fights (not the `encounter` or `blockade` enemy), up to n past the crew capacity of all the party's ships, so at
+  least n wait in reserve to reinforce, for example after a capture's orphan is removed (`boarding reserve=20`, `duel reserve=20`).
 
 A scenario client whose Ready press throws (R42 crash 2's first symptom) logs the exception, fails the `ready` step with
 `deployment half-finished` and runs no further steps in that battle.

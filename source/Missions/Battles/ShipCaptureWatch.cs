@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿#if DEBUG
+using Common.Logging;
 using Serilog;
 using System;
 using System.Diagnostics;
@@ -34,6 +35,10 @@ public class ShipCaptureWatch : IShipCaptureWatch
     private long ticks;
     private long ticksAtLastLine;
     private long lastTickAt;
+    private bool running;
+
+    /// <summary>Whether the alive lines of a capture are still being written.</summary>
+    internal bool IsRunning { get { lock (gate) return running; } }
 
     // A capture restarts the watch, so the lines always follow the latest one.
     public void Start(Guid capturedShipId)
@@ -45,6 +50,7 @@ public class ShipCaptureWatch : IShipCaptureWatch
             ticksAtLastLine = Interlocked.Read(ref ticks);
             timer ??= new Timer(_ => Report(), null, Timeout.Infinite, Timeout.Infinite);
             timer.Change(IntervalMilliseconds, IntervalMilliseconds);
+            running = true;
         }
     }
 
@@ -69,7 +75,10 @@ public class ShipCaptureWatch : IShipCaptureWatch
             Logger.Information("[NavalSync] Capture watch: {Seconds:0.0} s after hull {ShipId} was captured; {Ticks} naval tick(s) since " +
                 "the last line, the last {Age:0.0} s ago", sinceCapture, shipId, total - ticksAtLastLine, SecondsBetween(last, now));
             ticksAtLastLine = total;
-            if (IsOver(sinceCapture)) timer.Change(Timeout.Infinite, Timeout.Infinite);
+            if (!IsOver(sinceCapture)) return;
+
+            timer.Change(Timeout.Infinite, Timeout.Infinite);
+            running = false;
         }
     }
 
@@ -86,6 +95,8 @@ public class ShipCaptureWatch : IShipCaptureWatch
         {
             timer?.Dispose();
             timer = null;
+            running = false;
         }
     }
 }
+#endif

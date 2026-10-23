@@ -23,6 +23,9 @@ public interface INavalBattleServices : IDisposable
     /// <summary>Replicates in-mission ship captures, confirmed by each captured hull's authority.</summary>
     IBattleShipCaptureReplicator ShipCaptureReplicator { get; }
 
+    /// <summary>Applies the captures the hulls' authorities confirm, on this client's tick.</summary>
+    IShipCaptureApplier CaptureApplier { get; }
+
     IAgentStationUseReplicator StationUseReplicator { get; }
 
     INavalDeckPoses DeckPoses { get; }
@@ -66,7 +69,9 @@ public class NavalBattleServices : INavalBattleServices
     private readonly IShipCaptureApplier captureApplier;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
+#if DEBUG
     private readonly IShipCaptureWatch captureWatch = new ShipCaptureWatch();
+#endif
 
     public NavalBattleServices(IBattleNetwork network, INetwork relayNetwork, IMessageBroker messageBroker,
         IBattleTeamResolver teamResolver, IObjectManager objectManager, BattleContext context, INavalShipEngine shipEngine,
@@ -90,7 +95,9 @@ public class NavalBattleServices : INavalBattleServices
             hullAuthority);
         ShipCaptureReplicator = new BattleShipCaptureReplicator(network, messageBroker, context, shipEngine, captureEngine,
             hullAuthority, captureApplier);
+#if DEBUG
         captureApplier.CaptureApplied += OnCaptureApplied;
+#endif
         DeckPoses = new NavalDeckPoses(context.MissionComponent, shipEngine, StationUseReplicator);
         MigrationReserveFielder = new NavalMigrationReserveFielder(context.Session, context.ReinforcementFielder,
             context.MissionComponent.ShipRegistry, shipEngine, ShipReplicator);
@@ -111,6 +118,8 @@ public class NavalBattleServices : INavalBattleServices
 
     public IBattleShipCaptureReplicator ShipCaptureReplicator { get; }
 
+    public IShipCaptureApplier CaptureApplier => captureApplier;
+
     public IAgentStationUseReplicator StationUseReplicator { get; }
 
     public INavalDeckPoses DeckPoses { get; }
@@ -127,7 +136,9 @@ public class NavalBattleServices : INavalBattleServices
 
     public void Tick(float dt, Action beforeMigrationReserve = null)
     {
+#if DEBUG
         captureWatch.NoteTick();
+#endif
         WaterClock.Tick(dt);
         ShipReplicator.Tick(dt);
         captureApplier.Tick(dt);
@@ -161,15 +172,19 @@ public class NavalBattleServices : INavalBattleServices
         FateReporter.Flush();
     }
 
+#if DEBUG
     // Two live freezes followed a capture within a second, so each capture here is followed by alive lines.
     private void OnCaptureApplied(Guid prizeId, string captor) => captureWatch.Start(prizeId);
+#endif
 
     public void Dispose()
     {
         // First, so a throwing service below can't leave the engine reading battle water time on the campaign map.
         WaterClock.Dispose();
+#if DEBUG
         captureWatch.Dispose();
         captureApplier.CaptureApplied -= OnCaptureApplied;
+#endif
         messageBroker.Unsubscribe<BattleResultReporting>(Handle_BattleResultReporting);
         ShipWeaponReplicator.Dispose();
         ShipDamageRouter.Dispose();

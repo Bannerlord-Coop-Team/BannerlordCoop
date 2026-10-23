@@ -253,6 +253,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         var requestOfO = o.Network.NetworkSentMessages.GetMessages<NetworkShipCaptureRequest>().Single();
         h.Call(() => h.Instance.SimulateMessage(c.Network.NetPeer, requestOfC));
         h.Call(() => h.Instance.SimulateMessage(o.Network.NetPeer, requestOfO));
+        battle.SettleCaptures();
 
         Assert.Single(h.Network.NetworkSentMessages.GetMessages<NetworkShipCaptured>());
         var refusal = Assert.Single(h.Network.NetworkSentMessages.GetMessages<NetworkShipCaptureRejected>());
@@ -326,9 +327,11 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
 
         battle.MigrateHost(h, "O");
         o.Call(() => o.Instance.SimulateMessage(h.Network.NetPeer, confirm));
+        o.TickCaptures();
         bool appliedMidSwap = o.Ship(prize).CaptorControllerId != null;
         battle.TickAll(4);
         c.Call(() => c.Instance.SimulateMessage(h.Network.NetPeer, confirm));
+        c.TickCaptures();
 
         Assert.False(appliedMidSwap);
         foreach (var peer in new[] { c, o })
@@ -586,6 +589,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         var confirm = b.Network.NetworkSentMessages.GetMessages<NetworkShipCaptured>().Single();
         a.Network.RouteMessages = false;
         a.Call(() => a.Instance.SimulateMessage(b.Network.NetPeer, confirm));
+        a.TickCaptures();
         a.Network.RouteMessages = true;
         var records = a.Network.NetworkSentMessages.GetMessages<NetworkSpawnBattleShips>().Last();
         battle.Disconnect(b);
@@ -595,6 +599,7 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         o.Call(() => o.Instance.SimulateMessage(a.Network.NetPeer, records));
         battle.TickAll(2);
         o.Call(() => o.Instance.SimulateMessage(b.Network.NetPeer, confirm));
+        o.TickCaptures();
 
         Assert.Equal("A", o.Ship(hullB).CurrentAuthority);
         Assert.Equal("A", o.Ship(hullB).CaptorControllerId);
@@ -630,11 +635,12 @@ public class NavalCaptureScenarioTests : NavalBattleTestEnvironment
         Assert.True(joiner.Ship(pirates[0]).IsOrphaned);
     }
 
-    // R48 L6: a non-host captor takes the last afloat AI hull while the other AI hull sank with its crew swimming. The prize's
-    // authority moves off the battle host, both clients apply the capture once and hold nothing while the mission ticks on, the
-    // host's tally reads the AI side out of action with its swimmers alive, and the host's result concludes the battle once.
+    // R48 L6, coop layer only: a non-host captor takes the last afloat AI hull after the other AI hull sank. The prize's authority
+    // moves off the battle host, both clients apply the capture once from their ticks and hold nothing, the host's tally reads the
+    // AI side out of action with swimmers counted alive, and the result concludes the battle once. The fake engine runs no
+    // formation AI, so the swimmers' move into the prize's formation and the behaviour reset are not exercised here.
     [Fact]
-    public void NonHostCaptorTakesTheLastAfloatAiHull_WhileTheOtherCrewSwims_AndTheBattleConcludesOnce()
+    public void NonHostCaptorTakesTheLastAfloatAiHull_AfterTheOtherSank_AppliesOnceAndConcludesOnce()
     {
         using var battle = StartServerBattle(atSea: true, out var concluded, "H", "C");
         var (h, c) = (battle["H"], battle["C"]);

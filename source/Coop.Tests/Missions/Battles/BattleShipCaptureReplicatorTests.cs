@@ -98,6 +98,51 @@ public class BattleShipCaptureReplicatorTests
         Assert.Equal(1, captorShip.CaptureSequence);
     }
 
+    // R48 L6 review: a request that arrives over the mesh is decided on the next tick, which runs before the async agent tick
+    // starts, never while the game-thread queue drains alongside it.
+    [Fact]
+    public void ArrivedRequest_IsDecidedOnTheNextTick()
+    {
+        var harness = new Harness();
+        var prize = harness.Register(Own, BattleSideEnum.Defender, npc: true);
+        var captorShip = harness.Register(Captor, BattleSideEnum.Attacker);
+        harness.Vacant.Add(prize.Hull);
+
+        harness.Exchange.QueueRequest(new NetworkShipCaptureRequest(prize.ShipId, Captor, captorShip.ShipId));
+
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(It.IsAny<MissionObject>(), It.IsAny<MissionObject>()), Times.Never);
+        harness.Exchange.Tick(0.1f);
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(prize.Hull, captorShip.Hull), Times.Once);
+        Assert.Equal(Captor, prize.CurrentAuthority);
+    }
+
+    // R48 L6 review: an arrived confirm, and one held until its captor's hull registered, both apply from the tick at once,
+    // without waiting on anything.
+    [Fact]
+    public void ArrivedAndHeldConfirms_ApplyFromTheTick_WithoutBlocking()
+    {
+        var harness = new Harness();
+        var prize = harness.Register(Host, BattleSideEnum.Defender, npc: true);
+        var captorShip = harness.Register(Captor, BattleSideEnum.Attacker);
+        var heldPrize = harness.Register(Host, BattleSideEnum.Defender, npc: true);
+        var lateCaptorId = Guid.NewGuid();
+
+        harness.Applier.QueueConfirm(Confirm(prize, Captor, captorShip, Host));
+        harness.Applier.QueueConfirm(new NetworkShipCaptured(heldPrize.ShipId, Captor, lateCaptorId, Host, 1, 0, 0));
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(It.IsAny<MissionObject>(), It.IsAny<MissionObject>()), Times.Never);
+
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        harness.Applier.Tick(0.1f);
+        var lateCaptor = harness.Register(Captor, BattleSideEnum.Attacker, shipId: lateCaptorId);
+        harness.Applier.Tick(0.1f);
+        clock.Stop();
+
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(prize.Hull, captorShip.Hull), Times.Once);
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(heldPrize.Hull, lateCaptor.Hull), Times.Once);
+        Assert.Empty((JArray)harness.Inspect()["applied"]!["heldConfirms"]!);
+        Assert.True(clock.ElapsedMilliseconds < 1000, $"two ticks took {clock.ElapsedMilliseconds} ms");
+    }
+
     // R46: a swap vanilla can't run on the authority's hulls is refused before anything changes, so no client half-applies it.
     [Fact]
     public void Request_WhoseSwapCannotRunAtTheAuthority_IsRefusedBeforeAnythingChanges()
@@ -283,10 +328,10 @@ public class BattleShipCaptureReplicatorTests
         Assert.Equal(expected, BattleShipCaptureReplicator.IsSettling(followsHost, promoted, since));
     }
 
-    // 2.2 case 3: the battle host's own capture of an AI hull it simulates is decided at once, moves no authority, and ends the
-    // hull's host following; it still goes out so every client replays the swap.
+    // 2.2 case 3: the battle host's own capture of an AI hull it simulates is decided on its next tick (R48 L6: never from the queue
+    // drain that overlaps the async agent tick), moves no authority and ends the hull's host following; every client replays it.
     [Fact]
-    public void TimerElapsed_OnAnAiHullThisHostSimulates_CapturesAtOnce_WithoutMovingItsAuthority()
+    public void TimerElapsed_OnAnAiHullThisHostSimulates_CapturesOnTheNextTick_WithoutMovingItsAuthority()
     {
         var harness = new Harness();
         var prize = harness.Register(Own, BattleSideEnum.Defender, npc: true);
@@ -296,6 +341,8 @@ public class BattleShipCaptureReplicatorTests
         harness.Engine.Setup(e => e.CrewHullOf(main)).Returns(ownHull.Hull);
 
         harness.Broker.Publish(this, new ShipCaptureTimerElapsed(prize.Hull, main));
+        harness.CaptureEngine.Verify(e => e.ApplyCapture(It.IsAny<MissionObject>(), It.IsAny<MissionObject>()), Times.Never);
+        harness.Exchange.Tick(0.1f);
 
         Assert.Equal(Own, prize.CurrentAuthority);
         Assert.False(prize.FollowsBattleHost);
