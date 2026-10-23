@@ -2,6 +2,7 @@
 using GameInterface.Configuration;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
+using Moq;
 using System.Collections.Generic;
 using TaleWorlds.Library;
 using Xunit;
@@ -14,15 +15,7 @@ public class ModuleValidatorTests
 
     // Builds a validator over a fixed mod-config, defaulting to the shipped one.
     private static ModuleValidator NewValidator(ModConfigData config = null) =>
-        new ModuleValidator(new FixedModConfig(config ?? new ModConfigData()));
-
-    /// <summary>Serves a fixed mod-config without touching the disk.</summary>
-    private sealed class FixedModConfig : IModConfig
-    {
-        public FixedModConfig(ModConfigData data) => Data = data;
-
-        public ModConfigData Data { get; }
-    }
+        new ModuleValidator(Mock.Of<IModConfig>(modConfig => modConfig.Data == (config ?? new ModConfigData())));
 
     [Fact]
     public void Validate_RefusesClientOnlyModule_WhenWhitelistIsEmpty()
@@ -42,7 +35,7 @@ public class ModuleValidatorTests
     }
 
     [Fact]
-    public void Validate_AllowsClientOnlyModule_WhenWhitelisted()
+    public void Validate_RefusesOnlyClientOnlyModulesMissingFromWhitelist()
     {
         var serverModules = new List<ModuleInfo> { new ModuleInfo { Id = "ModuleA", Version = V1 } };
         var clientModules = new List<ModuleInfo>
