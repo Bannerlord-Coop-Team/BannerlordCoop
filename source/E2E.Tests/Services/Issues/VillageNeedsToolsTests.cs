@@ -42,6 +42,7 @@ public class VillageNeedsToolsTests : IDisposable
 
     private static readonly FieldInfo PaymentField = AccessTools.Field(typeof(Issue), nameof(Issue._payment));
     private static Hero ConversationHeroOverride;
+    private static readonly List<Hero> WorldEventOwners = new();
 
     private static readonly MethodBase[] QuestLogTexts =
     {
@@ -288,7 +289,7 @@ public class VillageNeedsToolsTests : IDisposable
     }
 
     [Fact]
-    public void CompanionFunding_RefusesWhenTheOwnerSpentTheQuotedFunds()
+    public void CompanionFunding_PreconditionRefusesBeforeStartingWhenTheOwnerSpentTheQuotedFunds()
     {
         Server.Call(() =>
         {
@@ -297,9 +298,14 @@ public class VillageNeedsToolsTests : IDisposable
             using (new MainHeroSubstitutionScope(owner, owner.PartyBelongedTo))
             {
                 owner.Gold = 0;
-                Assert.Throws<InvalidOperationException>(() => notable.Issue.AlternativeSolutionStartConsequence());
+                var strategy = Server.Container.Resolve<VillageNeedsToolsDescriptor>().AlternativeSolutionAcceptStrategy;
+                var precondition = Assert.IsAssignableFrom<IAlternativeSolutionAcceptPrecondition>(strategy);
+                Assert.False(precondition.CanAccept(notable.Issue, owner));
                 Assert.Equal(0, owner.Gold);
                 Assert.True(notable.Issue.IsOngoingWithoutQuest);
+                Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out _));
+                owner.Gold = ((Issue)notable.Issue).CostOfToolsForAlternativeSolution;
+                Assert.True(precondition.CanAccept(notable.Issue, owner));
             }
         });
     }
@@ -752,6 +758,52 @@ public class VillageNeedsToolsTests : IDisposable
                 Assert.True(notable.Power == power, $"{Describe(instance)} power was {notable.Power}");
             });
         }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ServerWorldEvent_VisitsTheOngoingQuestOnceAsItsOwner(bool kingdomChange)
+    {
+        Accept();
+        PutThePlayersInTheirOwnClan();
+        var listener = AccessTools.Method(typeof(Quest), kingdomChange ? nameof(Quest.OnClanChangedKingdom) : nameof(Quest.OnWarDeclared));
+        var unrelatedClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var anotherClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+        var harmony = new Harmony("bannerlordcoop.3766.world-event-count");
+        WorldEventOwners.Clear();
+        harmony.Patch(listener, prefix: new HarmonyMethod(typeof(VillageNeedsToolsTests), nameof(RecordWorldEventOwner)));
+        try
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(playerClanId, out var playerClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(giverClanId, out var giverClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(unrelatedClanId, out var unrelatedClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Clan>(anotherClanId, out var anotherClan));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+                if (kingdomChange)
+                    CampaignEventDispatcher.Instance.OnClanChangedKingdom(playerClan, null, null,
+                        ChangeKingdomAction.ChangeKingdomActionDetail.LeaveKingdom, false);
+                else
+                    CampaignEventDispatcher.Instance.OnWarDeclared(unrelatedClan, anotherClan,
+                        DeclareWarAction.DeclareWarDetail.CausedByRebellion);
+
+                Assert.True(QuestOfHere(Server).IsOngoing);
+                Assert.Same(owner, Assert.Single(WorldEventOwners));
+            }, QuestLogTexts);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        }
+        finally
+        {
+            harmony.Unpatch(listener, HarmonyPatchType.Prefix, harmony.Id);
+            WorldEventOwners.Clear();
+        }
+    }
+
+    private static void RecordWorldEventOwner()
+    {
+        if (Common.ModInformation.IsServer) WorldEventOwners.Add(Hero.MainHero);
     }
 
     [Fact]
