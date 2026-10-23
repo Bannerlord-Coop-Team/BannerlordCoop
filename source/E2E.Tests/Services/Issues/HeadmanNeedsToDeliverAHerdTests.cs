@@ -351,8 +351,7 @@ public class HeadmanNeedsToDeliverAHerdTests : IDisposable
             var cleanup = Server.Resolve<IHeadmanHerdCleanup>();
             if (takeQuest)
             {
-                using (new AllowedThread()) issue.IssueQuest.StringId = "herd_saved_quest";
-                cleanup.Remember(issue, Party(Server, QuestScenario.ControllerA));
+                Assert.False(string.IsNullOrEmpty(issue.IssueQuest.StringId));
             }
             var data = new CampaignBehaviorDataStore.BehaviorSaveData(true);
             cleanup.SyncData(data);
