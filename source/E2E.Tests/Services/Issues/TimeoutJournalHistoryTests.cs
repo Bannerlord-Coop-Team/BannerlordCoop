@@ -8,6 +8,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.Encyclopedia;
@@ -123,6 +124,44 @@ public class TimeoutJournalHistoryTests : IDisposable
         environment.FlushCoalescer();
         Assert.Equal(2, scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>().Count());
         scenario.Server.Call(() => Assert.Equal(2, serverQuest.JournalEntries.Count));
+    }
+
+    [Fact]
+    public void RealGiverDeathEndsTheOwnerQuestAndClearsTheBystanderIssueOnce()
+    {
+        Accept();
+        scenario.Server.Call(() =>
+        {
+            var giver = Object<Hero>(scenario.Server, scenario.NotableId);
+            Assert.Contains(Campaign.Current.IssueManager, CampaignEventDispatcher.Instance._eventReceivers);
+            output.WriteLine("Death receivers: {0}", string.Join(", ", CampaignEventDispatcher.Instance._eventReceivers.Select(receiver => receiver.GetType().FullName)));
+            var changeState = AccessTools.Method(typeof(Hero), nameof(Hero.ChangeState));
+            var bootstrap = Assert.Single(Harmony.GetPatchInfo(changeState).Prefixes, patch => patch.owner == "Coop.Testing");
+            var harmony = new Harmony("real-issue-giver-death-test");
+            harmony.Unpatch(changeState, bootstrap.PatchMethod);
+            try
+            {
+                giver.AddDeathMark(null, KillCharacterAction.KillCharacterActionDetail.Murdered);
+                KillCharacterAction.ApplyByDeathMarkForced(giver, false);
+            }
+            finally
+            {
+                harmony.Patch(changeState, prefix: new HarmonyMethod(bootstrap.PatchMethod) { priority = bootstrap.priority });
+            }
+            Assert.False(giver.IsAlive);
+            Assert.Null(giver.Issue);
+        }, new[] { AccessTools.Method(typeof(KillCharacterAction), nameof(KillCharacterAction.CreateObituary)) });
+        environment.FlushCoalescer();
+
+        Assert.Equal(IssueOutcome.QuestCancel,
+            Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        scenario.ClientA.Call(() =>
+        {
+            Assert.True(ownerQuest.IsFinalized);
+            Assert.DoesNotContain(ownerQuest, Campaign.Current.QuestManager.Quests);
+            Assert.True(Archive(Campaign.Current.LogEntryHistory).IsEnded());
+        });
+        scenario.ClientB.Call(() => Assert.Null(Object<Hero>(scenario.ClientB, scenario.NotableId).Issue));
     }
 
     [Fact]
