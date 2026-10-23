@@ -5,6 +5,7 @@ using E2E.Tests.Environment.Instance;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Finalization;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -112,9 +113,10 @@ public class TimeoutJournalHistoryTests : IDisposable
         Assert.Equal(2, scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>().Count());
         scenario.Server.Call(() => Assert.Equal(new[] { introduction, "Second acceptance stage" },
             serverQuest.JournalEntries.Select(log => log.LogText.ToString())));
+        Assert.Equal(0, scenario.ClientA.PendingGameThreadActionCount);
+        scenario.ClientA.SimulateMessage(this, new CampaignTick());
         scenario.ClientA.Call(() =>
         {
-            GameThread.Instance.Update(TimeSpan.Zero);
             ownerQuest.AddLog(new TextObject("Later quest progress"));
         });
         environment.FlushCoalescer();

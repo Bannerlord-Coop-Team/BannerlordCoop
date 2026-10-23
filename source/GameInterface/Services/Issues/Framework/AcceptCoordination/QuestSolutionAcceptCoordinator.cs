@@ -7,6 +7,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
 using LiteNetLib;
@@ -61,6 +62,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         messageBroker.Subscribe<QuestSolutionAcceptTriggered>(Handle_QuestSolutionAcceptTriggered);
         messageBroker.Subscribe<QuestAcceptanceJournalObserved>(Handle_QuestAcceptanceJournalObserved);
         messageBroker.Subscribe<QuestAcceptanceStarted>(Handle_QuestAcceptanceStarted);
+        messageBroker.Subscribe<CampaignTick>(Handle_CampaignTick);
         messageBroker.Subscribe<RequestQuestAcceptanceJournal>(Handle_RequestQuestAcceptanceJournal);
         messageBroker.Subscribe<RequestQuestSolutionAccept>(Handle_RequestQuestSolutionAccept);
         messageBroker.Subscribe<NetworkQuestSolutionAccepted>(Handle_NetworkQuestSolutionAccepted);
@@ -72,6 +74,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
         messageBroker.Unsubscribe<QuestSolutionAcceptTriggered>(Handle_QuestSolutionAcceptTriggered);
         messageBroker.Unsubscribe<QuestAcceptanceJournalObserved>(Handle_QuestAcceptanceJournalObserved);
         messageBroker.Unsubscribe<QuestAcceptanceStarted>(Handle_QuestAcceptanceStarted);
+        messageBroker.Unsubscribe<CampaignTick>(Handle_CampaignTick);
         messageBroker.Unsubscribe<RequestQuestAcceptanceJournal>(Handle_RequestQuestAcceptanceJournal);
         acceptingQuests.Clear();
         messageBroker.Unsubscribe<RequestQuestSolutionAccept>(Handle_RequestQuestSolutionAccept);
@@ -119,8 +122,9 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
         // StartQuest runs before the acceptance callback writes its introduction, sometimes on a later dialogue turn.
         acceptingQuests.Add(quest);
-        GameThread.EnqueueSafe(() => acceptingQuests.Remove(quest), context: nameof(QuestSolutionAcceptCoordinator));
     }
+
+    private void Handle_CampaignTick(MessagePayload<CampaignTick> payload) => acceptingQuests.Clear();
 
     private void Handle_QuestAcceptanceJournalObserved(MessagePayload<QuestAcceptanceJournalObserved> payload)
     {
