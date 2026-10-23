@@ -15,6 +15,7 @@ internal class LadysKnightOutLordPatches
 {
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.StartIssueWithLordSolution))]
     [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
     private static bool StartPrefix(IssueBase __instance)
     {
         if (!(__instance is Issue) || ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -24,6 +25,7 @@ internal class LadysKnightOutLordPatches
 
     [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithLordSolutionWithRefuseCounterOffer))]
     [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
     private static bool CompletePrefix(IssueBase __instance)
     {
         if (!(__instance is Issue) || ModInformation.IsServer) return true;

@@ -1068,7 +1068,7 @@ public class LadysKnightOutTests : IDisposable
             Campaign.Current.LogEntryHistory._logs.Clear();
             Campaign.Current.LogEntryHistory._logs.AddRange(saveHistory);
             Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
-                entry => entry.IsRelatedTo(issues[scenario.Server]) && entry.IsEnded()));
+                entry => entry.IsRelatedTo(issues[scenario.ClientA]) && entry.IsEnded()));
         });
     }
 
