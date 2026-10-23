@@ -1,0 +1,8 @@
+{
+  "schema": "native-ci-workspace-cleanup.v1",
+  "jobId": "docker-ci-957cd42bf6c547ee81ea",
+  "ownershipSha256": "b0d7806e9bd79b9c288cb7ab53f6d4cd71fe794d0ff68c6ad0e9321cc818a090",
+  "gameReferenceDetached": true,
+  "e2eSlotsRemoved": true,
+  "retainedFailureWorkspace": null
+}

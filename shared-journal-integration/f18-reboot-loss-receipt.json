@@ -1,0 +1,22 @@
+{
+  "job": {
+    "jobId": "docker-ci-f18b098635ef4c1a8719",
+    "kind": "docker-ci",
+    "packageDir": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\ci-shared-journal-ce57967e7-focused",
+    "label": "#3781 final journal integration focused ce57967e7 + shared ctor hotfix",
+    "priority": 0,
+    "pinRunner": "HIVE",
+    "state": "finished",
+    "queuedUtc": "2026-10-23T15:49:31Z",
+    "runner": "HIVE",
+    "dispatchUtc": "2026-10-23T16:00:33Z",
+    "submittedUtc": "2026-10-23T16:00:38Z",
+    "detail": "{\"submitted\":true,\"jobId\":\"docker-ci-f18b098635ef4c1a8719\",\"remotePath\":\"\\\\\\\\hive.tail4317d7.ts.net\\\\CodexLiveTransport\\\\inbox\\\\docker-ci-f18b098635ef4c1a8719.ready\",\"runner\":\"HIVE\",\"submittedUtc\":\"2026-10-23T16:00:38.6159199Z\"}",
+    "startedUtc": "2026-10-23T16:00:43Z",
+    "result": "failed",
+    "finishedUtc": "2026-10-23T16:16:47Z"
+  },
+  "reason": "Supervisor confirmed HIVE reboot at16:15:59Z and job loss; runner fault, no budget charge",
+  "sourceHead": "ce57967e79ae9995bd7f8eea462f786082506ed7",
+  "observedUtc": "2026-10-23T16:17:56.0693716Z"
+}

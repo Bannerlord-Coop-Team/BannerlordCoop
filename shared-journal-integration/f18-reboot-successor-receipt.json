@@ -1,0 +1,10 @@
+{
+  "originalJob": "docker-ci-f18b098635ef4c1a8719",
+  "recoveryJob": "docker-ci-957cd42bf6c547ee81ea",
+  "head": "ce57967e79ae9995bd7f8eea462f786082506ed7",
+  "tree": "93a104a9920f64d0209c678a0009cbf2b8f73e06",
+  "archiveSha256": "cffaedbe55082c39c0a7e0bccae61b93eb3798a65c70477ce8bb8e816510234f",
+  "payloadsIdentical": true,
+  "reason": "Original terminal ID returned startup-recovery failure completed16:16:20Z; original result retained, new submission identity required",
+  "budgetCharge": false
+}

@@ -1,0 +1,111 @@
+{
+  "schema": "debug-test-supplement.evidence.v1",
+  "sourceHead": "ce57967e79ae9995bd7f8eea462f786082506ed7",
+  "sourceTree": "93a104a9920f64d0209c678a0009cbf2b8f73e06",
+  "sourceArchiveSha256": "cffaedbe55082c39c0a7e0bccae61b93eb3798a65c70477ce8bb8e816510234f",
+  "requirement": {
+    "schema": "debug-test-requirement.v1",
+    "configuration": "Debug",
+    "sourceHead": "ce57967e79ae9995bd7f8eea462f786082506ed7",
+    "sourceTree": "93a104a9920f64d0209c678a0009cbf2b8f73e06",
+    "classes": [
+      "Coop.Tests.Autofac.ContainerBuildTests",
+      "E2E.Tests.Services.HeroDevelopers.HeroSocialParameterCoopCommandTests",
+      "E2E.Tests.Services.Heroes.HeroConversationDebugCommandTests",
+      "E2E.Tests.Services.Issues.LadysKnightOutTests",
+      "E2E.Tests.Services.UI.PlayerJournalHistoryTests",
+      "GameInterface.Tests.PatchTest",
+      "GameInterface.Tests.Services.Issues.IssuesLayoutTests",
+      "GameInterface.Tests.Services.UI.PlayerJournalHistoryTests"
+    ],
+    "projects": [
+      {
+        "project": "source/Coop.Tests/Coop.Tests.csproj",
+        "classes": [
+          "Coop.Tests.Autofac.ContainerBuildTests"
+        ]
+      },
+      {
+        "project": "source/E2E.Tests/E2E.Tests.csproj",
+        "classes": [
+          "E2E.Tests.Services.HeroDevelopers.HeroSocialParameterCoopCommandTests",
+          "E2E.Tests.Services.Heroes.HeroConversationDebugCommandTests",
+          "E2E.Tests.Services.Issues.LadysKnightOutTests",
+          "E2E.Tests.Services.UI.PlayerJournalHistoryTests"
+        ]
+      },
+      {
+        "project": "source/GameInterface.Tests/GameInterface.Tests.csproj",
+        "classes": [
+          "GameInterface.Tests.PatchTest",
+          "GameInterface.Tests.Services.Issues.IssuesLayoutTests",
+          "GameInterface.Tests.Services.UI.PlayerJournalHistoryTests"
+        ]
+      }
+    ]
+  },
+  "requirementSha256": "9ab2efaefad381ec29a408781c64012c991d068094b5f960e9158989a218f462",
+  "projects": [
+    {
+      "project": "source/Coop.Tests/Coop.Tests.csproj",
+      "trx": "debug-test-supplement/0.trx",
+      "sha256": "9a5d8b3d85cb65c6ff04a7fda6a22d1dc668d65ae848cfc800b94785007162f8",
+      "classes": {
+        "Coop.Tests.Autofac.ContainerBuildTests": {
+          "discovered": 4,
+          "executed": 4,
+          "passed": 4
+        }
+      }
+    },
+    {
+      "project": "source/E2E.Tests/E2E.Tests.csproj",
+      "trx": "debug-test-supplement/1.trx",
+      "sha256": "d6b658e3d73de8168277d57f8a32704ac1ad19d7fd8308f8c225855c6127e17b",
+      "classes": {
+        "E2E.Tests.Services.HeroDevelopers.HeroSocialParameterCoopCommandTests": {
+          "discovered": 4,
+          "executed": 4,
+          "passed": 4
+        },
+        "E2E.Tests.Services.Heroes.HeroConversationDebugCommandTests": {
+          "discovered": 12,
+          "executed": 12,
+          "passed": 12
+        },
+        "E2E.Tests.Services.Issues.LadysKnightOutTests": {
+          "discovered": 49,
+          "executed": 49,
+          "passed": 49
+        },
+        "E2E.Tests.Services.UI.PlayerJournalHistoryTests": {
+          "discovered": 3,
+          "executed": 3,
+          "passed": 3
+        }
+      }
+    },
+    {
+      "project": "source/GameInterface.Tests/GameInterface.Tests.csproj",
+      "trx": "debug-test-supplement/2.trx",
+      "sha256": "1855904c49004363b62cc77c49029f05a645f7c9384a4a7c614740588fc93229",
+      "classes": {
+        "GameInterface.Tests.PatchTest": {
+          "discovered": 7,
+          "executed": 7,
+          "passed": 7
+        },
+        "GameInterface.Tests.Services.Issues.IssuesLayoutTests": {
+          "discovered": 3,
+          "executed": 3,
+          "passed": 3
+        },
+        "GameInterface.Tests.Services.UI.PlayerJournalHistoryTests": {
+          "discovered": 5,
+          "executed": 5,
+          "passed": 5
+        }
+      }
+    }
+  ]
+}

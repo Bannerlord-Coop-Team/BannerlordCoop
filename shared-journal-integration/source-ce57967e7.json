@@ -8,8 +8,10 @@
   "hotfixCherryPick": "ce57967e7",
   "hotfixFilesIdentical": true,
   "privateConstructorVariantIsAncestor": false,
-  "focusedJob": "docker-ci-f18b098635ef4c1a8719",
-  "fullReleaseJob": null,
+  "focusedJob": "docker-ci-957cd42bf6c547ee81ea",
+  "fullReleaseJob": "docker-ci-94ab42a5e0a9406d9adb",
   "liveRun": null,
-  "lane": "pending supervisor assignment"
+  "lane": "pending supervisor assignment",
+  "focusedPassed": 87,
+  "originalFocusedLostToReboot": "docker-ci-f18b098635ef4c1a8719"
 }

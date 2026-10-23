@@ -1,0 +1,125 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="e5e4179d-f45b-40a5-b68f-51d2c9875caf" name="aisha@HIVE 2026-10-23 11:32:47" runUser="Hive\aisha" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-23T11:32:47.5090430-05:00" queuing="2026-10-23T11:32:47.5090433-05:00" start="2026-10-23T11:32:27.9611289-05:00" finish="2026-10-23T11:33:00.1610240-05:00" />
+  <TestSettings name="default" id="47478f2f-b45f-4cf1-baad-6b4fac4ff8c1">
+    <Deployment runDeploymentRoot="aisha_HIVE_2026-10-23_11_32_47" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="0169fa00-8b7c-485e-8d91-30f23cb8e2c1" testId="543252cf-209c-ecc2-eeb0-a3ca048a97ae" testName="GameInterface.Tests.PatchTest.PlayerLeaveSiegeEncounterPatch_NeutralPartyRequestsSynchronizedLeave" computerName="HIVE" duration="00:00:00.0179678" startTime="2026-10-23T11:32:53.9845483-05:00" endTime="2026-10-23T11:32:54.0006313-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0169fa00-8b7c-485e-8d91-30f23cb8e2c1" />
+    <UnitTestResult executionId="a3648af7-faf4-4ea9-a07a-035d080a1773" testId="a706c4fd-5b41-245b-6729-7cc2cb4ae0f4" testName="GameInterface.Tests.PatchTest.LateCategoryPatches_ApplyToCurrentGameAssemblies(category: &quot;UILoadingPatches&quot;)" computerName="HIVE" duration="00:00:02.5636051" startTime="2026-10-23T11:32:50.5229435-05:00" endTime="2026-10-23T11:32:53.0842599-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a3648af7-faf4-4ea9-a07a-035d080a1773" />
+    <UnitTestResult executionId="ef5ec937-3072-49cc-ada7-e5977a576db1" testId="dde1f5af-0968-6949-84bb-6afd05630b35" testName="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests.SavedArchiveIsVisibleOnlyToItsController(owner: null, local: null, visible: False)" computerName="HIVE" duration="00:00:00.0000385" startTime="2026-10-23T11:32:55.6552693-05:00" endTime="2026-10-23T11:32:55.6553063-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="ef5ec937-3072-49cc-ada7-e5977a576db1" />
+    <UnitTestResult executionId="0b049875-dc46-40e4-a425-5b7d42fe7229" testId="57a6f74a-e2dd-708f-1ade-1673576ae2f3" testName="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests.SavedArchiveIsVisibleOnlyToItsController(owner: &quot;player-A&quot;, local: &quot;player-B&quot;, visible: False)" computerName="HIVE" duration="00:00:00.0116017" startTime="2026-10-23T11:32:55.6425870-05:00" endTime="2026-10-23T11:32:55.6501544-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0b049875-dc46-40e4-a425-5b7d42fe7229" />
+    <UnitTestResult executionId="1453284b-b081-4c71-9e10-624bf4d05633" testId="49096079-42bb-3646-743a-fa64e6cc0ecc" testName="GameInterface.Tests.PatchTest.LateCategoryPatches_ApplyToCurrentGameAssemblies(category: &quot;GameStartedPatches&quot;)" computerName="HIVE" duration="00:00:00.8983340" startTime="2026-10-23T11:32:53.0881547-05:00" endTime="2026-10-23T11:32:53.9824314-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1453284b-b081-4c71-9e10-624bf4d05633" />
+    <UnitTestResult executionId="d9c34180-735b-4c57-921b-360fba6b653f" testId="41f53cea-eb44-9ad4-7111-65f2565c5eec" testName="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests.SavedArchiveIsVisibleOnlyToItsController(owner: &quot;player-A&quot;, local: &quot;player-A&quot;, visible: True)" computerName="HIVE" duration="00:00:00.0001437" startTime="2026-10-23T11:32:55.6528965-05:00" endTime="2026-10-23T11:32:55.6529445-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d9c34180-735b-4c57-921b-360fba6b653f" />
+    <UnitTestResult executionId="c915795c-4a0f-4a8a-818f-132a15663fe7" testId="275c03f6-15e7-3150-ff36-725362bb2f3f" testName="GameInterface.Tests.PatchTest.PlayerLeaveSiegeEncounterPatch_ArmyFollowerUsesVanillaCleanup" computerName="HIVE" duration="00:00:00.0007836" startTime="2026-10-23T11:32:54.0639235-05:00" endTime="2026-10-23T11:32:54.0639614-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c915795c-4a0f-4a8a-818f-132a15663fe7" />
+    <UnitTestResult executionId="b5adf2f3-62c0-411d-ae7f-aadf956d3419" testId="6f863e93-e61f-6e90-0659-18221b7274f7" testName="GameInterface.Tests.PatchTest.PlayerLeaveSettlementPatch_PatchesVillageHostileActionLeaveOptions" computerName="HIVE" duration="00:00:02.9431213" startTime="2026-10-23T11:32:47.5785125-05:00" endTime="2026-10-23T11:32:50.5201493-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b5adf2f3-62c0-411d-ae7f-aadf956d3419" />
+    <UnitTestResult executionId="054af7ea-4346-4d44-9c73-ab7dd0380d4d" testId="da931561-041b-1753-71db-f17426091c51" testName="GameInterface.Tests.Services.Issues.IssuesLayoutTests.Commands_AreProtoContractsThatSkipTheConstructor" computerName="HIVE" duration="00:00:00.0960134" startTime="2026-10-23T11:32:47.4943484-05:00" endTime="2026-10-23T11:32:47.5468833-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="054af7ea-4346-4d44-9c73-ab7dd0380d4d" />
+    <UnitTestResult executionId="d8750f66-1b32-4414-b92d-ea937f6c311b" testId="0c08ad49-03e5-ba9e-1bec-800d4195fb63" testName="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests.SavedArchiveIsVisibleOnlyToItsController(owner: null, local: &quot;player-B&quot;, visible: False)" computerName="HIVE" duration="00:00:01.5709215" startTime="2026-10-23T11:32:54.0685418-05:00" endTime="2026-10-23T11:32:55.6386514-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d8750f66-1b32-4414-b92d-ea937f6c311b" />
+    <UnitTestResult executionId="79cee8cf-a941-4501-82c6-87c5a6be3521" testId="139cd187-8b4f-eabf-2426-fb22dbf55e30" testName="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests.CampaignSaveRoundTripRetainsOwnerEndingAndJournalText" computerName="HIVE" duration="00:00:04.4095987" startTime="2026-10-23T11:32:55.6568944-05:00" endTime="2026-10-23T11:33:00.0603501-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="79cee8cf-a941-4501-82c6-87c5a6be3521" />
+    <UnitTestResult executionId="edc86b68-cb90-4920-83f4-7adc0869b364" testId="81636ca0-edc6-131d-3c6b-35310ff958d8" testName="GameInterface.Tests.Services.Issues.IssuesLayoutTests.FrameworkInterfaces_AreDeclaredInTheFrameworkInterfaceNamespace" computerName="HIVE" duration="00:00:06.9528632" startTime="2026-10-23T11:32:40.7391538-05:00" endTime="2026-10-23T11:32:47.4516078-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="edc86b68-cb90-4920-83f4-7adc0869b364" />
+    <UnitTestResult executionId="7a63c8c2-5f91-4575-beb7-8042254a2389" testId="15f98fde-6421-753e-fd78-3ebac599916a" testName="GameInterface.Tests.PatchTest.PlayerLeaveSiegeEncounterPatch_HooksDontGetInvolved" computerName="HIVE" duration="00:00:00.0040886" startTime="2026-10-23T11:32:54.0655134-05:00" endTime="2026-10-23T11:32:54.0670109-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7a63c8c2-5f91-4575-beb7-8042254a2389" />
+    <UnitTestResult executionId="e1c0e43c-000e-43ce-a624-91a7811912e5" testId="1069a43d-0575-528c-ade5-6026cb8cc132" testName="GameInterface.Tests.Services.Issues.IssuesLayoutTests.Messages_ArePublicReadonlyStructs" computerName="HIVE" duration="00:00:00.0236506" startTime="2026-10-23T11:32:47.5705616-05:00" endTime="2026-10-23T11:32:47.5707178-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="e1c0e43c-000e-43ce-a624-91a7811912e5" />
+    <UnitTestResult executionId="d1a52dd4-e5bc-4a1e-8290-929e88448364" testId="3498f170-ca23-65e0-1db4-5d38ba07c272" testName="GameInterface.Tests.PatchTest.PlayerLeaveSiegeEncounterPatch_SiegeParticipantUsesVanillaCleanup" computerName="HIVE" duration="00:00:00.0614003" startTime="2026-10-23T11:32:54.0032627-05:00" endTime="2026-10-23T11:32:54.0620090-05:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d1a52dd4-e5bc-4a1e-8290-929e88448364" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="GameInterface.Tests.PatchTest.PlayerLeaveSiegeEncounterPatch_SiegeParticipantUsesVanillaCleanup" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="3498f170-ca23-65e0-1db4-5d38ba07c272">
+      <Execution id="d1a52dd4-e5bc-4a1e-8290-929e88448364" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.PatchTest" name="PlayerLeaveSiegeEncounterPatch_SiegeParticipantUsesVanillaCleanup" />
+    </UnitTest>
+    <UnitTest name="GameInterface.Tests.Services.Issues.IssuesLayoutTests.Commands_AreProtoContractsThatSkipTheConstructor" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="da931561-041b-1753-71db-f17426091c51">
+      <Execution id="054af7ea-4346-4d44-9c73-ab7dd0380d4d" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.Services.Issues.IssuesLayoutTests" name="Commands_AreProtoContractsThatSkipTheConstructor" />
+    </UnitTest>
+    <UnitTest name="GameInterface.Tests.PatchTest.PlayerLeaveSettlementPatch_PatchesVillageHostileActionLeaveOptions" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="6f863e93-e61f-6e90-0659-18221b7274f7">
+      <Execution id="b5adf2f3-62c0-411d-ae7f-aadf956d3419" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.PatchTest" name="PlayerLeaveSettlementPatch_PatchesVillageHostileActionLeaveOptions" />
+    </UnitTest>
+    <UnitTest name="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests.SavedArchiveIsVisibleOnlyToItsController(owner: null, local: &quot;player-B&quot;, visible: False)" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="0c08ad49-03e5-ba9e-1bec-800d4195fb63">
+      <Execution id="d8750f66-1b32-4414-b92d-ea937f6c311b" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests" name="SavedArchiveIsVisibleOnlyToItsController" />
+    </UnitTest>
+    <UnitTest name="GameInterface.Tests.PatchTest.PlayerLeaveSiegeEncounterPatch_NeutralPartyRequestsSynchronizedLeave" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="543252cf-209c-ecc2-eeb0-a3ca048a97ae">
+      <Execution id="0169fa00-8b7c-485e-8d91-30f23cb8e2c1" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.PatchTest" name="PlayerLeaveSiegeEncounterPatch_NeutralPartyRequestsSynchronizedLeave" />
+    </UnitTest>
+    <UnitTest name="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests.SavedArchiveIsVisibleOnlyToItsController(owner: null, local: null, visible: False)" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="dde1f5af-0968-6949-84bb-6afd05630b35">
+      <Execution id="ef5ec937-3072-49cc-ada7-e5977a576db1" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests" name="SavedArchiveIsVisibleOnlyToItsController" />
+    </UnitTest>
+    <UnitTest name="GameInterface.Tests.PatchTest.PlayerLeaveSiegeEncounterPatch_HooksDontGetInvolved" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="15f98fde-6421-753e-fd78-3ebac599916a">
+      <Execution id="7a63c8c2-5f91-4575-beb7-8042254a2389" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.PatchTest" name="PlayerLeaveSiegeEncounterPatch_HooksDontGetInvolved" />
+    </UnitTest>
+    <UnitTest name="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests.CampaignSaveRoundTripRetainsOwnerEndingAndJournalText" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="139cd187-8b4f-eabf-2426-fb22dbf55e30">
+      <Execution id="79cee8cf-a941-4501-82c6-87c5a6be3521" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests" name="CampaignSaveRoundTripRetainsOwnerEndingAndJournalText" />
+    </UnitTest>
+    <UnitTest name="GameInterface.Tests.PatchTest.LateCategoryPatches_ApplyToCurrentGameAssemblies(category: &quot;GameStartedPatches&quot;)" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="49096079-42bb-3646-743a-fa64e6cc0ecc">
+      <Execution id="1453284b-b081-4c71-9e10-624bf4d05633" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.PatchTest" name="LateCategoryPatches_ApplyToCurrentGameAssemblies" />
+    </UnitTest>
+    <UnitTest name="GameInterface.Tests.Services.Issues.IssuesLayoutTests.FrameworkInterfaces_AreDeclaredInTheFrameworkInterfaceNamespace" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="81636ca0-edc6-131d-3c6b-35310ff958d8">
+      <Execution id="edc86b68-cb90-4920-83f4-7adc0869b364" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.Services.Issues.IssuesLayoutTests" name="FrameworkInterfaces_AreDeclaredInTheFrameworkInterfaceNamespace" />
+    </UnitTest>
+    <UnitTest name="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests.SavedArchiveIsVisibleOnlyToItsController(owner: &quot;player-A&quot;, local: &quot;player-B&quot;, visible: False)" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="57a6f74a-e2dd-708f-1ade-1673576ae2f3">
+      <Execution id="0b049875-dc46-40e4-a425-5b7d42fe7229" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests" name="SavedArchiveIsVisibleOnlyToItsController" />
+    </UnitTest>
+    <UnitTest name="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests.SavedArchiveIsVisibleOnlyToItsController(owner: &quot;player-A&quot;, local: &quot;player-A&quot;, visible: True)" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="41f53cea-eb44-9ad4-7111-65f2565c5eec">
+      <Execution id="d9c34180-735b-4c57-921b-360fba6b653f" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.Services.UI.PlayerJournalHistoryTests" name="SavedArchiveIsVisibleOnlyToItsController" />
+    </UnitTest>
+    <UnitTest name="GameInterface.Tests.Services.Issues.IssuesLayoutTests.Messages_ArePublicReadonlyStructs" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="1069a43d-0575-528c-ade5-6026cb8cc132">
+      <Execution id="e1c0e43c-000e-43ce-a624-91a7811912e5" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.Services.Issues.IssuesLayoutTests" name="Messages_ArePublicReadonlyStructs" />
+    </UnitTest>
+    <UnitTest name="GameInterface.Tests.PatchTest.LateCategoryPatches_ApplyToCurrentGameAssemblies(category: &quot;UILoadingPatches&quot;)" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="a706c4fd-5b41-245b-6729-7cc2cb4ae0f4">
+      <Execution id="a3648af7-faf4-4ea9-a07a-035d080a1773" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.PatchTest" name="LateCategoryPatches_ApplyToCurrentGameAssemblies" />
+    </UnitTest>
+    <UnitTest name="GameInterface.Tests.PatchTest.PlayerLeaveSiegeEncounterPatch_ArmyFollowerUsesVanillaCleanup" storage="c:\programdata\codexliverunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\gameinterface.tests\bin\debug\net6.0\gameinterface.tests.dll" id="275c03f6-15e7-3150-ff36-725362bb2f3f">
+      <Execution id="c915795c-4a0f-4a8a-818f-132a15663fe7" />
+      <TestMethod codeBase="C:\ProgramData\CodexLiveRunner\jobs\source\docker-ci-957cd42bf6c547ee81ea\source\GameInterface.Tests\bin\Debug\net6.0\GameInterface.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="GameInterface.Tests.PatchTest" name="PlayerLeaveSiegeEncounterPatch_ArmyFollowerUsesVanillaCleanup" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="543252cf-209c-ecc2-eeb0-a3ca048a97ae" executionId="0169fa00-8b7c-485e-8d91-30f23cb8e2c1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a706c4fd-5b41-245b-6729-7cc2cb4ae0f4" executionId="a3648af7-faf4-4ea9-a07a-035d080a1773" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="dde1f5af-0968-6949-84bb-6afd05630b35" executionId="ef5ec937-3072-49cc-ada7-e5977a576db1" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="57a6f74a-e2dd-708f-1ade-1673576ae2f3" executionId="0b049875-dc46-40e4-a425-5b7d42fe7229" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="49096079-42bb-3646-743a-fa64e6cc0ecc" executionId="1453284b-b081-4c71-9e10-624bf4d05633" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="41f53cea-eb44-9ad4-7111-65f2565c5eec" executionId="d9c34180-735b-4c57-921b-360fba6b653f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="275c03f6-15e7-3150-ff36-725362bb2f3f" executionId="c915795c-4a0f-4a8a-818f-132a15663fe7" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6f863e93-e61f-6e90-0659-18221b7274f7" executionId="b5adf2f3-62c0-411d-ae7f-aadf956d3419" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="da931561-041b-1753-71db-f17426091c51" executionId="054af7ea-4346-4d44-9c73-ab7dd0380d4d" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="0c08ad49-03e5-ba9e-1bec-800d4195fb63" executionId="d8750f66-1b32-4414-b92d-ea937f6c311b" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="139cd187-8b4f-eabf-2426-fb22dbf55e30" executionId="79cee8cf-a941-4501-82c6-87c5a6be3521" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="81636ca0-edc6-131d-3c6b-35310ff958d8" executionId="edc86b68-cb90-4920-83f4-7adc0869b364" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="15f98fde-6421-753e-fd78-3ebac599916a" executionId="7a63c8c2-5f91-4575-beb7-8042254a2389" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="1069a43d-0575-528c-ade5-6026cb8cc132" executionId="e1c0e43c-000e-43ce-a624-91a7811912e5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3498f170-ca23-65e0-1db4-5d38ba07c272" executionId="d1a52dd4-e5bc-4a1e-8290-929e88448364" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="15" executed="15" passed="15" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>Data collection : Logging DataCollector Diagnostics in file: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-957cd42bf6c547ee81ea\result\artifacts\native-commands\79cefb16b1814151a0f1484bdef10c0b\vstest-diag.datacollector.26-10-23_11-32-27_98009_5.log&#xD;
+Logging TestHost Diagnostics in file: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-957cd42bf6c547ee81ea\result\artifacts\native-commands\79cefb16b1814151a0f1484bdef10c0b\vstest-diag.host.26-10-23_11-32-28_56712_5.log&#xD;
+[xUnit.net 00:00:00.02] xUnit.net VSTest Adapter v3.0.2+dd36e86129 (64-bit .NET 6.0.36)&#xD;
+[xUnit.net 00:00:06.44]   Discovering: GameInterface.Tests&#xD;
+[xUnit.net 00:00:07.37]   Discovered:  GameInterface.Tests&#xD;
+[xUnit.net 00:00:07.52]   Starting:    GameInterface.Tests&#xD;
+[xUnit.net 00:00:27.21]   Finished:    GameInterface.Tests&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="HIVE" outcome="Warning" timestamp="2026-10-23T11:33:00.1200584-05:00">
+        <Text>Data collector 'Blame' message: All tests finished running, Sequence file will not be generated.</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

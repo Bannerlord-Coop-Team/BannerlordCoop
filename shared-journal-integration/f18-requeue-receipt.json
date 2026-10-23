@@ -1,0 +1,18 @@
+{
+  "jobId": "docker-ci-f18b098635ef4c1a8719",
+  "kind": "docker-ci",
+  "packageDir": "C:\\Users\\Andrew\\CodexWindows\\coop-live-orchestration\\3781\\ci-shared-journal-ce57967e7-focused",
+  "label": "#3781 final journal integration focused ce57967e7 + shared ctor hotfix",
+  "priority": 0,
+  "pinRunner": "HIVE",
+  "state": "queued",
+  "queuedUtc": "2026-10-23T16:17:56Z",
+  "runner": null,
+  "dispatchUtc": "2026-10-23T16:00:33Z",
+  "submittedUtc": "2026-10-23T16:00:38Z",
+  "detail": "{\"submitted\":true,\"jobId\":\"docker-ci-f18b098635ef4c1a8719\",\"remotePath\":\"\\\\\\\\hive.tail4317d7.ts.net\\\\CodexLiveTransport\\\\inbox\\\\docker-ci-f18b098635ef4c1a8719.ready\",\"runner\":\"HIVE\",\"submittedUtc\":\"2026-10-23T16:00:38.6159199Z\"}",
+  "startedUtc": "2026-10-23T16:00:43Z",
+  "result": null,
+  "finishedUtc": "2026-10-23T16:16:47Z",
+  "attempts": 0
+}
