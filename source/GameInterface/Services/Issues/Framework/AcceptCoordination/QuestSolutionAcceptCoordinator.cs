@@ -200,9 +200,7 @@ internal class QuestSolutionAcceptCoordinator : IHandler
 
     private void Reject(NetPeer peer, RequestQuestSolutionAccept data)
     {
-        long? dueTime = issueResolver.TryResolve(data.IssueOwnerId, data.IssueId, out _, out var issue, out _) &&
-            issue.IsOngoingWithoutQuest ? issue.IssueDueTime.NumTicks : (long?)null;
-        network.Send(peer, new NetworkQuestSolutionAcceptRejected(data.IssueOwnerId, data.IssueId, dueTime));
+        network.Send(peer, new NetworkQuestSolutionAcceptRejected(data.IssueOwnerId, data.IssueId));
     }
 
     private void Handle_NetworkQuestSolutionAccepted(MessagePayload<NetworkQuestSolutionAccepted> payload)
@@ -275,13 +273,6 @@ internal class QuestSolutionAcceptCoordinator : IHandler
             using (new AllowedThread())
             {
                 strayQuest.CompleteQuestWithCancel();
-            }
-
-            if (data.IssueDueTimeTicks.HasValue && !ownership.TryGetOwner(data.IssueOwnerId, data.IssueId, out _))
-            {
-                issue._issueState = IssueBase.IssueState.Ongoing;
-                issue.IsTriedToSolveBefore = false;
-                issue.IssueDueTime = new CampaignTime(data.IssueDueTimeTicks.Value);
             }
         }, context: nameof(QuestSolutionAcceptCoordinator));
     }

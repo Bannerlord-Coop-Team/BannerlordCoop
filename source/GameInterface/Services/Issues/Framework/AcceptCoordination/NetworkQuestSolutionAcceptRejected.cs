@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.Issues.Framework.AcceptCoordination;
 
 /// <summary>
-/// Sent to a client whose optimistic accept was refused.
+/// Sent to a client whose accept lost to another player's.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkQuestSolutionAcceptRejected : IServerToClientCommand
@@ -15,13 +15,9 @@ public readonly struct NetworkQuestSolutionAcceptRejected : IServerToClientComma
     [ProtoMember(2)]
     public readonly string IssueId;
 
-    [ProtoMember(3)]
-    public readonly long? IssueDueTimeTicks;
-
-    public NetworkQuestSolutionAcceptRejected(string issueOwnerId, string issueId, long? issueDueTimeTicks = null)
+    public NetworkQuestSolutionAcceptRejected(string issueOwnerId, string issueId)
     {
         IssueOwnerId = issueOwnerId;
         IssueId = issueId;
-        IssueDueTimeTicks = issueDueTimeTicks;
     }
 }

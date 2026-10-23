@@ -17,29 +17,27 @@ public class LadysKnightOutTournamentProgressTests
     {
         var progress = new LadysKnightOutTournamentProgress();
         Assert.Equal(LadysKnightOutTournamentOutcome.Ongoing,
-            progress.Observe("quest", "owner", Snapshot(round: round), out var started, out _));
-        Assert.True(started);
+            progress.Observe("quest", "owner", Snapshot(round: round), out _));
         var result = Snapshot(revision: 2, finished: true, round: round);
         Assert.Equal(LadysKnightOutTournamentOutcome.Eliminated,
-            progress.Observe("quest", "owner", result, out _, out var eliminatedRound));
+            progress.Observe("quest", "owner", result, out var eliminatedRound));
         Assert.Equal(round, eliminatedRound);
         Assert.Equal(LadysKnightOutTournamentOutcome.Ongoing,
-            progress.Observe("quest", "owner", result, out _, out _));
+            progress.Observe("quest", "owner", result, out _));
         Assert.Equal(LadysKnightOutTournamentOutcome.Ongoing,
-            progress.Observe("quest", "owner", Snapshot(revision: 3, finished: true, round: round), out _, out _));
+            progress.Observe("quest", "owner", Snapshot(revision: 3, finished: true, round: round), out _));
     }
 
     [Fact]
     public void AQualifyingMatchIsIntermediateProgressUntilTheTournamentFinishes()
     {
         var progress = new LadysKnightOutTournamentProgress();
-        progress.Observe("quest", "owner", Snapshot(), out _, out _);
+        progress.Observe("quest", "owner", Snapshot(), out _);
         Assert.Equal(LadysKnightOutTournamentOutcome.Ongoing,
-            progress.Observe("quest", "owner", Snapshot(revision: 2, finished: true, winner: true), out _, out _));
-        progress.Observe("quest", "owner", Snapshot(revision: 3, round: 3), out var startedAgain, out _);
-        Assert.False(startedAgain);
+            progress.Observe("quest", "owner", Snapshot(revision: 2, finished: true, winner: true), out _));
+        progress.Observe("quest", "owner", Snapshot(revision: 3, round: 3), out _);
         Assert.Equal(LadysKnightOutTournamentOutcome.Champion,
-            progress.Observe("quest", "owner", Snapshot(revision: 4, finished: true, winner: true, completed: true, round: 3), out _, out _));
+            progress.Observe("quest", "owner", Snapshot(revision: 4, finished: true, winner: true, completed: true, round: 3), out _));
     }
 
     [Theory]
@@ -48,10 +46,9 @@ public class LadysKnightOutTournamentProgressTests
     public void OtherPlayersAndSpectatorsDoNotAcquireMatchProgress(string controller, TournamentPlayerChoice choice)
     {
         var progress = new LadysKnightOutTournamentProgress();
-        progress.Observe("quest", controller, Snapshot(choice: choice), out var started, out _);
-        Assert.False(started);
+        progress.Observe("quest", controller, Snapshot(choice: choice), out _);
         Assert.Equal(LadysKnightOutTournamentOutcome.Ongoing,
-            progress.Observe("quest", controller, Snapshot(revision: 2, finished: true, winner: true, completed: true, choice: choice), out _, out _));
+            progress.Observe("quest", controller, Snapshot(revision: 2, finished: true, winner: true, completed: true, choice: choice), out _));
     }
 
     [Fact]
@@ -59,28 +56,29 @@ public class LadysKnightOutTournamentProgressTests
     {
         var progress = new LadysKnightOutTournamentProgress();
         Assert.Equal(LadysKnightOutTournamentOutcome.Ongoing,
-            progress.Observe("new-quest", "owner", Snapshot(revision: 2, finished: true, winner: true, completed: true), out _, out _));
+            progress.Observe("new-quest", "owner", Snapshot(revision: 2, finished: true, winner: true, completed: true), out _));
     }
 
     [Fact]
     public void TheNpcReplacingADepartedPlayerCannotFinishTheirQuest()
     {
         var progress = new LadysKnightOutTournamentProgress();
-        progress.Observe("quest", "owner", Snapshot(), out _, out _);
+        progress.Observe("quest", "owner", Snapshot(), out _);
         Assert.Equal(LadysKnightOutTournamentOutcome.Ongoing,
-            progress.Observe("quest", "owner", Snapshot(revision: 2, finished: true, winner: true, completed: true, replaced: true), out _, out _));
+            progress.Observe("quest", "owner", Snapshot(revision: 2, finished: true, winner: true, completed: true, replaced: true), out _));
     }
 
     [Fact]
     public void RemovalDiscardsTheOldSessionAndAllowsAFutureTournament()
     {
         var progress = new LadysKnightOutTournamentProgress();
-        progress.Observe("quest", "owner", Snapshot(), out _, out _);
+        progress.Observe("quest", "owner", Snapshot(), out _);
         progress.RemoveSession("session");
         Assert.Equal(LadysKnightOutTournamentOutcome.Ongoing,
-            progress.Observe("quest", "owner", Snapshot(revision: 2, finished: true), out _, out _));
-        progress.Observe("quest", "owner", Snapshot(session: "next-session"), out var started, out _);
-        Assert.True(started);
+            progress.Observe("quest", "owner", Snapshot(revision: 2, finished: true), out _));
+        progress.Observe("quest", "owner", Snapshot(session: "next-session"), out _);
+        Assert.Equal(LadysKnightOutTournamentOutcome.Eliminated,
+            progress.Observe("quest", "owner", Snapshot(session: "next-session", revision: 2, finished: true), out _));
     }
 
     private static TournamentSessionSnapshot Snapshot(long revision = 1, bool finished = false, bool winner = false,

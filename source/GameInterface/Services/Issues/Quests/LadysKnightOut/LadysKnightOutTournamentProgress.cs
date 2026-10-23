@@ -8,7 +8,7 @@ namespace GameInterface.Services.Issues.Quests.LadysKnightOut;
 internal interface ILadysKnightOutTournamentProgress
 {
     LadysKnightOutTournamentOutcome Observe(string questId, string controllerId,
-        TournamentSessionSnapshot snapshot, out bool started, out int round);
+        TournamentSessionSnapshot snapshot, out int round);
     void RemoveSession(string sessionId);
     void RemoveQuest(string questId);
     void RecordOutcome(string questId, LadysKnightOutBranch branch);
@@ -33,9 +33,8 @@ internal sealed class LadysKnightOutTournamentProgress : ILadysKnightOutTourname
     private readonly Dictionary<string, LadysKnightOutBranch> outcomes = new();
 
     public LadysKnightOutTournamentOutcome Observe(string questId, string controllerId,
-        TournamentSessionSnapshot snapshot, out bool started, out int round)
+        TournamentSessionSnapshot snapshot, out int round)
     {
-        started = false;
         round = 0;
         if (snapshot == null) return LadysKnightOutTournamentOutcome.Ongoing;
         var contestant = snapshot.Contestants.FirstOrDefault(slot => slot.IsHuman &&
@@ -67,7 +66,6 @@ internal sealed class LadysKnightOutTournamentProgress : ILadysKnightOutTourname
             match.MatchId == snapshot.CurrentMatchId && match.State != (int)TournamentMatch.MatchState.Finished &&
             match.Teams.Any(team => team.ParticipantSlotIds.Contains(contestant.SlotId))));
         if (currentRound == null) return LadysKnightOutTournamentOutcome.Ongoing;
-        started = previous == null || previous.SessionId != snapshot.SessionId;
         participation[questId] = new Participation
         {
             SessionId = snapshot.SessionId,

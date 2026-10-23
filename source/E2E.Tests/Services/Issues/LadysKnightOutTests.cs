@@ -235,94 +235,6 @@ public class LadysKnightOutTests : IDisposable
     }
 
     [Theory]
-    [InlineData(true, 0, IssueOutcome.QuestSuccess)]
-    [InlineData(false, 0, IssueOutcome.QuestFail)]
-    [InlineData(false, 1, IssueOutcome.QuestSuccess)]
-    public void NativeOwnerTournamentResultFinalizesOnlyItsQuestOnce(bool champion, int round, IssueOutcome expected)
-    {
-        var quest = Accept(scenario.ClientA);
-        var serverQuest = scenario.QuestOf(scenario.Server);
-        var before = new Dictionary<string, (int Gold, float Renown, int Relation)>();
-        var heroIds = new Dictionary<string, string>();
-        scenario.Server.Call(() =>
-        {
-            var giver = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId);
-            foreach (var controllerId in new[] { QuestScenario.ControllerA, QuestScenario.ControllerB })
-            {
-                Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(controllerId, out var player));
-                var hero = scenario.Server.GetRegisteredObject<Hero>(player.HeroId);
-                heroIds[controllerId] = player.HeroId;
-                before[controllerId] = (hero.Gold, hero.Clan.Renown, giver.GetRelation(hero));
-            }
-        });
-        scenario.ClientB.Call(() => scenario.ClientB.Resolve<INetwork>().SendAll(
-            new RequestLadysKnightOutTournamentOutcome(scenario.NotableId, QuestScenario.IssueId,
-                (byte)LadysKnightOutBranch.TournamentSuccess)));
-        scenario.ClientA.Call(() => scenario.ClientA.Resolve<INetwork>().SendAll(
-            new RequestLadysKnightOutTournamentOutcome(scenario.NotableId, "previous-offer",
-                (byte)LadysKnightOutBranch.TournamentSuccess)));
-        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        scenario.ClientA.Call(() => Assert.True(quest.IsOngoing));
-
-        scenario.ClientA.Call(() =>
-        {
-            var town = quest.QuestGiver.CurrentSettlement.Town;
-            CampaignEventDispatcher.Instance.OnPlayerStartedTournamentMatch(town);
-            if (champion)
-                CampaignEventDispatcher.Instance.OnTournamentFinished(
-                    CharacterObject.PlayerCharacter,
-                    new MBReadOnlyList<CharacterObject>(new[] { CharacterObject.PlayerCharacter }),
-                    town,
-                    null);
-            else
-                CampaignEventDispatcher.Instance.OnPlayerEliminatedFromTournament(round, town);
-        });
-
-        var nativeFinalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.Equal(scenario.NotableId, nativeFinalized.IssueOwnerId);
-        Assert.Equal(QuestScenario.IssueId, nativeFinalized.IssueId);
-        Assert.Equal(expected, nativeFinalized.Outcome);
-        scenario.Server.Call(() => Assert.True(serverQuest.IsFinalized));
-        scenario.ClientA.Call(() =>
-        {
-            Assert.True(quest.IsFinalized);
-            Assert.Equal(2, quest.JournalEntries.Count);
-        });
-
-        scenario.ClientA.Call(() => scenario.ClientA.Resolve<INetwork>().SendAll(
-            new RequestLadysKnightOutTournamentOutcome(scenario.NotableId, QuestScenario.IssueId,
-                (byte)(expected == IssueOutcome.QuestSuccess
-                    ? LadysKnightOutBranch.TournamentSuccess : LadysKnightOutBranch.TournamentFailure))));
-        var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
-        Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
-        Assert.Equal(expected, finalized.Outcome);
-        scenario.Server.Call(() => Assert.True(serverQuest.IsFinalized));
-        environment.FlushCoalescer();
-        foreach (var instance in Instances)
-            instance.Call(() =>
-            {
-                var giver = instance.GetRegisteredObject<Hero>(scenario.NotableId);
-                Assert.Null(giver.Issue);
-                foreach (var controllerId in new[] { QuestScenario.ControllerA, QuestScenario.ControllerB })
-                {
-                    var hero = instance.GetRegisteredObject<Hero>(heroIds[controllerId]);
-                    var owner = controllerId == QuestScenario.ControllerA;
-                    var success = expected == IssueOutcome.QuestSuccess;
-                    Assert.Equal(before[controllerId].Gold + (owner && success ? 750 : 0), hero.Gold);
-                    Assert.Equal(before[controllerId].Renown + (owner && success ? 1 : 0), hero.Clan.Renown);
-                    Assert.Equal(before[controllerId].Relation + (owner ? (success ? 5 : -5) : 0), giver.GetRelation(hero));
-                }
-            });
-        scenario.ClientA.Call(() =>
-        {
-            Assert.True(quest.IsFinalized);
-            Assert.Equal(2, quest.JournalEntries.Count);
-            Assert.Contains(expected == IssueOutcome.QuestSuccess ? "750" : "failed to reach", quest.JournalEntries.Last().LogText.ToString());
-        });
-    }
-
-    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void FrameworkAllowsSeparatePlayersButRefusesASecondQuestForTheSamePlayer(bool samePlayer)
@@ -655,17 +567,66 @@ public class LadysKnightOutTests : IDisposable
     }
 
     [Fact]
+    public void LordAcceptanceCreatesOnlyTheOwnersJournalHistory()
+    {
+        PrepareLordSolution();
+        foreach (var instance in Instances)
+            instance.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
+
+        scenario.ClientA.Call(() => scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution());
+
+        var started = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
+        Assert.Equal(scenario.NotableId, started.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, started.IssueId);
+        Assert.Equal(QuestScenario.ControllerA, started.ControllerId);
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        scenario.ClientA.Call(() =>
+        {
+            var issue = scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+            Assert.True(issue.IsSolvingWithLordSolution);
+            Assert.True(issue.IsTriedToSolveBefore);
+            Assert.Single(issue.JournalEntries);
+            var history = Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(issue)));
+            Assert.False(history.IsEnded());
+            Assert.Single(history.GetEntries());
+            Assert.Null(issue.IssueQuest);
+        });
+        scenario.ClientB.Call(() =>
+        {
+            var issue = scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+            Assert.True(issue.IsSolvingWithLordSolution);
+            Assert.False(issue.IsTriedToSolveBefore);
+            Assert.Empty(issue.JournalEntries);
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(issue)));
+            Assert.Null(issue.IssueQuest);
+        });
+    }
+
+    [Fact]
     public void ADelayedLordAcceptanceChecksTheAlreadyOpenMenu()
     {
+        PrepareLordSolution();
         using var callback = new MethodCallRecorder(AccessTools.Method(typeof(IssueBase), nameof(IssueBase.BeforeGameMenuOpened)));
-        scenario.ClientA.Call(() => Campaign.Current.ConversationManager.IsConversationInProgress = false);
-        scenario.ClientA.SimulateMessage(this, new NetworkLadysKnightOutLordAccepted(
-            scenario.NotableId,
-            QuestScenario.IssueId,
-            QuestScenario.ControllerA,
-            1f,
-            "accepted"));
+        var router = scenario.Server.Resolve<TestNetworkRouter>();
+        router.PauseLink(scenario.Server.NetPeer, scenario.ClientA.NetPeer);
+        scenario.ClientA.Call(() =>
+        {
+            scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution();
+            Campaign.Current.ConversationManager.IsConversationInProgress = false;
+        });
+        Assert.Equal(0, callback.CountFor(scenario.ClientA));
+        router.ResumeLink(scenario.Server.NetPeer, scenario.ClientA.NetPeer);
+        router.RunUntilIdle();
+        var started = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
+        Assert.Equal(scenario.NotableId, started.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, started.IssueId);
+        Assert.Equal(QuestScenario.ControllerA, started.ControllerId);
         Assert.Equal(1, callback.CountFor(scenario.ClientA));
+        Assert.Equal(0, callback.CountFor(scenario.ClientB));
+        Assert.Equal(0, callback.CountFor(scenario.Server));
     }
 
     [Fact]
@@ -691,8 +652,11 @@ public class LadysKnightOutTests : IDisposable
             });
             router.ResumeLink(scenario.Server.NetPeer, scenario.ClientA.NetPeer);
             router.RunUntilIdle();
-            scenario.ClientA.SimulateMessage(this, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLadysKnightOutLordAccepted>()));
-            Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+            scenario.ClientA.SimulateMessage(this, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>()));
+            var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+            Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
+            Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
+            Assert.Equal(IssueOutcome.LordRefusedCounterOffer, finalized.Outcome);
             environment.FlushCoalescer();
             scenario.Server.Call(() =>
             {
@@ -702,7 +666,7 @@ public class LadysKnightOutTests : IDisposable
             scenario.ClientA.Call(() =>
             {
                 Assert.Equal(2, localIssue.JournalEntries.Count);
-                Assert.Contains(localIssue.JournalEntries, log => log.LogText.ToString().Contains("in her honor"));
+                Assert.Single(localIssue.JournalEntries, log => log.LogText.ToString().Contains("in her honor"));
             });
             scenario.ClientB.Call(() => Assert.Empty(scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId).Issue?.JournalEntries ?? Enumerable.Empty<JournalLog>()));
         }
@@ -734,8 +698,13 @@ public class LadysKnightOutTests : IDisposable
                 using (new AllowedThread()) ownerIssue.BeforeGameMenuOpened(null);
             });
 
+            var request = Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestLordSolution>(),
+                message => message.Operation == LordSolutionOperation.RefuseCounterOffer);
+            Assert.Equal(scenario.NotableId, request.IssueOwnerId);
+            Assert.Equal(QuestScenario.IssueId, request.IssueId);
             var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-            Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
+            Assert.Equal(IssueOutcome.LordRefusedCounterOffer, finalized.Outcome);
+            Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
             Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
             environment.FlushCoalescer();
             scenario.Server.Call(() =>
@@ -768,7 +737,10 @@ public class LadysKnightOutTests : IDisposable
         Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
         Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
         scenario.ClientA.Call(() => scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
-        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
+        Assert.Equal(IssueOutcome.LordRefusedCounterOffer, finalized.Outcome);
     }
 
     [Fact]
@@ -797,6 +769,7 @@ public class LadysKnightOutTests : IDisposable
     [Theory]
     [InlineData(0.1f, 18)]
     [InlineData(0.8f, 39)]
+    [InlineData(1f, 45)]
     public void LordInfluenceCostKeepsTheClientDifficultyAfterTheRequestIsDelayed(float difficulty, int cost)
     {
         PrepareLordSolution();
@@ -809,8 +782,20 @@ public class LadysKnightOutTests : IDisposable
         });
         router.ResumeLink(scenario.ClientA.NetPeer, scenario.Server.NetPeer);
         router.RunUntilIdle();
-        Assert.Equal(difficulty, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLadysKnightOutLordAccepted>()).Difficulty);
+        var request = Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestLordSolution>());
+        Assert.Equal(scenario.NotableId, request.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, request.IssueId);
+        Assert.Equal(LordSolutionOperation.Start, request.Operation);
+        var started = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
+        Assert.Equal(scenario.NotableId, started.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, started.IssueId);
+        Assert.Equal(QuestScenario.ControllerA, started.ControllerId);
+        Assert.Equal(difficulty, started.Difficulty);
         scenario.ClientA.Call(() => scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+        var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
+        Assert.Equal(IssueOutcome.LordRefusedCounterOffer, finalized.Outcome);
         environment.FlushCoalescer();
         scenario.Server.Call(() =>
         {
@@ -823,6 +808,8 @@ public class LadysKnightOutTests : IDisposable
     public void TheWinningLordAcceptanceReplacesALosingOptimisticDirectAccept()
     {
         PrepareLordSolution();
+        foreach (var instance in Instances)
+            instance.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
         var router = scenario.Server.Resolve<TestNetworkRouter>();
         router.PauseLink(scenario.Server.NetPeer, scenario.ClientB.NetPeer);
         scenario.ClientA.Call(() => scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution());
@@ -833,6 +820,9 @@ public class LadysKnightOutTests : IDisposable
             issue.StartIssueWithQuest();
             losingQuest = (Quest)issue.IssueQuest;
             losingQuest.QuestAcceptedConsequences();
+            Assert.Single(losingQuest.JournalEntries);
+            Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(losingQuest)));
         });
         router.ResumeLink(scenario.Server.NetPeer, scenario.ClientB.NetPeer);
         router.RunUntilIdle();
@@ -846,7 +836,13 @@ public class LadysKnightOutTests : IDisposable
             Assert.Equal(QuestScenario.ControllerA, owner);
             losingQuest.QuestAcceptedConsequences();
             Assert.True(losingQuest.IsFinalized);
+            Assert.DoesNotContain(losingQuest, Campaign.Current.QuestManager.Quests);
+            Assert.Empty(issue.JournalEntries);
+            Assert.Empty(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
+                entry => entry.IsRelatedTo(losingQuest)));
         });
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkQuestSolutionAccepted>());
+        Assert.Equal(QuestScenario.ControllerA, scenario.OwnerOnServer());
     }
 
     [Fact]
@@ -859,7 +855,10 @@ public class LadysKnightOutTests : IDisposable
             scenario.Server.Resolve<IPlayerManager>().ClearPeer(scenario.ClientA.NetPeer);
             scenario.Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(scenario.ClientA.NetPeer, default));
         });
-        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
+        Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
         foreach (var instance in Instances)
             instance.Call(() => Assert.Null(instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
     }
@@ -878,13 +877,16 @@ public class LadysKnightOutTests : IDisposable
         scenario.Server.Call(() => CampaignEventDispatcher.Instance.OnHeroKilled(
             scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId), null,
             KillCharacterAction.KillCharacterActionDetail.DiedOfOldAge, false));
-        Assert.Equal(IssueOutcome.QuestCancel, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
+        Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
         foreach (var instance in Instances)
             instance.Call(() => Assert.Null(instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue));
         scenario.ClientA.Call(() => Assert.Equal(2, localIssue.JournalEntries.Count));
     }
 
-    private void PrepareLordSolution()
+    private void PrepareLordSolution(float influence = 100)
     {
         string heroId = null!;
         scenario.Server.Call(() =>
@@ -896,10 +898,13 @@ public class LadysKnightOutTests : IDisposable
             instance.Call(() =>
             {
                 var hero = instance.GetRegisteredObject<Hero>(heroId);
+                Campaign.Current.ConversationManager.IsConversationInProgress = true;
                 using (new AllowedThread())
                 {
-                    hero.Clan.Influence = 100;
-                    instance.GetRegisteredObject<Hero>(scenario.NotableId).CurrentSettlement.Town.OwnerClan = hero.Clan;
+                    hero.Clan.Influence = influence;
+                    var settlement = instance.GetRegisteredObject<Hero>(scenario.NotableId).CurrentSettlement;
+                    settlement.Town.OwnerClan = hero.Clan;
+                    hero.PartyBelongedTo.CurrentSettlement = settlement;
                 }
             });
     }
@@ -909,41 +914,72 @@ public class LadysKnightOutTests : IDisposable
     [InlineData(true)]
     public void LordSolutionChargesOnlyTheAcceptedPlayersInfluenceAndCompletesOnce(bool enoughInfluence)
     {
-        string heroId = null!;
+        PrepareLordSolution(enoughInfluence ? 100 : 0);
+        var before = new Dictionary<string, (int Gold, float Influence, float Renown, int Relation)>();
+        var heroIds = new Dictionary<string, string>();
+        IssueBase ownerIssue = null!;
+        scenario.ClientA.Call(() => ownerIssue = scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
         scenario.Server.Call(() =>
         {
-            Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
-            heroId = player.HeroId;
-        });
-        foreach (var instance in Instances)
-        {
-            instance.Call(() =>
+            var giver = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId);
+            foreach (var controller in new[] { QuestScenario.ControllerA, QuestScenario.ControllerB })
             {
-                var hero = instance.GetRegisteredObject<Hero>(heroId);
-                using (new AllowedThread())
-                {
-                    hero.Clan.Influence = enoughInfluence ? 100 : 0;
-                    instance.GetRegisteredObject<Hero>(scenario.NotableId).CurrentSettlement.Town.OwnerClan = hero.Clan;
-                }
-            });
-        }
-        scenario.ClientA.Call(() => scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution());
+                Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(controller, out var player));
+                var hero = scenario.Server.GetRegisteredObject<Hero>(player.HeroId);
+                heroIds[controller] = player.HeroId;
+                before[controller] = (hero.Gold, hero.Clan.Influence, hero.Clan.Renown, giver.GetRelation(hero));
+            }
+        });
+        scenario.ClientA.Call(() => ownerIssue.StartIssueWithLordSolution());
         if (!enoughInfluence)
         {
-            Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkLadysKnightOutLordAccepted>());
+            Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
+            Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+            scenario.Server.Call(() =>
+            {
+                Assert.True(scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.IsOngoingWithoutQuest);
+                Assert.False(scenario.Server.Resolve<IIssueOwnershipRegistry>()
+                    .TryGetOwner(scenario.NotableId, QuestScenario.IssueId, out _));
+            });
+            scenario.ClientA.Call(() =>
+            {
+                Assert.True(ownerIssue.IsOngoingWithoutQuest);
+                Assert.Empty(ownerIssue.JournalEntries);
+            });
             return;
         }
-        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLadysKnightOutLordAccepted>());
-        float expectedInfluence = 0;
-        scenario.Server.Call(() => expectedInfluence = 100 - scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.NeededInfluenceForLordSolution);
-        scenario.ClientA.Call(() => scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
-        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        var started = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
+        Assert.Equal(scenario.NotableId, started.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, started.IssueId);
+        Assert.Equal(QuestScenario.ControllerA, started.ControllerId);
+        int cost = 0;
+        scenario.Server.Call(() => cost = scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.NeededInfluenceForLordSolution);
+        scenario.ClientB.Call(() => scenario.ClientB.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+        Assert.Empty(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        scenario.ClientA.Call(() => ownerIssue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+        // The second click can still hold the detached issue after the first server response.
+        scenario.ClientA.Call(() => ownerIssue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+        var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
+        Assert.Equal(IssueOutcome.LordRefusedCounterOffer, finalized.Outcome);
         environment.FlushCoalescer();
-        scenario.Server.Call(() =>
-        {
-            Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
-            Assert.Equal(expectedInfluence, scenario.Server.GetRegisteredObject<Hero>(player.HeroId).Clan.Influence);
-        });
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                var giver = instance.GetRegisteredObject<Hero>(scenario.NotableId);
+                Assert.Null(giver.Issue);
+                foreach (var controller in new[] { QuestScenario.ControllerA, QuestScenario.ControllerB })
+                {
+                    var hero = instance.GetRegisteredObject<Hero>(heroIds[controller]);
+                    var owner = controller == QuestScenario.ControllerA;
+                    Assert.Equal(before[controller].Gold, hero.Gold);
+                    Assert.Equal(before[controller].Influence - (owner ? cost : 0), hero.Clan.Influence);
+                    Assert.Equal(before[controller].Renown + (owner ? 7 : 0), hero.Clan.Renown);
+                    Assert.Equal(before[controller].Relation + (owner ? 5 : 0), giver.GetRelation(hero));
+                }
+            });
+        scenario.ClientA.Call(() => Assert.Equal(2, ownerIssue.JournalEntries.Count));
     }
 
     [Theory]
@@ -1007,7 +1043,7 @@ public class LadysKnightOutTests : IDisposable
             scenario.Server.Call(() => scenario.Server.Resolve<IMessageBroker>()
                 .Publish(this, new PlayerCampaignEntered(scenario.ClientB.NetPeer)));
         var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
+        Assert.Equal(IssueOutcome.LordRefusedCounterOffer, finalized.Outcome);
         Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
         Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
         scenario.ClientA.Call(() => Assert.Single(Campaign.Current.LogEntryHistory
@@ -1036,8 +1072,10 @@ public class LadysKnightOutTests : IDisposable
         scenario.Server.Call(() => Assert.True(issues[scenario.Server].IsTriedToSolveBefore));
         scenario.ClientA.Call(() => issues[scenario.ClientA].CompleteIssueWithLordSolutionWithRefuseCounterOffer());
 
-        Assert.Equal(IssueOutcome.QuestSuccess,
-            Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
+        Assert.Equal(IssueOutcome.LordRefusedCounterOffer, finalized.Outcome);
         scenario.ClientA.Call(() =>
         {
             var ownerHistory = Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
@@ -1109,23 +1147,33 @@ public class LadysKnightOutTests : IDisposable
     public void AcceptedLordSolutionCompletesAfterInfluenceDrops()
     {
         PrepareLordSolution();
-        scenario.ClientA.Call(() => scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue.StartIssueWithLordSolution());
-        var expectedInfluence = 0f;
+        IssueBase ownerIssue = null!;
+        scenario.ClientA.Call(() =>
+        {
+            ownerIssue = scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue;
+            Assert.Null(ownerIssue.CounterOfferHero);
+            using (new IssueDifficultyOverride(0.1f)) ownerIssue.StartIssueWithLordSolution();
+        });
+        Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkLordSolutionStarted>());
         scenario.Server.Call(() =>
         {
             Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
             Assert.True(scenario.Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var owner));
             owner.Clan.Influence = 0;
-            expectedInfluence = -scenario.Server.GetRegisteredObject<Hero>(scenario.NotableId).Issue.NeededInfluenceForLordSolution;
         });
-        scenario.ClientA.Call(() => scenario.ClientA.GetRegisteredObject<Hero>(scenario.NotableId).Issue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
-        Assert.Equal(IssueOutcome.QuestSuccess, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
+        scenario.ClientA.Call(() => ownerIssue.CompleteIssueWithLordSolutionWithRefuseCounterOffer());
+        var finalized = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(scenario.NotableId, finalized.IssueOwnerId);
+        Assert.Equal(QuestScenario.IssueId, finalized.IssueId);
+        Assert.Equal(IssueOutcome.LordRefusedCounterOffer, finalized.Outcome);
         environment.FlushCoalescer();
-        scenario.Server.Call(() =>
-        {
-            Assert.True(scenario.Server.Resolve<IPlayerManager>().TryGetPlayer(QuestScenario.ControllerA, out var player));
-            Assert.Equal(expectedInfluence, scenario.Server.GetRegisteredObject<Hero>(player.HeroId).Clan.Influence);
-        });
+        foreach (var instance in Instances)
+            instance.Call(() =>
+            {
+                Assert.Null(instance.GetRegisteredObject<Hero>(scenario.NotableId).Issue);
+                Assert.Equal(-18, instance.GetRegisteredObject<Hero>(scenario.OwnerHeroId).Clan.Influence);
+                Assert.Equal(0, instance.GetRegisteredObject<Hero>(scenario.OtherHeroId).Clan.Influence);
+            });
     }
 
     private static TournamentSessionSnapshot Snapshot(int round, bool finished, bool champion)

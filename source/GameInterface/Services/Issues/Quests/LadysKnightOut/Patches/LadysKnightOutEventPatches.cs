@@ -1,5 +1,4 @@
 ﻿using Common;
-using Common.Messaging;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
@@ -28,11 +27,15 @@ internal class LadysKnightOutEventPatches
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
     [HarmonyPrefix]
-    private static void CaptureWarInitiator() => warInitiator = ResolvedMainHeroContext.ResolvedMainHero;
+    private static void CaptureWarInitiator(out Hero __state)
+    {
+        __state = warInitiator;
+        warInitiator = ResolvedMainHeroContext.ResolvedMainHero;
+    }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
-    [HarmonyPostfix, HarmonyPriority(Priority.Last)]
-    private static void ClearWarInitiator() => warInitiator = null;
+    [HarmonyFinalizer]
+    private static void RestoreWarInitiator(Hero __state) => warInitiator = __state;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnWarDeclared))]
     [HarmonyPrefix]
@@ -67,44 +70,4 @@ internal class LadysKnightOutWorldListenerPatches
     }
 
     private static bool Prefix() => ModInformation.IsServer;
-}
-
-[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
-[HarmonyPatch]
-internal class LadysKnightOutNativeTournamentPatches
-{
-    // Only natively launched tournaments fire these callbacks; co-op sessions use server snapshots.
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnPlayerStartedTournamentMatch))]
-    [HarmonyPrefix]
-    private static bool PlayerStartedPrefix() => ModInformation.IsClient;
-
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnPlayerEliminatedFromTournament))]
-    [HarmonyPrefix]
-    private static bool PlayerEliminatedPrefix(Quest __instance, int round)
-    {
-        if (ModInformation.IsServer)
-            return false;
-
-        Publish(__instance, __instance.TournamentRoundGoal > round + 1
-            ? LadysKnightOutBranch.TournamentFailure
-            : LadysKnightOutBranch.TournamentSuccess);
-        return false;
-    }
-
-    [HarmonyPatch(typeof(Quest), nameof(Quest.OnTournamentFinished))]
-    [HarmonyPrefix]
-    private static bool TournamentFinishedPrefix(Quest __instance, CharacterObject winner, Town town)
-    {
-        if (ModInformation.IsServer)
-            return false;
-
-        if (town == __instance._tournamentTown && winner == CharacterObject.PlayerCharacter)
-            Publish(__instance, LadysKnightOutBranch.TournamentSuccess);
-        return false;
-    }
-
-    private static void Publish(Quest quest, LadysKnightOutBranch branch)
-    {
-        MessageBroker.Instance.Publish(quest, new LadysKnightOutTournamentTriggered(quest, (byte)branch));
-    }
 }

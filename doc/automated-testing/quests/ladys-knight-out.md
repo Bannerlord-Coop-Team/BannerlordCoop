@@ -1,6 +1,8 @@
 # Lady's Knight Out
 
-Live testing is pending. Use the lane assigned by the supervisor, a dedicated server and two clients. No live test was run during the framework port.
+Local up28 on `b57cac112` passed village crime (owner Honor -50), TournamentFailure, a real co-op TournamentSuccess, and B joining during A's pending influence solution, with paired journals showing no new B completion or rewards. The supervisor accepted reuse on `3d1140bbd` for the conflict-only merge and quest-category attributes. Local up29/retry1 on `3d1140bbd` passed owner disconnect cancellation and same-process rejoin: one server cancellation, one B finalize, offline A received zero and reloaded with no active quest. Evidence and cleanup receipts are linked in PR #3949.
+
+The review correction now migrates influence handling to the shared lord coordinator and removes the unused native tournament fallback. A fresh combined Local run of influence and co-op tournaments is required on that correction's final head; the runs above remain historical. Use the lane assigned by the supervisor, a dedicated server and two clients.
 
 ## Installed source
 
@@ -26,7 +28,7 @@ The expected relation amounts below are vanilla base amounts; record any native 
 
 3. Fight real co-op tournament matches. Difficulty at most 0.2 requires round 2; above 0.2 through 0.5 requires round 3; above 0.5 through 0.7 requires round 4; above 0.7 requires the championship. For each difficulty band, exercise elimination one round below its goal and at its qualifying round, where reachable. A championship-only quest fails on final-round elimination and succeeds on a championship. Intermediate wins keep the quest active. A completed match before acceptance, watching, skipping, another player's win, and an NPC replacing a departed competitor must not finish this player's quest. A later valid tournament can still finish it.
 
-4. Tournament success pays the owner 750 gold, adds 1 clan renown and base +5 giver relation, appends the success log and ends the quest on every machine. Failure changes base giver relation by -5, appends the failure log and ends the quest. The other player's money, renown, relation and journal remain unchanged. Replaying the same tournament update or outcome request must not pay or penalize twice.
+4. Tournament success pays the owner 750 gold, adds 1 clan renown and base +5 giver relation, appends the success log and ends the quest on every machine. Failure changes base giver relation by -5, appends the failure log and ends the quest. The other player's money, renown, relation and journal remain unchanged. Replaying the same tournament update must not pay or penalize twice.
 
 5. Let the 30-day quest expire without a qualifying tournament. The server applies base -5 giver relation, the owner sees the timeout log, and every copy ends. The owner client must not apply the timeout penalty a second time.
 

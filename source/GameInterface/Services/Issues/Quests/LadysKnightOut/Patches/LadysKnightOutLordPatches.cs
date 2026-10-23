@@ -1,6 +1,4 @@
 ﻿using Common;
-using Common.Messaging;
-using GameInterface.Policies;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
@@ -14,27 +12,6 @@ namespace GameInterface.Services.Issues.Quests.LadysKnightOut.Patches;
 [HarmonyPatch]
 internal class LadysKnightOutLordPatches
 {
-    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.StartIssueWithLordSolution))]
-    [HarmonyPrefix]
-    [HarmonyPriority(Priority.First)]
-    private static bool StartPrefix(IssueBase __instance)
-    {
-        if (!(__instance is Issue) || ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed()) return true;
-        MessageBroker.Instance.Publish(__instance, new LadysKnightOutLordTriggered(__instance, false));
-        return false;
-    }
-
-    [HarmonyPatch(typeof(IssueBase), nameof(IssueBase.CompleteIssueWithLordSolutionWithRefuseCounterOffer))]
-    [HarmonyPrefix]
-    [HarmonyPriority(Priority.First)]
-    private static bool CompletePrefix(IssueBase __instance)
-    {
-        if (!(__instance is Issue) || ModInformation.IsServer) return true;
-        // Settlement replay can open the menu, but the server must still run its consequence.
-        MessageBroker.Instance.Publish(__instance, new LadysKnightOutLordTriggered(__instance, true));
-        return false;
-    }
-
     // Vanilla IssueManager cancels a lord solution whose giver dies, and no dispatch patch tells the clients.
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnHeroKilled))]
     [HarmonyPrefix]
