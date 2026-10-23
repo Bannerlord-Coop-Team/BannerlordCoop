@@ -1,3 +1,4 @@
+﻿using GameInterface.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,8 +12,9 @@ public interface IModuleValidator
 {
     /// <summary>
     /// Compares two lists of <see cref="ModuleInfo"/>, regardless of the order or sorting of the two lists. The server list specifies what the client list must fulfil. <para/>
-    /// Checks that the game versions match (changeset aside), that the client has no DLC enabled, and that community modules match exactly in both
-    /// directions, versions included. Official non-DLC modules and the DedicatedServer.* host modules are exempt from the exact match.
+    /// Checks that the game versions match (changeset aside), that the client has no DLC enabled, and that the client runs every server community
+    /// module with the same version. Client-only community modules must be in the mod-config whitelist, unless it is turned off.
+    /// Official non-DLC modules and the DedicatedServer.* host modules are exempt.
     /// </summary>
     /// <param name="serverModules">The server modules</param>
     /// <param name="clientModules">The client modules</param>
@@ -33,6 +35,13 @@ public interface IModuleValidator
 /// <inheritdoc href="IModuleValidator" />
 public class ModuleValidator : IModuleValidator
 {
+    private readonly IModConfig modConfig;
+
+    public ModuleValidator(IModConfig modConfig)
+    {
+        this.modConfig = modConfig;
+    }
+
     public bool Validate(IEnumerable<ModuleInfo> serverModules, IEnumerable<ModuleInfo> clientModules, out string error, IReadOnlyDictionary<string, string> displayNames = null)
     {
         if (!ValidateGameVersion(serverModules, clientModules, out error))
@@ -66,7 +75,8 @@ public class ModuleValidator : IModuleValidator
         }
 
         var modulesOnlyClientSide = clientModules.Where(clientModule =>
-            serverModules.All(serverModule => serverModule.Id != clientModule.Id));
+            serverModules.All(serverModule => serverModule.Id != clientModule.Id) &&
+            !IsAllowedClientOnly(clientModule));
 
         errors.AddRange(modulesOnlyClientSide.Select(clientModule =>
             $"Server does not support module {Describe(clientModule, displayNames)}."));
@@ -79,6 +89,16 @@ public class ModuleValidator : IModuleValidator
 
         error = null;
         return true;
+    }
+
+    // A module only the client runs is allowed when the whitelist is off or names it.
+    private bool IsAllowedClientOnly(ModuleInfo module)
+    {
+        var config = modConfig.Data;
+        if (config.ModWhitelistEnabled == false) return true;
+        if (config.ModWhitelist == null) return false;
+
+        return config.ModWhitelist.Any(id => string.Equals(id?.Trim(), module.Id, StringComparison.OrdinalIgnoreCase));
     }
 
     // 'Calradia Expanded' (CalradiaExpanded): players know the name, the id is what the files use.

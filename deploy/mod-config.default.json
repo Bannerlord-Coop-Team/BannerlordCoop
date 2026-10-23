@@ -12,6 +12,18 @@
   // DedicatedServer\server-config.json instead. Comments and trailing commas
   // are allowed here.
 
+  // Controls which extra modules joining players may run.
+  // Every community module the server runs is always required on the client with the same version.
+  // (Default) true: Players may only run extra modules (ones the server doesn't run) listed in "modWhitelist".
+  // false: Players may run any extra module.
+  // Extra modules only run on that player's machine, so only list client side mods (UI, cosmetics etc.).
+  // Mods that change campaign or battle logic can desync the game when only some players run them.
+  "modWhitelistEnabled": true,
+
+  // Module ids players may run although the server doesn't, e.g. ["ModuleA", "ModuleB"].
+  // The id is the Id value in the mod's SubModule.xml, usually its folder name under Modules.
+  "modWhitelist": [],
+
   // Campaign difficulty, applied by the HOSTING side at every boot; joining
   // players inherit the values with the save transfer. These values mirror a
   // newly created vanilla Bannerlord campaign.

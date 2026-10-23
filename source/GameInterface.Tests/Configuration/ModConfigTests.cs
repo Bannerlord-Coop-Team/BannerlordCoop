@@ -69,6 +69,8 @@ public class ModConfigTests : IDisposable
         Assert.True(config.Difficulty.BirthAndDeath);
         Assert.False(config.Difficulty.AutoAllocateClanMemberPerks);
         Assert.Equal(1000, config.ModOptions.BattleSize);
+        Assert.True(config.ModWhitelistEnabled);
+        Assert.Empty(config.ModWhitelist);
         Assert.True(config.UnknownKeys == null || config.UnknownKeys.Count == 0);
         Assert.True(config.Difficulty.UnknownKeys == null || config.Difficulty.UnknownKeys.Count == 0);
         Assert.True(config.ModOptions.UnknownKeys == null || config.ModOptions.UnknownKeys.Count == 0);

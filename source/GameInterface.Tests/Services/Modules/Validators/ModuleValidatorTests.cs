@@ -1,6 +1,8 @@
-using System;
+﻿using System;
+using GameInterface.Configuration;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
+using Moq;
 using System.Collections.Generic;
 using TaleWorlds.Library;
 using Xunit;
@@ -9,6 +11,103 @@ namespace GameInterface.Tests.Services.Modules.Validators;
 
 public class ModuleValidatorTests
 {
+    private static readonly ApplicationVersion V1 = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 0);
+
+    // Builds a validator over a fixed mod-config, defaulting to the shipped one.
+    private static ModuleValidator NewValidator(ModConfigData config = null) =>
+        new ModuleValidator(Mock.Of<IModConfig>(modConfig => modConfig.Data == (config ?? new ModConfigData())));
+
+    [Fact]
+    public void Validate_RefusesClientOnlyModule_WhenWhitelistIsEmpty()
+    {
+        var serverModules = new List<ModuleInfo> { new ModuleInfo { Id = "ModuleA", Version = V1 } };
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "ModuleA", Version = V1 },
+            new ModuleInfo { Id = "UiMod", Version = V1 }
+        };
+
+        var result = NewValidator(new ModConfigData { ModWhitelistEnabled = true, ModWhitelist = new List<string>() })
+            .Validate(serverModules, clientModules, out var error);
+
+        Assert.False(result);
+        Assert.Equal("Server does not support module 'UiMod'.", error);
+    }
+
+    [Fact]
+    public void Validate_RefusesOnlyClientOnlyModulesMissingFromWhitelist()
+    {
+        var serverModules = new List<ModuleInfo> { new ModuleInfo { Id = "ModuleA", Version = V1 } };
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "ModuleA", Version = V1 },
+            new ModuleInfo { Id = "UiMod", Version = V1 },
+            new ModuleInfo { Id = "OtherMod", Version = V1 }
+        };
+
+        var result = NewValidator(new ModConfigData { ModWhitelist = new List<string> { " uimod " } })
+            .Validate(serverModules, clientModules, out var error);
+
+        Assert.False(result);
+        Assert.Equal("Server does not support module 'OtherMod'.", error);
+    }
+
+    [Fact]
+    public void Validate_AllowsAnyClientOnlyModule_WhenWhitelistIsDisabled()
+    {
+        var serverModules = new List<ModuleInfo> { new ModuleInfo { Id = "ModuleA", Version = V1 } };
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "ModuleA", Version = V1 },
+            new ModuleInfo { Id = "UiMod", Version = V1 }
+        };
+
+        var result = NewValidator(new ModConfigData { ModWhitelistEnabled = false })
+            .Validate(serverModules, clientModules, out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+    }
+
+    [Fact]
+    public void Validate_StillRequiresServerModules_WhenWhitelistIsDisabled()
+    {
+        var serverModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "ModuleA", Version = V1 },
+            new ModuleInfo { Id = "ModuleB", Version = new ApplicationVersion(ApplicationVersionType.Release, 2, 0, 0, 0) }
+        };
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "ModuleA", Version = V1 },
+            new ModuleInfo { Id = "ModuleB", Version = V1 }
+        };
+
+        var result = NewValidator(new ModConfigData { ModWhitelistEnabled = false, ModWhitelist = new List<string> { "ModuleB" } })
+            .Validate(serverModules, clientModules, out var error);
+
+        Assert.False(result);
+        Assert.Equal("Wrong version of module 'ModuleB' detected. Server uses 'v2.0.0.0', client uses 'v1.0.0.0'.", error);
+    }
+
+    [Fact]
+    public void Validate_StillRefusesDlc_WhenWhitelistIsDisabled()
+    {
+        var gameVersion = new ApplicationVersion(ApplicationVersionType.Release, 1, 4, 8, 0);
+        var serverModules = new List<ModuleInfo> { new ModuleInfo { Id = "Native", IsOfficial = true, Version = gameVersion } };
+        var clientModules = new List<ModuleInfo>
+        {
+            new ModuleInfo { Id = "Native", IsOfficial = true, Version = gameVersion },
+            new ModuleInfo { Id = "NavalDLC", IsOfficial = true, IsDlc = true, Version = gameVersion }
+        };
+
+        var result = NewValidator(new ModConfigData { ModWhitelistEnabled = false, ModWhitelist = new List<string> { "NavalDLC" } })
+            .Validate(serverModules, clientModules, out var error);
+
+        Assert.False(result);
+        Assert.Equal("DLC is not supported. Please disable the following module(s): 'NavalDLC'.", error);
+    }
+
     [Fact]
     public void Validate_ReturnsNull_WhenClientModulesMatchServerModules()
     {
@@ -25,7 +124,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "ModuleB", Version = new ApplicationVersion(ApplicationVersionType.Release,1, 2, 0, 352) }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         // Act
         var result = validator.Validate(serverModules, clientModules, out var error);
@@ -49,7 +148,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "ModuleA", Version = new ApplicationVersion(ApplicationVersionType.Release,1, 0, 0, 352) }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         // Act
         var result = validator.Validate(serverModules, clientModules, out var error);
@@ -75,7 +174,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "ModuleB", Version = new ApplicationVersion(ApplicationVersionType.Release,1, 1, 0, 352) }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         // Act
         var result = validator.Validate(serverModules, clientModules, out var error);
@@ -99,7 +198,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "Native", IsOfficial = true, Version = new ApplicationVersion(ApplicationVersionType.Release,1, 1, 0, 352) }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         // Act
         var result = validator.Validate(serverModules, clientModules, out var error);
@@ -124,7 +223,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "SomeDlc", IsOfficial = true, IsDlc = true, Version = new ApplicationVersion(ApplicationVersionType.Release,1, 0, 0, 352) }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         // Act
         var result = validator.Validate(serverModules, clientModules, out var error);
@@ -144,7 +243,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "ModuleA", Version = new ApplicationVersion(ApplicationVersionType.Release,1, 0, 0, 352) }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         // Act
         var result = validator.ValidateNoDlc(modules, out var error);
@@ -165,7 +264,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "DlcTwo", IsOfficial = true, IsDlc = true, Version = new ApplicationVersion(ApplicationVersionType.Release,1, 0, 0, 352) }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         // Act
         var result = validator.ValidateNoDlc(modules, out var error);
@@ -192,7 +291,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "ModuleC", Version = new ApplicationVersion(ApplicationVersionType.Release,1, 0, 0, 352) }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         // Act
         var result = validator.Validate(serverModules, clientModules, out var error);
@@ -219,7 +318,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "ModuleE", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 352) }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         var result = validator.Validate(serverModules, clientModules, out var error);
 
@@ -248,7 +347,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "Coop", Version = version }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         var result = validator.Validate(serverModules, clientModules, out var error);
 
@@ -270,7 +369,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "StoryMode", IsOfficial = true, Version = version }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         var result = validator.Validate(serverModules, clientModules, out var error);
 
@@ -292,7 +391,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "Native", IsOfficial = true, Version = version }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         var result = validator.Validate(serverModules, clientModules, out var error);
 
@@ -314,7 +413,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "Native", IsOfficial = true, Version = version }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         var result = validator.Validate(serverModules, clientModules, out var error);
 
@@ -336,7 +435,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "Native", IsOfficial = true, Version = version }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         var result = validator.Validate(serverModules, clientModules, out var error);
 
@@ -360,7 +459,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "CustomBattle", IsOfficial = true, Version = version }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         var result = validator.Validate(serverModules, clientModules, out var error);
 
@@ -382,7 +481,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "Native", IsOfficial = true, Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 4, 7, 117484) }
         };
 
-        var validator = new ModuleValidator();
+        var validator = NewValidator();
 
         var result = validator.Validate(serverModules, clientModules, out var error);
 
@@ -412,7 +511,7 @@ public class ModuleValidatorTests
             ["ExtraMod"] = "Extra Mod",
         };
 
-        var result = new ModuleValidator().Validate(serverModules, clientModules, out var error, names);
+        var result = NewValidator().Validate(serverModules, clientModules, out var error, names);
 
         Assert.False(result);
         Assert.Equal(string.Join(Environment.NewLine,
@@ -430,7 +529,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "ModuleB", Version = new ApplicationVersion(ApplicationVersionType.Release, 1, 0, 0, 0) }
         };
 
-        var result = new ModuleValidator().Validate(serverModules, new List<ModuleInfo>(), out var error,
+        var result = NewValidator().Validate(serverModules, new List<ModuleInfo>(), out var error,
             new Dictionary<string, string> { ["ModuleA"] = "ModuleA" });
 
         Assert.False(result);
@@ -447,7 +546,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "Coop", Version = new ApplicationVersion(ApplicationVersionType.Release, 0, 1, 6, 0) }
         };
 
-        var result = new ModuleValidator().Validate(new List<ModuleInfo>(), clientModules, out var error,
+        var result = NewValidator().Validate(new List<ModuleInfo>(), clientModules, out var error,
             new Dictionary<string, string> { ["Coop"] = "Bannerlord Coop" });
 
         Assert.False(result);
@@ -465,7 +564,7 @@ public class ModuleValidatorTests
             new ModuleInfo { Id = "NavalDLC", IsOfficial = true, IsDlc = true, Version = gameVersion }
         };
 
-        var result = new ModuleValidator().Validate(serverModules, clientModules, out var error,
+        var result = NewValidator().Validate(serverModules, clientModules, out var error,
             new Dictionary<string, string> { ["NavalDLC"] = "War Sails" });
 
         Assert.False(result);
