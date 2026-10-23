@@ -179,6 +179,7 @@ public class SettlementOwnerChangeRelayTests : IDisposable
         });
     }
 
+    /// <summary>A quest fixture that records the relayed event and cancels through the framework.</summary>
     private sealed class OwnerChangeQuest : QuestBase
     {
         private readonly Settlement target;

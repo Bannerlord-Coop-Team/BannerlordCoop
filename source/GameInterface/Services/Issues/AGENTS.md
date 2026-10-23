@@ -47,9 +47,9 @@ Open framework gaps are tracked as `[QUESTS]` issues (#3981 to #3988).
    replay (a war, an army's removal), and `OutcomeDispatcher.BeforeQuestOutcome` drops that ending unless
    `Replay` is running (`Framework/Finalization/QuestEndingReplay.cs`). A listener outside `AllowedThread`, like a
    clan's kingdom change, still sends its ending to the server as a request.
-9. Endings the server sees (a war, a kingdom change, a capture, an army dispersal) are decided on the server.
+9. Endings the server sees (a war, a kingdom change, a capture, an army dispersal, a settlement owner change) are decided on the server.
    `Framework/Dispatch/QuestWorldEventRelayPatches.cs` postfixes `CampaignEventDispatcher.OnWarDeclared`,
-   `OnClanChangedKingdom`, `OnHeroPrisonerTaken` and `OnArmyDispersed`, and `Framework/Dispatch/QuestEventRelay.cs`
+   `OnClanChangedKingdom`, `OnHeroPrisonerTaken`, `OnArmyDispersed` and `OnSettlementOwnerChanged`, and `Framework/Dispatch/QuestEventRelay.cs`
    runs the listener with that exact name and parameter types on every running registered quest, as its owner through
    `IOutcomeDispatcher.RunAsOwners`. A listener under another name is skipped without a log. These two files pass
    listener names as strings because `Framework/` cannot name quest types.
