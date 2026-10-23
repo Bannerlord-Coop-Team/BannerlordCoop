@@ -75,15 +75,7 @@ namespace GameInterface.Serialization.Native
 
             foreach (string fieldName in StoredFields.Keys)
             {
-                var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
-
-                // Cross-runtime field skew (see BinaryPackageBase.UnpackFields): skip fields the
-                // sender's runtime packed that don't exist on this runtime's type.
-                if (field == null)
-                {
-                    FieldSkewLog.WarnOnce(Logger, type, fieldName);
-                    continue;
-                }
+                if (!FieldSkewLog.TryGetField(Logger, type, fields, fieldName, out var field)) continue;
 
                 field.SetValue((object)Object, StoredFields[fieldName].Unpack(binaryPackageFactory));
             }
