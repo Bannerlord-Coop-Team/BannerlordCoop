@@ -1,5 +1,6 @@
 ﻿using ProtoBuf;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Surrogates;
@@ -25,6 +26,9 @@ internal struct TextObjectSurrogate
     [ProtoMember(5)]
     public Dictionary<string, float> FloatAttributes { get; set; }
 
+    [ProtoMember(6)]
+    public string[] NullAttributes { get; set; }
+
     public TextObjectSurrogate(TextObject textObject)
     {
         Text = textObject?.Value;
@@ -32,6 +36,9 @@ internal struct TextObjectSurrogate
         IntAttributes = new();
         StringAttributes = new();
         FloatAttributes = new();
+        NullAttributes = textObject?.Attributes?.Where(attribute => attribute.Value == null)
+            .Select(attribute => attribute.Key)
+            .ToArray();
 
         if (textObject?.Attributes == null)
             return;
@@ -68,7 +75,8 @@ internal struct TextObjectSurrogate
         if (surrogate.TextObjectAttributes == null 
             && surrogate.IntAttributes == null
             && surrogate.StringAttributes == null
-            && surrogate.FloatAttributes == null)
+            && surrogate.FloatAttributes == null
+            && surrogate.NullAttributes == null)
             return new TextObject(surrogate.Text);
 
         var attributes = new Dictionary<string, object>();
@@ -99,6 +107,14 @@ internal struct TextObjectSurrogate
             foreach (var floatAttribute in surrogate.FloatAttributes)
             {
                 attributes[floatAttribute.Key] = floatAttribute.Value;
+            }
+        }
+
+        if (surrogate.NullAttributes != null)
+        {
+            foreach (var nullAttribute in surrogate.NullAttributes)
+            {
+                attributes[nullAttribute] = null;
             }
         }
 
