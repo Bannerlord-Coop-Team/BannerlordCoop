@@ -81,6 +81,7 @@ internal class PlayerPartyInteractionOutcomeHandler
     private readonly IClanJoinRules clanJoinRules;
     private readonly IClanLeaveRules clanLeaveRules;
     private readonly IPlayerMarriageRules playerMarriageRules;
+    private readonly IPlayerDivorceRules playerDivorceRules;
     private readonly IPlayerMapTracking mapTracking;
 
     public PlayerPartyInteractionOutcomeHandler(
@@ -89,6 +90,7 @@ internal class PlayerPartyInteractionOutcomeHandler
         IClanJoinRules clanJoinRules,
         IClanLeaveRules clanLeaveRules,
         IPlayerMarriageRules playerMarriageRules,
+        IPlayerDivorceRules playerDivorceRules,
         IPlayerMapTracking mapTracking)
     {
         this.objectManager = objectManager;
@@ -96,6 +98,7 @@ internal class PlayerPartyInteractionOutcomeHandler
         this.clanJoinRules = clanJoinRules;
         this.clanLeaveRules = clanLeaveRules;
         this.playerMarriageRules = playerMarriageRules;
+        this.playerDivorceRules = playerDivorceRules;
         this.mapTracking = mapTracking;
     }
 
@@ -116,6 +119,9 @@ internal class PlayerPartyInteractionOutcomeHandler
                 return HandleClanDeparture(outcome);
             case PlayerPartyInteractionOutcomeType.MarriageAccepted:
                 return HandleMarriageAccepted(outcome);
+            case PlayerPartyInteractionOutcomeType.Divorced:
+            case PlayerPartyInteractionOutcomeType.DivorcedAndLeftClan:
+                return HandleDivorce(outcome);
             case PlayerPartyInteractionOutcomeType.MapTrackingAccepted:
                 return SetMapTracking(outcome, isTracking: true);
             case PlayerPartyInteractionOutcomeType.MapTrackingStopped:
@@ -195,6 +201,33 @@ internal class PlayerPartyInteractionOutcomeHandler
             initiatorParty.LeaderHero,
             responderParty.LeaderHero,
             outcome.Proposal == PlayerPartyInteractionProposal.MatrilinealMarriage);
+    }
+
+    private bool HandleDivorce(PlayerPartyInteractionOutcome outcome)
+    {
+        try
+        {
+            bool result = false;
+            RunOnGameThread(() => result = ApplyDivorce(outcome), "Apply player-party divorce");
+            return result;
+        }
+        catch (Exception e)
+        {
+            Logger.Error(e,
+                "Failed to apply player-party divorce. SessionId={SessionId}, InitiatorPartyId={InitiatorPartyId}, ResponderPartyId={ResponderPartyId}",
+                outcome.SessionId,
+                outcome.InitiatorPartyId,
+                outcome.ResponderPartyId);
+            return false;
+        }
+    }
+
+    private bool ApplyDivorce(PlayerPartyInteractionOutcome outcome)
+    {
+        if (!TryGetSessionParties(outcome, outcome.ActorPartyId, out var actorParty, out var otherParty)) return false;
+
+        return playerDivorceRules.TryApply(actorParty.LeaderHero, otherParty.LeaderHero,
+            outcome.OutcomeType == PlayerPartyInteractionOutcomeType.DivorcedAndLeftClan);
     }
 
     private bool TryGetSessionParties(

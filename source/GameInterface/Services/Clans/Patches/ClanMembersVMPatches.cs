@@ -91,6 +91,8 @@ internal static class ClanMembersVMPatches
                 : "str_coop_clan_player");
             if (hero == Hero.MainHero)
                 roleText = GameTexts.FindText("str_coop_clan_player_self").SetTextVariable("ROLE", roleText);
+            else if (hero.Spouse == Hero.MainHero)
+                roleText = GameTexts.FindText("str_coop_clan_player_spouse").SetTextVariable("ROLE", roleText);
 
             __instance.RelationToMainHeroText = roleText.ToString();
         }
