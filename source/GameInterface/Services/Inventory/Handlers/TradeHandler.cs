@@ -318,7 +318,9 @@ internal class TradeHandler : IHandler
         AddUniqueElements(elements, initialRoster);
         AddUniqueElements(elements, submittedRoster);
 
-        var rebased = new ItemRoster(authoritativeRoster);
+        // ItemRoster(ItemRoster) sizes its array to Count, and an empty copy can never grow
+        var rebased = new ItemRoster();
+        rebased.Add(authoritativeRoster);
         foreach (var element in elements)
         {
             long delta = (long)FindAmount(submittedRoster, element) - FindAmount(initialRoster, element);
