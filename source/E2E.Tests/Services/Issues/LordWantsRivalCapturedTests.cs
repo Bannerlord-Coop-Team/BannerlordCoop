@@ -12,6 +12,7 @@ using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Quests.LordWantsRivalCaptured;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using GameInterface.Services.Players;
 using GameInterface.Services.Players.Data;
