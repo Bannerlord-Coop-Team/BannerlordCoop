@@ -8,12 +8,27 @@ namespace GameInterface.Services.Kingdoms
 {
     public interface IKingdomDecisionDataConverter : IGameAbstraction
     {
+        /// <summary>
+        /// True when <paramref name="kingdomDecision"/>'s exact type can be sent to clients. Other types are
+        /// resolved on the server without a player vote, so they never enter the indexed decision list.
+        /// </summary>
+        bool IsSupported(KingdomDecision kingdomDecision);
         KingdomDecisionData Convert(KingdomDecision kingdomDecision);
+        bool TryGetKingdomDecision(KingdomDecisionData data, out KingdomDecision kingdomDecision);
+
+        /// <summary>
+        /// Lets a compat mod sync its own decision type so players vote on it. Coop sends the shared decision
+        /// fields (proposer, kingdom, trigger time, flags); <paramref name="write"/> and <paramref name="read"/>
+        /// handle the rest. Register on the server and on every client, once per Coop session, through
+        /// <c>ContainerProvider.TryResolve&lt;IKingdomDecisionDataConverter&gt;</c>.
+        /// </summary>
+        void Register<TDecision>(Func<TDecision, byte[]> write, Func<byte[], TDecision> read) where TDecision : KingdomDecision;
     }
     internal class KingdomDecisionDataConverter : IKingdomDecisionDataConverter
     {
         private readonly IObjectManager objectManager;
         private readonly Dictionary<Type, Func<KingdomDecision, KingdomDecisionData>> supportedConversions;
+        private readonly Dictionary<string, Func<byte[], KingdomDecision>> registeredReaders = new Dictionary<string, Func<byte[], KingdomDecision>>(StringComparer.Ordinal);
         public KingdomDecisionDataConverter(IObjectManager objectManager)
         {
             this.objectManager = objectManager;
@@ -39,6 +54,35 @@ namespace GameInterface.Services.Kingdoms
                 throw new InvalidOperationException($"Type of kingdom decision: {kingdomDecision.GetType().Name} is not supported.");
             }
             return conversionFunction(kingdomDecision);
+        }
+        public bool IsSupported(KingdomDecision kingdomDecision)
+        {
+            return kingdomDecision != null && supportedConversions.ContainsKey(kingdomDecision.GetType());
+        }
+        public bool TryGetKingdomDecision(KingdomDecisionData data, out KingdomDecision kingdomDecision)
+        {
+            if (data is not RegisteredKingdomDecisionData registeredData)
+            {
+                return data.TryGetKingdomDecision(objectManager, out kingdomDecision);
+            }
+
+            if (registeredData.TypeName == null || !registeredReaders.TryGetValue(registeredData.TypeName, out var read))
+            {
+                kingdomDecision = null;
+                return false;
+            }
+
+            return registeredData.TryGetKingdomDecision(objectManager, read, out kingdomDecision);
+        }
+        public void Register<TDecision>(Func<TDecision, byte[]> write, Func<byte[], TDecision> read) where TDecision : KingdomDecision
+        {
+            if (write == null) throw new ArgumentNullException(nameof(write));
+            if (read == null) throw new ArgumentNullException(nameof(read));
+
+            string typeName = typeof(TDecision).FullName;
+            supportedConversions[typeof(TDecision)] = decision => new RegisteredKingdomDecisionData(GetId(decision.ProposerClan), GetId(decision.Kingdom),
+                decision.TriggerTime._numTicks, decision.IsEnforced, decision.NotifyPlayer, decision.PlayerExamined, typeName, write((TDecision)decision));
+            registeredReaders[typeName] = payload => read(payload);
         }
         private KingdomDecisionData ConvertDeclareWarDecision(KingdomDecision decision)
         {

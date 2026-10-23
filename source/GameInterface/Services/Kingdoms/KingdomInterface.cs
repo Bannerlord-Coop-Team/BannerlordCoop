@@ -27,16 +27,28 @@ internal class KingdomInterface : IKingdomInterface
     private static readonly ILogger Logger = LogManager.GetLogger<KingdomInterface>();
     private readonly IKingdomDecisionVoteManager decisionVoteManager;
     private readonly IOfflineWarProtection offlineWarProtection;
-    public KingdomInterface(IKingdomDecisionVoteManager decisionVoteManager, IOfflineWarProtection offlineWarProtection)
+    private readonly IKingdomDecisionDataConverter decisionDataConverter;
+    public KingdomInterface(
+        IKingdomDecisionVoteManager decisionVoteManager,
+        IOfflineWarProtection offlineWarProtection,
+        IKingdomDecisionDataConverter decisionDataConverter)
     {
         this.decisionVoteManager = decisionVoteManager;
         this.offlineWarProtection = offlineWarProtection;
+        this.decisionDataConverter = decisionDataConverter;
     }
     public bool AddDecisionPrefix(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsClient)
         {
+            // The server could not add it for everyone, so a local copy would shift this client's indexes.
+            if (!decisionDataConverter.IsSupported(kingdomDecision))
+            {
+                Logger.Warning("Dropped a {DecisionType} proposal: Coop cannot send this kingdom decision type",
+                    kingdomDecision.GetType().Name);
+                return false;
+            }
             float clientRandomNumber = AddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, applyInfluenceCost: false);
             MessageBroker.Instance.Publish(kingdom,
                 new DecisionAdded(kingdom, kingdomDecision, ignoreInfluenceCost, clientRandomNumber));
@@ -106,7 +118,10 @@ internal class KingdomInterface : IKingdomInterface
             int influenceCost = kingdomDecision.GetInfluenceCost(proposerClan);
             ChangeClanInfluenceAction.Apply(proposerClan, (float)(-(float)influenceCost));
         }
-        bool hasEligiblePlayerClan = decisionVoteManager.HasEligiblePlayerClan(kingdomDecision);
+        // Votes and removals address decisions by list index, so a type clients cannot receive never enters
+        // the list; it resolves here like a decision no player votes on.
+        bool hasEligiblePlayerClan = decisionDataConverter.IsSupported(kingdomDecision) &&
+            decisionVoteManager.HasEligiblePlayerClan(kingdomDecision);
         CampaignEventDispatcher.Instance.OnKingdomDecisionAdded(kingdomDecision, hasEligiblePlayerClan);
         if (!hasEligiblePlayerClan)
         {

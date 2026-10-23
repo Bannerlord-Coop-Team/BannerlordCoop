@@ -35,6 +35,7 @@ public class ServerKingdomHandler : IHandler
     private readonly IKingdomCreationSettlementTracker settlementTracker;
     private readonly IKingdomDecisionDataConverter kingdomDecisionDataConverter;
     private readonly Dictionary<string, PendingSettlementRestore> pendingKingdomCreationSettlements = new();
+    private readonly HashSet<Type> warnedDecisionTypes = new();
 
     public ServerKingdomHandler(
         IMessageBroker messageBroker,
@@ -315,6 +316,19 @@ public class ServerKingdomHandler : IHandler
         var payload = obj.What;
 
         if (!TryGetKingdomId(payload.Kingdom, out var kingdomId)) return;
+
+        // KingdomInterface already resolved an unsupported type on the server, so clients have nothing to add.
+        if (!kingdomDecisionDataConverter.IsSupported(payload.Decision))
+        {
+            Type decisionType = payload.Decision.GetType();
+            if (warnedDecisionTypes.Add(decisionType))
+            {
+                Logger.Warning(
+                    "Kingdom decision type {DecisionType} is not synced; it resolves on the server without a player vote",
+                    decisionType.FullName);
+            }
+            return;
+        }
 
         var data = kingdomDecisionDataConverter.Convert(payload.Decision);
         var message = new NetworkAddDecision(kingdomId, data, payload.IgnoreInfluenceCost, payload.RandomNumber);
