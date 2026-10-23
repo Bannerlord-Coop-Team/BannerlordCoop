@@ -299,6 +299,8 @@ public class ShipCaptureApplier : IShipCaptureApplier
 
         int captorSequence = captorShip.CaptureSequence + 1;
         ships.TransferHull(prize, captor, inPlace: true);
+        Logger.Debug("[NavalSync] Capture of hull {ShipId}: authority now {Captor}; vanilla's swap runs {RunSwap} (prize side {PrizeSide}, " +
+            "captor side {CaptorSide})", prize.ShipId, captor, runSwap, prizeSide, captorSide);
         if (runSwap) captureEngine.ApplyCapture(prize.Hull, captorShip.Hull);
         Registry.TryMarkCaptured(prize.ShipId, new HullCapture(captor, captorShip.ShipId, prizeSide), captorFormation, prizeSequence);
         Registry.TryMarkOrphaned(captorShip.ShipId, captorSide, captorSequence);
@@ -306,6 +308,8 @@ public class ShipCaptureApplier : IShipCaptureApplier
         appliedAt[(prize.ShipId, prizeSequence)] = applied;
         appliedAt[(captorShip.ShipId, captorSequence)] = applied;
         if (IsBattleSide(prizeSide) && prizeSide != captorSide) ships.CountCapturedFrom(prizeSide);
+        Logger.Debug("[NavalSync] Capture of hull {ShipId}: swap and registry done; hulls gone from {PrizeSide}: {Departed}",
+            prize.ShipId, prizeSide, ships.DepartedHulls(prizeSide));
 
         capturesApplied++;
         Logger.Information("[NavalSync] Hull {ShipId} of {Previous} captured by {Captor} into hull {CaptorShipId}'s formation; that hull is orphaned",
@@ -318,6 +322,7 @@ public class ShipCaptureApplier : IShipCaptureApplier
         CaptureApplied?.Invoke(prize.ShipId, captor);
         if (!session.IsOwn(captor)) return;
 
+        Logger.Debug("[NavalSync] Capture of hull {ShipId}: reporting it to the server and announcing both hulls", prize.ShipId);
         ReportCaptureToServer(prize, prizeSequence);
         // A peer that took the prize out with its departed old authority before the confirm arrived spawns it from these.
         ships.AnnounceHulls(new[] { prize, captorShip });

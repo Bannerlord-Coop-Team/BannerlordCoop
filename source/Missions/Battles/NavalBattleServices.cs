@@ -66,6 +66,7 @@ public class NavalBattleServices : INavalBattleServices
     private readonly IShipCaptureApplier captureApplier;
     private readonly IMessageBroker messageBroker;
     private readonly IBattleSession session;
+    private readonly IShipCaptureWatch captureWatch = new ShipCaptureWatch();
 
     public NavalBattleServices(IBattleNetwork network, INetwork relayNetwork, IMessageBroker messageBroker,
         IBattleTeamResolver teamResolver, IObjectManager objectManager, BattleContext context, INavalShipEngine shipEngine,
@@ -89,6 +90,7 @@ public class NavalBattleServices : INavalBattleServices
             hullAuthority);
         ShipCaptureReplicator = new BattleShipCaptureReplicator(network, messageBroker, context, shipEngine, captureEngine,
             hullAuthority, captureApplier);
+        captureApplier.CaptureApplied += OnCaptureApplied;
         DeckPoses = new NavalDeckPoses(context.MissionComponent, shipEngine, StationUseReplicator);
         MigrationReserveFielder = new NavalMigrationReserveFielder(context.Session, context.ReinforcementFielder,
             context.MissionComponent.ShipRegistry, shipEngine, ShipReplicator);
@@ -125,6 +127,7 @@ public class NavalBattleServices : INavalBattleServices
 
     public void Tick(float dt, Action beforeMigrationReserve = null)
     {
+        captureWatch.NoteTick();
         WaterClock.Tick(dt);
         ShipReplicator.Tick(dt);
         captureApplier.Tick(dt);
@@ -158,10 +161,15 @@ public class NavalBattleServices : INavalBattleServices
         FateReporter.Flush();
     }
 
+    // Two live freezes followed a capture within a second, so each capture here is followed by alive lines.
+    private void OnCaptureApplied(Guid prizeId, string captor) => captureWatch.Start(prizeId);
+
     public void Dispose()
     {
         // First, so a throwing service below can't leave the engine reading battle water time on the campaign map.
         WaterClock.Dispose();
+        captureWatch.Dispose();
+        captureApplier.CaptureApplied -= OnCaptureApplied;
         messageBroker.Unsubscribe<BattleResultReporting>(Handle_BattleResultReporting);
         ShipWeaponReplicator.Dispose();
         ShipDamageRouter.Dispose();
