@@ -1,0 +1,3 @@
+4317: Results File: C:\ProgramData\CodexLiveRunner\jobs\active\docker-ci-3a9386aa7e8c47cb8faf\result\artifacts\debug-test-supplement\0.trx
+4319: Passed!  - Failed:     0, Passed:    36, Skipped:     0, Total:    36, Duration: 1 m 7 s - E2E.Tests.dll (net6.0)
+4320: CI docker passed; executionPlatform=windows-native-v1

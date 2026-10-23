@@ -1,0 +1,57 @@
+diff --git a/source/E2E.Tests/Services/Issues/ArtisanOverpricedGoodsTests.cs b/source/E2E.Tests/Services/Issues/ArtisanOverpricedGoodsTests.cs
+index 8d6db86a5..e6bb87125 100644
+--- a/source/E2E.Tests/Services/Issues/ArtisanOverpricedGoodsTests.cs
++++ b/source/E2E.Tests/Services/Issues/ArtisanOverpricedGoodsTests.cs
+@@ -1,4 +1,7 @@
+ ﻿using Common.Messaging;
++using Common.Network.Messages;
++using GameInterface.Services.Players;
++using GameInterface.Services.UI.Notifications;
+ using Coop.Core.Client.Services.Heroes.Messages;
+ using Common;
+ using Common.Util;
+@@ -115,6 +118,44 @@ public class ArtisanOverpricedGoodsTests : IDisposable
+ 
+     public void Dispose() => environment.Dispose();
+ 
++    [Fact]
++    public void DiagnosticOwnerDisconnectLeavesTheSharedHiddenUnendedArchive()
++    {
++        foreach (var instance in Instances)
++            instance.Call(() => new JournalLogsCampaignBehavior().RegisterEvents());
++
++        Accept();
++        IssueBase acceptedIssue = null!;
++        Server.Call(() => acceptedIssue = Get<Hero>(Server, scenario.NotableId).Issue);
++        Assert.NotNull(acceptedIssue);
++        var issueId = acceptedIssue.StringId;
++
++        Server.Call(() =>
++        {
++            var before = Assert.IsType<PlayerJournalLogEntry>(Assert.Single(
++                Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(acceptedIssue))));
++            Assert.Equal(QuestScenario.ControllerA, before.OwnerControllerId);
++            Assert.False(before.IsEnded());
++            Assert.Empty(before.GetEntries());
++
++            Server.Resolve<IPlayerManager>().ClearPeer(ClientA.NetPeer);
++            Server.Resolve<IMessageBroker>().Publish(this, new PlayerDisconnected(ClientA.NetPeer, default));
++        });
++
++        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
++        Assert.Equal(issueId, finalized.IssueId);
++        Assert.Equal(IssueOutcome.QuestCancel, finalized.Outcome);
++
++        Server.Call(() =>
++        {
++            Assert.Null(Get<Hero>(Server, scenario.NotableId).Issue);
++            var after = Assert.IsType<PlayerJournalLogEntry>(Assert.Single(
++                Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(entry => entry.IsRelatedTo(acceptedIssue))));
++            Assert.Equal(QuestScenario.ControllerA, after.OwnerControllerId);
++            Assert.False(after.IsEnded());
++            Assert.Empty(after.GetEntries());
++        });
++    }
+     [Fact]
+     public void Acceptance_StartsOnlyTheOwnersQuestAndRetainsAnUnstartedServerCopy()
+     {
