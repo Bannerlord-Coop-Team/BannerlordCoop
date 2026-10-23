@@ -108,7 +108,7 @@ public class TimeoutJournalHistoryTests : IDisposable
     }
 
     [Fact]
-    public void CapturesEveryAcceptanceStageButStopsBeforeLaterProgressLogs()
+    public void AcceptanceCaptureStopsWhileLaterHistoryStillMirrorsToTheServer()
     {
         Accept(addSecondStage: true);
         Assert.Equal(2, scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>().Count());
@@ -122,7 +122,14 @@ public class TimeoutJournalHistoryTests : IDisposable
         });
         environment.FlushCoalescer();
         Assert.Equal(2, scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>().Count());
-        scenario.Server.Call(() => Assert.Equal(2, serverQuest.JournalEntries.Count));
+        JournalLog[] expected = null!;
+        scenario.ClientA.Call(() =>
+        {
+            expected = ownerQuest.JournalEntries.ToArray();
+            Assert.Equal(new[] { introduction, "Second acceptance stage", "Later quest progress" },
+                expected.Select(log => log.LogText.ToString()));
+        });
+        scenario.Server.Call(() => Assert.Equal(Fields(expected), Fields(serverQuest.JournalEntries)));
     }
 
     [Fact]
@@ -137,12 +144,14 @@ public class TimeoutJournalHistoryTests : IDisposable
         environment.FlushCoalescer();
 
         string[] expected = null!;
+        JournalLog[] expectedEntries = null!;
         scenario.ClientA.Call(() =>
         {
             var ownerArchive = Archive(Campaign.Current.LogEntryHistory);
             Assert.True(ownerArchive.IsEnded());
             Assert.Equal(QuestBase.QuestCompleteDetails.Timeout, ownerArchive._questCompletionDetail);
             expected = Texts(ownerArchive);
+            expectedEntries = ownerArchive.GetEntries().ToArray();
             Assert.Equal(2, expected.Length);
             Assert.Equal(introduction, expected[0]);
             Assert.Contains("failed", expected[1]);
@@ -154,6 +163,7 @@ public class TimeoutJournalHistoryTests : IDisposable
         {
             var history = Campaign.Current.LogEntryHistory;
             originalArchive = Archive(history);
+            Assert.Equal(Fields(expectedEntries), Fields(originalArchive.GetEntries()));
             output.WriteLine("Server archive before save: {0}", string.Join(" | ", Texts(originalArchive)));
             var definitions = new DefinitionContext();
             definitions.FillWithCurrentTypes();
@@ -180,6 +190,7 @@ public class TimeoutJournalHistoryTests : IDisposable
             Assert.True(archive.IsEnded());
             Assert.Equal(QuestBase.QuestCompleteDetails.Timeout, archive._questCompletionDetail);
             Assert.Equal(expected, Texts(archive));
+            Assert.Equal(Fields(expectedEntries), Fields(archive.GetEntries()));
         });
         Assert.Equal(IssueOutcome.QuestTimeOut, Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>()).Outcome);
     }
@@ -238,6 +249,10 @@ public class TimeoutJournalHistoryTests : IDisposable
         entry => entry._relatedObjectIds.Contains(QuestScenario.IssueId)));
 
     private static string[] Texts(JournalLogEntry entry) => entry.GetEntries().Select(log => log.LogText.ToString()).ToArray();
+
+    private static (long, string?, string?, int, int, LogType)[] Fields(IEnumerable<JournalLog> entries) =>
+        entries.Select(log => (log.LogTime.NumTicks, log.LogText?.ToString(), log.TaskName?.ToString(),
+            log.CurrentProgress, log.Range, log.Type)).ToArray();
 
     private static T Object<T>(EnvironmentInstance instance, string id) where T : class
     {

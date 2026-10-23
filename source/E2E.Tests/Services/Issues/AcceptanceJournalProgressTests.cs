@@ -99,11 +99,25 @@ public class AcceptanceJournalProgressTests : GangLeaderNeedsWeaponsAcceptScenar
             Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestAcceptanceJournal>());
         }
         Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        JournalLog[] expected = null!;
+        ClientA.Call(() =>
+        {
+            expected = ownerQuest.JournalEntries.ToArray();
+            Assert.Equal(endInsideCallback ? 1 : 2, expected.Length);
+            Assert.Equal(endInsideCallback ? 3 : 7, expected[0].CurrentProgress);
+            if (!endInsideCallback)
+                Assert.Equal("Later progress before the next campaign tick", expected[1].LogText.ToString());
+            var archive = Campaign.Current.LogEntryHistory.FindLastGameActionLog(
+                (JournalLogEntry entry) => entry.IsRelatedTo(ownerQuest));
+            Assert.NotNull(archive);
+            Assert.True(archive.IsEnded());
+            AssertEntries(expected, archive.GetEntries());
+        });
         Server.Call(() =>
         {
             var archive = Archive();
             Assert.True(archive.IsEnded());
-            Assert.Equal(3, Assert.Single(archive.GetEntries()).CurrentProgress);
+            AssertEntries(expected, archive.GetEntries());
             var definitions = new DefinitionContext();
             definitions.FillWithCurrentTypes();
             Assert.False(definitions.GotError, string.Join("\n", definitions.Errors));
@@ -117,9 +131,18 @@ public class AcceptanceJournalProgressTests : GangLeaderNeedsWeaponsAcceptScenar
             var loaded = Assert.IsType<LogEntryHistory>(load.RootObject);
             var loadedArchive = Assert.Single(loaded.GetGameActionLogs<JournalLogEntry>(entry => entry._relatedObjectIds.Contains(FirstIssueId)));
             Assert.NotSame(archive, loadedArchive);
-            AssertMetadata(sent, Assert.Single(loadedArchive.GetEntries()));
-            output.WriteLine("Loaded server archive progress: {0}", Assert.Single(loadedArchive.GetEntries()).CurrentProgress);
+            Assert.True(loadedArchive.IsEnded());
+            AssertEntries(expected, loadedArchive.GetEntries());
+            output.WriteLine("Loaded server archive progress: {0}", loadedArchive.GetEntries().First().CurrentProgress);
         });
+    }
+
+    private static void AssertEntries(JournalLog[] expected, IEnumerable<JournalLog> entries)
+    {
+        var actual = entries.ToArray();
+        Assert.Equal(expected.Length, actual.Length);
+        for (var index = 0; index < expected.Length; index++)
+            AssertMetadata(expected[index], actual[index]);
     }
 
     private static JournalLogEntry Archive() => Assert.Single(Campaign.Current.LogEntryHistory.GetGameActionLogs<JournalLogEntry>(
@@ -131,9 +154,9 @@ public class AcceptanceJournalProgressTests : GangLeaderNeedsWeaponsAcceptScenar
     private static void AssertMetadata(RequestQuestAcceptanceJournal expected, JournalLog actual)
     {
         Assert.Equal(expected.Progress, actual.CurrentProgress);
-        Assert.Equal(expected.Text.ToString(), actual.LogText.ToString());
-        Assert.Equal(expected.Time, actual.LogTime);
-        Assert.Equal(expected.TaskName.ToString(), actual.TaskName.ToString());
+        Assert.Equal(expected.Text?.ToString(), actual.LogText?.ToString());
+        Assert.Equal(expected.Time.NumTicks, actual.LogTime.NumTicks);
+        Assert.Equal(expected.TaskName?.ToString(), actual.TaskName?.ToString());
         Assert.Equal(expected.Range, actual.Range);
         Assert.Equal(expected.Type, actual.Type);
     }
