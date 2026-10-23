@@ -8,7 +8,7 @@ namespace GameInterface.Services.Kingdoms.Data
 {
     /// <summary>
     /// Carries a kingdom decision of a type a mod registered through
-    /// <see cref="IKingdomDecisionDataConverter.Register{TDecision}"/>: the shared decision fields plus the mod's own payload.
+    /// <see cref="KingdomDecisionTypeRegistry.Register{TDecision}"/>: the shared decision fields plus the mod's own payload.
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public class RegisteredKingdomDecisionData : KingdomDecisionData

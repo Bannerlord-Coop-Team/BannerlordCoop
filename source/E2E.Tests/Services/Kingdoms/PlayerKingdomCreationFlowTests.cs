@@ -48,6 +48,7 @@ using SandBox.Conversation.MissionLogics;
 using SandBox.ViewModelCollection.Map.Tracker;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -1036,6 +1037,81 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     [Fact]
     public void KingdomDecisionAdded_UnsupportedModType_ResolvesOnServerAndKeepsVoteIndexesAligned()
     {
+        var (kingdomId, targetKingdomId) = AddModDecisionThenWar(proposerClan => new TestModKingdomDecision(proposerClan), out var modDecision);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.IsType<DeclareWarDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+        });
+        Assert.Equal(1, modDecision.AppliedOutcomes);
+        Assert.IsType<DeclareWarDecisionData>(Assert.Single(
+            Server.NetworkSentMessages.GetMessages<NetworkAddDecision>(),
+            message => message.KingdomId == kingdomId).Data);
+        foreach (var client in Clients)
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.IsType<DeclareWarDecision>(Assert.Single(kingdom.UnresolvedDecisions));
+            });
+        }
+
+        VoteWarFromBothClients(kingdomId, warIndex: 0);
+
+        AssertWarResolved(kingdomId, targetKingdomId, warIndex: 0);
+        Assert.Equal(1, modDecision.AppliedOutcomes);
+    }
+
+    [Fact]
+    public void KingdomDecisionAdded_RegisteredModType_ReachesClientsAtTheServersIndex()
+    {
+        KingdomDecisionTypeRegistry.Register<RegisteredModKingdomDecision>(
+            decision => Encoding.UTF8.GetBytes(decision.Note),
+            payload =>
+            {
+                var decision = ObjectHelper.SkipConstructor<RegisteredModKingdomDecision>();
+                decision.Note = Encoding.UTF8.GetString(payload);
+                return decision;
+            });
+        try
+        {
+            var (kingdomId, targetKingdomId) = AddModDecisionThenWar(
+                proposerClan => new RegisteredModKingdomDecision(proposerClan) { Note = "council seat" }, out var modDecision);
+
+            Assert.Equal(0, modDecision.AppliedOutcomes);
+            foreach (var instance in new[] { Server }.Concat(Clients))
+            {
+                instance.Call(() =>
+                {
+                    Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                    Assert.Equal(2, kingdom.UnresolvedDecisions.Count);
+                    var registered = Assert.IsType<RegisteredModKingdomDecision>(kingdom.UnresolvedDecisions[0]);
+                    Assert.Equal("council seat", registered.Note);
+                    Assert.IsType<DeclareWarDecision>(kingdom.UnresolvedDecisions[1]);
+                });
+            }
+
+            VoteWarFromBothClients(kingdomId, warIndex: 1);
+
+            AssertWarResolved(kingdomId, targetKingdomId, warIndex: 1);
+        }
+        finally
+        {
+            KingdomDecisionTypeRegistry.Unregister<RegisteredModKingdomDecision>();
+        }
+    }
+
+    public class RegisteredModKingdomDecision : TestModKingdomDecision
+    {
+        public RegisteredModKingdomDecision(Clan proposerClan) : base(proposerClan) { }
+    }
+
+    // Two player clans in one kingdom; the server adds the mod's decision first, then a war decision.
+    private (string KingdomId, string TargetKingdomId) AddModDecisionThenWar<TDecision>(
+        Func<Clan, TDecision> createModDecision,
+        out TDecision modDecision) where TDecision : TestModKingdomDecision
+    {
         var client1 = Clients.First();
         var client2 = Clients.Skip(1).First();
         client1.Resolve<IControllerIdProvider>().SetControllerId(ControllerId);
@@ -1053,43 +1129,44 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         EnsureKingdomRegisteredEverywhere(kingdomId);
         EnsureKingdomRegisteredEverywhere(targetKingdomId);
 
-        TestModKingdomDecision modDecision = null;
+        TDecision added = null;
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(targetKingdomId, out var targetKingdom));
             Assert.True(Server.ObjectManager.TryGetObject<Clan>(player1.ClanId, out var proposerClan));
 
-            modDecision = new TestModKingdomDecision(proposerClan);
-            kingdom.AddDecision(modDecision);
+            added = createModDecision(proposerClan);
+            kingdom.AddDecision(added);
             kingdom.AddDecision(new DeclareWarDecision(proposerClan, targetKingdom));
-
-            Assert.IsType<DeclareWarDecision>(Assert.Single(kingdom.UnresolvedDecisions));
         });
 
-        Assert.Equal(1, modDecision.AppliedOutcomes);
-        Assert.IsType<DeclareWarDecisionData>(Assert.Single(
-            Server.NetworkSentMessages.GetMessages<NetworkAddDecision>(),
-            message => message.KingdomId == kingdomId).Data);
-        foreach (var client in Clients)
+        modDecision = added;
+        return (kingdomId, targetKingdomId);
+    }
+
+    private void VoteWarFromBothClients(string kingdomId, int warIndex)
+    {
+        foreach (var client in Clients.Take(2))
         {
-            client.Call(() =>
-            {
-                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
-                Assert.IsType<DeclareWarDecision>(Assert.Single(kingdom.UnresolvedDecisions));
-            });
+            client.SimulateMessage(this, new KingdomDecisionVoteRequested(new KingdomDecisionVoteData(
+                kingdomId,
+                decisionIndex: warIndex,
+                outcomeIndex: 0,
+                supportWeight: (int)Supporter.SupportWeights.FullyPush,
+                isAbstain: false,
+                isFinal: true)));
         }
+    }
 
-        client1.SimulateMessage(this, new KingdomDecisionVoteRequested(CreateDeclareWarVote(kingdomId, isFinal: true)));
-        client2.SimulateMessage(this, new KingdomDecisionVoteRequested(CreateDeclareWarVote(kingdomId, isFinal: true)));
-
+    private void AssertWarResolved(string kingdomId, string targetKingdomId, int warIndex)
+    {
         Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkKingdomDecisionResolved>(),
-            message => message.KingdomId == kingdomId && message.DecisionIndex == 0 && message.OutcomeIndex == 0);
+            message => message.KingdomId == kingdomId && message.DecisionIndex == warIndex && message.OutcomeIndex == 0);
         Assert.Single(
             Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>(),
             message => message.Faction1Id == kingdomId && message.Faction2Id == targetKingdomId);
-        Assert.Equal(1, modDecision.AppliedOutcomes);
     }
 
     [Fact]

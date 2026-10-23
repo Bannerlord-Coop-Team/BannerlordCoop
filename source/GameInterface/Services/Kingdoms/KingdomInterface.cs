@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
 using Serilog;
@@ -47,6 +48,8 @@ internal class KingdomInterface : IKingdomInterface
             {
                 Logger.Warning("Dropped a {DecisionType} proposal: Coop cannot send this kingdom decision type",
                     kingdomDecision.GetType().Name);
+                MessageBroker.Instance.Publish(this, new SendInformationMessage(
+                    "This kingdom decision can't be proposed in Coop because its type isn't synced."));
                 return false;
             }
             float clientRandomNumber = AddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, applyInfluenceCost: false);

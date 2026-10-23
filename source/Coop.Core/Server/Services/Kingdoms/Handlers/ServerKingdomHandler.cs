@@ -324,7 +324,8 @@ public class ServerKingdomHandler : IHandler
             if (warnedDecisionTypes.Add(decisionType))
             {
                 Logger.Warning(
-                    "Kingdom decision type {DecisionType} is not synced; it resolves on the server without a player vote",
+                    "Kingdom decision type {DecisionType} is not synced, so the server AI decides it instead of a player vote; " +
+                    "a compat mod can sync it with KingdomDecisionTypeRegistry.Register",
                     decisionType.FullName);
             }
             return;

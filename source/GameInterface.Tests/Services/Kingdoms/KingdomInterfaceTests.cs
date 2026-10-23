@@ -3,6 +3,7 @@ using Common;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Messages;
 using Moq;
@@ -78,12 +79,24 @@ public class KingdomInterfaceTests : IDisposable
         kingdom._unresolvedDecisions = new MBList<CampaignKingdomDecision>();
         var decision = ObjectHelper.SkipConstructor<TestModKingdomDecision>();
         decisionDataConverter.Setup(converter => converter.IsSupported(decision)).Returns(false);
+        var shown = new List<string>();
+        Action<MessagePayload<SendInformationMessage>> showCapture = payload => shown.Add(payload.What.Text);
+        MessageBroker.Instance.Subscribe(showCapture);
 
-        bool runOriginal = kingdomInterface.AddDecisionPrefix(kingdom, decision, ignoreInfluenceCost: false);
+        bool runOriginal;
+        try
+        {
+            runOriginal = kingdomInterface.AddDecisionPrefix(kingdom, decision, ignoreInfluenceCost: false);
+        }
+        finally
+        {
+            MessageBroker.Instance.Unsubscribe(showCapture);
+        }
 
         Assert.False(runOriginal);
         Assert.Empty(published);
         Assert.Empty(kingdom._unresolvedDecisions);
+        Assert.Single(shown, text => text.Contains("kingdom decision can't be proposed"));
         voteManager.VerifyNoOtherCalls();
     }
 

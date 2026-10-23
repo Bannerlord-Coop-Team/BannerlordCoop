@@ -6,6 +6,7 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Modules;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
@@ -20,6 +21,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.Library;
 using Xunit;
 using Xunit.Abstractions;
@@ -193,6 +195,46 @@ namespace Coop.Tests.Server.Connections.States
 
             var castedMessage = (NetworkModuleVersionsValidated)message;
             Assert.False(castedMessage.Matches);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidate_ServerSyncsADecisionTypeTheClientDoesNot_Denied()
+        {
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var modules = new List<ModuleInfo> { new ModuleInfo("1", false, false, new ApplicationVersion()) };
+            SetServerModules(modules);
+            // Stands in for a mod's own decision type; it is never the exact type of a real decision.
+            KingdomDecisionTypeRegistry.Register<KingdomDecision>(_ => Array.Empty<byte>(), _ => null);
+            try
+            {
+                currentState.Handle_ModuleVersionsValidate(new MessagePayload<NetworkModuleVersionsValidate>(
+                    playerPeer, new NetworkModuleVersionsValidate(modules) with { KingdomDecisionTypes = null }));
+            }
+            finally
+            {
+                KingdomDecisionTypeRegistry.Unregister<KingdomDecision>();
+            }
+
+            var reply = Assert.IsType<NetworkModuleVersionsValidated>(
+                Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer)));
+            Assert.False(reply.Matches);
+            Assert.Contains(typeof(KingdomDecision).FullName, reply.Reason);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidate_ClientSyncsADecisionTypeTheServerDoesNot_Denied()
+        {
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+            var modules = new List<ModuleInfo> { new ModuleInfo("1", false, false, new ApplicationVersion()) };
+            SetServerModules(modules);
+
+            currentState.Handle_ModuleVersionsValidate(new MessagePayload<NetworkModuleVersionsValidate>(
+                playerPeer, new NetworkModuleVersionsValidate(modules) with { KingdomDecisionTypes = new[] { "SomeMod.CouncilSeatDecision" } }));
+
+            var reply = Assert.IsType<NetworkModuleVersionsValidated>(
+                Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer)));
+            Assert.False(reply.Matches);
+            Assert.Contains("SomeMod.CouncilSeatDecision", reply.Reason);
         }
 
         [Fact]
