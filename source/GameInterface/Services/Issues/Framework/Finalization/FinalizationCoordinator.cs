@@ -341,6 +341,14 @@ internal class FinalizationCoordinator : IHandler
     {
         var quest = issue.IssueQuest;
 
+        // A non-owner's mirror has no quest. Only finalize it, otherwise vanilla's ending adds journal entries and
+        // issue updates for an issue this player never took. A lord solution has no quest on the owner either.
+        if (!isOwner && quest == null)
+        {
+            issue.IssueFinalized();
+            return;
+        }
+
         if (quest != null && !Campaign.Current.QuestManager.Quests.Contains(quest))
         {
             issue.IssueQuest = null;
