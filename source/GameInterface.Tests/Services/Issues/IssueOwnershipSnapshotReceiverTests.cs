@@ -1,7 +1,11 @@
-using Common;
+﻿using Common;
 using Common.Messaging;
+using Common.Util;
+using GameInterface.Services.Entity;
+using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using ProtoBuf;
+using Moq;
 using System;
 using System.IO;
 using System.Linq;
@@ -20,7 +24,9 @@ public class IssueOwnershipSnapshotReceiverTests : IDisposable
     {
         ModInformation.IsServer = false;
         registry.TrySetOwner("hero_1", "issue_1", "stale-player");
-        receiver = new IssueOwnershipSnapshotReceiver(new MessageBroker(), registry);
+        GameThread.Instance.MarkGameThread();
+        receiver = new IssueOwnershipSnapshotReceiver(new MessageBroker(), registry,
+            Mock.Of<IIssueResolver>(), Mock.Of<IControllerIdProvider>());
     }
 
     public void Dispose()

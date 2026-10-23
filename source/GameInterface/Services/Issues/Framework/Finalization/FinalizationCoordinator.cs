@@ -428,10 +428,12 @@ internal class FinalizationCoordinator : IHandler
             case IssueOutcome.LordAcceptedCounterOffer:
                 if (isOwner) issue.AddLog(new JournalLog(CampaignTime.Now, issue.LordSolutionCounterOfferAcceptLog));
                 issue.IssueFinalized();
+                if (isOwner) CampaignEventDispatcher.Instance.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueFinishedWithBetrayal, Hero.MainHero);
                 return true;
             case IssueOutcome.LordRefusedCounterOffer:
                 if (isOwner) issue.AddLog(new JournalLog(CampaignTime.Now, issue.LordSolutionCounterOfferRefuseLog));
                 issue.IssueFinalized();
+                if (isOwner) CampaignEventDispatcher.Instance.OnIssueUpdated(issue, IssueBase.IssueUpdateDetails.IssueFinishedWithSuccess, Hero.MainHero);
                 return true;
             default:
                 return false;
