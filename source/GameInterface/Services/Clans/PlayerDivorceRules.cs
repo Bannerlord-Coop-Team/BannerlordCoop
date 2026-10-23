@@ -56,7 +56,8 @@ public class PlayerDivorceRules : IPlayerDivorceRules
 
     public bool TryApply(Hero actor, Hero spouse, bool leaveClan)
     {
-        if (!CanDivorce(actor, spouse) || (leaveClan && !CanLeaveClan(actor, spouse))) return false;
+        if (!CanDivorce(actor, spouse) ||
+            (leaveClan && (!CanLeaveClan(actor, spouse) || clanLeaveRules.AreExpectingChild(actor, spouse)))) return false;
 
         var clan = actor.Clan;
         var junior = GetJuniorPartner(actor, spouse);

@@ -74,8 +74,17 @@ public class CoopClanMembersVM : ClanMembersVM
 
     public void ExecuteLeaveClan()
     {
-        if (CanLeaveClan)
-            messageBroker.Publish(this, new ClanMemberLeaveRequested(Hero.MainHero, Hero.MainHero));
+        if (!CanLeaveClan) return;
+
+        if (leaveRules.AreExpectingChild(Hero.MainHero, Hero.MainHero.Clan.Leader))
+        {
+            InformationManager.ShowInquiry(new InquiryData(LeaveClanText,
+                GameTexts.FindText("str_coop_clan_leave_expecting_child").ToString(),
+                true, false, GameTexts.FindText("str_ok").ToString(), null, null, null));
+            return;
+        }
+
+        messageBroker.Publish(this, new ClanMemberLeaveRequested(Hero.MainHero, Hero.MainHero));
     }
 
     public void ExecuteManagePlayer()
@@ -83,12 +92,14 @@ public class CoopClanMembersVM : ClanMembersVM
         if (!CanManagePlayer) return;
         var actor = Hero.MainHero;
         var member = CurrentSelectedMember.GetHero();
-        bool canRemove = leaveRules.CanRemove(actor, member);
+        bool expectingChild = leaveRules.AreExpectingChild(member, actor);
+        bool canRemove = leaveRules.CanRemove(actor, member) && !expectingChild;
+        var removeHint = expectingChild ? "str_coop_clan_leave_expecting_child"
+            : canRemove ? "str_coop_clan_remove_player_description" : "str_coop_clan_member_cannot_leave";
         var options = new List<InquiryElement>
         {
             new InquiryElement(PlayerAction.Remove, GameTexts.FindText("str_coop_clan_remove_player").ToString(), null,
-                canRemove, GameTexts.FindText(canRemove ? "str_coop_clan_remove_player_description"
-                    : "str_coop_clan_member_cannot_leave").ToString())
+                canRemove, GameTexts.FindText(removeHint).ToString())
         };
         if (divorceRules.CanDivorce(actor, member))
             options.Add(new InquiryElement(PlayerAction.Divorce, GameTexts.FindText("str_coop_clan_divorce").ToString(), null,
@@ -107,7 +118,7 @@ public class CoopClanMembersVM : ClanMembersVM
                     if (divorceRules.CanDivorce(actor, member))
                         messageBroker.Publish(this, new PlayerDivorceRequested(actor, member));
                 }
-                else if (leaveRules.CanRemove(actor, member))
+                else if (leaveRules.CanRemove(actor, member) && !leaveRules.AreExpectingChild(member, actor))
                     messageBroker.Publish(this, new ClanMemberLeaveRequested(actor, member));
             }, null));
     }

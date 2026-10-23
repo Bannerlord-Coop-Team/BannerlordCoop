@@ -118,6 +118,14 @@ public static class PlayerPartyInteractionDialogState
             return false;
         }
 
+        // The server only sends these disabled while the two players are expecting a child.
+        if (option == PlayerPartyInteractionOption.LeaveClan || option == PlayerPartyInteractionOption.RemoveFromClan ||
+            option == PlayerPartyInteractionOption.DivorceLeaveClan)
+        {
+            explanation = GameTexts.FindText("str_coop_clan_leave_expecting_child");
+            return false;
+        }
+
         if (option == PlayerPartyInteractionOption.OfferServices && IsHostile)
         {
             explanation = new TextObject("{=coop_player_party_interaction_hostile_disabled}Not available while hostile");
@@ -421,9 +429,10 @@ public static class PlayerPartyInteractionDialogState
 
         localOptionsInitialState = currentState;
         var options = new[] { PlayerPartyInteractionOption.DivorceStayInClan,
-            PlayerPartyInteractionOption.DivorceLeaveClan, PlayerPartyInteractionOption.CancelDivorce };
+            PlayerPartyInteractionOption.DivorceLeaveClan, PlayerPartyInteractionOption.CancelDivorce }
+            .Where(option => option == PlayerPartyInteractionOption.CancelDivorce || HasOption(option)).ToArray();
         var enabledOptions = options.Where(option => option == PlayerPartyInteractionOption.CancelDivorce || IsOptionEnabled(option)).ToArray();
-        ShowLocalOptions(PlayerPartyInteractionPhase.DivorceOptions, enabledOptions, enabledOptions);
+        ShowLocalOptions(PlayerPartyInteractionPhase.DivorceOptions, options, enabledOptions);
     }
 
     public static void CancelDivorceOptions()

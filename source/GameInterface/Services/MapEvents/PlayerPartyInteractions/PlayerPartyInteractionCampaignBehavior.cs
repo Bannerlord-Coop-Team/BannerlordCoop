@@ -37,7 +37,7 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.LeaveClan),
             () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.LeaveClan),
             PlayerPartyDialogPriority,
-            null,
+            IsLeaveClanEnabled,
             null);
 
         starter.AddPlayerLine(
@@ -48,7 +48,7 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             () => PlayerPartyInteractionDialogState.HasOption(PlayerPartyInteractionOption.RemoveFromClan),
             () => PlayerPartyInteractionDialogState.Submit(PlayerPartyInteractionOption.RemoveFromClan),
             PlayerPartyDialogPriority,
-            null,
+            IsRemoveFromClanEnabled,
             null);
 
         starter.AddDialogLine(
@@ -412,7 +412,7 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
             "{=!}{COOP_DIVORCE_LEAVE_TEXT}",
             () => HasDivorceOption(PlayerPartyInteractionOption.DivorceLeaveClan, "COOP_DIVORCE_LEAVE_TEXT", leaveClan: true),
             () => PlayerPartyInteractionDialogState.ConfirmDivorce(leaveClan: true),
-            PlayerPartyDialogPriority);
+            PlayerPartyDialogPriority, IsDivorceLeaveClanEnabled);
 
         starter.AddPlayerLine(
             "coop_player_party_interaction_divorce_cancel", DivorceToken, RootToken,
@@ -427,6 +427,15 @@ public class PlayerPartyInteractionCampaignBehavior : CampaignBehaviorBase
         MBTextManager.SetTextVariable(textVariable, PlayerPartyInteractionDialogState.GetDivorceClanOptionText(leaveClan));
         return PlayerPartyInteractionDialogState.HasOption(option);
     }
+
+    private static bool IsLeaveClanEnabled(out TextObject explanation)
+        => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.LeaveClan, out explanation);
+
+    private static bool IsRemoveFromClanEnabled(out TextObject explanation)
+        => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.RemoveFromClan, out explanation);
+
+    private static bool IsDivorceLeaveClanEnabled(out TextObject explanation)
+        => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.DivorceLeaveClan, out explanation);
 
     private static bool IsMarriageEnabled(out TextObject explanation)
         => PlayerPartyInteractionDialogState.IsOptionEnabled(PlayerPartyInteractionOption.ProposeMarriage, out explanation);

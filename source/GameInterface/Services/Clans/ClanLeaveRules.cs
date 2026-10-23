@@ -22,6 +22,8 @@ public interface IClanLeaveRules : IGameAbstraction
     bool CanLeave(Hero member);
     bool CanRemove(Hero actor, Hero member);
     bool CanLeaveAfterDivorce(Hero member);
+    // The Can* checks leave this out so callers can show the option disabled; TryApply enforces it.
+    bool AreExpectingChild(Hero first, Hero second);
     bool TryApply(Hero member, bool isRemoval);
 }
 
@@ -71,9 +73,20 @@ public class ClanLeaveRules : IClanLeaveRules
             TryGetOriginalClan(member, out _, out _, out _);
     }
 
+    // Co-op delivers a player couple's child into the father's clan, so both parents stay in one clan until the birth.
+    public bool AreExpectingChild(Hero first, Hero second)
+    {
+        if (first == null || second == null || first.IsFemale == second.IsFemale) return false;
+
+        var mother = first.IsFemale ? first : second;
+        var father = mother == first ? second : first;
+        return mother.IsPregnant && (mother.Spouse == father || mother.ExSpouses.Contains(father));
+    }
+
     public bool TryApply(Hero member, bool isRemoval)
     {
-        if (!CanLeave(member) || !TryGetOriginalClan(member, out var player, out var originalClan, out var originalClanId))
+        if (!CanLeave(member) || AreExpectingChild(member, member.Clan.Leader) ||
+            !TryGetOriginalClan(member, out var player, out var originalClan, out var originalClanId))
             return false;
 
         var sourceClan = member.Clan;

@@ -119,6 +119,7 @@
     <string id="str_coop_clan_kingdom_leader_only" text="{=str_coop_clan_kingdom_leader_only}Only the clan leader can manage kingdom affairs." />
     <string id="str_coop_clan_settlement_menu_in_use" text="{=str_coop_clan_settlement_menu_in_use}Another player is using this menu at this settlement." />
     <string id="str_coop_clan_member_cannot_leave" text="{=str_coop_clan_member_cannot_leave}The clan leader's family and players married to another player cannot leave or be removed from the clan." />
+    <string id="str_coop_clan_leave_expecting_child" text="{=str_coop_clan_leave_expecting_child}Neither parent can leave the clan or be removed from it until your child is born." />
     <string id="str_coop_succession_heir_title" text="{=str_coop_succession_heir_title}Select Your Heir" />
     <string id="str_coop_succession_appoint_title" text="{=str_coop_succession_appoint_title}Appoint a New Clan Leader" />
     <string id="str_coop_succession_appoint_button" text="{=str_coop_succession_appoint_button}Appoint Clan Leader" />

@@ -973,9 +973,9 @@ internal class PlayerPartyInteractionHandler : IHandler
 
     private void AddInitialOptions(PlayerPartyInteractionSession session, PartyBase initiatorParty, PartyBase responderParty)
     {
-        foreach (var option in GetClanDepartureOptions(initiatorParty.LeaderHero, responderParty.LeaderHero)
+        foreach (var (option, enabled) in GetClanDepartureOptions(initiatorParty.LeaderHero, responderParty.LeaderHero)
                      .Concat(GetDivorceOptions(initiatorParty.LeaderHero, responderParty.LeaderHero)))
-            AddInitiatorOption(session, option, enabled: true);
+            AddInitiatorOption(session, option, enabled);
 
         AddInitiatorOption(session, PlayerPartyInteractionOption.TradeProposal, enabled: true);
         AddInitiatorOption(session, mapTracking.AreTracking(initiatorParty.MobileParty, responderParty.MobileParty)
@@ -1026,19 +1026,23 @@ internal class PlayerPartyInteractionHandler : IHandler
         return clanJoinRules.GetUnavailableReason(initiatorParty.LeaderHero, responderParty.LeaderHero) == ClanJoinUnavailableReason.None;
     }
 
-    private IEnumerable<PlayerPartyInteractionOption> GetClanDepartureOptions(Hero actor, Hero other)
+    // A departure blocked only by a pregnancy is still offered, disabled, so the client can explain why.
+    private IEnumerable<(PlayerPartyInteractionOption Option, bool Enabled)> GetClanDepartureOptions(Hero actor, Hero other)
     {
         if (actor?.Clan == null || actor.Clan != other?.Clan) yield break;
-        if (clanLeaveRules.CanLeave(actor)) yield return PlayerPartyInteractionOption.LeaveClan;
-        if (clanLeaveRules.CanRemove(actor, other)) yield return PlayerPartyInteractionOption.RemoveFromClan;
+        if (clanLeaveRules.CanLeave(actor))
+            yield return (PlayerPartyInteractionOption.LeaveClan, !clanLeaveRules.AreExpectingChild(actor, actor.Clan.Leader));
+        if (clanLeaveRules.CanRemove(actor, other))
+            yield return (PlayerPartyInteractionOption.RemoveFromClan, !clanLeaveRules.AreExpectingChild(other, actor));
     }
 
-    private IEnumerable<PlayerPartyInteractionOption> GetDivorceOptions(Hero actor, Hero spouse)
+    private IEnumerable<(PlayerPartyInteractionOption Option, bool Enabled)> GetDivorceOptions(Hero actor, Hero spouse)
     {
         if (!playerDivorceRules.CanDivorce(actor, spouse)) yield break;
-        yield return PlayerPartyInteractionOption.ProposeDivorce;
-        yield return PlayerPartyInteractionOption.DivorceStayInClan;
-        if (playerDivorceRules.CanLeaveClan(actor, spouse)) yield return PlayerPartyInteractionOption.DivorceLeaveClan;
+        yield return (PlayerPartyInteractionOption.ProposeDivorce, true);
+        yield return (PlayerPartyInteractionOption.DivorceStayInClan, true);
+        if (playerDivorceRules.CanLeaveClan(actor, spouse))
+            yield return (PlayerPartyInteractionOption.DivorceLeaveClan, !clanLeaveRules.AreExpectingChild(actor, spouse));
     }
 
     private static int GetMercenaryAwardMultiplier(Clan mercenaryClan, Kingdom kingdom)
