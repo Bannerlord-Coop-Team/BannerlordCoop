@@ -7,6 +7,8 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.HeroDevelopers.Patches
 {
+    // Install before quest callers can inline focus changes.
+    [HarmonyPatchCategory(GameInterface.HARMONY_STATIC_FIXES_CATEGORY)]
     [HarmonyPatch(typeof(HeroDeveloper))]
     internal class SetFocusPatch
     {
