@@ -15,6 +15,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.Ladys
 
 namespace GameInterface.Services.Issues.Quests.LadysKnightOut.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class LadysKnightOutEventPatches
 {
@@ -54,6 +55,7 @@ internal class LadysKnightOutEventPatches
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class LadysKnightOutWorldListenerPatches
 {
@@ -67,6 +69,7 @@ internal class LadysKnightOutWorldListenerPatches
     private static bool Prefix() => ModInformation.IsServer;
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class LadysKnightOutNativeTournamentPatches
 {

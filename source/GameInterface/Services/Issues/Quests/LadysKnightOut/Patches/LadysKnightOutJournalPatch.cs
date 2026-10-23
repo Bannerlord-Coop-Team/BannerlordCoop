@@ -7,6 +7,7 @@ using Issue = TaleWorlds.CampaignSystem.Issues.LadysKnightOutIssueBehavior.Ladys
 
 namespace GameInterface.Services.Issues.Quests.LadysKnightOut.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class LadysKnightOutJournalPatch
 {
