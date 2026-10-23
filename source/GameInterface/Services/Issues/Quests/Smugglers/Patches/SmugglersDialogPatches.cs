@@ -13,6 +13,7 @@ namespace GameInterface.Services.Issues.Quests.Smugglers.Patches;
 /// Vanilla opens the smugglers' dialog for any party led by the same caravan master troop, which every smugglers'
 /// party shares. In co-op each player can run their own Smugglers quest, so a quest only talks to its own party.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class SmugglersDialogPatches
 {

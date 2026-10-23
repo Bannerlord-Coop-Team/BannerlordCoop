@@ -12,6 +12,7 @@ namespace GameInterface.Services.Issues.Quests.CapturedByBountyHunters.Patches;
 /// Vanilla's start log names the settlement the player is in. When the offer conversation is opened outside a
 /// settlement there is none and accepting throws, so the log names the giver's settlement instead.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(Quest), nameof(Quest.PlayerStartsQuestLogText), MethodType.Getter)]
 internal class CapturedByBountyHuntersStartLogPatch
 {
