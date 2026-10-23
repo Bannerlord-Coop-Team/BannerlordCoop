@@ -1,7 +1,10 @@
 ﻿using Common.Commands;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface;
 using GameInterface.Services.HeroDevelopers.Commands;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using Xunit.Abstractions;
@@ -85,6 +88,11 @@ public class HeroSocialParameterCoopCommandTests : IDisposable
         });
     }
 
-    private static CoopCommandResult Execute(params string[] args) =>
-        new HeroDeveloperCommands.HeroSocialParameterCoopCommand().ProcessCommand(new CoopCommandArgsFactory().FromValues(args));
+    private static CoopCommandResult Execute(params string[] args)
+    {
+        Assert.True(ContainerProvider.TryResolve<ICommandObjectResolver>(out var resolver));
+        Assert.True(ContainerProvider.TryResolve<IObjectManager>(out var objectManager));
+        return new HeroDeveloperCommands.HeroSocialParameterCoopCommand(resolver, objectManager)
+            .ProcessCommand(new CoopCommandArgsFactory().FromValues(args));
+    }
 }

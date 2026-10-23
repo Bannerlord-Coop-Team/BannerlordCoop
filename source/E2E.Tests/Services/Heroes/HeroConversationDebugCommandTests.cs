@@ -6,6 +6,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Commands;
+using GameInterface.Utils.Commands;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -212,7 +213,7 @@ public class HeroConversationDebugCommandTests : IDisposable
             Campaign.Current.PlayerEncounter = encounter;
             try
             {
-                result = new HeroConversationDebugCommand.HeroConversationOpenCoopCommand()
+                result = new HeroConversationDebugCommand.HeroConversationOpenCoopCommand(Client.Resolve<ICommandObjectResolver>())
                     .ProcessCommand(new CoopCommandArgsFactory().FromValues(new[] { heroId }));
             }
             finally
