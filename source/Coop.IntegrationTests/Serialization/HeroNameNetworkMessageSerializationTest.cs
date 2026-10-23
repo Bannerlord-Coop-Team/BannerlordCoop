@@ -3,6 +3,7 @@ using Common.Serialization;
 using Coop.Core.Client.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Surrogates;
+using ProtoBuf;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
@@ -67,6 +68,75 @@ namespace Coop.IntegrationTests.Serialization
             var nested = Assert.IsType<TextObject>(copy.Data.FullName.Attributes["NESTED"]);
             Assert.Equal(0f, Assert.IsType<float>(nested.Attributes["ZERO"]));
             Assert.Equal(-1.25f, Assert.IsType<float>(nested.Attributes["FRACTION"]));
+        }
+
+        [Fact]
+        public void NetworkChangeHeroName_RoundTrips_OnlyNullAttribute()
+        {
+            var name = new TextObject("{=!}{KINGDOM_NAME}", new Dictionary<string, object>
+            {
+                ["KINGDOM_NAME"] = null,
+            });
+
+            var copy = RoundTrip(new NetworkChangeHeroName(new HeroChangeNameData(CreateHero(), name, null)));
+
+            Assert.NotNull(copy.Data.FullName.Attributes);
+            Assert.Single(copy.Data.FullName.Attributes);
+            Assert.True(copy.Data.FullName.Attributes.ContainsKey("KINGDOM_NAME"));
+            Assert.Null(copy.Data.FullName.Attributes["KINGDOM_NAME"]);
+            Assert.False(copy.Data.FullName.Attributes.ContainsKey("ABSENT"));
+        }
+
+        [Fact]
+        public void NetworkChangeHeroName_RoundTrips_NullAttributesIncludingNestedValues()
+        {
+            var faction = new TextObject("{=!}{KINGDOM_NAME} {LINK}", new Dictionary<string, object>
+            {
+                ["KINGDOM_NAME"] = null,
+                ["LINK"] = "Kingdom-Created_1",
+                ["ZERO"] = 0f,
+                ["FRACTION"] = -1.25f,
+            });
+            var name = new TextObject("{=!}{FACTION}", new Dictionary<string, object>
+            {
+                ["FACTION"] = faction,
+                ["NULL"] = null,
+                ["AGE"] = 42,
+                ["ZERO"] = 0f,
+                ["FRACTION"] = 2.5f,
+            });
+
+            var copy = RoundTrip(new NetworkChangeHeroName(new HeroChangeNameData(CreateHero(), name, null)));
+
+            var attributes = copy.Data.FullName.Attributes;
+            Assert.Equal(5, attributes.Count);
+            Assert.True(attributes.ContainsKey("NULL"));
+            Assert.Null(attributes["NULL"]);
+            Assert.False(attributes.ContainsKey("ABSENT"));
+            Assert.Equal(42, Assert.IsType<int>(attributes["AGE"]));
+            Assert.Equal(0f, Assert.IsType<float>(attributes["ZERO"]));
+            Assert.Equal(2.5f, Assert.IsType<float>(attributes["FRACTION"]));
+            var nested = Assert.IsType<TextObject>(attributes["FACTION"]);
+            Assert.Equal(faction.Value, nested.Value);
+            Assert.Equal(4, nested.Attributes.Count);
+            Assert.True(nested.Attributes.ContainsKey("KINGDOM_NAME"));
+            Assert.Null(nested.Attributes["KINGDOM_NAME"]);
+            Assert.False(nested.Attributes.ContainsKey("ABSENT"));
+            Assert.Equal("Kingdom-Created_1", Assert.IsType<string>(nested.Attributes["LINK"]));
+            Assert.Equal(0f, Assert.IsType<float>(nested.Attributes["ZERO"]));
+            Assert.Equal(-1.25f, Assert.IsType<float>(nested.Attributes["FRACTION"]));
+        }
+
+        [Fact]
+        public void TextObjectSurrogate_ReadsLegacyPayloadWithoutOptionalAttributes()
+        {
+            // Field 1 contains "legacy"; all optional attribute fields are absent.
+            using var stream = new MemoryStream(new byte[] { 0x0a, 6, 108, 101, 103, 97, 99, 121 });
+
+            var copy = Serializer.Deserialize<TextObject>(stream);
+
+            Assert.Equal("legacy", copy.Value);
+            Assert.Null(copy.Attributes);
         }
 
         private static Hero CreateHero()
