@@ -22,12 +22,16 @@ internal struct TextObjectSurrogate
     [ProtoMember(4)]
     public Dictionary<string, string> StringAttributes { get; set; }
 
+    [ProtoMember(5)]
+    public Dictionary<string, float> FloatAttributes { get; set; }
+
     public TextObjectSurrogate(TextObject textObject)
     {
         Text = textObject?.Value;
         TextObjectAttributes = new();
         IntAttributes = new();
         StringAttributes = new();
+        FloatAttributes = new();
 
         if (textObject?.Attributes == null)
             return;
@@ -46,6 +50,10 @@ internal struct TextObjectSurrogate
             {
                 StringAttributes[attribute.Key] = stringVariable;
             }
+            else if (attribute.Value is float floatVariable)
+            {
+                FloatAttributes[attribute.Key] = floatVariable;
+            }
         }
     }
 
@@ -59,7 +67,8 @@ internal struct TextObjectSurrogate
         // Keep null attributes instead of initializing an empty dictionary
         if (surrogate.TextObjectAttributes == null 
             && surrogate.IntAttributes == null
-            && surrogate.StringAttributes == null)
+            && surrogate.StringAttributes == null
+            && surrogate.FloatAttributes == null)
             return new TextObject(surrogate.Text);
 
         var attributes = new Dictionary<string, object>();
@@ -83,6 +92,13 @@ internal struct TextObjectSurrogate
             foreach (var stringAttribute in surrogate.StringAttributes)
             {
                 attributes[stringAttribute.Key] = stringAttribute.Value;
+            }
+        }
+        if (surrogate.FloatAttributes != null)
+        {
+            foreach (var floatAttribute in surrogate.FloatAttributes)
+            {
+                attributes[floatAttribute.Key] = floatAttribute.Value;
             }
         }
 
