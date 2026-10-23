@@ -185,7 +185,7 @@ internal class FinalizationCoordinator : IHandler
     {
         if (ModInformation.IsClient) return;
         var issue = payload.What.Issue;
-        if (issue.IsSolvingWithLordSolution ||
+        if (issue.IsSolvingWithLordSolution || issue.IsSolvingWithAlternative ||
             !objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId) ||
             !ownership.TryGetOwner(giverId, issue.StringId, out var owner) ||
             !playerManager.TryGetPeer(owner, out var peer)) return;
@@ -193,7 +193,7 @@ internal class FinalizationCoordinator : IHandler
         var quest = issue.IssueQuest;
         var entries = quest?.JournalEntries ?? issue.JournalEntries;
         network.Send(peer, new NetworkIssueJournal(giverId, issue.StringId, quest != null,
-            entries.Select(log => log.LogText).Where(text => text != null).ToArray()));
+            entries.Where(log => log.LogText != null).Select(log => new IssueJournalEntry(log)).ToArray()));
     }
 
     private void Handle_NetworkIssueJournal(MessagePayload<NetworkIssueJournal> payload)
@@ -208,22 +208,30 @@ internal class FinalizationCoordinator : IHandler
             var quest = issue.IssueQuest;
             if (data.IsQuestJournal && (quest == null || !quest.IsOngoing ||
                 !Campaign.Current.QuestManager.Quests.Contains(quest))) return;
-            if (!data.IsQuestJournal && quest != null) return;
+            if (!data.IsQuestJournal && (quest != null || issue.IsSolvingWithAlternative)) return;
 
-            var entries = quest?.JournalEntries ?? issue.JournalEntries;
-            var existing = entries.Where(log => log.LogText != null).GroupBy(log => log.LogText.ToString())
-                .ToDictionary(group => group.Key, group => group.Count());
-            foreach (var text in data.Logs ?? Array.Empty<TextObject>())
+            using (new AllowedThread())
+            using (new QuestJournalReplay())
             {
-                if (text == null) continue;
-                var key = text.ToString();
-                if (existing.TryGetValue(key, out var count) && count > 0)
+                if (quest != null)
                 {
-                    existing[key] = count - 1;
-                    continue;
+                    quest._journalEntries.Clear();
+                    foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
+                        quest._journalEntries.Add(log.ToJournalLog());
+                    CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, false);
                 }
-                if (quest != null) quest.AddLog(text);
-                else issue.AddLog(new JournalLog(CampaignTime.Now, text));
+                else
+                {
+                    var existing = issue.JournalEntries.Where(log => log.LogText != null)
+                        .GroupBy(log => log.LogText.ToString()).ToDictionary(group => group.Key, group => group.Count());
+                    foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
+                    {
+                        if (log.Text == null) continue;
+                        var key = log.Text.ToString();
+                        if (existing.TryGetValue(key, out var count) && count > 0) existing[key] = count - 1;
+                        else issue.AddLog(log.ToJournalLog());
+                    }
+                }
             }
         }, context: nameof(FinalizationCoordinator));
     }
@@ -271,6 +279,7 @@ internal class FinalizationCoordinator : IHandler
 
             using (new AllowedThread())
             using (new QuestEndingReplay())
+            using (new QuestJournalReplay())
             {
                 Replay(issue, data.Outcome, isOwner);
             }
