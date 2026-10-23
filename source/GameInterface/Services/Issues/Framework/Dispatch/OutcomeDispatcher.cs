@@ -181,8 +181,8 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         if (--observation.Depth != 0) return;
         questOutcomes.Remove(quest);
 
-        // A nested failure can return to a timeout, while OnBeforeTimedOut can redirect to success or defer.
-        if (exception == null && observation.Outcome.HasValue)
+        // A completed inner ending still applies if an outer callback later throws.
+        if (observation.Outcome.HasValue)
             After(observed, observation.Outcome.Value);
     }
 
