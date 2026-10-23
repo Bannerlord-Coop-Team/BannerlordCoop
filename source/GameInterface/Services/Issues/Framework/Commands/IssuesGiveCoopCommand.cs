@@ -1,7 +1,7 @@
 ﻿using Common.Commands;
 using GameInterface.Services.Heroes.Extensions;
 using GameInterface.Services.Issues.Framework.Interface;
-using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.Commands;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -11,12 +11,12 @@ namespace GameInterface.Services.Issues.Framework.Commands;
 public sealed class IssuesGiveCoopCommand : ICoopCommand
 {
     private readonly IQuestTypeRegistry registry;
-    private readonly IObjectManager objectManager;
+    private readonly ICommandObjectResolver resolver;
 
-    public IssuesGiveCoopCommand(IQuestTypeRegistry registry, IObjectManager objectManager)
+    public IssuesGiveCoopCommand(IQuestTypeRegistry registry, ICommandObjectResolver resolver)
     {
         this.registry = registry;
-        this.objectManager = objectManager;
+        this.resolver = resolver;
     }
 
     public string Prefix => "coop.debug.issues";
@@ -28,15 +28,15 @@ public sealed class IssuesGiveCoopCommand : ICoopCommand
     public CoopCommandSide Side => CoopCommandSide.Server;
 
     public IExpectedArgs[] ExpectedArgs { get; } = {
-        new ExpectedArgs("hero_id", "The registered id of the hero that offers the issue."),
+        new ExpectedArgs("hero_id", "Name or id of the hero that offers the issue; quote names with spaces."),
         new ExpectedArgs("quest_type", "The issue type name, see coop.debug.issues.list_types."),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
     {
-        if (!objectManager.TryGetObject<Hero>(args[0], out var hero))
+        if (!resolver.TryResolveHero(args[0], out var hero, out var error))
         {
-            return Failed($"Hero with id '{args[0]}' not found");
+            return Failed(error);
         }
 
         if (!registry.TryGetByName(args[1], out var descriptor))

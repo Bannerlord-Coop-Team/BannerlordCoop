@@ -8,6 +8,7 @@ using E2E.Tests.Environment.Extensions;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using E2E.Tests.Environment.MockEngine;
+using GameInterface.Services.Locations;
 using LiteNetLib;
 using Missions;
 using Missions.Agents;
@@ -15,6 +16,7 @@ using Missions.Agents.Handlers;
 using Missions.Agents.Packets;
 using Missions.Messages;
 using Missions.Services.Network;
+using Moq;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -1282,7 +1284,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
             var data = new AgentData(sourceRider);
             data.Apply(puppetRider);
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(puppetRider, data);
 
             puppetRiderMirror.MovementFlags =
@@ -1343,7 +1345,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             sourceHorseMirror.RealGlobalVelocity = new Vec3(1f, 0f, 0f);
             sourceHorseMirror.MovementFlags = Agent.MovementControlFlag.TurnRight;
 
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(
                 puppetRider,
                 new AgentData(sourceRider));
@@ -1396,7 +1398,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
             var data = new AgentData(sourceRider);
             data.Apply(puppetRider);
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(
                 puppetRider,
                 data);
@@ -1464,7 +1466,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 sourceRider,
                 out var sourceRiderMirror));
 
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             sourceRiderMirror.LookDirection =
                 new Vec3(1f, 0f, 0f);
             interpolator.SetMountedRiderTarget(
@@ -1525,7 +1527,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             var data = new AgentData(source);
             data.Apply(puppet);
             Vec2 expectedInput = puppet.MovementInputVector;
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetRiderTarget(puppet, data);
 
             puppetMirror.MovementFlags =
@@ -1572,7 +1574,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
 
             var data = new AgentData(source);
             data.Apply(puppet);
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetRiderTarget(puppet, data);
             interpolator.Tick(1f / 60f);
             int targetFrameCalls =
@@ -1624,7 +1626,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 Agent.MovementControlFlag.Forward |
                 Agent.MovementControlFlag.TurnRight;
 
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetRiderTarget(puppet, new AgentData(source));
 
             puppetMirror.Health = 0f;
@@ -1707,7 +1709,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             Assert.True(AgentMirror.TryGet(horse, out var horseMirror));
 
             var target = new Vec3(0.02f, 0f, 0f);
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(rider, target, Vec2.Forward, Vec2.Forward, target);
 
             for (int i = 0; i < 60; i++)
@@ -1741,7 +1743,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 Agent.MovementControlFlag.DefendBlock |
                 Agent.MovementControlFlag.DefendUp;
 
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(
                 rider,
                 new Vec3(2f, 0f, 0f),
@@ -1797,7 +1799,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 Agent.MovementControlFlag.DefendBlock |
                 Agent.MovementControlFlag.DefendRight;
 
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(
                 rider,
                 new Vec3(0.1f, 0f, 0f),
@@ -1835,7 +1837,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
             riderMirror.Action1CodeType =
                 Agent.ActionCodeType.BlockedMelee;
 
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(
                 rider,
                 new Vec3(2f, 0f, 0f),
@@ -1868,7 +1870,7 @@ public class MountedPuppetMovementTests : MissionTestEnvironment
                 Agent.MovementControlFlag.DefendUp;
 
             var target = new Vec3(13f, 0f, 0f);
-            var interpolator = new AgentPositionInterpolator();
+            var interpolator = new AgentPositionInterpolator(Mock.Of<ILocationNpcAuthorityState>());
             interpolator.SetMountedRiderTarget(
                 rider,
                 target,
