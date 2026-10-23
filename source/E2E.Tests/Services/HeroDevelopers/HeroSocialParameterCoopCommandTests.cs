@@ -87,5 +87,6 @@ public class HeroSocialParameterCoopCommandTests : IDisposable
     }
 
     private static CoopCommandResult Execute(EnvironmentInstance instance, params string[] args) =>
-        new HeroDeveloperCommands.HeroSocialParameterCoopCommand(instance.Resolve<ICommandObjectResolver>(), instance.ObjectManager).ProcessCommand(new CoopCommandArgsFactory().FromValues(args));
+        new HeroDeveloperCommands.HeroSocialParameterCoopCommand(instance.Resolve<ICommandObjectResolver>(), instance.ObjectManager)
+            .ProcessCommand(new CoopCommandArgsFactory().FromValues(args));
 }

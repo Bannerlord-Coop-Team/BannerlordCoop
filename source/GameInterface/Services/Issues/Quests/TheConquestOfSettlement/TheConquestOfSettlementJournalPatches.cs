@@ -13,6 +13,7 @@ namespace GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 
 using Quest = TheConquestOfSettlementIssueBehavior.TheConquestOfSettlementIssueQuest;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestManager), nameof(QuestManager.Quests), MethodType.Getter)]
 internal static class TheConquestOfSettlementQuestListPatch
 {
@@ -26,6 +27,7 @@ internal static class TheConquestOfSettlementQuestListPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestManager), nameof(QuestManager.TrackedObjects), MethodType.Getter)]
 internal static class TheConquestOfSettlementTrackedPatch
 {
@@ -46,6 +48,7 @@ internal static class TheConquestOfSettlementTrackedPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.IsTrackEnabled), MethodType.Getter)]
 internal static class TheConquestOfSettlementTrackEnabledPatch
 {
@@ -58,6 +61,7 @@ internal static class TheConquestOfSettlementTrackEnabledPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.IsThereDiscussDialogFlow), MethodType.Getter)]
 internal static class TheConquestOfSettlementDiscussionPatch
 {
@@ -70,6 +74,7 @@ internal static class TheConquestOfSettlementDiscussionPatch
     }
 }
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal static class TheConquestOfSettlementNotificationPatches
 {
