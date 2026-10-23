@@ -12,7 +12,6 @@ using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 
@@ -25,6 +24,7 @@ internal class ClientSiegeBreakOutHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISiegeBreakOut breakOut;
+    private readonly ISiegeCasualtyDecoder casualtyDecoder;
     private Pending pending;
 
     private sealed class Pending
@@ -42,12 +42,13 @@ internal class ClientSiegeBreakOutHandler : IHandler
     }
 
     public ClientSiegeBreakOutHandler(IMessageBroker messageBroker, INetwork network,
-        IObjectManager objectManager, ISiegeBreakOut breakOut)
+        IObjectManager objectManager, ISiegeBreakOut breakOut, ISiegeCasualtyDecoder casualtyDecoder)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.breakOut = breakOut;
+        this.casualtyDecoder = casualtyDecoder;
         messageBroker.Subscribe<BreakOutAttempted>(HandleAttempt);
         messageBroker.Subscribe<NetworkBreakOutResult>(HandleResult);
     }
@@ -94,16 +95,7 @@ internal class ClientSiegeBreakOutHandler : IHandler
                 Logger.Warning("Server rejected breakout request {RequestId}", result.RequestId);
                 return;
             }
-            // Protobuf sends an empty array as null, e.g. an army leader whose own party lost nobody.
-            var ids = result.CharacterIds ?? Array.Empty<uint>();
-            var counts = result.Counts ?? Array.Empty<int>();
-            if (ids.Length != counts.Length) return;
-            var casualties = TroopRoster.CreateDummyTroopRoster();
-            for (int index = 0; index < ids.Length; index++)
-            {
-                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(ids[index], out var character)) return;
-                casualties.AddToCounts(character, counts[index]);
-            }
+            if (!casualtyDecoder.TryDecode(result.CharacterIds, result.Counts, out var casualties)) return;
             breakOut.ShowDebrief(casualties, result.ArmyCasualties, attempt.Request.IsFromPort);
         }, context: nameof(NetworkBreakOutResult));
     }
