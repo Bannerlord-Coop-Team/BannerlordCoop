@@ -12,6 +12,7 @@ using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -190,7 +191,7 @@ internal class FinalizationCoordinator : IHandler
         var quest = issue.IssueQuest;
         var entries = quest?.JournalEntries ?? issue.JournalEntries;
         network.Send(peer, new NetworkIssueJournal(giverId, issue.StringId, quest != null,
-            entries.Select(log => log.LogText).Where(text => text != null).ToArray()));
+            entries.Where(log => log.LogText != null).Select(log => new IssueJournalEntry(log)).ToArray()));
     }
 
     private void Handle_NetworkIssueJournal(MessagePayload<NetworkIssueJournal> payload)
@@ -207,21 +208,23 @@ internal class FinalizationCoordinator : IHandler
                 !Campaign.Current.QuestManager.Quests.Contains(quest))) return;
             if (!data.IsQuestJournal && quest != null) return;
 
-            var entries = quest?.JournalEntries ?? issue.JournalEntries;
-            var existing = entries.Where(log => log.LogText != null).GroupBy(log => log.LogText.ToString())
-                .ToDictionary(group => group.Key, group => group.Count());
-            foreach (var text in data.Logs ?? Array.Empty<TextObject>())
+            var entries = quest?._journalEntries ?? issue._journalEntries;
+            var existing = entries.Select((log, index) => new { Log = log, Index = index })
+                .Where(entry => entry.Log.LogText != null).GroupBy(entry => entry.Log.LogText.ToString())
+                .ToDictionary(group => group.Key, group => new Queue<int>(group.Select(entry => entry.Index)));
+            foreach (var log in data.Logs ?? Array.Empty<IssueJournalEntry>())
             {
-                if (text == null) continue;
-                var key = text.ToString();
-                if (existing.TryGetValue(key, out var count) && count > 0)
+                if (log.Text == null) continue;
+                var key = log.Text.ToString();
+                if (existing.TryGetValue(key, out var matches) && matches.Count > 0)
                 {
-                    existing[key] = count - 1;
+                    entries[matches.Dequeue()] = log.ToJournalLog();
                     continue;
                 }
-                if (quest != null) quest.AddLog(text);
-                else issue.AddLog(new JournalLog(CampaignTime.Now, text));
+                if (quest != null) entries.Add(log.ToJournalLog());
+                else issue.AddLog(log.ToJournalLog());
             }
+            if (quest != null) CampaignEventDispatcher.Instance.OnQuestLogAdded(quest, false);
         }, context: nameof(FinalizationCoordinator));
     }
 

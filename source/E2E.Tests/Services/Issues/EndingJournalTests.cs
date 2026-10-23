@@ -1,12 +1,14 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.LogEntries;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -77,7 +79,7 @@ public class EndingJournalTests : IDisposable
         var snapshot = Assert.Single(scenario.Server.NetworkSentMessages.GetMessages<NetworkIssueJournal>());
         var sent = scenario.Server.NetworkSentMessages.ToList();
         Assert.True(sent.FindIndex(message => message is NetworkIssueJournal) < sent.FindIndex(message => message is NetworkIssueFinalized));
-        Assert.Equal(Ending().Value, snapshot.Logs.Single().Value);
+        Assert.Equal(Ending().Value, snapshot.Logs.Single().Text.Value);
         Assert.Equal(outcome, finalized.Outcome);
         scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, finalized);
         scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(snapshot));
@@ -107,6 +109,7 @@ public class EndingJournalTests : IDisposable
         LogEntryHistory loaded = null!;
         scenario.Server.Call(() =>
         {
+            using var owner = OwnerScope();
             serverQuest._journalEntries.Add(new JournalLog(new CampaignTime(123L), Ending(),
                 new TextObject("Collected troops"), 3, 5, LogType.Discreate));
             serverQuest.CompleteQuestWithCancel();
@@ -155,19 +158,71 @@ public class EndingJournalTests : IDisposable
         var serverQuest = scenario.QuestOf(scenario.Server);
         var ownerQuest = scenario.QuestOf(scenario.ClientA);
         JournalLog serverProgress = null!;
-        scenario.Server.Call(() => serverProgress = serverQuest.AddDiscreteLog(
-            new TextObject("Collected troops"), new TextObject("Troops"), 0, 5));
+        scenario.Server.Call(() =>
+        {
+            using var owner = OwnerScope();
+            serverProgress = serverQuest.AddDiscreteLog(new TextObject("Collected troops"), new TextObject("Troops"), 0, 5);
+        });
         scenario.ClientA.Call(() =>
         {
             var progress = ownerQuest.AddDiscreteLog(new TextObject("Collected troops"), new TextObject("Troops"), 0, 5);
             progress.UpdateCurrentProgress(4);
         });
         environment.FlushCoalescer();
-        scenario.Server.Call(() => serverQuest.CompleteQuestWithCancel(Ending()));
+        scenario.Server.Call(() =>
+        {
+            using var owner = OwnerScope();
+            serverQuest.CompleteQuestWithCancel(Ending());
+        });
         environment.FlushCoalescer();
         scenario.Server.Call(() => Assert.Equal(4, serverProgress.CurrentProgress));
         scenario.ClientA.Call(() => Assert.Equal(4, ownerQuest.JournalEntries.First().CurrentProgress));
     }
+
+    [Fact]
+    public void ProgressUpdatesRejectForeignStaleAndCompletedIssues()
+    {
+        var serverQuest = scenario.QuestOf(scenario.Server);
+        var ownerQuest = scenario.QuestOf(scenario.ClientA);
+        JournalLog serverProgress = null!;
+        scenario.Server.Call(() =>
+        {
+            using var owner = OwnerScope();
+            serverProgress = serverQuest.AddDiscreteLog(new TextObject("Collected troops"), new TextObject("Troops"), 0, 5);
+        });
+        scenario.ClientA.Call(() =>
+        {
+            var progress = ownerQuest.AddDiscreteLog(new TextObject("Collected troops"), new TextObject("Troops"), 0, 5);
+            progress.UpdateCurrentProgress(4);
+            progress.UpdateCurrentProgress(4);
+        });
+        environment.FlushCoalescer();
+        Assert.Single(scenario.ClientA.NetworkSentMessages.GetMessages<RequestQuestJournalProgress>());
+        var invalidProgress = new JournalLog(CampaignTime.Zero, new TextObject("Collected troops"),
+            new TextObject("Troops"), 99, 5, LogType.Discreate);
+        scenario.Server.SimulateMessage(scenario.ClientB.NetPeer,
+            new RequestQuestJournalProgress(scenario.NotableId, QuestScenario.IssueId, 0, invalidProgress));
+        scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
+            new RequestQuestJournalProgress(scenario.NotableId, "previous_issue", 0, invalidProgress));
+        scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
+            new RequestQuestJournalProgress(scenario.NotableId, QuestScenario.IssueId, 1, invalidProgress));
+        scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
+            new RequestQuestJournalProgress(scenario.NotableId, QuestScenario.IssueId, 0,
+                new JournalLog(CampaignTime.Zero, Ending(), null, 99, 7)));
+        scenario.Server.Call(() =>
+        {
+            Assert.Equal(4, serverProgress.CurrentProgress);
+            using var owner = OwnerScope();
+            serverQuest.CompleteQuestWithCancel(Ending());
+        });
+        scenario.Server.SimulateMessage(scenario.ClientA.NetPeer,
+            new RequestQuestJournalProgress(scenario.NotableId, QuestScenario.IssueId, 0, invalidProgress));
+        scenario.Server.Call(() => Assert.Equal(4, serverProgress.CurrentProgress));
+    }
+
+    private MainHeroSubstitutionScope OwnerScope() => new(
+        scenario.Server.GetRegisteredObject<Hero>(scenario.OwnerHeroId),
+        scenario.Server.GetRegisteredObject<MobileParty>(scenario.OwnerPartyId));
 
     private static (long, string?, string?, int, int, LogType)[] EntryFields(JournalLogEntry archive) =>
         archive.GetEntries().Select(log => (log.LogTime.NumTicks, log.LogText?.ToString(),
@@ -196,7 +251,7 @@ public class EndingJournalTests : IDisposable
             quest.AddLog(Ending());
         });
         var journal = new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, true,
-            new[] { new TextObject("server progress"), Ending(), Ending() });
+            new[] { Entry(new TextObject("server progress")), Entry(Ending()), Entry(Ending()) });
         var wire = scenario.Server.SerializeForWire(journal);
         scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, wire);
         scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, wire);
@@ -227,7 +282,7 @@ public class EndingJournalTests : IDisposable
             }
         });
         joiner.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(
-            new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, true, new[] { Ending() })));
+            new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, true, new[] { Entry(Ending()) })));
         joiner.Call(() => Assert.Empty(mirror.JournalEntries));
     }
 
@@ -243,7 +298,7 @@ public class EndingJournalTests : IDisposable
                 scenario.NotableId, "replacement_issue", QuestScenario.ControllerA));
         });
         scenario.ClientA.SimulateMessage(scenario.Server.NetPeer, scenario.Server.SerializeForWire(
-            new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, true, new[] { Ending() })));
+            new NetworkIssueJournal(scenario.NotableId, QuestScenario.IssueId, true, new[] { Entry(Ending()) })));
         scenario.ClientA.SimulateMessage(scenario.Server.NetPeer,
             new NetworkIssueFinalized(scenario.NotableId, QuestScenario.IssueId, IssueOutcome.QuestCancel));
         scenario.ClientA.Call(() =>
@@ -345,6 +400,8 @@ public class EndingJournalTests : IDisposable
     private static TextObject Ending() => new TextObject("{=3985-test-ending}Ended for {REASON}: {COUNT}")
         .SetTextVariable("REASON", new TextObject("{=3985-test-reason}army dispersed"))
         .SetTextVariable("COUNT", 7);
+
+    private static IssueJournalEntry Entry(TextObject text) => new(new JournalLog(CampaignTime.Now, text));
 
     private static void Complete(QuestBase quest, IssueOutcome outcome)
     {
