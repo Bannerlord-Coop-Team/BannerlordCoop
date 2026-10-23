@@ -309,6 +309,47 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         });
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CompletedQuestDoesNotLeakThroughTheLateJoinSaveHistory(bool success)
+    {
+        QuestJournalHistoryAssertions.RegisterJournalBehavior(Instances);
+        Accept();
+        Assert.Equal(ControllerA, OwnerOnServer());
+        var ownerQuest = QuestOf(ClientA);
+        var serverQuest = QuestOf(Server);
+        ClientA.Call(() =>
+        {
+            using (new AllowedThread())
+                ownerQuest.QuestAcceptedConsequences();
+        }, QuestLogTexts);
+
+        if (success)
+        {
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(ownerPartyId, out var party));
+                Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var hero));
+                Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+                using (new AllowedThread())
+                {
+                    hero._partyBelongedTo = party;
+                    party.CurrentSettlement = settlement;
+                    party.ItemRoster.AddToCounts(DefaultItems.IronIngot1, serverQuest._requestedItemAmount);
+                }
+            });
+            ClientA.Call(() => ownerQuest.Success(), QuestLogTexts);
+        }
+        else
+        {
+            ClientA.Call(() => ownerQuest.CompleteQuestWithFail(), QuestLogTexts);
+        }
+
+        QuestJournalHistoryAssertions.AssertLateJoinHistory(Server, ClientA, ClientB, IssueId, ownerQuest,
+            success ? IssueOutcome.QuestSuccess : IssueOutcome.QuestFail);
+    }
+
     [Fact]
     public void OwnersTimeout_RunsTheFailConsequencesOnTheServerOnly()
     {
@@ -322,9 +363,9 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         var request = Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
         Assert.Equal(IssueOutcome.QuestTimeOut, request.Outcome);
 
-        // Vanilla fails inside the timeout, so only the nested failure is announced
+        // The inner failure returns to vanilla's outer timeout completion.
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
+        Assert.Equal(IssueOutcome.QuestTimeOut, finalized.Outcome);
 
         foreach (var instance in Instances)
         {

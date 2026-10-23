@@ -61,7 +61,7 @@ namespace Coop.Tests.Server.States
             var mapEventLoadCleaner = serverComponent.Container.Resolve<Mock<IMapEventLoadCleaner>>();
             registryManager.Setup(manager => manager.RegisterAllGameObjects())
                 .Callback(() => calls.Add("register"));
-            mapEventLoadCleaner.Setup(cleaner => cleaner.FinalizePlayerMapEvents())
+            mapEventLoadCleaner.Setup(cleaner => cleaner.CleanUpLoadedMapEvents())
                 .Callback(() => calls.Add("clean"));
             registryManager.Setup(manager => manager.PatchLifetimes())
                 .Callback(() => calls.Add("patch"));

@@ -417,7 +417,7 @@ public class SmugglersTests : IDisposable
     }
 
     [Fact]
-    public void ServerTimeout_AnnouncesOnlyTheNestedFailureAndReplaysTheOwnersQuest()
+    public void ServerTimeout_AnnouncesTheOuterTimeoutOnceAndReplaysTheOwnersQuest()
     {
         var targetId = TestEnvironment.CreateRegisteredObject<Settlement>();
         var originId = TestEnvironment.CreateRegisteredObject<Settlement>();
@@ -478,7 +478,7 @@ public class SmugglersTests : IDisposable
         Assert.Equal(-10, serverQuest.RelationshipChangeWithQuestGiver);
         Assert.True(serverQuest.IsFinalized);
         var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
-        Assert.Equal(IssueOutcome.QuestFail, finalized.Outcome);
+        Assert.Equal(IssueOutcome.QuestTimeOut, finalized.Outcome);
         Assert.Equal(issueOwnerId, finalized.IssueOwnerId);
         Assert.Equal(IssueId, finalized.IssueId);
         Assert.True(ownerQuest.IsFinalized);
