@@ -530,6 +530,86 @@ public class TestNetworkRouterTests : E2ETestEnvironment
     }
 
     [Fact]
+    public async Task DisposalBoundary_DrainsCallbacksOutsideStaticScopeLock()
+    {
+        EnvironmentInstance[] clients = Clients.ToArray();
+        EnvironmentInstance client = clients[0];
+        EnvironmentInstance sibling = clients[1];
+        using var releaseCallback = new ManualResetEventSlim();
+        Exception? receiveFailure = null;
+        IObjectManager? siblingObjectManager = null;
+        int applied = 0;
+        Subscribe<QueuedApplyMessage>(client, _ => applied++);
+        Assert.True(ContainerProvider.TryGetContainer(out var previousContainer));
+
+        Task callback = Task.Factory.StartNew(
+            () =>
+            {
+                Assert.True(releaseCallback.Wait(TimeSpan.FromSeconds(10)));
+                receiveFailure = Record.Exception(() => client.SimulateMessage(
+                    this, new QueuedApplyMessage { Value = 1 }, markGameThread: false));
+                sibling.Call(() => ContainerProvider.TryResolve<IObjectManager>(out siblingObjectManager));
+            },
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
+
+        Exception? disposalFailure;
+        try
+        {
+            disposalFailure = Record.Exception(() => client.CloseGameThreadQueueAndDispose(() =>
+            {
+                releaseCallback.Set();
+                Assert.True(callback.Wait(TimeSpan.FromSeconds(5)));
+            }));
+        }
+        finally
+        {
+            releaseCallback.Set();
+            await callback.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
+        Assert.Null(disposalFailure);
+        Assert.IsType<ObjectDisposedException>(receiveFailure);
+        Assert.Equal(0, applied);
+        Assert.Equal(0, client.PendingGameThreadActionCount);
+        Assert.Same(sibling.ObjectManager, siblingObjectManager);
+        Assert.True(ContainerProvider.TryGetContainer(out var restoredContainer));
+        Assert.Same(previousContainer, restoredContainer);
+        Assert.Throws<ObjectDisposedException>(() => client.Call(() => applied++));
+        Assert.Throws<ObjectDisposedException>(() => client.PumpGameThread());
+    }
+
+    [Fact]
+    public async Task DisposalBoundary_CancelsPendingCallerAndPreservesBothFailures()
+    {
+        EnvironmentInstance client = Clients.First();
+        Task<Exception?>? pendingCaller = null;
+        int applied = 0;
+        client.Call(() =>
+        {
+            pendingCaller = Task.Run(() =>
+                Record.Exception(() => GameThread.Run(() => applied++, blocking: true)));
+        });
+
+        Assert.True(SpinWait.SpinUntil(
+            () => client.PendingGameThreadActionCount == 1,
+            TimeSpan.FromSeconds(5)));
+        var resourceFailure = new InvalidOperationException("expected resource disposal failure");
+        AggregateException failure = Assert.Throws<AggregateException>(() =>
+            client.CloseGameThreadQueueAndDispose(() => throw resourceFailure));
+        Exception? callerFailure = await pendingCaller!.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(2, failure.InnerExceptions.Count);
+        Assert.Contains("1 unpumped game-thread action", failure.InnerExceptions[0].Message);
+        Assert.Same(resourceFailure, failure.InnerExceptions[1]);
+        Assert.IsType<OperationCanceledException>(callerFailure);
+        Assert.Equal(0, applied);
+        Assert.Equal(0, client.PendingGameThreadActionCount);
+        Assert.Throws<ObjectDisposedException>(() => client.Call(() => applied++));
+    }
+
+    [Fact]
     public void ManualDelivery_AllowsLegalCrossChannelReordering()
     {
         EnvironmentInstance client = Clients.First();

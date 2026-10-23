@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Configuration;
 using Common.Commands;
 using Common.Network;
 using Common.Messaging;
@@ -17,8 +18,10 @@ using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Kingdoms;
 using GameInterface.Services.Kingdoms.Commands;
 using GameInterface.Services.Kingdoms.Data;
@@ -77,6 +80,8 @@ public class PlayerKingdomCreationFlowTests : IDisposable
     private const string KingdomName = "Real Kingdom";
 
     private E2ETestEnvironment TestEnvironment { get; }
+    private readonly ITestOutputHelper output;
+    private readonly ModOptions previousModOptions = ModConfigProvider.ModOptions;
     private EnvironmentInstance Server => TestEnvironment.Server;
     private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
     private static IKingdomDecisionVoteManager GetVoteManager(EnvironmentInstance instance) =>
@@ -86,12 +91,251 @@ public class PlayerKingdomCreationFlowTests : IDisposable
 
     public PlayerKingdomCreationFlowTests(ITestOutputHelper output)
     {
+        this.output = output;
         TestEnvironment = new E2ETestEnvironment(output);
     }
 
     public void Dispose()
     {
         TestEnvironment.Dispose();
+        ModConfigProvider.ModOptions = previousModOptions;
+    }
+
+    [Fact]
+    public void DiplomacyDebugActionsRequireAnActorAndDispatchInsideThatPlayersScope()
+    {
+        var player = CreateSyncedPlayerContext();
+        var enemy = CreateSyncedPlayerContext("DiplomacyEnemy", _ => false);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var enemyId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        ConfigureClanInKingdom(enemy.ClanId, enemyId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        EnsureKingdomRegisteredEverywhere(enemyId);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(enemyId, out var enemyKingdom));
+            var previousHero = ResolvedMainHeroContext.ResolvedMainHero;
+            var previousParty = Campaign.Current.MainParty;
+            var args = new CoopCommandArgsFactory();
+            var war = new KingdomDebugCommand.KingdomDeclareWarCoopCommand();
+            Assert.False(war.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId })).Succeeded);
+            Assert.False(war.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId, "hostility", "none" })).Succeeded);
+            Assert.False(kingdom.IsAtWarWith(enemyKingdom));
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
+
+            var wars = 0;
+            var peaces = 0;
+            CampaignEvents.WarDeclared.AddNonSerializedListener(this, (first, second, detail) =>
+            {
+                Assert.Same(hero, Hero.MainHero);
+                Assert.Equal(DeclareWarAction.DeclareWarDetail.CausedByPlayerHostility, detail);
+                wars++;
+            });
+            CampaignEvents.MakePeace.AddNonSerializedListener(this, (first, second, detail) =>
+            {
+                Assert.Same(hero, Hero.MainHero);
+                peaces++;
+            });
+            try
+            {
+                var result = war.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId, "hostility", ControllerId }));
+                Assert.True(result.Succeeded, result.Output);
+                Assert.Equal(1, wars);
+                Assert.True(kingdom.IsAtWarWith(enemyKingdom));
+                Assert.Same(previousHero, ResolvedMainHeroContext.ResolvedMainHero);
+                Assert.Same(previousParty, Campaign.Current.MainParty);
+
+                var peace = new KingdomDebugCommand.KingdomMakePeaceCoopCommand();
+                Assert.False(peace.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId })).Succeeded);
+                Assert.True(kingdom.IsAtWarWith(enemyKingdom));
+                result = peace.ProcessCommand(args.FromValues(new[] { kingdomId, enemyId, ControllerId }));
+                Assert.True(result.Succeeded, result.Output);
+                Assert.Equal(1, peaces);
+                Assert.False(kingdom.IsAtWarWith(enemyKingdom));
+                Assert.Same(previousHero, ResolvedMainHeroContext.ResolvedMainHero);
+                Assert.Same(previousParty, Campaign.Current.MainParty);
+            }
+            finally
+            {
+                CampaignEvents.WarDeclared.ClearListeners(this);
+                CampaignEvents.MakePeace.ClearListeners(this);
+            }
+        }, new[] { AccessTools.Method(typeof(DefaultAllianceModel), nameof(DefaultAllianceModel.GetCallToWarCost)) });
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
+        foreach (var client in Clients)
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(enemyId, out var enemyKingdom));
+                Assert.False(kingdom.IsAtWarWith(enemyKingdom));
+            });
+    }
+
+    [Fact]
+    public void RebellionDebugActionRequiresAnActorAndCompletesClanMembershipChanges()
+    {
+        var player = CreateSyncedPlayerContext();
+        var ruler = CreateSyncedPlayerContext("RebellionRuler", _ => false);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(ruler.ClanId, kingdomId);
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        void Observe(EnvironmentInstance instance, string phase)
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+            Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            var clanRegistered = instance.ObjectManager.TryGetHandle(clan, out var clanHandle);
+            var kingdomRegistered = instance.ObjectManager.TryGetHandle(kingdom, out var kingdomHandle);
+            var setter = AccessTools.PropertySetter(typeof(Clan), nameof(Clan.Kingdom));
+            var internalSetter = AccessTools.Method(typeof(Clan), nameof(Clan.SetKingdomInternal));
+            output.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(new
+            {
+                diagnostic = "rebellion-membership", phase,
+                role = ReferenceEquals(instance, Server) ? "server" : "client-" + Array.IndexOf(Clients.ToArray(), instance),
+                player.ClanId, clanRegistered, clanHandle, kingdomId, kingdomRegistered, kingdomHandle,
+                clanKingdom = clan.Kingdom?.StringId, backingKingdom = clan._kingdom?.StringId,
+                kingdomClans = kingdom._clans?.Select(member => member?.StringId).ToArray(),
+                pendingApplies = instance.PendingGameThreadActionCount,
+                localSets = instance.InternalMessages.GetMessages<SetClanKingdom>()
+                    .Select(message => new { clan = message.Clan?.StringId, kingdom = message.Kingdom?.StringId }).ToArray(),
+                sentSets = instance.NetworkSentMessages.GetMessages<NetworkSetClanKingdom>().ToArray(),
+                receivedSets = instance.InternalMessages.GetMessages<NetworkSetClanKingdom>().ToArray(),
+                sentChanges = instance.NetworkSentMessages.GetMessages<NetworkOnClanChangedKingdom>().ToArray(),
+                receivedChanges = instance.InternalMessages.GetMessages<NetworkOnClanChangedKingdom>().ToArray(),
+                membershipMessageOrder = instance.InternalMessages.Select((message, index) => new { message, index })
+                    .Where(item => item.message is SetClanKingdom || item.message is NetworkSetClanKingdom ||
+                        item.message is NetworkOnClanChangedKingdom || item.message.GetType().Name.StartsWith("Kingdom__clans_"))
+                    .Select(item => new { item.index, type = item.message.GetType().FullName }).ToArray(),
+                setterPrefixes = Harmony.GetPatchInfo(setter)?.Prefixes
+                    .Select(patch => patch.PatchMethod.DeclaringType.FullName + "." + patch.PatchMethod.Name).ToArray(),
+                internalSetterPrefixes = Harmony.GetPatchInfo(internalSetter)?.Prefixes
+                    .Select(patch => patch.PatchMethod.DeclaringType.FullName + "." + patch.PatchMethod.Name).ToArray(),
+            }));
+        }
+        foreach (var instance in new[] { Server }.Concat(Clients))
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                using (new AllowedThread())
+                {
+                    kingdom.Name = new TextObject("Rebellion kingdom");
+                }
+                Observe(instance, "before-command");
+            });
+
+        var notifiedMemberships = new Dictionary<EnvironmentInstance, List<Kingdom>>();
+        foreach (var client in Clients)
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+                var memberships = new List<Kingdom>();
+                notifiedMemberships.Add(client, memberships);
+                CampaignEvents.OnClanChangedKingdomEvent.AddNonSerializedListener(this,
+                    (changed, oldKingdom, newKingdom, detail, show) =>
+                    {
+                        if (changed == clan) memberships.Add(clan.Kingdom);
+                    });
+            });
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(player.HeroId, out var hero));
+            Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+            var previousHero = ResolvedMainHeroContext.ResolvedMainHero;
+            var previousParty = Campaign.Current.MainParty;
+            var command = new ClanDebugCommands.ClanLeaveKingdomCoopCommand();
+            var args = new CoopCommandArgsFactory();
+            var missingActor = command.ProcessCommand(args.FromValues(new[] { player.ClanId, "rebellion" }));
+            Assert.False(missingActor.Succeeded);
+            Assert.Contains("An acting player's registered hero and party are required.", missingActor.Output);
+            Assert.Same(kingdom, clan.Kingdom);
+            Assert.Contains(clan, kingdom.Clans);
+            Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
+            var changes = 0;
+            CampaignEvents.OnClanChangedKingdomEvent.AddNonSerializedListener(this, (changed, oldKingdom, newKingdom, detail, show) =>
+            {
+                Assert.Same(hero, Hero.MainHero);
+                Assert.Same(clan, changed);
+                Assert.Equal(ChangeKingdomAction.ChangeKingdomActionDetail.LeaveWithRebellion, detail);
+                changes++;
+            });
+            try
+            {
+                var result = command.ProcessCommand(args.FromValues(new[] { player.ClanId, "rebellion", ControllerId }));
+                Observe(Server, "after-command");
+                Assert.True(result.Succeeded, result.Output);
+                Assert.Equal(1, changes);
+                Assert.True(clan.IsAtWarWith(kingdom));
+                Assert.Same(previousHero, ResolvedMainHeroContext.ResolvedMainHero);
+                Assert.Same(previousParty, Campaign.Current.MainParty);
+            }
+            finally
+            {
+                CampaignEvents.OnClanChangedKingdomEvent.ClearListeners(this);
+            }
+        }, new[] { AccessTools.Method(typeof(DefaultAllianceModel), nameof(DefaultAllianceModel.GetCallToWarCost)) });
+        Assert.Contains(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>(),
+            message => message.Detail == (int)DeclareWarAction.DeclareWarDetail.CausedByRebellion);
+        foreach (var instance in new[] { Server }.Concat(Clients))
+            instance.Call(() => Observe(instance, "before-pump"));
+        foreach (var client in Clients)
+            client.PumpGameThread();
+        foreach (var instance in new[] { Server }.Concat(Clients))
+            instance.Call(() => Observe(instance, "after-pump"));
+        foreach (var client in Clients)
+            client.Call(() =>
+            {
+                CampaignEvents.OnClanChangedKingdomEvent.ClearListeners(this);
+                Assert.Null(Assert.Single(notifiedMemberships[client]));
+            });
+        foreach (var instance in new[] { Server }.Concat(Clients))
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+                Assert.True(instance.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.Null(clan.Kingdom);
+                Assert.DoesNotContain(clan, kingdom.Clans);
+            });
+    }
+
+    [Fact]
+    public void RepeatedKingdomMembershipDoesNotResetClientInfluence()
+    {
+        var player = CreateSyncedPlayerContext();
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        ConfigureClanInKingdom(player.ClanId, kingdomId);
+        EnsureKingdomRegisteredEverywhere(kingdomId);
+        const float influence = 123f;
+        foreach (var client in Clients)
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+                using (new AllowedThread())
+                {
+                    clan._influence = influence;
+                }
+            });
+
+        Server.Call(() => Server.Resolve<INetwork>().SendAll(new NetworkSetClanKingdom(player.ClanId, kingdomId)));
+        foreach (var client in Clients)
+        {
+            client.PumpGameThread();
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Clan>(player.ClanId, out var clan));
+                Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+                Assert.Same(kingdom, clan.Kingdom);
+                Assert.Equal(influence, clan.Influence);
+                Assert.Same(clan, Assert.Single(kingdom.Clans));
+                Assert.Contains(client.InternalMessages.GetMessages<NetworkSetClanKingdom>(),
+                    message => message.ClanId == player.ClanId && message.KingdomId == kingdomId);
+            });
+        }
     }
 
     [Fact]
@@ -2372,9 +2616,16 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkDeclareWar>());
     }
 
-    [Fact]
-    public void KingdomDecisionVotes_MissingVoteTimesOutAfterVotingWindow()
+    [Theory]
+    [InlineData(60)]
+    [InlineData(600)]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void KingdomDecisionVotes_MissingVoteTimesOutAfterVotingWindow(int timeoutSeconds)
     {
+        ModConfigProvider.LoadModConfig(new ModOptionsData { KingdomDecisionVoteTimeoutSeconds = timeoutSeconds });
+        Assert.Equal(timeoutSeconds > 0 ? timeoutSeconds : 60, (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds);
+        timeoutSeconds = (int)KingdomDecisionVoteManager.VotingRoundDuration.TotalSeconds;
         var player = CreateSyncedPlayerContext();
         var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
         var targetKingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
@@ -2423,6 +2674,9 @@ public class PlayerKingdomCreationFlowTests : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
+
+            GetConcreteVoteManager(Server).ProcessVotingRounds(DateTime.UtcNow.AddSeconds(timeoutSeconds * 0.9));
+            Assert.Same(decision, Assert.Single(kingdom.UnresolvedDecisions));
 
             GetConcreteVoteManager(Server).ProcessVotingRounds(
                 DateTime.UtcNow + KingdomDecisionVoteManager.VotingRoundDuration);

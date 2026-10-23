@@ -29,7 +29,7 @@ public sealed class IssuesCompleteCoopCommand : ICoopCommand
     public IExpectedArgs[] ExpectedArgs { get; } = new IExpectedArgs[]
     {
         new ExpectedArgs("hero_id", "The registered id of the hero that offers the issue."),
-        new ExpectedArgs("outcome", "success, fail, betrayal, cancel or timeout. Success is the default.", isRequired: false),
+        new ExpectedArgs("outcome", "success, fail, betrayal, cancel, timeout or ailord. Success is the default.", isRequired: false),
     };
 
     public CoopCommandResult ProcessCommand(ICoopCommandArgs args)
@@ -90,10 +90,25 @@ public sealed class IssuesCompleteCoopCommand : ICoopCommand
                     case "cancel":
                         issue.CompleteIssueWithStayAliveConditionsFailed();
                         break;
+                    case "ailord":
+                        var aiLord = hero.CurrentSettlement?.OwnerClan?.Leader;
+                        if (aiLord == null)
+                        {
+                            return Failed($"{hero.Name} is not in a settlement with an owner clan leader");
+                        }
+
+                        issue.CompleteIssueWithAiLord(aiLord);
+                        break;
                     default:
-                        return Failed($"{hero.Name} has no accepted quest, only timeout and cancel can end the issue");
+                        return Failed($"{hero.Name} has no accepted quest, only timeout, cancel and ailord can end the issue");
                 }
             }
+        }
+
+        // A quest can refuse its own ending, for example a hand-in without the goods
+        if (hero.Issue == issue)
+        {
+            return Failed($"The issue of {hero.Name} did not end with {outcome}, see the server log");
         }
 
         return new CoopCommandResult(true, $"Ended the issue of {hero.Name} with {outcome}");

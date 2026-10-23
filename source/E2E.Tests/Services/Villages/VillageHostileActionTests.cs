@@ -10,13 +10,16 @@ using Coop.Core.Server.Services.Time.Messages;
 using Common.Util;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Services.MapEvents;
 using E2E.Tests.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.MapEventComponents.Messages;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages.Conversation;
@@ -48,12 +51,15 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
+using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
@@ -1010,6 +1016,198 @@ public class VillageHostileActionTests : MapEventTestBase
         }, MapEventDisabledMethods);
     }
 
+    [Theory]
+    [InlineData(VillageHostileAction.ForceSupplies)]
+    [InlineData(VillageHostileAction.ForceVolunteers)]
+    public void ClientLeavesForcedVillage_RequestsFinalizeAndReentryWithoutSimulating(VillageHostileAction action)
+    {
+        var client = Clients.First();
+        var (_, mobilePartyId) = CreatePlayerHeroParty("PlayerOne");
+        RegisterPeer(client, "PlayerOne");
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        var target = CreateVillageTarget();
+        string? mapEventId = null;
+
+        foreach (var instance in Clients.Prepend(Server))
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+                Assert.True(instance.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                using (new AllowedThread())
+                {
+                    party.MemberRoster.AddToCounts(troop, 2);
+                    settlement.Party.MemberRoster.AddToCounts(troop, 2);
+                    party.CurrentSettlement = settlement;
+                    party.Position = new CampaignVec2(default, isOnLand: true);
+                }
+            });
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            var mapEvent = CreateHostileActionMapEvent(party.Party, settlement.Party, action);
+            mapEvent.Position = new CampaignVec2(default, isOnLand: true);
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+        }, MapEventDisabledMethods);
+
+        TestEnvironment.FlushCoalescer();
+        EnableHeadlessEncounterFinish(client);
+        var encounter = SetMockPlayerEncounter(client, mapEventId: mapEventId);
+        var model = new SimulationRoundProbe();
+        var router = client.Resolve<TestNetworkRouter>();
+        client.NetworkSentMessages.Clear();
+        router.AutoDrainReady = false;
+        try
+        {
+            client.Call(() =>
+            {
+                Assert.True(client.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var party));
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+                Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out var mapEvent));
+                using (new AllowedThread())
+                {
+                    Campaign.Current.MainParty = party;
+                }
+                encounter._encounteredParty = settlement.Party;
+                encounter.EncounterSettlementAux = settlement;
+                InstallSimulationModels(client, model);
+
+                Assert.False(CallOriginalPolicy.IsOriginalAllowed());
+                Assert.Same(party.Party, mapEvent.AttackerSide.LeaderParty);
+                Assert.Single(mapEvent.AttackerSide.Parties);
+                var attackerHealthy = party.Party.NumberOfHealthyMembers;
+                var defenderHealthy = settlement.Party.NumberOfHealthyMembers;
+                Assert.True(attackerHealthy >= 2);
+                Assert.True(defenderHealthy >= 2);
+                Assert.Equal(attackerHealthy, mapEvent.GetNumberOfInvolvedMen(BattleSideEnum.Attacker));
+                Assert.Equal(BattleState.None, mapEvent.BattleState);
+                Assert.False(mapEvent.IsRaid);
+                Assert.False(mapEvent.IsNavalMapEvent);
+                Assert.False(party.IsCurrentlyAtSea);
+                Assert.False(mapEvent.IsFinalized);
+                var behavior = new EncounterGameMenuBehavior();
+                var args = new MenuCallbackArgs((MenuContext)null, TextObject.GetEmpty());
+                Assert.True(behavior.game_menu_encounter_leave_on_condition(args));
+
+                // Keep the real finalization request pending while native Leave finishes locally.
+                behavior.game_menu_encounter_leave_on_consequence(args);
+
+                Assert.Equal(2, model.ParticipatingCountCalls);
+                Assert.Equal(0, model.RoundCalls);
+                Assert.Equal(BattleState.None, mapEvent.BattleState);
+                Assert.False(mapEvent.IsFinalized);
+                Assert.Equal(attackerHealthy, party.Party.NumberOfHealthyMembers);
+                Assert.Equal(defenderHealthy, settlement.Party.NumberOfHealthyMembers);
+                Assert.Same(settlement, party.CurrentSettlement);
+                Assert.Null(PlayerEncounter.Current);
+                Assert.True(client.ObjectManager.TryGetHandle(party, out var partyHandle));
+                Assert.True(client.ObjectManager.TryGetHandle(settlement, out var settlementHandle));
+                var finalize = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkMapEventFinalizeAttempted>());
+                var reentry = Assert.Single(client.NetworkSentMessages.GetMessages<NetworkRequestStartSettlementEncounter>());
+                Assert.Equal(mapEventId, finalize.MapEventId);
+                Assert.Equal(partyHandle, reentry.PartyId);
+                Assert.Equal(settlementHandle, reentry.SettlementId);
+                var requests = client.NetworkSentMessages.Messages.ToList();
+                Assert.True(requests.FindIndex(message => message is NetworkMapEventFinalizeAttempted)
+                    < requests.FindIndex(message => message is NetworkRequestStartSettlementEncounter));
+                Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkTroopKilled>());
+                Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkTroopWounded>());
+                Assert.Empty(client.NetworkSentMessages.GetMessages<NetworkTroopScoreHit>());
+            }, MapEventDisabledMethods.Append(
+                // The headless test uses the default spawn setting without loading BannerlordConfig.
+                AccessTools.PropertyGetter(typeof(MBGameManager), nameof(MBGameManager.UnitSpawnPrioritization))));
+        }
+        finally
+        {
+            router.AutoDrainReady = true;
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false, false, false)]
+    [InlineData(true, false, false, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, false, false, true)]
+    [InlineData(true, false, false, true)]
+    public void NativeSimulationRound_PreservesServerAndAllowedOriginalExecution(
+        bool isServer, bool allowedThread, bool allowNonSync, bool internalCaller)
+    {
+        var context = CreateServerMapEvent();
+        var instance = isServer ? Server : Clients.First();
+        instance.Call(() =>
+        {
+            Assert.True(instance.ObjectManager.TryGetObject<MapEvent>(context.MapEventId, out var mapEvent));
+            var model = new SimulationRoundProbe();
+            InstallSimulationModels(instance, model);
+            var policy = (TestPolicy)instance.Resolve<ISyncPolicy>();
+            var previous = policy.AllowOriginals;
+            policy.AllowOriginals = allowNonSync;
+            try
+            {
+                using var originalScope = allowedThread ? new AllowedThread() : null;
+                Action simulate = internalCaller
+                    ? mapEvent.SimulateBattleRoundInternal
+                    : () => mapEvent.SimulateBattleRound(1, 0);
+                if (isServer || allowedThread || allowNonSync)
+                {
+                    var error = Assert.Throws<InvalidOperationException>(simulate);
+                    Assert.Equal(SimulationRoundProbe.RoundEntered, error.Message);
+                    Assert.Equal(1, model.RoundCalls);
+                }
+                else
+                {
+                    simulate();
+                    Assert.Equal(0, model.RoundCalls);
+                }
+            }
+            finally
+            {
+                policy.AllowOriginals = previous;
+            }
+        }, MapEventDisabledMethods);
+    }
+
+    private static void InstallSimulationModels(EnvironmentInstance instance, SimulationRoundProbe model)
+    {
+        // Existing models take precedence over these fallbacks.
+        var models = new List<GameModel>
+        {
+            new DefaultTroopSupplierProbabilityModel(),
+            new DefaultCharacterStatsModel(),
+        };
+        models.AddRange(Campaign.Current.Models.GetGameModels());
+        models.Add(model);
+        var gameModels = new GameModels(models);
+        instance.GameInstance.Game._gameModelManagers[typeof(GameModels)] = gameModels;
+        Campaign.Current._gameModels = gameModels;
+    }
+
+    private sealed class SimulationRoundProbe : DefaultCombatSimulationModel
+    {
+        public const string RoundEntered = "native simulation round reached";
+        public int RoundCalls { get; private set; }
+        public int ParticipatingCountCalls { get; private set; }
+
+        public override int GetParticipatingTroopCount(MapEventSide side)
+        {
+            ParticipatingCountCalls++;
+            return base.GetParticipatingTroopCount(side);
+        }
+
+        public override (int defenderRounds, int attackerRounds) GetSimulationTicksForBattleRound(MapEvent mapEvent) => (1, 0);
+
+        public override void GetBattleAdvantage(MapEvent mapEvent, out ExplainedNumber defenderAdvantage, out ExplainedNumber attackerAdvantage)
+        {
+            RoundCalls++;
+            throw new InvalidOperationException(RoundEntered);
+        }
+    }
+
     [Fact]
     public void RaidAttackerVictoryFinalizeRequest_ResetsPlayersToVillageAndPreservesProgress()
     {
@@ -1697,6 +1895,77 @@ public class VillageHostileActionTests : MapEventTestBase
         }, MapEventDisabledMethods);
 
         Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkMapEventLockChanged>());
+    }
+
+    [Theory]
+    [InlineData(0.5f, Village.VillageStates.Normal)]
+    [InlineData(0f, Village.VillageStates.Looted)]
+    public void CleanUpLoadedMapEvents_EndedAiRaid_ResetsVillageState(float hitPoints, Village.VillageStates expectedState)
+    {
+        // a save where an AI raid already left the map event manager but still links its parties
+        var aiRaiderMobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var target = CreateVillageTarget();
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(aiRaiderMobilePartyId, out var aiRaiderParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            settlement.SettlementHitPoints = hitPoints;
+
+            var mapEvent = CreateHostileActionMapEvent(aiRaiderParty.Party, settlement.Party, VillageHostileAction.Raid);
+            Campaign.Current.MapEventManager._mapEvents.Remove(mapEvent);
+            Assert.Equal(Village.VillageStates.BeingRaided, settlement.Village.VillageState);
+
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+
+            Assert.True(mapEvent.IsFinalized);
+            Assert.Null(aiRaiderParty.Party.MapEventSide);
+            Assert.False(settlement.IsUnderRaid);
+        }, MapEventDisabledMethods);
+
+        foreach (var instance in Clients.Append(Server))
+        {
+            AssertVillageStateAndHitPoints(instance, target.SettlementId, target.VillageId, expectedState, hitPoints);
+        }
+    }
+
+    [Theory]
+    [InlineData(VillageHostileAction.ForceSupplies, Village.VillageStates.ForcedForSupplies)]
+    [InlineData(VillageHostileAction.ForceVolunteers, Village.VillageStates.ForcedForVolunteers)]
+    public void CleanUpLoadedMapEvents_EndedAiForceEvent_ResetsVillageState(
+        VillageHostileAction action,
+        Village.VillageStates forcedState)
+    {
+        // a save where an AI force event already left the map event manager but still links its parties
+        var aiAttackerMobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var target = CreateVillageTarget();
+        string? mapEventId = null;
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(aiAttackerMobilePartyId, out var aiAttackerParty));
+            Assert.True(Server.ObjectManager.TryGetObject<Settlement>(target.SettlementId, out var settlement));
+            settlement.SettlementHitPoints = 1f;
+
+            var mapEvent = CreateHostileActionMapEvent(aiAttackerParty.Party, settlement.Party, action);
+            Assert.True(Server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+            Campaign.Current.MapEventManager._mapEvents.Remove(mapEvent);
+            Assert.Equal(forcedState, settlement.Village.VillageState);
+
+            Server.Resolve<IMapEventLoadCleaner>().CleanUpLoadedMapEvents();
+
+            Assert.True(mapEvent.IsFinalized);
+            Assert.Null(aiAttackerParty.Party.MapEventSide);
+            Assert.Empty(mapEvent.AttackerSide.Parties);
+            Assert.Empty(mapEvent.DefenderSide.Parties);
+        }, MapEventDisabledMethods);
+
+        Assert.NotNull(mapEventId);
+        foreach (var instance in Clients.Append(Server))
+        {
+            AssertVillageStateAndHitPoints(instance, target.SettlementId, target.VillageId, Village.VillageStates.Normal, 1f);
+            instance.Call(() => Assert.False(instance.ObjectManager.TryGetObject<MapEvent>(mapEventId!, out _)));
+        }
     }
 
     [Fact]

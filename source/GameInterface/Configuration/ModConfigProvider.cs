@@ -45,7 +45,7 @@ public readonly struct ModOptions
     [ProtoMember(12)]
     public readonly bool SmithingStaminaRecoveryOutsideSettlements { get; } = true;
     [ProtoMember(13)]
-    public readonly float SmithingStaminaRecoveryMultiplier { get; } = 0.1f;
+    public readonly float SmithingStaminaRecoveryMultiplier { get; } = 0.6f;
     [ProtoMember(14)]
     public readonly float MaximumLootersMultiplier { get; } = 1f;
     [ProtoMember(15)]
@@ -74,6 +74,8 @@ public readonly struct ModOptions
     public readonly bool BlockAiWarDeclarationsOnOfflinePlayers { get; } = false;
     [ProtoMember(26)]
     public readonly int SpawnRateWanderers { get; } = 1;
+    [ProtoMember(27)]
+    public readonly int KingdomDecisionVoteTimeoutSeconds { get; } = 60;
 
     public ModOptions(ModOptions previous, bool voiceEnabled)
     {
@@ -109,5 +111,6 @@ public readonly struct ModOptions
         EnablePlayerExecutions = modOptionsData.EnablePlayerExecutions ?? EnablePlayerExecutions;
         ShowPlayerNameplates = modOptionsData.ShowPlayerNameplates ?? ShowPlayerNameplates;
         PlayerWoundedBattleEntry = modOptionsData.PlayerWoundedBattleEntry ?? PlayerWoundedBattleEntry;
+        KingdomDecisionVoteTimeoutSeconds = modOptionsData.KingdomDecisionVoteTimeoutSeconds ?? KingdomDecisionVoteTimeoutSeconds;
     }
 }
