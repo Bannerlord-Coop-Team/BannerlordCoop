@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
