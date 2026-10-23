@@ -3,6 +3,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Issues.Framework.Dispatch;
 
@@ -32,6 +33,22 @@ internal class QuestWorldEventRelayPatches
             "OnClanChangedKingdom",
             new[] { typeof(Clan), typeof(Kingdom), typeof(Kingdom), typeof(ChangeKingdomAction.ChangeKingdomActionDetail), typeof(bool) },
             clan, oldKingdom, newKingdom, actionDetail, showNotification);
+    }
+
+    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnSettlementOwnerChanged))]
+    [HarmonyPostfix]
+    private static void OnSettlementOwnerChangedPostfix(
+        Settlement settlement,
+        bool openToClaim,
+        Hero newOwner,
+        Hero oldOwner,
+        Hero capturerHero,
+        ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
+    {
+        Relay(
+            "OnSettlementOwnerChanged",
+            new[] { typeof(Settlement), typeof(bool), typeof(Hero), typeof(Hero), typeof(Hero), typeof(ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail) },
+            settlement, openToClaim, newOwner, oldOwner, capturerHero, detail);
     }
 
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnArmyDispersed))]

@@ -16,6 +16,7 @@ switched off, and a server running one cancels any quest a nightly save still ha
   no journal entry, no pop-up.
 - Rewards, relations and endings are worked out by the server as the owning player. Clients only show the
   result.
+- Settlement ownership changes reach active quests on the server, so vanilla cancellations end the owner's quest.
 - Quests are not saved between sessions. A quest ends when its player leaves or the server restarts.
 
 ## Trying it in game
