@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Patches;
@@ -8,6 +9,7 @@ using GameInterface.Services.Issues.Framework.Finalization;
 using GameInterface.Services.Issues.Framework.Interface;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Issues;
@@ -22,6 +24,15 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
     private readonly IMessageBroker messageBroker;
     private readonly IQuestTypeRegistry registry;
     private readonly IIssueOwnerResolver ownerResolver;
+    private readonly Dictionary<QuestBase, QuestOutcomeObservation> questOutcomes =
+        new Dictionary<QuestBase, QuestOutcomeObservation>(ReferenceComparer<QuestBase>.Instance);
+
+    /// <summary>Only retained while this quest's completion calls are on the stack.</summary>
+    private sealed class QuestOutcomeObservation
+    {
+        public int Depth;
+        public IssueOutcome? Outcome;
+    }
 
     public OutcomeDispatcher(IMessageBroker messageBroker, IQuestTypeRegistry registry, IIssueOwnerResolver ownerResolver)
     {
@@ -51,6 +62,12 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
         if (ModInformation.IsServer)
         {
             observed = issue;
+            if (!questOutcomes.TryGetValue(quest, out var observation))
+            {
+                observation = new QuestOutcomeObservation();
+                questOutcomes.Add(quest, observation);
+            }
+            observation.Depth++;
             return true;
         }
 
@@ -72,8 +89,7 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
             return true;
         }
 
-        // A finished quest was announced by BeforeQuestOutcome, vanilla then ends its issue here through IssueManager.OnQuestCompleted
-        // The server only announces an issue that ends while its quest is still running
+        // The outer quest dispatch announces quest completion; only an independently ending issue is observed here.
         if (issue.IssueQuest != null)
         {
             if (ModInformation.IsServer && issue.IssueQuest.IsOngoing)
@@ -140,6 +156,34 @@ internal class OutcomeDispatcher : IOutcomeDispatcher
 
         owner = scope;
         return true;
+    }
+
+    public void ObserveQuestCompletion(QuestBase quest, QuestBase.QuestCompleteDetails detail)
+    {
+        if (ModInformation.IsClient || !questOutcomes.TryGetValue(quest, out var observation)) return;
+
+        observation.Outcome = detail switch
+        {
+            QuestBase.QuestCompleteDetails.Success => IssueOutcome.QuestSuccess,
+            QuestBase.QuestCompleteDetails.Fail => IssueOutcome.QuestFail,
+            QuestBase.QuestCompleteDetails.Cancel => IssueOutcome.QuestCancel,
+            QuestBase.QuestCompleteDetails.Timeout => IssueOutcome.QuestTimeOut,
+            QuestBase.QuestCompleteDetails.FailWithBetrayal => IssueOutcome.QuestBetrayal,
+            _ => (IssueOutcome?)null,
+        };
+    }
+
+    public void AfterQuestOutcome(QuestBase quest, IssueBase observed, Exception exception)
+    {
+        if (observed == null || ModInformation.IsClient) return;
+
+        var observation = questOutcomes[quest];
+        if (--observation.Depth != 0) return;
+        questOutcomes.Remove(quest);
+
+        // A nested failure can return to a timeout, while OnBeforeTimedOut can redirect to success or defer.
+        if (exception == null && observation.Outcome.HasValue)
+            After(observed, observation.Outcome.Value);
     }
 
     public void After(IssueBase observed, IssueOutcome outcome)

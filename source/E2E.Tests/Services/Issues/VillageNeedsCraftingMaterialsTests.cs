@@ -363,9 +363,9 @@ public class VillageNeedsCraftingMaterialsTests : IDisposable
         var request = Assert.Single(ClientA.NetworkSentMessages.GetMessages<RequestQuestOutcome>());
         Assert.Equal(IssueOutcome.QuestTimeOut, request.Outcome);
 
-        // Vanilla fails the quest from inside its timeout, the fail is announced first
-        var finalized = Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>();
-        Assert.Equal(IssueOutcome.QuestFail, finalized.First().Outcome);
+        // The inner failure returns to vanilla's outer timeout completion.
+        var finalized = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueFinalized>());
+        Assert.Equal(IssueOutcome.QuestTimeOut, finalized.Outcome);
 
         foreach (var instance in Instances)
         {
