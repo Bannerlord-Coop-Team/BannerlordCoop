@@ -141,21 +141,40 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Server.Call(() => Assert.True(Get<Hero>(Server, scenario.NotableId).Issue.IsOngoingWithoutQuest));
     }
 
-    [Fact]
-    public void NoCounterOffer_MenuReplayRequestsTheServerAndDoesNotCompleteLocally()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NoCounterOffer_MenuReplayRequestsTheServerAndDoesNotCompleteLocally(bool influenceDropped)
     {
         ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.StartIssueWithLordSolution());
         // Exercise IssueBase's no-counteroffer menu branch on the owner; retain the real artisan's
         // merchant on the server because its reward consequence changes that merchant's power.
         ClientA.Call(() => Get<Hero>(ClientA, scenario.NotableId).Issue.CounterOfferHero = null);
+        if (influenceDropped)
+            Server.Call(() =>
+            {
+                Get<Hero>(Server, scenario.NotableId).Issue.CounterOfferHero = null;
+                Get<Clan>(Server, clanId).Influence = 0;
+            });
+        environment.FlushCoalescer();
         using var rewards = new MethodCallRecorder(Priority.First,
             AccessTools.Method(typeof(Issue), nameof(Issue.LordSolutionConsequenceWithRefuseCounterOffer)));
-
-        OnMapAfterConversation(ClientA, () =>
+        // The framework sees a no-counteroffer issue; the actual artisan reward still needs its merchant.
+        var harmony = new Harmony($"no-counteroffer-rewards.{Guid.NewGuid():N}");
+        harmony.Patch(AccessTools.Method(typeof(Issue), nameof(Issue.LordSolutionConsequenceWithRefuseCounterOffer)),
+            prefix: new HarmonyMethod(typeof(ArtisanOverpricedGoodsTests), nameof(RestoreRewardMerchant)));
+        try
         {
-            using (new AllowedThread())
-                CampaignEventDispatcher.Instance.BeforeGameMenuOpened(null);
-        });
+            OnMapAfterConversation(ClientA, () =>
+            {
+                using (new AllowedThread())
+                    CampaignEventDispatcher.Instance.BeforeGameMenuOpened(null);
+            });
+        }
+        finally
+        {
+            harmony.UnpatchAll(harmony.Id);
+        }
         environment.FlushCoalescer();
 
         Assert.Equal(LordSolutionOperation.RefuseCounterOffer,
@@ -165,6 +184,12 @@ public class ArtisanOverpricedGoodsTests : IDisposable
         Assert.Equal(0, rewards.CountFor(ClientA));
         Assert.Equal(0, rewards.CountFor(ClientB));
         AssertFinished(2530, 10900);
+    }
+
+    private static void RestoreRewardMerchant(Issue __instance)
+    {
+        if (ModInformation.IsServer)
+            __instance.CounterOfferHero = __instance.IssueSettlement.Notables.First(hero => hero.IsMerchant);
     }
 
     [Theory]
