@@ -5,6 +5,7 @@ using Quest = TaleWorlds.CampaignSystem.Issues.SmugglersIssueBehavior.SmugglersI
 
 namespace GameInterface.Services.Issues.Quests.Smugglers.Patches;
 
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch]
 internal class SmugglersBranchPatches
 {

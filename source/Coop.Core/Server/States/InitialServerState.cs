@@ -80,7 +80,7 @@ public class InitialServerState : ServerStateBase
 
         loadingInterface.SetLoadingMessage("Hosting Coop Server", "Applying synced object lifetimes...");
         registryManager.PatchLifetimes();
-        mapEventLoadCleaner.FinalizePlayerMapEvents();
+        mapEventLoadCleaner.CleanUpLoadedMapEvents();
         leaderlessClanResolver.RepairLoadedClans();
         emptyLordPartyResetter.ResetEmptyLordParties();
 

@@ -6,6 +6,9 @@ stays switched off.
 
 How it works and how to add a quest type are in [AGENTS.md](AGENTS.md).
 
+Quests only run in nightly builds and local Debug builds. Stable releases have every issue and quest
+switched off, and a server running one cancels any quest a nightly save still has in progress.
+
 ## What players get
 
 - Every player sees the same issue on the same notable or lord, built from the server's values.
