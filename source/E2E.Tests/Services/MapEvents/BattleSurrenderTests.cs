@@ -114,6 +114,46 @@ public class BattleSurrenderTests : MapEventTestBase
     }
 
     /// <summary>
+    /// A surrender clicked while the encounter's map event has not reached the client yet cannot be sent, so it
+    /// must not latch the local pending state either; once the map event arrives the next click sends exactly
+    /// one request.
+    /// </summary>
+    [Fact]
+    public void RealSurrenderAction_BeforeMapEventArrives_DoesNotLatch_ThenSendsOnceItArrives()
+    {
+        var setup = SetupTwoOpposingPlayersInBattle();
+        var recipientClient = Clients.Last();
+
+        // The encounter is open but the server's map event has not been attached to it yet.
+        SetMockPlayerEncounter(recipientClient);
+
+        recipientClient.Call(() =>
+        {
+            var encounter = PlayerEncounter.Current;
+            Assert.Null(encounter._mapEvent);
+
+            InvokePatchedSurrender(encounter);
+            Assert.False(encounter._playerSurrender, "a surrender that could not be sent must not latch");
+        }, BattleMenuSurrenderDisabledMethods());
+
+        Assert.Empty(recipientClient.NetworkSentMessages.GetMessages<NetworkPlayerSurrendered>());
+
+        recipientClient.Call(() =>
+        {
+            var encounter = PlayerEncounter.Current;
+            Assert.True(recipientClient.ObjectManager.TryGetObject<MapEvent>(setup.ctx.MapEventId, out var mapEvent));
+            encounter._mapEvent = mapEvent;
+
+            InvokePatchedSurrender(encounter);
+            Assert.True(encounter._playerSurrender);
+        }, BattleMenuSurrenderDisabledMethods());
+
+        var request = Assert.Single(recipientClient.NetworkSentMessages.GetMessages<NetworkPlayerSurrendered>());
+        Assert.Equal(setup.recipientPartyId, request.PlayerParty);
+        Assert.Equal(setup.ctx.MapEventId, request.MapEventId);
+    }
+
+    /// <summary>
     /// BR-061: the final battle result records the surrendered hero as a prisoner of the captor. Driven from
     /// the real surrender action, the surrendered hero is captive of the captor party on the server and every
     /// client, and its party has left the battle.

@@ -2,6 +2,7 @@ using Common.Util;
 using E2E.Tests.Environment.Instance;
 using GameInterface.Services.MapEvents;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Initialization;
 using HarmonyLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -11,6 +12,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
@@ -107,6 +109,62 @@ public class EncounterSurrenderOptionTests : MapEventTestBase
             {
                 BattleModeRegistry.End();
             }
+        }, MapEventDisabledMethods);
+    }
+
+    /// <summary>
+    /// The encounter menu can open before the server's map event is attached to the encounter. Surrender is
+    /// built from that map event, so it stays shown but refused until the event arrives, then enables.
+    /// </summary>
+    [Fact]
+    public void IncapacitatedDefender_BeforeEncounterMapEventArrives_SurrenderRefusedUntilItArrives()
+    {
+        var (ctx, client) = SetupIncapacitatedDefenderInBattle(withHealthyAllyOnSide: true);
+        SetMockPlayerEncounter(client);
+
+        client.Call(() =>
+        {
+            var encounter = PlayerEncounter.Current;
+            Assert.Null(encounter._mapEvent);
+
+            var (shown, args) = InvokeSurrenderCondition();
+
+            Assert.True(shown);
+            Assert.False(args.IsEnabled, "surrender must wait for the encounter's map event");
+            Assert.NotNull(args.Tooltip);
+
+            Assert.True(client.ObjectManager.TryGetObject<MapEvent>(ctx.MapEventId, out var mapEvent));
+            encounter._mapEvent = mapEvent;
+
+            var (shownAfter, argsAfter) = InvokeSurrenderCondition();
+
+            Assert.True(shownAfter);
+            Assert.True(argsAfter.IsEnabled);
+        }, MapEventDisabledMethods);
+    }
+
+    /// <summary>
+    /// A map event that reached the client but is still initializing (barrier pending) refuses surrender the
+    /// same way, because the server cannot resolve a request for it yet.
+    /// </summary>
+    [Fact]
+    public void IncapacitatedDefender_WhileEncounterMapEventInitializing_SurrenderRefused()
+    {
+        var (_, client) = SetupIncapacitatedDefenderInBattle(withHealthyAllyOnSide: true);
+        SetMockPlayerEncounter(client);
+
+        client.Call(() =>
+        {
+            var pendingMapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+            var barrier = client.Resolve<IMapEventInitializationBarrier>();
+            barrier.Register(pendingMapEvent);
+            Assert.True(barrier.IsPending(pendingMapEvent));
+            PlayerEncounter.Current._mapEvent = pendingMapEvent;
+
+            var (shown, args) = InvokeSurrenderCondition();
+
+            Assert.True(shown);
+            Assert.False(args.IsEnabled, "surrender must wait until the map event finishes initializing");
         }, MapEventDisabledMethods);
     }
 

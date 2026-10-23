@@ -258,7 +258,6 @@ internal class PlayerEncounterPatches
 
         // Preserve vanilla's local pending state so a delayed server response cannot enqueue duplicate surrender requests.
         if (__instance._playerSurrender) return false;
-        __instance._playerSurrender = true;
 
         Logger.Information(
             "[PvPBattleEncounterTrace] Battle encounter option clicked: surrender; party={PartyId} mapEvent={MapEventId} menu={Menu} encounter={Encounter}",
@@ -267,11 +266,36 @@ internal class PlayerEncounterPatches
             Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId ?? "<none>",
             PlayerEncounter.Current != null);
 
-        var message = new PlayerSurrendered(PlayerEncounter.Current._mapEvent, MobileParty.MainParty);
+        // Latching before the request can be sent would leave Surrender dead for the rest of the encounter.
+        if (!IsSurrenderRequestReady(__instance))
+        {
+            Logger.Warning("Surrender clicked before the server's map event reached this client; request not sent");
+            return false;
+        }
+
+        __instance._playerSurrender = true;
+
+        var message = new PlayerSurrendered(__instance._mapEvent, MobileParty.MainParty);
 
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;
+    }
+
+    /// <summary>
+    /// The surrender request names the encounter's own map event, so it can only be sent once that event has
+    /// reached this client and finished initializing.
+    /// </summary>
+    internal static bool IsSurrenderRequestReady(PlayerEncounter encounter)
+    {
+        var mapEvent = encounter?._mapEvent;
+        if (mapEvent == null) return false;
+
+        if (ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier) && barrier.IsPending(mapEvent))
+            return false;
+
+        return ContainerProvider.TryResolve<IObjectManager>(out var objectManager) &&
+               objectManager.TryGetId(mapEvent, out _);
     }
 
     [HarmonyPatch(nameof(PlayerEncounter.CheckNearbyPartiesToJoinPlayerMapEvent))]

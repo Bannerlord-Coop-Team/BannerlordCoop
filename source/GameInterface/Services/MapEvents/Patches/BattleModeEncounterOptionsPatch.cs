@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Configuration;
+using GameInterface.Services.MapEvents.Initialization;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Helpers;
@@ -39,6 +40,7 @@ internal class BattleModeEncounterOptionsPatch
     private static readonly TextObject MissionUnderwayTooltip = new("{=!}A battle is already underway.");
     private static readonly TextObject SimulationUnderwayTooltip = new("{=!}A battle simulation is already underway.");
     private static readonly TextObject EncounterUnavailableTooltip = new("{=!}The battle encounter is no longer available.");
+    private static readonly TextObject BattleNotReadyTooltip = new("{=!}Waiting for the server to set up the battle.");
     private static readonly TextObject LowMoraleTooltip = new("{=xnRtINwH}Your men lack the courage to continue the battle without you. (Low Morale)");
     private static readonly TextObject WoundedTooltip = new("{=UL8za0AO}You are wounded.");
     private static readonly TextObject RaftTooltip = new("{=x9ePfpw5}You are on a raft, in desperate circumstances, and cannot fight");
@@ -67,6 +69,9 @@ internal class BattleModeEncounterOptionsPatch
     // Handled inversely to the start buckets: forced available / refused rather than only greyed.
     private const string SurrenderCondition = "game_menu_encounter_surrender_on_condition"; // Surrender.
     private const string AbandonArmyCondition = "game_menu_encounter_abandon_army_on_condition"; // Abandon army.
+
+    // The map event a pending surrender gate waits on, so repeated menu refreshes queue one commit callback.
+    private static MapEvent refreshQueuedFor;
 
     static IEnumerable<MethodBase> TargetMethods()
     {
@@ -385,6 +390,8 @@ internal class BattleModeEncounterOptionsPatch
     /// auto-resolve), a surrender would conclude the battle under them, so a claimed event refuses the option until
     /// the claim releases (<see cref="Messages.Start.NetworkBattleModeSet"/>); the server mirrors this refusal
     /// authoritatively via <see cref="ServerBattleModeArbiter"/> in <c>PlayerCaptivityServerHandler</c>.
+    /// Until the encounter's own map event has reached this client the option is also refused, because the
+    /// request is built from it (<see cref="PlayerEncounterPatches.IsSurrenderRequestReady"/>).
     /// </summary>
     private static void PostfixSurrenderCondition(MenuCallbackArgs args, ref bool __result)
     {
@@ -395,6 +402,16 @@ internal class BattleModeEncounterOptionsPatch
         }
 
         if (!__result) return;
+
+        // The surrender request carries the encounter's map event; a click before it arrives would be dropped.
+        var encounter = PlayerEncounter.Current;
+        if (encounter != null && !PlayerEncounterPatches.IsSurrenderRequestReady(encounter))
+        {
+            args.IsEnabled = false;
+            args.Tooltip = BattleNotReadyTooltip;
+            RefreshMenuAfterCommit(encounter._mapEvent);
+            return;
+        }
 
         if (!TryGetCurrentMapEventId(out var mapEventId)) return;
 
@@ -408,6 +425,22 @@ internal class BattleModeEncounterOptionsPatch
             args.IsEnabled = false;
             args.Tooltip = SimulationUnderwayTooltip;
         }
+    }
+
+    /// <summary>Re-evaluates the encounter menu once a still initializing map event commits on this client.</summary>
+    private static void RefreshMenuAfterCommit(MapEvent mapEvent)
+    {
+        if (mapEvent == null || ReferenceEquals(refreshQueuedFor, mapEvent)) return;
+        if (!ContainerProvider.TryResolve<IMapEventInitializationBarrier>(out var barrier) || !barrier.IsPending(mapEvent))
+            return;
+        if (!ContainerProvider.TryResolve<IEncounterMenuConditionRefresher>(out var refresher)) return;
+
+        refreshQueuedFor = mapEvent;
+        barrier.RunAfterCommit(mapEvent, () =>
+        {
+            refreshQueuedFor = null;
+            refresher.RefreshForMapEvent(mapEvent);
+        });
     }
 
     /// <summary>Wounded main hero with no healthy member in its own party, on a battle side native gives no plain
@@ -434,7 +467,7 @@ internal class BattleModeEncounterOptionsPatch
     }
 
     [HarmonyFinalizer]
-    static Exception Finalizer(MenuCallbackArgs __0, MethodBase __originalMethod, ref bool __result, Exception __exception)
+    internal static Exception Finalizer(MenuCallbackArgs __0, MethodBase __originalMethod, ref bool __result, Exception __exception)
     {
         if (__exception == null) return null;
         if (ModInformation.IsServer) return __exception;
@@ -456,7 +489,7 @@ internal class BattleModeEncounterOptionsPatch
     }
 
     private static bool IsEncounterMenuRefresh()
-        => Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId == "encounter" ||
+        => Campaign.Current?.CurrentMenuContext?.GameMenu?.StringId is "encounter" or "join_encounter" ||
            PlayerEncounter.Current != null ||
            MobileParty.MainParty?.MapEvent != null;
 

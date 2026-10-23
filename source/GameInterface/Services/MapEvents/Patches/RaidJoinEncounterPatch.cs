@@ -1,6 +1,7 @@
 ﻿using Common;
 using GameInterface.Policies;
 using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -25,7 +26,8 @@ internal class RaidJoinEncounterConditionPatch
     [HarmonyPostfix]
     private static void Postfix(MethodBase __originalMethod, MenuCallbackArgs args, ref bool __result)
     {
-        var mapEvent = PlayerEncounter.EncounteredBattle;
+        // EncounteredBattle dereferences Current._encounteredParty, which is still null while the encounter is set up.
+        var mapEvent = PlayerEncounter.Current?._encounteredParty?.MapEvent;
         if (!mapEvent.IsActiveSlowVillageRaid())
             return;
 
@@ -39,6 +41,12 @@ internal class RaidJoinEncounterConditionPatch
         args.IsEnabled = false;
         args.Tooltip = TextObject.GetEmpty();
     }
+
+    // Vanilla's join conditions read EncounteredBattle unguarded too; share the encounter menu finalizer so a
+    // refresh before the encounter is set up greys the option instead of throwing.
+    [HarmonyFinalizer]
+    private static Exception Finalizer(MenuCallbackArgs args, MethodBase __originalMethod, ref bool __result, Exception __exception)
+        => BattleModeEncounterOptionsPatch.Finalizer(args, __originalMethod, ref __result, __exception);
 }
 
 [HarmonyPatch]
