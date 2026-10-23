@@ -857,13 +857,14 @@ public class NavalScenarioStager : INavalScenarioStager
         if (log.Length > 0) Logger.Warning("[NavalScenario] Troop top-up of {PartyId}: {Log}", party.StringId, log.ToString());
     }
 
-    // reserve=n: tops the regulars up past every ship's crew capacity, so at least n wait in reserve whatever ships deploy.
+    // reserve=n: tops the healthy troops (heroes too, wounded left out, as deployment counts them) up past every ship's crew
+    // capacity, so at least n wait in reserve whatever ships deploy.
     private void TopUpReserve(MobileParty party, int reserve)
     {
         if (reserve <= 0) return;
 
         var log = new StringBuilder();
-        for (int i = ReserveTemplatesMissing(party.MemberRoster.TotalRegulars, CrewCapacityOf(party), reserve); i > 0; i--)
+        for (int i = ReserveTemplatesMissing(party.MemberRoster.TotalHealthyCount, CrewCapacityOf(party), reserve); i > 0; i--)
             PartyCommands.AddTroopTemplate(party.MemberRoster, objectManager, log);
         if (log.Length > 0) Logger.Warning("[NavalScenario] Reserve top-up of {PartyId}: {Log}", party.StringId, log.ToString());
     }
@@ -873,9 +874,9 @@ public class NavalScenarioStager : INavalScenarioStager
 
     internal static int ShipsMissing(int ships, int wanted) => Math.Max(0, wanted - ships);
 
-    /// <summary>How many add_troops templates bring <paramref name="regulars"/> to <paramref name="reserve"/> past <paramref name="crewCapacity"/>.</summary>
-    internal static int ReserveTemplatesMissing(int regulars, int crewCapacity, int reserve) =>
-        Math.Max(0, (crewCapacity + reserve - regulars + TroopsPerTemplate - 1) / TroopsPerTemplate);
+    /// <summary>How many add_troops templates bring <paramref name="healthy"/> troops to <paramref name="reserve"/> past <paramref name="crewCapacity"/>.</summary>
+    internal static int ReserveTemplatesMissing(int healthy, int crewCapacity, int reserve) =>
+        Math.Max(0, (crewCapacity + reserve - healthy + TroopsPerTemplate - 1) / TroopsPerTemplate);
 
     /// <summary>How many add_troops templates bring <paramref name="regulars"/> up to <paramref name="templates"/> templates' worth.</summary>
     internal static int TemplatesMissing(int regulars, int templates) =>
