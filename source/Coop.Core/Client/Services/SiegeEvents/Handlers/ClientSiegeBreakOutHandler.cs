@@ -12,7 +12,6 @@ using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 
@@ -25,6 +24,7 @@ internal class ClientSiegeBreakOutHandler : IHandler
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
     private readonly ISiegeBreakOut breakOut;
+    private readonly ISiegeCasualtyDecoder casualtyDecoder;
     private Pending pending;
 
     private sealed class Pending
@@ -42,19 +42,20 @@ internal class ClientSiegeBreakOutHandler : IHandler
     }
 
     public ClientSiegeBreakOutHandler(IMessageBroker messageBroker, INetwork network,
-        IObjectManager objectManager, ISiegeBreakOut breakOut)
+        IObjectManager objectManager, ISiegeBreakOut breakOut, ISiegeCasualtyDecoder casualtyDecoder)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.breakOut = breakOut;
+        this.casualtyDecoder = casualtyDecoder;
         messageBroker.Subscribe<BreakOutAttempted>(HandleAttempt);
         messageBroker.Subscribe<NetworkBreakOutResult>(HandleResult);
     }
 
     private void HandleAttempt(MessagePayload<BreakOutAttempted> payload)
     {
-        if (pending != null && pending.IsCurrent())
+        if (pending != null && pending.IsCurrent() && pending.Request.IsFromPort == payload.What.IsFromPort)
         {
             network.SendAll(pending.Request);
             return;
@@ -70,7 +71,7 @@ internal class ClientSiegeBreakOutHandler : IHandler
 
         pending = new Pending
         {
-            Request = new NetworkRequestBreakOut(Guid.NewGuid().ToString(), partyId, settlementId, siegeId),
+            Request = new NetworkRequestBreakOut(Guid.NewGuid().ToString(), partyId, settlementId, siegeId, payload.What.IsFromPort),
             Party = party,
             Settlement = settlement,
             Siege = siege,
@@ -94,14 +95,8 @@ internal class ClientSiegeBreakOutHandler : IHandler
                 Logger.Warning("Server rejected breakout request {RequestId}", result.RequestId);
                 return;
             }
-            if (result.CharacterIds == null || result.Counts == null || result.CharacterIds.Length != result.Counts.Length) return;
-            var casualties = TroopRoster.CreateDummyTroopRoster();
-            for (int index = 0; index < result.CharacterIds.Length; index++)
-            {
-                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(result.CharacterIds[index], out var character)) return;
-                casualties.AddToCounts(character, result.Counts[index]);
-            }
-            breakOut.ShowDebrief(casualties, result.ArmyCasualties);
+            if (!casualtyDecoder.TryDecode(result.CharacterIds, result.Counts, out var casualties)) return;
+            breakOut.ShowDebrief(casualties, result.ArmyCasualties, attempt.Request.IsFromPort);
         }, context: nameof(NetworkBreakOutResult));
     }
 
