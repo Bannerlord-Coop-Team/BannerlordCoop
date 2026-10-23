@@ -78,7 +78,10 @@ public class IssueOwnerChangeSyncTests : IDisposable
         });
 
         issueId = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkIssueCreated>()).IssueId;
+    }
 
+    private void AcceptOnEveryMachine()
+    {
         foreach (var instance in AllInstances)
         {
             instance.Call(() => Assert.True(instance.Resolve<IIssueOwnershipRegistry>().TrySetOwner(deadNotableId, issueId, OwnerControllerId)));
@@ -133,8 +136,26 @@ public class IssueOwnerChangeSyncTests : IDisposable
     }
 
     [Fact]
+    public void AnIssueNobodyAcceptedMovesToTheNewOwnerWithoutAnOwnershipEntry()
+    {
+        ChangeOwnerOnServer();
+
+        foreach (var instance in AllInstances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<Hero>(newNotableId, out var newNotable));
+
+                Assert.Equal(issueId, newNotable.Issue?.StringId);
+                Assert.Empty(instance.Resolve<IIssueOwnershipRegistry>().GetAll());
+            });
+        }
+    }
+
+    [Fact]
     public void EveryMachineMovesTheOwnershipEntryToTheNewOwner()
     {
+        AcceptOnEveryMachine();
         ChangeOwnerOnServer();
 
         foreach (var instance in AllInstances)
