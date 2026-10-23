@@ -5,7 +5,7 @@ using TaleWorlds.CampaignSystem.Issues;
 namespace GameInterface.Services.Issues.Quests.VillageNeedsTools;
 
 /// <summary>The quest uses the offer already captured from the server at issue creation.</summary>
-internal class VillageNeedsToolsAcceptStrategy : IQuestSolutionAcceptStrategy
+internal class VillageNeedsToolsQuestSolutionAcceptStrategy : IQuestSolutionAcceptStrategy
 {
     public byte[] Capture(IssueBase issue) => Array.Empty<byte>();
 

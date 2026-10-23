@@ -2,9 +2,9 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.Entity;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using ProtoBuf;
 using System;
 using System.Linq;
@@ -25,18 +25,18 @@ internal class VillageNeedsToolsJournalHandler : IHandler
     private readonly IObjectManager objectManager;
     private readonly IIssueOwnershipRegistry ownership;
     private readonly IIssueResolver issueResolver;
-    private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IPlayerManager players;
 
     public VillageNeedsToolsJournalHandler(IMessageBroker messageBroker, INetwork network,
         IObjectManager objectManager, IIssueOwnershipRegistry ownership,
-        IIssueResolver issueResolver, IControllerIdProvider controllerIdProvider)
+        IIssueResolver issueResolver, IPlayerManager players)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
         this.ownership = ownership;
         this.issueResolver = issueResolver;
-        this.controllerIdProvider = controllerIdProvider;
+        this.players = players;
         messageBroker.Subscribe<VillageNeedsToolsJournalAdded>(Handle_Added);
         messageBroker.Subscribe<NetworkVillageNeedsToolsJournal>(Handle_Journal);
         messageBroker.Subscribe<VillageNeedsToolsAlternativeEnding>(Handle_AlternativeEnding);
@@ -58,9 +58,10 @@ internal class VillageNeedsToolsJournalHandler : IHandler
         var quest = payload.What.Quest;
         var issue = quest.QuestGiver.Issue;
         if (issue == null || !objectManager.TryGetIdWithLogging(quest.QuestGiver, out var giverId)
-            || !ownership.TryGetOwner(giverId, issue.StringId, out var controllerId)) return;
+            || !ownership.TryGetOwner(giverId, issue.StringId, out var controllerId)
+            || !players.TryGetPeer(controllerId, out var peer)) return;
 
-        network.SendAll(new NetworkVillageNeedsToolsJournal(giverId, issue.StringId, controllerId, payload.What.Text));
+        network.Send(peer, new NetworkVillageNeedsToolsJournal(giverId, issue.StringId, payload.What.Text));
     }
 
     private void Handle_Journal(MessagePayload<NetworkVillageNeedsToolsJournal> payload)
@@ -70,8 +71,7 @@ internal class VillageNeedsToolsJournalHandler : IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (data.ControllerId != controllerIdProvider.ControllerId
-                || !issueResolver.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _)
+            if (!issueResolver.TryResolve(data.GiverId, data.IssueId, out _, out var issue, out _)
                 || !(issue.IssueQuest is Quest quest) || !quest.IsOngoing) return;
 
             quest.AddLog(new TextObject("{=!}" + data.Text));
@@ -84,9 +84,10 @@ internal class VillageNeedsToolsJournalHandler : IHandler
 
         var issue = payload.What.Issue;
         if (!objectManager.TryGetIdWithLogging(issue.IssueOwner, out var giverId)
-            || !ownership.TryGetOwner(giverId, issue.StringId, out var controllerId)) return;
+            || !ownership.TryGetOwner(giverId, issue.StringId, out var controllerId)
+            || !players.TryGetPeer(controllerId, out var peer)) return;
 
-        network.SendAll(new NetworkVillageNeedsToolsAlternativeJournal(giverId, issue.StringId, controllerId,
+        network.Send(peer, new NetworkVillageNeedsToolsAlternativeJournal(giverId, issue.StringId,
             issue.JournalEntries.Select(log => log.LogText?.ToString() ?? string.Empty).ToArray(),
             issue.JournalEntries.Select(log => log.LogTime.NumTicks).ToArray(), payload.What.Status));
     }
@@ -98,8 +99,7 @@ internal class VillageNeedsToolsJournalHandler : IHandler
         var data = payload.What;
         GameThread.RunSafe(() =>
         {
-            if (data.ControllerId != controllerIdProvider.ControllerId
-                || !issueResolver.TryResolve(data.GiverId, data.IssueId, out _, out var resolved, out _)
+            if (!issueResolver.TryResolve(data.GiverId, data.IssueId, out _, out var resolved, out _)
                 || !(resolved is Issue issue) || !issue.IsSolvingWithAlternative) return;
 
             var texts = data.Texts ?? Array.Empty<string>();
@@ -140,17 +140,15 @@ public readonly struct NetworkVillageNeedsToolsAlternativeJournal : IServerToCli
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
-    [ProtoMember(3)] public readonly string ControllerId;
     [ProtoMember(4)] public readonly string[] Texts;
     [ProtoMember(5)] public readonly long[] Times;
     [ProtoMember(6)] public readonly IssueBase.IssueUpdateDetails Status;
 
-    public NetworkVillageNeedsToolsAlternativeJournal(string giverId, string issueId, string controllerId,
+    public NetworkVillageNeedsToolsAlternativeJournal(string giverId, string issueId,
         string[] texts, long[] times, IssueBase.IssueUpdateDetails status)
     {
         GiverId = giverId;
         IssueId = issueId;
-        ControllerId = controllerId;
         Texts = texts;
         Times = times;
         Status = status;
@@ -174,14 +172,12 @@ public readonly struct NetworkVillageNeedsToolsJournal : IServerToClientCommand
 {
     [ProtoMember(1)] public readonly string GiverId;
     [ProtoMember(2)] public readonly string IssueId;
-    [ProtoMember(3)] public readonly string ControllerId;
     [ProtoMember(4)] public readonly string Text;
 
-    public NetworkVillageNeedsToolsJournal(string giverId, string issueId, string controllerId, string text)
+    public NetworkVillageNeedsToolsJournal(string giverId, string issueId, string text)
     {
         GiverId = giverId;
         IssueId = issueId;
-        ControllerId = controllerId;
         Text = text;
     }
 }

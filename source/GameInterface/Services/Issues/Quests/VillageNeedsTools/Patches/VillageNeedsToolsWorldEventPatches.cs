@@ -3,7 +3,6 @@ using GameInterface.Services.Issues.Framework.Interface;
 using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
@@ -12,31 +11,12 @@ using Quest = TaleWorlds.CampaignSystem.Issues.VillageNeedsToolsIssueBehavior.Vi
 namespace GameInterface.Services.Issues.Quests.VillageNeedsTools.Patches;
 
 /// <summary>
-/// The war, kingdom, raid and coercion endings are decided by the server, which runs the quest's
+/// The raid and coercion endings are decided by the server, which runs the quest's
 /// listeners as each owning player. The owner's client never runs them on its own copy.
 /// </summary>
 [HarmonyPatch]
 internal class VillageNeedsToolsWorldEventPatches
 {
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnWarDeclared))]
-    [HarmonyPostfix]
-    private static void OnWarDeclaredPostfix(IFaction faction1, IFaction faction2, DeclareWarAction.DeclareWarDetail declareWarDetail)
-    {
-        RunAsOwners(quest => quest.OnWarDeclared(faction1, faction2, declareWarDetail));
-    }
-
-    [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnClanChangedKingdom))]
-    [HarmonyPostfix]
-    private static void OnClanChangedKingdomPostfix(
-        Clan clan,
-        Kingdom oldKingdom,
-        Kingdom newKingdom,
-        ChangeKingdomAction.ChangeKingdomActionDetail actionDetail,
-        bool showNotification)
-    {
-        RunAsOwners(quest => quest.OnClanChangedKingdom(clan, oldKingdom, newKingdom, actionDetail, showNotification));
-    }
-
     [HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.RaidCompleted))]
     [HarmonyPostfix]
     private static void RaidCompletedPostfix(BattleSideEnum winnerSide, RaidEventComponent raidEvent)

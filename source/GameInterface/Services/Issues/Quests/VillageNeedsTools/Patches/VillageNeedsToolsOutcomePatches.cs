@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Localization;
@@ -22,17 +21,7 @@ internal class VillageNeedsToolsOutcomePatches
 {
     [HarmonyPatch(typeof(Issue), nameof(Issue.AlternativeSolutionStartConsequence))]
     [HarmonyPrefix]
-    private static bool FundingPrefix(Issue __instance)
-    {
-        if (ModInformation.IsClient) return false;
-
-        if (Hero.MainHero.Gold < __instance.CostOfToolsForAlternativeSolution)
-        {
-            throw new InvalidOperationException("The owner can no longer afford the tools");
-        }
-
-        return true;
-    }
+    private static bool FundingPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.FinishQuestSuccess1))]
     [HarmonyPrefix]
@@ -92,19 +81,12 @@ internal class VillageNeedsToolsOutcomePatches
 
     [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
     [HarmonyPrefix]
-    private static bool TimeoutPrefix(Quest __instance)
-    {
-        if (ModInformation.IsServer)
-        {
-            // Run the timeout's mutations through the current sync patches.
-            __instance.AddLog(__instance.QuestTimeOutFailLog);
-            __instance.QuestGiver.AddPower(-10f);
-            __instance.QuestGiver.CurrentSettlement.Village.Hearth -= 30f;
-            ChangeRelationAction.ApplyPlayerRelation(__instance.QuestGiver, -5);
-        }
+    private static bool TimeoutPrefix() => ModInformation.IsServer;
 
-        return false;
-    }
+    [HarmonyPatch(typeof(Quest), nameof(Quest.OnTimedOut))]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> TimeoutWritesTranspiler(IEnumerable<CodeInstruction> instructions)
+        => SyncedWritesTranspiler(instructions);
 
     // The server's daily issue tick has no player context, but the timeout relation penalty is owner-scoped.
     [HarmonyPatch(typeof(QuestBase), nameof(QuestBase.CompleteQuestWithTimeOut))]

@@ -332,8 +332,59 @@ public class VillageNeedsToolsTests : IDisposable
         Assert.Equal(previousLogs + 1, ownerQuest.JournalEntries.Count);
         Assert.Equal(reason, ownerQuest.JournalEntries.Last().LogText.ToString());
         var journal = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
-        Assert.Equal(ControllerA, journal.ControllerId);
+        Assert.Equal(reason, journal.Text);
+        Assert.Single(ClientA.InternalMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
+        Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
         ClientB.Call(() => Assert.Empty(Campaign.Current.QuestManager.Quests.OfType<Quest>()));
+    }
+
+    [Fact]
+    public void CompanionFunding_RejectsTheRequestWithoutApplyingSentTroops()
+    {
+        var companionId = TestEnvironment.CreateRegisteredObject<Hero>();
+        var troopId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+        foreach (var instance in Instances)
+        {
+            instance.Call(() =>
+            {
+                Assert.True(instance.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+                troop.Level = 16;
+                troop.UpgradeTargets = Array.Empty<CharacterObject>();
+            });
+        }
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+            using (new AllowedThread()) owner.Gold = 0;
+        });
+        ClientA.Call(() =>
+        {
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(notableId, out var giver));
+            Assert.True(ClientA.ObjectManager.TryGetObject<Hero>(companionId, out var companion));
+            Assert.True(ClientA.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            using (new AllowedThread())
+            {
+                giver.Issue.AlternativeSolutionSentTroops.AddToCounts(companion.CharacterObject, 1);
+                giver.Issue.AlternativeSolutionSentTroops.AddToCounts(troop, 6);
+            }
+            giver.Issue.AlternativeSolutionStartConsequence();
+            giver.Issue.StartIssueWithAlternativeSolution();
+        }, AlternativeSolutionLogTexts);
+        TestEnvironment.FlushCoalescer();
+
+        Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAcceptRejected>());
+        Assert.Empty(Server.NetworkSentMessages.GetMessages<NetworkAlternativeSolutionAccepted>());
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(notableId, out var giver));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(ownerHeroId, out var owner));
+            Assert.True(Server.ObjectManager.TryGetObject<CharacterObject>(troopId, out var troop));
+            Assert.False(Server.Resolve<IIssueOwnershipRegistry>().TryGetOwner(notableId, IssueId, out _));
+            Assert.True(giver.Issue.IsOngoingWithoutQuest);
+            Assert.Empty(giver.Issue.AlternativeSolutionSentTroops.GetTroopRoster());
+            Assert.Equal(0, owner.Gold);
+            Assert.Equal(6, owner.PartyBelongedTo.MemberRoster.GetTroopCount(troop));
+        });
     }
 
     [Theory]
@@ -430,7 +481,8 @@ public class VillageNeedsToolsTests : IDisposable
         Assert.Equal(IssueOutcome.QuestSuccess, finalized.Outcome);
 
         var ending = Assert.Single(Server.NetworkSentMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
-        Assert.Equal(ControllerA, ending.ControllerId);
+        Assert.Single(ClientA.InternalMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
+        Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkVillageNeedsToolsJournal>());
         Assert.Equal("You brought the promised tools.", ending.Text);
         Assert.Contains(ownerQuest.JournalEntries, log => log.LogText?.ToString() == ending.Text);
 
@@ -649,7 +701,10 @@ public class VillageNeedsToolsTests : IDisposable
         {
             journalHarmony.Unpatch(successLogGetter, HarmonyPatchType.Prefix, journalHarmony.Id);
         }
+
         TestEnvironment.FlushCoalescer();
+        Assert.Single(ClientA.InternalMessages.GetMessages<NetworkVillageNeedsToolsAlternativeJournal>());
+        Assert.Empty(ClientB.InternalMessages.GetMessages<NetworkVillageNeedsToolsAlternativeJournal>());
 
         ClientA.Call(() =>
         {
