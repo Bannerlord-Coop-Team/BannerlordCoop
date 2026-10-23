@@ -380,6 +380,35 @@ public class BattleShipReplicatorTests
         Assert.Equal(0, harness.Replicator.ReportedReserveOf(copy));
     }
 
+    // R48 re-review: the successor's first report for an AI hull can come over the mesh before the server's host change; it is
+    // kept and applied when the change moves the hull to it, so this client doesn't read the side's reserve as 0.
+    [Fact]
+    public void SuccessorsReport_ThatOvertookTheHostChange_AppliesOnceTheHullMovesToIt()
+    {
+        var harness = new Harness(committed: false);
+        harness.Members.Add("third_peer");
+        var (copy, ship) = RegisterPeerCopy(harness, isNpcParty: true);
+        harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, Peer, 1, HostEpoch, Condition(100f), 12));
+
+        harness.Replicator.AcceptCondition(new NetworkShipCondition(ship.ShipId, "third_peer", 1, HostEpoch, Condition(100f), 7));
+        int beforeMove = harness.Replicator.ReportedReserveOf(copy);
+        harness.Replicator.TransferHostHulls("third_peer");
+
+        Assert.Equal(12, beforeMove);
+        Assert.Equal(7, harness.Replicator.ReportedReserveOf(copy));
+    }
+
+    [Theory]
+    [InlineData(true, "not_authority", 4, 3, true)]
+    [InlineData(true, "not_authority", 3, 3, false)]
+    [InlineData(false, "not_authority", 4, 3, false)]
+    [InlineData(true, "stale", 4, 3, false)]
+    public void IsEarlyHostCondition_OnlyAnAiHullsReportFromANewerHostEpoch(bool followsHost, string rejection, int conditionEpoch,
+        int appliedEpoch, bool expected)
+    {
+        Assert.Equal(expected, BattleShipReplicator.IsEarlyHostCondition(followsHost, rejection, conditionEpoch, appliedEpoch));
+    }
+
     // A new owner of an AI hull reports its own reserve at its first check, even when it equals the last one reported.
     [Fact]
     public void TransferHostHulls_ToThisClient_SendsTheReserveAgainAtTheFirstCheck()
@@ -1891,7 +1920,7 @@ public class BattleShipReplicatorTests
         public Guid OwnShipId { get; } = Guid.NewGuid();
         public BattleShipReplicator Replicator { get; }
         // Applies at once: these tests drive the replicator alone, without the naval services tick that applies arrivals.
-        public IBattleShipArrivals Arrivals { get; } = new ImmediateArrivals();
+        public IBattleShipArrivals Arrivals { get; } = new ImmediateShipArrivals();
 
         public Harness(bool committed, bool resultHeld = false)
         {
@@ -1955,20 +1984,5 @@ public class BattleShipReplicatorTests
                 });
             return copy;
         }
-    }
-
-    /// <summary>Applies each arrival as it comes, as these tests drive the replicator without the services tick.</summary>
-    private sealed class ImmediateArrivals : IBattleShipArrivals
-    {
-        public int Count => 0;
-
-        // Runs the arrival where the queue would have held it.
-        public void Enqueue(Action apply, string context) => apply();
-
-        // Nothing waits.
-        public void ApplyAll() { }
-
-        // Nothing waits.
-        public void Clear() { }
     }
 }

@@ -23,6 +23,7 @@ public class NavalDamageRoundTripScenarioTests : NavalBattleTestEnvironment
 
         b.Hit(pirate, 30f);
         a.Tick();
+        battle.ApplyArrivals();
 
         Assert.Single(a.Hull(pirate).AppliedDamage);
         Assert.Empty(b.Hull(pirate).AppliedDamage);
@@ -75,6 +76,7 @@ public class NavalDamageRoundTripScenarioTests : NavalBattleTestEnvironment
 
         b.Ram(pirate, rammer, 30f);
         a.Tick();
+        battle.ApplyArrivals();
 
         var applied = Assert.Single(a.Hull(pirate).AppliedDamage);
         Assert.Equal(BattleShipDamageKind.Collision, applied.Kind);

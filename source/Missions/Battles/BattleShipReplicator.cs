@@ -144,11 +144,16 @@ public class BattleShipReplicator : IBattleShipReplicator
     private readonly Dictionary<Guid, string> leftWith = new Dictionary<Guid, string>();
     // [Game thread] Hulls a captor's record brought back after such a removal, which already counted them gone from their side.
     private readonly HashSet<Guid> reopenedForCaptor = new HashSet<Guid>();
+    // [Game thread] An AI hull's latest condition from a controller that isn't its authority yet: the successor's first report
+    // can come over the mesh before the server's host change reaches this client, and only goes out again on change.
+    private readonly Dictionary<Guid, NetworkShipCondition> earlyHostConditions = new Dictionary<Guid, NetworkShipCondition>();
     // [Game thread] Departed players whose party withdrawal waits for their hulls to settle, with whether each was the host.
     private readonly Dictionary<string, bool> pendingWithdrawals = new Dictionary<string, bool>();
     private long recordsHeld;
     // The host AI hulls last migrated to, so an AI copy whose record was still waiting registers under it too.
     private string npcHullHost;
+    // The host epoch whose AI hull move this client applied last; a successor's report from a newer one is early here.
+    private int appliedHostEpoch;
     private bool spawnRecordsSent;
     private float sendElapsed;
     private float elapsed;
@@ -265,6 +270,7 @@ public class BattleShipReplicator : IBattleShipReplicator
     internal int TransferHostHulls(string newHost)
     {
         npcHullHost = newHost;
+        appliedHostEpoch = session.HostEpoch;
         int transferred = 0;
         foreach (var ship in Registry.Ships)
         {
@@ -285,6 +291,7 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         bool isOwn = hullAuthority.Transfer(ship, newAuthority, inPlace);
         RestartStreams(ship);
+        AcceptEarlyHostCondition(ship);
         Logger.Information("[NavalSync] {Kind} hull {ShipId} of {Owner} moved to {Authority}{Local}",
             ship.IsNpcParty ? "AI" : "Player", ship.ShipId, ship.OriginalOwner, newAuthority,
             isOwn ? " (this client)" : "");
@@ -373,6 +380,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         streams.Remove(shipId);
         conditions.Forget(shipId);
         heldShips.Remove(shipId);
+        earlyHostConditions.Remove(shipId);
     }
 
     public void AnnounceRemoval(MissionObject hull, ShipRemovalReason reason, bool missionEnding)
@@ -561,7 +569,7 @@ public class BattleShipReplicator : IBattleShipReplicator
         GameThread.RunSafe(() =>
         {
             if (Mission.Current == null) return;
-            AcceptCondition(condition);
+            arrivals.Enqueue(() => AcceptCondition(condition), nameof(Handle_NetworkShipCondition));
         }, context: nameof(Handle_NetworkShipCondition));
     }
 
@@ -581,7 +589,38 @@ public class BattleShipReplicator : IBattleShipReplicator
 
         var stream = GetStream(condition.ShipId);
         var rejection = conditions.Accept(ship, condition, fromDepartedHost: false);
-        if (rejection != null) stream.Reject("condition_" + rejection);
+        if (rejection == null) return;
+
+        stream.Reject("condition_" + rejection);
+        if (IsEarlyHostCondition(ship, condition, rejection)) HoldEarlyHostCondition(condition);
+    }
+
+    /// <summary>
+    /// Whether a rejected condition is an AI hull's from a controller of a newer host epoch than this client applied: the
+    /// successor's report that overtook the host change, kept until that change moves the hull to it.
+    /// </summary>
+    internal static bool IsEarlyHostCondition(bool followsHost, string rejection, int conditionEpoch, int localEpoch) =>
+        followsHost && rejection == "not_authority" && conditionEpoch > localEpoch;
+
+    // Reads the hull and the session's epoch for IsEarlyHostCondition.
+    private bool IsEarlyHostCondition(NetworkShipInfo ship, NetworkShipCondition condition, string rejection) =>
+        IsEarlyHostCondition(ship.FollowsBattleHost, rejection, condition.HostEpoch, appliedHostEpoch);
+
+    // Keeps the newest early report per hull.
+    private void HoldEarlyHostCondition(NetworkShipCondition condition)
+    {
+        if (earlyHostConditions.TryGetValue(condition.ShipId, out var held) && !condition.Stamp.IsNewer(held.Stamp)) return;
+
+        earlyHostConditions[condition.ShipId] = condition;
+    }
+
+    // A host change moved the hull: the report its new authority sent ahead of it applies now.
+    private void AcceptEarlyHostCondition(NetworkShipInfo ship)
+    {
+        if (!earlyHostConditions.TryGetValue(ship.ShipId, out var held)) return;
+
+        earlyHostConditions.Remove(ship.ShipId);
+        if (held.OwnerControllerId == ship.CurrentAuthority) AcceptCondition(held);
     }
 
     public void SendFinalRopes()
@@ -924,6 +963,8 @@ public class BattleShipReplicator : IBattleShipReplicator
         if (!Registry.TryGet(sample.ShipId, out var ship))
         {
             if (Registry.StateOf(sample.ShipId) == ShipLifecycle.Awaiting) HoldSample(sample);
+            // Also a sample whose spawn record still waits in the arrivals queue: dropped, as the owner streams at 20 Hz, so the
+            // next one lands about 50 ms later, once the record applied.
             else GetStream(sample.ShipId).Reject("unknown_ship");
             return;
         }
