@@ -35,7 +35,7 @@ internal class ClanVariablesCampaignBehaviorPatches
     [HarmonyPrefix]
     public static bool DailyTickClanPrefix(ClanVariablesCampaignBehavior __instance, Clan clan)
     {
-        ContainerProvider.TryResolve<IClanVariablesCampaignBehaviorInterface>(out var clanVariablesCampaignBehaviorInterface);
+        if (!ContainerProvider.TryResolve<IClanVariablesCampaignBehaviorInterface>(out var clanVariablesCampaignBehaviorInterface)) return true;
 
         clanVariablesCampaignBehaviorInterface.DailyTickClan(__instance, clan);
 

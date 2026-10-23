@@ -24,8 +24,8 @@ internal static class ClanManagementVMPatches
     [HarmonyPrefix]
     public static bool CreateDataSourcePrefix(GauntletClanScreen __instance, ref ClanManagementVM __result)
     {
-        ContainerProvider.TryResolve<IClanFinance>(out var finance);
-        ContainerProvider.TryResolve<IMessageBroker>(out var messages);
+        if (!ContainerProvider.TryResolve<IClanFinance>(out var finance)) return true;
+        if (!ContainerProvider.TryResolve<IMessageBroker>(out var messages)) return true;
 
         __result = new CoopClanManagementVM(__instance.CloseClanScreen, __instance.ShowHeroOnMap,
             __instance.OpenPartyScreenForNewClanParty, __instance.OpenBannerEditorWithPlayerClan, finance, messages);
@@ -45,7 +45,7 @@ internal static class ClanManagementVMPatches
     public static void MapGoldTooltipPrefix(string itemId, ref TooltipTriggerVM tooltipTrigger)
     {
         if (itemId != "gold") return;
-        ContainerProvider.TryResolve<IClanFinance>(out var finance);
+        if (!ContainerProvider.TryResolve<IClanFinance>(out var finance)) return;
 
         // Choose at hover time so an existing map tooltip follows clan joins and departures.
         ExplainedNumber GetGoldChange(bool details) => finance.IsNonLeaderMember(Hero.MainHero)
