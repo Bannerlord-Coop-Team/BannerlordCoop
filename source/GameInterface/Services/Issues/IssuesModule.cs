@@ -1,10 +1,13 @@
 ﻿using Autofac;
 using GameInterface.Services.Issues.Framework.AcceptCoordination;
 using GameInterface.Services.Issues.Framework.Conversation;
+using GameInterface.Services.Issues.Framework.Dismissal;
 using GameInterface.Services.Issues.Framework.Dispatch;
+using GameInterface.Services.Issues.Framework.Gating;
 using GameInterface.Services.Issues.Framework.Interface;
 using GameInterface.Services.Issues.Framework.Registries;
 using GameInterface.Services.Issues.Framework.Resolvers;
+using GameInterface.Services.Issues.Quests.LesserNobleRevolt;
 using GameInterface.Services.Issues.Quests.TheConquestOfSettlement;
 using GameInterface.Services.Issues.Quests.VillageNeedsTools;
 using System;
@@ -20,6 +23,7 @@ internal class IssuesModule : Module
 
     protected override void Load(ContainerBuilder builder)
     {
+        builder.RegisterType<QuestFeatureFlag>().As<IQuestFeatureFlag>().InstancePerDependency();
         builder.RegisterType<QuestTypeRegistry>().As<IQuestTypeRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<IssueResolver>().As<IIssueResolver>().InstancePerLifetimeScope();
         builder.RegisterType<IssueOwnerResolver>().As<IIssueOwnerResolver>().InstancePerLifetimeScope();
@@ -32,8 +36,12 @@ internal class IssuesModule : Module
         builder.RegisterType<TheConquestOfSettlementService>()
             .As<ITheConquestOfSettlementService>()
             .InstancePerLifetimeScope();
+        builder.RegisterType<LesserNobleRevoltWorldEventService>()
+            .As<ILesserNobleRevoltWorldEventService>()
+            .InstancePerLifetimeScope();
         builder.RegisterType<QuestEventRelay>().As<IQuestEventRelay>().InstancePerDependency();
         builder.RegisterType<VillageNeedsToolsService>().As<IVillageNeedsToolsService>().InstancePerDependency();
+        builder.RegisterType<IssueDismisser>().As<IIssueDismisser>().InstancePerDependency();
 
         builder.RegisterAssemblyTypes(typeof(IssuesModule).Assembly)
             .Where(IsQuestPiece)
