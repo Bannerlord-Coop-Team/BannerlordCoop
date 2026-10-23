@@ -52,7 +52,7 @@ public class IssueOwnershipSnapshotHandlerTests
             var otherPeer = network.CreatePeer();
             var ownership = new Mock<IIssueOwnershipRegistry>();
             ownership.Setup(registry => registry.GetAll()).Returns(Owners());
-            using var handler = new IssueOwnershipSnapshotHandler(messageBroker, network, ownership.Object);
+            using var handler = new IssueOwnershipSnapshotHandler(messageBroker, network, ownership.Object, Mock.Of<IQuestFeatureFlag>(flag => flag.IsEnabled));
 
             messageBroker.Publish(this, new PlayerCampaignEntered(enteringPeer));
 
@@ -73,12 +73,31 @@ public class IssueOwnershipSnapshotHandlerTests
             var enteringPeer = network.CreatePeer();
             var ownership = new Mock<IIssueOwnershipRegistry>();
             ownership.Setup(registry => registry.GetAll()).Returns(Enumerable.Empty<IssueOwnershipData>().ToArray());
-            using var handler = new IssueOwnershipSnapshotHandler(messageBroker, network, ownership.Object);
+            using var handler = new IssueOwnershipSnapshotHandler(messageBroker, network, ownership.Object, Mock.Of<IQuestFeatureFlag>(flag => flag.IsEnabled));
 
             messageBroker.Publish(this, new PlayerCampaignEntered(enteringPeer));
 
             var snapshot = Assert.Single(network.GetPeerMessagesFromType<NetworkIssueOwnershipSnapshot>(enteringPeer));
             Assert.Empty(snapshot.Owners);
+        });
+    }
+
+    [Fact]
+    public void PlayerCampaignEntered_OnServerWithQuestsOff_SendsNothing()
+    {
+        WithRole(true, () =>
+        {
+            var messageBroker = new MessageBroker();
+            var network = new TestNetwork();
+            var enteringPeer = network.CreatePeer();
+            var ownership = new Mock<IIssueOwnershipRegistry>();
+            ownership.Setup(registry => registry.GetAll()).Returns(Owners());
+            using var handler = new IssueOwnershipSnapshotHandler(messageBroker, network, ownership.Object, Mock.Of<IQuestFeatureFlag>());
+
+            messageBroker.Publish(this, new PlayerCampaignEntered(enteringPeer));
+
+            Assert.False(network.SentNetworkMessages.ContainsKey(enteringPeer.Id));
+            ownership.Verify(registry => registry.GetAll(), Times.Never);
         });
     }
 
@@ -92,7 +111,7 @@ public class IssueOwnershipSnapshotHandlerTests
             var enteringPeer = network.CreatePeer();
             var ownership = new Mock<IIssueOwnershipRegistry>();
             ownership.Setup(registry => registry.GetAll()).Returns(Owners());
-            using var handler = new IssueOwnershipSnapshotHandler(messageBroker, network, ownership.Object);
+            using var handler = new IssueOwnershipSnapshotHandler(messageBroker, network, ownership.Object, Mock.Of<IQuestFeatureFlag>(flag => flag.IsEnabled));
 
             messageBroker.Publish(this, new PlayerCampaignEntered(enteringPeer));
 

@@ -16,6 +16,7 @@ namespace GameInterface.Services.Issues.Framework.Visibility;
 /// quest screen does not list it. A mission is this player's only when the accept this client saw, or the
 /// snapshot it got when joining, named this player.
 /// </summary>
+[HarmonyPatchCategory(GameInterface.HARMONY_QUESTS_CATEGORY)]
 [HarmonyPatch(typeof(QuestsVM), MethodType.Constructor, typeof(Action))]
 internal class QuestScreenIssueFilterPatch
 {
