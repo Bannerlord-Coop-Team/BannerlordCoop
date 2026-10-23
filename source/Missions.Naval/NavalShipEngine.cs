@@ -37,15 +37,18 @@ public class NavalShipEngine : INavalShipEngine
 
     private readonly ICoopShipSnapshotBuilder snapshotBuilder;
     private readonly IObjectManager objectManager;
+    private readonly INavalAgentTickGate agentTickGate;
     // [Game thread] The last state each copy's weapon took from its authority; a copy's own State never follows it.
     private readonly Dictionary<MissionObject, BattleShipWeaponState> replicatedWeaponStates =
         new Dictionary<MissionObject, BattleShipWeaponState>();
 
-    public NavalShipEngine(ICoopShipSnapshotBuilder snapshotBuilder, IObjectManager objectManager, INavalSteeredCopies steeredCopies)
+    public NavalShipEngine(ICoopShipSnapshotBuilder snapshotBuilder, IObjectManager objectManager, INavalSteeredCopies steeredCopies,
+        INavalAgentTickGate agentTickGate)
     {
         this.snapshotBuilder = snapshotBuilder;
         this.objectManager = objectManager;
         SteeredCopies = steeredCopies;
+        this.agentTickGate = agentTickGate;
     }
 
     /// <summary>This engine's copies and their steering knobs (the DEBUG probe and copy_steer read them).</summary>
@@ -133,8 +136,10 @@ public class NavalShipEngine : INavalShipEngine
     internal static bool OpensHelmToPlayer(bool hasPlayerTeam, bool isPlayerSide, int formationUnits) =>
         hasPlayerTeam && !isPlayerSide && formationUnits == 0;
 
+    // The async agent tick reads the hull's controller and the copy set, so it finishes before either changes.
     public void ReleaseHull(MissionObject hull)
     {
+        agentTickGate.WaitForAgentTick("a hull is handed away");
         var ship = (MissionShip)hull;
         SteeredCopies.Track(ship);
         ship.SetController(ShipControllerType.None, autoUpdateController: false);
@@ -143,6 +148,7 @@ public class NavalShipEngine : INavalShipEngine
     // A steered copy keeps its dynamic body, so dropping it from the copy set is all a new authority needs to simulate it.
     public void AdoptHull(MissionObject hull)
     {
+        agentTickGate.WaitForAgentTick("a hull is adopted");
         var ship = (MissionShip)hull;
         if (!NavalSteeredCopies.IsSimulating(ship))
             Logger.Warning("[NavalSync] Adopted hull {Index} has no simulating body; it stays where its last sample put it", ship.Index);

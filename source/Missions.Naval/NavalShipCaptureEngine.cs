@@ -15,6 +15,13 @@ public class NavalShipCaptureEngine : INavalShipCaptureEngine
 {
     private static readonly ILogger Logger = LogManager.GetLogger<NavalShipCaptureEngine>();
 
+    private readonly INavalAgentTickGate agentTickGate;
+
+    public NavalShipCaptureEngine(INavalAgentTickGate agentTickGate)
+    {
+        this.agentTickGate = agentTickGate;
+    }
+
     private static NavalShipsLogic ShipsLogic => Mission.Current?.GetMissionBehavior<NavalShipsLogic>();
 
     // Refuses before touching anything when a precondition fails; a throw inside vanilla's swap is logged (RunVanillaSwap).
@@ -29,7 +36,11 @@ public class NavalShipCaptureEngine : INavalShipCaptureEngine
 
         var ship = (MissionShip)prize;
         var captor = (MissionShip)captorHull;
+        // The async team and agent tick reads the assignments, formations and crew records the swap rewrites (R46, R48 L6).
+        agentTickGate.WaitForAgentTick("a capture swap");
+        var formerFormation = ship.Formation;
         RunVanillaSwap(ship, captor);
+        TurnOffShiplessBehaviors(ship, formerFormation);
         // Vanilla's swap hands both hulls an auto-updated controller; a copy keeps none, so it never steers itself here.
         if (NavalForeignHulls.Contains(ship)) ship.SetController(ShipControllerType.None, autoUpdateController: false);
         if (NavalForeignHulls.Contains(captor)) captor.SetController(ShipControllerType.None, autoUpdateController: false);
@@ -52,6 +63,24 @@ public class NavalShipCaptureEngine : INavalShipCaptureEngine
                 "it threw in its {Stage} after the checks passed", ship.Index, captor.Index, SwapStage(exception.StackTrace));
         }
     }
+
+    // The swap points the naval behaviours of the prize's former formation at its emptied assignment, and they dereference that
+    // hull every formation AI tick (BehaviorNavalRemoveConnection.GetAiWeight first) on the async team tick. Swimmers the AI moved
+    // into the prize's formation keep it ticking (R46 and R48 L6), so its behaviours go to weight 0, as for a formation never shipped.
+    private static void TurnOffShiplessBehaviors(MissionShip prize, Formation formerFormation)
+    {
+        if (formerFormation?.Team == null || formerFormation.AI == null) return;
+
+        bool hasShip = ShipsLogic?.GetShip(formerFormation.Team.TeamSide, formerFormation.FormationIndex, out _) == true;
+        if (!KeepsUnitsWithoutShip(formerFormation.CountOfUnits, hasShip)) return;
+
+        formerFormation.AI.ResetBehaviorWeights();
+        Logger.Information("[NavalSync] Hull {Index}'s former formation {Formation} on {Team} keeps {Units} unit(s) and no hull; turned " +
+            "off its behaviours", prize.Index, formerFormation.FormationIndex, formerFormation.Team.TeamSide, formerFormation.CountOfUnits);
+    }
+
+    /// <summary>Whether a capture left the prize's former formation with units but no hull, which vanilla's naval behaviours can't tick.</summary>
+    internal static bool KeepsUnitsWithoutShip(int unitCount, bool hasShip) => unitCount > 0 && !hasShip;
 
     /// <summary>Which step of vanilla's swap a throw came from, read from its stack (the steps run one after another).</summary>
     internal static string SwapStage(string stackTrace)
@@ -94,6 +123,7 @@ public class NavalShipCaptureEngine : INavalShipCaptureEngine
     // Vanilla's swap gives the captor's assignment to the prize, so the orphan holds none; a joiner's copy had one of its own.
     public void OrphanHull(MissionObject hull)
     {
+        agentTickGate.WaitForAgentTick("orphaning a hull");
         var ship = (MissionShip)hull;
         var shipsLogic = ShipsLogic;
         if (shipsLogic != null && shipsLogic.FindAssignmentOfShipOrigin(ship.ShipOrigin, out var assignment))

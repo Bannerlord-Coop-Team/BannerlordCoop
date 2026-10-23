@@ -18,5 +18,16 @@ public class NavalShipCaptureEngineTests
     {
         Assert.Equal(expected, NavalShipCaptureEngine.SwapStage(frame + "\n   at NavalDLC.Missions.MissionLogics.NavalShipsLogic.OnShipCaptured(MissionShip ship, Formation targetFormation)"));
     }
+
+    // R48 L6: swimmers left in the prize's former formation, which lost its hull, keep its naval behaviours ticking on a null hull.
+    [Theory]
+    [InlineData(9, false, true)]
+    [InlineData(0, false, false)]
+    [InlineData(9, true, false)]
+    [InlineData(0, true, false)]
+    public void KeepsUnitsWithoutShip_OnlyForUnitsLeftWithNoHull(int units, bool hasShip, bool expected)
+    {
+        Assert.Equal(expected, NavalShipCaptureEngine.KeepsUnitsWithoutShip(units, hasShip));
+    }
 }
 #endif

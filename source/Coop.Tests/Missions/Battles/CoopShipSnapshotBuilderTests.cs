@@ -119,7 +119,7 @@ public class CoopShipSnapshotBuilderTests
         var objectManager = new Mock<IObjectManager>();
         string sourceId = "Ship_3";
         objectManager.Setup(manager => manager.TryGetId(source, out sourceId)).Returns(true);
-        var engine = new NavalShipEngine(null!, objectManager.Object, null!);
+        var engine = new NavalShipEngine(null!, objectManager.Object, null!, null!);
 
         Assert.Equal("Ship_3", engine.CampaignShipIdOf(own));
         Assert.Equal("Ship_7", engine.CampaignShipIdOf(copy));
